@@ -128,13 +128,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    const websocketForm = document.getElementById('kt_settings_websocket_form');
-    if (websocketForm) {
-        websocketForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            submitForm(this, '<?= \App\Helpers\Url::to('/settings/websocket') ?>');
-        });
-    }
+    // O evento de submit do formulário de websocket é configurado no script principal (index.php)
 });
 </script>
 

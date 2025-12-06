@@ -570,6 +570,15 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Form Tempo Real (WebSocket/Polling)
+    const websocketForm = document.getElementById('kt_settings_websocket_form');
+    if (websocketForm) {
+        websocketForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            submitForm(this, '" . \App\Helpers\Url::to('/settings/websocket') . "');
+        });
+    }
+    
     function submitForm(form, url) {
         const submitBtn = form.querySelector('button[type=\"submit\"]');
         submitBtn.setAttribute('data-kt-indicator', 'on');

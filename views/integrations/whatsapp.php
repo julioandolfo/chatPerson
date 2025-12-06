@@ -78,26 +78,45 @@ ob_start();
                                     <?php if (\App\Helpers\Permission::can('whatsapp.view')): ?>
                                     <button type="button" class="btn btn-light-primary btn-sm flex-grow-1" 
                                             onclick="getQRCode(<?= $account['id'] ?>)">
-                                        <i class="ki-duotone ki-qr-code fs-4"></i>
+                                        <i class="ki-duotone ki-qr-code fs-4">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
                                         QR Code
                                     </button>
                                     <button type="button" class="btn btn-light-info btn-sm" 
-                                            onclick="checkStatus(<?= $account['id'] ?>)">
-                                        <i class="ki-duotone ki-information fs-4"></i>
+                                            onclick="checkStatus(<?= $account['id'] ?>)"
+                                            title="Verificar Status">
+                                        <i class="ki-duotone ki-information fs-4">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
                                     </button>
                                     <?php endif; ?>
                                     <?php if (\App\Helpers\Permission::can('whatsapp.edit')): ?>
                                     <?php if ($currentStatus === 'active'): ?>
                                     <button type="button" class="btn btn-light-danger btn-sm" 
-                                            onclick="disconnectAccount(<?= $account['id'] ?>)">
-                                        <i class="ki-duotone ki-cross fs-4"></i>
+                                            onclick="disconnectAccount(<?= $account['id'] ?>)"
+                                            title="Desconectar">
+                                        <i class="ki-duotone ki-cross fs-4">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
                                     </button>
                                     <?php endif; ?>
                                     <?php endif; ?>
                                     <?php if (\App\Helpers\Permission::can('whatsapp.delete')): ?>
                                     <button type="button" class="btn btn-light-danger btn-sm" 
-                                            onclick="deleteAccount(<?= $account['id'] ?>, '<?= htmlspecialchars($account['name'], ENT_QUOTES) ?>')">
-                                        <i class="ki-duotone ki-trash fs-4"></i>
+                                            onclick="deleteAccount(<?= $account['id'] ?>, '<?= htmlspecialchars($account['name'], ENT_QUOTES) ?>')"
+                                            title="Deletar Conta">
+                                        <i class="ki-duotone ki-trash fs-4">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                            <span class="path4"></span>
+                                            <span class="path5"></span>
+                                        </i>
                                     </button>
                                     <?php endif; ?>
                                 </div>

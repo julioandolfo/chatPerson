@@ -679,32 +679,99 @@ class WhatsAppService
     public static function processWebhook(array $payload): void
     {
         try {
-            // Identificar conta pelo trackid ou chatid
+            // Identificar conta pelo trackid, chatid, wid ou phone
             $trackid = $payload['trackid'] ?? null;
-            $chatid = $payload['chatid'] ?? null;
+            $chatid = $payload['chatid'] ?? $payload['wid'] ?? null; // wid é o WhatsApp ID do bot
             $from = $payload['from'] ?? $payload['phone'] ?? null;
             
-            if (!$trackid && !$chatid && !$from) {
+            // Formato novo do Quepasa: chat.id ou chat.phone
+            if (!$from && isset($payload['chat'])) {
+                $from = $payload['chat']['id'] ?? $payload['chat']['phone'] ?? null;
+            }
+            
+            // Se ainda não tem from, tentar extrair do chat.id
+            if (!$from && isset($payload['chat']['id'])) {
+                $from = $payload['chat']['id'];
+            }
+            
+            // Extrair número de telefone do from (remover @s.whatsapp.net)
+            $fromPhone = null;
+            if ($from) {
+                $fromPhone = str_replace('@s.whatsapp.net', '', $from);
+                // Remover + se presente
+                $fromPhone = ltrim($fromPhone, '+');
+            }
+            
+            Logger::quepasa("processWebhook - Payload recebido: trackid={$trackid}, chatid={$chatid}, from={$from}, fromPhone={$fromPhone}");
+            
+            if (!$trackid && !$chatid && !$fromPhone) {
                 Logger::error("WhatsApp webhook sem identificação: " . json_encode($payload));
                 return;
             }
 
             // Buscar conta
             $account = null;
+            
+            // 1. Tentar por trackid
             if ($trackid) {
                 $accounts = WhatsAppAccount::where('quepasa_trackid', '=', $trackid);
                 $account = !empty($accounts) ? $accounts[0] : null;
+                if ($account) {
+                    Logger::quepasa("processWebhook - Conta encontrada por trackid: {$trackid}");
+                }
             }
             
+            // 2. Tentar por chatid/wid (WhatsApp ID do bot)
             if (!$account && $chatid) {
-                $accounts = WhatsAppAccount::where('quepasa_chatid', '=', $chatid);
-                $account = !empty($accounts) ? $accounts[0] : null;
+                // Remover @s.whatsapp.net se presente
+                $chatidClean = str_replace('@s.whatsapp.net', '', $chatid);
+                // Extrair número antes dos dois pontos (ex: "553591970289:86@s.whatsapp.net" -> "553591970289")
+                $chatidNumber = explode(':', $chatidClean)[0];
+                
+                $accounts = WhatsAppAccount::where('quepasa_chatid', 'LIKE', $chatidNumber . '%');
+                if (empty($accounts)) {
+                    // Tentar buscar pelo número do WhatsApp
+                    $account = WhatsAppAccount::findByPhone($chatidNumber);
+                } else {
+                    $account = $accounts[0];
+                }
+                
+                if ($account) {
+                    Logger::quepasa("processWebhook - Conta encontrada por chatid/wid: {$chatid}");
+                }
             }
             
-            if (!$account && $from) {
-                // Remover @s.whatsapp.net se presente
-                $phone = str_replace('@s.whatsapp.net', '', $from);
-                $account = WhatsAppAccount::findByPhone($phone);
+            // 3. Tentar por wid do payload (WhatsApp ID do bot que recebeu)
+            if (!$account && isset($payload['wid'])) {
+                $widClean = str_replace('@s.whatsapp.net', '', $payload['wid']);
+                $widNumber = explode(':', $widClean)[0];
+                $account = WhatsAppAccount::findByPhone($widNumber);
+                if ($account) {
+                    Logger::quepasa("processWebhook - Conta encontrada por wid: {$payload['wid']}");
+                }
+            }
+            
+            // 4. Tentar por número do remetente (último recurso - pode não ser confiável)
+            if (!$account && $fromPhone) {
+                // Buscar todas as contas WhatsApp ativas e tentar encontrar pela conta que recebeu
+                // Como não sabemos qual conta recebeu, vamos tentar todas
+                $allAccounts = WhatsAppAccount::where('status', '=', 'active');
+                foreach ($allAccounts as $acc) {
+                    // Verificar se o wid da conta corresponde ao wid do payload
+                    if (!empty($acc['quepasa_chatid'])) {
+                        $accWid = str_replace('@s.whatsapp.net', '', $acc['quepasa_chatid']);
+                        $accWidNumber = explode(':', $accWid)[0];
+                        if (isset($payload['wid'])) {
+                            $payloadWid = str_replace('@s.whatsapp.net', '', $payload['wid']);
+                            $payloadWidNumber = explode(':', $payloadWid)[0];
+                            if ($accWidNumber === $payloadWidNumber) {
+                                $account = $acc;
+                                Logger::quepasa("processWebhook - Conta encontrada por comparação de wid: {$acc['id']}");
+                                break;
+                            }
+                        }
+                    }
+                }
             }
 
             if (!$account) {
@@ -712,14 +779,15 @@ class WhatsAppService
                 return;
             }
 
-            // Se recebeu chatid no webhook e a conta ainda não tem, atualizar
-            if (!empty($chatid) && empty($account['quepasa_chatid'])) {
-                Logger::quepasa("processWebhook - Atualizando chatid da conta {$account['id']}: {$chatid}");
+            // Atualizar chatid/wid se necessário
+            $wid = $payload['wid'] ?? null;
+            if ($wid && empty($account['quepasa_chatid'])) {
+                Logger::quepasa("processWebhook - Atualizando chatid da conta {$account['id']}: {$wid}");
                 WhatsAppAccount::update($account['id'], [
-                    'quepasa_chatid' => $chatid,
+                    'quepasa_chatid' => $wid,
                     'status' => 'active'
                 ]);
-                $account['quepasa_chatid'] = $chatid;
+                $account['quepasa_chatid'] = $wid;
                 $account['status'] = 'active';
                 
                 // Se acabou de conectar, tentar configurar webhook automaticamente
@@ -727,28 +795,43 @@ class WhatsAppService
                     self::configureWebhookAutomatically($account['id']);
                 } catch (\Exception $e) {
                     Logger::quepasa("processWebhook - Erro ao configurar webhook automaticamente: " . $e->getMessage());
-                    // Não interromper o processamento do webhook
                 }
-            }
-            
-            // Se recebeu chatid mas não estava salvo, atualizar também
-            if (!empty($chatid) && $account['quepasa_chatid'] !== $chatid) {
-                Logger::quepasa("processWebhook - Chatid mudou para conta {$account['id']}: {$chatid}");
+            } elseif ($wid && $account['quepasa_chatid'] !== $wid) {
+                Logger::quepasa("processWebhook - Chatid mudou para conta {$account['id']}: {$wid}");
                 WhatsAppAccount::update($account['id'], [
-                    'quepasa_chatid' => $chatid,
+                    'quepasa_chatid' => $wid,
                     'status' => 'active'
                 ]);
             }
 
             // Processar mensagem recebida
-            $fromPhone = $payload['from'] ?? $payload['phone'] ?? null;
-            if ($fromPhone) {
-                $fromPhone = str_replace('@s.whatsapp.net', '', $fromPhone);
+            // Formato novo do Quepasa: chat.id ou chat.phone
+            $from = $payload['from'] ?? $payload['phone'] ?? null;
+            if (!$from && isset($payload['chat'])) {
+                $from = $payload['chat']['id'] ?? $payload['chat']['phone'] ?? null;
+            }
+            
+            $fromPhone = null;
+            if ($from) {
+                $fromPhone = str_replace('@s.whatsapp.net', '', $from);
+                $fromPhone = ltrim($fromPhone, '+'); // Remover + se presente
             }
             
             $message = $payload['text'] ?? $payload['message'] ?? $payload['caption'] ?? '';
             $messageId = $payload['id'] ?? $payload['message_id'] ?? null;
-            $timestamp = $payload['timestamp'] ?? time();
+            
+            // Processar timestamp (pode vir em formato ISO ou Unix timestamp)
+            $timestamp = time();
+            if (isset($payload['timestamp'])) {
+                if (is_numeric($payload['timestamp'])) {
+                    $timestamp = (int)$payload['timestamp'];
+                } else {
+                    $timestamp = strtotime($payload['timestamp']);
+                    if ($timestamp === false) {
+                        $timestamp = time();
+                    }
+                }
+            }
             
             // Processar tipo de mensagem e metadados
             $messageType = $payload['type'] ?? 'text';

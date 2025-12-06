@@ -5,6 +5,7 @@
 # Logs
 *.log
 logs/
+storage/logs
 
 # Cache
 cache/

@@ -24,10 +24,6 @@ Thumbs.db
 # Dependências (se usar Composer)
 vendor/
 
-# Assets compilados (se usar build tools)
-public/assets/css/metronic/
-public/assets/js/metronic/
-public/assets/plugins/
 
 # Uploads
 public/uploads/

@@ -1,0 +1,370 @@
+<?php
+/**
+ * Model Conversation
+ */
+
+namespace App\Models;
+
+use App\Helpers\Database;
+
+class Conversation extends Model
+{
+    protected string $table = 'conversations';
+    protected string $primaryKey = 'id';
+    protected array $fillable = ['contact_id', 'agent_id', 'department_id', 'channel', 'status', 'subject', 'funnel_id', 'funnel_stage_id', 'whatsapp_account_id', 'pinned', 'pinned_at'];
+    protected array $hidden = [];
+    protected bool $timestamps = true;
+
+    /**
+     * Obter conversas do usuário logado
+     */
+    public static function getByAgent(int $agentId, array $filters = []): array
+    {
+        $sql = "SELECT c.*, 
+                       ct.name as contact_name, ct.phone as contact_phone, ct.email as contact_email, ct.avatar as contact_avatar,
+                       u.name as agent_name, u.email as agent_email,
+                       (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact' AND m.read_at IS NULL) as unread_count,
+                       (SELECT content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message,
+                       (SELECT created_at FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message_at
+                FROM conversations c
+                LEFT JOIN contacts ct ON c.contact_id = ct.id
+                LEFT JOIN users u ON c.agent_id = u.id
+                WHERE c.agent_id = ?";
+        
+        $params = [$agentId];
+        
+        // Aplicar filtros
+        if (!empty($filters['status'])) {
+            $sql .= " AND c.status = ?";
+            $params[] = $filters['status'];
+        }
+        
+        if (!empty($filters['channel'])) {
+            $sql .= " AND c.channel = ?";
+            $params[] = $filters['channel'];
+        }
+        
+        $sql .= " ORDER BY c.updated_at DESC";
+        
+        return Database::fetchAll($sql, $params);
+    }
+
+    /**
+     * Obter todas as conversas (com filtros)
+     */
+    public static function getAll(array $filters = []): array
+    {
+        try {
+            $sql = "SELECT c.*, 
+                       ct.name as contact_name, ct.phone as contact_phone, ct.email as contact_email, ct.avatar as contact_avatar,
+                       u.name as agent_name, u.email as agent_email,
+                       (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact' AND m.read_at IS NULL) as unread_count,
+                       (SELECT content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message,
+                       (SELECT created_at FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message_at,
+                       GROUP_CONCAT(DISTINCT CONCAT(t.id, ':', t.name, ':', COALESCE(t.color, '#009ef7')) SEPARATOR '|||') as tags_data,
+                       COALESCE(c.pinned, 0) as pinned,
+                       c.pinned_at
+                FROM conversations c
+                LEFT JOIN contacts ct ON c.contact_id = ct.id
+                LEFT JOIN users u ON c.agent_id = u.id
+                LEFT JOIN conversation_tags ctt ON c.id = ctt.conversation_id
+                LEFT JOIN tags t ON ctt.tag_id = t.id
+                WHERE 1=1";
+        
+        $params = [];
+        
+        // Aplicar filtros
+        if (!empty($filters['status'])) {
+            $sql .= " AND c.status = ?";
+            $params[] = $filters['status'];
+        }
+        
+        if (!empty($filters['channel'])) {
+            $sql .= " AND c.channel = ?";
+            $params[] = $filters['channel'];
+        }
+        
+        if (!empty($filters['agent_id'])) {
+            $sql .= " AND c.agent_id = ?";
+            $params[] = $filters['agent_id'];
+        }
+        
+        if (!empty($filters['department_id'])) {
+            $sql .= " AND c.department_id = ?";
+            $params[] = $filters['department_id'];
+        }
+        
+        if (!empty($filters['tag_id'])) {
+            $sql .= " AND EXISTS (SELECT 1 FROM conversation_tags ctt2 WHERE ctt2.conversation_id = c.id AND ctt2.tag_id = ?)";
+            $params[] = $filters['tag_id'];
+        }
+        
+        // Busca avançada (nome, telefone, email E mensagens)
+        $searchTerm = null;
+        if (!empty($filters['search'])) {
+            $searchTerm = trim($filters['search']);
+            if (!empty($searchTerm)) {
+                $search = "%{$searchTerm}%";
+                $sql .= " AND (
+                    ct.name LIKE ? OR 
+                    ct.phone LIKE ? OR 
+                    ct.email LIKE ? OR
+                    EXISTS (
+                        SELECT 1 FROM messages m 
+                        WHERE m.conversation_id = c.id 
+                        AND m.content LIKE ?
+                    )
+                )";
+                $params[] = $search;
+                $params[] = $search;
+                $params[] = $search;
+                $params[] = $search;
+                
+                // Log para debug
+                \App\Helpers\Log::debug("Aplicando filtro de busca: '{$searchTerm}'", 'conversas.log');
+            }
+        }
+        
+        // Filtro: Sem resposta (última mensagem é do contato e não foi respondida)
+        if (!empty($filters['unanswered'])) {
+            $sql .= " AND EXISTS (
+                SELECT 1 FROM messages m1 
+                WHERE m1.conversation_id = c.id 
+                AND m1.sender_type = 'contact'
+                AND m1.created_at = (
+                    SELECT MAX(m2.created_at) 
+                    FROM messages m2 
+                    WHERE m2.conversation_id = c.id
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM messages m3 
+                    WHERE m3.conversation_id = c.id 
+                    AND m3.sender_type = 'agent'
+                    AND m3.created_at > m1.created_at
+                )
+            )";
+        }
+        
+        // Filtro: Respondido (última mensagem é do agente)
+        if (!empty($filters['answered'])) {
+            $sql .= " AND EXISTS (
+                SELECT 1 FROM messages m1 
+                WHERE m1.conversation_id = c.id 
+                AND m1.sender_type = 'agent'
+                AND m1.created_at = (
+                    SELECT MAX(m2.created_at) 
+                    FROM messages m2 
+                    WHERE m2.conversation_id = c.id
+                )
+            )";
+        }
+        
+        // Filtro por período (data de criação ou última mensagem)
+        if (!empty($filters['date_from'])) {
+            $sql .= " AND (
+                c.created_at >= ? OR 
+                EXISTS (
+                    SELECT 1 FROM messages m 
+                    WHERE m.conversation_id = c.id 
+                    AND m.created_at >= ?
+                )
+            )";
+            $params[] = $filters['date_from'];
+            $params[] = $filters['date_from'];
+        }
+        
+        if (!empty($filters['date_to'])) {
+            $sql .= " AND (
+                c.created_at <= ? OR 
+                EXISTS (
+                    SELECT 1 FROM messages m 
+                    WHERE m.conversation_id = c.id 
+                    AND m.created_at <= ?
+                )
+            )";
+            $params[] = $filters['date_to'] . ' 23:59:59';
+            $params[] = $filters['date_to'] . ' 23:59:59';
+        }
+        
+        // Filtro por pinned (fixadas)
+        if (isset($filters['pinned'])) {
+            if ($filters['pinned'] === true || $filters['pinned'] === '1' || $filters['pinned'] === 1) {
+                $sql .= " AND c.pinned = 1";
+            } else {
+                $sql .= " AND (c.pinned = 0 OR c.pinned IS NULL)";
+            }
+        }
+        
+        $sql .= " GROUP BY c.id";
+        
+        // Ordenação: pinned primeiro, depois por updated_at
+        if (!empty($filters['order_by'])) {
+            $orderBy = $filters['order_by'];
+            $orderDir = !empty($filters['order_dir']) && strtoupper($filters['order_dir']) === 'ASC' ? 'ASC' : 'DESC';
+            
+            if ($orderBy === 'pinned') {
+                $sql .= " ORDER BY c.pinned DESC, c.pinned_at DESC, c.updated_at DESC";
+            } elseif ($orderBy === 'last_message') {
+                $sql .= " ORDER BY c.pinned DESC, last_message_at {$orderDir}";
+            } else {
+                $sql .= " ORDER BY c.pinned DESC, c.{$orderBy} {$orderDir}";
+            }
+        } else {
+            // Ordenação padrão: pinned primeiro, depois updated_at
+            $sql .= " ORDER BY c.pinned DESC, c.pinned_at DESC, c.updated_at DESC";
+        }
+        
+        // Paginação
+        if (!empty($filters['limit'])) {
+            $limit = (int)$filters['limit'];
+            $offset = !empty($filters['offset']) ? (int)$filters['offset'] : 0;
+            $sql .= " LIMIT {$limit} OFFSET {$offset}";
+        }
+        
+        // Log da query SQL e parâmetros antes de executar
+        \App\Helpers\Log::debug("SQL Query: " . substr($sql, 0, 500), 'conversas.log');
+        \App\Helpers\Log::context("SQL Params", $params, 'conversas.log', 'DEBUG');
+        
+        $conversations = Database::fetchAll($sql, $params);
+        
+        \App\Helpers\Log::debug("Conversas retornadas do banco: " . count($conversations), 'conversas.log');
+        
+        // Se houver busca, identificar qual campo fez match
+        if ($searchTerm !== null && !empty($searchTerm)) {
+            foreach ($conversations as &$conversation) {
+                $matchType = null;
+                $matchText = null;
+                
+                // Verificar nome
+                if (!empty($conversation['contact_name']) && mb_stripos($conversation['contact_name'], $searchTerm) !== false) {
+                    $matchType = 'name';
+                    $matchText = $conversation['contact_name'];
+                }
+                // Verificar telefone
+                elseif (!empty($conversation['contact_phone']) && mb_stripos($conversation['contact_phone'], $searchTerm) !== false) {
+                    $matchType = 'phone';
+                    $matchText = $conversation['contact_phone'];
+                }
+                // Verificar email
+                elseif (!empty($conversation['contact_email']) && mb_stripos($conversation['contact_email'], $searchTerm) !== false) {
+                    $matchType = 'email';
+                    $matchText = $conversation['contact_email'];
+                }
+                // Verificar mensagens
+                else {
+                    // Buscar mensagem que contém o termo
+                    $messageSql = "SELECT content FROM messages WHERE conversation_id = ? AND content LIKE ? LIMIT 1";
+                    $messageParams = [$conversation['id'], "%{$searchTerm}%"];
+                    $message = Database::fetch($messageSql, $messageParams);
+                    if ($message && !empty($message['content'])) {
+                        $matchType = 'message';
+                        $matchText = $message['content'];
+                    }
+                }
+                
+                $conversation['search_match_type'] = $matchType;
+                $conversation['search_match_text'] = $matchText;
+            }
+            unset($conversation); // Liberar referência
+        }
+        
+        // Processar tags para cada conversa
+        foreach ($conversations as &$conversation) {
+            $tags = [];
+            if (!empty($conversation['tags_data'])) {
+                $tagsData = explode('|||', $conversation['tags_data']);
+                foreach ($tagsData as $tagData) {
+                    if (!empty($tagData)) {
+                        $parts = explode(':', $tagData, 3);
+                        if (count($parts) >= 2) {
+                            $tags[] = [
+                                'id' => (int)$parts[0],
+                                'name' => $parts[1],
+                                'color' => $parts[2] ?? '#009ef7'
+                            ];
+                        }
+                    }
+                }
+            }
+            $conversation['tags'] = $tags;
+            unset($conversation['tags_data']);
+        }
+        
+        return $conversations;
+        } catch (\Exception $e) {
+            \App\Helpers\Log::error("Erro em Conversation::getAll: " . $e->getMessage(), 'conversas.log');
+            \App\Helpers\Log::error("SQL: " . ($sql ?? 'não definido'), 'conversas.log');
+            \App\Helpers\Log::context("Params", $params ?? [], 'conversas.log', 'ERROR');
+            \App\Helpers\Log::context("Filtros", $filters, 'conversas.log', 'ERROR');
+            throw $e;
+        }
+    }
+
+    /**
+     * Obter conversa com relacionamentos
+     */
+    public static function findWithRelations(int $id): ?array
+    {
+        $sql = "SELECT c.*, 
+                       ct.name as contact_name, ct.phone as contact_phone, ct.email as contact_email, ct.avatar as contact_avatar,
+                       u.name as agent_name, u.email as agent_email, u.avatar as agent_avatar,
+                       (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact' AND m.read_at IS NULL) as unread_count
+                FROM conversations c
+                LEFT JOIN contacts ct ON c.contact_id = ct.id
+                LEFT JOIN users u ON c.agent_id = u.id
+                WHERE c.id = ?";
+        
+        return Database::fetch($sql, [$id]);
+    }
+
+    /**
+     * Atribuir conversa a um agente
+     */
+    public static function assignToAgent(int $conversationId, int $agentId): bool
+    {
+        return self::update($conversationId, [
+            'agent_id' => $agentId,
+            'status' => 'open'
+        ]);
+    }
+
+    /**
+     * Fechar conversa
+     */
+    public static function close(int $conversationId): bool
+    {
+        return self::update($conversationId, [
+            'status' => 'closed'
+        ]);
+    }
+
+    /**
+     * Reabrir conversa
+     */
+    public static function reopen(int $conversationId): bool
+    {
+        return self::update($conversationId, [
+            'status' => 'open'
+        ]);
+    }
+
+    /**
+     * Buscar conversa por contato e canal
+     */
+    public static function findByContactAndChannel(int $contactId, string $channel, ?int $whatsappAccountId = null): ?array
+    {
+        $sql = "SELECT * FROM conversations 
+                WHERE contact_id = ? AND channel = ?";
+        $params = [$contactId, $channel];
+        
+        if ($whatsappAccountId) {
+            $sql .= " AND whatsapp_account_id = ?";
+            $params[] = $whatsappAccountId;
+        }
+        
+        $sql .= " ORDER BY created_at DESC LIMIT 1";
+        
+        return Database::fetchOne($sql, $params);
+    }
+}
+

@@ -1,0 +1,77 @@
+<?php
+/**
+ * Helper Logger
+ * Sistema de logging para arquivos
+ */
+
+namespace App\Helpers;
+
+class Logger
+{
+    private static string $logDir = __DIR__ . '/../../logs';
+    private static string $defaultFile = 'app.log';
+
+    /**
+     * Criar diretório de logs se não existir
+     */
+    private static function ensureLogDir(): void
+    {
+        if (!is_dir(self::$logDir)) {
+            mkdir(self::$logDir, 0755, true);
+        }
+    }
+
+    /**
+     * Escrever log em arquivo
+     */
+    public static function log(string $message, string $file = null): void
+    {
+        self::ensureLogDir();
+        
+        $logFile = $file ? self::$logDir . '/' . $file : self::$logDir . '/' . self::$defaultFile;
+        $timestamp = date('Y-m-d H:i:s');
+        $logMessage = "[{$timestamp}] {$message}" . PHP_EOL;
+        
+        file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
+    }
+
+    /**
+     * Log específico para automações
+     */
+    public static function automation(string $message): void
+    {
+        self::log($message, 'automacao.log');
+    }
+
+    public static function quepasa(string $message): void
+    {
+        self::log($message, 'quepasa.log');
+    }
+
+    /**
+     * Log de debug
+     */
+    public static function debug(string $message, string $file = null): void
+    {
+        if (defined('APP_DEBUG') && APP_DEBUG) {
+            self::log("[DEBUG] {$message}", $file);
+        }
+    }
+
+    /**
+     * Log de erro
+     */
+    public static function error(string $message, string $file = null): void
+    {
+        self::log("[ERROR] {$message}", $file);
+    }
+
+    /**
+     * Log de warning
+     */
+    public static function warning(string $message, string $file = null): void
+    {
+        self::log("[WARNING] {$message}", $file);
+    }
+}
+

@@ -1,0 +1,527 @@
+<?php
+/**
+ * Service DashboardService
+ * Métricas e estatísticas para o dashboard
+ */
+
+namespace App\Services;
+
+use App\Models\User;
+use App\Models\Conversation;
+use App\Models\Department;
+use App\Models\Funnel;
+use App\Models\Message;
+
+class DashboardService
+{
+    /**
+     * Obter estatísticas gerais do dashboard
+     */
+    public static function getGeneralStats(?int $userId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    {
+        $dateFrom = $dateFrom ?? date('Y-m-01'); // Primeiro dia do mês
+        $dateTo = $dateTo ?? date('Y-m-d H:i:s'); // Hoje
+
+        // Total de conversas
+        $totalConversations = self::getTotalConversations($dateFrom, $dateTo);
+        
+        // Conversas abertas
+        $openConversations = self::getOpenConversations();
+        
+        // Conversas fechadas
+        $closedConversations = self::getClosedConversations($dateFrom, $dateTo);
+        
+        // Conversas do usuário (se informado)
+        $myConversations = $userId ? self::getMyConversations($userId) : 0;
+        $myOpenConversations = $userId ? self::getMyOpenConversations($userId) : 0;
+        
+        // Total de agentes
+        $totalAgents = self::getTotalAgents();
+        $activeAgents = self::getActiveAgents();
+        $onlineAgents = self::getOnlineAgents();
+        
+        // Total de contatos
+        $totalContacts = self::getTotalContacts($dateFrom, $dateTo);
+        
+        // Total de mensagens
+        $totalMessages = self::getTotalMessages($dateFrom, $dateTo);
+        
+        // Conversas por status
+        $conversationsByStatus = self::getConversationsByStatus();
+        
+        // Conversas por canal
+        $conversationsByChannel = self::getConversationsByChannel($dateFrom, $dateTo);
+        
+        // Taxa de resolução
+        $resolutionRate = $totalConversations > 0 
+            ? round(($closedConversations / $totalConversations) * 100, 2) 
+            : 0;
+        
+        // Tempo médio de primeira resposta (últimos 30 dias)
+        $avgFirstResponseTime = self::getAverageFirstResponseTime($dateFrom, $dateTo);
+        
+        // Conversas sem atribuição
+        $unassignedConversations = self::getUnassignedConversations();
+        
+        return [
+            'conversations' => [
+                'total' => $totalConversations,
+                'open' => $openConversations,
+                'closed' => $closedConversations,
+                'my_total' => $myConversations,
+                'my_open' => $myOpenConversations,
+                'unassigned' => $unassignedConversations,
+                'by_status' => $conversationsByStatus,
+                'by_channel' => $conversationsByChannel
+            ],
+            'agents' => [
+                'total' => $totalAgents,
+                'active' => $activeAgents,
+                'online' => $onlineAgents
+            ],
+            'contacts' => [
+                'total' => $totalContacts
+            ],
+            'messages' => [
+                'total' => $totalMessages
+            ],
+            'metrics' => [
+                'resolution_rate' => $resolutionRate,
+                'avg_first_response_time' => $avgFirstResponseTime
+            ],
+            'period' => [
+                'from' => $dateFrom,
+                'to' => $dateTo
+            ]
+        ];
+    }
+
+    /**
+     * Obter estatísticas por setor
+     */
+    public static function getDepartmentStats(): array
+    {
+        $sql = "SELECT 
+                    d.id,
+                    d.name,
+                    COUNT(DISTINCT c.id) as conversations_count,
+                    COUNT(DISTINCT CASE WHEN c.status = 'open' THEN c.id END) as open_conversations,
+                    COUNT(DISTINCT ad.user_id) as agents_count
+                FROM departments d
+                LEFT JOIN conversations c ON d.id = c.department_id
+                LEFT JOIN agent_departments ad ON d.id = ad.department_id
+                GROUP BY d.id, d.name
+                ORDER BY conversations_count DESC
+                LIMIT 10";
+        
+        return \App\Helpers\Database::fetchAll($sql);
+    }
+
+    /**
+     * Obter estatísticas por funil
+     */
+    public static function getFunnelStats(): array
+    {
+        $sql = "SELECT 
+                    f.id,
+                    f.name,
+                    COUNT(DISTINCT c.id) as conversations_count,
+                    COUNT(DISTINCT fs.id) as stages_count
+                FROM funnels f
+                LEFT JOIN conversations c ON f.id = c.funnel_id
+                LEFT JOIN funnel_stages fs ON f.id = fs.funnel_id
+                WHERE f.is_active = 1
+                GROUP BY f.id, f.name
+                ORDER BY conversations_count DESC
+                LIMIT 10";
+        
+        return \App\Helpers\Database::fetchAll($sql);
+    }
+
+    /**
+     * Obter ranking de agentes (top 10)
+     */
+    public static function getTopAgents(?string $dateFrom = null, ?string $dateTo = null, int $limit = 10): array
+    {
+        $dateFrom = $dateFrom ?? date('Y-m-01');
+        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+
+        return \App\Services\AgentPerformanceService::getAgentsRanking($dateFrom, $dateTo, $limit);
+    }
+
+    /**
+     * Obter conversas recentes
+     */
+    public static function getRecentConversations(int $limit = 10): array
+    {
+        $sql = "SELECT 
+                    c.*,
+                    ct.name as contact_name,
+                    ct.phone as contact_phone,
+                    ct.avatar as contact_avatar,
+                    u.name as agent_name,
+                    (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.read_at IS NULL) as unread_count
+                FROM conversations c
+                LEFT JOIN contacts ct ON c.contact_id = ct.id
+                LEFT JOIN users u ON c.agent_id = u.id
+                ORDER BY c.updated_at DESC
+                LIMIT ?";
+        
+        return \App\Helpers\Database::fetchAll($sql, [$limit]);
+    }
+
+    /**
+     * Obter atividade recente (últimas 24 horas)
+     */
+    public static function getRecentActivity(int $limit = 20): array
+    {
+        if (!class_exists('\App\Models\Activity')) {
+            return [];
+        }
+        
+        $sql = "SELECT 
+                    a.*,
+                    u.name as user_name,
+                    u.avatar as user_avatar
+                FROM activities a
+                LEFT JOIN users u ON a.user_id = u.id
+                WHERE a.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                ORDER BY a.created_at DESC
+                LIMIT ?";
+        
+        $activities = \App\Helpers\Database::fetchAll($sql, [$limit]);
+        
+        // Decodificar metadata
+        foreach ($activities as &$activity) {
+            if (!empty($activity['metadata'])) {
+                $activity['metadata'] = json_decode($activity['metadata'], true);
+            } else {
+                $activity['metadata'] = [];
+            }
+        }
+        
+        return $activities;
+    }
+
+    // Métodos privados auxiliares
+
+    private static function getTotalConversations(string $dateFrom, string $dateTo): int
+    {
+        $sql = "SELECT COUNT(*) as total FROM conversations 
+                WHERE created_at >= ? AND created_at <= ?";
+        $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
+        return (int)($result['total'] ?? 0);
+    }
+
+    private static function getOpenConversations(): int
+    {
+        $sql = "SELECT COUNT(*) as total FROM conversations 
+                WHERE status IN ('open', 'pending')";
+        $result = \App\Helpers\Database::fetch($sql);
+        return (int)($result['total'] ?? 0);
+    }
+
+    private static function getClosedConversations(string $dateFrom, string $dateTo): int
+    {
+        $sql = "SELECT COUNT(*) as total FROM conversations 
+                WHERE status IN ('closed', 'resolved')
+                AND updated_at >= ? AND updated_at <= ?";
+        $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
+        return (int)($result['total'] ?? 0);
+    }
+
+    private static function getMyConversations(int $userId): int
+    {
+        $sql = "SELECT COUNT(*) as total FROM conversations 
+                WHERE agent_id = ?";
+        $result = \App\Helpers\Database::fetch($sql, [$userId]);
+        return (int)($result['total'] ?? 0);
+    }
+
+    private static function getMyOpenConversations(int $userId): int
+    {
+        $sql = "SELECT COUNT(*) as total FROM conversations 
+                WHERE agent_id = ? AND status IN ('open', 'pending')";
+        $result = \App\Helpers\Database::fetch($sql, [$userId]);
+        return (int)($result['total'] ?? 0);
+    }
+
+    private static function getTotalAgents(): int
+    {
+        $sql = "SELECT COUNT(*) as total FROM users 
+                WHERE role IN ('agent', 'admin', 'supervisor')";
+        $result = \App\Helpers\Database::fetch($sql);
+        return (int)($result['total'] ?? 0);
+    }
+
+    private static function getActiveAgents(): int
+    {
+        $sql = "SELECT COUNT(*) as total FROM users 
+                WHERE role IN ('agent', 'admin', 'supervisor') 
+                AND status = 'active'";
+        $result = \App\Helpers\Database::fetch($sql);
+        return (int)($result['total'] ?? 0);
+    }
+
+    private static function getOnlineAgents(): int
+    {
+        $sql = "SELECT COUNT(*) as total FROM users 
+                WHERE role IN ('agent', 'admin', 'supervisor') 
+                AND status = 'active' 
+                AND availability_status = 'online'";
+        $result = \App\Helpers\Database::fetch($sql);
+        return (int)($result['total'] ?? 0);
+    }
+
+    private static function getTotalContacts(string $dateFrom, string $dateTo): int
+    {
+        $sql = "SELECT COUNT(*) as total FROM contacts 
+                WHERE created_at >= ? AND created_at <= ?";
+        $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
+        return (int)($result['total'] ?? 0);
+    }
+
+    private static function getTotalMessages(string $dateFrom, string $dateTo): int
+    {
+        $sql = "SELECT COUNT(*) as total FROM messages 
+                WHERE created_at >= ? AND created_at <= ?";
+        $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
+        return (int)($result['total'] ?? 0);
+    }
+
+    private static function getConversationsByStatus(): array
+    {
+        $sql = "SELECT status, COUNT(*) as count 
+                FROM conversations 
+                GROUP BY status";
+        $results = \App\Helpers\Database::fetchAll($sql);
+        
+        $byStatus = [];
+        foreach ($results as $row) {
+            $byStatus[$row['status']] = (int)$row['count'];
+        }
+        
+        return $byStatus;
+    }
+
+    private static function getConversationsByChannel(string $dateFrom, string $dateTo): array
+    {
+        $sql = "SELECT channel, COUNT(*) as count 
+                FROM conversations 
+                WHERE created_at >= ? AND created_at <= ?
+                GROUP BY channel";
+        $results = \App\Helpers\Database::fetchAll($sql, [$dateFrom, $dateTo]);
+        
+        $byChannel = [];
+        foreach ($results as $row) {
+            $byChannel[$row['channel']] = (int)$row['count'];
+        }
+        
+        return $byChannel;
+    }
+
+    private static function getAverageFirstResponseTime(string $dateFrom, string $dateTo): ?float
+    {
+        $sql = "SELECT AVG(TIMESTAMPDIFF(MINUTE, c.created_at, m.created_at)) as avg_time
+                FROM conversations c
+                INNER JOIN messages m ON m.conversation_id = c.id
+                WHERE m.sender_type = 'agent'
+                AND c.created_at >= ?
+                AND c.created_at <= ?
+                AND m.created_at = (
+                    SELECT MIN(m2.created_at) 
+                    FROM messages m2 
+                    WHERE m2.conversation_id = c.id 
+                    AND m2.sender_type = 'agent'
+                )";
+        
+        $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
+        return $result && $result['avg_time'] !== null ? round((float)$result['avg_time'], 2) : null;
+    }
+
+    private static function getUnassignedConversations(): int
+    {
+        $sql = "SELECT COUNT(*) as total FROM conversations 
+                WHERE agent_id IS NULL 
+                AND status IN ('open', 'pending')";
+        $result = \App\Helpers\Database::fetch($sql);
+        return (int)($result['total'] ?? 0);
+    }
+
+    /**
+     * Obter dados de conversas ao longo do tempo (para gráfico de linha)
+     */
+    public static function getConversationsOverTime(?string $dateFrom = null, ?string $dateTo = null, string $groupBy = 'day'): array
+    {
+        $dateFrom = $dateFrom ?? date('Y-m-01');
+        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        
+        $dateFormat = match($groupBy) {
+            'hour' => '%Y-%m-%d %H:00:00',
+            'day' => '%Y-%m-%d',
+            'week' => '%Y-%u',
+            'month' => '%Y-%m',
+            default => '%Y-%m-%d'
+        };
+        
+        $sql = "SELECT 
+                    DATE_FORMAT(created_at, ?) as period,
+                    COUNT(*) as total,
+                    COUNT(CASE WHEN status IN ('open', 'pending') THEN 1 END) as open_count,
+                    COUNT(CASE WHEN status IN ('closed', 'resolved') THEN 1 END) as closed_count
+                FROM conversations
+                WHERE created_at >= ? AND created_at <= ?
+                GROUP BY period
+                ORDER BY period ASC";
+        
+        return \App\Helpers\Database::fetchAll($sql, [$dateFormat, $dateFrom, $dateTo]);
+    }
+
+    /**
+     * Obter dados de conversas por canal (para gráfico de pizza)
+     */
+    public static function getConversationsByChannelChart(?string $dateFrom = null, ?string $dateTo = null): array
+    {
+        $dateFrom = $dateFrom ?? date('Y-m-01');
+        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        
+        $sql = "SELECT 
+                    COALESCE(channel, 'N/A') as channel,
+                    COUNT(*) as count,
+                    COUNT(CASE WHEN status IN ('open', 'pending') THEN 1 END) as open_count,
+                    COUNT(CASE WHEN status IN ('closed', 'resolved') THEN 1 END) as closed_count
+                FROM conversations
+                WHERE created_at >= ? AND created_at <= ?
+                GROUP BY channel
+                ORDER BY count DESC";
+        
+        return \App\Helpers\Database::fetchAll($sql, [$dateFrom, $dateTo]);
+    }
+
+    /**
+     * Obter dados de conversas por status (para gráfico de pizza)
+     */
+    public static function getConversationsByStatusChart(?string $dateFrom = null, ?string $dateTo = null): array
+    {
+        $dateFrom = $dateFrom ?? date('Y-m-01');
+        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        
+        $sql = "SELECT 
+                    status,
+                    COUNT(*) as count
+                FROM conversations
+                WHERE created_at >= ? AND created_at <= ?
+                GROUP BY status
+                ORDER BY count DESC";
+        
+        return \App\Helpers\Database::fetchAll($sql, [$dateFrom, $dateTo]);
+    }
+
+    /**
+     * Obter dados de performance de agentes (para gráfico de barras)
+     */
+    public static function getAgentsPerformanceChart(?string $dateFrom = null, ?string $dateTo = null, int $limit = 10): array
+    {
+        $dateFrom = $dateFrom ?? date('Y-m-01');
+        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        
+        $agents = self::getTopAgents($dateFrom, $dateTo, $limit);
+        
+        $result = [];
+        foreach ($agents as $agent) {
+            $result[] = [
+                'name' => $agent['name'] ?? 'Sem nome',
+                'total_conversations' => (int)($agent['total_conversations'] ?? 0),
+                'closed_conversations' => (int)($agent['closed_conversations'] ?? 0),
+                'resolution_rate' => (float)($agent['resolution_rate'] ?? 0),
+                'avg_response_time' => (float)($agent['avg_response_time'] ?? 0)
+            ];
+        }
+        
+        return $result;
+    }
+
+    /**
+     * Obter dados de mensagens ao longo do tempo
+     */
+    public static function getMessagesOverTime(?string $dateFrom = null, ?string $dateTo = null, string $groupBy = 'day'): array
+    {
+        $dateFrom = $dateFrom ?? date('Y-m-01');
+        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        
+        $dateFormat = match($groupBy) {
+            'hour' => '%Y-%m-%d %H:00:00',
+            'day' => '%Y-%m-%d',
+            'week' => '%Y-%u',
+            'month' => '%Y-%m',
+            default => '%Y-%m-%d'
+        };
+        
+        $sql = "SELECT 
+                    DATE_FORMAT(created_at, ?) as period,
+                    COUNT(*) as total,
+                    COUNT(CASE WHEN sender_type = 'agent' THEN 1 END) as agent_messages,
+                    COUNT(CASE WHEN sender_type = 'contact' THEN 1 END) as contact_messages
+                FROM messages
+                WHERE created_at >= ? AND created_at <= ?
+                GROUP BY period
+                ORDER BY period ASC";
+        
+        return \App\Helpers\Database::fetchAll($sql, [$dateFormat, $dateFrom, $dateTo]);
+    }
+
+    /**
+     * Obter dados de SLA (tempo de resposta)
+     */
+    public static function getSLAMetrics(?string $dateFrom = null, ?string $dateTo = null): array
+    {
+        $dateFrom = $dateFrom ?? date('Y-m-01');
+        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        
+        $sql = "SELECT 
+                    COUNT(*) as total_conversations,
+                    COUNT(CASE WHEN TIMESTAMPDIFF(MINUTE, c.created_at, m.created_at) <= 5 THEN 1 END) as responded_5min,
+                    COUNT(CASE WHEN TIMESTAMPDIFF(MINUTE, c.created_at, m.created_at) <= 15 THEN 1 END) as responded_15min,
+                    COUNT(CASE WHEN TIMESTAMPDIFF(MINUTE, c.created_at, m.created_at) <= 30 THEN 1 END) as responded_30min,
+                    AVG(TIMESTAMPDIFF(MINUTE, c.created_at, m.created_at)) as avg_response_time
+                FROM conversations c
+                INNER JOIN messages m ON m.conversation_id = c.id
+                WHERE m.sender_type = 'agent'
+                AND c.created_at >= ? AND c.created_at <= ?
+                AND m.created_at = (
+                    SELECT MIN(m2.created_at) 
+                    FROM messages m2 
+                    WHERE m2.conversation_id = c.id 
+                    AND m2.sender_type = 'agent'
+                )";
+        
+        $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
+        
+        if (!$result) {
+            return [
+                'total_conversations' => 0,
+                'responded_5min' => 0,
+                'responded_15min' => 0,
+                'responded_30min' => 0,
+                'avg_response_time' => 0,
+                'sla_5min_rate' => 0,
+                'sla_15min_rate' => 0,
+                'sla_30min_rate' => 0
+            ];
+        }
+        
+        $total = (int)($result['total_conversations'] ?? 0);
+        
+        return [
+            'total_conversations' => $total,
+            'responded_5min' => (int)($result['responded_5min'] ?? 0),
+            'responded_15min' => (int)($result['responded_15min'] ?? 0),
+            'responded_30min' => (int)($result['responded_30min'] ?? 0),
+            'avg_response_time' => round((float)($result['avg_response_time'] ?? 0), 2),
+            'sla_5min_rate' => $total > 0 ? round((($result['responded_5min'] ?? 0) / $total) * 100, 2) : 0,
+            'sla_15min_rate' => $total > 0 ? round((($result['responded_15min'] ?? 0) / $total) * 100, 2) : 0,
+            'sla_30min_rate' => $total > 0 ? round((($result['responded_30min'] ?? 0) / $total) * 100, 2) : 0
+        ];
+    }
+}
+

@@ -1,0 +1,213 @@
+<?php
+/**
+ * Controller do Dashboard
+ */
+
+namespace App\Controllers;
+
+use App\Helpers\Response;
+use App\Helpers\Database;
+use App\Helpers\Permission;
+
+class DashboardController
+{
+    /**
+     * Mostrar dashboard
+     */
+    public function index(): void
+    {
+        // Dashboard é acessível a todos os usuários autenticados
+        // Mas podemos verificar permissão específica se necessário
+        // Permission::abortIfCannot('dashboard.view');
+        
+        $userId = \App\Helpers\Auth::id();
+        $dateFrom = \App\Helpers\Request::get('date_from', date('Y-m-01'));
+        $dateTo = \App\Helpers\Request::get('date_to', date('Y-m-d H:i:s'));
+        
+        try {
+            // Estatísticas gerais
+            $generalStats = \App\Services\DashboardService::getGeneralStats($userId, $dateFrom, $dateTo);
+            
+            // Estatísticas por setor
+            $departmentStats = \App\Services\DashboardService::getDepartmentStats();
+            
+            // Estatísticas por funil
+            $funnelStats = \App\Services\DashboardService::getFunnelStats();
+            
+            // Top agentes
+            $topAgents = \App\Services\DashboardService::getTopAgents($dateFrom, $dateTo, 5);
+            
+            // Conversas recentes
+            $recentConversations = \App\Services\DashboardService::getRecentConversations(10);
+            
+            // Atividade recente
+            $recentActivity = \App\Services\DashboardService::getRecentActivity(10);
+            
+            Response::view('dashboard/index', [
+                'stats' => $generalStats,
+                'departmentStats' => $departmentStats,
+                'funnelStats' => $funnelStats,
+                'topAgents' => $topAgents,
+                'recentConversations' => $recentConversations,
+                'recentActivity' => $recentActivity,
+                'dateFrom' => $dateFrom,
+                'dateTo' => $dateTo
+            ]);
+        } catch (\Exception $e) {
+            error_log("Erro ao carregar dashboard: " . $e->getMessage());
+            // Fallback para estatísticas básicas
+            $stats = [
+                'conversations' => [
+                    'total' => Database::fetch("SELECT COUNT(*) as total FROM conversations")['total'] ?? 0,
+                    'open' => Database::fetch("SELECT COUNT(*) as total FROM conversations WHERE status = 'open'")['total'] ?? 0,
+                    'my_total' => Database::fetch("SELECT COUNT(*) as total FROM conversations WHERE agent_id = ?", [$userId])['total'] ?? 0,
+                ],
+                'agents' => ['total' => 0, 'active' => 0, 'online' => 0],
+                'contacts' => ['total' => 0],
+                'messages' => ['total' => 0],
+                'metrics' => ['resolution_rate' => 0, 'avg_first_response_time' => null]
+            ];
+            
+            Response::view('dashboard/index', [
+                'stats' => $stats,
+                'departmentStats' => [],
+                'funnelStats' => [],
+                'topAgents' => [],
+                'recentConversations' => [],
+                'recentActivity' => [],
+                'dateFrom' => $dateFrom,
+                'dateTo' => $dateTo
+            ]);
+        }
+    }
+
+    /**
+     * Obter dados de gráficos (AJAX)
+     */
+    public function getChartData(): void
+    {
+        $chartType = \App\Helpers\Request::get('type', 'conversations_over_time');
+        $dateFrom = \App\Helpers\Request::get('date_from', date('Y-m-01'));
+        $dateTo = \App\Helpers\Request::get('date_to', date('Y-m-d H:i:s'));
+        $groupBy = \App\Helpers\Request::get('group_by', 'day');
+        
+        try {
+            $data = [];
+            
+            switch ($chartType) {
+                case 'conversations_over_time':
+                    $data = \App\Services\DashboardService::getConversationsOverTime($dateFrom, $dateTo, $groupBy);
+                    break;
+                    
+                case 'conversations_by_channel':
+                    $data = \App\Services\DashboardService::getConversationsByChannelChart($dateFrom, $dateTo);
+                    break;
+                    
+                case 'conversations_by_status':
+                    $data = \App\Services\DashboardService::getConversationsByStatusChart($dateFrom, $dateTo);
+                    break;
+                    
+                case 'agents_performance':
+                    $limit = (int)\App\Helpers\Request::get('limit', 10);
+                    $data = \App\Services\DashboardService::getAgentsPerformanceChart($dateFrom, $dateTo, $limit);
+                    break;
+                    
+                case 'messages_over_time':
+                    $data = \App\Services\DashboardService::getMessagesOverTime($dateFrom, $dateTo, $groupBy);
+                    break;
+                    
+                case 'sla_metrics':
+                    $data = \App\Services\DashboardService::getSLAMetrics($dateFrom, $dateTo);
+                    break;
+                    
+                default:
+                    Response::json(['error' => 'Tipo de gráfico inválido'], 400);
+                    return;
+            }
+            
+            Response::json([
+                'success' => true,
+                'data' => $data
+            ]);
+        } catch (\Exception $e) {
+            error_log("Erro ao obter dados de gráfico: " . $e->getMessage());
+            Response::json([
+                'success' => false,
+                'error' => 'Erro ao carregar dados do gráfico'
+            ], 500);
+        }
+    }
+
+    /**
+     * Exportar relatório (PDF/Excel)
+     */
+    public function exportReport(): void
+    {
+        $format = \App\Helpers\Request::get('format', 'pdf'); // pdf, excel, csv
+        $dateFrom = \App\Helpers\Request::get('date_from', date('Y-m-01'));
+        $dateTo = \App\Helpers\Request::get('date_to', date('Y-m-d H:i:s'));
+        
+        // Por enquanto, retornamos JSON. Implementação completa de PDF/Excel requer bibliotecas adicionais
+        $stats = \App\Services\DashboardService::getGeneralStats(null, $dateFrom, $dateTo);
+        $topAgents = \App\Services\DashboardService::getTopAgents($dateFrom, $dateTo, 20);
+        $departmentStats = \App\Services\DashboardService::getDepartmentStats();
+        $funnelStats = \App\Services\DashboardService::getFunnelStats();
+        
+        if ($format === 'csv') {
+            // Exportar CSV simples
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename="relatorio_' . date('Y-m-d') . '.csv"');
+            
+            $output = fopen('php://output', 'w');
+            
+            // BOM para UTF-8
+            fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+            
+            // Cabeçalho
+            fputcsv($output, ['Relatório de Dashboard', 'Período: ' . $dateFrom . ' até ' . $dateTo], ';');
+            fputcsv($output, [], ';');
+            
+            // Estatísticas gerais
+            fputcsv($output, ['Estatísticas Gerais'], ';');
+            fputcsv($output, ['Métrica', 'Valor'], ';');
+            fputcsv($output, ['Total de Conversas', $stats['conversations']['total']], ';');
+            fputcsv($output, ['Conversas Abertas', $stats['conversations']['open']], ';');
+            fputcsv($output, ['Conversas Fechadas', $stats['conversations']['closed']], ';');
+            fputcsv($output, ['Taxa de Resolução', $stats['metrics']['resolution_rate'] . '%'], ';');
+            fputcsv($output, ['Agentes Online', $stats['agents']['online']], ';');
+            fputcsv($output, [], ';');
+            
+            // Top Agentes
+            if (!empty($topAgents)) {
+                fputcsv($output, ['Top Agentes'], ';');
+                fputcsv($output, ['Nome', 'Total Conversas', 'Fechadas', 'Taxa Resolução'], ';');
+                foreach ($topAgents as $agent) {
+                    fputcsv($output, [
+                        $agent['name'] ?? 'Sem nome',
+                        $agent['total_conversations'] ?? 0,
+                        $agent['closed_conversations'] ?? 0,
+                        ($agent['resolution_rate'] ?? 0) . '%'
+                    ], ';');
+                }
+                fputcsv($output, [], ';');
+            }
+            
+            fclose($output);
+            exit;
+        } else {
+            // Para PDF e Excel, retornamos JSON por enquanto
+            // Implementação completa requer bibliotecas como TCPDF/FPDF ou PhpSpreadsheet
+            Response::json([
+                'success' => true,
+                'message' => 'Exportação em ' . strtoupper($format) . ' será implementada em breve',
+                'data' => [
+                    'stats' => $stats,
+                    'top_agents' => $topAgents,
+                    'departments' => $departmentStats,
+                    'funnels' => $funnelStats
+                ]
+            ]);
+        }
+    }
+}
+

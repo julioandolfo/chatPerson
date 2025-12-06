@@ -1,0 +1,38 @@
+# Arquivos de ambiente
+.env
+.env.local
+
+# Logs
+*.log
+logs/
+
+# Cache
+cache/
+tmp/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependências (se usar Composer)
+vendor/
+
+# Assets compilados (se usar build tools)
+public/assets/css/metronic/
+public/assets/js/metronic/
+public/assets/plugins/
+
+# Uploads
+public/uploads/
+storage/
+
+# Banco de dados local
+*.sqlite
+*.db
+

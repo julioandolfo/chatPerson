@@ -1,0 +1,455 @@
+/* Sidebar Toggle Styles */
+
+/* Quando sidebar esquerdo está minimizado */
+#kt_aside.aside-minimize {
+    width: 70px !important;
+    min-width: 70px !important;
+    max-width: 70px !important;
+    transition: width 0.3s ease, min-width 0.3s ease, max-width 0.3s ease;
+    flex-shrink: 0 !important;
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    z-index: 100 !important;
+}
+
+#kt_aside.aside-minimize .aside-logo {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+    justify-content: center !important;
+}
+
+#kt_aside.aside-minimize .aside-logo .logo-text {
+    display: none !important;
+}
+
+#kt_aside.aside-minimize .aside-logo .d-flex {
+    justify-content: center !important;
+}
+
+#kt_aside.aside-minimize #kt_aside_toggle_sidebar {
+    margin-left: 0 !important;
+}
+
+#kt_aside.aside-minimize .menu-title {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    width: 0;
+    overflow: hidden;
+    display: none;
+}
+
+#kt_aside.aside-minimize .menu-arrow {
+    opacity: 0;
+    visibility: hidden;
+    width: 0;
+    overflow: hidden;
+    display: none;
+}
+
+#kt_aside.aside-minimize .menu-sub {
+    display: none !important;
+}
+
+#kt_aside.aside-minimize .menu-item {
+    justify-content: center;
+}
+
+#kt_aside.aside-minimize .menu-link {
+    justify-content: center !important;
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+}
+
+/* Fechar todos os submenus quando minimizado */
+#kt_aside.aside-minimize .menu-item.menu-accordion.show {
+    display: block;
+}
+
+#kt_aside.aside-minimize .menu-item.menu-accordion .menu-sub {
+    display: none !important;
+}
+
+/* Rotacionar ícone do botão toggle quando minimizado */
+#kt_aside.aside-minimize #kt_aside_toggle_sidebar i {
+    transform: rotate(180deg);
+    transition: transform 0.3s ease;
+}
+
+#kt_aside:not(.aside-minimize) #kt_aside_toggle_sidebar i {
+    transform: rotate(0deg);
+    transition: transform 0.3s ease;
+}
+
+/* Ajustar conteúdo quando sidebar esquerdo está minimizado */
+body.aside-minimize .page {
+    margin-left: 0;
+}
+
+body.aside-minimize .wrapper {
+    margin-left: 70px !important; /* Respeitar largura do sidebar minimizado */
+    padding-left: 1.5rem !important; /* Pequeno espaçamento entre sidebar e conteúdo */
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    transition: margin-left 0.3s ease, padding-left 0.3s ease;
+}
+
+/* Garantir que o padding não seja removido por outras regras */
+body.aside-minimize .wrapper {
+    padding-left: 1.5rem !important;
+}
+
+body.aside-minimize #kt_content {
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    padding-left: 0 !important;
+}
+
+body.aside-minimize #kt_content_container {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-left: 0 !important;
+}
+
+/* Ajustar header quando sidebar esquerdo está minimizado */
+body.aside-minimize #kt_header {
+    margin-left: 70px !important;
+    width: 90% !important;
+    transition: margin-left 0.3s ease, margin-right 0.3s ease;
+}
+
+/* Quando sidebar direito está expandido (não minimizado) e esquerdo está minimizado */
+/* O sidebar direito pode estar aberto como drawer, então precisamos respeitar sua largura quando visível */
+body.aside-minimize:not(.right-sidebar-visible) #kt_header {
+    /* Por padrão, quando o sidebar direito não está minimizado, ele pode estar como drawer */
+    /* O drawer do Metronic tem largura de 300px (default) ou 400px (lg) quando aberto */
+    /* Mas quando fechado, não ocupa espaço, então right: 0 */
+    margin-right: 0 !important;
+}
+
+/* Quando sidebar direito está minimizado e esquerdo está minimizado */
+body.aside-minimize.right-sidebar-minimize #kt_header {
+    margin-right: 70px !important;
+}
+
+body.aside-minimize #kt_header_container {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-left: 1.5rem !important; /* Pequeno espaçamento entre sidebar e header */
+}
+
+/* Ajustar conteúdo quando sidebar direito está minimizado */
+#kt_sidebar.sidebar-minimize {
+    width: 70px !important;
+    min-width: 70px !important;
+    max-width: 70px !important;
+    transition: width 0.3s ease, min-width 0.3s ease, max-width 0.3s ease;
+    position: fixed !important;
+    right: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    z-index: 105 !important;
+}
+
+#kt_sidebar.sidebar-minimize .sidebar-body {
+    display: none !important;
+}
+
+#kt_sidebar.sidebar-minimize .border-bottom h3 {
+    display: none !important;
+}
+
+#kt_sidebar.sidebar-minimize .border-bottom {
+    padding: 0.75rem !important;
+    justify-content: center !important;
+    align-items: center !important;
+    display: flex !important;
+    min-height: 60px;
+    position: relative;
+}
+
+#kt_sidebar.sidebar-minimize #kt_right_sidebar_toggle {
+    margin: 0 !important;
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+    transform: none !important;
+}
+
+/* Ajustar wrapper quando sidebar direito está minimizado */
+body.right-sidebar-minimize .wrapper {
+    margin-right: 70px !important; /* Respeitar largura do sidebar direito minimizado */
+    padding-right: 1.5rem !important; /* Pequeno espaçamento entre conteúdo e sidebar direito */
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    transition: margin-right 0.3s ease, padding-right 0.3s ease;
+}
+
+body.right-sidebar-minimize #kt_content {
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    margin-right: 0;
+    padding-right: 0 !important;
+}
+
+body.right-sidebar-minimize #kt_content_container {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-right: 0;
+    padding-right: 0 !important;
+}
+
+body.right-sidebar-minimize #kt_header {
+    margin-right: 70px !important;
+    width: 90% !important;
+    transition: margin-right 0.3s ease;
+}
+
+/* Se sidebar esquerdo estiver expandido quando direito está minimizado, respeitar o esquerdo */
+body.right-sidebar-minimize:not(.aside-minimize) #kt_header {
+    margin-left: 0 !important;
+}
+
+body.right-sidebar-minimize #kt_header_container {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-right: 1.5rem !important; /* Pequeno espaçamento entre header e sidebar direito */
+}
+
+/* Sidebar direito visível (drawer aberto ou fixo) */
+body.right-sidebar-visible #kt_header {
+    margin-right: 400px !important;
+    width: 90% !important;
+}
+
+body.aside-minimize.right-sidebar-visible #kt_header {
+    margin-left: 70px !important;
+    margin-right: 400px !important;
+    width: 90% !important;
+}
+
+body.right-sidebar-visible #kt_header_container {
+    padding-right: 1.5rem !important;
+}
+
+@media (max-width: 1199.98px) {
+    body.right-sidebar-visible #kt_header {
+        margin-right: 300px !important;
+        width: 90% !important;
+    }
+
+    body.aside-minimize.right-sidebar-visible #kt_header {
+        margin-left: 70px !important;
+        margin-right: 300px !important;
+        width: 90% !important;
+    }
+
+    body.right-sidebar-visible .wrapper {
+        margin-right: 300px !important;
+        padding-right: 1.5rem !important;
+    }
+}
+
+body.right-sidebar-visible .wrapper {
+    margin-right: 400px !important;
+    padding-right: 1.5rem !important;
+}
+
+/* Quando ambos estão minimizados */
+body.aside-minimize.right-sidebar-minimize .wrapper {
+    margin-left: 70px !important; /* Respeitar largura do sidebar esquerdo minimizado */
+    margin-right: 70px !important; /* Respeitar largura do sidebar direito minimizado */
+    padding-left: 1.5rem !important; /* Pequeno espaçamento esquerdo */
+    padding-right: 1.5rem !important; /* Pequeno espaçamento direito */
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+}
+
+body.aside-minimize.right-sidebar-minimize #kt_header {
+    margin-left: 70px !important;
+    margin-right: 70px !important;
+    width: 90% !important;
+}
+
+body.aside-minimize.right-sidebar-minimize #kt_header_container {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-left: 1.5rem !important; /* Pequeno espaçamento esquerdo */
+    padding-right: 1.5rem !important; /* Pequeno espaçamento direito */
+}
+
+body.aside-minimize.right-sidebar-minimize #kt_content {
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    margin-right: 0;
+    padding-right: 0 !important;
+}
+
+body.aside-minimize.right-sidebar-minimize #kt_content_container {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-right: 0;
+    padding-right: 0 !important;
+}
+
+/* Garantir que o wrapper ocupe todo o espaço disponível */
+.wrapper {
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+    width: auto !important;
+    transition: margin-left 0.3s ease, margin-right 0.3s ease, padding-left 0.3s ease, padding-right 0.3s ease;
+}
+
+/* Nota: O padding já está sendo aplicado nas regras específicas acima */
+
+/* Ajustar página para usar flexbox corretamente */
+.page {
+    width: 100%;
+    position: relative;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+}
+
+/* Garantir que o conteúdo se adapte */
+#kt_content {
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    transition: margin-right 0.3s ease, padding-right 0.3s ease;
+}
+
+#kt_content_container {
+    width: 100% !important;
+    max-width: 100% !important;
+    transition: width 0.3s ease, padding-left 0.3s ease, padding-right 0.3s ease;
+}
+
+/* Garantir que header também se adapte */
+#kt_header {
+    position: relative;
+    transition: left 0.3s ease, right 0.3s ease;
+    width: 100% !important;
+}
+
+#kt_header_container {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* Sobrescrever padding do Metronic quando necessário */
+body.aside-minimize .wrapper .container,
+body.aside-minimize .wrapper .container-xxl,
+body.aside-minimize .wrapper .container-fluid {
+    padding-left: 1.5rem !important;
+}
+
+body.right-sidebar-minimize .wrapper .container,
+body.right-sidebar-minimize .wrapper .container-xxl,
+body.right-sidebar-minimize .wrapper .container-fluid {
+    padding-right: 1.5rem !important;
+}
+
+body.aside-minimize.right-sidebar-minimize .wrapper .container,
+body.aside-minimize.right-sidebar-minimize .wrapper .container-xxl,
+body.aside-minimize.right-sidebar-minimize .wrapper .container-fluid {
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+}
+
+/* Responsivo - em mobile não aplicar margens */
+@media (max-width: 991.98px) {
+    body.aside-minimize .wrapper,
+    body.right-sidebar-minimize .wrapper,
+    body.aside-minimize.right-sidebar-minimize .wrapper {
+        width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+    
+    body.aside-minimize #kt_header {
+        left: 0 !important;
+        width: 100% !important;
+    }
+    
+    #kt_aside.aside-minimize {
+        width: auto !important;
+        min-width: auto !important;
+    }
+    
+    #kt_sidebar.sidebar-minimize {
+        width: auto !important;
+        min-width: auto !important;
+    }
+}
+
+/* Mostrar apenas ícones quando minimizado */
+.aside-minimize .menu-icon {
+    margin-right: 0 !important;
+}
+
+.aside-minimize .menu-link {
+    justify-content: center !important;
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+}
+
+/* Tooltip quando minimizado */
+#kt_aside.aside-minimize .menu-link {
+    position: relative;
+}
+
+#kt_aside.aside-minimize .menu-link:hover::after {
+    content: attr(data-title);
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #1e1e2d;
+    color: #fff;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    white-space: nowrap;
+    margin-left: 0.5rem;
+    z-index: 1000;
+    font-size: 0.875rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    pointer-events: none;
+}
+
+[data-bs-theme="dark"] #kt_aside.aside-minimize .menu-link:hover::after {
+    background: #15171C;
+    color: #F5F5F5;
+}
+
+/* Ajustar logo quando minimizado */
+.aside-minimize .aside-logo a {
+    justify-content: center;
+}
+
+/* Responsivo - em mobile sempre drawer */
+@media (max-width: 991.98px) {
+    .aside-minimize {
+        width: auto !important;
+    }
+    
+    body.aside-minimize .wrapper {
+        margin-left: 0;
+    }
+    
+    body.aside-minimize #kt_header {
+        left: 0;
+    }
+}
+

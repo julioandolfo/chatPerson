@@ -1,0 +1,303 @@
+# Regras do Cursor para este Projeto
+
+## Contexto do Projeto
+Este é um sistema multiatendimento/multiatendentes/multicanal desenvolvido em PHP + MySQL, inspirado no Chatwoot.
+
+## Tecnologias
+- Backend: PHP 8.1+ (Vanilla PHP, sem framework)
+- Banco: MySQL 8.0+
+- Frontend: HTML5, CSS3, JavaScript (Vanilla)
+- Tema: Metronic 8 (Demo 3 - Compact Sidebar)
+- WebSocket: Ratchet ou ReactPHP
+- IA: OpenAI (GPT-4, GPT-3.5-turbo) para Agentes de IA
+
+## Estrutura de Diretórios
+- `/api/` - API REST
+- `/app/` - Lógica MVC (Controllers, Models, Services, Middleware)
+- `/config/` - Configurações
+- `/database/` - Migrations e seeds
+- `/public/` - Entry point e assets públicos
+- `/views/` - Templates PHP
+- `/metronic/` - ⚠️ Referência apenas, NÃO usar diretamente
+
+## Convenções de Código
+- PHP: PSR-12, camelCase métodos, PascalCase classes
+- JavaScript: ES6+, classes para componentes
+- Banco: snake_case para tabelas/colunas
+- Arquivos: kebab-case para views
+
+## Sistema de Permissões
+- 7 níveis hierárquicos (Super Admin → Admin → Supervisor → Agente Sênior → Agente → Agente Júnior → Visualizador)
+- Permissões granulares por recurso
+- Verificar sempre antes de ações usando `Permission::can()` ou `Permission::abortIfCannot()`
+- Cache em arquivo (`storage/cache/permissions/`)
+- Herança hierárquica automática
+
+## Sistema de Permissões - Verificação
+SEMPRE verificar permissões antes de ações:
+```php
+// No início dos métodos do Controller
+Permission::abortIfCannot('conversations.view.all');
+// ou
+if (!Permission::can('conversations.edit.own')) {
+    Response::json(['error' => 'Sem permissão'], 403);
+}
+```
+
+## Padrões de Design
+- MVC: Controllers → Services → Models
+- Service Layer: Lógica de negócio isolada em Services
+- Middleware: Interceptação de requisições
+- Active Record: Para Models (herdam de `App\Models\Model`)
+
+## Estrutura de Arquivos
+- Controllers: `PascalCaseController.php` em `app/Controllers/`
+- Models: `PascalCase.php` em `app/Models/` (herdam de `App\Models\Model`)
+- Services: `PascalCaseService.php` em `app/Services/` (métodos estáticos)
+- Views: `kebab-case.php` em `views/`
+- Migrations: `XXX_descriptive_name.php` em `database/migrations/`
+
+## Ao Criar Novas Funcionalidades
+1. Criar migration (`database/migrations/XXX_create_table.php`)
+2. Criar Model (`app/Models/ModelName.php`)
+3. Criar Service (`app/Services/ModelNameService.php`)
+4. Criar Controller (`app/Controllers/ModelNameController.php`)
+5. Criar Views (`views/model-name/index.php`, `show.php`, etc)
+6. Adicionar rotas em `routes/web.php`
+7. Adicionar permissões em seeds (`database/seeds/002_create_roles_and_permissions.php`)
+8. Adicionar link no menu (`views/layouts/metronic/sidebar.php`)
+9. Documentar
+
+## Ao Modificar Funcionalidades
+1. Verificar impacto em outras partes do sistema
+2. Criar migration se necessário (nunca alterar migrations existentes)
+3. Atualizar Models/Services/Views conforme necessário
+4. Atualizar documentação (.md files)
+5. Testar funcionalidade
+
+## Banco de Dados
+- Usar migrations para TODAS as mudanças
+- Timestamps: `created_at`, `updated_at` (automático via Model)
+- Soft deletes: `deleted_at` quando necessário
+- JSON para campos complexos (settings, metadata, config)
+- Foreign keys sempre com `ON DELETE CASCADE` ou `ON DELETE SET NULL`
+- Índices em campos frequentemente consultados
+
+## Models - Padrão
+```php
+namespace App\Models;
+use App\Helpers\Database;
+
+class ModelName extends Model
+{
+    protected string $table = 'table_name';
+    protected string $primaryKey = 'id';
+    protected array $fillable = ['field1', 'field2'];
+    protected bool $timestamps = true;
+}
+```
+
+## Services - Padrão
+```php
+namespace App\Services;
+use App\Models\ModelName;
+use App\Helpers\Validator;
+
+class ModelNameService
+{
+    public static function create(array $data): int
+    {
+        // Validação
+        $errors = Validator::validate($data, [
+            'field1' => 'required|string|max:255',
+        ]);
+        if (!empty($errors)) {
+            throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));
+        }
+        
+        // Lógica de negócio
+        // ...
+        
+        // Criar no banco
+        return ModelName::create($data);
+    }
+}
+```
+
+## Controllers - Padrão
+```php
+namespace App\Controllers;
+use App\Helpers\Response;
+use App\Helpers\Permission;
+use App\Services\ModelNameService;
+
+class ModelNameController
+{
+    public function index(): void
+    {
+        Permission::abortIfCannot('model.view');
+        // ...
+        Response::view('model-name/index', $data);
+    }
+}
+```
+
+## Segurança
+- SEMPRE validar inputs usando `Validator::validate()`
+- SEMPRE sanitizar outputs (htmlspecialchars, etc)
+- SEMPRE usar prepared statements (via Model)
+- SEMPRE verificar permissões antes de ações
+- CSRF protection em formulários
+- XSS protection (escapar outputs)
+- SQL Injection: usar Models/Prepared Statements
+- Rate limiting em APIs
+
+## Performance
+- Cache quando possível (permissões, configurações)
+- Índices no banco de dados
+- Paginação em listagens (limite padrão: 50)
+- Processar tarefas pesadas em background (Jobs)
+- Lazy loading de relacionamentos quando necessário
+
+## Frontend
+- Layout: 3 colunas (Sidebar 70px + Lista 380px + Chat flex)
+- Responsivo: Mobile-friendly
+- Tempo real: WebSocket (já implementado)
+- Componentes reutilizáveis em `views/components/`
+- Metronic 8: Usar classes e componentes do Metronic
+- JavaScript: Modular, ES6+, classes para componentes principais
+
+## WebSocket
+- Servidor: `public/websocket-server.php` (Rodar separadamente)
+- Cliente: `public/assets/js/websocket-client.js` (incluído automaticamente)
+- Eventos: `new_message`, `conversation_updated`, `agent_status`, etc
+- Usar `WebSocket::notify*()` helpers para notificar
+
+## Integrações
+- WhatsApp: Quepasa API (implementado) e Evolution API (pendente)
+- Webhooks: Receber eventos externos
+- OpenAI: Para Agentes de IA (pendente implementação)
+
+## Sistema de Agentes de IA (NOVO - Pendente)
+- Criar agentes especializados (SDR, CS, CLOSER, etc)
+- Cada agente tem: prompt, model, temperature, tools
+- Tools disponíveis: WooCommerce, Database, N8N, Documents, System, API
+- Integração com OpenAI Function Calling
+- Logs em `ai_conversations` (tokens, custo, tools utilizadas)
+- Ver `PROGRESSO_AGENTES_IA.md` para detalhes
+
+## Configurações Avançadas de Conversas (NOVO - Pendente)
+- Limites por agente/setor/funil
+- SLA de resposta e resolução
+- Distribuição avançada (round-robin, por carga, etc)
+- Reatribuição automática após SLA
+- Priorização e filas
+- Armazenado em `settings` table com chave `conversation_settings`
+- Ver `NOVAS_FUNCIONALIDADES.md` para detalhes
+
+## Funcionalidades Implementadas
+✅ WebSocket (100%)
+✅ WhatsApp Quepasa (100%)
+✅ Tags (100%)
+✅ Notificações (100%)
+✅ Templates de Mensagens (100%)
+✅ Configurações Básicas (100%)
+✅ Permissões (95%)
+✅ Setores/Departamentos (70%)
+✅ Funis/Kanban (75%)
+✅ Automações (85%)
+
+## Funcionalidades Pendentes
+⏳ Configurações Avançadas de Conversas
+⏳ Sistema de Agentes de IA
+⏳ CRUD Completo de Agentes/Usuários
+⏳ Melhorias de interface (Setores, Automações)
+⏳ Validações avançadas de Kanban
+⏳ Anexos e Mídia
+
+## Regras Importantes
+1. NUNCA referenciar arquivos de `/metronic/` diretamente no código
+2. Usar sempre `/public/assets/` para assets
+3. Sempre verificar permissões antes de ações
+4. Usar Services para lógica de negócio (Controllers devem ser finos)
+5. Sempre validar inputs com `Validator::validate()`
+6. Usar Models para acesso a dados (não SQL direto)
+7. Documentar código complexo
+8. Seguir padrões existentes no código
+9. Atualizar documentação (.md) quando criar/modificar funcionalidades
+10. Testar funcionalidades antes de considerar concluídas
+
+## Helpers Disponíveis
+- `App\Helpers\Auth` - Autenticação
+- `App\Helpers\Database` - Conexão com banco
+- `App\Helpers\Permission` - Verificação de permissões
+- `App\Helpers\Request` - Dados da requisição
+- `App\Helpers\Response` - Respostas (view, json, redirect)
+- `App\Helpers\Router` - Rotas
+- `App\Helpers\Url` - URLs e helpers
+- `App\Helpers\Validator` - Validação de dados
+- `App\Helpers\WebSocket` - Notificações WebSocket
+
+## Documentação Importante
+- `CONTEXT_IA.md` - Contexto completo do sistema
+- `ARQUITETURA.md` - Arquitetura técnica detalhada
+- `SISTEMA_REGRAS_COMPLETO.md` - Regras detalhadas de permissões, Kanban e automações
+- `FUNCIONALIDADES_PENDENTES.md` - O que está feito e o que falta
+- `PROGRESSO_*.md` - Progresso de cada módulo
+- `NOVAS_FUNCIONALIDADES.md` - Novas funcionalidades planejadas
+
+## Quando em Dúvida
+1. Consultar `CONTEXT_IA.md` primeiro
+2. Consultar `ARQUITETURA.md` para arquitetura
+3. Consultar `FUNCIONALIDADES_PENDENTES.md` para ver o que está implementado
+4. Verificar código existente similar
+5. Seguir padrões existentes
+6. Documentar decisões importantes
+
+## Exemplos de Código
+
+### Criar Migration
+```php
+function up_table_name() {
+    global $pdo;
+    $sql = "CREATE TABLE IF NOT EXISTS table_name (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+    if (isset($pdo)) {
+        $pdo->exec($sql);
+    } else {
+        \App\Helpers\Database::getInstance()->exec($sql);
+    }
+    echo "✅ Tabela 'table_name' criada com sucesso!\n";
+}
+```
+
+### Adicionar Rota
+```php
+// Em routes/web.php
+Router::get('/route', [Controller::class, 'method'], ['Authentication']);
+Router::post('/route', [Controller::class, 'method'], ['Authentication', 'Permission:resource.action']);
+```
+
+### Adicionar Permissão
+```php
+// Em database/seeds/002_create_roles_and_permissions.php
+Permission::create([
+    'name' => 'Visualizar Recurso',
+    'slug' => 'resource.view',
+    'module' => 'resource'
+]);
+```
+
+## Notas Finais
+- Este projeto usa PHP Vanilla (sem framework)
+- Padrão MVC com Service Layer
+- Active Record para Models
+- WebSocket para tempo real
+- Sistema de permissões hierárquico
+- Automações com engine completa
+- Integração WhatsApp funcional
+- Preparado para Agentes de IA

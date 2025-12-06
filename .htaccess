@@ -1,0 +1,5 @@
+# Redirecionar para pasta public
+RewriteEngine On
+RewriteCond %{REQUEST_URI} !^/chat/public/
+RewriteRule ^(.*)$ /chat/public/$1 [L]
+

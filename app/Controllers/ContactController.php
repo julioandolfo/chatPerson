@@ -1,0 +1,246 @@
+<?php
+/**
+ * Controller de Contatos
+ */
+
+namespace App\Controllers;
+
+use App\Helpers\Response;
+use App\Helpers\Permission;
+use App\Services\ContactService;
+
+class ContactController
+{
+    /**
+     * Listar contatos
+     */
+    public function index(): void
+    {
+        Permission::abortIfCannot('contacts.view');
+        // Obter filtros da requisição
+        $filters = [
+            'search' => $_GET['search'] ?? null,
+            'limit' => $_GET['limit'] ?? 50,
+            'offset' => $_GET['offset'] ?? 0
+        ];
+
+        // Remover filtros vazios
+        $filters = array_filter($filters, function($value) {
+            return $value !== null && $value !== '';
+        });
+
+        try {
+            $contacts = ContactService::list($filters);
+            
+            Response::view('contacts/index', [
+                'contacts' => $contacts,
+                'filters' => $filters
+            ]);
+        } catch (\Exception $e) {
+            Response::view('contacts/index', [
+                'contacts' => [],
+                'filters' => $filters,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Mostrar contato específico
+     */
+    public function show(int $id): void
+    {
+        Permission::abortIfCannot('contacts.view');
+        try {
+            $contact = \App\Models\Contact::find($id);
+            
+            if (!$contact) {
+                Response::notFound('Contato não encontrado');
+                return;
+            }
+
+            // Obter conversas do contato
+            $conversations = \App\Models\Conversation::where('contact_id', '=', $id);
+
+            Response::view('contacts/show', [
+                'contact' => $contact,
+                'conversations' => $conversations
+            ]);
+        } catch (\Exception $e) {
+            Response::view('errors/404', [
+                'message' => $e->getMessage()
+            ], 404);
+        }
+    }
+
+    /**
+     * Criar novo contato
+     */
+    public function store(): void
+    {
+        Permission::abortIfCannot('contacts.create');
+        
+        try {
+            $request = \App\Helpers\Request::post();
+            
+            $data = [
+                'name' => $request['name'] ?? '',
+                'last_name' => $request['last_name'] ?? null,
+                'email' => $request['email'] ?? null,
+                'phone' => $request['phone'] ?? null,
+                'whatsapp_id' => $request['whatsapp_id'] ?? null,
+                'city' => $request['city'] ?? null,
+                'country' => $request['country'] ?? null,
+                'bio' => $request['bio'] ?? null,
+                'company' => $request['company'] ?? null,
+                'social_media' => $request['social_media'] ?? null,
+                'avatar' => $request['avatar'] ?? null
+            ];
+            
+            // Processar social_media se for string JSON
+            if (isset($data['social_media']) && is_string($data['social_media'])) {
+                $data['social_media'] = json_decode($data['social_media'], true) ?? [];
+            } elseif (!isset($data['social_media'])) {
+                $data['social_media'] = [];
+            }
+            
+            // Criar contato primeiro
+            $contact = ContactService::createOrUpdate($data);
+            
+            // Processar upload de avatar se houver
+            if (!empty($_FILES['avatar_file']) && $_FILES['avatar_file']['error'] === UPLOAD_ERR_OK && isset($contact['id'])) {
+                $data['avatar'] = ContactService::uploadAvatar($contact['id'], $_FILES['avatar_file']);
+                $contact = ContactService::update($contact['id'], ['avatar' => $data['avatar']]);
+            }
+            
+            // Atualizar social_media se necessário
+            if (isset($contact['id']) && !empty($data['social_media'])) {
+                $contact = ContactService::update($contact['id'], ['social_media' => $data['social_media']]);
+            }
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Contato criado com sucesso',
+                'contact' => $contact
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Atualizar contato
+     */
+    public function update(int $id): void
+    {
+        Permission::abortIfCannot('contacts.edit');
+        
+        try {
+            $request = \App\Helpers\Request::post();
+            
+            $data = [
+                'name' => $request['name'] ?? null,
+                'last_name' => $request['last_name'] ?? null,
+                'email' => $request['email'] ?? null,
+                'phone' => $request['phone'] ?? null,
+                'whatsapp_id' => $request['whatsapp_id'] ?? null,
+                'city' => $request['city'] ?? null,
+                'country' => $request['country'] ?? null,
+                'bio' => $request['bio'] ?? null,
+                'company' => $request['company'] ?? null,
+                'social_media' => $request['social_media'] ?? null,
+                'avatar' => $request['avatar'] ?? null
+            ];
+            
+            // Processar upload de avatar se houver
+            if (!empty($_FILES['avatar_file']) && $_FILES['avatar_file']['error'] === UPLOAD_ERR_OK) {
+                $data['avatar'] = ContactService::uploadAvatar($id, $_FILES['avatar_file']);
+            }
+            
+            // Processar social_media se for string JSON
+            if (isset($data['social_media']) && is_string($data['social_media'])) {
+                $data['social_media'] = json_decode($data['social_media'], true) ?? [];
+            } elseif (!isset($data['social_media'])) {
+                $data['social_media'] = [];
+            }
+
+            // Remover campos vazios (exceto arrays vazios que podem ser válidos)
+            $data = array_filter($data, function($value) {
+                if (is_array($value)) {
+                    return true; // Manter arrays mesmo vazios
+                }
+                return $value !== null && $value !== '';
+            });
+
+            $contact = ContactService::update($id, $data);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Contato atualizado com sucesso',
+                'contact' => $contact
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Upload de avatar do contato
+     */
+    public function uploadAvatar(int $id): void
+    {
+        Permission::abortIfCannot('contacts.edit');
+        
+        try {
+            if (empty($_FILES['avatar']) || $_FILES['avatar']['error'] !== UPLOAD_ERR_OK) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro ao fazer upload do arquivo'
+                ], 400);
+                return;
+            }
+
+            $avatarPath = ContactService::uploadAvatar($id, $_FILES['avatar']);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Avatar atualizado com sucesso',
+                'avatar' => $avatarPath
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Deletar contato
+     */
+    public function destroy(int $id): void
+    {
+        Permission::abortIfCannot('contacts.delete');
+        
+        try {
+            ContactService::delete($id);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Contato deletado com sucesso'
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+}
+

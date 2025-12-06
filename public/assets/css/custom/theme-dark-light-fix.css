@@ -1,0 +1,736 @@
+/**
+ * CORREÇÃO COMPLETA DE TEMA DARK/LIGHT
+ * 
+ * Este arquivo corrige todas as cores que não se adaptam corretamente
+ * entre os modos dark e light, usando as variáveis CSS do Metronic.
+ * 
+ * IMPORTANTE: Este arquivo deve ser carregado APÓS o style.bundle.css do Metronic
+ */
+
+/* ============================================
+   CORES DE TEXTO GRAY - CORREÇÃO COMPLETA
+   ============================================ */
+
+/* 
+ * No modo dark, text-gray-900 (muito escuro) deve ser claro
+ * No modo dark, text-gray-800 (escuro) deve ser claro
+ * No modo dark, text-gray-700 (médio-escuro) deve ser médio-claro
+ * E assim por diante...
+ */
+
+[data-bs-theme="dark"] {
+    /* 
+     * CORES DE TEXTO GRAY PARA DARK MODE
+     * Valores oficiais do Metronic para dark mode
+     * No dark mode, as cores são invertidas:
+     * - text-gray-900 (mais escuro no light) = mais claro no dark (#F5F5F5)
+     * - text-gray-800 = claro no dark (#B5B7C8)
+     * - text-gray-700 = médio-claro no dark (#9A9CAE)
+     * - text-gray-600 = médio no dark (#808290)
+     * - text-gray-500 = médio-escuro no dark (#636674)
+     * - text-gray-400 = escuro no dark (#464852)
+     */
+    
+    /* Text Gray 900 - Títulos principais - BRANCO/CLARO no dark */
+    --bs-text-gray-900: #F5F5F5 !important;
+    
+    /* Text Gray 800 - Subtítulos - CLARO no dark */
+    --bs-text-gray-800: #B5B7C8 !important;
+    
+    /* Text Gray 700 - Texto importante - MÉDIO-CLARO no dark */
+    --bs-text-gray-700: #9A9CAE !important;
+    
+    /* Text Gray 600 - Texto normal - MÉDIO no dark */
+    --bs-text-gray-600: #808290 !important;
+    
+    /* Text Gray 500 - Texto secundário - MÉDIO-ESCURO no dark */
+    --bs-text-gray-500: #636674 !important;
+    
+    /* Text Gray 400 - Texto desabilitado - ESCURO no dark */
+    --bs-text-gray-400: #464852 !important;
+    
+    /* Gray colors para backgrounds (valores do Metronic dark) */
+    --bs-gray-900: #1C1D22 !important;
+    --bs-gray-800: #1E2027 !important;
+    --bs-gray-700: #252F4A !important;
+    --bs-gray-600: #4B5675 !important;
+    --bs-gray-500: #636674 !important;
+    --bs-gray-400: #464852 !important;
+    --bs-gray-300: #363843 !important;
+    --bs-gray-200: #26272F !important;
+    --bs-gray-100: #1B1C22 !important;
+}
+
+/* Aplicar as variáveis CSS nas classes de texto */
+[data-bs-theme="dark"] .text-gray-900,
+[data-bs-theme="dark"] h1.text-gray-900,
+[data-bs-theme="dark"] h2.text-gray-900,
+[data-bs-theme="dark"] h3.text-gray-900,
+[data-bs-theme="dark"] h4.text-gray-900,
+[data-bs-theme="dark"] h5.text-gray-900,
+[data-bs-theme="dark"] h6.text-gray-900,
+[data-bs-theme="dark"] .fw-bold.text-gray-900,
+[data-bs-theme="dark"] .fw-semibold.text-gray-900,
+[data-bs-theme="dark"] span.text-gray-900,
+[data-bs-theme="dark"] a.text-gray-900,
+[data-bs-theme="dark"] div.text-gray-900,
+[data-bs-theme="dark"] p.text-gray-900,
+[data-bs-theme="dark"] td.text-gray-900,
+[data-bs-theme="dark"] th.text-gray-900 {
+    color: var(--bs-text-gray-900) !important;
+}
+
+[data-bs-theme="dark"] .text-gray-800,
+[data-bs-theme="dark"] h1.text-gray-800,
+[data-bs-theme="dark"] h2.text-gray-800,
+[data-bs-theme="dark"] h3.text-gray-800,
+[data-bs-theme="dark"] h4.text-gray-800,
+[data-bs-theme="dark"] h5.text-gray-800,
+[data-bs-theme="dark"] h6.text-gray-800,
+[data-bs-theme="dark"] .fw-bold.text-gray-800,
+[data-bs-theme="dark"] .fw-semibold.text-gray-800,
+[data-bs-theme="dark"] span.text-gray-800,
+[data-bs-theme="dark"] a.text-gray-800,
+[data-bs-theme="dark"] div.text-gray-800,
+[data-bs-theme="dark"] p.text-gray-800,
+[data-bs-theme="dark"] td.text-gray-800,
+[data-bs-theme="dark"] th.text-gray-800 {
+    color: var(--bs-text-gray-800) !important;
+}
+
+[data-bs-theme="dark"] .text-gray-700 {
+    color: var(--bs-text-gray-700) !important;
+}
+
+[data-bs-theme="dark"] .text-gray-600 {
+    color: var(--bs-text-gray-600) !important;
+}
+
+[data-bs-theme="dark"] .text-gray-500 {
+    color: var(--bs-text-gray-500) !important;
+}
+
+[data-bs-theme="dark"] .text-gray-400 {
+    color: var(--bs-text-gray-400) !important;
+}
+
+/* Text Muted */
+[data-bs-theme="dark"] .text-muted {
+    color: var(--bs-text-gray-500) !important;
+}
+
+/* ============================================
+   BACKGROUNDS E ELEMENTOS
+   ============================================ */
+
+/* Backgrounds brancos devem ser escuros */
+[data-bs-theme="dark"] .bg-white {
+    background-color: var(--bs-gray-800) !important;
+}
+
+[data-bs-theme="dark"] .bg-light {
+    background-color: var(--bs-gray-700) !important;
+}
+
+/* ============================================
+   CARDS - CORREÇÃO COMPLETA (Estilo Metronic Demo)
+   ============================================ */
+
+/* Cards base - fundo #15171C e borda #26272F como no demo do Metronic */
+[data-bs-theme="dark"] .card {
+    background-color: #15171C !important;
+    border-color: #26272F !important;
+    border-width: 1px !important;
+    border-style: solid !important;
+    color: var(--bs-text-gray-800) !important;
+}
+
+[data-bs-theme="dark"] .card-header {
+    background-color: #15171C !important;
+    border-color: #26272F !important;
+    border-bottom-color: #26272F !important;
+}
+
+[data-bs-theme="dark"] .card-body {
+    background-color: #15171C !important;
+    color: var(--bs-text-gray-800) !important;
+}
+
+[data-bs-theme="dark"] .card-footer {
+    background-color: #15171C !important;
+    border-color: #26272F !important;
+    border-top-color: #26272F !important;
+}
+
+/* Card titles e textos - garantir que sejam claros */
+[data-bs-theme="dark"] .card-title,
+[data-bs-theme="dark"] .card .card-title {
+    color: var(--bs-text-gray-900) !important;
+}
+
+[data-bs-theme="dark"] .card-header .card-title {
+    color: var(--bs-text-gray-900) !important;
+}
+
+/* Todos os textos dentro de cards devem ser claros */
+[data-bs-theme="dark"] .card * {
+    color: inherit;
+}
+
+[data-bs-theme="dark"] .card .text-gray-900,
+[data-bs-theme="dark"] .card .text-gray-800,
+[data-bs-theme="dark"] .card .text-gray-700,
+[data-bs-theme="dark"] .card .text-gray-600 {
+    color: var(--bs-text-gray-800) !important;
+}
+
+/* Card labels e spans */
+[data-bs-theme="dark"] .card-label {
+    color: var(--bs-text-gray-900) !important;
+}
+
+[data-bs-theme="dark"] .card .fw-bold,
+[data-bs-theme="dark"] .card .fw-semibold {
+    color: var(--bs-text-gray-900) !important;
+}
+
+/* Cards com backgrounds coloridos específicos */
+[data-bs-theme="dark"] .card[style*="background-color: #F7D9E3"],
+[data-bs-theme="dark"] .card[style*="background-color:#F7D9E3"] {
+    background-color: rgba(247, 217, 227, 0.1) !important;
+    border-color: rgba(247, 217, 227, 0.2);
+}
+
+[data-bs-theme="dark"] .card[style*="background-color: #CBF0F4"],
+[data-bs-theme="dark"] .card[style*="background-color:#CBF0F4"] {
+    background-color: rgba(203, 240, 244, 0.1) !important;
+    border-color: rgba(203, 240, 244, 0.2);
+}
+
+[data-bs-theme="dark"] .card[style*="background-color: #CBD4F4"],
+[data-bs-theme="dark"] .card[style*="background-color:#CBD4F4"] {
+    background-color: rgba(203, 212, 244, 0.1) !important;
+    border-color: rgba(203, 212, 244, 0.2);
+}
+
+/* Garantir que textos dentro de cards coloridos sejam claros */
+[data-bs-theme="dark"] .card[style*="background-color: #F7D9E3"] .text-gray-900,
+[data-bs-theme="dark"] .card[style*="background-color:#F7D9E3"] .text-gray-900,
+[data-bs-theme="dark"] .card[style*="background-color: #CBF0F4"] .text-gray-900,
+[data-bs-theme="dark"] .card[style*="background-color:#CBF0F4"] .text-gray-900,
+[data-bs-theme="dark"] .card[style*="background-color: #CBD4F4"] .text-gray-900,
+[data-bs-theme="dark"] .card[style*="background-color:#CBD4F4"] .text-gray-900,
+[data-bs-theme="dark"] .card[style*="background-color: #F7D9E3"] a,
+[data-bs-theme="dark"] .card[style*="background-color:#F7D9E3"] a,
+[data-bs-theme="dark"] .card[style*="background-color: #CBF0F4"] a,
+[data-bs-theme="dark"] .card[style*="background-color:#CBF0F4"] a,
+[data-bs-theme="dark"] .card[style*="background-color: #CBD4F4"] a,
+[data-bs-theme="dark"] .card[style*="background-color:#CBD4F4"] a {
+    color: var(--bs-text-gray-900) !important;
+}
+
+[data-bs-theme="dark"] .card[style*="background-color: #F7D9E3"] span,
+[data-bs-theme="dark"] .card[style*="background-color:#F7D9E3"] span,
+[data-bs-theme="dark"] .card[style*="background-color: #CBF0F4"] span,
+[data-bs-theme="dark"] .card[style*="background-color:#CBF0F4"] span,
+[data-bs-theme="dark"] .card[style*="background-color: #CBD4F4"] span,
+[data-bs-theme="dark"] .card[style*="background-color:#CBD4F4"] span {
+    color: var(--bs-text-gray-900) !important;
+}
+
+/* Theme dark bg body */
+[data-bs-theme="dark"] .theme-dark-bg-body {
+    background-color: var(--bs-body-bg) !important;
+}
+
+/* ============================================
+   TABELAS
+   ============================================ */
+
+[data-bs-theme="dark"] .table {
+    color: var(--bs-text-gray-800);
+}
+
+[data-bs-theme="dark"] .table thead th {
+    color: var(--bs-text-gray-600);
+    border-color: var(--bs-gray-700);
+}
+
+[data-bs-theme="dark"] .table tbody td {
+    border-color: var(--bs-gray-700);
+    color: var(--bs-text-gray-800);
+}
+
+[data-bs-theme="dark"] .table tbody tr {
+    color: var(--bs-text-gray-800);
+}
+
+[data-bs-theme="dark"] .table-row-dashed td {
+    border-color: var(--bs-gray-700);
+}
+
+/* ============================================
+   FORMULÁRIOS - CORREÇÃO COMPLETA (Estilo Metronic Demo)
+   ============================================ */
+
+/* Inputs normais - usar cores do Metronic dark mode */
+[data-bs-theme="dark"] .form-control,
+[data-bs-theme="dark"] .form-select {
+    background-color: #1B1C22 !important; /* gray-100-dark do Metronic */
+    border-color: #26272F !important; /* gray-200-dark do Metronic */
+    color: var(--bs-text-gray-800) !important;
+}
+
+/* Inputs solid (form-control-solid) - usar gray-100-dark como no demo */
+[data-bs-theme="dark"] .form-control-solid,
+[data-bs-theme="dark"] .form-select-solid {
+    background-color: #1B1C22 !important; /* gray-100-dark - cor correta do Metronic */
+    border-color: #1B1C22 !important; /* mesma cor da borda */
+    color: var(--bs-text-gray-800) !important;
+}
+
+[data-bs-theme="dark"] .form-control-solid::placeholder,
+[data-bs-theme="dark"] .form-select-solid::placeholder {
+    color: var(--bs-text-gray-500) !important;
+}
+
+/* Focus state - usar gray-200-dark como no demo */
+[data-bs-theme="dark"] .form-control-solid:focus,
+[data-bs-theme="dark"] .form-select-solid:focus {
+    background-color: #26272F !important; /* gray-200-dark - cor de focus do Metronic */
+    border-color: var(--bs-primary) !important;
+    color: var(--bs-text-gray-800) !important;
+}
+
+/* Inputs normais em focus */
+[data-bs-theme="dark"] .form-control:focus,
+[data-bs-theme="dark"] .form-select:focus {
+    background-color: #1B1C22 !important;
+    border-color: var(--bs-primary) !important;
+    color: var(--bs-text-gray-800) !important;
+}
+
+[data-bs-theme="dark"] label,
+[data-bs-theme="dark"] .form-label {
+    color: var(--bs-text-gray-800);
+}
+
+/* ============================================
+   MODAIS
+   ============================================ */
+
+/* ============================================
+   MODAIS - CORREÇÃO COMPLETA (Estilo Metronic Demo)
+   ============================================ */
+
+/* Modais - fundo #15171C e borda #26272F como no demo do Metronic */
+[data-bs-theme="dark"] .modal-content {
+    background-color: #15171C !important;
+    border-color: #26272F !important;
+    border-width: 1px !important;
+    border-style: solid !important;
+    color: var(--bs-text-gray-800) !important;
+}
+
+[data-bs-theme="dark"] .modal-header {
+    background-color: #15171C !important;
+    border-color: #26272F !important;
+    border-bottom-color: #26272F !important;
+    color: var(--bs-text-gray-900) !important;
+}
+
+[data-bs-theme="dark"] .modal-body {
+    background-color: #15171C !important;
+    color: var(--bs-text-gray-800) !important;
+}
+
+[data-bs-theme="dark"] .modal-footer {
+    background-color: #15171C !important;
+    border-color: #26272F !important;
+    border-top-color: #26272F !important;
+}
+
+[data-bs-theme="dark"] .modal-title {
+    color: var(--bs-text-gray-900) !important;
+}
+
+/* Modal backdrop */
+[data-bs-theme="dark"] .modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Textos dentro dos modais */
+[data-bs-theme="dark"] .modal-content .text-gray-900,
+[data-bs-theme="dark"] .modal-content .text-gray-800,
+[data-bs-theme="dark"] .modal-content .text-gray-700 {
+    color: var(--bs-text-gray-800) !important;
+}
+
+[data-bs-theme="dark"] .modal-content .text-muted {
+    color: var(--bs-text-gray-600) !important;
+}
+
+/* ============================================
+   BADGES
+   ============================================ */
+
+[data-bs-theme="dark"] .badge-light-primary {
+    background-color: rgba(var(--bs-primary-rgb), 0.15) !important;
+    color: var(--bs-primary) !important;
+}
+
+[data-bs-theme="dark"] .badge-light-success {
+    background-color: rgba(var(--bs-success-rgb), 0.15) !important;
+    color: var(--bs-success) !important;
+}
+
+[data-bs-theme="dark"] .badge-light-info {
+    background-color: rgba(var(--bs-info-rgb), 0.15) !important;
+    color: var(--bs-info) !important;
+}
+
+[data-bs-theme="dark"] .badge-light-warning {
+    background-color: rgba(var(--bs-warning-rgb), 0.15) !important;
+    color: var(--bs-warning) !important;
+}
+
+[data-bs-theme="dark"] .badge-light-danger {
+    background-color: rgba(var(--bs-danger-rgb), 0.15) !important;
+    color: var(--bs-danger) !important;
+}
+
+[data-bs-theme="dark"] .badge-light-secondary {
+    background-color: var(--bs-gray-700) !important;
+    color: var(--bs-text-gray-800) !important;
+}
+
+[data-bs-theme="dark"] .badge-light-dark {
+    background-color: var(--bs-gray-700) !important;
+    color: var(--bs-text-gray-900) !important;
+}
+
+[data-bs-theme="dark"] .badge-light {
+    background-color: var(--bs-gray-700) !important;
+    color: var(--bs-text-gray-800) !important;
+}
+
+/* ============================================
+   SYMBOLS E AVATARS
+   ============================================ */
+
+[data-bs-theme="dark"] .symbol-label.bg-light {
+    background-color: var(--bs-gray-700) !important;
+}
+
+[data-bs-theme="dark"] .symbol-label.bg-light-primary {
+    background-color: rgba(var(--bs-primary-rgb), 0.15) !important;
+}
+
+[data-bs-theme="dark"] .symbol-label.bg-light-success {
+    background-color: rgba(var(--bs-success-rgb), 0.15) !important;
+}
+
+[data-bs-theme="dark"] .symbol-label.bg-light-info {
+    background-color: rgba(var(--bs-info-rgb), 0.15) !important;
+}
+
+[data-bs-theme="dark"] .symbol-label.bg-light-warning {
+    background-color: rgba(var(--bs-warning-rgb), 0.15) !important;
+}
+
+[data-bs-theme="dark"] .symbol-label.bg-light-danger {
+    background-color: rgba(var(--bs-danger-rgb), 0.15) !important;
+}
+
+[data-bs-theme="dark"] .symbol-label.text-gray-900 {
+    color: var(--bs-text-gray-900) !important;
+}
+
+/* ============================================
+   HEADER E SIDEBAR
+   ============================================ */
+
+[data-bs-theme="dark"] #kt_header .text-gray-900,
+[data-bs-theme="dark"] .page-title .text-gray-900 {
+    color: var(--bs-text-gray-900) !important;
+}
+
+[data-bs-theme="dark"] #kt_aside .text-gray-900,
+[data-bs-theme="dark"] #kt_aside_logo .text-gray-900,
+[data-bs-theme="dark"] .aside-logo .text-gray-900 {
+    color: var(--bs-text-gray-900) !important;
+}
+
+/* ============================================
+   SEPARADORES E BORDAS
+   ============================================ */
+
+[data-bs-theme="dark"] .separator {
+    border-color: var(--bs-gray-700) !important;
+}
+
+[data-bs-theme="dark"] .border-gray-200 {
+    border-color: var(--bs-gray-700) !important;
+}
+
+[data-bs-theme="dark"] .border-gray-300 {
+    border-color: var(--bs-gray-600) !important;
+}
+
+/* ============================================
+   ALERTS
+   ============================================ */
+
+[data-bs-theme="dark"] .alert {
+    border-color: var(--bs-gray-700);
+}
+
+[data-bs-theme="dark"] .alert-danger {
+    background-color: rgba(var(--bs-danger-rgb), 0.15);
+    border-color: var(--bs-danger);
+    color: var(--bs-danger);
+}
+
+[data-bs-theme="dark"] .alert-success {
+    background-color: rgba(var(--bs-success-rgb), 0.15);
+    border-color: var(--bs-success);
+    color: var(--bs-success);
+}
+
+[data-bs-theme="dark"] .alert-info {
+    background-color: rgba(var(--bs-info-rgb), 0.15);
+    border-color: var(--bs-info);
+    color: var(--bs-info);
+}
+
+[data-bs-theme="dark"] .alert-warning {
+    background-color: rgba(var(--bs-warning-rgb), 0.15);
+    border-color: var(--bs-warning);
+    color: var(--bs-warning);
+}
+
+
+/* ============================================
+   LINKS E HOVER STATES
+   ============================================ */
+
+[data-bs-theme="dark"] a.text-gray-900:hover,
+[data-bs-theme="dark"] a.text-gray-800:hover {
+    color: var(--bs-primary) !important;
+}
+
+[data-bs-theme="dark"] .text-hover-primary:hover {
+    color: var(--bs-primary) !important;
+}
+
+/* ============================================
+   SIDEBAR RIGHT - RECOLHER/EXPANDIR
+   ============================================ */
+
+/* Sidebar direito - fundo e borda personalizados */
+#kt_sidebar {
+    background-color: #0D0E12 !important;
+    border-left: 1px solid #15171c !important;
+}
+
+[data-bs-theme="dark"] #kt_sidebar {
+    background-color: #0D0E12 !important;
+    border-left: 1px solid #15171c !important;
+}
+
+/* Garantir que sidebar body também tenha a mesma cor */
+#kt_sidebar .sidebar-body {
+    background-color: transparent !important;
+}
+
+/* Header do sidebar também com fundo correto */
+#kt_sidebar .border-bottom {
+    border-color: #15171c !important;
+}
+
+[data-bs-theme="dark"] #kt_sidebar .border-bottom {
+    border-color: #15171c !important;
+}
+
+/* Garantir que o conteúdo principal estique quando sidebar direito estiver fechado */
+.wrapper {
+    transition: all 0.3s ease;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Botão de fechar sidebar */
+#kt_sidebar_close {
+    transition: all 0.2s ease;
+    cursor: pointer;
+    border: none !important;
+    background: transparent !important;
+}
+
+#kt_sidebar_close:hover {
+    transform: scale(1.1);
+    background-color: var(--bs-gray-100) !important;
+}
+
+[data-bs-theme="dark"] #kt_sidebar_close:hover {
+    background-color: var(--bs-gray-700) !important;
+}
+
+/* O Metronic já gerencia o espaço do sidebar via drawer system */
+/* O conteúdo principal automaticamente se ajusta quando o drawer está aberto/fechado */
+
+/* ============================================
+   MENUS E DROPDOWNS - CORREÇÃO COMPLETA
+   ============================================ */
+
+/* Menu links - garantir texto claro no dark mode */
+[data-bs-theme="dark"] .menu-link {
+    color: var(--bs-text-gray-800) !important;
+}
+
+[data-bs-theme="dark"] .menu-link .menu-title {
+    color: var(--bs-text-gray-800) !important;
+}
+
+[data-bs-theme="dark"] .menu-link .menu-icon {
+    color: var(--bs-text-gray-600) !important;
+}
+
+/* Menu link ativo - deve ter texto claro quando background é escuro */
+[data-bs-theme="dark"] .menu-link.active,
+[data-bs-theme="dark"] .menu-link.active .menu-title,
+[data-bs-theme="dark"] .menu-link.active .menu-icon {
+    color: var(--bs-text-gray-900) !important;
+}
+
+/* Menu link hover - texto claro */
+[data-bs-theme="dark"] .menu-link:hover:not(.active) .menu-title,
+[data-bs-theme="dark"] .menu-link:hover:not(.active) .menu-icon {
+    color: var(--bs-text-gray-900) !important;
+}
+
+/* Menu active bg - garantir que texto seja claro quando background é aplicado */
+[data-bs-theme="dark"] .menu-active-bg .menu-link.active .menu-title,
+[data-bs-theme="dark"] .menu-active-bg .menu-link.active .menu-icon {
+    color: var(--bs-text-gray-900) !important;
+}
+
+/* Menu items com background ativo - FUNDO MAIS ESCURO */
+[data-bs-theme="dark"] .menu-item > .menu-link.active {
+    background-color: var(--bs-gray-800) !important;
+}
+
+[data-bs-theme="dark"] .menu-item > .menu-link.active .menu-title,
+[data-bs-theme="dark"] .menu-item > .menu-link.active .menu-icon {
+    color: var(--bs-text-gray-900) !important;
+}
+
+/* Menu title e icon colors */
+[data-bs-theme="dark"] .menu-title-gray-700 .menu-title {
+    color: var(--bs-text-gray-800) !important;
+}
+
+[data-bs-theme="dark"] .menu-icon-gray-500 .menu-icon {
+    color: var(--bs-text-gray-600) !important;
+}
+
+/* Aside/Sidebar menu específico */
+[data-bs-theme="dark"] #kt_aside .menu-link {
+    color: var(--bs-text-gray-800) !important;
+}
+
+[data-bs-theme="dark"] #kt_aside .menu-link .menu-title {
+    color: var(--bs-text-gray-800) !important;
+}
+
+[data-bs-theme="dark"] #kt_aside .menu-link .menu-icon {
+    color: var(--bs-text-gray-600) !important;
+}
+
+/* Garantir que ícones do menu sejam visíveis */
+#kt_aside .menu-link .menu-icon i {
+    color: #808290 !important; /* text-gray-600 padrão */
+}
+
+[data-bs-theme="dark"] #kt_aside .menu-link .menu-icon i {
+    color: #808290 !important; /* text-gray-600 - mais visível no dark */
+}
+
+/* Ícone do dashboard e links ativos mais claros */
+#kt_aside .menu-link[href*="dashboard"] .menu-icon i,
+#kt_aside .menu-link.active .menu-icon i {
+    color: #9A9CAE !important; /* text-gray-700 - mais claro */
+}
+
+[data-bs-theme="dark"] #kt_aside .menu-link[href*="dashboard"] .menu-icon i,
+[data-bs-theme="dark"] #kt_aside .menu-link.active .menu-icon i {
+    color: #B5B7C8 !important; /* text-gray-800 - bem visível no dark */
+}
+
+/* Hover nos ícones */
+#kt_aside .menu-link:hover .menu-icon i {
+    color: #9A9CAE !important;
+}
+
+[data-bs-theme="dark"] #kt_aside .menu-link:hover .menu-icon i {
+    color: #B5B7C8 !important;
+}
+
+[data-bs-theme="dark"] #kt_aside .menu-link.active {
+    background-color: var(--bs-gray-800) !important;
+}
+
+[data-bs-theme="dark"] #kt_aside .menu-link.active .menu-title,
+[data-bs-theme="dark"] #kt_aside .menu-link.active .menu-icon {
+    color: var(--bs-text-gray-900) !important;
+}
+
+[data-bs-theme="dark"] #kt_aside .menu-link:hover:not(.active) {
+    background-color: var(--bs-gray-800) !important;
+}
+
+[data-bs-theme="dark"] #kt_aside .menu-link:hover:not(.active) .menu-title,
+[data-bs-theme="dark"] #kt_aside .menu-link:hover:not(.active) .menu-icon {
+    color: var(--bs-text-gray-900) !important;
+}
+
+/* ============================================
+   TIMELINE
+   ============================================ */
+
+[data-bs-theme="dark"] .timeline-label .text-gray-800 {
+    color: var(--bs-text-gray-800) !important;
+}
+
+[data-bs-theme="dark"] .timeline-content .text-gray-800 {
+    color: var(--bs-text-gray-800) !important;
+}
+
+/* ============================================
+   PROGRESS BARS
+   ============================================ */
+
+[data-bs-theme="dark"] .progress {
+    background-color: var(--bs-gray-700);
+}
+
+/* ============================================
+   EMPTY STATES
+   ============================================ */
+
+[data-bs-theme="dark"] .text-center h3.text-gray-800,
+[data-bs-theme="dark"] .text-center h3.text-gray-900,
+[data-bs-theme="dark"] .text-center h4.text-gray-800,
+[data-bs-theme="dark"] .text-center h4.text-gray-900 {
+    color: var(--bs-text-gray-900) !important;
+}
+
+[data-bs-theme="dark"] .empty-state h3,
+[data-bs-theme="dark"] .empty-state h4 {
+    color: var(--bs-text-gray-900) !important;
+}
+
+[data-bs-theme="dark"] .empty-state .text-gray-500 {
+    color: var(--bs-text-gray-500) !important;
+}
+

@@ -775,9 +775,26 @@ class WhatsAppService
             }
 
             if (!$account) {
-                Logger::error("WhatsApp webhook: conta não encontrada (trackid: {$trackid}, chatid: {$chatid}, from: {$from})");
-                return;
+                Logger::error("WhatsApp webhook: conta não encontrada (trackid: {$trackid}, chatid: {$chatid}, wid: " . ($payload['wid'] ?? 'N/A') . ", from: {$from})");
+                Logger::error("WhatsApp webhook: Tentando buscar conta pelo número do wid...");
+                // Última tentativa: buscar pelo número do wid
+                if (isset($payload['wid'])) {
+                    $widNumber = explode(':', $payload['wid'])[0];
+                    $widNumber = str_replace('@s.whatsapp.net', '', $widNumber);
+                    Logger::error("WhatsApp webhook: Número extraído do wid: {$widNumber}");
+                    $account = WhatsAppAccount::findByPhone($widNumber);
+                    if ($account) {
+                        Logger::quepasa("processWebhook - Conta encontrada por número do wid: {$widNumber}");
+                    }
+                }
+                
+                if (!$account) {
+                    Logger::error("WhatsApp webhook: CONTA NÃO ENCONTRADA - Verifique se o número do WhatsApp está correto no cadastro");
+                    return;
+                }
             }
+            
+            Logger::quepasa("processWebhook - Conta encontrada: ID={$account['id']}, Nome={$account['name']}, Phone={$account['phone_number']}");
 
             // Atualizar chatid/wid se necessário
             $wid = $payload['wid'] ?? null;
@@ -864,12 +881,15 @@ class WhatsAppService
                 $message = $payload['caption'];
             }
 
+            Logger::quepasa("processWebhook - Processando mensagem: fromPhone={$fromPhone}, message={$message}, messageId={$messageId}");
+            
             if (!$fromPhone || (empty($message) && !$mediaUrl)) {
-                Logger::error("WhatsApp webhook: dados incompletos (sem telefone ou conteúdo)");
+                Logger::error("WhatsApp webhook: dados incompletos (fromPhone: " . ($fromPhone ?? 'NULL') . ", message: " . ($message ?? 'NULL') . ", mediaUrl: " . ($mediaUrl ?? 'NULL') . ")");
                 return;
             }
 
             // Criar ou atualizar contato
+            Logger::quepasa("processWebhook - Buscando contato pelo telefone: {$fromPhone}");
             $contact = \App\Models\Contact::findByPhone($fromPhone);
             if (!$contact) {
                 $whatsappId = ($payload['from'] ?? $payload['phone'] ?? $fromPhone);
@@ -901,10 +921,12 @@ class WhatsAppService
             }
 
             // Criar ou buscar conversa
+            Logger::quepasa("processWebhook - Buscando conversa existente: contact_id={$contact['id']}, channel=whatsapp, account_id={$account['id']}");
             $conversation = \App\Models\Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['id']);
             $isNewConversation = false;
             
             if (!$conversation) {
+                Logger::quepasa("processWebhook - Conversa não encontrada, criando nova...");
                 // Usar ConversationService para criar conversa (com todas as integrações)
                 try {
                     $conversation = \App\Services\ConversationService::create([
@@ -913,17 +935,27 @@ class WhatsAppService
                         'whatsapp_account_id' => $account['id']
                     ]);
                     $isNewConversation = true;
+                    Logger::quepasa("processWebhook - Conversa criada via ConversationService: ID={$conversation['id']}");
                 } catch (\Exception $e) {
                     Logger::quepasa("Erro ao criar conversa via ConversationService: " . $e->getMessage());
+                    Logger::quepasa("Stack trace: " . $e->getTraceAsString());
                     // Fallback: criar diretamente se ConversationService falhar
-                    $conversationId = \App\Models\Conversation::create([
-                        'contact_id' => $contact['id'],
-                        'channel' => 'whatsapp',
-                        'whatsapp_account_id' => $account['id'],
-                        'status' => 'open'
-                    ]);
-                    $conversation = \App\Models\Conversation::find($conversationId);
+                    try {
+                        $conversationId = \App\Models\Conversation::create([
+                            'contact_id' => $contact['id'],
+                            'channel' => 'whatsapp',
+                            'whatsapp_account_id' => $account['id'],
+                            'status' => 'open'
+                        ]);
+                        $conversation = \App\Models\Conversation::find($conversationId);
+                        Logger::quepasa("processWebhook - Conversa criada via fallback: ID={$conversationId}");
+                    } catch (\Exception $e2) {
+                        Logger::error("Erro ao criar conversa via fallback: " . $e2->getMessage());
+                        throw $e2;
+                    }
                 }
+            } else {
+                Logger::quepasa("processWebhook - Conversa existente encontrada: ID={$conversation['id']}");
             }
 
             // Processar anexos/mídia do WhatsApp agora que temos a conversa
@@ -979,9 +1011,11 @@ class WhatsAppService
                 }
             }
 
+            Logger::quepasa("processWebhook - Mensagem processada com sucesso: fromPhone={$fromPhone}, message={$message}, conversationId={$conversation['id']}");
             Logger::log("WhatsApp mensagem processada: {$fromPhone} -> {$message}");
         } catch (\Exception $e) {
             Logger::error("WhatsApp processWebhook Error: " . $e->getMessage());
+            Logger::error("WhatsApp processWebhook Stack: " . $e->getTraceAsString());
         }
     }
 

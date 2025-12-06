@@ -110,10 +110,6 @@ class WebSocketClient {
                 this.attemptReconnect();
             }
         };
-        } catch (error) {
-            console.error('Erro ao conectar WebSocket:', error);
-            this.attemptReconnect();
-        }
     }
 
     /**

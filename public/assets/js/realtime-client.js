@@ -170,14 +170,16 @@ class RealtimeClient {
         if (!this.userId) return;
 
         try {
-            // Construir URL base do sistema (remover último segmento do path se houver)
-            let basePath = window.location.pathname;
-            // Se terminar com algo como /conversations ou /settings, remover
-            if (basePath.match(/\/\w+$/)) {
-                basePath = basePath.replace(/\/[^/]+$/, '');
-            }
-            if (!basePath) basePath = '/';
-            const response = await fetch(basePath + '/api/realtime/poll', {
+            // Construir URL absoluto para evitar resolver como https://api/...
+            const origin = window.location.origin || '';
+            let pathPrefix = window.location.pathname || '';
+            // Remover o último segmento (ex: /conversations) para ficar só o prefixo base
+            pathPrefix = pathPrefix.replace(/\/[^/]+$/, '');
+            if (!pathPrefix) pathPrefix = '';
+
+            const pollUrl = origin + pathPrefix + '/api/realtime/poll';
+
+            const response = await fetch(pollUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

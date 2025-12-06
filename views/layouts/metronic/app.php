@@ -151,7 +151,7 @@
     <?php endif; ?>
     
     <!-- WebSocket Client -->
-    <script src="<?= \App\Helpers\Url::asset('js/websocket-client.js') ?>"></script>
+    <script src="<?= \App\Helpers\Url::asset('js/realtime-client.js') ?>"></script>
     
     <!--begin::Sidebar Toggle Script-->
     <script>
@@ -507,16 +507,24 @@
                 }
             }, 100);
             
-            // Inicializar WebSocket se usuário estiver logado
+            // Inicializar Cliente de Tempo Real se usuário estiver logado
             <?php if (\App\Helpers\Auth::check()): ?>
             const userId = <?= \App\Helpers\Auth::id() ?>;
-            if (typeof window.wsClient !== 'undefined') {
-                window.wsClient.connect(userId);
+            if (typeof window.realtimeClient !== 'undefined') {
+                window.realtimeClient.connect(userId);
                 
                 // Handler para reconexão automática
-                window.wsClient.on('reconnect_failed', () => {
-                    console.warn('WebSocket: Falha ao reconectar. Recarregue a página.');
+                window.realtimeClient.on('reconnect_failed', () => {
+                    console.warn('Tempo Real: Falha ao reconectar. Recarregue a página.');
                 });
+                
+                // Log do modo atual
+                window.realtimeClient.on('connected', () => {
+                    console.log('Tempo Real conectado em modo:', window.realtimeClient.currentMode);
+                });
+            } else if (typeof window.wsClient !== 'undefined') {
+                // Fallback para compatibilidade com código antigo
+                window.wsClient.connect(userId);
             }
             <?php endif; ?>
         });

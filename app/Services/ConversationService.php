@@ -186,6 +186,14 @@ class ConversationService
         
         return $filtered;
     }
+
+    /**
+     * Obter conversas do usuário (para polling)
+     */
+    public static function getUserConversations(int $userId): array
+    {
+        return self::list([], $userId);
+    }
     
     /**
      * Verificar se pode usar cache baseado nos filtros

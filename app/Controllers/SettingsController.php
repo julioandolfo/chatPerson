@@ -32,6 +32,7 @@ class SettingsController
         $emailSettings = SettingService::getDefaultEmailSettings();
         $whatsappSettings = SettingService::getDefaultWhatsAppSettings();
         $securitySettings = SettingService::getDefaultSecuritySettings();
+        $websocketSettings = SettingService::getDefaultWebSocketSettings();
         $conversationSettings = ConversationSettingsService::getSettings();
         
         // Obter dados para preencher selects
@@ -65,6 +66,7 @@ class SettingsController
             'emailSettings' => $emailSettings,
             'whatsappSettings' => $whatsappSettings,
             'securitySettings' => $securitySettings,
+            'websocketSettings' => $websocketSettings,
             'conversationSettings' => $conversationSettings,
             'users' => $users,
             'departments' => $departments,
@@ -297,6 +299,35 @@ class SettingsController
             Response::json([
                 'success' => true,
                 'message' => 'Configurações de segurança salvas com sucesso!'
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao salvar configurações: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Salvar configurações de WebSocket/Tempo Real
+     */
+    public function saveWebSocket(): void
+    {
+        Permission::abortIfCannot('admin.settings');
+        
+        try {
+            $data = Request::post();
+            
+            SettingService::set('websocket_enabled', isset($data['websocket_enabled']), 'boolean', 'websocket');
+            SettingService::set('websocket_connection_type', $data['websocket_connection_type'] ?? 'auto', 'string', 'websocket');
+            SettingService::set('websocket_port', (int)($data['websocket_port'] ?? 8080), 'integer', 'websocket');
+            SettingService::set('websocket_path', $data['websocket_path'] ?? '/ws', 'string', 'websocket');
+            SettingService::set('websocket_custom_url', $data['websocket_custom_url'] ?? '', 'string', 'websocket');
+            SettingService::set('websocket_polling_interval', (int)($data['websocket_polling_interval'] ?? 3000), 'integer', 'websocket');
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Configurações de tempo real salvas com sucesso!'
             ]);
         } catch (\Exception $e) {
             Response::json([

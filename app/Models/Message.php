@@ -243,6 +243,51 @@ class Message extends Model
     /**
      * Buscar mensagens dentro de uma conversa por conteúdo com filtros avançados
      */
+    /**
+     * Obter novas mensagens desde uma data específica
+     */
+    public static function getNewMessagesSince(int $conversationId, ?string $since = null): array
+    {
+        $sql = "SELECT m.*, 
+                       CASE 
+                           WHEN m.sender_type = 'agent' THEN u.name
+                           ELSE ct.name
+                       END as sender_name,
+                       CASE 
+                           WHEN m.sender_type = 'agent' THEN u.avatar
+                           ELSE ct.avatar
+                       END as sender_avatar,
+                       m.ai_agent_id,
+                       aia.name as ai_agent_name
+                FROM messages m
+                LEFT JOIN users u ON m.sender_type = 'agent' AND m.sender_id = u.id AND m.ai_agent_id IS NULL
+                LEFT JOIN contacts ct ON m.sender_type = 'contact' AND m.sender_id = ct.id
+                LEFT JOIN ai_agents aia ON m.ai_agent_id = aia.id
+                WHERE m.conversation_id = ?";
+        
+        $params = [$conversationId];
+        
+        if ($since) {
+            $sql .= " AND m.created_at > ?";
+            $params[] = $since;
+        }
+        
+        $sql .= " ORDER BY m.created_at ASC";
+        
+        $messages = Database::fetchAll($sql, $params);
+        
+        // Processar attachments JSON
+        foreach ($messages as &$message) {
+            if (!empty($message['attachments'])) {
+                $message['attachments'] = json_decode($message['attachments'], true) ?? [];
+            } else {
+                $message['attachments'] = [];
+            }
+        }
+        
+        return $messages;
+    }
+
     public static function searchInConversation(int $conversationId, string $search, array $filters = []): array
     {
         $sql = "SELECT m.*, 

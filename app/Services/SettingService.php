@@ -98,6 +98,21 @@ class SettingService
     }
 
     /**
+     * Obter configurações de WebSocket/Tempo Real padrão
+     */
+    public static function getDefaultWebSocketSettings(): array
+    {
+        return [
+            'websocket_enabled' => Setting::get('websocket_enabled', true),
+            'websocket_connection_type' => Setting::get('websocket_connection_type', 'auto'), // auto, websocket, polling
+            'websocket_port' => Setting::get('websocket_port', 8080),
+            'websocket_path' => Setting::get('websocket_path', '/ws'),
+            'websocket_custom_url' => Setting::get('websocket_custom_url', ''),
+            'websocket_polling_interval' => Setting::get('websocket_polling_interval', 3000), // em milissegundos
+        ];
+    }
+
+    /**
      * Obter configurações de WhatsApp padrão
      */
     public static function getDefaultWhatsAppSettings(): array

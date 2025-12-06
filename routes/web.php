@@ -27,6 +27,7 @@ use App\Controllers\AIToolController;
 use App\Controllers\SearchController;
 use App\Controllers\TestController;
 use App\Controllers\AIAssistantController;
+use App\Controllers\RealtimeController;
 
 // Rotas públicas
 Router::get('/', function() {
@@ -153,6 +154,7 @@ Router::post('/settings/remove-logo', [SettingsController::class, 'removeLogo'],
 Router::post('/settings/email', [SettingsController::class, 'saveEmail'], ['Authentication']);
 Router::post('/settings/whatsapp', [SettingsController::class, 'saveWhatsApp'], ['Authentication']);
 Router::post('/settings/security', [SettingsController::class, 'saveSecurity'], ['Authentication']);
+Router::post('/settings/websocket', [SettingsController::class, 'saveWebSocket'], ['Authentication']);
 Router::post('/settings/conversations', [SettingsController::class, 'saveConversations'], ['Authentication']);
 
 // Rotas de Agentes de IA
@@ -250,4 +252,8 @@ Router::delete('/attachments/{path}', [AttachmentController::class, 'delete'], [
 Router::get('/activities', [ActivityController::class, 'index'], ['Authentication']);
 Router::get('/activities/user/{id}', [ActivityController::class, 'getByUser'], ['Authentication']);
 Router::get('/activities/{entityType}/{id}', [ActivityController::class, 'getByEntity'], ['Authentication']);
+
+// Rotas de Tempo Real (WebSocket/Polling)
+Router::get('/api/realtime/config', [RealtimeController::class, 'getConfig'], ['Authentication']);
+Router::post('/api/realtime/poll', [RealtimeController::class, 'poll'], ['Authentication']);
 

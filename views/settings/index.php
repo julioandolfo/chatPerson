@@ -79,6 +79,16 @@ ob_start();
                     Assistente IA
                 </a>
             </li>
+            <li class="nav-item mt-2">
+                <a class="nav-link text-active-primary me-10 <?= $activeTab === 'websocket' ? 'active' : '' ?>" 
+                   href="<?= \App\Helpers\Url::to('/settings?tab=websocket') ?>">
+                    <i class="ki-duotone ki-wifi fs-2 me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Tempo Real
+                </a>
+            </li>
         </ul>
         <!--end::Tabs-->
         
@@ -416,6 +426,14 @@ ob_start();
             include __DIR__ . '/ai-assistant-tab.php';
             ?>
             <!--end::Form Assistente IA-->
+        <?php endif; ?>
+        
+        <?php if ($activeTab === 'websocket'): ?>
+            <!--begin::Form Tempo Real-->
+            <?php
+            include __DIR__ . '/websocket-tab.php';
+            ?>
+            <!--end::Form Tempo Real-->
         <?php endif; ?>
         <!--end::Tab Content-->
     </div>

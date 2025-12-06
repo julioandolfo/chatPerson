@@ -222,6 +222,7 @@ class WhatsAppService
 
     /**
      * Verificar status da conexão
+     * Verifica no banco e também tenta consultar a API Quepasa diretamente
      */
     public static function getConnectionStatus(int $accountId): array
     {
@@ -230,8 +231,13 @@ class WhatsAppService
             throw new \InvalidArgumentException('Conta não encontrada');
         }
 
-        // Se tiver chatid, provavelmente está conectado
+        // Se tiver chatid no banco, está conectado
         if (!empty($account['quepasa_chatid'])) {
+            // Atualizar status para active se ainda não estiver
+            if ($account['status'] !== 'active') {
+                WhatsAppAccount::update($accountId, ['status' => 'active']);
+            }
+            
             return [
                 'connected' => true,
                 'status' => 'connected',
@@ -239,6 +245,83 @@ class WhatsAppService
                 'chatid' => $account['quepasa_chatid'],
                 'message' => 'Conectado'
             ];
+        }
+
+        // Se for Quepasa, tentar verificar status diretamente na API
+        if ($account['provider'] === 'quepasa' && !empty($account['quepasa_token'])) {
+            try {
+                $apiUrl = rtrim($account['api_url'], '/');
+                
+                // Tentar diferentes endpoints para verificar status
+                $endpoints = ['/status', '/info', '/me', '/scan'];
+                
+                foreach ($endpoints as $endpoint) {
+                    try {
+                        $url = "{$apiUrl}{$endpoint}";
+                        
+                        $headers = [
+                            'Accept: application/json',
+                            'X-QUEPASA-USER: ' . ($account['quepasa_user'] ?? 'default'),
+                            'X-QUEPASA-TOKEN: ' . $account['quepasa_token']
+                        ];
+                        
+                        $ch = curl_init($url);
+                        curl_setopt_array($ch, [
+                            CURLOPT_RETURNTRANSFER => true,
+                            CURLOPT_TIMEOUT => 3,
+                            CURLOPT_HTTPGET => true, // Tentar GET primeiro
+                            CURLOPT_HTTPHEADER => $headers,
+                            CURLOPT_SSL_VERIFYPEER => false,
+                            CURLOPT_SSL_VERIFYHOST => false,
+                            CURLOPT_FOLLOWLOCATION => true
+                        ]);
+                        
+                        $response = curl_exec($ch);
+                        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                        curl_close($ch);
+                        
+                        // Se retornar 200 e for JSON, verificar se tem chatid
+                        if ($httpCode === 200 && !empty($response)) {
+                            $jsonResponse = @json_decode($response, true);
+                            if ($jsonResponse !== null) {
+                                // Verificar se tem chatid no JSON
+                                $chatid = $jsonResponse['chatid'] ?? $jsonResponse['chat_id'] ?? $jsonResponse['id'] ?? null;
+                                
+                                if ($chatid) {
+                                    // Chatid encontrado - atualizar no banco
+                                    WhatsAppAccount::update($accountId, [
+                                        'quepasa_chatid' => $chatid,
+                                        'status' => 'active'
+                                    ]);
+                                    
+                                    Logger::quepasa("getConnectionStatus - Chatid encontrado via {$endpoint}: {$chatid}");
+                                    
+                                    return [
+                                        'connected' => true,
+                                        'status' => 'connected',
+                                        'phone_number' => $account['phone_number'],
+                                        'chatid' => $chatid,
+                                        'message' => 'Conectado'
+                                    ];
+                                }
+                                
+                                // Verificar se tem status "connected" ou similar
+                                $status = $jsonResponse['status'] ?? $jsonResponse['state'] ?? null;
+                                if ($status === 'connected' || $status === 'ready' || $status === 'authenticated') {
+                                    // Está conectado mas não temos chatid ainda - aguardar webhook
+                                    Logger::quepasa("getConnectionStatus - Status conectado via {$endpoint} mas sem chatid");
+                                }
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        // Continuar para próximo endpoint
+                        continue;
+                    }
+                }
+            } catch (\Exception $e) {
+                // Ignorar erros na consulta à API e continuar com verificação do banco
+                Logger::quepasa("getConnectionStatus - Erro ao consultar API: " . $e->getMessage());
+            }
         }
 
         return [
@@ -491,6 +574,26 @@ class WhatsAppService
             if (!$account) {
                 Logger::error("WhatsApp webhook: conta não encontrada (trackid: {$trackid}, chatid: {$chatid}, from: {$from})");
                 return;
+            }
+
+            // Se recebeu chatid no webhook e a conta ainda não tem, atualizar
+            if (!empty($chatid) && empty($account['quepasa_chatid'])) {
+                Logger::quepasa("processWebhook - Atualizando chatid da conta {$account['id']}: {$chatid}");
+                WhatsAppAccount::update($account['id'], [
+                    'quepasa_chatid' => $chatid,
+                    'status' => 'active'
+                ]);
+                $account['quepasa_chatid'] = $chatid;
+                $account['status'] = 'active';
+            }
+            
+            // Se recebeu chatid mas não estava salvo, atualizar também
+            if (!empty($chatid) && $account['quepasa_chatid'] !== $chatid) {
+                Logger::quepasa("processWebhook - Chatid mudou para conta {$account['id']}: {$chatid}");
+                WhatsAppAccount::update($account['id'], [
+                    'quepasa_chatid' => $chatid,
+                    'status' => 'active'
+                ]);
             }
 
             // Processar mensagem recebida

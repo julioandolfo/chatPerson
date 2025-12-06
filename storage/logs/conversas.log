@@ -3833,3 +3833,19 @@
 [2025-12-06 17:43:19] [DEBUG] GET params
 [2025-12-06 17:43:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
 [2025-12-06 17:43:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:44:17] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:44:17] [DEBUG] GET params
+[2025-12-06 17:44:17] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:44:17] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:44:23] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:44:23] [DEBUG] GET params
+[2025-12-06 17:44:23] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:44:23] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:44:33] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:44:33] [DEBUG] GET params
+[2025-12-06 17:44:33] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:44:33] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:44:43] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:44:43] [DEBUG] GET params
+[2025-12-06 17:44:43] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:44:43] [DEBUG] Conversas retornadas do Service: 1

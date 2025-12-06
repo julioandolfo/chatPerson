@@ -227,6 +227,7 @@ $content = ob_get_clean();
 $scripts = '
 <script>
 let currentAccountId = null;
+let qrCodeStatusInterval = null;
 
 document.addEventListener("DOMContentLoaded", function() {
     const form = document.getElementById("kt_modal_new_whatsapp_form");
@@ -271,6 +272,13 @@ document.addEventListener("DOMContentLoaded", function() {
 
 function getQRCode(accountId) {
     currentAccountId = accountId;
+    
+    // Limpar intervalo anterior se existir
+    if (qrCodeStatusInterval) {
+        clearInterval(qrCodeStatusInterval);
+        qrCodeStatusInterval = null;
+    }
+    
     const modal = new bootstrap.Modal(document.getElementById("kt_modal_qrcode"));
     modal.show();
     
@@ -289,7 +297,11 @@ function getQRCode(accountId) {
                 container.innerHTML = `
                     <img src="${data.qrcode}" alt="QR Code" class="img-fluid mb-5" style="max-width: 300px;" />
                     <p class="text-muted fs-7">QR Code válido por ${data.expires_in || 60} segundos</p>
+                    <div id="qrCodeStatusMessage" class="mt-3"></div>
                 `;
+                
+                // Iniciar polling para verificar status da conexão
+                startQRCodeStatusPolling(accountId);
             } else {
                 container.innerHTML = `
                     <div class="alert alert-danger">
@@ -310,9 +322,107 @@ function getQRCode(accountId) {
                 </div>
             `;
         });
+    
+    // Limpar intervalo quando modal for fechado
+    const qrModal = document.getElementById("kt_modal_qrcode");
+    qrModal.addEventListener("hidden.bs.modal", function() {
+        if (qrCodeStatusInterval) {
+            clearInterval(qrCodeStatusInterval);
+            qrCodeStatusInterval = null;
+        }
+    }, { once: true });
+}
+
+function startQRCodeStatusPolling(accountId) {
+    const statusMessage = document.getElementById("qrCodeStatusMessage");
+    let attempts = 0;
+    const maxAttempts = 300; // 5 minutos (300 * 1 segundo)
+    
+    qrCodeStatusInterval = setInterval(function() {
+        attempts++;
+        
+        // Atualizar mensagem de status
+        if (statusMessage) {
+            statusMessage.innerHTML = `
+                <div class="alert alert-info d-flex align-items-center">
+                    <i class="ki-duotone ki-loader fs-3 me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    <div>
+                        <div class="fw-semibold">Aguardando conexão...</div>
+                        <div class="fs-7">Escaneie o QR Code com o WhatsApp</div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Verificar status da conexão
+        fetch("' . \App\Helpers\Url::to('/integrations/whatsapp') . '/" + accountId + "/status")
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.status && data.status.connected) {
+                    // Conexão bem-sucedida!
+                    clearInterval(qrCodeStatusInterval);
+                    qrCodeStatusInterval = null;
+                    
+                    if (statusMessage) {
+                        statusMessage.innerHTML = `
+                            <div class="alert alert-success d-flex align-items-center">
+                                <i class="ki-duotone ki-check-circle fs-2x me-3">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <div>
+                                    <div class="fw-bold">WhatsApp conectado com sucesso!</div>
+                                    <div class="fs-7">${data.status.phone_number ? 'Número: ' + data.status.phone_number : ''}</div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    // Fechar modal após 2 segundos
+                    setTimeout(function() {
+                        const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_qrcode"));
+                        if (modal) {
+                            modal.hide();
+                        }
+                        // Recarregar página para atualizar status
+                        location.reload();
+                    }, 2000);
+                }
+            })
+            .catch(error => {
+                console.error("Erro ao verificar status:", error);
+            });
+        
+        // Parar após máximo de tentativas
+        if (attempts >= maxAttempts) {
+            clearInterval(qrCodeStatusInterval);
+            qrCodeStatusInterval = null;
+            if (statusMessage) {
+                statusMessage.innerHTML = `
+                    <div class="alert alert-warning">
+                        <i class="ki-duotone ki-information fs-2 me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        Tempo de espera esgotado. Clique em "Atualizar QR Code" para gerar um novo.
+                    </div>
+                `;
+            }
+        }
+    }, 1000); // Verificar a cada 1 segundo
 }
 
 function refreshQRCode() {
+    // Limpar intervalo anterior
+    if (qrCodeStatusInterval) {
+        clearInterval(qrCodeStatusInterval);
+        qrCodeStatusInterval = null;
+    }
+    
     if (currentAccountId) {
         getQRCode(currentAccountId);
     }

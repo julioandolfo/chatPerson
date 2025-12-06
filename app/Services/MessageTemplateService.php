@@ -288,14 +288,6 @@ class MessageTemplateService
     }
 
     /**
-     * Obter templates disponíveis para uso
-     */
-    public static function getAvailable(?int $departmentId = null, ?string $channel = null): array
-    {
-        return MessageTemplate::getAvailable($departmentId, $channel);
-    }
-
-    /**
      * Obter variáveis disponíveis para templates
      */
     public static function getAvailableVariables(): array

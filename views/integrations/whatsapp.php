@@ -375,7 +375,7 @@ function startQRCodeStatusPolling(accountId) {
                                 </i>
                                 <div>
                                     <div class="fw-bold">WhatsApp conectado com sucesso!</div>
-                                    <div class="fs-7">${data.status.phone_number ? 'Número: ' + data.status.phone_number : ''}</div>
+                                    <div class="fs-7">${data.status.phone_number ? "Número: " + data.status.phone_number : ""}</div>
                                 </div>
                             </div>
                         `;

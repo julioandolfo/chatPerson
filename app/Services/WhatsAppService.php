@@ -160,24 +160,21 @@ class WhatsAppService
                 $errorNo = curl_errno($ch);
                 
                 Logger::quepasa("getQRCode - Tentativa GET - HTTP Code: {$httpCode}");
+                Logger::quepasa("getQRCode - Effective URL: {$effectiveUrl}");
+                Logger::quepasa("getQRCode - Redirect Count: {$redirectCount}");
+                Logger::quepasa("getQRCode - Error No: {$errorNo}");
+                Logger::quepasa("getQRCode - Error: " . ($error ?: 'Nenhum'));
+                Logger::quepasa("getQRCode - Response Length: " . strlen($response));
+                Logger::quepasa("getQRCode - Response Preview: " . substr($response, 0, 500));
+                
+                curl_close($ch);
+            } else {
+                // POST funcionou, já temos a resposta
+                Logger::quepasa("getQRCode - POST bem-sucedido - HTTP Code: {$httpCode}");
+                Logger::quepasa("getQRCode - Effective URL: {$effectiveUrl}");
+                Logger::quepasa("getQRCode - Response Length: " . strlen($response));
+                curl_close($ch);
             }
-
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
-            $redirectCount = curl_getinfo($ch, CURLINFO_REDIRECT_COUNT);
-            $error = curl_error($ch);
-            $errorNo = curl_errno($ch);
-            
-            Logger::quepasa("getQRCode - Tentativa GET - HTTP Code: {$httpCode}");
-            Logger::quepasa("getQRCode - Effective URL: {$effectiveUrl}");
-            Logger::quepasa("getQRCode - Redirect Count: {$redirectCount}");
-            Logger::quepasa("getQRCode - Error No: {$errorNo}");
-            Logger::quepasa("getQRCode - Error: " . ($error ?: 'Nenhum'));
-            Logger::quepasa("getQRCode - Response Length: " . strlen($response));
-            Logger::quepasa("getQRCode - Response Preview: " . substr($response, 0, 500));
-            
-            curl_close($ch);
 
             if ($error) {
                 Logger::quepasa("getQRCode - Erro cURL: {$error} (Code: {$errorNo})");
@@ -204,12 +201,33 @@ class WhatsAppService
             }
 
             // A API retorna imagem PNG, não JSON
-            $base64 = 'data:image/png;base64,' . base64_encode($response);
-            Logger::quepasa("getQRCode - PNG recebido com " . strlen($response) . " bytes");
+            // Verificar se a resposta é realmente uma imagem PNG
+            if (empty($response) || strlen($response) < 100) {
+                Logger::quepasa("getQRCode - Resposta muito pequena ou vazia: " . strlen($response) . " bytes");
+                throw new \Exception('QR Code inválido ou vazio recebido da API');
+            }
+            
+            // Verificar se começa com PNG signature
+            $pngSignature = substr($response, 0, 8);
+            $expectedSignature = "\x89PNG\r\n\x1a\n";
+            
+            if ($pngSignature !== $expectedSignature) {
+                Logger::quepasa("getQRCode - Assinatura PNG inválida. Recebido: " . bin2hex(substr($response, 0, 8)));
+                // Mesmo assim, tentar converter para base64 (pode ser que a API retorne diferente)
+            }
+            
+            $base64 = base64_encode($response);
+            if (empty($base64)) {
+                Logger::quepasa("getQRCode - Erro ao codificar base64");
+                throw new \Exception('Erro ao processar QR Code');
+            }
+            
+            $base64DataUri = 'data:image/png;base64,' . $base64;
+            Logger::quepasa("getQRCode - PNG recebido com " . strlen($response) . " bytes, base64: " . strlen($base64) . " caracteres");
 
             return [
-                'qrcode' => $base64,
-                'base64' => $base64,
+                'qrcode' => $base64DataUri,
+                'base64' => $base64DataUri,
                 'expires_in' => 60
             ];
         } catch (\Exception $e) {

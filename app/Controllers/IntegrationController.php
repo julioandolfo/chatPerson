@@ -87,7 +87,17 @@ class IntegrationController
         Permission::abortIfCannot('whatsapp.view');
         
         try {
+            // Limpar qualquer output buffer antes de enviar JSON
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            
             $qrData = WhatsAppService::getQRCode($id);
+            
+            // Verificar se os dados foram retornados corretamente
+            if (empty($qrData) || empty($qrData['qrcode'])) {
+                throw new \Exception('QR Code não foi gerado corretamente');
+            }
             
             Response::json([
                 'success' => true,
@@ -96,6 +106,14 @@ class IntegrationController
                 'expires_in' => $qrData['expires_in'] ?? 60
             ]);
         } catch (\Exception $e) {
+            // Limpar output buffer antes de enviar erro
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            
+            \App\Helpers\Logger::error("IntegrationController::getQRCode Error: " . $e->getMessage());
+            \App\Helpers\Logger::error("IntegrationController::getQRCode Stack: " . $e->getTraceAsString());
+            
             Response::json([
                 'success' => false,
                 'message' => $e->getMessage()

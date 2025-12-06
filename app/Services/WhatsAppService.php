@@ -251,6 +251,21 @@ class WhatsAppService
 
         // Se tiver chatid no banco, está conectado
         if (!empty($account['quepasa_chatid'])) {
+            // Verificar se precisa configurar webhook (se não foi configurado ainda)
+            // Verificar se há uma flag indicando que o webhook já foi configurado
+            $config = json_decode($account['config'] ?? '{}', true);
+            $webhookConfigured = $config['webhook_configured'] ?? false;
+            
+            // Se o webhook não foi configurado ainda, tentar configurar
+            if (!$webhookConfigured) {
+                try {
+                    self::configureWebhookAutomatically($accountId);
+                } catch (\Exception $e) {
+                    Logger::quepasa("getConnectionStatus - Erro ao configurar webhook automaticamente: " . $e->getMessage());
+                    // Não falhar a conexão se o webhook não puder ser configurado
+                }
+            }
+            
             // Atualizar status para active se ainda não estiver
             if ($account['status'] !== 'active') {
                 WhatsAppAccount::update($accountId, ['status' => 'active']);
@@ -307,12 +322,24 @@ class WhatsAppService
                                 
                                 if ($chatid) {
                                     // Chatid encontrado - atualizar no banco
+                                    $wasConnected = !empty($account['quepasa_chatid']); // Verificar se já estava conectado antes
+                                    
                                     WhatsAppAccount::update($accountId, [
                                         'quepasa_chatid' => $chatid,
                                         'status' => 'active'
                                     ]);
                                     
                                     Logger::quepasa("getConnectionStatus - Chatid encontrado via {$endpoint}: {$chatid}");
+                                    
+                                    // Se não estava conectado antes, configurar webhook automaticamente
+                                    if (!$wasConnected) {
+                                        try {
+                                            self::configureWebhookAutomatically($accountId);
+                                        } catch (\Exception $e) {
+                                            Logger::quepasa("getConnectionStatus - Erro ao configurar webhook automaticamente: " . $e->getMessage());
+                                            // Não falhar a conexão se o webhook não puder ser configurado
+                                        }
+                                    }
                                     
                                     return [
                                         'connected' => true,
@@ -472,6 +499,63 @@ class WhatsAppService
     }
 
     /**
+     * Configurar webhook automaticamente após conexão
+     */
+    private static function configureWebhookAutomatically(int $accountId): void
+    {
+        // Obter URL do webhook (da configuração ou gerar automaticamente)
+        $webhookUrl = self::getWebhookUrl();
+        
+        if (empty($webhookUrl)) {
+            Logger::quepasa("configureWebhookAutomatically - URL do webhook não configurada, pulando configuração automática");
+            return;
+        }
+        
+        try {
+            // Configurar webhook
+            self::configureWebhook($accountId, $webhookUrl, [
+                'forwardinternal' => true
+            ]);
+            
+            // Marcar como configurado no banco
+            $account = WhatsAppAccount::find($accountId);
+            if ($account) {
+                $config = json_decode($account['config'] ?? '{}', true);
+                $config['webhook_configured'] = true;
+                $config['webhook_url'] = $webhookUrl;
+                WhatsAppAccount::update($accountId, ['config' => json_encode($config)]);
+            }
+            
+            Logger::quepasa("configureWebhookAutomatically - Webhook configurado automaticamente para conta {$accountId}: {$webhookUrl}");
+        } catch (\Exception $e) {
+            Logger::quepasa("configureWebhookAutomatically - Erro: " . $e->getMessage());
+            throw $e;
+        }
+    }
+    
+    /**
+     * Obter URL do webhook (da configuração ou gerar automaticamente)
+     */
+    private static function getWebhookUrl(): string
+    {
+        // Tentar obter da configuração primeiro
+        $webhookUrl = \App\Services\SettingService::get('whatsapp_webhook_url', '');
+        
+        if (!empty($webhookUrl)) {
+            return $webhookUrl;
+        }
+        
+        // Se não tiver configuração, gerar automaticamente baseado na URL atual
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
+        $basePath = \App\Helpers\Url::basePath();
+        
+        $webhookUrl = "{$protocol}://{$host}{$basePath}/whatsapp-webhook";
+        
+        return $webhookUrl;
+    }
+
+    /**
      * Configurar webhook no Quepasa
      * Endpoint: POST /webhook
      */
@@ -603,6 +687,14 @@ class WhatsAppService
                 ]);
                 $account['quepasa_chatid'] = $chatid;
                 $account['status'] = 'active';
+                
+                // Se acabou de conectar, tentar configurar webhook automaticamente
+                try {
+                    self::configureWebhookAutomatically($account['id']);
+                } catch (\Exception $e) {
+                    Logger::quepasa("processWebhook - Erro ao configurar webhook automaticamente: " . $e->getMessage());
+                    // Não interromper o processamento do webhook
+                }
             }
             
             // Se recebeu chatid mas não estava salvo, atualizar também

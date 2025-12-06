@@ -323,9 +323,17 @@ class WhatsAppService
                             $jsonResponse = @json_decode($response, true);
                             if ($jsonResponse !== null) {
                                 Logger::quepasa("getConnectionStatus - {$endpoint} response: " . substr($response, 0, 400));
-                                // Verificar se tem chatid no JSON
+
+                                // Preferência: pegar chatid ou wid quando existir
                                 $chatid = $jsonResponse['chatid'] ?? $jsonResponse['chat_id'] ?? $jsonResponse['id'] ?? null;
-                                
+
+                                // Em algumas respostas (/info) vem dentro de server.wid
+                                if (!$chatid && isset($jsonResponse['server']['wid'])) {
+                                    $chatid = $jsonResponse['server']['wid'];
+                                }
+
+                                // Se vier wid com sufixo após ":", manter completo; ainda é identificador válido
+
                                 if ($chatid) {
                                     // Chatid encontrado - atualizar no banco
                                     $wasConnected = !empty($account['quepasa_chatid']); // Verificar se já estava conectado antes
@@ -335,7 +343,7 @@ class WhatsAppService
                                         'status' => 'active'
                                     ]);
                                     
-                                    Logger::quepasa("getConnectionStatus - Chatid encontrado via {$endpoint}: {$chatid}");
+                                    Logger::quepasa("getConnectionStatus - Chatid/WID encontrado via {$endpoint}: {$chatid}");
                                     
                                     // Se não estava conectado antes, configurar webhook automaticamente
                                     if (!$wasConnected) {
@@ -358,7 +366,7 @@ class WhatsAppService
                                 
                                 // Verificar se tem status "connected" ou similar
                                 $status = $jsonResponse['status'] ?? $jsonResponse['state'] ?? null;
-                                if ($status === 'connected' || $status === 'ready' || $status === 'authenticated') {
+                                if ($status === 'connected' || $status === 'ready' || $status === 'authenticated' || $status === 'follow server information') {
                                     // Está conectado mas não temos chatid ainda - marcar active e tentar webhook
                                     Logger::quepasa("getConnectionStatus - Status conectado via {$endpoint} mas sem chatid");
                                     

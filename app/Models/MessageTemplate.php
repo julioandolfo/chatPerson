@@ -9,7 +9,7 @@ class MessageTemplate extends Model
 {
     protected string $table = 'message_templates';
     protected string $primaryKey = 'id';
-    protected array $fillable = ['name', 'category', 'content', 'description', 'department_id', 'channel', 'is_active', 'created_by'];
+    protected array $fillable = ['name', 'category', 'content', 'description', 'department_id', 'channel', 'is_active', 'created_by', 'user_id'];
     protected bool $timestamps = true;
 
     /**
@@ -47,11 +47,59 @@ class MessageTemplate extends Model
 
     /**
      * Obter templates disponíveis para uso
+     * Retorna templates pessoais do usuário + templates globais (user_id IS NULL)
      */
-    public static function getAvailable(?int $departmentId = null, ?string $channel = null): array
+    public static function getAvailable(?int $departmentId = null, ?string $channel = null, ?int $userId = null): array
     {
         $sql = "SELECT * FROM message_templates 
                 WHERE is_active = TRUE";
+        $params = [];
+        
+        // Incluir templates pessoais do usuário + templates globais
+        if ($userId !== null) {
+            $sql .= " AND (user_id = ? OR user_id IS NULL)";
+            $params[] = $userId;
+        } else {
+            // Se não tem userId, retornar apenas globais
+            $sql .= " AND user_id IS NULL";
+        }
+        
+        if ($departmentId !== null) {
+            $sql .= " AND (department_id = ? OR department_id IS NULL)";
+            $params[] = $departmentId;
+        }
+        
+        if ($channel !== null) {
+            $sql .= " AND (channel = ? OR channel IS NULL)";
+            $params[] = $channel;
+        }
+        
+        // Ordenar: templates pessoais primeiro, depois globais, depois por nome
+        $sql .= " ORDER BY user_id DESC, department_id DESC, channel DESC, name ASC";
+        
+        return \App\Helpers\Database::fetchAll($sql, $params);
+    }
+    
+    /**
+     * Obter templates pessoais de um usuário
+     */
+    public static function getPersonal(int $userId): array
+    {
+        $sql = "SELECT * FROM message_templates 
+                WHERE is_active = TRUE 
+                AND user_id = ?
+                ORDER BY name ASC";
+        return \App\Helpers\Database::fetchAll($sql, [$userId]);
+    }
+    
+    /**
+     * Obter templates globais (sem user_id)
+     */
+    public static function getGlobal(?int $departmentId = null, ?string $channel = null): array
+    {
+        $sql = "SELECT * FROM message_templates 
+                WHERE is_active = TRUE 
+                AND user_id IS NULL";
         $params = [];
         
         if ($departmentId !== null) {

@@ -58,6 +58,8 @@ class MessageTemplateController
 
     /**
      * Criar template
+     * Se user_id não for fornecido, será NULL (template global)
+     * Se user_id for fornecido, será um template pessoal do usuário
      */
     public function store(): void
     {
@@ -65,6 +67,32 @@ class MessageTemplateController
         
         try {
             $data = Request::post();
+            
+            // Se não foi fornecido user_id, verificar se é template pessoal ou global
+            if (!isset($data['user_id'])) {
+                // Se for template pessoal (is_personal = true), usar ID do usuário logado
+                if (isset($data['is_personal']) && $data['is_personal']) {
+                    $data['user_id'] = \App\Helpers\Auth::id();
+                } else {
+                    $data['user_id'] = null; // Template global
+                }
+                unset($data['is_personal']); // Remover flag auxiliar
+            }
+            
+            // Se user_id foi fornecido, verificar se o usuário tem permissão
+            if (isset($data['user_id']) && $data['user_id'] !== null) {
+                $currentUserId = \App\Helpers\Auth::id();
+                // Só pode criar template pessoal para si mesmo, a menos que tenha permissão especial
+                if ($data['user_id'] != $currentUserId && !Permission::can('message_templates.create.all')) {
+                    $data['user_id'] = $currentUserId; // Forçar para o usuário logado
+                }
+            }
+            
+            // Definir created_by se não foi fornecido
+            if (!isset($data['created_by'])) {
+                $data['created_by'] = \App\Helpers\Auth::id();
+            }
+            
             $templateId = MessageTemplateService::create($data);
             
             Response::json([
@@ -86,6 +114,44 @@ class MessageTemplateController
     }
 
     /**
+     * Obter template específico (para edição)
+     */
+    public function show(int $id): void
+    {
+        Permission::abortIfCannot('message_templates.view');
+        
+        try {
+            $template = MessageTemplateService::get($id);
+            if ($template) {
+                // Verificar se é template pessoal do usuário ou global
+                $userId = \App\Helpers\Auth::id();
+                if ($template['user_id'] !== null && $template['user_id'] != $userId && !Permission::can('message_templates.view.all')) {
+                    Response::json([
+                        'success' => false,
+                        'message' => 'Você não tem permissão para ver este template'
+                    ], 403);
+                    return;
+                }
+                
+                Response::json([
+                    'success' => true,
+                    'template' => $template
+                ]);
+            } else {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Template não encontrado'
+                ], 404);
+            }
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao obter template: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Atualizar template
      */
     public function update(int $id): void
@@ -94,6 +160,27 @@ class MessageTemplateController
         
         try {
             $data = Request::post();
+            
+            // Verificar se é template pessoal do usuário
+            $template = MessageTemplateService::get($id);
+            if ($template) {
+                $userId = \App\Helpers\Auth::id();
+                // Se for template pessoal, só o dono pode editar (a menos que tenha permissão especial)
+                if ($template['user_id'] !== null && $template['user_id'] != $userId && !Permission::can('message_templates.edit.all')) {
+                    Response::json([
+                        'success' => false,
+                        'message' => 'Você não tem permissão para editar este template'
+                    ], 403);
+                    return;
+                }
+            }
+            
+            // Processar is_personal se fornecido
+            if (isset($data['is_personal']) && $data['is_personal']) {
+                $data['user_id'] = \App\Helpers\Auth::id();
+                unset($data['is_personal']);
+            }
+            
             if (MessageTemplateService::update($id, $data)) {
                 Response::json([
                     'success' => true,
@@ -147,6 +234,7 @@ class MessageTemplateController
 
     /**
      * Obter templates disponíveis (JSON - para uso em selects)
+     * Retorna templates pessoais do usuário logado + templates globais
      */
     public function getAvailable(): void
     {
@@ -155,11 +243,46 @@ class MessageTemplateController
         try {
             $departmentId = Request::get('department_id');
             $channel = Request::get('channel');
+            $userId = \App\Helpers\Auth::id(); // Obter ID do usuário logado
             
             $templates = MessageTemplateService::getAvailable(
                 $departmentId ? (int)$departmentId : null,
-                $channel
+                $channel,
+                $userId
             );
+            
+            Response::json([
+                'success' => true,
+                'templates' => $templates
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'templates' => []
+            ], 500);
+        }
+    }
+    
+    /**
+     * Obter templates pessoais do usuário logado (JSON)
+     */
+    public function getPersonal(): void
+    {
+        Permission::abortIfCannot('message_templates.view');
+        
+        try {
+            $userId = \App\Helpers\Auth::id();
+            if (!$userId) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Usuário não autenticado',
+                    'templates' => []
+                ], 401);
+                return;
+            }
+            
+            $templates = MessageTemplateService::getPersonal($userId);
             
             Response::json([
                 'success' => true,

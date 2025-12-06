@@ -335,6 +335,25 @@ class ConversationService
         } catch (\Exception $e) {
             $conversation['tags'] = [];
         }
+        
+        // Verificar se conversa está com agente de IA
+        try {
+            $aiConversation = \App\Models\AIConversation::getByConversationId($conversationId);
+            if ($aiConversation && $aiConversation['status'] === 'active') {
+                $conversation['has_ai_agent'] = true;
+                $conversation['ai_agent_id'] = $aiConversation['ai_agent_id'];
+                $aiAgent = \App\Models\AIAgent::find($aiConversation['ai_agent_id']);
+                $conversation['ai_agent_name'] = $aiAgent ? $aiAgent['name'] : null;
+            } else {
+                $conversation['has_ai_agent'] = false;
+                $conversation['ai_agent_id'] = null;
+                $conversation['ai_agent_name'] = null;
+            }
+        } catch (\Exception $e) {
+            $conversation['has_ai_agent'] = false;
+            $conversation['ai_agent_id'] = null;
+            $conversation['ai_agent_name'] = null;
+        }
 
         return $conversation;
     }
@@ -420,6 +439,144 @@ class ConversationService
         try {
             if (class_exists('\App\Services\ActivityService')) {
                 \App\Services\ActivityService::logConversationAssigned($conversationId, $agentId, $oldAgentId);
+            }
+        } catch (\Exception $e) {
+            error_log("Erro ao logar atividade: " . $e->getMessage());
+        }
+
+        return $conversation;
+    }
+
+    /**
+     * Escalar conversa de agente de IA para humano
+     */
+    public static function escalateFromAI(int $conversationId, ?int $agentId = null): array
+    {
+        // Verificar se conversa existe
+        $conversation = Conversation::find($conversationId);
+        if (!$conversation) {
+            throw new \Exception('Conversa não encontrada');
+        }
+
+        // Verificar se conversa está com agente de IA
+        $aiConversation = \App\Models\AIConversation::getByConversationId($conversationId);
+        if (!$aiConversation || $aiConversation['status'] !== 'active') {
+            throw new \Exception('Conversa não está atribuída a um agente de IA ativo');
+        }
+
+        // Se não foi especificado agente, tentar atribuição automática
+        if (!$agentId) {
+            try {
+                $assignedId = \App\Services\ConversationSettingsService::autoAssignConversation(
+                    $conversationId,
+                    $conversation['department_id'] ?? null,
+                    $conversation['funnel_id'] ?? null,
+                    $conversation['funnel_stage_id'] ?? null
+                );
+                
+                // Se retornar negativo, ainda é IA - não escalar
+                if ($assignedId !== null && $assignedId < 0) {
+                    throw new \Exception('Nenhum agente humano disponível. Tente selecionar um agente manualmente.');
+                }
+                
+                $agentId = $assignedId;
+            } catch (\Exception $e) {
+                throw new \Exception('Erro ao atribuir automaticamente: ' . $e->getMessage());
+            }
+        }
+
+        // Verificar se agente existe e está ativo
+        $agent = User::find($agentId);
+        if (!$agent || $agent['status'] !== 'active') {
+            throw new \Exception('Agente não encontrado ou inativo');
+        }
+
+        // Verificar limites
+        if (!\App\Services\ConversationSettingsService::canAssignToAgent(
+            $agentId,
+            $conversation['department_id'] ?? null,
+            $conversation['funnel_id'] ?? null,
+            $conversation['funnel_stage_id'] ?? null
+        )) {
+            throw new \Exception('Agente atingiu o limite máximo de conversas ou não está disponível');
+        }
+
+        // Atualizar status da conversa de IA
+        \App\Models\AIConversation::updateStatus(
+            $aiConversation['id'],
+            'escalated',
+            $agentId
+        );
+
+        // Atribuir conversa ao agente humano
+        Conversation::update($conversationId, ['agent_id' => $agentId]);
+        
+        // Invalidar cache
+        self::invalidateCache($conversationId);
+        
+        // Atualizar contagem de conversas
+        User::updateConversationsCount($agentId);
+        
+        // Obter conversa atualizada
+        $conversation = Conversation::findWithRelations($conversationId);
+        
+        // Criar mensagem de sistema informando escalação
+        try {
+            $aiAgent = \App\Models\AIAgent::find($aiConversation['ai_agent_id']);
+            $aiAgentName = $aiAgent ? $aiAgent['name'] : 'Assistente IA';
+            $agentName = $agent['name'] ?? 'Agente';
+            
+            self::sendMessage(
+                $conversationId,
+                "🔄 Esta conversa foi escalada de {$aiAgentName} para {$agentName}.",
+                'system',
+                null,
+                [],
+                'system'
+            );
+        } catch (\Exception $e) {
+            error_log("Erro ao criar mensagem de sistema: " . $e->getMessage());
+        }
+        
+        // Criar notificação para o agente
+        try {
+            if (class_exists('\App\Services\NotificationService')) {
+                \App\Services\NotificationService::notifyConversationAssigned(
+                    $agentId,
+                    $conversationId,
+                    $conversation['contact_name'] ?? 'Contato',
+                    'Conversa escalada de IA'
+                );
+            }
+        } catch (\Exception $e) {
+            error_log("Erro ao criar notificação: " . $e->getMessage());
+        }
+        
+        // Notificar via WebSocket
+        try {
+            \App\Helpers\WebSocket::notifyConversationUpdated($conversationId, $conversation);
+        } catch (\Exception $e) {
+            error_log("Erro ao notificar WebSocket: " . $e->getMessage());
+        }
+        
+        // Executar automações
+        try {
+            \App\Services\AutomationService::executeForConversationUpdated($conversationId, [
+                'agent_id' => $agentId,
+                'escalated_from_ai' => true
+            ]);
+        } catch (\Exception $e) {
+            error_log("Erro ao executar automações: " . $e->getMessage());
+        }
+        
+        // Log de atividade
+        try {
+            if (class_exists('\App\Services\ActivityService')) {
+                \App\Services\ActivityService::logConversationEscalated(
+                    $conversationId,
+                    $aiConversation['ai_agent_id'],
+                    $agentId
+                );
             }
         } catch (\Exception $e) {
             error_log("Erro ao logar atividade: " . $e->getMessage());

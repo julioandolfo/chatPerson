@@ -1,4 +1,8 @@
 <?php
+// Log de debug
+$logFile = __DIR__ . '/../../storage/logs/conversas_bug.log';
+@file_put_contents($logFile, date('Y-m-d H:i:s') . " - Carregando views/conversations/index.php\n", FILE_APPEND);
+
 $layout = 'layouts.metronic.app';
 $title = 'Conversas';
 $pageTitle = 'Conversas';
@@ -436,6 +440,60 @@ ob_start();
 
 .message-search-result.bg-light-primary {
     background-color: rgba(13, 110, 253, 0.1) !important;
+}
+
+.message-search-result.hover-bg-light-primary:hover {
+    background-color: rgba(13, 110, 253, 0.15) !important;
+}
+
+[data-bs-theme="dark"] .message-search-result.hover-bg-light-primary:hover {
+    background-color: rgba(13, 110, 253, 0.25) !important;
+}
+
+[data-bs-theme="dark"] #messageSearchResults {
+    background-color: var(--bs-gray-800) !important;
+    border-color: var(--bs-gray-700) !important;
+}
+
+[data-bs-theme="dark"] #messageSearchResults .text-gray-800 {
+    color: var(--bs-gray-100) !important;
+}
+
+[data-bs-theme="dark"] #messageSearchResults .text-gray-600 {
+    color: var(--bs-gray-300) !important;
+}
+
+[data-bs-theme="dark"] #messageSearchResults .text-gray-500 {
+    color: var(--bs-gray-400) !important;
+}
+
+[data-bs-theme="dark"] #messageSearchResults .text-gray-700 {
+    color: var(--bs-gray-200) !important;
+}
+
+[data-bs-theme="dark"] #messageSearchResults mark {
+    background-color: #ffc107;
+    color: #000;
+}
+
+.template-quick-group-header {
+    padding: 8px 12px;
+    background-color: var(--bs-gray-100);
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--bs-gray-700);
+    border-bottom: 1px solid var(--bs-gray-200);
+    margin-top: 8px;
+}
+
+.template-quick-group-header:first-child {
+    margin-top: 0;
+}
+
+[data-bs-theme="dark"] .template-quick-group-header {
+    background-color: var(--bs-gray-800);
+    color: var(--bs-gray-300);
+    border-bottom-color: var(--bs-gray-700);
 }
 
 #messageSearchResults mark {
@@ -1369,7 +1427,7 @@ body.dark-mode .swal2-content {
                             <span class="path1"></span>
                             <span class="path2"></span>
                         </i>
-                        <div id="messageSearchResults" class="position-absolute top-100 start-0 w-100 bg-white border rounded shadow-lg d-none" style="max-height: 300px; overflow-y: auto; z-index: 1000; margin-top: 5px;">
+                        <div id="messageSearchResults" class="position-absolute top-100 start-0 w-100 bg-body border rounded shadow-lg d-none" style="max-height: 300px; overflow-y: auto; z-index: 1000; margin-top: 5px;">
                             <!-- Resultados da busca serão inseridos aqui -->
                         </div>
                     </div>
@@ -1703,11 +1761,20 @@ body.dark-mode .swal2-content {
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="fw-bold">Templates de Mensagens</h2>
-                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
-                    <i class="ki-duotone ki-cross fs-1">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                    </i>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm btn-light-warning" onclick="showPersonalTemplatesModal()" title="Gerenciar meus templates">
+                        <i class="ki-duotone ki-user fs-5 me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Meus Templates
+                    </button>
+                    <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                        <i class="ki-duotone ki-cross fs-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                    </div>
                 </div>
             </div>
             <div class="modal-body">
@@ -2090,6 +2157,66 @@ body.dark-mode .swal2-content {
     </div>
 </div>
 
+<!-- MODAL: Escalar de IA para Humano -->
+<div class="modal fade" id="kt_modal_escalate" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-500px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Escalar para Agente Humano</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info d-flex align-items-center p-5 mb-5">
+                    <i class="ki-duotone ki-information fs-2hx text-info me-4">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div class="d-flex flex-column">
+                        <h4 class="mb-1">Escalação de IA</h4>
+                        <span>Esta conversa será transferida de um agente de IA para um agente humano. Você pode escolher um agente específico ou deixar o sistema atribuir automaticamente.</span>
+                    </div>
+                </div>
+                <form id="escalateForm">
+                    <input type="hidden" id="escalateConversationId" value="">
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold">Agente (opcional):</label>
+                        <select id="escalateAgent" class="form-select form-select-solid">
+                            <option value="">Atribuir automaticamente</option>
+                            <?php if (!empty($agents)): ?>
+                                <?php foreach ($agents as $agent): ?>
+                                    <option value="<?= $agent['id'] ?>">
+                                        <?= htmlspecialchars($agent['name']) ?>
+                                        <?php if (!empty($agent['email'])): ?>
+                                            (<?= htmlspecialchars($agent['email']) ?>)
+                                        <?php endif; ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </select>
+                        <div class="form-text">Deixe em branco para atribuição automática baseada em disponibilidade e carga de trabalho.</div>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="ki-duotone ki-arrow-up fs-5 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Escalar Agora
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: Gerenciar Tags -->
 <div class="modal fade" id="kt_modal_tags" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered mw-650px">
@@ -2235,6 +2362,15 @@ let hasMoreMessages = true;
 let oldestMessageId = null;
 let currentConversationId = null;
 
+// Helper para converter valores vindos do PHP em JSON válido
+function parsePhpJson(value) {
+    try {
+        return JSON.parse(value);
+    } catch (e) {
+        return null;
+    }
+}
+
 /**
  * Iniciar polling (verificação periódica de novas mensagens)
  */
@@ -2379,7 +2515,16 @@ function selectConversation(id) {
             'Accept': 'application/json'
         }
     })
-    .then(response => response.json())
+    .then(async response => {
+        // Verificar se a resposta é JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error('Resposta não é JSON:', text.substring(0, 200));
+            throw new Error('Resposta do servidor não é JSON. Status: ' + response.status);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success && data.conversation) {
             // Atualizar URL sem recarregar
@@ -2450,7 +2595,25 @@ function selectConversation(id) {
     })
     .catch(error => {
         console.error('Erro ao carregar conversa:', error);
-        alert('Erro ao carregar conversa');
+        const chatMessages = document.getElementById('chatMessages');
+        if (chatMessages) {
+            chatMessages.innerHTML = `
+                <div class="d-flex align-items-center justify-content-center" style="height: 100%;">
+                    <div class="text-center text-danger">
+                        <i class="ki-duotone ki-information fs-3x mb-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div class="fw-semibold">Erro ao carregar conversa</div>
+                        <div class="text-muted fs-7">${escapeHtml(error.message || 'Erro desconhecido')}</div>
+                        <button class="btn btn-sm btn-primary mt-3" onclick="selectConversation(${id})">Tentar novamente</button>
+                    </div>
+                </div>
+            `;
+        } else {
+            alert('Erro ao carregar conversa: ' + (error.message || 'Erro desconhecido'));
+        }
     });
 }
 
@@ -2763,6 +2926,22 @@ function updateConversationSidebar(conversation, tags) {
         manageTagsBtn.style.display = '';
     }
     
+    // Verificar se conversa está com agente de IA
+    const escalateBtn = sidebar.querySelector('#sidebar-escalate-btn');
+    if (escalateBtn && conversation.id) {
+        // Verificar se conversa está com IA (buscar via API)
+        checkIfConversationHasAI(conversation.id).then(hasAI => {
+            if (hasAI) {
+                escalateBtn.setAttribute('onclick', `escalateFromAI(${conversation.id})`);
+                escalateBtn.style.display = '';
+            } else {
+                escalateBtn.style.display = 'none';
+            }
+        }).catch(() => {
+            escalateBtn.style.display = 'none';
+        });
+    }
+    
     const assignBtn = sidebar.querySelector('#sidebar-assign-btn');
     if (assignBtn && conversation.id) {
         assignBtn.setAttribute('onclick', `assignConversation(${conversation.id})`);
@@ -3002,9 +3181,94 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Handler do formulário de escalação
+    const escalateForm = document.getElementById('escalateForm');
+    if (escalateForm) {
+        escalateForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const conversationId = document.getElementById('escalateConversationId').value;
+            const agentId = document.getElementById('escalateAgent').value;
+            
+            if (!conversationId) {
+                const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
+                                   document.body.classList.contains('dark-mode') ||
+                                   window.matchMedia('(prefers-color-scheme: dark)').matches;
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: 'ID da conversa não encontrado',
+                    colorScheme: isDarkMode ? 'dark' : 'light'
+                });
+                return;
+            }
+            
+            const btn = escalateForm.querySelector('button[type="submit"]');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Escalando...';
+            
+            try {
+                const formData = new FormData();
+                if (agentId) {
+                    formData.append('agent_id', agentId);
+                }
+                
+                const response = await fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/escalate`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
+                                   document.body.classList.contains('dark-mode') ||
+                                   window.matchMedia('(prefers-color-scheme: dark)').matches;
+                
+                if (data.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('kt_modal_escalate')).hide();
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso!',
+                        text: data.message || 'Conversa escalada com sucesso',
+                        colorScheme: isDarkMode ? 'dark' : 'light',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                    
+                    // Recarregar detalhes da conversa
+                    if (currentConversationId) {
+                        loadConversationDetails(currentConversationId);
+                    }
+                    
+                    // Recarregar lista de conversas
+                    refreshConversationList();
+                } else {
+                    throw new Error(data.message || 'Erro ao escalar conversa');
+                }
+            } catch (error) {
+                const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
+                                   document.body.classList.contains('dark-mode') ||
+                                   window.matchMedia('(prefers-color-scheme: dark)').matches;
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: error.message || 'Erro ao escalar conversa',
+                    colorScheme: isDarkMode ? 'dark' : 'light'
+                });
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        });
+    }
+    
     // Se houver conversa selecionada no carregamento inicial, atualizar sidebar
-    const selectedConversationId = <?= $selectedConversationId ?? 'null' ?>;
-    const selectedConversation = <?= json_encode($selectedConversation ?? null) ?>;
+    const selectedConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+    const selectedConversation = parsePhpJson('<?= json_encode($selectedConversation ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     
     if (selectedConversationId) {
         // IMPORTANTE: Definir currentConversationId para que funcionalidades como Assistente IA funcionem
@@ -3533,7 +3797,7 @@ function searchMessagesInConversation(event) {
     // Aguardar 300ms antes de buscar (debounce)
     messageSearchTimeout = setTimeout(() => {
         if (!conversationId) {
-            resultsDiv.innerHTML = '<div class="p-3 text-muted">Nenhuma conversa selecionada</div>';
+            resultsDiv.innerHTML = '<div class="p-3 text-center text-gray-500"><i class="ki-duotone ki-information-5 fs-2x mb-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i><br>Nenhuma conversa selecionada</div>';
             resultsDiv.classList.remove('d-none');
             return;
         }
@@ -3570,8 +3834,8 @@ function searchMessagesInConversation(event) {
                 
                 const total = data.messages.length;
                 let html = `
-                    <div class="p-2 border-bottom bg-light d-flex justify-content-between align-items-center">
-                        <small class="text-muted fw-semibold">${total} mensagem(ns) encontrada(s)</small>
+                    <div class="p-2 border-bottom bg-light-primary d-flex justify-content-between align-items-center">
+                        <small class="text-gray-700 fw-semibold">${total} mensagem(ns) encontrada(s)</small>
                         <div class="d-flex gap-2 align-items-center">
                             <button class="btn btn-sm btn-icon btn-light-primary" onclick="navigateSearchResults(-1)" title="Anterior (↑)" id="searchPrevBtn" style="padding: 2px 6px;">
                                 <i class="ki-duotone ki-up fs-6">
@@ -3579,7 +3843,7 @@ function searchMessagesInConversation(event) {
                                     <span class="path2"></span>
                                 </i>
                             </button>
-                            <small class="text-muted" id="searchCounter">-</small>
+                            <small class="text-gray-700 fw-semibold" id="searchCounter">-</small>
                             <button class="btn btn-sm btn-icon btn-light-primary" onclick="navigateSearchResults(1)" title="Próximo (↓)" id="searchNextBtn" style="padding: 2px 6px;">
                                 <i class="ki-duotone ki-down fs-6">
                                     <span class="path1"></span>
@@ -3610,23 +3874,35 @@ function searchMessagesInConversation(event) {
                     }
                     
                     const time = msg.created_at ? new Date(msg.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+                    const senderType = msg.sender_type || 'contact';
+                    let senderBadge = '';
+                    if (msg.ai_agent_id) {
+                        senderBadge = '<span class="badge badge-light-warning badge-sm ms-2"><i class="ki-duotone ki-robot fs-7 me-1"><span class="path1"></span><span class="path2"></span></i>IA</span>';
+                    } else if (senderType === 'agent') {
+                        senderBadge = '<span class="badge badge-light-primary badge-sm ms-2">Agente</span>';
+                    } else {
+                        senderBadge = '<span class="badge badge-light-info badge-sm ms-2">Contato</span>';
+                    }
                     html += `
-                        <div class="message-search-result p-3 border-bottom cursor-pointer hover-bg-light" 
+                        <div class="message-search-result p-3 border-bottom cursor-pointer hover-bg-light-primary" 
                              data-message-id="${msg.id}" 
                              data-index="${index}"
                              onclick="selectSearchResult(${index}, true)">
                             <div class="d-flex justify-content-between align-items-start mb-1">
-                                <span class="fw-semibold">${escapeHtml(msg.sender_name || 'Remetente')}</span>
-                                <span class="text-muted small">${time}</span>
+                                <div class="d-flex align-items-center">
+                                    <span class="fw-semibold text-gray-800">${escapeHtml(msg.sender_name || 'Remetente')}</span>
+                                    ${senderBadge}
+                                </div>
+                                <span class="text-gray-500 small">${time}</span>
                             </div>
-                            <div class="text-muted small">${highlightSearchTerm(preview, searchTerm)}</div>
+                            <div class="text-gray-600 small mt-1">${highlightSearchTerm(preview, searchTerm)}</div>
                         </div>
                     `;
                 });
                 resultsDiv.innerHTML = html;
                 updateSearchCounter();
             } else {
-                resultsDiv.innerHTML = '<div class="p-3 text-muted">Nenhuma mensagem encontrada</div>';
+                resultsDiv.innerHTML = '<div class="p-3 text-center text-gray-500"><i class="ki-duotone ki-magnifier fs-2x mb-2"><span class="path1"></span><span class="path2"></span></i><br>Nenhuma mensagem encontrada</div>';
                 messageSearchResults = [];
                 currentSearchIndex = -1;
             }
@@ -3634,7 +3910,7 @@ function searchMessagesInConversation(event) {
         })
         .catch(error => {
             console.error('Erro ao buscar mensagens:', error);
-            resultsDiv.innerHTML = '<div class="p-3 text-danger">Erro ao buscar mensagens</div>';
+            resultsDiv.innerHTML = '<div class="p-3 text-center text-danger"><i class="ki-duotone ki-information-5 fs-2x mb-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i><br>Erro ao buscar mensagens</div>';
             resultsDiv.classList.remove('d-none');
             messageSearchResults = [];
             currentSearchIndex = -1;
@@ -3985,7 +4261,7 @@ function applyMessageSearchFilters() {
             // Mostrar mensagem informando que filtros estão ativos
             const resultsDiv = document.getElementById('messageSearchResults');
             if (resultsDiv) {
-                resultsDiv.innerHTML = '<div class="p-3 text-muted text-center">Digite um termo de busca para aplicar os filtros</div>';
+                resultsDiv.innerHTML = '<div class="p-3 text-center text-gray-500"><i class="ki-duotone ki-filter fs-2x mb-2"><span class="path1"></span><span class="path2"></span></i><br>Digite um termo de busca para aplicar os filtros</div>';
                 resultsDiv.classList.remove('d-none');
             }
         }
@@ -4411,7 +4687,7 @@ function cancelReply() {
 async function forwardMessage(messageId) {
     if (!messageId) return;
     
-    const conversationId = <?= $selectedConversationId ?? 'null' ?>;
+const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     if (!conversationId) {
         alert('Selecione uma conversa primeiro');
         return;
@@ -4506,7 +4782,7 @@ async function forwardMessage(messageId) {
 
 // Selecionar conversa para encaminhamento
 async function selectForwardConversation(targetConversationId, messageId) {
-    const conversationId = <?= $selectedConversationId ?? 'null' ?>;
+const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     
     if (!conversationId || !targetConversationId || !messageId) {
         alert('Dados inválidos');
@@ -4685,7 +4961,7 @@ let isRecording = false;
 // Gravar áudio
 async function toggleAudioRecording() {
     const btn = document.getElementById('recordAudioBtn');
-    const conversationId = <?= $selectedConversationId ?? 'null' ?>;
+const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     
     if (!conversationId) {
         alert('Selecione uma conversa primeiro');
@@ -4813,7 +5089,7 @@ function sendMessage() {
         return;
     }
     
-    const conversationId = <?= $selectedConversationId ?? 'null' ?>;
+const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     if (!conversationId) {
         return;
     }
@@ -4959,14 +5235,14 @@ function loadTemplates() {
     // Mostrar loading
     templatesList.innerHTML = `
         <tr>
-            <td colspan="3" class="text-center text-muted py-10">
+            <td colspan="4" class="text-center text-muted py-10">
                 <span class="spinner-border spinner-border-sm text-primary mb-3" role="status"></span>
                 <div>Carregando templates...</div>
             </td>
         </tr>
     `;
     
-    // Buscar templates disponíveis para a conversa atual
+    // Buscar templates disponíveis para a conversa atual (inclui pessoais + globais)
     const conversationId = currentConversationId;
     const url = '<?= \App\Helpers\Url::to('/message-templates/available') ?>' + 
                 (conversationId ? `?conversation_id=${conversationId}` : '');
@@ -4983,7 +5259,7 @@ function loadTemplates() {
         } else {
             templatesList.innerHTML = `
                 <tr>
-                    <td colspan="3" class="text-center text-muted py-10">
+                    <td colspan="4" class="text-center text-muted py-10">
                         <i class="ki-duotone ki-information-5 fs-3x mb-3">
                             <span class="path1"></span>
                             <span class="path2"></span>
@@ -4999,7 +5275,7 @@ function loadTemplates() {
         console.error('Erro ao carregar templates:', error);
         templatesList.innerHTML = `
             <tr>
-                <td colspan="3" class="text-center text-danger py-10">
+                <td colspan="4" class="text-center text-danger py-10">
                     <div>Erro ao carregar templates</div>
                 </td>
             </tr>
@@ -5014,7 +5290,7 @@ function renderTemplates(templates) {
     if (templates.length === 0) {
         templatesList.innerHTML = `
             <tr>
-                <td colspan="3" class="text-center text-muted py-10">
+                <td colspan="4" class="text-center text-muted py-10">
                     <div>Nenhum template disponível</div>
                 </td>
             </tr>
@@ -5022,37 +5298,119 @@ function renderTemplates(templates) {
         return;
     }
     
+    // Separar templates pessoais e globais
+    const personalTemplates = templates.filter(t => t.user_id !== null && t.user_id !== undefined);
+    const globalTemplates = templates.filter(t => t.user_id === null || t.user_id === undefined);
+    
     let html = '';
-    templates.forEach(template => {
-        const category = template.category || 'Geral';
+    
+    // Templates pessoais primeiro
+    if (personalTemplates.length > 0) {
         html += `
-            <tr>
-                <td>
-                    <div class="fw-semibold">${escapeHtml(template.name)}</div>
-                    ${template.description ? `<div class="text-muted fs-7">${escapeHtml(template.description)}</div>` : ''}
-                </td>
-                <td>
-                    <span class="badge badge-light">${escapeHtml(category)}</span>
-                </td>
-                <td class="text-end">
-                    <button class="btn btn-sm btn-light-primary me-2" onclick="previewTemplate(${template.id})" title="Preview">
-                        <i class="ki-duotone ki-eye fs-5">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                            <span class="path3"></span>
-                        </i>
-                    </button>
-                    <button class="btn btn-sm btn-primary" onclick="useTemplate(${template.id})" title="Usar template">
-                        <i class="ki-duotone ki-check fs-5">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                        </i>
-                        Usar
-                    </button>
+            <tr class="table-group">
+                <td colspan="4" class="bg-light-primary fw-bold py-2">
+                    <i class="ki-duotone ki-user fs-6 me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Meus Templates (${personalTemplates.length})
                 </td>
             </tr>
         `;
-    });
+        personalTemplates.forEach(template => {
+            const category = template.category || 'Geral';
+            html += `
+                <tr data-template-id="${template.id}" data-type="personal">
+                    <td>
+                        <div class="fw-semibold text-gray-800">${escapeHtml(template.name)}</div>
+                        ${template.description ? `<div class="text-muted fs-7">${escapeHtml(template.description)}</div>` : ''}
+                    </td>
+                    <td>
+                        <span class="badge badge-light-primary">${escapeHtml(category)}</span>
+                    </td>
+                    <td>
+                        <span class="badge badge-light-warning badge-sm">
+                            <i class="ki-duotone ki-user fs-7 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Pessoal
+                        </span>
+                    </td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-light-primary me-2" onclick="previewTemplate(${template.id})" title="Preview">
+                            <i class="ki-duotone ki-eye fs-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                        </button>
+                        <button class="btn btn-sm btn-primary" onclick="useTemplate(${template.id})" title="Usar template">
+                            <i class="ki-duotone ki-check fs-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Usar
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+    
+    // Templates globais depois
+    if (globalTemplates.length > 0) {
+        html += `
+            <tr class="table-group">
+                <td colspan="4" class="bg-light-info fw-bold py-2">
+                    <i class="ki-duotone ki-global fs-6 me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Templates Globais (${globalTemplates.length})
+                </td>
+            </tr>
+        `;
+        globalTemplates.forEach(template => {
+            const category = template.category || 'Geral';
+            html += `
+                <tr data-template-id="${template.id}" data-type="global">
+                    <td>
+                        <div class="fw-semibold text-gray-800">${escapeHtml(template.name)}</div>
+                        ${template.description ? `<div class="text-muted fs-7">${escapeHtml(template.description)}</div>` : ''}
+                    </td>
+                    <td>
+                        <span class="badge badge-light-info">${escapeHtml(category)}</span>
+                    </td>
+                    <td>
+                        <span class="badge badge-light-secondary badge-sm">
+                            <i class="ki-duotone ki-global fs-7 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Global
+                        </span>
+                    </td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-light-primary me-2" onclick="previewTemplate(${template.id})" title="Preview">
+                            <i class="ki-duotone ki-eye fs-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                        </button>
+                        <button class="btn btn-sm btn-primary" onclick="useTemplate(${template.id})" title="Usar template">
+                            <i class="ki-duotone ki-check fs-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Usar
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
     
     templatesList.innerHTML = html;
     
@@ -5270,7 +5628,7 @@ function loadTemplates() {
             console.error('Erro ao carregar templates:', error);
             document.getElementById('templatesList').innerHTML = `
                 <tr>
-                    <td colspan="3" class="text-center text-danger py-10">
+                    <td colspan="4" class="text-center text-danger py-10">
                         Erro ao carregar templates
                     </td>
                 </tr>
@@ -5280,7 +5638,7 @@ function loadTemplates() {
 
 // Preview de template com variáveis preenchidas
 function previewTemplate(templateId) {
-    const conversationId = <?= $selectedConversationId ?? 'null' ?>;
+const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     const previewDiv = document.getElementById(`preview-${templateId}`);
     const previewContent = previewDiv ? previewDiv.querySelector('.preview-content') : null;
     
@@ -5325,13 +5683,25 @@ function previewTemplate(templateId) {
 }
 
 function useTemplate(templateId) {
+    const conversationId = currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+    
+    if (!conversationId) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Atenção',
+            text: 'Selecione uma conversa primeiro',
+            confirmButtonText: 'OK'
+        });
+        return;
+    }
+    
     fetch(`<?= \App\Helpers\Url::to("/message-templates") ?>/${templateId}/process`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            conversation_id: <?= $selectedConversationId ?? 'null' ?>
+            conversation_id: conversationId
         })
     })
     .then(response => response.json())
@@ -5479,8 +5849,11 @@ function loadTemplateQuickSelect() {
         .then(response => response.json())
         .then(data => {
             if (data.success && data.templates) {
-                templateQuickSelectData = data.templates;
-                renderTemplateQuickSelect(data.templates);
+                // Separar e ordenar: pessoais primeiro, depois globais
+                const personalTemplates = data.templates.filter(t => t.user_id !== null && t.user_id !== undefined);
+                const globalTemplates = data.templates.filter(t => t.user_id === null || t.user_id === undefined);
+                templateQuickSelectData = [...personalTemplates, ...globalTemplates];
+                renderTemplateQuickSelect(templateQuickSelectData);
             } else {
                 templateQuickList.innerHTML = `
                     <div class="text-center text-muted py-5">
@@ -5505,13 +5878,29 @@ function renderTemplateQuickSelect(templates) {
     if (!templateQuickList) return;
     
     const searchTerm = templateQuickSearch ? templateQuickSearch.value.toLowerCase() : '';
-    const filteredTemplates = templates.filter(t => {
+    
+    // Separar templates pessoais e globais
+    const personalTemplates = templates.filter(t => t.user_id !== null && t.user_id !== undefined);
+    const globalTemplates = templates.filter(t => t.user_id === null || t.user_id === undefined);
+    
+    // Filtrar ambos os grupos
+    const filteredPersonal = personalTemplates.filter(t => {
         if (!searchTerm) return true;
         const name = (t.name || '').toLowerCase();
         const content = (t.content || '').toLowerCase();
         const category = (t.category || '').toLowerCase();
         return name.includes(searchTerm) || content.includes(searchTerm) || category.includes(searchTerm);
     });
+    
+    const filteredGlobal = globalTemplates.filter(t => {
+        if (!searchTerm) return true;
+        const name = (t.name || '').toLowerCase();
+        const content = (t.content || '').toLowerCase();
+        const category = (t.category || '').toLowerCase();
+        return name.includes(searchTerm) || content.includes(searchTerm) || category.includes(searchTerm);
+    });
+    
+    const filteredTemplates = [...filteredPersonal, ...filteredGlobal];
     
     if (filteredTemplates.length === 0) {
         templateQuickList.innerHTML = `
@@ -5523,20 +5912,79 @@ function renderTemplateQuickSelect(templates) {
     }
     
     let html = '';
-    filteredTemplates.forEach((template, index) => {
-        const preview = (template.content || '').substring(0, 60);
+    let currentIndex = 0;
+    
+    // Templates pessoais primeiro
+    if (filteredPersonal.length > 0) {
         html += `
-            <div class="template-quick-item ${index === templateQuickSelectIndex ? 'selected' : ''}" 
-                 data-template-id="${template.id}" 
-                 data-index="${index}"
-                 onclick="selectTemplateQuickItem(${index})"
-                 onmouseenter="highlightTemplateQuickItem(${index})">
-                <div class="template-quick-item-name">${escapeHtml(template.name || 'Sem nome')}</div>
-                <div class="template-quick-item-preview">${escapeHtml(preview)}${template.content && template.content.length > 60 ? '...' : ''}</div>
-                ${template.category ? `<span class="template-quick-item-category">${escapeHtml(template.category)}</span>` : ''}
+            <div class="template-quick-group-header">
+                <i class="ki-duotone ki-user fs-7 me-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                Meus Templates (${filteredPersonal.length})
             </div>
         `;
-    });
+        filteredPersonal.forEach((template) => {
+            const preview = (template.content || '').substring(0, 60);
+            html += `
+                <div class="template-quick-item ${currentIndex === templateQuickSelectIndex ? 'selected' : ''}" 
+                     data-template-id="${template.id}" 
+                     data-index="${currentIndex}"
+                     onclick="selectTemplateQuickItem(${currentIndex})"
+                     onmouseenter="highlightTemplateQuickItem(${currentIndex})">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="template-quick-item-name">${escapeHtml(template.name || 'Sem nome')}</div>
+                        <span class="badge badge-light-warning badge-sm ms-2">
+                            <i class="ki-duotone ki-user fs-7">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                        </span>
+                    </div>
+                    <div class="template-quick-item-preview">${escapeHtml(preview)}${template.content && template.content.length > 60 ? '...' : ''}</div>
+                    ${template.category ? `<span class="template-quick-item-category">${escapeHtml(template.category)}</span>` : ''}
+                </div>
+            `;
+            currentIndex++;
+        });
+    }
+    
+    // Templates globais depois
+    if (filteredGlobal.length > 0) {
+        html += `
+            <div class="template-quick-group-header">
+                <i class="ki-duotone ki-global fs-7 me-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                Templates Globais (${filteredGlobal.length})
+            </div>
+        `;
+        filteredGlobal.forEach((template) => {
+            const preview = (template.content || '').substring(0, 60);
+            html += `
+                <div class="template-quick-item ${currentIndex === templateQuickSelectIndex ? 'selected' : ''}" 
+                     data-template-id="${template.id}" 
+                     data-index="${currentIndex}"
+                     onclick="selectTemplateQuickItem(${currentIndex})"
+                     onmouseenter="highlightTemplateQuickItem(${currentIndex})">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="template-quick-item-name">${escapeHtml(template.name || 'Sem nome')}</div>
+                        <span class="badge badge-light-secondary badge-sm ms-2">
+                            <i class="ki-duotone ki-global fs-7">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                        </span>
+                    </div>
+                    <div class="template-quick-item-preview">${escapeHtml(preview)}${template.content && template.content.length > 60 ? '...' : ''}</div>
+                    ${template.category ? `<span class="template-quick-item-category">${escapeHtml(template.category)}</span>` : ''}
+                </div>
+            `;
+            currentIndex++;
+        });
+    }
     
     templateQuickList.innerHTML = html;
     
@@ -5960,10 +6408,6 @@ function insertVariable(variable) {
         setTimeout(() => modal.hide(), 500);
     }
 }
-    
-    // Carregar variáveis
-    loadVariables();
-}
 
 function loadVariables() {
     const variablesList = document.getElementById('variablesList');
@@ -6207,6 +6651,35 @@ function copyVariable(variable) {
     insertVariable(variable);
 }
 
+// Verificar se conversa está com agente de IA
+async function checkIfConversationHasAI(conversationId) {
+    try {
+        const response = await fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        });
+        const data = await response.json();
+        if (data.success && data.conversation) {
+            // Verificar se existe conversa de IA ativa
+            return data.conversation.has_ai_agent === true || data.conversation.ai_agent_id !== null;
+        }
+        return false;
+    } catch (error) {
+        console.error('Erro ao verificar agente de IA:', error);
+        return false;
+    }
+}
+
+// Escalar conversa de IA para humano
+function escalateFromAI(conversationId) {
+    const modal = new bootstrap.Modal(document.getElementById('kt_modal_escalate'));
+    document.getElementById('escalateConversationId').value = conversationId;
+    document.getElementById('escalateAgent').value = '';
+    modal.show();
+}
+
 // Modal de Atribuição
 function assignConversation(conversationId) {
     const modal = new bootstrap.Modal(document.getElementById('kt_modal_assign'));
@@ -6223,7 +6696,7 @@ function assignConversation(conversationId) {
 document.getElementById('assignForm')?.addEventListener('submit', function(e) {
     e.preventDefault();
     
-    const conversationId = this.dataset.conversationId || <?= $selectedConversationId ?? 'null' ?>;
+    const conversationId = this.dataset.conversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     const agentId = document.getElementById('assignAgent').value;
     const departmentId = document.getElementById('assignDepartment').value;
     
@@ -6271,7 +6744,7 @@ function manageTags(conversationId) {
     modal.show();
     
     // Salvar ID da conversa
-    document.getElementById('kt_modal_tags').dataset.conversationId = conversationId || <?= $selectedConversationId ?? 'null' ?>;
+    document.getElementById('kt_modal_tags').dataset.conversationId = conversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     
     // Carregar tags
     loadTagsForConversation();
@@ -6289,16 +6762,13 @@ function loadTagsForConversation() {
             if (data.success && data.tags && data.tags.length > 0) {
                 let html = '<div class="w-100 mb-2"><strong>Tags Atuais:</strong></div>';
                 data.tags.forEach(tag => {
-                    html += `
-                        <span class="badge badge-lg" style="background-color: ${tag.color}20; color: ${tag.color}; cursor: pointer;" 
-                              onclick="removeTagFromList(${tag.id}, '${escapeHtml(tag.name)}')" title="Clique para remover">
-                            ${escapeHtml(tag.name)}
-                            <i class="ki-duotone ki-cross fs-7 ms-1">
-                                <span class="path1"></span>
-                                <span class="path2"></span>
-                            </i>
-                        </span>
-                    `;
+                    const tagNameEscaped = escapeHtml(tag.name).replace(/'/g, "\\'");
+                    html += '<span class="badge badge-lg" style="background-color: ' + tag.color + '20; color: ' + tag.color + '; cursor: pointer;" ';
+                    html += 'onclick="removeTagFromList(' + tag.id + ', \'' + tagNameEscaped + '\')" title="Clique para remover">';
+                    html += escapeHtml(tag.name);
+                    html += '<i class="ki-duotone ki-cross fs-7 ms-1">';
+                    html += '<span class="path1"></span><span class="path2"></span>';
+                    html += '</i></span>';
                 });
                 currentTagsDiv.innerHTML = html;
             } else {
@@ -6478,82 +6948,71 @@ function attachFile() {
 }
 
 function uploadFile(file) {
-    const conversationId = <?= $selectedConversationId ?? 'null' ?>;
+    // Usar helper seguro para parsear ID
+    const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+    
     if (!conversationId) {
         alert('Selecione uma conversa primeiro');
         return;
     }
-    
-    // Mostrar preview de upload primeiro
+
     const uploadId = 'upload_' + Date.now();
     const chatMessages = document.getElementById('chatMessages');
     const uploadDiv = document.createElement('div');
     uploadDiv.id = uploadId;
     uploadDiv.className = 'chat-message outgoing';
-    uploadDiv.innerHTML = `
-        <div class="message-content">
-            <div class="message-bubble">
-                <div class="d-flex align-items-center gap-2">
-                    <i class="ki-duotone ki-file-up fs-3">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                        <span class="path3"></span>
-                    </i>
-                    <div class="flex-grow-1">
-                        <div class="fw-semibold">${escapeHtml(file.name)}</div>
-                        <div class="progress progress-sm mt-2">
-                            <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    chatMessages.appendChild(uploadDiv);
     
-    // Scroll para última mensagem (com verificação de segurança)
+    // Construir HTML inicial
+    let initialHtml = '<div class="message-content">';
+    initialHtml += '<div class="message-bubble">';
+    initialHtml += '<div class="d-flex align-items-center gap-2">';
+    initialHtml += '<i class="ki-duotone ki-file-up fs-3">';
+    initialHtml += '<span class="path1"></span><span class="path2"></span><span class="path3"></span>';
+    initialHtml += '</i>';
+    initialHtml += '<div class="flex-grow-1">';
+    initialHtml += '<div class="fw-semibold">' + escapeHtml(file.name) + '</div>';
+    initialHtml += '<div class="progress progress-sm mt-2">';
+    initialHtml += '<div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>';
+    initialHtml += '</div>'; // progress
+    initialHtml += '</div>'; // flex-grow-1
+    initialHtml += '</div>'; // d-flex
+    initialHtml += '</div>'; // message-bubble
+    initialHtml += '</div>'; // message-content
+    
+    uploadDiv.innerHTML = initialHtml;
+    chatMessages.appendChild(uploadDiv);
+
     if (chatMessages && chatMessages.scrollHeight !== undefined) {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
-    
-    // Validar tamanho do arquivo (10MB)
-    const maxSize = 10 * 1024 * 1024; // 10MB
+
+    const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
-        uploadDiv.innerHTML = `
-            <div class="message-content">
-                <div class="message-bubble text-danger">
-                    Arquivo muito grande. Tamanho máximo: 10MB
-                </div>
-            </div>
-        `;
+        uploadDiv.innerHTML = '<div class="message-content"><div class="message-bubble text-danger">Arquivo muito grande. Tamanho máximo: 10MB</div></div>';
         return;
     }
-    
-    // Validar tipo de arquivo
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 
-                          'video/mp4', 'video/webm', 'video/ogg',
-                          'audio/mp3', 'audio/wav', 'audio/ogg',
-                          'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                          'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                          'text/plain', 'text/csv'];
-    
-    if (!allowedTypes.includes(file.type) && !file.name.match(/\.(jpg|jpeg|png|gif|webp|mp4|webm|ogg|mp3|wav|pdf|doc|docx|xls|xlsx|txt|csv)$/i)) {
-        uploadDiv.innerHTML = `
-            <div class="message-content">
-                <div class="message-bubble text-danger">
-                    Tipo de arquivo não permitido
-                </div>
-            </div>
-        `;
+
+    const allowedTypes = [
+        'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+        'video/mp4', 'video/webm', 'video/ogg',
+        'audio/mp3', 'audio/wav', 'audio/ogg',
+        'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/plain', 'text/csv'
+    ];
+
+    const isAllowed = allowedTypes.includes(file.type) ||
+        /\.(jpg|jpeg|png|gif|webp|mp4|webm|ogg|mp3|wav|pdf|doc|docx|xls|xlsx|txt|csv)$/i.test(file.name);
+
+    if (!isAllowed) {
+        uploadDiv.innerHTML = '<div class="message-content"><div class="message-bubble text-danger">Tipo de arquivo não permitido</div></div>';
         return;
     }
-    
-    // Preparar FormData para enviar via sendMessage
+
     const formData = new FormData();
     formData.append('attachments[]', file);
-    formData.append('content', ''); // Mensagem vazia, apenas anexo
-    
-    // Melhorar preview baseado no tipo
+    formData.append('content', '');
+
     if (file.type.startsWith('image/')) {
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -6561,38 +7020,40 @@ function uploadFile(file) {
             if (img) img.src = e.target.result;
         };
         reader.readAsDataURL(file);
-        uploadDiv.querySelector('.message-bubble').innerHTML = `
-            <div class="attachment-preview mb-2">
-                <img src="" alt="${escapeHtml(file.name)}" style="max-width: 200px; max-height: 200px; border-radius: 8px; display: block;">
-            </div>
-            <div class="fw-semibold fs-7">${escapeHtml(file.name)}</div>
-            <div class="progress progress-sm mt-2" style="height: 4px;">
-                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
-            </div>
-        `;
+        
+        // Atualizar HTML para imagem
+        let imgHtml = '<div class="attachment-preview mb-2">';
+        imgHtml += '<img src="" alt="' + escapeHtml(file.name) + '" style="max-width: 200px; max-height: 200px; border-radius: 8px; display: block;">';
+        imgHtml += '</div>';
+        imgHtml += '<div class="fw-semibold fs-7">' + escapeHtml(file.name) + '</div>';
+        imgHtml += '<div class="progress progress-sm mt-2" style="height: 4px;">';
+        imgHtml += '<div class="progress-bar progress-bar-striped progress-bar-animated" role="width: 0%"></div>';
+        imgHtml += '</div>';
+        
+        const bubble = uploadDiv.querySelector('.message-bubble');
+        if(bubble) bubble.innerHTML = imgHtml;
+        
     } else {
-        uploadDiv.querySelector('.message-bubble').innerHTML = `
-            <div class="d-flex align-items-center gap-2">
-                <i class="ki-duotone ki-file-up fs-3">
-                    <span class="path1"></span>
-                    <span class="path2"></span>
-                    <span class="path3"></span>
-                </i>
-                <div class="flex-grow-1">
-                    <div class="fw-semibold">${escapeHtml(file.name)}</div>
-                    <div class="text-muted fs-7">${formatFileSize(file.size)}</div>
-                </div>
-            </div>
-            <div class="progress progress-sm mt-2" style="height: 4px;">
-                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
-            </div>
-        `;
+        // Atualizar HTML para arquivo
+        let fileHtml = '<div class="d-flex align-items-center gap-2">';
+        fileHtml += '<i class="ki-duotone ki-file-up fs-3">';
+        fileHtml += '<span class="path1"></span><span class="path2"></span><span class="path3"></span>';
+        fileHtml += '</i>';
+        fileHtml += '<div class="flex-grow-1">';
+        fileHtml += '<div class="fw-semibold">' + escapeHtml(file.name) + '</div>';
+        fileHtml += '<div class="text-muted fs-7">' + formatFileSize(file.size) + '</div>';
+        fileHtml += '</div>';
+        fileHtml += '</div>';
+        fileHtml += '<div class="progress progress-sm mt-2" style="height: 4px;">';
+        fileHtml += '<div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>';
+        fileHtml += '</div>';
+        
+        const bubble = uploadDiv.querySelector('.message-bubble');
+        if(bubble) bubble.innerHTML = fileHtml;
     }
-    
-    // Enviar arquivo usando XMLHttpRequest para ter progresso
+
     const xhr = new XMLHttpRequest();
-    
-    // Atualizar progresso
+
     xhr.upload.addEventListener('progress', function(e) {
         if (e.lengthComputable) {
             const percentComplete = (e.loaded / e.total) * 100;
@@ -6602,62 +7063,33 @@ function uploadFile(file) {
             }
         }
     });
-    
+
     xhr.onload = function() {
         if (xhr.status === 200) {
             try {
                 const data = JSON.parse(xhr.responseText);
                 if (data.success && data.message) {
-                    // Remover preview de upload
                     uploadDiv.remove();
-                    
-                    // Adicionar mensagem com anexo
                     addMessageToChat(data.message);
-                    
-                    // Atualizar último ID de mensagem
                     if (data.message.id) {
                         lastMessageId = Math.max(lastMessageId || 0, data.message.id);
                     }
                 } else {
-                    uploadDiv.innerHTML = `
-                        <div class="message-content">
-                            <div class="message-bubble text-danger">
-                                Erro: ${escapeHtml(data.message || 'Erro desconhecido')}
-                            </div>
-                        </div>
-                    `;
+                    uploadDiv.innerHTML = '<div class="message-content"><div class="message-bubble text-danger">Erro: ' + escapeHtml(data.message || 'Erro desconhecido') + '</div></div>';
                 }
             } catch (e) {
                 console.error('Erro ao processar resposta:', e);
-                uploadDiv.innerHTML = `
-                    <div class="message-content">
-                        <div class="message-bubble text-danger">
-                            Erro ao processar resposta do servidor
-                        </div>
-                    </div>
-                `;
+                uploadDiv.innerHTML = '<div class="message-content"><div class="message-bubble text-danger">Erro ao processar resposta do servidor</div></div>';
             }
         } else {
-            uploadDiv.innerHTML = `
-                <div class="message-content">
-                    <div class="message-bubble text-danger">
-                        Erro ao enviar arquivo (${xhr.status})
-                    </div>
-                </div>
-            `;
+            uploadDiv.innerHTML = '<div class="message-content"><div class="message-bubble text-danger">Erro ao enviar arquivo (' + xhr.status + ')</div></div>';
         }
     };
-    
+
     xhr.onerror = function() {
-        uploadDiv.innerHTML = `
-            <div class="message-content">
-                <div class="message-bubble text-danger">
-                    Erro de conexão. Tente novamente.
-                </div>
-            </div>
-        `;
+        uploadDiv.innerHTML = '<div class="message-content"><div class="message-bubble text-danger">Erro de conexão. Tente novamente.</div></div>';
     };
-    
+
     xhr.open('POST', `<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/messages`);
     xhr.send(formData);
 }
@@ -6824,7 +7256,7 @@ function toggleConversationSidebar() {
 // WebSocket - Atualizar em tempo real
 if (typeof window.wsClient !== 'undefined') {
     window.wsClient.on('new_message', (data) => {
-        const currentConversationId = <?= $selectedConversationId ?? 'null' ?>;
+        const currentConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
         
         // Atualizar lista de conversas
         const conversationItem = document.querySelector(`[data-conversation-id="${data.conversation_id}"]`);
@@ -6899,7 +7331,7 @@ if (typeof window.wsClient !== 'undefined') {
     });
     
     window.wsClient.on('conversation_updated', (data) => {
-        const currentConversationId = <?= $selectedConversationId ?? 'null' ?>;
+        const currentConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
         
         // Atualizar badge de não lidas na lista
         const conversationItem = document.querySelector(`[data-conversation-id="${data.conversation_id}"]`);
@@ -6931,7 +7363,7 @@ if (typeof window.wsClient !== 'undefined') {
     });
     
     // Inscrever na conversa atual
-    const currentConversationId = <?= $selectedConversationId ?? 'null' ?>;
+const currentConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     if (currentConversationId) {
         if (window.wsClient.connected) {
             window.wsClient.subscribe(currentConversationId);
@@ -6957,7 +7389,7 @@ if (typeof window.wsClient !== 'undefined') {
     }
 } else {
     // Se WebSocket não estiver disponível, usar polling
-    const currentConversationId = <?= $selectedConversationId ?? 'null' ?>;
+const currentConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     if (currentConversationId) {
         startPolling(currentConversationId);
     }
@@ -7011,7 +7443,7 @@ function refreshConversationBadges() {
                 if (conversationItem) {
                     const badge = conversationItem.querySelector('.conversation-item-badge');
                     const unreadCount = conv.unread_count || 0;
-                    const currentConversationId = <?= $selectedConversationId ?? 'null' ?>;
+                    const currentConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
                     
                     // Não atualizar badge se for a conversa atual (já está sendo gerenciada separadamente)
                     if (currentConversationId == conv.id) {

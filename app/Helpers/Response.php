@@ -173,6 +173,21 @@ class Response
     public static function forbidden(string $message = 'Acesso negado'): void
     {
         http_response_code(403);
+        
+        // Se for requisição AJAX ou JSON, retornar JSON
+        $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+                  strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+        $acceptJson = !empty($_SERVER['HTTP_ACCEPT']) && 
+                      strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false;
+        
+        if ($isAjax || $acceptJson) {
+            self::json([
+                'success' => false,
+                'message' => $message
+            ], 403);
+            return;
+        }
+        
         self::view('errors/403', ['message' => $message]);
         exit;
     }

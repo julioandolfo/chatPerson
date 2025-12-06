@@ -552,6 +552,11 @@ class ConversationController
 
             // Se for requisição AJAX, retornar JSON
             if (\App\Helpers\Request::isAjax() || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                // Limpar qualquer output buffer antes de retornar JSON
+                while (ob_get_level() > 0) {
+                    ob_end_clean();
+                }
+                
                 // Marcar mensagens como lidas quando a conversa é aberta
                 $userId = \App\Helpers\Auth::id();
                 if ($userId) {
@@ -617,6 +622,22 @@ class ConversationController
                 'allTags' => $allTags ?? []
             ]);
         } catch (\Exception $e) {
+            // Log do erro
+            \App\Helpers\Log::error("Erro em ConversationController::show({$id}): " . $e->getMessage(), 'conversas.log');
+            \App\Helpers\Log::error("Stack trace: " . $e->getTraceAsString(), 'conversas.log');
+            
+            // Se for AJAX, retornar JSON de erro
+            if (\App\Helpers\Request::isAjax() || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                while (ob_get_level() > 0) {
+                    ob_end_clean();
+                }
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro ao carregar conversa: ' . $e->getMessage()
+                ], 500);
+                return;
+            }
+            
             Response::forbidden($e->getMessage());
         }
     }
@@ -662,6 +683,32 @@ class ConversationController
             Response::json([
                 'success' => true,
                 'message' => 'Conversa atribuída com sucesso',
+                'conversation' => $conversation
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Escalar conversa de IA para humano
+     */
+    public function escalate(int $id): void
+    {
+        try {
+            Permission::abortIfCannot('conversations.edit');
+            
+            $agentId = $_POST['agent_id'] ?? null;
+            $agentId = $agentId ? (int)$agentId : null;
+
+            $conversation = ConversationService::escalateFromAI($id, $agentId);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Conversa escalada com sucesso',
                 'conversation' => $conversation
             ]);
         } catch (\Exception $e) {

@@ -18,12 +18,35 @@ class MessageTemplateService
     {
         $sql = "SELECT mt.*, 
                        d.name as department_name,
-                       u.name as created_by_name
+                       u.name as created_by_name,
+                       u2.name as user_name
                 FROM message_templates mt
                 LEFT JOIN departments d ON mt.department_id = d.id
                 LEFT JOIN users u ON mt.created_by = u.id
+                LEFT JOIN users u2 ON mt.user_id = u2.id
                 WHERE 1=1";
         $params = [];
+
+        // Filtrar por user_id se fornecido (para ver apenas templates pessoais ou globais)
+        if (isset($filters['user_id'])) {
+            if ($filters['user_id'] === 'personal') {
+                // Apenas templates pessoais do usuário logado
+                $userId = \App\Helpers\Auth::id();
+                if ($userId) {
+                    $sql .= " AND mt.user_id = ?";
+                    $params[] = $userId;
+                } else {
+                    $sql .= " AND 1=0"; // Não retornar nada se não tem usuário logado
+                }
+            } elseif ($filters['user_id'] === 'global') {
+                // Apenas templates globais
+                $sql .= " AND mt.user_id IS NULL";
+            } elseif ($filters['user_id'] !== null) {
+                // Templates de um usuário específico
+                $sql .= " AND mt.user_id = ?";
+                $params[] = $filters['user_id'];
+            }
+        }
 
         if (!empty($filters['category'])) {
             $sql .= " AND mt.category = ?";
@@ -55,7 +78,7 @@ class MessageTemplateService
             $params[] = $search;
         }
 
-        $sql .= " ORDER BY mt.name ASC";
+        $sql .= " ORDER BY mt.user_id DESC, mt.name ASC";
 
         if (!empty($filters['limit'])) {
             $sql .= " LIMIT " . (int)$filters['limit'];
@@ -76,6 +99,29 @@ class MessageTemplateService
     }
 
     /**
+     * Obter templates disponíveis para uso no chat
+     * Retorna templates pessoais do usuário + templates globais
+     */
+    public static function getAvailable(?int $departmentId = null, ?string $channel = null, ?int $userId = null): array
+    {
+        return MessageTemplate::getAvailable($departmentId, $channel, $userId);
+    }
+    
+    /**
+     * Obter templates pessoais do usuário logado
+     */
+    public static function getPersonal(?int $userId = null): array
+    {
+        if ($userId === null) {
+            $userId = \App\Helpers\Auth::id();
+        }
+        if (!$userId) {
+            return [];
+        }
+        return MessageTemplate::getPersonal($userId);
+    }
+
+    /**
      * Criar template
      */
     public static function create(array $data): int
@@ -87,7 +133,9 @@ class MessageTemplateService
             'description' => 'nullable|string',
             'department_id' => 'nullable|integer',
             'channel' => 'nullable|string|max:50',
-            'is_active' => 'nullable|boolean'
+            'is_active' => 'nullable|boolean',
+            'user_id' => 'nullable|integer',
+            'created_by' => 'nullable|integer'
         ]);
 
         if (!empty($errors)) {
@@ -96,7 +144,9 @@ class MessageTemplateService
 
         // Valores padrão
         $data['is_active'] = $data['is_active'] ?? true;
-        $data['created_by'] = \App\Helpers\Auth::id();
+        if (!isset($data['created_by'])) {
+            $data['created_by'] = \App\Helpers\Auth::id();
+        }
 
         return MessageTemplate::create($data);
     }

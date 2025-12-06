@@ -47,6 +47,7 @@ Router::get('/conversations/{id}', [ConversationController::class, 'show'], ['Au
 // Rota alternativa para exibir conversa na lista (usado no layout Chatwoot)
 Router::get('/conversations/list/{id}', [ConversationController::class, 'index'], ['Authentication']);
 Router::post('/conversations/{id}/assign', [ConversationController::class, 'assign'], ['Authentication']);
+Router::post('/conversations/{id}/escalate', [ConversationController::class, 'escalate'], ['Authentication']);
 Router::post('/conversations/{id}/close', [ConversationController::class, 'close'], ['Authentication']);
 Router::post('/conversations/{id}/reopen', [ConversationController::class, 'reopen'], ['Authentication']);
 // Rotas de tags movidas para após as rotas de tags (linhas 192-199)
@@ -233,6 +234,8 @@ Router::post('/message-templates', [MessageTemplateController::class, 'store'], 
 Router::post('/message-templates/{id}', [MessageTemplateController::class, 'update'], ['Authentication']);
 Router::delete('/message-templates/{id}', [MessageTemplateController::class, 'destroy'], ['Authentication']);
 Router::get('/message-templates/available', [MessageTemplateController::class, 'getAvailable'], ['Authentication']);
+Router::get('/message-templates/personal', [MessageTemplateController::class, 'getPersonal'], ['Authentication']);
+Router::get('/message-templates/{id}', [MessageTemplateController::class, 'show'], ['Authentication']);
 Router::post('/message-templates/{id}/preview', [MessageTemplateController::class, 'preview'], ['Authentication']);
 Router::post('/message-templates/{id}/process', [MessageTemplateController::class, 'process'], ['Authentication']);
 Router::get('/message-templates/variables', [MessageTemplateController::class, 'getVariables'], ['Authentication']);

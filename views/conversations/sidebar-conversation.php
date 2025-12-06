@@ -190,6 +190,14 @@
                 <div class="sidebar-section">
                     <div class="sidebar-section-title">Ações</div>
                     
+                    <button class="btn btn-sm btn-light-warning w-100 mb-2" id="sidebar-escalate-btn" style="display: none;" onclick="escalateFromAI(0)">
+                        <i class="ki-duotone ki-arrow-up fs-5">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Escalar para Humano
+                    </button>
+                    
                     <button class="btn btn-sm btn-light-primary w-100 mb-2" id="sidebar-assign-btn" style="display: none;" onclick="assignConversation(0)">
                         <i class="ki-duotone ki-user-tick fs-5">
                             <span class="path1"></span>

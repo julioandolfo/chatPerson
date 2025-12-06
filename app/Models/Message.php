@@ -247,16 +247,23 @@ class Message extends Model
     {
         $sql = "SELECT m.*, 
                        CASE 
+                           WHEN m.ai_agent_id IS NOT NULL THEN aia.name
                            WHEN m.sender_type = 'agent' THEN u.name
                            ELSE ct.name
                        END as sender_name,
                        CASE 
                            WHEN m.sender_type = 'agent' THEN u.avatar
                            ELSE ct.avatar
-                       END as sender_avatar
+                       END as sender_avatar,
+                       m.ai_agent_id,
+                       CASE 
+                           WHEN m.ai_agent_id IS NOT NULL THEN aia.name
+                           ELSE NULL
+                       END as ai_agent_name
                 FROM messages m
-                LEFT JOIN users u ON m.sender_type = 'agent' AND m.sender_id = u.id
+                LEFT JOIN users u ON m.sender_type = 'agent' AND m.sender_id = u.id AND m.ai_agent_id IS NULL
                 LEFT JOIN contacts ct ON m.sender_type = 'contact' AND m.sender_id = ct.id
+                LEFT JOIN ai_agents aia ON m.ai_agent_id = aia.id
                 WHERE m.conversation_id = ?";
         
         $params = [$conversationId];

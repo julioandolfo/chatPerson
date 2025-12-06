@@ -32,8 +32,7 @@ class ConversationService
         // Validar dados
         $errors = Validator::validate($data, [
             'contact_id' => 'required|integer',
-            'channel' => 'required|string|in:whatsapp,email,chat,telegram',
-            'subject' => 'nullable|string|max:255'
+            'channel' => 'required|string|in:whatsapp,email,chat,telegram'
         ]);
 
         // Converter erros para array simples
@@ -85,11 +84,11 @@ class ConversationService
             'contact_id' => $data['contact_id'],
             'channel' => $data['channel'],
             'status' => 'open',
-            'subject' => $data['subject'] ?? null,
             'agent_id' => $agentId,
             'department_id' => $data['department_id'] ?? null,
             'funnel_id' => $data['funnel_id'] ?? null,
-            'funnel_stage_id' => $data['stage_id'] ?? null
+            'funnel_stage_id' => $data['stage_id'] ?? null,
+            'whatsapp_account_id' => $data['whatsapp_account_id'] ?? null
         ];
 
         $id = Conversation::create($conversationData);

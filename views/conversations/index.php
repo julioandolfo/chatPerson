@@ -308,6 +308,8 @@ ob_start();
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
+    position: relative;
+    padding-right: 30px; /* Espaço para o badge */
 }
 
 .conversation-item-channel {
@@ -332,6 +334,11 @@ ob_start();
     min-width: 20px;
     text-align: center;
     display: inline-block;
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 1;
 }
 
 /* Coluna 2: Área de Chat */
@@ -5226,8 +5233,11 @@ function sendMessage() {
         return;
     }
     
-const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+    // Obter conversationId da variável global atualizada ou do PHP
+    let conversationId = window.currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     if (!conversationId) {
+        console.error('Nenhuma conversa selecionada');
+        alert('Por favor, selecione uma conversa primeiro');
         return;
     }
 
@@ -7849,10 +7859,27 @@ if (typeof window.wsClient !== 'undefined') {
         }
     });
     
+    // Handler para novas conversas criadas
+    window.wsClient.on('new_conversation', (data) => {
+        // Adicionar nova conversa à lista sem recarregar a página
+        if (data.conversation) {
+            refreshConversationList();
+        }
+    });
+    
     window.wsClient.on('conversation_updated', (data) => {
         const currentConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
         
-        // Atualizar badge de não lidas na lista
+        // Se é a conversa atual, não atualizar badge (já foi removido ao selecionar)
+        if (currentConversationId == data.conversation_id) {
+            // Recarregar apenas se necessário (mudanças de status, atribuição)
+            if (data.changes && (data.changes.status || data.changes.agent_id || data.changes.department_id)) {
+                window.location.reload();
+            }
+            return; // Não atualizar badge se for a conversa atual
+        }
+        
+        // Atualizar badge de não lidas na lista apenas se não for a conversa atual
         const conversationItem = document.querySelector(`[data-conversation-id="${data.conversation_id}"]`);
         if (conversationItem) {
             const badge = conversationItem.querySelector('.conversation-item-badge');
@@ -7869,14 +7896,6 @@ if (typeof window.wsClient !== 'undefined') {
             } else {
                 // Remover badge se não houver mensagens não lidas
                 if (badge) badge.remove();
-            }
-        }
-        
-        // Se é a conversa atual, recarregar para pegar mudanças de status, atribuição, etc
-        if (currentConversationId == data.conversation_id) {
-            // Recarregar apenas se necessário (mudanças de status, atribuição)
-            if (data.changes && (data.changes.status || data.changes.agent_id || data.changes.department_id)) {
-                window.location.reload();
             }
         }
     });

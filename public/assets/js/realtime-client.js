@@ -228,6 +228,14 @@ class RealtimeClient {
             });
         }
 
+        if (updates.new_conversations) {
+            updates.new_conversations.forEach(conv => {
+                this.emit('new_conversation', {
+                    conversation: conv
+                });
+            });
+        }
+
         if (updates.conversation_updates) {
             updates.conversation_updates.forEach(conv => {
                 this.emit('conversation_updated', {

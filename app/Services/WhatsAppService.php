@@ -891,32 +891,74 @@ class WhatsAppService
             // Criar ou atualizar contato
             Logger::quepasa("processWebhook - Buscando contato pelo telefone: {$fromPhone}");
             $contact = \App\Models\Contact::findByPhone($fromPhone);
+            
+            // Extrair nome do contato do payload (chat.title)
+            $contactName = $payload['chat']['title'] ?? $payload['chat']['name'] ?? $payload['name'] ?? null;
+            if (!$contactName && isset($payload['chat']['phone'])) {
+                // Se não tem nome, usar telefone formatado
+                $contactName = $payload['chat']['phone'];
+            }
+            if (!$contactName) {
+                $contactName = $fromPhone; // Fallback para telefone
+            }
+            
             if (!$contact) {
                 $whatsappId = ($payload['from'] ?? $payload['phone'] ?? $fromPhone);
                 if (!str_ends_with($whatsappId, '@s.whatsapp.net')) {
                     $whatsappId .= '@s.whatsapp.net';
                 }
                 
+                Logger::quepasa("processWebhook - Criando novo contato: name={$contactName}, phone={$fromPhone}");
                 $contactId = \App\Models\Contact::create([
-                    'name' => $fromPhone,
+                    'name' => $contactName,
                     'phone' => $fromPhone,
                     'whatsapp_id' => $whatsappId,
                     'email' => null
                 ]);
                 $contact = \App\Models\Contact::find($contactId);
                 
-                // Tentar buscar avatar do WhatsApp
+                Logger::quepasa("processWebhook - Contato criado: ID={$contactId}");
+                
+                // Tentar buscar avatar do WhatsApp usando chat.id do payload
                 try {
-                    \App\Services\ContactService::fetchWhatsAppAvatar($contact['id'], $account['id']);
+                    $chatId = $payload['chat']['id'] ?? null;
+                    if ($chatId) {
+                        \App\Services\ContactService::fetchWhatsAppAvatarByChatId($contact['id'], $account['id'], $chatId);
+                    } else {
+                        \App\Services\ContactService::fetchWhatsAppAvatar($contact['id'], $account['id']);
+                    }
                 } catch (\Exception $e) {
                     Logger::quepasa("Erro ao buscar avatar: " . $e->getMessage());
                 }
-            } elseif (empty($contact['avatar'])) {
-                // Se contato existe mas não tem avatar, tentar buscar
-                try {
-                    \App\Services\ContactService::fetchWhatsAppAvatar($contact['id'], $account['id']);
-                } catch (\Exception $e) {
-                    Logger::quepasa("Erro ao buscar avatar: " . $e->getMessage());
+            } else {
+                // Atualizar nome APENAS se:
+                // 1. Veio no payload (chat.title)
+                // 2. O contato não tem nome cadastrado (nome igual ao telefone)
+                if ($contactName && !empty($payload['chat']['title'])) {
+                    // Verificar se o nome atual é igual ao telefone (nome padrão/não cadastrado)
+                    $currentNameIsPhone = ($contact['name'] === $contact['phone'] || 
+                                          $contact['name'] === $fromPhone ||
+                                          preg_match('/^[0-9\s\+\-\(\)]+$/', $contact['name']) === 1);
+                    
+                    if ($currentNameIsPhone && $contact['name'] !== $contactName) {
+                        Logger::quepasa("processWebhook - Atualizando nome do contato (sem nome cadastrado): {$contact['name']} -> {$contactName}");
+                        \App\Models\Contact::update($contact['id'], ['name' => $contactName]);
+                        $contact['name'] = $contactName;
+                    }
+                }
+                
+                // Se contato existe mas não tem avatar, tentar buscar usando chat.id
+                if (empty($contact['avatar'])) {
+                    try {
+                        $chatId = $payload['chat']['id'] ?? null;
+                        if ($chatId) {
+                            \App\Services\ContactService::fetchWhatsAppAvatarByChatId($contact['id'], $account['id'], $chatId);
+                        } else {
+                            \App\Services\ContactService::fetchWhatsAppAvatar($contact['id'], $account['id']);
+                        }
+                    } catch (\Exception $e) {
+                        Logger::quepasa("Erro ao buscar avatar: " . $e->getMessage());
+                    }
                 }
             }
 

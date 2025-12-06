@@ -11,7 +11,7 @@ class Conversation extends Model
 {
     protected string $table = 'conversations';
     protected string $primaryKey = 'id';
-    protected array $fillable = ['contact_id', 'agent_id', 'department_id', 'channel', 'status', 'subject', 'funnel_id', 'funnel_stage_id', 'whatsapp_account_id', 'pinned', 'pinned_at'];
+    protected array $fillable = ['contact_id', 'agent_id', 'department_id', 'channel', 'status', 'funnel_id', 'funnel_stage_id', 'whatsapp_account_id', 'pinned', 'pinned_at'];
     protected array $hidden = [];
     protected bool $timestamps = true;
 

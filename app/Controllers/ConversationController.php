@@ -1072,6 +1072,11 @@ class ConversationController
      */
     public function getMessages(int $id): void
     {
+        // Limpar output buffer antes de processar
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
         Permission::abortIfCannot('conversations.view.own');
         
         try {
@@ -1089,6 +1094,11 @@ class ConversationController
             // Contar total de mensagens
             $total = \App\Models\Message::countByConversation($id);
             
+            // Limpar output buffer novamente antes de retornar JSON
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            
             Response::json([
                 'success' => true,
                 'messages' => $messages,
@@ -1097,6 +1107,11 @@ class ConversationController
                 'count' => count($messages)
             ]);
         } catch (\Exception $e) {
+            // Limpar output buffer antes de retornar erro
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            
             Response::json(['success' => false, 'message' => $e->getMessage()], 400);
         }
     }

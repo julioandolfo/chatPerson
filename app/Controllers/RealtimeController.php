@@ -117,6 +117,7 @@ class RealtimeController
             $updates = [
                 'new_messages' => [],
                 'conversation_updates' => [],
+                'new_conversations' => [], // Novas conversas criadas
                 'agent_status' => []
             ];
 
@@ -193,6 +194,14 @@ class RealtimeController
                             $lastUpdateTime = 0;
                         }
 
+                        $isNewConversation = false;
+                        if (isset($conv['created_at'])) {
+                            $createdAt = strtotime($conv['created_at']);
+                            if ($createdAt !== false && $createdAt > ($lastUpdateTime / 1000)) {
+                                $isNewConversation = true;
+                            }
+                        }
+
                         if ($updatedAt > ($lastUpdateTime / 1000)) {
                             // Verificar se já não está na lista de updates
                             $exists = false;
@@ -204,14 +213,25 @@ class RealtimeController
                             }
                             
                             if (!$exists) {
-                                $updates['conversation_updates'][] = [
+                                $conversationData = [
                                     'id' => $conv['id'],
                                     'status' => $conv['status'] ?? 'open',
                                     'unread_count' => $conv['unread_count'] ?? 0,
                                     'updated_at' => $conv['updated_at'],
                                     'contact_name' => $conv['contact_name'] ?? null,
-                                    'last_message' => $conv['last_message'] ?? null
+                                    'contact_phone' => $conv['contact_phone'] ?? null,
+                                    'contact_avatar' => $conv['contact_avatar'] ?? null,
+                                    'last_message' => $conv['last_message'] ?? null,
+                                    'last_message_at' => $conv['last_message_at'] ?? null,
+                                    'channel' => $conv['channel'] ?? 'whatsapp',
+                                    'agent_name' => $conv['agent_name'] ?? null
                                 ];
+                                
+                                if ($isNewConversation) {
+                                    $updates['new_conversations'][] = $conversationData;
+                                } else {
+                                    $updates['conversation_updates'][] = $conversationData;
+                                }
                             }
                         }
                     }

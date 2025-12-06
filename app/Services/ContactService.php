@@ -311,6 +311,74 @@ class ContactService
     }
 
     /**
+     * Buscar avatar do WhatsApp via Quepasa usando chat.id
+     */
+    public static function fetchWhatsAppAvatarByChatId(int $contactId, int $whatsappAccountId, string $chatId): ?string
+    {
+        try {
+            $account = \App\Models\WhatsAppAccount::find($whatsappAccountId);
+            if (!$account || $account['provider'] !== 'quepasa' || empty($account['quepasa_token'])) {
+                return null;
+            }
+
+            // Tentar buscar avatar usando chat.id diretamente
+            $apiUrl = rtrim($account['api_url'], '/');
+            $endpoints = [
+                "/profile-picture/{$chatId}",
+                "/contact/{$chatId}/picture",
+                "/avatar/{$chatId}",
+                "/picture/{$chatId}"
+            ];
+
+            foreach ($endpoints as $endpoint) {
+                $url = $apiUrl . $endpoint;
+                $headers = [
+                    'Accept: image/*',
+                    'X-QUEPASA-TOKEN: ' . $account['quepasa_token'],
+                    'X-QUEPASA-TRACKID: ' . ($account['quepasa_trackid'] ?? $account['name'])
+                ];
+
+                $ch = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 10,
+                    CURLOPT_HTTPHEADER => $headers,
+                    CURLOPT_FOLLOWLOCATION => true,
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_SSL_VERIFYHOST => false
+                ]);
+
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+
+                if ($httpCode === 200 && !empty($response)) {
+                    // Salvar avatar
+                    $uploadDir = __DIR__ . '/../../public/assets/media/avatars/contacts/';
+                    if (!is_dir($uploadDir)) {
+                        mkdir($uploadDir, 0755, true);
+                    }
+
+                    $filename = 'whatsapp_' . $contactId . '_' . time() . '.jpg';
+                    $filepath = $uploadDir . $filename;
+
+                    if (file_put_contents($filepath, $response)) {
+                        $avatarUrl = \App\Helpers\Url::asset('media/avatars/contacts/' . $filename);
+                        Contact::update($contactId, ['avatar' => $avatarUrl]);
+                        return $avatarUrl;
+                    }
+                }
+            }
+
+            // Se não conseguir com chat.id, tentar método padrão
+            return self::fetchWhatsAppAvatar($contactId, $whatsappAccountId);
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error("Erro ao buscar avatar do WhatsApp por chat.id: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Deletar contato
      */
     public static function delete(int $id): bool

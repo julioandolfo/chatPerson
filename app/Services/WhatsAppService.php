@@ -923,6 +923,7 @@ class WhatsAppService
             // Criar ou buscar conversa
             Logger::quepasa("processWebhook - Buscando conversa existente: contact_id={$contact['id']}, channel=whatsapp, account_id={$account['id']}");
             $conversation = \App\Models\Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['id']);
+            Logger::quepasa("processWebhook - Resultado da busca: " . ($conversation ? "Encontrada (ID={$conversation['id']})" : "Não encontrada"));
             $isNewConversation = false;
             
             if (!$conversation) {

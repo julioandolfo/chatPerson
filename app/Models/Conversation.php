@@ -364,7 +364,8 @@ class Conversation extends Model
         
         $sql .= " ORDER BY created_at DESC LIMIT 1";
         
-        return Database::fetchOne($sql, $params);
+        // Usar fetch ao invés de fetchOne (que não existe)
+        return Database::fetch($sql, $params);
     }
 }
 

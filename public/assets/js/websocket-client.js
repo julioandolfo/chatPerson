@@ -24,46 +24,92 @@ class WebSocketClient {
 
         this.userId = userId;
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.hostname}:8080`;
+        const hostname = window.location.hostname;
+        const port = window.location.port;
+        
+        // Tentar primeiro usar proxy reverso (/ws) se estiver em HTTPS ou em produção
+        // Se falhar, tentar porta direta 8080
+        let wsUrl;
+        const isProduction = hostname !== 'localhost' && hostname !== '127.0.0.1';
+        
+        if (isProduction || protocol === 'wss:') {
+            // Tentar usar proxy reverso primeiro (/ws)
+            wsUrl = `${protocol}//${hostname}${port ? ':' + port : ''}/ws`;
+        } else {
+            // Desenvolvimento: usar porta direta
+            wsUrl = `${protocol}//${hostname}:8080`;
+        }
 
         try {
             this.ws = new WebSocket(wsUrl);
+            this.setupWebSocketHandlers(userId, wsUrl, protocol, hostname);
+        } catch (error) {
+            console.error('Erro ao conectar WebSocket:', error);
+            this.attemptReconnect();
+        }
+    }
+    
+    /**
+     * Configurar handlers do WebSocket
+     */
+    setupWebSocketHandlers(userId, wsUrl, protocol, hostname) {
+        if (!this.ws) return;
+        
+        this.ws.onopen = () => {
+            console.log('WebSocket conectado em:', wsUrl);
+            this.isConnected = true;
+            this.reconnectAttempts = 0;
+            
+            // Autenticar usuário
+            this.authenticate(userId);
+            
+            // Reinscrever em conversas
+            this.subscribedConversations.forEach(convId => {
+                this.subscribe(convId);
+            });
 
-            this.ws.onopen = () => {
-                console.log('WebSocket conectado');
-                this.isConnected = true;
-                this.reconnectAttempts = 0;
-                
-                // Autenticar usuário
-                this.authenticate(userId);
-                
-                // Reinscrever em conversas
-                this.subscribedConversations.forEach(convId => {
-                    this.subscribe(convId);
-                });
+            this.emit('connected');
+        };
 
-                this.emit('connected');
-            };
+        this.ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                this.handleMessage(data);
+            } catch (e) {
+                console.error('Erro ao processar mensagem WebSocket:', e);
+            }
+        };
+        
+        this.ws.onerror = (error) => {
+            console.error('Erro WebSocket:', error);
+            console.error('URL tentada:', wsUrl);
+            this.emit('error', error);
+            
+            // Se falhou com /ws e estamos em produção, tentar porta direta como fallback
+            if (wsUrl && wsUrl.includes('/ws') && this.reconnectAttempts === 0) {
+                console.log('Tentando fallback para porta direta 8080...');
+                setTimeout(() => {
+                    const fallbackUrl = `${protocol}//${hostname}:8080`;
+                    console.log('Tentando conectar em:', fallbackUrl);
+                    if (this.ws) {
+                        this.ws.close();
+                    }
+                    this.ws = new WebSocket(fallbackUrl);
+                    this.setupWebSocketHandlers(userId, fallbackUrl, protocol, hostname);
+                }, 1000);
+                return;
+            }
+        };
 
-            this.ws.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    this.handleMessage(data);
-                } catch (e) {
-                    console.error('Erro ao processar mensagem WebSocket:', e);
-                }
-            };
-
-            this.ws.onerror = (error) => {
-                console.error('Erro WebSocket:', error);
-                this.emit('error', error);
-            };
-
-            this.ws.onclose = () => {
-                console.log('WebSocket desconectado');
-                this.isConnected = false;
+        this.ws.onclose = (event) => {
+            console.log('WebSocket desconectado', event.code, event.reason);
+            this.isConnected = false;
+            
+            // Não tentar reconectar se foi fechado intencionalmente (código 1000)
+            if (event.code !== 1000) {
                 this.attemptReconnect();
-            };
+            }
+        };
         } catch (error) {
             console.error('Erro ao conectar WebSocket:', error);
             this.attemptReconnect();

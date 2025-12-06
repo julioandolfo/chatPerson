@@ -168,7 +168,8 @@ class MessageTemplateService
             'description' => 'nullable|string',
             'department_id' => 'nullable|integer',
             'channel' => 'nullable|string|max:50',
-            'is_active' => 'nullable|boolean'
+            'is_active' => 'nullable|boolean',
+            'user_id' => 'nullable|integer'
         ]);
 
         if (!empty($errors)) {

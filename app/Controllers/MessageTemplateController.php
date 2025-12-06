@@ -213,6 +213,20 @@ class MessageTemplateController
         Permission::abortIfCannot('message_templates.delete');
         
         try {
+            // Verificar se é template pessoal do usuário
+            $template = MessageTemplateService::get($id);
+            if ($template) {
+                $userId = \App\Helpers\Auth::id();
+                // Se for template pessoal, só o dono pode deletar (a menos que tenha permissão especial)
+                if ($template['user_id'] !== null && $template['user_id'] != $userId && !Permission::can('message_templates.delete.all')) {
+                    Response::json([
+                        'success' => false,
+                        'message' => 'Você não tem permissão para deletar este template'
+                    ], 403);
+                    return;
+                }
+            }
+            
             if (MessageTemplateService::delete($id)) {
                 Response::json([
                     'success' => true,

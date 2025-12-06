@@ -2103,6 +2103,143 @@ body.dark-mode .swal2-content {
     </div>
 </div>
 
+<!-- MODAL: Gerenciar Templates Pessoais -->
+<div class="modal fade" id="kt_modal_personal_templates" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-800px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">
+                    <i class="ki-duotone ki-user fs-2x text-warning me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Meus Templates de Mensagens
+                </h2>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm btn-primary" onclick="showCreatePersonalTemplateModal()">
+                        <i class="ki-duotone ki-plus fs-5">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Novo Template
+                    </button>
+                    <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                        <i class="ki-duotone ki-cross fs-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="mb-5">
+                    <input type="text" id="personalTemplateSearch" class="form-control form-control-solid" placeholder="Buscar meus templates...">
+                </div>
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table class="table table-row-dashed align-middle gs-0 gy-4">
+                        <thead>
+                            <tr class="fw-bold text-muted">
+                                <th class="min-w-200px">Nome</th>
+                                <th class="min-w-150px">Categoria</th>
+                                <th class="min-w-300px">Conteúdo</th>
+                                <th class="text-end min-w-150px">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="personalTemplatesList">
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-10">
+                                    <span class="spinner-border spinner-border-sm text-primary mb-3" role="status"></span>
+                                    <div>Carregando templates...</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Criar/Editar Template Pessoal -->
+<div class="modal fade" id="kt_modal_personal_template_form" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-700px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold" id="personalTemplateFormTitle">Novo Template Pessoal</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <form id="personalTemplateForm">
+                    <input type="hidden" id="personalTemplateId" name="id">
+                    <input type="hidden" name="is_personal" value="1">
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold">Nome do Template <span class="text-danger">*</span></label>
+                        <input type="text" id="personalTemplateName" name="name" class="form-control form-control-solid" placeholder="Ex: Saudação Inicial" required>
+                        <div class="form-text">Dê um nome descritivo para identificar este template facilmente.</div>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold">Categoria</label>
+                        <input type="text" id="personalTemplateCategory" name="category" class="form-control form-control-solid" placeholder="Ex: Saudação, Follow-up, Suporte">
+                        <div class="form-text">Categoria opcional para organizar seus templates.</div>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold">Descrição</label>
+                        <textarea id="personalTemplateDescription" name="description" class="form-control form-control-solid" rows="2" placeholder="Descrição opcional do template"></textarea>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold">
+                            Conteúdo do Template <span class="text-danger">*</span>
+                            <button type="button" class="btn btn-sm btn-light-primary ms-2" onclick="showVariablesModal()" title="Ver variáveis disponíveis">
+                                <i class="ki-duotone ki-code fs-6">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                    <span class="path4"></span>
+                                </i>
+                                Variáveis
+                            </button>
+                        </label>
+                        <textarea id="personalTemplateContent" name="content" class="form-control form-control-solid" rows="6" placeholder="Digite o conteúdo do template. Use {{variavel}} para variáveis dinâmicas." required></textarea>
+                        <div class="form-text">
+                            Use variáveis como <code>{{contact.name}}</code>, <code>{{agent.name}}</code>, <code>{{date}}</code>, etc.
+                        </div>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <div class="form-check form-check-custom form-check-solid">
+                            <input class="form-check-input" type="checkbox" id="personalTemplateActive" name="is_active" value="1" checked>
+                            <label class="form-check-label" for="personalTemplateActive">
+                                Template ativo
+                            </label>
+                        </div>
+                        <div class="form-text">Templates inativos não aparecerão na lista de seleção.</div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary" id="personalTemplateSubmitBtn">
+                            <span class="indicator-label">Salvar Template</span>
+                            <span class="indicator-progress d-none">
+                                Salvando...
+                                <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                            </span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: Atribuir Conversa -->
 <div class="modal fade" id="kt_modal_assign" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered mw-500px">
@@ -5227,6 +5364,388 @@ function showTemplatesModal() {
     // Carregar templates
     loadTemplates();
 }
+
+// Modal de Templates Pessoais
+function showPersonalTemplatesModal() {
+    const modal = new bootstrap.Modal(document.getElementById('kt_modal_personal_templates'));
+    modal.show();
+    
+    // Fechar modal de templates se estiver aberto
+    const templatesModal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_templates'));
+    if (templatesModal) {
+        templatesModal.hide();
+    }
+    
+    // Carregar templates pessoais
+    loadPersonalTemplates();
+}
+
+// Carregar templates pessoais
+function loadPersonalTemplates() {
+    const templatesList = document.getElementById('personalTemplatesList');
+    if (!templatesList) return;
+    
+    templatesList.innerHTML = `
+        <tr>
+            <td colspan="4" class="text-center text-muted py-10">
+                <span class="spinner-border spinner-border-sm text-primary mb-3" role="status"></span>
+                <div>Carregando templates...</div>
+            </td>
+        </tr>
+    `;
+    
+    fetch('<?= \App\Helpers\Url::to("/message-templates/personal") ?>', {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.templates) {
+            renderPersonalTemplates(data.templates);
+        } else {
+            templatesList.innerHTML = `
+                <tr>
+                    <td colspan="4" class="text-center text-muted py-10">
+                        <i class="ki-duotone ki-information-5 fs-3x mb-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div>Você ainda não tem templates pessoais.</div>
+                        <button class="btn btn-sm btn-primary mt-3" onclick="showCreatePersonalTemplateModal()">
+                            <i class="ki-duotone ki-plus fs-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Criar Primeiro Template
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao carregar templates pessoais:', error);
+        templatesList.innerHTML = `
+            <tr>
+                <td colspan="4" class="text-center text-danger py-10">
+                    <div>Erro ao carregar templates pessoais</div>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+// Renderizar templates pessoais
+function renderPersonalTemplates(templates) {
+    const templatesList = document.getElementById('personalTemplatesList');
+    if (!templatesList) return;
+    
+    if (templates.length === 0) {
+        templatesList.innerHTML = `
+            <tr>
+                <td colspan="4" class="text-center text-muted py-10">
+                    <div>Você ainda não tem templates pessoais.</div>
+                    <button class="btn btn-sm btn-primary mt-3" onclick="showCreatePersonalTemplateModal()">
+                        <i class="ki-duotone ki-plus fs-5">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Criar Primeiro Template
+                    </button>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    let html = '';
+    templates.forEach(template => {
+        const category = template.category || 'Geral';
+        const contentPreview = (template.content || '').substring(0, 100);
+        html += `
+            <tr data-template-id="${template.id}">
+                <td>
+                    <div class="fw-semibold text-gray-800">${escapeHtml(template.name)}</div>
+                    ${template.description ? `<div class="text-muted fs-7">${escapeHtml(template.description)}</div>` : ''}
+                </td>
+                <td>
+                    <span class="badge badge-light-primary">${escapeHtml(category)}</span>
+                </td>
+                <td>
+                    <div class="text-gray-600 fs-7" style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(template.content || '')}">
+                        ${escapeHtml(contentPreview)}${template.content && template.content.length > 100 ? '...' : ''}
+                    </div>
+                </td>
+                <td class="text-end">
+                    <div class="d-flex gap-2 justify-content-end">
+                        <button class="btn btn-sm btn-light-primary" onclick="editPersonalTemplate(${template.id})" title="Editar">
+                            <i class="ki-duotone ki-notepad-edit fs-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                        </button>
+                        <button class="btn btn-sm btn-light-danger" onclick="deletePersonalTemplate(${template.id})" title="Excluir">
+                            <i class="ki-duotone ki-trash fs-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+    
+    templatesList.innerHTML = html;
+    
+    // Adicionar busca em tempo real
+    const searchInput = document.getElementById('personalTemplateSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const rows = templatesList.querySelectorAll('tr');
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+        });
+    }
+}
+
+// Mostrar modal de criar template pessoal
+function showCreatePersonalTemplateModal() {
+    document.getElementById('personalTemplateFormTitle').textContent = 'Novo Template Pessoal';
+    document.getElementById('personalTemplateForm').reset();
+    document.getElementById('personalTemplateId').value = '';
+    document.getElementById('personalTemplateActive').checked = true;
+    
+    const modal = new bootstrap.Modal(document.getElementById('kt_modal_personal_template_form'));
+    modal.show();
+}
+
+// Editar template pessoal
+function editPersonalTemplate(templateId) {
+    fetch(`<?= \App\Helpers\Url::to("/message-templates") ?>/${templateId}`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.template) {
+            const template = data.template;
+            document.getElementById('personalTemplateFormTitle').textContent = 'Editar Template Pessoal';
+            document.getElementById('personalTemplateId').value = template.id;
+            document.getElementById('personalTemplateName').value = template.name || '';
+            document.getElementById('personalTemplateCategory').value = template.category || '';
+            document.getElementById('personalTemplateDescription').value = template.description || '';
+            document.getElementById('personalTemplateContent').value = template.content || '';
+            document.getElementById('personalTemplateActive').checked = template.is_active !== false;
+            
+            const modal = new bootstrap.Modal(document.getElementById('kt_modal_personal_template_form'));
+            modal.show();
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Template não encontrado',
+                colorScheme: isDarkMode ? 'dark' : 'light',
+                customClass: {
+                    popup: isDarkMode ? 'swal2-dark' : '',
+                    title: isDarkMode ? 'text-white' : '',
+                    htmlContainer: isDarkMode ? 'text-white' : ''
+                }
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao carregar template:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro ao carregar template',
+            colorScheme: isDarkMode ? 'dark' : 'light',
+            customClass: {
+                popup: isDarkMode ? 'swal2-dark' : '',
+                title: isDarkMode ? 'text-white' : '',
+                htmlContainer: isDarkMode ? 'text-white' : ''
+            }
+        });
+    });
+}
+
+// Deletar template pessoal
+function deletePersonalTemplate(templateId) {
+    Swal.fire({
+        icon: 'warning',
+        title: 'Confirmar Exclusão',
+        text: 'Tem certeza que deseja excluir este template pessoal? Esta ação não pode ser desfeita.',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, excluir',
+        cancelButtonText: 'Cancelar',
+        colorScheme: isDarkMode ? 'dark' : 'light',
+        customClass: {
+            popup: isDarkMode ? 'swal2-dark' : '',
+            title: isDarkMode ? 'text-white' : '',
+            htmlContainer: isDarkMode ? 'text-white' : '',
+            confirmButton: 'btn btn-danger',
+            cancelButton: 'btn btn-light'
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch(`<?= \App\Helpers\Url::to("/message-templates") ?>/${templateId}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso!',
+                        text: 'Template excluído com sucesso',
+                        timer: 2000,
+                        showConfirmButton: false,
+                        colorScheme: isDarkMode ? 'dark' : 'light',
+                        customClass: {
+                            popup: isDarkMode ? 'swal2-dark' : '',
+                            title: isDarkMode ? 'text-white' : '',
+                            htmlContainer: isDarkMode ? 'text-white' : ''
+                        }
+                    });
+                    loadPersonalTemplates();
+                    loadTemplates(); // Recarregar templates no modal principal também
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: data.message || 'Erro ao excluir template',
+                        colorScheme: isDarkMode ? 'dark' : 'light',
+                        customClass: {
+                            popup: isDarkMode ? 'swal2-dark' : '',
+                            title: isDarkMode ? 'text-white' : '',
+                            htmlContainer: isDarkMode ? 'text-white' : ''
+                        }
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao excluir template:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: 'Erro ao excluir template',
+                    colorScheme: isDarkMode ? 'dark' : 'light',
+                    customClass: {
+                        popup: isDarkMode ? 'swal2-dark' : '',
+                        title: isDarkMode ? 'text-white' : '',
+                        htmlContainer: isDarkMode ? 'text-white' : ''
+                    }
+                });
+            });
+        }
+    });
+}
+
+// Submeter formulário de template pessoal
+document.addEventListener('DOMContentLoaded', function() {
+    const personalTemplateForm = document.getElementById('personalTemplateForm');
+    if (personalTemplateForm) {
+        personalTemplateForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('personalTemplateSubmitBtn');
+            const indicator = submitBtn.querySelector('.indicator-label');
+            const progress = submitBtn.querySelector('.indicator-progress');
+            
+            submitBtn.disabled = true;
+            indicator.classList.add('d-none');
+            progress.classList.remove('d-none');
+            
+            const formData = new FormData(this);
+            const data = {
+                name: formData.get('name'),
+                category: formData.get('category') || null,
+                description: formData.get('description') || null,
+                content: formData.get('content'),
+                is_active: formData.get('is_active') === '1',
+                is_personal: true
+            };
+            
+            const templateId = formData.get('id');
+            const url = templateId 
+                ? `<?= \App\Helpers\Url::to("/message-templates") ?>/${templateId}`
+                : '<?= \App\Helpers\Url::to("/message-templates") ?>';
+            const method = templateId ? 'POST' : 'POST';
+            
+            fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso!',
+                        text: templateId ? 'Template atualizado com sucesso!' : 'Template criado com sucesso!',
+                        timer: 2000,
+                        showConfirmButton: false,
+                        colorScheme: isDarkMode ? 'dark' : 'light',
+                        customClass: {
+                            popup: isDarkMode ? 'swal2-dark' : '',
+                            title: isDarkMode ? 'text-white' : '',
+                            htmlContainer: isDarkMode ? 'text-white' : ''
+                        }
+                    });
+                    
+                    bootstrap.Modal.getInstance(document.getElementById('kt_modal_personal_template_form')).hide();
+                    loadPersonalTemplates();
+                    loadTemplates(); // Recarregar templates no modal principal também
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: result.message || 'Erro ao salvar template',
+                        colorScheme: isDarkMode ? 'dark' : 'light',
+                        customClass: {
+                            popup: isDarkMode ? 'swal2-dark' : '',
+                            title: isDarkMode ? 'text-white' : '',
+                            htmlContainer: isDarkMode ? 'text-white' : ''
+                        }
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao salvar template:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: 'Erro ao salvar template',
+                    colorScheme: isDarkMode ? 'dark' : 'light',
+                    customClass: {
+                        popup: isDarkMode ? 'swal2-dark' : '',
+                        title: isDarkMode ? 'text-white' : '',
+                        htmlContainer: isDarkMode ? 'text-white' : ''
+                    }
+                });
+            })
+            .finally(() => {
+                submitBtn.disabled = false;
+                indicator.classList.remove('d-none');
+                progress.classList.add('d-none');
+            });
+        });
+    }
+});
 
 function loadTemplates() {
     const templatesList = document.getElementById('templatesList');

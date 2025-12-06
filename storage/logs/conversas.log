@@ -3662,3 +3662,174 @@
 [2025-12-06 17:16:19] [DEBUG] GET params
 [2025-12-06 17:16:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
 [2025-12-06 17:16:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:17:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:17:19] [DEBUG] GET params
+[2025-12-06 17:17:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:17:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:17:52] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:17:52] [DEBUG] GET params
+[2025-12-06 17:17:52] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:17:52] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:17:53] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:17:53] [DEBUG] GET params
+[2025-12-06 17:17:53] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:17:53] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:18:03] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:18:03] [DEBUG] GET params
+[2025-12-06 17:18:03] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:18:03] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:18:13] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:18:13] [DEBUG] GET params
+[2025-12-06 17:18:13] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:18:13] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:18:23] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:18:23] [DEBUG] GET params
+[2025-12-06 17:18:23] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:18:23] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:18:33] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:18:33] [DEBUG] GET params
+[2025-12-06 17:18:33] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:18:33] [DEBUG] SQL Query: SELECT c.*, 
+                       ct.name as contact_name, ct.phone as contact_phone, ct.email as contact_email, ct.avatar as contact_avatar,
+                       u.name as agent_name, u.email as agent_email,
+                       (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact' AND m.read_at IS NULL) as unread_count,
+                       (SELECT content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as l
+[2025-12-06 17:18:33] [DEBUG] SQL Params
+[2025-12-06 17:18:33] [DEBUG] Conversas retornadas do banco: 1
+[2025-12-06 17:18:33] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:18:43] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:18:43] [DEBUG] GET params
+[2025-12-06 17:18:43] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:18:43] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:18:53] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:18:53] [DEBUG] GET params
+[2025-12-06 17:18:53] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:18:53] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:19:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:19:19] [DEBUG] GET params
+[2025-12-06 17:19:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:19:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:20:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:20:19] [DEBUG] GET params
+[2025-12-06 17:20:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:20:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:21:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:21:19] [DEBUG] GET params
+[2025-12-06 17:21:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:21:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:22:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:22:19] [DEBUG] GET params
+[2025-12-06 17:22:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:22:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:23:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:23:19] [DEBUG] GET params
+[2025-12-06 17:23:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:23:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:24:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:24:19] [DEBUG] GET params
+[2025-12-06 17:24:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:24:19] [DEBUG] SQL Query: SELECT c.*, 
+                       ct.name as contact_name, ct.phone as contact_phone, ct.email as contact_email, ct.avatar as contact_avatar,
+                       u.name as agent_name, u.email as agent_email,
+                       (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact' AND m.read_at IS NULL) as unread_count,
+                       (SELECT content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as l
+[2025-12-06 17:24:19] [DEBUG] SQL Params
+[2025-12-06 17:24:19] [DEBUG] Conversas retornadas do banco: 1
+[2025-12-06 17:24:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:25:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:25:19] [DEBUG] GET params
+[2025-12-06 17:25:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:25:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:26:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:26:19] [DEBUG] GET params
+[2025-12-06 17:26:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:26:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:27:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:27:19] [DEBUG] GET params
+[2025-12-06 17:27:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:27:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:28:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:28:19] [DEBUG] GET params
+[2025-12-06 17:28:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:28:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:29:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:29:19] [DEBUG] GET params
+[2025-12-06 17:29:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:29:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:30:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:30:19] [DEBUG] GET params
+[2025-12-06 17:30:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:30:19] [DEBUG] SQL Query: SELECT c.*, 
+                       ct.name as contact_name, ct.phone as contact_phone, ct.email as contact_email, ct.avatar as contact_avatar,
+                       u.name as agent_name, u.email as agent_email,
+                       (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact' AND m.read_at IS NULL) as unread_count,
+                       (SELECT content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as l
+[2025-12-06 17:30:19] [DEBUG] SQL Params
+[2025-12-06 17:30:19] [DEBUG] Conversas retornadas do banco: 1
+[2025-12-06 17:30:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:31:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:31:19] [DEBUG] GET params
+[2025-12-06 17:31:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:31:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:32:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:32:19] [DEBUG] GET params
+[2025-12-06 17:32:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:32:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:33:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:33:19] [DEBUG] GET params
+[2025-12-06 17:33:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:33:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:34:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:34:19] [DEBUG] GET params
+[2025-12-06 17:34:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:34:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:35:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:35:19] [DEBUG] GET params
+[2025-12-06 17:35:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:35:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:36:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:36:19] [DEBUG] GET params
+[2025-12-06 17:36:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:36:19] [DEBUG] SQL Query: SELECT c.*, 
+                       ct.name as contact_name, ct.phone as contact_phone, ct.email as contact_email, ct.avatar as contact_avatar,
+                       u.name as agent_name, u.email as agent_email,
+                       (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact' AND m.read_at IS NULL) as unread_count,
+                       (SELECT content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as l
+[2025-12-06 17:36:19] [DEBUG] SQL Params
+[2025-12-06 17:36:19] [DEBUG] Conversas retornadas do banco: 1
+[2025-12-06 17:36:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:37:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:37:19] [DEBUG] GET params
+[2025-12-06 17:37:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:37:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:38:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:38:19] [DEBUG] GET params
+[2025-12-06 17:38:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:38:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:39:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:39:19] [DEBUG] GET params
+[2025-12-06 17:39:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:39:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:40:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:40:19] [DEBUG] GET params
+[2025-12-06 17:40:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:40:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:41:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:41:19] [DEBUG] GET params
+[2025-12-06 17:41:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:41:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:42:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:42:19] [DEBUG] GET params
+[2025-12-06 17:42:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:42:19] [DEBUG] SQL Query: SELECT c.*, 
+                       ct.name as contact_name, ct.phone as contact_phone, ct.email as contact_email, ct.avatar as contact_avatar,
+                       u.name as agent_name, u.email as agent_email,
+                       (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact' AND m.read_at IS NULL) as unread_count,
+                       (SELECT content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as l
+[2025-12-06 17:42:19] [DEBUG] SQL Params
+[2025-12-06 17:42:19] [DEBUG] Conversas retornadas do banco: 1
+[2025-12-06 17:42:19] [DEBUG] Conversas retornadas do Service: 1
+[2025-12-06 17:43:19] [DEBUG] ConversationController::index - userId: 1
+[2025-12-06 17:43:19] [DEBUG] GET params
+[2025-12-06 17:43:19] [DEBUG] Filtros após limpeza | Context: {"limit":50,"offset":0}
+[2025-12-06 17:43:19] [DEBUG] Conversas retornadas do Service: 1

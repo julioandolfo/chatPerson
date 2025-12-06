@@ -124,6 +124,7 @@ class SettingService
             'whatsapp_evolution_url' => Setting::get('whatsapp_evolution_url', ''),
             'whatsapp_evolution_api_key' => Setting::get('whatsapp_evolution_api_key', ''),
             'whatsapp_webhook_url' => Setting::get('whatsapp_webhook_url', ''),
+            'whatsapp_allow_group_messages' => Setting::get('whatsapp_allow_group_messages', true),
         ];
     }
 

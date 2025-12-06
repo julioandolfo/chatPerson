@@ -45,6 +45,7 @@ function seed_roles_and_permissions() {
         ['name' => 'Editar conversas do setor', 'slug' => 'conversations.edit.department', 'description' => 'Editar conversas do setor', 'module' => 'conversations'],
         ['name' => 'Editar todas as conversas', 'slug' => 'conversations.edit.all', 'description' => 'Editar todas as conversas', 'module' => 'conversations'],
         ['name' => 'Atribuir conversas', 'slug' => 'conversations.edit.assign', 'description' => 'Atribuir conversas a agentes', 'module' => 'conversations'],
+        ['name' => 'Deletar conversas', 'slug' => 'conversations.delete', 'description' => 'Deletar conversas', 'module' => 'conversations'],
         
         // Mensagens
         ['name' => 'Enviar mensagens em próprias conversas', 'slug' => 'messages.send.own', 'description' => 'Enviar mensagens em conversas próprias', 'module' => 'messages'],

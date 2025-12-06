@@ -379,14 +379,92 @@ class ContactService
     }
 
     /**
-     * Deletar contato
+     * Baixar avatar de uma URL e salvar
      */
-    public static function delete(int $id): bool
+    public static function downloadAvatarFromUrl(int $contactId, string $avatarUrl): ?string
+    {
+        try {
+            if (empty($avatarUrl)) {
+                return null;
+            }
+
+            $ch = curl_init($avatarUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false,
+                CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            ]);
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+            curl_close($ch);
+
+            if ($httpCode === 200 && !empty($response)) {
+                // Determinar extensão baseado no content-type ou URL
+                $extension = 'jpg';
+                if (strpos($contentType, 'png') !== false) {
+                    $extension = 'png';
+                } elseif (strpos($contentType, 'gif') !== false) {
+                    $extension = 'gif';
+                } elseif (strpos($contentType, 'webp') !== false) {
+                    $extension = 'webp';
+                } else {
+                    // Tentar extrair da URL
+                    $pathInfo = pathinfo(parse_url($avatarUrl, PHP_URL_PATH));
+                    if (!empty($pathInfo['extension'])) {
+                        $extension = $pathInfo['extension'];
+                    }
+                }
+
+                // Salvar avatar
+                $uploadDir = __DIR__ . '/../../public/assets/media/avatars/contacts/';
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0755, true);
+                }
+
+                $filename = 'whatsapp_' . $contactId . '_' . time() . '.' . $extension;
+                $filepath = $uploadDir . $filename;
+
+                if (file_put_contents($filepath, $response)) {
+                    $avatarUrl = \App\Helpers\Url::asset('media/avatars/contacts/' . $filename);
+                    Contact::update($contactId, ['avatar' => $avatarUrl]);
+                    return $avatarUrl;
+                }
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error("Erro ao baixar avatar de URL: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Deletar contato
+     * @param bool $force Se true, deleta mesmo com conversas (apenas para admin global)
+     */
+    public static function delete(int $id, bool $force = false): bool
     {
         // Verificar se contato tem conversas
         $conversations = \App\Models\Conversation::where('contact_id', '=', $id);
-        if (!empty($conversations)) {
+        if (!empty($conversations) && !$force) {
             throw new \Exception('Não é possível deletar contato com conversas associadas');
+        }
+        
+        // Se force=true, deletar conversas primeiro
+        if ($force && !empty($conversations)) {
+            foreach ($conversations as $conv) {
+                // Deletar mensagens
+                \App\Helpers\Database::query("DELETE FROM messages WHERE conversation_id = ?", [$conv['id']]);
+                // Deletar tags
+                \App\Helpers\Database::query("DELETE FROM conversation_tags WHERE conversation_id = ?", [$conv['id']]);
+                // Deletar conversa
+                \App\Models\Conversation::delete($conv['id']);
+            }
         }
 
         return Contact::delete($id);

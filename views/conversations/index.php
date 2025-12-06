@@ -335,10 +335,10 @@ ob_start();
     text-align: center;
     display: inline-block;
     position: absolute;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
+    right: 15px;
+    bottom: 15px;
     z-index: 1;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
 /* Coluna 2: Área de Chat */
@@ -2561,7 +2561,14 @@ function checkForNewMessages(conversationId) {
     if (!chatMessages) return;
     
     // Buscar apenas mensagens novas
-    fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}?last_message_id=${lastMessageId || 0}`, {
+    const conversationIdNum = parseInt(conversationId);
+    const lastMessageIdNum = parseInt(lastMessageId) || 0;
+    if (isNaN(conversationIdNum)) {
+        console.error('ID de conversa inválido:', conversationId);
+        return;
+    }
+    const url = `<?= \App\Helpers\Url::to('/conversations') ?>/${conversationIdNum}?last_message_id=${lastMessageIdNum}`;
+    fetch(url, {
         headers: {
             'X-Requested-With': 'XMLHttpRequest',
             'Accept': 'application/json'
@@ -7840,7 +7847,10 @@ if (typeof window.wsClient !== 'undefined') {
             const statusElement = messageElement.querySelector('.message-status');
             if (statusElement) {
                 // Buscar mensagem atualizada do servidor
-                fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${data.conversation_id}?last_message_id=${data.message_id}`)
+                const convId = parseInt(data.conversation_id);
+                const msgId = parseInt(data.message_id) || 0;
+                if (!isNaN(convId)) {
+                    fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${convId}?last_message_id=${msgId}`)
                     .then(res => res.json())
                     .then(result => {
                         if (result.success && result.conversation && result.conversation.messages) {

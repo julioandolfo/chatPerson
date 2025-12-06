@@ -264,6 +264,7 @@ class SettingsController
             SettingService::set('whatsapp_evolution_url', $data['whatsapp_evolution_url'] ?? '', 'string', 'whatsapp');
             SettingService::set('whatsapp_evolution_api_key', $data['whatsapp_evolution_api_key'] ?? '', 'string', 'whatsapp');
             SettingService::set('whatsapp_webhook_url', $data['whatsapp_webhook_url'] ?? '', 'string', 'whatsapp');
+            SettingService::set('whatsapp_allow_group_messages', isset($data['whatsapp_allow_group_messages']), 'boolean', 'whatsapp');
             
             Response::json([
                 'success' => true,

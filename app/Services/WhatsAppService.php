@@ -852,11 +852,18 @@ class WhatsAppService
             
             // Processar tipo de mensagem e metadados
             $messageType = $payload['type'] ?? 'text';
-            $isGroup = $payload['isGroup'] ?? false;
-            $groupName = $payload['groupName'] ?? null;
+            $isGroup = $payload['isGroup'] ?? ($payload['chat']['isGroup'] ?? false);
+            $groupName = $payload['groupName'] ?? ($payload['chat']['groupName'] ?? null);
             $forwarded = $payload['forwarded'] ?? false;
             $quotedMessageId = $payload['quoted'] ?? $payload['quoted_message_id'] ?? null;
             $quotedMessageText = $payload['quoted_text'] ?? null;
+            
+            // Verificar se mensagens de grupo são permitidas
+            $allowGroupMessages = \App\Services\SettingService::get('whatsapp_allow_group_messages', true);
+            if ($isGroup && !$allowGroupMessages) {
+                Logger::quepasa("processWebhook - Mensagem de grupo ignorada (grupos desabilitados): groupName={$groupName}");
+                return;
+            }
             
             // Processar anexos/mídia do WhatsApp (será processado depois de criar a conversa)
             $mediaUrl = $payload['media_url'] ?? $payload['mediaUrl'] ?? $payload['url'] ?? null;
@@ -881,7 +888,7 @@ class WhatsAppService
                 $message = $payload['caption'];
             }
 
-            Logger::quepasa("processWebhook - Processando mensagem: fromPhone={$fromPhone}, message={$message}, messageId={$messageId}");
+            Logger::quepasa("processWebhook - Processando mensagem: fromPhone={$fromPhone}, message={$message}, messageId={$messageId}, isGroup=" . ($isGroup ? 'true' : 'false'));
             
             if (!$fromPhone || (empty($message) && !$mediaUrl)) {
                 Logger::error("WhatsApp webhook: dados incompletos (fromPhone: " . ($fromPhone ?? 'NULL') . ", message: " . ($message ?? 'NULL') . ", mediaUrl: " . ($mediaUrl ?? 'NULL') . ")");
@@ -922,7 +929,14 @@ class WhatsAppService
                 // Tentar buscar avatar do WhatsApp usando chat.id do payload
                 try {
                     $chatId = $payload['chat']['id'] ?? null;
-                    if ($chatId) {
+                    // Verificar se há URL de avatar direta no payload
+                    $avatarUrl = $payload['chat']['picture'] ?? $payload['chat']['avatar'] ?? $payload['avatar'] ?? null;
+                    
+                    if ($avatarUrl) {
+                        // Se tem URL direta, baixar e salvar
+                        Logger::quepasa("processWebhook - Avatar encontrado no payload: {$avatarUrl}");
+                        \App\Services\ContactService::downloadAvatarFromUrl($contact['id'], $avatarUrl);
+                    } elseif ($chatId) {
                         \App\Services\ContactService::fetchWhatsAppAvatarByChatId($contact['id'], $account['id'], $chatId);
                     } else {
                         \App\Services\ContactService::fetchWhatsAppAvatar($contact['id'], $account['id']);
@@ -951,7 +965,14 @@ class WhatsAppService
                 if (empty($contact['avatar'])) {
                     try {
                         $chatId = $payload['chat']['id'] ?? null;
-                        if ($chatId) {
+                        // Verificar se há URL de avatar direta no payload
+                        $avatarUrl = $payload['chat']['picture'] ?? $payload['chat']['avatar'] ?? $payload['avatar'] ?? null;
+                        
+                        if ($avatarUrl) {
+                            // Se tem URL direta, baixar e salvar
+                            Logger::quepasa("processWebhook - Avatar encontrado no payload: {$avatarUrl}");
+                            \App\Services\ContactService::downloadAvatarFromUrl($contact['id'], $avatarUrl);
+                        } elseif ($chatId) {
                             \App\Services\ContactService::fetchWhatsAppAvatarByChatId($contact['id'], $account['id'], $chatId);
                         } else {
                             \App\Services\ContactService::fetchWhatsAppAvatar($contact['id'], $account['id']);

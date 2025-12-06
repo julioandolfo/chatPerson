@@ -73,19 +73,6 @@ class ConversationController
             
             \App\Helpers\Log::debug("Conversas retornadas do Service: " . count($conversations), 'conversas.log');
             
-            // Modo DEMO: Se não houver conversas ou se demo=on, criar dados de demonstração
-            // MAS apenas se não houver filtro de busca ativo
-            $demoMode = false;
-            $hasSearchFilter = !empty($filters['search']) && trim($filters['search']) !== '';
-            
-            if (isset($_GET['demo']) && $_GET['demo'] === 'on') {
-                $demoMode = true;
-                $conversations = self::getDemoConversations();
-            } elseif (empty($conversations) && !isset($_GET['demo']) && !$hasSearchFilter) {
-                // Só usar modo demo se não houver busca ativa
-                $demoMode = true;
-                $conversations = self::getDemoConversations();
-            }
             
             // Se for requisição AJAX ou formato JSON, retornar apenas JSON com lista de conversas
             if ($isAjax || $isJsonFormat) {
@@ -117,20 +104,8 @@ class ConversationController
                 }
                 
                 try {
-                    // Se for modo demo, buscar da lista demo
-                    if ($demoMode) {
-                        foreach ($conversations as $conv) {
-                            if (isset($conv['id']) && $conv['id'] == $selectedConversationId) {
-                                $selectedConversation = $conv;
-                                // Adicionar mensagens de exemplo para modo demo
-                                $selectedConversation['messages'] = self::getDemoMessages((int)$selectedConversationId);
-                                break;
-                            }
-                        }
-                    } else {
-                        // Recarregar conversa para obter unread_count atualizado após marcar como lidas
-                        $selectedConversation = ConversationService::getConversation((int)$selectedConversationId);
-                    }
+                    // Recarregar conversa para obter unread_count atualizado após marcar como lidas
+                    $selectedConversation = ConversationService::getConversation((int)$selectedConversationId);
                 } catch (\Exception $e) {
                     // Ignorar erro se conversa não encontrada
                 }
@@ -143,8 +118,7 @@ class ConversationController
                 'tags' => $tags ?? [],
                 'filters' => $filters,
                 'selectedConversation' => $selectedConversation,
-                'selectedConversationId' => $selectedConversationId,
-                'demoMode' => $demoMode
+                'selectedConversationId' => $selectedConversationId
             ]);
         } catch (\Exception $e) {
             // Log do erro para debug
@@ -188,347 +162,59 @@ class ConversationController
     }
 
     /**
-     * Garantir que uma conversa demo existe no banco de dados
+     * Deletar conversa
      */
-    public static function ensureDemoConversationExists(int $id): ?array
+    public function destroy(int $id): void
     {
-        try {
-            $demoConversations = self::getDemoConversations();
-            $demoData = null;
-            
-            // Encontrar dados da conversa demo
-            foreach ($demoConversations as $demo) {
-                if (isset($demo['id']) && $demo['id'] == $id) {
-                    $demoData = $demo;
-                    break;
-                }
-            }
-            
-            if (!$demoData) {
-                return null;
-            }
-            
-            // Verificar se contato existe, criar se não existir
-            $contact = \App\Models\Contact::findByEmail($demoData['contact_email']);
-            if (!$contact) {
-                // Criar contato
-                $contactId = \App\Models\Contact::create([
-                    'name' => $demoData['contact_name'],
-                    'email' => $demoData['contact_email'],
-                    'phone' => $demoData['contact_phone'],
-                    'avatar' => $demoData['contact_avatar']
-                ]);
-                $contact = \App\Models\Contact::find($contactId);
-            }
-            
-            if (!$contact) {
-                return null;
-            }
-            
-            // Verificar se conversa já existe
-            $existingConversation = \App\Models\Conversation::find($id);
-            if ($existingConversation) {
-                return ConversationService::getConversation($id);
-            }
-            
-            // Criar conversa
-            $conversationData = [
-                'contact_id' => $contact['id'],
-                'channel' => $demoData['channel'] ?? 'whatsapp',
-                'status' => $demoData['status'] ?? 'open'
-            ];
-            
-            // Se tiver agente atribuído, buscar ID do agente
-            if (!empty($demoData['agent_name'])) {
-                $agent = \App\Helpers\Database::fetch(
-                    "SELECT id FROM users WHERE name = ? LIMIT 1",
-                    [$demoData['agent_name']]
-                );
-                if ($agent) {
-                    $conversationData['agent_id'] = $agent['id'];
-                }
-            }
-            
-            // Criar conversa
-            // Tentar criar com ID específico primeiro
-            $db = \App\Helpers\Database::getInstance();
-            $createdId = null;
-            
-            try {
-                // Tentar inserir com ID específico
-                $stmt = $db->prepare("INSERT INTO conversations (id, contact_id, channel, status, agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())");
-                $stmt->execute([
-                    $id,
-                    $contact['id'],
-                    $conversationData['channel'],
-                    $conversationData['status'],
-                    $conversationData['agent_id'] ?? null
-                ]);
-                $createdId = $id;
-            } catch (\PDOException $e) {
-                // Se der erro (ID já existe ou AUTO_INCREMENT), criar normalmente
-                $createdId = \App\Models\Conversation::create([
-                    'contact_id' => $contact['id'],
-                    'channel' => $conversationData['channel'],
-                    'status' => $conversationData['status'],
-                    'agent_id' => $conversationData['agent_id'] ?? null
-                ]);
-            }
-            
-            if (!$createdId) {
-                throw new \Exception('Falha ao criar conversa demo');
-            }
-            
-            // Usar o ID criado (pode ser diferente do ID demo se não conseguiu inserir com ID específico)
-            $finalId = $createdId;
-            
-            // Criar mensagens demo se houver (usar ID demo original para buscar mensagens)
-            $demoMessages = self::getDemoMessages($id);
-            if (!empty($demoMessages)) {
-                foreach ($demoMessages as $msg) {
-                    if ($msg['type'] === 'system') {
-                        continue; // Pular mensagens de sistema
-                    }
-                    
-                    $senderType = $msg['direction'] === 'incoming' ? 'contact' : 'agent';
-                    $senderId = $senderType === 'contact' ? $contact['id'] : ($conversationData['agent_id'] ?? \App\Helpers\Auth::id());
-                    
-                    // Criar mensagem usando SQL direto para poder definir created_at
-                    $db = \App\Helpers\Database::getInstance();
-                    $stmt = $db->prepare("INSERT INTO messages (conversation_id, sender_id, sender_type, content, message_type, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                    $stmt->execute([
-                        $finalId,
-                        $senderId,
-                        $senderType,
-                        $msg['content'],
-                        $msg['type'] === 'note' ? 'note' : 'text',
-                        'sent',
-                        $msg['created_at']
-                    ]);
-                }
-            }
-            
-            // Retornar conversa criada
-            return ConversationService::getConversation($finalId);
-            
-        } catch (\Exception $e) {
-            error_log("Erro ao criar conversa demo: " . $e->getMessage());
-            return null;
+        // Verificar permissão - admin global pode deletar qualquer conversa
+        $user = \App\Helpers\Auth::user();
+        if (!$user || ($user['role'] !== 'super_admin' && $user['role'] !== 'admin')) {
+            Permission::abortIfCannot('conversations.delete');
         }
-    }
-
-    /**
-     * Obter conversas de demonstração
-     */
-    private static function getDemoConversations(): array
-    {
-        $now = time();
-        $demoData = [
-            [
-                'id' => 1,
-                'contact_name' => 'Maria Silva',
-                'contact_phone' => '+55 11 98765-4321',
-                'contact_email' => 'maria.silva@email.com',
-                'contact_avatar' => null,
-                'status' => 'open',
-                'channel' => 'whatsapp',
-                'last_message' => 'Olá, preciso de ajuda com meu pedido #12345',
-                'last_message_at' => date('Y-m-d H:i:s', $now - 300),
-                'unread_count' => 2,
-                'agent_name' => 'João Santos',
-                'tags' => [
-                    ['id' => 1, 'name' => 'VIP', 'color' => '#f1416c'],
-                    ['id' => 2, 'name' => 'Urgente', 'color' => '#ffc700']
-                ]
-            ],
-            [
-                'id' => 2,
-                'contact_name' => 'Carlos Oliveira',
-                'contact_phone' => '+55 21 99876-5432',
-                'contact_email' => 'carlos.oliveira@email.com',
-                'contact_avatar' => null,
-                'status' => 'open',
-                'channel' => 'email',
-                'last_message' => 'Gostaria de saber mais sobre os planos disponíveis',
-                'last_message_at' => date('Y-m-d H:i:s', $now - 1800),
-                'unread_count' => 0,
-                'agent_name' => null,
-                'tags' => [
-                    ['id' => 3, 'name' => 'Novo', 'color' => '#009ef7']
-                ]
-            ],
-            [
-                'id' => 3,
-                'contact_name' => 'Ana Costa',
-                'contact_phone' => '+55 47 91234-5678',
-                'contact_email' => 'ana.costa@email.com',
-                'contact_avatar' => null,
-                'status' => 'resolved',
-                'channel' => 'whatsapp',
-                'last_message' => 'Obrigada pela ajuda! Problema resolvido.',
-                'last_message_at' => date('Y-m-d H:i:s', $now - 7200),
-                'unread_count' => 0,
-                'agent_name' => 'João Santos',
-                'tags' => []
-            ],
-            [
-                'id' => 4,
-                'contact_name' => 'Roberto Santos',
-                'contact_phone' => '+55 85 98765-4321',
-                'contact_email' => 'roberto.santos@email.com',
-                'contact_avatar' => null,
-                'status' => 'open',
-                'channel' => 'chat',
-                'last_message' => 'Quando meu produto será entregue?',
-                'last_message_at' => date('Y-m-d H:i:s', $now - 600),
-                'unread_count' => 1,
-                'agent_name' => null,
-                'tags' => [
-                    ['id' => 4, 'name' => 'Follow-up', 'color' => '#50cd89']
-                ]
-            ],
-            [
-                'id' => 5,
-                'contact_name' => 'Juliana Ferreira',
-                'contact_phone' => '+55 11 97654-3210',
-                'contact_email' => 'juliana.ferreira@email.com',
-                'contact_avatar' => null,
-                'status' => 'open',
-                'channel' => 'whatsapp',
-                'last_message' => 'Preciso cancelar minha assinatura',
-                'last_message_at' => date('Y-m-d H:i:s', $now - 120),
-                'unread_count' => 3,
-                'agent_name' => 'Maria Oliveira',
-                'tags' => [
-                    ['id' => 1, 'name' => 'VIP', 'color' => '#f1416c'],
-                    ['id' => 2, 'name' => 'Urgente', 'color' => '#ffc700']
-                ]
-            ],
-            [
-                'id' => 6,
-                'contact_name' => 'Pedro Almeida',
-                'contact_phone' => '+55 48 91234-5678',
-                'contact_email' => 'pedro.almeida@email.com',
-                'contact_avatar' => null,
-                'status' => 'open',
-                'channel' => 'email',
-                'last_message' => 'Gostaria de fazer uma reclamação sobre o atendimento',
-                'last_message_at' => date('Y-m-d H:i:s', $now - 3600),
-                'unread_count' => 0,
-                'agent_name' => null,
-                'tags' => [
-                    ['id' => 3, 'name' => 'Novo', 'color' => '#009ef7']
-                ]
-            ],
-            [
-                'id' => 7,
-                'contact_name' => 'Fernanda Lima',
-                'contact_phone' => '+55 31 99876-5432',
-                'contact_email' => 'fernanda.lima@email.com',
-                'contact_avatar' => null,
-                'status' => 'closed',
-                'channel' => 'whatsapp',
-                'last_message' => 'Tudo certo, obrigada!',
-                'last_message_at' => date('Y-m-d H:i:s', $now - 86400),
-                'unread_count' => 0,
-                'agent_name' => 'João Santos',
-                'tags' => []
-            ],
-            [
-                'id' => 8,
-                'contact_name' => 'Lucas Martins',
-                'contact_phone' => '+55 41 98765-4321',
-                'contact_email' => 'lucas.martins@email.com',
-                'contact_avatar' => null,
-                'status' => 'open',
-                'channel' => 'chat',
-                'last_message' => 'Como faço para alterar minha senha?',
-                'last_message_at' => date('Y-m-d H:i:s', $now - 900),
-                'unread_count' => 0,
-                'agent_name' => 'Maria Oliveira',
-                'tags' => [
-                    ['id' => 4, 'name' => 'Follow-up', 'color' => '#50cd89']
-                ]
-            ],
-            [
-                'id' => 9,
-                'contact_name' => 'Patricia Souza',
-                'contact_phone' => '+55 11 99888-7766',
-                'contact_email' => 'patricia.souza@email.com',
-                'contact_avatar' => null,
-                'status' => 'open',
-                'channel' => 'whatsapp',
-                'last_message' => 'Gostaria de informações sobre o produto X',
-                'last_message_at' => date('Y-m-d H:i:s', $now - 180),
-                'unread_count' => 1,
-                'agent_name' => null,
-                'tags' => [
-                    ['id' => 3, 'name' => 'Novo', 'color' => '#009ef7']
-                ]
-            ]
-        ];
-
-        return $demoData;
-    }
-
-    /**
-     * Obter mensagens de demonstração para uma conversa
-     */
-    private static function getDemoMessages(int $conversationId): array
-    {
-        $now = time();
-        $messages = [];
         
-        // Mensagens diferentes para cada conversa
-        $conversationMessages = [
-            1 => [
-                ['type' => 'system', 'content' => 'Conversa iniciada em ' . date('d/m/Y H:i'), 'created_at' => date('Y-m-d H:i:s', $now - 3700)],
-                ['type' => 'message', 'direction' => 'incoming', 'sender_name' => 'Maria Silva', 'content' => 'Olá, preciso de ajuda com meu pedido #12345', 'created_at' => date('Y-m-d H:i:s', $now - 3600)],
-                ['type' => 'system', 'content' => 'Conversa atribuída para João Santos', 'created_at' => date('Y-m-d H:i:s', $now - 3550)],
-                ['type' => 'message', 'direction' => 'outgoing', 'sender_name' => 'João Santos', 'content' => 'Olá Maria! Claro, vou verificar seu pedido agora mesmo.', 'created_at' => date('Y-m-d H:i:s', $now - 3500), 'delivered_at' => date('Y-m-d H:i:s', $now - 3490), 'read_at' => date('Y-m-d H:i:s', $now - 3480)],
-                ['type' => 'note', 'sender_name' => 'João Santos', 'content' => 'Cliente VIP - dar prioridade no atendimento', 'created_at' => date('Y-m-d H:i:s', $now - 3400)],
-                ['type' => 'message', 'direction' => 'incoming', 'sender_name' => 'Maria Silva', 'content' => 'Obrigada! Estou aguardando.', 'created_at' => date('Y-m-d H:i:s', $now - 300)],
-            ],
-            2 => [
-                ['type' => 'system', 'content' => 'Conversa iniciada em ' . date('d/m/Y H:i'), 'created_at' => date('Y-m-d H:i:s', $now - 1850)],
-                ['type' => 'message', 'direction' => 'incoming', 'sender_name' => 'Carlos Oliveira', 'content' => 'Gostaria de saber mais sobre os planos disponíveis', 'created_at' => date('Y-m-d H:i:s', $now - 1800)],
-            ],
-            3 => [
-                ['type' => 'system', 'content' => 'Conversa iniciada em ' . date('d/m/Y H:i'), 'created_at' => date('Y-m-d H:i:s', $now - 7300)],
-                ['type' => 'message', 'direction' => 'incoming', 'sender_name' => 'Ana Costa', 'content' => 'Obrigada pela ajuda! Problema resolvido.', 'created_at' => date('Y-m-d H:i:s', $now - 7200)],
-                ['type' => 'message', 'direction' => 'outgoing', 'sender_name' => 'João Santos', 'content' => 'Fico feliz em ajudar! Se precisar de mais alguma coisa, estou à disposição.', 'created_at' => date('Y-m-d H:i:s', $now - 7100), 'read_at' => date('Y-m-d H:i:s', $now - 7000)],
-            ],
-            4 => [
-                ['type' => 'system', 'content' => 'Conversa iniciada em ' . date('d/m/Y H:i'), 'created_at' => date('Y-m-d H:i:s', $now - 650)],
-                ['type' => 'message', 'direction' => 'incoming', 'sender_name' => 'Roberto Santos', 'content' => 'Quando meu produto será entregue?', 'created_at' => date('Y-m-d H:i:s', $now - 600)],
-            ],
-            5 => [
-                ['type' => 'system', 'content' => 'Conversa iniciada em ' . date('d/m/Y H:i'), 'created_at' => date('Y-m-d H:i:s', $now - 1900)],
-                ['type' => 'message', 'direction' => 'incoming', 'sender_name' => 'Juliana Ferreira', 'content' => 'Preciso cancelar minha assinatura', 'created_at' => date('Y-m-d H:i:s', $now - 1800)],
-                ['type' => 'message', 'direction' => 'outgoing', 'sender_name' => 'Maria Oliveira', 'content' => 'Entendo sua solicitação. Vou processar o cancelamento para você.', 'created_at' => date('Y-m-d H:i:s', $now - 1700), 'delivered_at' => date('Y-m-d H:i:s', $now - 1690)],
-                ['type' => 'message', 'direction' => 'incoming', 'sender_name' => 'Juliana Ferreira', 'content' => 'Obrigada! Quanto tempo leva?', 'created_at' => date('Y-m-d H:i:s', $now - 120)],
-            ],
-            6 => [
-                ['type' => 'system', 'content' => 'Conversa iniciada em ' . date('d/m/Y H:i'), 'created_at' => date('Y-m-d H:i:s', $now - 3650)],
-                ['type' => 'message', 'direction' => 'incoming', 'sender_name' => 'Pedro Almeida', 'content' => 'Gostaria de fazer uma reclamação sobre o atendimento', 'created_at' => date('Y-m-d H:i:s', $now - 3600)],
-            ],
-            7 => [
-                ['type' => 'system', 'content' => 'Conversa iniciada em ' . date('d/m/Y H:i'), 'created_at' => date('Y-m-d H:i:s', $now - 86500)],
-                ['type' => 'message', 'direction' => 'incoming', 'sender_name' => 'Fernanda Lima', 'content' => 'Tudo certo, obrigada!', 'created_at' => date('Y-m-d H:i:s', $now - 86400)],
-                ['type' => 'message', 'direction' => 'outgoing', 'sender_name' => 'João Santos', 'content' => 'Que bom! Fico feliz em saber que conseguimos ajudar.', 'created_at' => date('Y-m-d H:i:s', $now - 86300), 'read_at' => date('Y-m-d H:i:s', $now - 86200)],
-            ],
-            8 => [
-                ['type' => 'system', 'content' => 'Conversa iniciada em ' . date('d/m/Y H:i'), 'created_at' => date('Y-m-d H:i:s', $now - 950)],
-                ['type' => 'message', 'direction' => 'incoming', 'sender_name' => 'Lucas Martins', 'content' => 'Como faço para alterar minha senha?', 'created_at' => date('Y-m-d H:i:s', $now - 900)],
-                ['type' => 'message', 'direction' => 'outgoing', 'sender_name' => 'Maria Oliveira', 'content' => 'Você pode alterar sua senha nas configurações da conta. Quer que eu te guie?', 'created_at' => date('Y-m-d H:i:s', $now - 800), 'delivered_at' => date('Y-m-d H:i:s', $now - 790)],
-            ],
-            9 => [
-                ['type' => 'system', 'content' => 'Conversa iniciada em ' . date('d/m/Y H:i'), 'created_at' => date('Y-m-d H:i:s', $now - 200)],
-                ['type' => 'message', 'direction' => 'incoming', 'sender_name' => 'Patricia Souza', 'content' => 'Olá! Gostaria de informações sobre o produto X', 'created_at' => date('Y-m-d H:i:s', $now - 180)],
-            ],
-        ];
-        
-        return $conversationMessages[$conversationId] ?? [];
+        try {
+            $conversation = \App\Models\Conversation::find($id);
+            if (!$conversation) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Conversa não encontrada'
+                ], 404);
+                return;
+            }
+            
+            // Deletar mensagens relacionadas (cascade já faz isso, mas vamos garantir)
+            \App\Helpers\Database::query("DELETE FROM messages WHERE conversation_id = ?", [$id]);
+            
+            // Deletar relacionamentos de tags
+            \App\Helpers\Database::query("DELETE FROM conversation_tags WHERE conversation_id = ?", [$id]);
+            
+            // Deletar logs de automação relacionados
+            try {
+                \App\Helpers\Database::query("DELETE FROM automation_logs WHERE conversation_id = ?", [$id]);
+            } catch (\Exception $e) {
+                // Ignorar se tabela não existir
+            }
+            
+            // Deletar conversas de IA relacionadas
+            try {
+                \App\Helpers\Database::query("DELETE FROM ai_conversations WHERE conversation_id = ?", [$id]);
+            } catch (\Exception $e) {
+                // Ignorar se tabela não existir
+            }
+            
+            // Deletar conversa
+            \App\Models\Conversation::delete($id);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Conversa deletada com sucesso'
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao deletar conversa: ' . $e->getMessage()
+            ], 400);
+        }
     }
 
     /**
@@ -842,15 +528,8 @@ class ConversationController
             // Verificar se é uma conversa demo e criar no banco se necessário
             $conversation = ConversationService::getConversation($id);
             if (!$conversation) {
-                // Tentar criar conversa demo se o ID for de 1 a 9 (IDs das conversas demo)
-                if ($id >= 1 && $id <= 9) {
-                    $conversation = self::ensureDemoConversationExists($id);
-                }
-                
-                if (!$conversation) {
-                    Response::json(['success' => false, 'message' => 'Conversa não encontrada.'], 404);
-                    return;
-                }
+                Response::json(['success' => false, 'message' => 'Conversa não encontrada.'], 404);
+                return;
             }
             
             // Verificar permissão

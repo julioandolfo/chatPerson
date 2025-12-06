@@ -226,14 +226,23 @@ class ContactController
      */
     public function destroy(int $id): void
     {
-        Permission::abortIfCannot('contacts.delete');
+        // Verificar permissão - admin global pode deletar qualquer contato mesmo com conversas
+        $user = \App\Helpers\Auth::user();
+        $force = false;
+        
+        if ($user && ($user['role'] === 'super_admin' || $user['role'] === 'admin')) {
+            // Admin global pode forçar deleção mesmo com conversas
+            $force = true;
+        } else {
+            Permission::abortIfCannot('contacts.delete');
+        }
         
         try {
-            ContactService::delete($id);
+            ContactService::delete($id, $force);
             
             Response::json([
                 'success' => true,
-                'message' => 'Contato deletado com sucesso'
+                'message' => 'Contato deletado com sucesso' . ($force ? ' (incluindo conversas associadas)' : '')
             ]);
         } catch (\Exception $e) {
             Response::json([

@@ -334,6 +334,17 @@ ob_start();
                            value="<?= htmlspecialchars($whatsappSettings['whatsapp_webhook_url'] ?? '') ?>" placeholder="https://seusite.com.br/webhooks/whatsapp" />
                     <div class="form-text">URL para receber eventos do WhatsApp</div>
                 </div>
+                <div class="separator separator-dashed my-5"></div>
+                <div class="fv-row mb-7">
+                    <label class="form-check form-check-custom form-check-solid">
+                        <input class="form-check-input" type="checkbox" name="whatsapp_allow_group_messages" 
+                               value="1" <?= ($whatsappSettings['whatsapp_allow_group_messages'] ?? true) ? 'checked' : '' ?> />
+                        <span class="form-check-label fw-semibold">
+                            Permitir mensagens de grupos
+                        </span>
+                    </label>
+                    <div class="form-text">Se desabilitado, mensagens recebidas de grupos do WhatsApp serão ignoradas</div>
+                </div>
                 <div class="d-flex justify-content-end">
                     <button type="submit" class="btn btn-primary">
                         <span class="indicator-label">Salvar Configurações</span>

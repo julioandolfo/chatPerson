@@ -32,14 +32,20 @@ class RealtimeClient {
      */
     async loadConfig() {
         try {
-            // Construir URL base do sistema (remover último segmento do path se houver)
-            let basePath = window.location.pathname;
-            // Se terminar com algo como /conversations ou /settings, remover
-            if (basePath.match(/\/\w+$/)) {
-                basePath = basePath.replace(/\/[^/]+$/, '');
-            }
-            if (!basePath) basePath = '/';
-            const response = await fetch(basePath + '/api/realtime/config');
+            // Construir URL absoluto para evitar resolver como https://api/...
+            const origin = window.location.origin || '';
+            let pathPrefix = window.location.pathname || '';
+            // Remover o último segmento (ex: /settings) para ficar só o prefixo base
+            pathPrefix = pathPrefix.replace(/\/[^/]+$/, '');
+            if (!pathPrefix) pathPrefix = '';
+
+            const configUrl = origin + pathPrefix + '/api/realtime/config';
+
+            const response = await fetch(configUrl, {
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
             if (response.ok) {
                 const data = await response.json();
                 if (data.success) {

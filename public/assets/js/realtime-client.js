@@ -32,14 +32,9 @@ class RealtimeClient {
      */
     async loadConfig() {
         try {
-            // Construir URL absoluto para evitar resolver como https://api/...
-            const origin = window.location.origin || '';
-            let pathPrefix = window.location.pathname || '';
-            // Remover o último segmento (ex: /settings) para ficar só o prefixo base
-            pathPrefix = pathPrefix.replace(/\/[^/]+$/, '');
-            if (!pathPrefix) pathPrefix = '';
-
-            const configUrl = origin + pathPrefix + '/api/realtime/config';
+            // Usar URL relativa começando com / para que o navegador resolva corretamente
+            // O navegador automaticamente resolve /api/realtime/config baseado no origin atual
+            const configUrl = '/api/realtime/config';
 
             const response = await fetch(configUrl, {
                 headers: {
@@ -176,14 +171,9 @@ class RealtimeClient {
         if (!this.userId) return;
 
         try {
-            // Construir URL absoluto para evitar resolver como https://api/...
-            const origin = window.location.origin || '';
-            let pathPrefix = window.location.pathname || '';
-            // Remover o último segmento (ex: /conversations) para ficar só o prefixo base
-            pathPrefix = pathPrefix.replace(/\/[^/]+$/, '');
-            if (!pathPrefix) pathPrefix = '';
-
-            const pollUrl = origin + pathPrefix + '/api/realtime/poll';
+            // Usar URL relativa começando com / para que o navegador resolva corretamente
+            // O navegador automaticamente resolve /api/realtime/poll baseado no origin atual
+            const pollUrl = '/api/realtime/poll';
 
             const response = await fetch(pollUrl, {
                 method: 'POST',

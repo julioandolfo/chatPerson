@@ -297,6 +297,9 @@ class WhatsAppService
                             'X-QUEPASA-USER: ' . ($account['quepasa_user'] ?? 'default'),
                             'X-QUEPASA-TOKEN: ' . $account['quepasa_token']
                         ];
+                        if (!empty($account['quepasa_trackid'])) {
+                            $headers[] = 'X-QUEPASA-TRACKID: ' . $account['quepasa_trackid'];
+                        }
                         
                         $ch = curl_init($url);
                         curl_setopt_array($ch, [
@@ -313,10 +316,13 @@ class WhatsAppService
                         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                         curl_close($ch);
                         
+                        Logger::quepasa("getConnectionStatus - {$endpoint} HTTP {$httpCode}");
+                        
                         // Se retornar 200 e for JSON, verificar se tem chatid
                         if ($httpCode === 200 && !empty($response)) {
                             $jsonResponse = @json_decode($response, true);
                             if ($jsonResponse !== null) {
+                                Logger::quepasa("getConnectionStatus - {$endpoint} response: " . substr($response, 0, 400));
                                 // Verificar se tem chatid no JSON
                                 $chatid = $jsonResponse['chatid'] ?? $jsonResponse['chat_id'] ?? $jsonResponse['id'] ?? null;
                                 
@@ -353,9 +359,29 @@ class WhatsAppService
                                 // Verificar se tem status "connected" ou similar
                                 $status = $jsonResponse['status'] ?? $jsonResponse['state'] ?? null;
                                 if ($status === 'connected' || $status === 'ready' || $status === 'authenticated') {
-                                    // Está conectado mas não temos chatid ainda - aguardar webhook
+                                    // Está conectado mas não temos chatid ainda - marcar active e tentar webhook
                                     Logger::quepasa("getConnectionStatus - Status conectado via {$endpoint} mas sem chatid");
+                                    
+                                    // Atualizar status para active mesmo sem chatid
+                                    WhatsAppAccount::update($accountId, ['status' => 'active']);
+                                    
+                                    // Tentar configurar webhook automaticamente
+                                    try {
+                                        self::configureWebhookAutomatically($accountId);
+                                    } catch (\Exception $e) {
+                                        Logger::quepasa("getConnectionStatus - Erro ao configurar webhook automaticamente (sem chatid): " . $e->getMessage());
+                                    }
+                                    
+                                    return [
+                                        'connected' => true,
+                                        'status' => 'connected',
+                                        'phone_number' => $account['phone_number'],
+                                        'chatid' => $account['quepasa_chatid'] ?? null,
+                                        'message' => 'Conectado (aguardando chatid)'
+                                    ];
                                 }
+                            } else {
+                                Logger::quepasa("getConnectionStatus - {$endpoint} resposta não JSON: " . substr($response, 0, 200));
                             }
                         }
                     } catch (\Exception $e) {

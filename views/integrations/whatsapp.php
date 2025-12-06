@@ -358,7 +358,12 @@ function startQRCodeStatusPolling(accountId) {
         }
         
         // Verificar status da conexão
-        fetch("' . \App\Helpers\Url::to('/integrations/whatsapp') . '/" + accountId + "/status")
+        fetch("' . \App\Helpers\Url::to('/integrations/whatsapp') . '/" + accountId + "/status", {
+            headers: {
+                "X-Requested-With": "XMLHttpRequest",
+                "Accept": "application/json"
+            }
+        })
             .then(response => response.json())
             .then(data => {
                 if (data.success && data.status && data.status.connected) {
@@ -429,7 +434,12 @@ function refreshQRCode() {
 }
 
 function checkStatus(accountId) {
-    fetch("' . \App\Helpers\Url::to('/integrations/whatsapp') . '/" + accountId + "/status")
+    fetch("' . \App\Helpers\Url::to('/integrations/whatsapp') . '/" + accountId + "/status", {
+        headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "Accept": "application/json"
+        }
+    })
         .then(response => response.json())
         .then(data => {
             if (data.success) {

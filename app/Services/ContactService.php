@@ -444,6 +444,71 @@ class ContactService
     }
 
     /**
+     * Salvar avatar a partir de base64
+     */
+    public static function saveAvatarFromBase64(int $contactId, string $base64Data, string $mimeType = 'image/jpeg'): ?string
+    {
+        try {
+            if (empty($base64Data)) {
+                return null;
+            }
+
+            // Remover prefixo data:image/xxx;base64, se presente
+            if (strpos($base64Data, 'base64,') !== false) {
+                $base64Data = explode('base64,', $base64Data)[1];
+            }
+
+            // Decodificar base64
+            $imageData = base64_decode($base64Data, true);
+            if ($imageData === false) {
+                \App\Helpers\Logger::error("Erro ao decodificar base64 do avatar para contato {$contactId}");
+                return null;
+            }
+
+            // Determinar extensão baseado no mime type
+            $extension = 'jpg';
+            if (strpos($mimeType, 'png') !== false) {
+                $extension = 'png';
+            } elseif (strpos($mimeType, 'gif') !== false) {
+                $extension = 'gif';
+            } elseif (strpos($mimeType, 'webp') !== false) {
+                $extension = 'webp';
+            }
+
+            // Criar diretório se não existir
+            $uploadDir = __DIR__ . '/../../public/assets/media/avatars/contacts/';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+
+            // Remover avatar antigo se existir
+            $contact = Contact::find($contactId);
+            if ($contact && !empty($contact['avatar'])) {
+                $oldPath = __DIR__ . '/../../public' . str_replace(\App\Helpers\Url::basePath(), '', $contact['avatar']);
+                if (file_exists($oldPath) && strpos($oldPath, 'contacts/') !== false) {
+                    @unlink($oldPath);
+                }
+            }
+
+            // Salvar arquivo
+            $filename = 'whatsapp_' . $contactId . '_' . time() . '.' . $extension;
+            $filepath = $uploadDir . $filename;
+
+            if (file_put_contents($filepath, $imageData)) {
+                $avatarUrl = \App\Helpers\Url::asset('media/avatars/contacts/' . $filename);
+                Contact::update($contactId, ['avatar' => $avatarUrl]);
+                \App\Helpers\Logger::quepasa("Avatar salvo a partir de base64 para contato {$contactId}: {$avatarUrl}");
+                return $avatarUrl;
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error("Erro ao salvar avatar base64: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Deletar contato
      * @param bool $force Se true, deleta mesmo com conversas (apenas para admin global)
      */

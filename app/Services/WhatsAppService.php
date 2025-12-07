@@ -929,10 +929,27 @@ class WhatsAppService
                 // Tentar buscar avatar do WhatsApp usando chat.id do payload
                 try {
                     $chatId = $payload['chat']['id'] ?? null;
+                    
+                    // Verificar se há thumbnail base64 no payload (url.thumbnail.data)
+                    $thumbnailData = null;
+                    $thumbnailMime = 'image/jpeg';
+                    if (isset($payload['url']['thumbnail']['data'])) {
+                        $thumbnailData = $payload['url']['thumbnail']['data'];
+                        $thumbnailMime = $payload['url']['thumbnail']['mime'] ?? 'image/jpeg';
+                        // Se tem urlprefix, adicionar ao início
+                        if (isset($payload['url']['thumbnail']['urlprefix']) && strpos($thumbnailData, 'base64,') === false) {
+                            $thumbnailData = $payload['url']['thumbnail']['urlprefix'] . $thumbnailData;
+                        }
+                    }
+                    
                     // Verificar se há URL de avatar direta no payload
                     $avatarUrl = $payload['chat']['picture'] ?? $payload['chat']['avatar'] ?? $payload['avatar'] ?? null;
                     
-                    if ($avatarUrl) {
+                    if ($thumbnailData) {
+                        // Se tem thumbnail base64, salvar diretamente
+                        Logger::quepasa("processWebhook - Avatar encontrado como base64 no payload (thumbnail)");
+                        \App\Services\ContactService::saveAvatarFromBase64($contact['id'], $thumbnailData, $thumbnailMime);
+                    } elseif ($avatarUrl) {
                         // Se tem URL direta, baixar e salvar
                         Logger::quepasa("processWebhook - Avatar encontrado no payload: {$avatarUrl}");
                         \App\Services\ContactService::downloadAvatarFromUrl($contact['id'], $avatarUrl);
@@ -965,10 +982,27 @@ class WhatsAppService
                 if (empty($contact['avatar'])) {
                     try {
                         $chatId = $payload['chat']['id'] ?? null;
+                        
+                        // Verificar se há thumbnail base64 no payload (url.thumbnail.data)
+                        $thumbnailData = null;
+                        $thumbnailMime = 'image/jpeg';
+                        if (isset($payload['url']['thumbnail']['data'])) {
+                            $thumbnailData = $payload['url']['thumbnail']['data'];
+                            $thumbnailMime = $payload['url']['thumbnail']['mime'] ?? 'image/jpeg';
+                            // Se tem urlprefix, adicionar ao início
+                            if (isset($payload['url']['thumbnail']['urlprefix']) && strpos($thumbnailData, 'base64,') === false) {
+                                $thumbnailData = $payload['url']['thumbnail']['urlprefix'] . $thumbnailData;
+                            }
+                        }
+                        
                         // Verificar se há URL de avatar direta no payload
                         $avatarUrl = $payload['chat']['picture'] ?? $payload['chat']['avatar'] ?? $payload['avatar'] ?? null;
                         
-                        if ($avatarUrl) {
+                        if ($thumbnailData) {
+                            // Se tem thumbnail base64, salvar diretamente
+                            Logger::quepasa("processWebhook - Avatar encontrado como base64 no payload (thumbnail)");
+                            \App\Services\ContactService::saveAvatarFromBase64($contact['id'], $thumbnailData, $thumbnailMime);
+                        } elseif ($avatarUrl) {
                             // Se tem URL direta, baixar e salvar
                             Logger::quepasa("processWebhook - Avatar encontrado no payload: {$avatarUrl}");
                             \App\Services\ContactService::downloadAvatarFromUrl($contact['id'], $avatarUrl);

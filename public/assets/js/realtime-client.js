@@ -259,9 +259,27 @@ class RealtimeClient {
             });
         }
 
+        if (updates.message_status_updates) {
+            updates.message_status_updates.forEach(msu => {
+                this.emit('message_status_updated', {
+                    conversation_id: msu.conversation_id,
+                    message_id: msu.message_id,
+                    status: msu.status,
+                    delivered_at: msu.delivered_at,
+                    read_at: msu.read_at
+                });
+            });
+        }
+
         if (updates.agent_status) {
             updates.agent_status.forEach(status => {
                 this.emit('agent_status', status);
+            });
+        }
+
+        if (updates.message_status_updates) {
+            updates.message_status_updates.forEach(st => {
+                this.emit('message_status_updated', st);
             });
         }
     }

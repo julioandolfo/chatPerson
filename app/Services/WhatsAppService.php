@@ -975,10 +975,11 @@ class WhatsAppService
                     $avatarUrl = $payload['chat']['picture'] ?? $payload['chat']['avatar'] ?? $payload['avatar'] ?? null;
                     
                     // Primeira tentativa: rota Quepasa com instance_id + phone/chat
+                    \App\Helpers\Logger::quepasa("processWebhook - Tentando avatar via Quepasa (novo contato): chatId={$chatId}, phone={$fromPhone}");
                     $avatarFetched = \App\Services\ContactService::fetchQuepasaAvatar($contact['id'], $account, $chatId, $fromPhone);
                     
                     if ($avatarFetched) {
-                        // ok
+                        \App\Helpers\Logger::quepasa("processWebhook - Avatar via Quepasa obtido para contato {$contact['id']}");
                     } elseif ($avatarUrl) {
                         Logger::quepasa("processWebhook - Avatar encontrado no payload: {$avatarUrl}");
                         \App\Services\ContactService::downloadAvatarFromUrl($contact['id'], $avatarUrl);
@@ -1013,10 +1014,11 @@ class WhatsAppService
                         $chatId = $payload['chat']['id'] ?? null;
                         $avatarUrl = $payload['chat']['picture'] ?? $payload['chat']['avatar'] ?? $payload['avatar'] ?? null;
                         
+                        \App\Helpers\Logger::quepasa("processWebhook - Tentando avatar via Quepasa (contato existente): chatId={$chatId}, phone={$fromPhone}");
                         $avatarFetched = \App\Services\ContactService::fetchQuepasaAvatar($contact['id'], $account, $chatId, $fromPhone);
                         
                         if ($avatarFetched) {
-                            // ok
+                            \App\Helpers\Logger::quepasa("processWebhook - Avatar via Quepasa obtido para contato {$contact['id']}");
                         } elseif ($avatarUrl) {
                             Logger::quepasa("processWebhook - Avatar encontrado no payload: {$avatarUrl}");
                             \App\Services\ContactService::downloadAvatarFromUrl($contact['id'], $avatarUrl);
@@ -1218,6 +1220,80 @@ class WhatsAppService
         } catch (\Exception $e) {
             // Fallback caso random_bytes não esteja disponível
             return bin2hex(openssl_random_pseudo_bytes(16));
+        }
+    }
+
+    /**
+     * Processar webhook de ACK (message.updated) do Quepasa
+     * ack: 0 (enviado), 1 (enviado_whatsapp), 2 (entregue), 3 (lido), 4 (falha)
+     */
+    public static function processAckWebhook(array $payload): void
+    {
+        try {
+            $event = $payload['event'] ?? null;
+            if ($event !== 'message.updated') {
+                return;
+            }
+
+            $data = $payload['data'] ?? [];
+            $messageId = $data['id'] ?? null;
+            $ack = isset($data['ack']) ? (int)$data['ack'] : null;
+
+            if (!$messageId || $ack === null) {
+                Logger::quepasa("processAckWebhook - Dados incompletos: " . json_encode($payload));
+                return;
+            }
+
+            $message = \App\Models\Message::findByExternalId($messageId);
+            if (!$message) {
+                Logger::quepasa("processAckWebhook - Mensagem não encontrada: {$messageId}");
+                return;
+            }
+
+            $status = 'sent';
+            $deliveredAt = null;
+            $readAt = null;
+
+            switch ($ack) {
+                case 0:
+                case 1:
+                    $status = 'sent';
+                    break;
+                case 2:
+                    $status = 'delivered';
+                    $deliveredAt = date('Y-m-d H:i:s');
+                    break;
+                case 3:
+                    $status = 'read';
+                    $readAt = date('Y-m-d H:i:s');
+                    break;
+                case 4:
+                    $status = 'failed';
+                    break;
+            }
+
+            \App\Models\Message::updateStatus(
+                $message['id'],
+                $status,
+                null,
+                $deliveredAt,
+                $readAt
+            );
+
+            // Notificar via WebSocket
+            try {
+                \App\Helpers\WebSocket::notifyMessageStatusUpdated(
+                    $message['conversation_id'],
+                    $message['id'],
+                    $status
+                );
+            } catch (\Exception $e) {
+                Logger::quepasa("processAckWebhook - Erro ao notificar WS: " . $e->getMessage());
+            }
+
+            Logger::quepasa("processAckWebhook - ACK atualizado: {$messageId} -> ack={$ack}, status={$status}");
+        } catch (\Exception $e) {
+            Logger::error("WhatsApp processAckWebhook Error: " . $e->getMessage());
         }
     }
 }

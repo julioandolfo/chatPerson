@@ -241,6 +241,22 @@ class Message extends Model
     }
 
     /**
+     * Buscar mensagens com status alterado desde um timestamp (para polling)
+     */
+    public static function getStatusUpdatesSince(?string $since = null): array
+    {
+        $sql = "SELECT id, conversation_id, status, delivered_at, read_at, updated_at FROM messages";
+        $params = [];
+        if ($since) {
+            $sql .= " WHERE updated_at > ?";
+            $params[] = $since;
+        }
+        $sql .= " ORDER BY updated_at DESC LIMIT 200";
+
+        return Database::fetchAll($sql, $params);
+    }
+
+    /**
      * Buscar mensagem por external_id (ID externo do WhatsApp)
      */
     public static function findByExternalId(string $externalId): ?array

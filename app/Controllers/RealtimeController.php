@@ -127,7 +127,8 @@ class RealtimeController
                 'new_messages' => [],
                 'conversation_updates' => [],
                 'new_conversations' => [], // Novas conversas criadas
-                'agent_status' => []
+                'agent_status' => [],
+                'message_status_updates' => []
             ];
 
             // Verificar novas mensagens nas conversas inscritas
@@ -185,6 +186,18 @@ class RealtimeController
                 $checkedCount = 0;
                 $maxChecks = 50; // Limitar para não sobrecarregar
                 
+                // Coletar mensagens com status alterado desde last_update_time
+                $statusUpdates = \App\Models\Message::getStatusUpdatesSince($lastUpdateTime > 0 ? date('Y-m-d H:i:s', $lastUpdateTime / 1000) : null);
+                foreach ($statusUpdates as $su) {
+                    $updates['message_status_updates'][] = [
+                        'conversation_id' => $su['conversation_id'],
+                        'message_id' => $su['id'],
+                        'status' => $su['status'],
+                        'delivered_at' => $su['delivered_at'] ?? null,
+                        'read_at' => $su['read_at'] ?? null
+                    ];
+                }
+
                 // Se lastUpdateTime for 0 ou muito antigo, verificar conversas criadas nos últimos 30 segundos
                 $checkRecentThreshold = time() - 30; // Últimos 30 segundos
                 $shouldCheckRecent = ($lastUpdateTime === 0 || ($lastUpdateTime / 1000) < $checkRecentThreshold);

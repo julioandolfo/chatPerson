@@ -35,7 +35,10 @@ class WebhookController
         Logger::log("WhatsApp Webhook recebido: " . json_encode($payload));
 
         try {
-            // Verificar se é webhook de status (delivered, read, failed)
+            // Detectar evento do Quepasa (message.updated para ACK)
+            $event = $payload['event'] ?? null;
+            
+            // Verificar se é webhook de status (delivered, read, failed) ou ACK (message.updated)
             $status = $payload['status'] ?? null;
             $isStatusWebhook = in_array($status, ['sent', 'delivered', 'read', 'failed']) 
                 && (isset($payload['id']) || isset($payload['message_id']))
@@ -44,6 +47,9 @@ class WebhookController
             if ($isStatusWebhook) {
                 // Processar webhook de status
                 WhatsAppService::processStatusWebhook($payload);
+            } elseif ($event === 'message.updated') {
+                // Webhook de atualização de ACK (Quepasa)
+                WhatsAppService::processAckWebhook($payload);
             } else {
                 // Processar webhook de mensagem recebida
                 WhatsAppService::processWebhook($payload);

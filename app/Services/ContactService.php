@@ -385,6 +385,7 @@ class ContactService
     {
         try {
             if (($account['provider'] ?? '') !== 'quepasa') {
+                \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - provider != quepasa para contato {$contactId}");
                 return null;
             }
 
@@ -393,6 +394,7 @@ class ContactService
             $instanceId = $account['instance_id'] ?? null;
 
             if (empty($apiUrl) || empty($token) || empty($instanceId)) {
+                \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - dados insuficientes (apiUrl/instanceId/token) para contato {$contactId}");
                 return null;
             }
 
@@ -432,6 +434,7 @@ class ContactService
             \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - Resposta: httpCode={$httpCode}, contentType={$contentType}");
 
             if ($httpCode !== 200 || empty($response)) {
+                \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - HTTP {$httpCode} sem corpo para contato {$contactId}");
                 return null;
             }
 

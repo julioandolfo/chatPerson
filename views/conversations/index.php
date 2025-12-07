@@ -2561,6 +2561,29 @@ function moveConversationToTop(conversationId) {
     }
 }
 
+// Atualizar atributos de data (updated_at) e resortear a lista
+function updateConversationMeta(conversationItem, conv) {
+    if (!conversationItem || !conv) return;
+    const updatedAt = conv.last_message_at || conv.updated_at || new Date().toISOString();
+    conversationItem.dataset.updatedAt = updatedAt;
+}
+
+function sortConversationList() {
+    const list = document.querySelector('.conversations-list-items');
+    if (!list) return;
+    const items = Array.from(list.children);
+    // Ordenar: pinned primeiro, depois updatedAt desc
+    items.sort((a, b) => {
+        const pinnedA = a.classList.contains('pinned') ? 1 : 0;
+        const pinnedB = b.classList.contains('pinned') ? 1 : 0;
+        if (pinnedA !== pinnedB) return pinnedB - pinnedA;
+        const dateA = Date.parse(a.dataset.updatedAt || '') || 0;
+        const dateB = Date.parse(b.dataset.updatedAt || '') || 0;
+        return dateB - dateA;
+    });
+    items.forEach(item => list.appendChild(item));
+}
+
 // Atualizar preview/tempo/badge de um item de conversa com dados recebidos
 function applyConversationUpdate(conv) {
     const conversationItem = document.querySelector(`[data-conversation-id="${conv.id}"]`);
@@ -2593,6 +2616,10 @@ function applyConversationUpdate(conv) {
     } else if (badge) {
         badge.remove();
     }
+    
+    // Atualizar meta e resortear
+    updateConversationMeta(conversationItem, conv);
+    sortConversationList();
 }
 
 // Helper para converter valores vindos do PHP em JSON válido
@@ -2861,13 +2888,13 @@ function selectConversation(id) {
 
             // Garantir truncamento visual do preview (limitando caracteres)
             const preview = document.querySelector(`[data-conversation-id="${id}"] .conversation-item-preview`);
-            if (preview) {
-                const text = preview.textContent || '';
-                const maxChars = 55;
-                if (text.length > maxChars) {
-                    preview.textContent = text.substring(0, maxChars) + '...';
-                }
+        if (preview) {
+            const text = preview.textContent || '';
+            const maxChars = 37;
+            if (text.length > maxChars) {
+                preview.textContent = text.substring(0, maxChars) + '...';
             }
+        }
         } else {
             alert('Erro ao carregar conversa: ' + (data.message || 'Erro desconhecido'));
         }
@@ -5521,7 +5548,10 @@ function updateConversationInList(conversationId, lastMessage) {
     if (conversationItem) {
         const preview = conversationItem.querySelector('.conversation-item-preview');
         const time = conversationItem.querySelector('.conversation-item-time');
-        if (preview) preview.textContent = lastMessage.substring(0, 60) + (lastMessage.length > 60 ? '...' : '');
+        if (preview) {
+            const maxChars = 37;
+            preview.textContent = lastMessage.substring(0, maxChars) + (lastMessage.length > maxChars ? '...' : '');
+        }
         if (time) time.textContent = 'Agora';
         
         // Mover para o topo da lista
@@ -8215,6 +8245,7 @@ function addConversationToList(conv) {
     const conversationHtml = `
         <div class="conversation-item ${isActive ? 'active' : ''} ${pinned ? 'pinned' : ''}" 
              data-conversation-id="${conv.id}"
+             data-updated-at="${conv.last_message_at || conv.updated_at || new Date().toISOString()}"
              data-onclick="selectConversation">
             <div class="d-flex gap-3 w-100">
                 <div class="symbol symbol-45px flex-shrink-0">
@@ -8259,6 +8290,9 @@ function addConversationToList(conv) {
             window.wsClient.subscribe(conv.id);
         }
     }
+    
+    // Resortear lista (respeitando pinned e updated_at)
+    sortConversationList();
     
     console.log('Nova conversa adicionada à lista:', conv.id);
 }
@@ -8350,6 +8384,10 @@ function refreshConversationBadges() {
                             preview.textContent = content;
                         }
                     }
+                    
+                    // Atualizar meta e resortear
+                    updateConversationMeta(conversationItem, conv);
+                    sortConversationList();
                 }
             });
 

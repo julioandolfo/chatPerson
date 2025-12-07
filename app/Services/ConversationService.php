@@ -879,6 +879,16 @@ class ConversationService
                         } else {
                             $options['media_name'] = basename($firstAttachment['path']);
                         }
+
+                        // Enviar também em base64 (fallback para casos em que a URL não é baixada externamente)
+                        // Limite: 7MB para evitar payloads gigantes
+                        $maxBase64Size = 7 * 1024 * 1024;
+                        if (file_exists($filePath) && filesize($filePath) <= $maxBase64Size) {
+                            $fileContent = file_get_contents($filePath);
+                            if ($fileContent !== false) {
+                                $options['media_base64'] = base64_encode($fileContent);
+                            }
+                        }
                         
                         // Para Quepasa, se for imagem/vídeo/áudio e houver legenda, usar content como caption
                         if (!empty($content)) {

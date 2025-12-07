@@ -1320,13 +1320,17 @@ body.dark-mode .swal2-content {
                             <!-- Avatar -->
                             <div class="symbol symbol-45px flex-shrink-0">
                                 <?php
-                                $initials = '';
                                 $name = $conv['contact_name'] ?? 'NN';
                                 $parts = explode(' ', $name);
                                 $initials = strtoupper(substr($parts[0], 0, 1) . (isset($parts[1]) ? substr($parts[1], 0, 1) : ''));
+                                
+                                if (!empty($conv['contact_avatar'])):
                                 ?>
-                                <div class="symbol-label bg-light-primary text-primary fw-bold"><?= $initials ?></div>
-                                                </div>
+                                    <div class="symbol-label"><img src="<?= htmlspecialchars($conv['contact_avatar']) ?>" alt="<?= htmlspecialchars($name) ?>" class="h-45px w-45px rounded" style="object-fit: cover;"></div>
+                                <?php else: ?>
+                                    <div class="symbol-label bg-light-primary text-primary fw-bold"><?= $initials ?></div>
+                                <?php endif; ?>
+                            </div>
                             
                             <!-- Conteúdo -->
                             <div class="flex-grow-1 min-w-0">
@@ -1338,7 +1342,12 @@ body.dark-mode .swal2-content {
                                             <span class="path2"></span>
                                         </i>
                                         <?php endif; ?>
-                                                        <?= htmlspecialchars($conv['contact_name'] ?? 'Sem nome') ?>
+                                                        <?php
+                                                        $nameRaw = $conv['contact_name'] ?? 'Sem nome';
+                                                        $maxName = 25;
+                                                        $displayName = mb_strlen($nameRaw) > $maxName ? mb_substr($nameRaw, 0, $maxName) . '...' : $nameRaw;
+                                                        echo htmlspecialchars($displayName);
+                                                        ?>
                                     </div>
                             <div class="conversation-item-time d-flex align-items-center gap-2">
                                 <?php
@@ -1527,8 +1536,12 @@ body.dark-mode .swal2-content {
                             <!-- Mensagem normal -->
                             <div class="chat-message <?= $msgDirection === 'incoming' ? 'incoming' : 'outgoing' ?>" data-message-id="<?= $msg['id'] ?? '' ?>" data-timestamp="<?= strtotime($msgCreatedAt) * 1000 ?>">
                                 <?php if ($msgDirection === 'incoming'): ?>
-                                    <div class="message-avatar"><?= $initials ?></div>
-                                            <?php endif; ?>
+                                    <?php if (!empty($selectedConversation['contact_avatar'])): ?>
+                                        <img src="<?= htmlspecialchars($selectedConversation['contact_avatar']) ?>" alt="Avatar" class="message-avatar" style="object-fit: cover;">
+                                    <?php else: ?>
+                                        <div class="message-avatar"><?= $initials ?></div>
+                                    <?php endif; ?>
+                                <?php endif; ?>
                                 <div class="message-content">
                                     <div class="message-actions">
                                         <button class="message-actions-btn" onclick="replyToMessage(<?= $msg['id'] ?? 0 ?>, '<?= htmlspecialchars($msgSenderName, ENT_QUOTES) ?>', '<?= htmlspecialchars(substr($msgContent, 0, 100), ENT_QUOTES) ?>')" title="Responder">
@@ -2524,11 +2537,13 @@ let isLoadingMessages = false;
 let hasMoreMessages = true;
 let oldestMessageId = null;
 let currentConversationId = null;
+let currentContactAvatar = null; // Avatar do contato da conversa atual
 
 // Se já vier um ID da URL/PHP, setar na inicialização
 const initialConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
 if (initialConversationId) {
     currentConversationId = initialConversationId;
+    currentContactAvatar = parsePhpJson('<?= json_encode($selectedConversation['contact_avatar'] ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
 }
 
 // Garantir inscrição no cliente de tempo real para conversas da lista (necessário no modo polling)
@@ -2898,6 +2913,7 @@ function selectConversation(id) {
             
             // Resetar paginação
             currentConversationId = id;
+            currentContactAvatar = data.conversation.contact_avatar || null; // Armazenar avatar do contato
             isLoadingMessages = false;
             hasMoreMessages = true;
             oldestMessageId = null;
@@ -3206,13 +3222,28 @@ function updateConversationSidebar(conversation, tags) {
     // Atualizar ID da conversa no sidebar
     sidebar.dataset.conversationId = conversation.id;
     
-    // Atualizar iniciais do contato
-    const initialsEl = sidebar.querySelector('#sidebar-contact-initials');
-    if (initialsEl && conversation.contact_name) {
-        const name = conversation.contact_name;
-        const parts = name.split(' ');
-        const initials = (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
-        initialsEl.textContent = initials;
+    // Atualizar avatar ou iniciais do contato
+    const avatarContainer = sidebar.querySelector('.sidebar-contact-avatar');
+    if (avatarContainer) {
+        if (conversation.contact_avatar) {
+            // Mostrar imagem do avatar
+            avatarContainer.innerHTML = `<img src="${escapeHtml(conversation.contact_avatar)}" alt="Avatar" class="w-100 h-100 rounded" style="object-fit: cover;">`;
+        } else if (conversation.contact_name) {
+            // Mostrar iniciais
+            const name = conversation.contact_name;
+            const parts = name.split(' ');
+            const initials = (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
+            avatarContainer.innerHTML = `<div id="sidebar-contact-initials" class="symbol-label bg-light-primary text-primary fw-bold">${initials}</div>`;
+        }
+    } else {
+        // Fallback: atualizar iniciais se elemento antigo existir
+        const initialsEl = sidebar.querySelector('#sidebar-contact-initials');
+        if (initialsEl && conversation.contact_name) {
+            const name = conversation.contact_name;
+            const parts = name.split(' ');
+            const initials = (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
+            initialsEl.textContent = initials;
+        }
     }
     
     // Atualizar informações do contato
@@ -4799,8 +4830,12 @@ function addMessageToChat(message) {
         
         let avatarHtml = '';
         if (isIncoming) {
-            const initials = getInitials(message.sender_name || 'NN');
-            avatarHtml = `<div class="message-avatar">${initials}</div>`;
+            if (currentContactAvatar) {
+                avatarHtml = `<img src="${escapeHtml(currentContactAvatar)}" alt="Avatar" class="message-avatar" style="object-fit: cover;">`;
+            } else {
+                const initials = getInitials(message.sender_name || 'NN');
+                avatarHtml = `<div class="message-avatar">${initials}</div>`;
+            }
         }
         
         // Badge de IA se for mensagem de agente de IA

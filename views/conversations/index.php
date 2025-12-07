@@ -233,6 +233,7 @@ ob_start();
     cursor: pointer;
     transition: background 0.15s ease;
     position: relative;
+    overflow: hidden; /* evita overflow horizontal com textos longos */
 }
 
 .conversation-item:hover {
@@ -263,11 +264,10 @@ ob_start();
 }
 
 .conversation-item-header {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    flex-wrap: nowrap;
+    column-gap: 8px;
     min-width: 0;
     margin-bottom: 6px;
 }

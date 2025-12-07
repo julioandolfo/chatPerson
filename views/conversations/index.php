@@ -1369,8 +1369,8 @@ body.dark-mode .swal2-content {
                             </div>
                         </div>
                         <div class="conversation-item-preview">
-                            <?= htmlspecialchars(mb_substr($conv['last_message'] ?? 'Sem mensagens', 0, 60)) ?>
-                            <?= mb_strlen($conv['last_message'] ?? '') > 60 ? '...' : '' ?>
+                            <?= htmlspecialchars(mb_substr($conv['last_message'] ?? 'Sem mensagens', 0, 37)) ?>
+                            <?= mb_strlen($conv['last_message'] ?? '') > 37 ? '...' : '' ?>
                         </div>
                         <div class="conversation-item-meta">
                             <span class="conversation-item-channel">
@@ -2565,7 +2565,7 @@ function applyConversationUpdate(conv) {
             const badge = conversationItem.querySelector('.conversation-item-badge');
 
             if (preview && conv.last_message) {
-                const maxChars = 55;
+                const maxChars = 37;
                 const content = conv.last_message.length > maxChars
                     ? conv.last_message.substring(0, maxChars) + '...'
                     : conv.last_message;
@@ -3824,7 +3824,8 @@ function refreshConversationList(params = null) {
             const initials = (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
             
             const lastMessage = conv.last_message || '';
-            const lastMessagePreview = lastMessage.length > 50 ? lastMessage.substring(0, 50) + '...' : lastMessage;
+            const maxCharsPreview = 37;
+            const lastMessagePreview = lastMessage.length > maxCharsPreview ? lastMessage.substring(0, maxCharsPreview) + '...' : lastMessage;
             
             const unreadCount = conv.unread_count || 0;
             const pinned = conv.pinned || 0;
@@ -8156,8 +8157,11 @@ function refreshConversationBadges() {
                     if (conv.last_message) {
                         const preview = conversationItem.querySelector('.conversation-item-preview');
                         if (preview) {
-                            const content = conv.last_message.substring(0, 60);
-                            preview.textContent = content + (conv.last_message.length > 60 ? '...' : '');
+                            const maxChars = 37;
+                            const content = conv.last_message.length > maxChars
+                                ? conv.last_message.substring(0, maxChars) + '...'
+                                : conv.last_message;
+                            preview.textContent = content;
                         }
                     }
                 }

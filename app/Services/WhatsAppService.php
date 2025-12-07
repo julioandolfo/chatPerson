@@ -509,9 +509,13 @@ class WhatsAppService
                         'type' => $options['media_type'] ?? 'image'
                     ];
                     
-                    // Se houver caption/legenda, adicionar ao payload
+                    // Se houver caption/legenda, usar como text
                     if (!empty($options['caption'])) {
                         $payload['text'] = $options['caption'];
+                    } 
+                    // Se não houver caption nem message, usar espaço (Quepasa exige text não vazio)
+                    elseif (empty($payload['text'])) {
+                        $payload['text'] = ' '; // Espaço único para satisfazer validação da API
                     }
                 }
                 

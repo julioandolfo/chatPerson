@@ -827,9 +827,14 @@ class ConversationService
                     if (!empty($attachmentsData)) {
                         $firstAttachment = $attachmentsData[0];
                         
-                        // Construir URL pública do anexo
-                        $baseUrl = rtrim(\App\Helpers\Url::to('/'), '/');
-                        $attachmentUrl = $baseUrl . '/' . ltrim($firstAttachment['path'], '/');
+                        // Construir URL ABSOLUTA do anexo
+                        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                        $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
+                        $baseUrl = $protocol . '://' . $host;
+                        
+                        // Garantir que o path comece com /
+                        $attachmentPath = '/' . ltrim($firstAttachment['path'], '/');
+                        $attachmentUrl = $baseUrl . $attachmentPath;
                         
                         $options['media_url'] = $attachmentUrl;
                         $options['media_type'] = $firstAttachment['type'] ?? 'document';

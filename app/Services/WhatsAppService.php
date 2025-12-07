@@ -488,35 +488,45 @@ class WhatsAppService
             $apiUrl = rtrim($account['api_url'], '/');
             
             if ($account['provider'] === 'quepasa') {
-                // Quepasa self-hosted: POST /send
-                $url = "{$apiUrl}/send";
-                
-                $headers = [
-                    'Accept: application/json',
-                    'Content-Type: application/json',
-                    'X-QUEPASA-TOKEN: ' . $account['quepasa_token'],
-                    'X-QUEPASA-TRACKID: ' . ($account['quepasa_trackid'] ?? $account['name']),
-                    'X-QUEPASA-CHATID: ' . ($to . '@s.whatsapp.net')
-                ];
-                
-                $payload = [
-                    'text' => $message
-                ];
-                
+                // Quepasa: Usar endpoint específico para mídia
                 if (!empty($options['media_url'])) {
-                    $payload['media'] = [
-                        'url' => $options['media_url'],
-                        'type' => $options['media_type'] ?? 'image'
+                    // Endpoint para envio de mídia/anexo
+                    $url = "{$apiUrl}/attachment";
+                    
+                    $headers = [
+                        'Accept: application/json',
+                        'Content-Type: application/json',
+                        'X-QUEPASA-TOKEN: ' . $account['quepasa_token'],
+                        'X-QUEPASA-TRACKID: ' . ($account['quepasa_trackid'] ?? $account['name']),
+                        'X-QUEPASA-CHATID: ' . ($to . '@s.whatsapp.net')
                     ];
                     
-                    // Se houver caption/legenda, usar como text
-                    if (!empty($options['caption'])) {
-                        $payload['text'] = $options['caption'];
-                    } 
-                    // Se não houver caption nem message, usar espaço (Quepasa exige text não vazio)
-                    elseif (empty($payload['text'])) {
-                        $payload['text'] = ' '; // Espaço único para satisfazer validação da API
+                    // Payload para envio de anexo
+                    $payload = [
+                        'url' => $options['media_url']
+                    ];
+                    
+                    // Se houver legenda, adicionar
+                    if (!empty($options['caption']) || !empty($message)) {
+                        $payload['text'] = $options['caption'] ?: $message;
                     }
+                    
+                    Logger::quepasa("sendMessage - Usando endpoint /attachment para mídia");
+                } else {
+                    // Endpoint para envio de texto apenas
+                    $url = "{$apiUrl}/send";
+                    
+                    $headers = [
+                        'Accept: application/json',
+                        'Content-Type: application/json',
+                        'X-QUEPASA-TOKEN: ' . $account['quepasa_token'],
+                        'X-QUEPASA-TRACKID: ' . ($account['quepasa_trackid'] ?? $account['name']),
+                        'X-QUEPASA-CHATID: ' . ($to . '@s.whatsapp.net')
+                    ];
+                    
+                    $payload = [
+                        'text' => $message
+                    ];
                 }
                 
                 Logger::quepasa("sendMessage - Iniciando envio");

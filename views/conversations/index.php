@@ -2933,6 +2933,15 @@ async function loadMoreMessages() {
             }
         });
         
+        // Garantir que a resposta é JSON (evita erro de parser com HTML/404)
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            const text = await response.text();
+            console.warn('loadMoreMessages: resposta não-JSON (provável 404 ou erro). Encerrando paginação.', text.substring(0, 200));
+            hasMoreMessages = false;
+            return;
+        }
+        
         const data = await response.json();
         
         if (data.success && data.messages && data.messages.length > 0) {
@@ -7926,7 +7935,8 @@ if (typeof window.wsClient !== 'undefined') {
     });
     
     window.wsClient.on('conversation_updated', (data) => {
-        const currentConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+        // Usar variável global para refletir a conversa selecionada após navegação AJAX
+        const currentConversationId = window.currentConversationId ?? parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
         
         // Se é a conversa atual, não atualizar badge (já foi removido ao selecionar)
         if (currentConversationId == data.conversation_id) {
@@ -8030,7 +8040,13 @@ function refreshConversationBadges() {
             'Accept': 'application/json'
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            throw new Error('Resposta não é JSON (refreshConversationBadges)');
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success && data.conversations) {
             // Atualizar badges de não lidas em cada conversa da lista
@@ -8039,7 +8055,7 @@ function refreshConversationBadges() {
                 if (conversationItem) {
                     const badge = conversationItem.querySelector('.conversation-item-badge');
                     const unreadCount = conv.unread_count || 0;
-                    const currentConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+                    const currentConversationId = window.currentConversationId ?? parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
                     
                     // Não atualizar badge se for a conversa atual (já está sendo gerenciada separadamente)
                     if (currentConversationId == conv.id) {

@@ -111,7 +111,8 @@ class Message extends Model
     public static function countByConversation(int $conversationId): int
     {
         $sql = "SELECT COUNT(*) as total FROM messages WHERE conversation_id = ?";
-        $result = Database::fetchOne($sql, [$conversationId]);
+        // Database::fetchOne não existe; usar fetch (que retorna uma linha)
+        $result = Database::fetch($sql, [$conversationId]);
         return (int) ($result['total'] ?? 0);
     }
 

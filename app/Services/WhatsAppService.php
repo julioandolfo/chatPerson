@@ -349,6 +349,25 @@ class WhatsAppService
                                         $instanceId = $jsonResponse['id'];
                                     }
                                     
+                                    // Se ainda não tiver instance_id, tentar extrair da URL da API
+                                    // Muitas vezes no Quepasa self-hosted a URL é tipo: https://servidor/bot123
+                                    if (empty($instanceId) && !empty($account['api_url'])) {
+                                        $urlParts = parse_url($account['api_url']);
+                                        $path = $urlParts['path'] ?? '';
+                                        // Extrair última parte do path como instance_id
+                                        $pathSegments = array_filter(explode('/', trim($path, '/')));
+                                        if (!empty($pathSegments)) {
+                                            $instanceId = end($pathSegments);
+                                            Logger::quepasa("getConnectionStatus - Instance ID extraído da URL: {$instanceId}");
+                                        }
+                                    }
+                                    
+                                    // Se ainda não tiver, usar o quepasa_user como fallback
+                                    if (empty($instanceId) && !empty($account['quepasa_user'])) {
+                                        $instanceId = $account['quepasa_user'];
+                                        Logger::quepasa("getConnectionStatus - Instance ID usando quepasa_user: {$instanceId}");
+                                    }
+                                    
                                     $updateData = [
                                         'quepasa_chatid' => $chatid,
                                         'status' => 'active'
@@ -356,7 +375,7 @@ class WhatsAppService
                                     
                                     if (!empty($instanceId)) {
                                         $updateData['instance_id'] = $instanceId;
-                                        Logger::quepasa("getConnectionStatus - Instance ID encontrado: {$instanceId}");
+                                        Logger::quepasa("getConnectionStatus - Instance ID salvo: {$instanceId}");
                                     }
                                     
                                     WhatsAppAccount::update($accountId, $updateData);
@@ -842,6 +861,24 @@ class WhatsAppService
             // Tentar extrair instance_id do payload se não tiver ainda
             if (empty($account['instance_id'])) {
                 $instanceId = $payload['instanceId'] ?? $payload['instance_id'] ?? null;
+                
+                // Se não veio no payload, tentar extrair da URL
+                if (empty($instanceId) && !empty($account['api_url'])) {
+                    $urlParts = parse_url($account['api_url']);
+                    $path = $urlParts['path'] ?? '';
+                    $pathSegments = array_filter(explode('/', trim($path, '/')));
+                    if (!empty($pathSegments)) {
+                        $instanceId = end($pathSegments);
+                        Logger::quepasa("processWebhook - Instance ID extraído da URL: {$instanceId}");
+                    }
+                }
+                
+                // Se ainda não tiver, usar quepasa_user
+                if (empty($instanceId) && !empty($account['quepasa_user'])) {
+                    $instanceId = $account['quepasa_user'];
+                    Logger::quepasa("processWebhook - Instance ID usando quepasa_user: {$instanceId}");
+                }
+                
                 if (!empty($instanceId)) {
                     WhatsAppAccount::update($account['id'], ['instance_id' => $instanceId]);
                     $account['instance_id'] = $instanceId;

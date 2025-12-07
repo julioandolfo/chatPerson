@@ -2543,6 +2543,20 @@ function subscribeVisibleConversations() {
     });
 }
 
+/**
+ * Atualizar tempos relativos de todas as conversas na lista
+ */
+function updateConversationTimes() {
+    const conversationItems = document.querySelectorAll('.conversation-item');
+    conversationItems.forEach(item => {
+        const timeElement = item.querySelector('.conversation-item-time');
+        const updatedAt = item.getAttribute('data-updated-at');
+        if (timeElement && updatedAt) {
+            timeElement.textContent = formatTime(updatedAt);
+        }
+    });
+}
+
 // Remover badge (não lidas) de uma conversa na lista
 function removeConversationBadge(conversationId) {
     if (!conversationId) return;
@@ -8150,7 +8164,12 @@ const currentConversationId = parsePhpJson('<?= json_encode($selectedConversatio
     // Atualizar a cada 10 segundos para verificar novas mensagens em todas as conversas
     let conversationListUpdateInterval = setInterval(() => {
         refreshConversationBadges();
-    }, 10000); // 10 segundos
+    }, 10000);
+    
+    // Atualizar tempos relativos a cada 30 segundos
+    let timeUpdateInterval = setInterval(() => {
+        updateConversationTimes();
+    }, 30000); // 30 segundos // 10 segundos
     
     // Carregar funcionalidades do Assistente IA quando modal for aberto
     const aiAssistantModal = document.getElementById('kt_modal_ai_assistant');

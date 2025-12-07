@@ -206,6 +206,13 @@ class RealtimeClient {
             const data = await response.json();
             
             if (data.success && data.updates) {
+                // DEBUG: logs para diagnosticar novas conversas
+                if (data.updates.new_conversations && data.updates.new_conversations.length) {
+                    console.log('RealtimeClient: novas conversas recebidas (polling):', data.updates.new_conversations);
+                }
+                if (data.updates.conversation_updates && data.updates.conversation_updates.length) {
+                    console.log('RealtimeClient: conversation_updates recebidas (polling):', data.updates.conversation_updates);
+                }
                 this.processPollingUpdates(data.updates);
                 this.lastUpdateTime = data.timestamp || Date.now();
             }

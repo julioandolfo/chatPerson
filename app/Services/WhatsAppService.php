@@ -858,19 +858,62 @@ class WhatsAppService
             $quotedMessageId = $payload['quoted'] ?? $payload['quoted_message_id'] ?? null;
             $quotedMessageText = $payload['quoted_text'] ?? null;
             
-            // Verificar se mensagens de grupo são permitidas
+            // Verificar se mensagens de grupo são permitidas (usar isGroup detectado do payload)
             $allowGroupMessages = \App\Services\SettingService::get('whatsapp_allow_group_messages', true);
             if ($isGroup && !$allowGroupMessages) {
                 Logger::quepasa("processWebhook - Mensagem de grupo ignorada (grupos desabilitados): groupName={$groupName}");
                 return;
             }
             
-            // Processar anexos/mídia do WhatsApp (será processado depois de criar a conversa)
-            $mediaUrl = $payload['media_url'] ?? $payload['mediaUrl'] ?? $payload['url'] ?? null;
-            $mediaType = $payload['media_type'] ?? $messageType;
-            $filename = $payload['filename'] ?? $payload['media_name'] ?? null;
-            $mimetype = $payload['mimetype'] ?? $payload['mime_type'] ?? null;
-            $size = $payload['size'] ?? null;
+            // Suportar formato do Quepasa (event/data) e campos completos
+            $quepasaData = $payload;
+            if (isset($payload['event']) && isset($payload['data'])) {
+                $quepasaData = $payload['data'];
+            }
+            
+            // Priorizar campos do formato Quepasa
+            $messageType = $quepasaData['type'] ?? $payload['type'] ?? $messageType;
+            $message = $quepasaData['body'] ?? $payload['text'] ?? $payload['message'] ?? $payload['caption'] ?? $message;
+            $from = $quepasaData['from'] ?? ($payload['from'] ?? $payload['chat']['id'] ?? null);
+            $to = $quepasaData['to'] ?? null;
+            // Detectar grupo apenas pelo formato novo: flag isGroup ou sufixo @g.us
+            $isGroup = (bool)($quepasaData['isGroup'] ?? false);
+            $author = $quepasaData['author'] ?? null;
+            if (!$isGroup && $from && strpos($from, '@g.us') !== false) {
+                $isGroup = true;
+            }
+            // Se for grupo, usar author como remetente
+            if ($isGroup && $author) {
+                $from = $author;
+            }
+            // Reprocessar fromPhone com novos dados
+            if ($from) {
+                $fromPhone = str_replace(['@s.whatsapp.net', '@c.us', '@g.us'], '', $from);
+                $fromPhone = ltrim($fromPhone, '+');
+            }
+            
+            // Media / arquivos
+            $mediaUrl = $quepasaData['url'] ?? $payload['media_url'] ?? $payload['mediaUrl'] ?? $payload['url'] ?? null;
+            $mimetype = $quepasaData['mimeType'] ?? $payload['mimetype'] ?? $payload['mime_type'] ?? null;
+            $filename = $quepasaData['fileName'] ?? $quepasaData['filename'] ?? $payload['filename'] ?? $payload['media_name'] ?? null;
+            $size = $quepasaData['size'] ?? $payload['size'] ?? null;
+            $quotedMsg = $quepasaData['quotedMsg'] ?? null;
+            $quotedMessageId = $quotedMsg['id'] ?? ($payload['quoted'] ?? $payload['quoted_message_id'] ?? null);
+            $quotedMessageText = $quotedMsg['body'] ?? ($payload['quoted_text'] ?? null);
+            $location = null;
+            if (isset($quepasaData['latitude']) && isset($quepasaData['longitude'])) {
+                $location = [
+                    'latitude' => $quepasaData['latitude'],
+                    'longitude' => $quepasaData['longitude'],
+                    'name' => $quepasaData['body'] ?? null,
+                    'address' => $quepasaData['body'] ?? null
+                ];
+            }
+            
+            // Se não tem texto mas tem caption, usar caption como conteúdo
+            if (empty($message) && !empty($payload['caption'])) {
+                $message = $payload['caption'];
+            }
             
             // Processar localização se houver
             $location = null;
@@ -890,7 +933,7 @@ class WhatsAppService
 
             Logger::quepasa("processWebhook - Processando mensagem: fromPhone={$fromPhone}, message={$message}, messageId={$messageId}, isGroup=" . ($isGroup ? 'true' : 'false'));
             
-            if (!$fromPhone || (empty($message) && !$mediaUrl)) {
+            if (!$fromPhone || (empty($message) && !$mediaUrl && empty($location))) {
                 Logger::error("WhatsApp webhook: dados incompletos (fromPhone: " . ($fromPhone ?? 'NULL') . ", message: " . ($message ?? 'NULL') . ", mediaUrl: " . ($mediaUrl ?? 'NULL') . ")");
                 return;
             }
@@ -926,31 +969,17 @@ class WhatsAppService
                 
                 Logger::quepasa("processWebhook - Contato criado: ID={$contactId}");
                 
-                // Tentar buscar avatar do WhatsApp usando chat.id do payload
+                // Tentar buscar avatar usando Quepasa (rota instances/{instanceId}/contacts/{number}/photo), depois fallback
                 try {
                     $chatId = $payload['chat']['id'] ?? null;
-                    
-                    // Verificar se há thumbnail base64 no payload (url.thumbnail.data)
-                    $thumbnailData = null;
-                    $thumbnailMime = 'image/jpeg';
-                    if (isset($payload['url']['thumbnail']['data'])) {
-                        $thumbnailData = $payload['url']['thumbnail']['data'];
-                        $thumbnailMime = $payload['url']['thumbnail']['mime'] ?? 'image/jpeg';
-                        // Se tem urlprefix, adicionar ao início
-                        if (isset($payload['url']['thumbnail']['urlprefix']) && strpos($thumbnailData, 'base64,') === false) {
-                            $thumbnailData = $payload['url']['thumbnail']['urlprefix'] . $thumbnailData;
-                        }
-                    }
-                    
-                    // Verificar se há URL de avatar direta no payload
                     $avatarUrl = $payload['chat']['picture'] ?? $payload['chat']['avatar'] ?? $payload['avatar'] ?? null;
                     
-                    if ($thumbnailData) {
-                        // Se tem thumbnail base64, salvar diretamente
-                        Logger::quepasa("processWebhook - Avatar encontrado como base64 no payload (thumbnail)");
-                        \App\Services\ContactService::saveAvatarFromBase64($contact['id'], $thumbnailData, $thumbnailMime);
+                    // Primeira tentativa: rota Quepasa com instance_id + phone/chat
+                    $avatarFetched = \App\Services\ContactService::fetchQuepasaAvatar($contact['id'], $account, $chatId, $fromPhone);
+                    
+                    if ($avatarFetched) {
+                        // ok
                     } elseif ($avatarUrl) {
-                        // Se tem URL direta, baixar e salvar
                         Logger::quepasa("processWebhook - Avatar encontrado no payload: {$avatarUrl}");
                         \App\Services\ContactService::downloadAvatarFromUrl($contact['id'], $avatarUrl);
                     } elseif ($chatId) {
@@ -978,32 +1007,17 @@ class WhatsAppService
                     }
                 }
                 
-                // Se contato existe mas não tem avatar, tentar buscar usando chat.id
+                // Se contato existe mas não tem avatar, tentar buscar usando Quepasa (rota instance/contact/photo) ou chat.id
                 if (empty($contact['avatar'])) {
                     try {
                         $chatId = $payload['chat']['id'] ?? null;
-                        
-                        // Verificar se há thumbnail base64 no payload (url.thumbnail.data)
-                        $thumbnailData = null;
-                        $thumbnailMime = 'image/jpeg';
-                        if (isset($payload['url']['thumbnail']['data'])) {
-                            $thumbnailData = $payload['url']['thumbnail']['data'];
-                            $thumbnailMime = $payload['url']['thumbnail']['mime'] ?? 'image/jpeg';
-                            // Se tem urlprefix, adicionar ao início
-                            if (isset($payload['url']['thumbnail']['urlprefix']) && strpos($thumbnailData, 'base64,') === false) {
-                                $thumbnailData = $payload['url']['thumbnail']['urlprefix'] . $thumbnailData;
-                            }
-                        }
-                        
-                        // Verificar se há URL de avatar direta no payload
                         $avatarUrl = $payload['chat']['picture'] ?? $payload['chat']['avatar'] ?? $payload['avatar'] ?? null;
                         
-                        if ($thumbnailData) {
-                            // Se tem thumbnail base64, salvar diretamente
-                            Logger::quepasa("processWebhook - Avatar encontrado como base64 no payload (thumbnail)");
-                            \App\Services\ContactService::saveAvatarFromBase64($contact['id'], $thumbnailData, $thumbnailMime);
+                        $avatarFetched = \App\Services\ContactService::fetchQuepasaAvatar($contact['id'], $account, $chatId, $fromPhone);
+                        
+                        if ($avatarFetched) {
+                            // ok
                         } elseif ($avatarUrl) {
-                            // Se tem URL direta, baixar e salvar
                             Logger::quepasa("processWebhook - Avatar encontrado no payload: {$avatarUrl}");
                             \App\Services\ContactService::downloadAvatarFromUrl($contact['id'], $avatarUrl);
                         } elseif ($chatId) {
@@ -1063,8 +1077,13 @@ class WhatsAppService
                     $attachment = \App\Services\AttachmentService::saveFromUrl(
                         $mediaUrl, 
                         $conversation['id'], 
-                        $payload['filename'] ?? $payload['media_name'] ?? null
+                        $filename
                     );
+                    // Enriquecer metadados do attachment se possível
+                    if (!empty($attachment)) {
+                        if ($mimetype) $attachment['mime_type'] = $mimetype;
+                        if ($size) $attachment['size'] = $size;
+                    }
                     $attachments[] = $attachment;
                 } catch (\Exception $e) {
                     Logger::quepasa("Erro ao salvar mídia do WhatsApp: " . $e->getMessage());
@@ -1091,9 +1110,17 @@ class WhatsAppService
                     'sender_type' => 'contact',
                     'sender_id' => $contact['id'],
                     'content' => $message ?: '',
-                    'message_type' => !empty($attachments) ? ($attachments[0]['type'] ?? 'text') : 'text',
-                    'external_id' => $messageId
+                    'message_type' => !empty($attachments) ? ($attachments[0]['type'] ?? $messageType ?? 'text') : ($messageType ?? 'text'),
+                    'external_id' => $messageId,
+                    'quoted_message_id' => $quotedMessageId ?? null,
+                    'quoted_text' => $quotedMessageText ?? null
                 ];
+                
+                // Se for localização, armazenar como JSON no content
+                if ($location) {
+                    $messageData['content'] = json_encode($location);
+                    $messageData['message_type'] = 'location';
+                }
                 
                 if (!empty($attachments)) {
                     $messageData['attachments'] = $attachments;

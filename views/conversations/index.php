@@ -2525,6 +2525,12 @@ let hasMoreMessages = true;
 let oldestMessageId = null;
 let currentConversationId = null;
 
+// Se já vier um ID da URL/PHP, setar na inicialização
+const initialConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+if (initialConversationId) {
+    currentConversationId = initialConversationId;
+}
+
 // Garantir inscrição no cliente de tempo real para conversas da lista (necessário no modo polling)
 function subscribeVisibleConversations() {
     if (typeof window.wsClient === 'undefined') return;
@@ -2735,6 +2741,17 @@ function selectConversation(id) {
     if (!chatMessages) {
         console.error('Elemento chatMessages não encontrado');
         return;
+    }
+    
+    // Limpar caixa de mensagem ao trocar de conversa (evita texto pendente em outra conversa)
+    const messageInput = document.getElementById('messageInput');
+    if (messageInput) {
+        messageInput.value = '';
+        messageInput.style.height = 'auto';
+    }
+    const noteToggle = document.getElementById('noteToggle');
+    if (noteToggle) {
+        noteToggle.checked = false;
     }
     
     chatMessages.innerHTML = `

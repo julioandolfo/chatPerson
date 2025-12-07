@@ -379,6 +379,100 @@ class ContactService
     }
 
     /**
+     * Buscar avatar via Quepasa (rota /instances/{instanceId}/contacts/{number}/photo)
+     */
+    public static function fetchQuepasaAvatar(int $contactId, array $account, ?string $chatId = null, ?string $phone = null): ?string
+    {
+        try {
+            if (($account['provider'] ?? '') !== 'quepasa') {
+                return null;
+            }
+
+            $apiUrl = rtrim($account['api_url'] ?? '', '/');
+            $token = $account['quepasa_token'] ?? $account['api_key'] ?? null;
+            $instanceId = $account['instance_id'] ?? null;
+
+            if (empty($apiUrl) || empty($token) || empty($instanceId)) {
+                return null;
+            }
+
+            // Extrair número limpo
+            $number = null;
+            if ($phone) {
+                $number = preg_replace('/\D+/', '', $phone);
+            }
+            if (!$number && $chatId) {
+                $number = preg_replace('/\D+/', '', $chatId);
+            }
+            if (empty($number)) {
+                return null;
+            }
+
+            $url = "{$apiUrl}/instances/{$instanceId}/contacts/{$number}/photo";
+
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10,
+                CURLOPT_HTTPHEADER => [
+                    'Accept: application/json',
+                    'Authorization: Bearer ' . $token,
+                ],
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false
+            ]);
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+            curl_close($ch);
+
+            if ($httpCode !== 200 || empty($response)) {
+                return null;
+            }
+
+            // Se veio JSON com url/base64
+            if (strpos($contentType, 'application/json') !== false) {
+                $json = json_decode($response, true);
+                $photoUrl = $json['data']['url'] ?? $json['photo'] ?? null;
+                if ($photoUrl) {
+                    if (str_starts_with($photoUrl, 'data:image')) {
+                        return self::saveAvatarFromBase64($contactId, $photoUrl);
+                    }
+                    return self::downloadAvatarFromUrl($contactId, $photoUrl);
+                }
+                return null;
+            }
+
+            // Se veio imagem binária
+            if (strpos($contentType, 'image/') !== false) {
+                $uploadDir = __DIR__ . '/../../public/assets/media/avatars/contacts/';
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0755, true);
+                }
+                $ext = 'jpg';
+                if (strpos($contentType, 'png') !== false) $ext = 'png';
+                elseif (strpos($contentType, 'gif') !== false) $ext = 'gif';
+                elseif (strpos($contentType, 'webp') !== false) $ext = 'webp';
+
+                $filename = 'whatsapp_' . $contactId . '_' . time() . '.' . $ext;
+                $filepath = $uploadDir . $filename;
+                if (file_put_contents($filepath, $response)) {
+                    $avatarUrl = \App\Helpers\Url::asset('media/avatars/contacts/' . $filename);
+                    \App\Models\Contact::update($contactId, ['avatar' => $avatarUrl]);
+                    return $avatarUrl;
+                }
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error("Erro ao buscar avatar via Quepasa: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Baixar avatar de uma URL e salvar
      */
     public static function downloadAvatarFromUrl(int $contactId, string $avatarUrl): ?string

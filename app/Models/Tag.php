@@ -53,5 +53,18 @@ class Tag extends Model
             return false;
         }
     }
+
+    /**
+     * Obter tags de um contato (através das conversas do contato)
+     */
+    public static function getByContact(int $contactId): array
+    {
+        $sql = "SELECT DISTINCT t.* FROM tags t
+                INNER JOIN conversation_tags ct ON t.id = ct.tag_id
+                INNER JOIN conversations c ON ct.conversation_id = c.id
+                WHERE c.contact_id = ?
+                ORDER BY t.name ASC";
+        return Database::fetchAll($sql, [$contactId]);
+    }
 }
 

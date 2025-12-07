@@ -1296,7 +1296,7 @@ body.dark-mode .swal2-content {
                     ?>
                     <div class="conversation-item <?= $isActive ? 'active' : '' ?> <?= !empty($conv['pinned']) ? 'pinned' : '' ?>" 
                          data-conversation-id="<?= $conv['id'] ?>"
-                         onclick="selectConversation(<?= $conv['id'] ?>)">
+                         data-onclick="selectConversation"
                         <div class="d-flex gap-3 w-100">
                             <!-- Avatar -->
                             <div class="symbol symbol-45px flex-shrink-0">
@@ -3308,6 +3308,17 @@ function formatDateTime(dateString) {
 }
 
 
+// Delegação de eventos para conversation-item (resolve problema de função não definida em onclick)
+document.addEventListener('click', function(e) {
+    const conversationItem = e.target.closest('.conversation-item[data-onclick="selectConversation"]');
+    if (conversationItem) {
+        const conversationId = parseInt(conversationItem.getAttribute('data-conversation-id'));
+        if (!isNaN(conversationId)) {
+            selectConversation(conversationId);
+        }
+    }
+});
+
 // Auto-scroll para última mensagem
 document.addEventListener('DOMContentLoaded', function() {
     const chatMessages = document.getElementById('chatMessages');
@@ -3716,7 +3727,7 @@ function refreshConversationList(params = null) {
             html += `
                 <div class="conversation-item ${isActive ? 'active' : ''} ${pinned ? 'pinned' : ''}" 
                      data-conversation-id="${conv.id}"
-                     onclick="selectConversation(${conv.id})">
+                     data-onclick="selectConversation">
                     <div class="d-flex gap-3 w-100">
                         <div class="symbol symbol-45px flex-shrink-0">
                             <div class="symbol-label bg-light-primary text-primary fw-bold">${initials}</div>

@@ -1219,50 +1219,50 @@ body.dark-mode .swal2-content {
         <div class="conversations-list-header">
             <div class="position-relative">
                 <i class="ki-duotone ki-magnifier fs-3 text-gray-500 position-absolute top-50 translate-middle ms-6">
-                    <span class="path1"></span>
-                    <span class="path2"></span>
-                </i>
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
                 <input type="text" id="kt_conversations_search" class="form-control form-control-solid ps-10" placeholder="Buscar conversas e mensagens..." value="<?= htmlspecialchars($filters['search'] ?? '') ?>">
-            </div>
-        </div>
+                    </div>
+                </div>
         
         <!-- Filtros -->
         <div class="conversations-list-filters">
             <select id="filter_status" class="form-select form-select-sm form-select-solid" style="width: auto;">
                 <option value="">Todas</option>
-                <option value="open" <?= ($filters['status'] ?? '') === 'open' ? 'selected' : '' ?>>Abertas</option>
+                                        <option value="open" <?= ($filters['status'] ?? '') === 'open' ? 'selected' : '' ?>>Abertas</option>
                 <option value="resolved" <?= ($filters['status'] ?? '') === 'resolved' ? 'selected' : '' ?>>Resolvidas</option>
-                <option value="closed" <?= ($filters['status'] ?? '') === 'closed' ? 'selected' : '' ?>>Fechadas</option>
-            </select>
+                                        <option value="closed" <?= ($filters['status'] ?? '') === 'closed' ? 'selected' : '' ?>>Fechadas</option>
+                                    </select>
             
             <select id="filter_channel" class="form-select form-select-sm form-select-solid" style="width: auto;">
                 <option value="">Canais</option>
                 <option value="whatsapp" <?= ($filters['channel'] ?? '') === 'whatsapp' ? 'selected' : '' ?>>📱 WhatsApp</option>
                 <option value="email" <?= ($filters['channel'] ?? '') === 'email' ? 'selected' : '' ?>>✉️ Email</option>
                 <option value="chat" <?= ($filters['channel'] ?? '') === 'chat' ? 'selected' : '' ?>>💬 Chat</option>
-            </select>
+                                    </select>
             
-            <?php if (!empty($departments)): ?>
+                                <?php if (!empty($departments)): ?>
             <select id="filter_department" class="form-select form-select-sm form-select-solid" style="width: auto;">
                 <option value="">Setores</option>
-                <?php foreach ($departments as $dept): ?>
-                    <option value="<?= $dept['id'] ?>" <?= ($filters['department_id'] ?? '') == $dept['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($dept['name']) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-            <?php endif; ?>
+                                        <?php foreach ($departments as $dept): ?>
+                                            <option value="<?= $dept['id'] ?>" <?= ($filters['department_id'] ?? '') == $dept['id'] ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($dept['name']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                <?php endif; ?>
             
-            <?php if (!empty($tags)): ?>
+                                <?php if (!empty($tags)): ?>
             <select id="filter_tag" class="form-select form-select-sm form-select-solid" style="width: auto;">
                 <option value="">Tags</option>
-                <?php foreach ($tags as $tag): ?>
-                    <option value="<?= $tag['id'] ?>" <?= ($filters['tag_id'] ?? '') == $tag['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($tag['name']) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-            <?php endif; ?>
+                                        <?php foreach ($tags as $tag): ?>
+                                            <option value="<?= $tag['id'] ?>" <?= ($filters['tag_id'] ?? '') == $tag['id'] ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($tag['name']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                <?php endif; ?>
             
             <button type="button" class="btn btn-sm btn-light-primary" onclick="openAdvancedFilters()" title="Filtros Avançados">
                 <i class="ki-duotone ki-filter fs-6">
@@ -1280,22 +1280,22 @@ body.dark-mode .swal2-content {
                 </i>
             </button>
             <?php endif; ?>
-        </div>
+                                </div>
         
         <!-- Lista de conversas -->
         <div class="conversations-list-items">
-            <?php if (empty($conversations)): ?>
+                <?php if (empty($conversations)): ?>
                 <div class="empty-state">
                     <i class="ki-duotone ki-message-text">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
+                            <span class="path1"></span>
+                            <span class="path2"></span>
                         <span class="path3"></span>
                     </i>
                     <h5>Nenhuma conversa</h5>
                     <p class="text-muted">Aguarde novas mensagens</p>
-                </div>
-            <?php else: ?>
-                <?php foreach ($conversations as $conv): ?>
+                    </div>
+                <?php else: ?>
+                                <?php foreach ($conversations as $conv): ?>
                     <?php
                     $channelIcon = match($conv['channel'] ?? 'chat') {
                         'whatsapp' => '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#25D366" style="vertical-align: middle;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>',
@@ -1326,7 +1326,7 @@ body.dark-mode .swal2-content {
                                 $initials = strtoupper(substr($parts[0], 0, 1) . (isset($parts[1]) ? substr($parts[1], 0, 1) : ''));
                                 ?>
                                 <div class="symbol-label bg-light-primary text-primary fw-bold"><?= $initials ?></div>
-                            </div>
+                                                </div>
                             
                             <!-- Conteúdo -->
                             <div class="flex-grow-1 min-w-0">
@@ -1338,7 +1338,7 @@ body.dark-mode .swal2-content {
                                             <span class="path2"></span>
                                         </i>
                                         <?php endif; ?>
-                                        <?= htmlspecialchars($conv['contact_name'] ?? 'Sem nome') ?>
+                                                        <?= htmlspecialchars($conv['contact_name'] ?? 'Sem nome') ?>
                                     </div>
                             <div class="conversation-item-time d-flex align-items-center gap-2">
                                 <?php
@@ -1376,24 +1376,24 @@ body.dark-mode .swal2-content {
                             <span class="conversation-item-channel">
                                 <?= $channelIcon ?> <?= $channelName ?>
                             </span>
-                            <?php if (!empty($conv['tags']) && is_array($conv['tags'])): ?>
+                                                    <?php if (!empty($conv['tags']) && is_array($conv['tags'])): ?>
                                 <?php foreach (array_slice($conv['tags'], 0, 2) as $tag): ?>
                                     <span class="badge badge-sm" style="background-color: <?= htmlspecialchars($tag['color'] ?? '#009ef7') ?>20; color: <?= htmlspecialchars($tag['color'] ?? '#009ef7') ?>;">
-                                        <?= htmlspecialchars($tag['name']) ?>
-                                    </span>
-                                <?php endforeach; ?>
+                                                                    <?= htmlspecialchars($tag['name']) ?>
+                                                                </span>
+                                                            <?php endforeach; ?>
                             <?php endif; ?>
                             <?php if (!empty($conv['unread_count'])): ?>
                                 <span class="conversation-item-badge"><?= $conv['unread_count'] ?></span>
                             <?php endif; ?>
-                        </div>
+                                                        </div>
                             </div><!-- fim flex-grow -->
                         </div><!-- fim d-flex -->
                     </div>
                 <?php endforeach; ?>
-            <?php endif; ?>
-        </div>
-    </div>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
     
     <!-- COLUNA 2: ÁREA DE CHAT -->
     <div class="chat-area">
@@ -1523,12 +1523,12 @@ body.dark-mode .swal2-content {
                                 </div>
                             </div>
                         
-                        <?php else: ?>
+                                            <?php else: ?>
                             <!-- Mensagem normal -->
                             <div class="chat-message <?= $msgDirection === 'incoming' ? 'incoming' : 'outgoing' ?>" data-message-id="<?= $msg['id'] ?? '' ?>" data-timestamp="<?= strtotime($msgCreatedAt) * 1000 ?>">
                                 <?php if ($msgDirection === 'incoming'): ?>
                                     <div class="message-avatar"><?= $initials ?></div>
-                                <?php endif; ?>
+                                            <?php endif; ?>
                                 <div class="message-content">
                                     <div class="message-actions">
                                         <button class="message-actions-btn" onclick="replyToMessage(<?= $msg['id'] ?? 0 ?>, '<?= htmlspecialchars($msgSenderName, ENT_QUOTES) ?>', '<?= htmlspecialchars(substr($msgContent, 0, 100), ENT_QUOTES) ?>')" title="Responder">
@@ -1544,7 +1544,7 @@ body.dark-mode .swal2-content {
                                             </i>
                                         </button>
                                     </div>
-                                    <?php 
+                                            <?php
                                     // Verificar se é mensagem de IA
                                     $isAIMessage = !empty($msg['ai_agent_id']);
                                     $aiAgentName = $msg['ai_agent_name'] ?? 'Assistente IA';
@@ -1637,7 +1637,7 @@ body.dark-mode .swal2-content {
                         <?php endif; ?>
                         
                     <?php endforeach; ?>
-                <?php else: ?>
+                                            <?php else: ?>
                     <div class="empty-state">
                         <i class="ki-duotone ki-message-text">
                             <span class="path1"></span>
@@ -1647,7 +1647,7 @@ body.dark-mode .swal2-content {
                         <h5>Nenhuma mensagem</h5>
                         <p class="text-muted">Envie a primeira mensagem</p>
                     </div>
-                <?php endif; ?>
+                                            <?php endif; ?>
             <?php else: ?>
                 <!-- Estado vazio - nenhuma conversa selecionada -->
                 <div class="empty-state">
@@ -1824,7 +1824,7 @@ body.dark-mode .swal2-content {
                                         <span class="path2"></span>
                                     </i>
                                     <div>Carregando templates...</div>
-                                </td>
+                                        </td>
                             </tr>
                         </tbody>
                     </table>
@@ -2176,11 +2176,11 @@ body.dark-mode .swal2-content {
                                 <td colspan="4" class="text-center text-muted py-10">
                                     <span class="spinner-border spinner-border-sm text-primary mb-3" role="status"></span>
                                     <div>Carregando templates...</div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                                        </td>
+                                    </tr>
+                            </tbody>
+                        </table>
+                    </div>
             </div>
         </div>
     </div>
@@ -2291,12 +2291,12 @@ body.dark-mode .swal2-content {
                                         <?= htmlspecialchars($agent['name']) ?>
                                         <?php if (!empty($agent['email'])): ?>
                                             (<?= htmlspecialchars($agent['email']) ?>)
-                                        <?php endif; ?>
+                <?php endif; ?>
                                     </option>
                                 <?php endforeach; ?>
                             <?php endif; ?>
                         </select>
-                    </div>
+            </div>
                     <div class="mb-5">
                         <label class="form-label fw-semibold">Setor (opcional):</label>
                         <select id="assignDepartment" class="form-select form-select-solid">
@@ -2309,7 +2309,7 @@ body.dark-mode .swal2-content {
                                 <?php endforeach; ?>
                             <?php endif; ?>
                         </select>
-                    </div>
+        </div>
                     <div class="d-flex justify-content-end">
                         <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
                         <button type="submit" class="btn btn-primary">Atribuir</button>
@@ -5196,9 +5196,9 @@ function scrollToMessage(messageId) {
         });
         
         // Remover highlight após 3 segundos
-        setTimeout(() => {
+            setTimeout(() => {
             messageElement.classList.remove('message-highlight');
-        }, 3000);
+            }, 3000);
         
         console.log('✅ scrollToMessage: Scroll executado com sucesso');
         
@@ -5348,7 +5348,7 @@ async function sendAudioMessage(audioBlob, conversationId) {
         
         if (data.success && data.message) {
             // Adicionar mensagem ao chat
-            addMessageToChat(data.message);
+                addMessageToChat(data.message);
         } else {
             throw new Error(data.message || 'Erro ao enviar áudio');
         }
@@ -8010,6 +8010,7 @@ if (typeof window.wsClient !== 'undefined') {
 
     // Handler para novas conversas criadas
     window.wsClient.on('new_conversation', (data) => {
+        console.log('Nova conversa recebida (WS/Poll):', data);
         // Adicionar nova conversa à lista sem recarregar a página
         if (data.conversation) {
             addConversationToList(data.conversation);

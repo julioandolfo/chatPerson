@@ -448,8 +448,15 @@ class ContactService
                 if ($httpCode === 200 && !empty($response)) {
                     // Tentar decodificar JSON
                     $json = json_decode($response, true);
+                    $photoUrl = null;
                     if ($json && isset($json['url'])) {
                         $photoUrl = $json['url'];
+                    } elseif ($json && isset($json['info']['url'])) {
+                        // Formato picinfo v3: info.url
+                        $photoUrl = $json['info']['url'];
+                    }
+                    
+                    if ($photoUrl) {
                         \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - Avatar encontrado via {$version}: {$photoUrl}");
                         
                         // Baixar e salvar avatar
@@ -462,13 +469,12 @@ class ContactService
                     }
                 }
                 
-                // Se v4 não funcionar, tentar v3
-                if ($version === 'v4' && $httpCode !== 200) {
+                // Se v4 não funcionar, tentar v3; se já tentou v3, parar
+                if ($version === 'v4') {
                     continue;
+                } else {
+                    break;
                 }
-                
-                // Se chegou aqui e já tentou v3, parar
-                break;
             }
 
             return null;

@@ -8013,7 +8013,11 @@ if (typeof window.wsClient !== 'undefined') {
                 const maxChars = 37;
                 preview.textContent = content.substring(0, maxChars) + (content.length > maxChars ? '...' : '');
             }
-            if (time) time.textContent = 'Agora';
+            if (time) {
+                const ts = data.message.created_at || new Date().toISOString();
+                time.textContent = formatTime(ts);
+                conversationItem.setAttribute('data-updated-at', ts);
+            }
             
             // Atualizar badge de não lidas (se não for a conversa atual)
             if (currentConversationId != data.conversation_id) {
@@ -8032,6 +8036,10 @@ if (typeof window.wsClient !== 'undefined') {
                 const list = conversationItem.parentElement;
                 list.insertBefore(conversationItem, list.firstChild);
             }
+        } else {
+            // Se não existe na lista, fazer refresh para forçar render
+            console.log('new_message: conversa não encontrada na lista, atualizando lista');
+            refreshConversationList();
         }
         
         // Se é a conversa atual, adicionar mensagem dinamicamente

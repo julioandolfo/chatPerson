@@ -305,6 +305,7 @@ ob_start();
     text-overflow: ellipsis;
     white-space: nowrap;
     margin-bottom: 8px;
+    max-width: 100%;
 }
 
 .conversation-item-search-match {
@@ -2559,14 +2560,17 @@ function applyConversationUpdate(conv) {
     const conversationItem = document.querySelector(`[data-conversation-id="${conv.id}"]`);
     if (!conversationItem) return;
 
-    const preview = conversationItem.querySelector('.conversation-item-preview');
-    const time = conversationItem.querySelector('.conversation-item-time');
-    const badge = conversationItem.querySelector('.conversation-item-badge');
+            const preview = conversationItem.querySelector('.conversation-item-preview');
+            const time = conversationItem.querySelector('.conversation-item-time');
+            const badge = conversationItem.querySelector('.conversation-item-badge');
 
-    if (preview && conv.last_message) {
-        const content = conv.last_message.substring(0, 60);
-        preview.textContent = content + (conv.last_message.length > 60 ? '...' : '');
-    }
+            if (preview && conv.last_message) {
+                const maxChars = 55;
+                const content = conv.last_message.length > maxChars
+                    ? conv.last_message.substring(0, maxChars) + '...'
+                    : conv.last_message;
+                preview.textContent = content;
+            }
     if (time && (conv.last_message_at || conv.updated_at)) {
         time.textContent = formatTime(conv.last_message_at || conv.updated_at);
     }
@@ -2762,7 +2766,7 @@ function selectConversation(id) {
         return response.json();
     })
     .then(data => {
-        if (data.success && data.conversation) {
+    if (data.success && data.conversation) {
             // Atualizar URL sem recarregar
             const newUrl = `<?= \App\Helpers\Url::to('/conversations') ?>?id=${id}`;
             window.history.pushState({ conversationId: id }, '', newUrl);
@@ -2832,6 +2836,16 @@ function selectConversation(id) {
                 const lastMsg = data.messages[data.messages.length - 1];
                 if (lastMsg.id) {
                     lastMessageId = lastMsg.id;
+                }
+            }
+
+            // Garantir truncamento visual do preview (limitando caracteres)
+            const preview = document.querySelector(`[data-conversation-id="${id}"] .conversation-item-preview`);
+            if (preview) {
+                const text = preview.textContent || '';
+                const maxChars = 55;
+                if (text.length > maxChars) {
+                    preview.textContent = text.substring(0, maxChars) + '...';
                 }
             }
         } else {
@@ -8033,6 +8047,8 @@ const currentConversationId = parsePhpJson('<?= json_encode($selectedConversatio
             startPolling(currentConversationId);
         }
     }
+    // Inscrever todas as conversas visíveis (modo polling)
+    subscribeVisibleConversations();
     
     // Sistema de atualização periódica da lista de conversas (para badges de não lidas)
     // Atualizar a cada 10 segundos para verificar novas mensagens em todas as conversas
@@ -8127,6 +8143,8 @@ function refreshConversationBadges() {
                                 meta.insertAdjacentHTML('beforeend', badgeHtml);
                             }
                         }
+                        // Se chegou mensagem não lida, trazer para o topo
+                        moveConversationToTop(conv.id);
                     } else {
                         // Remover badge se não houver mensagens não lidas
                         if (badge) {

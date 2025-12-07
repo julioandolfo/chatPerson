@@ -2606,6 +2606,7 @@ function applyConversationUpdate(conv) {
             const preview = conversationItem.querySelector('.conversation-item-preview');
             const time = conversationItem.querySelector('.conversation-item-time');
             const badge = conversationItem.querySelector('.conversation-item-badge');
+            const avatarContainer = conversationItem.querySelector('.symbol-label');
 
             if (preview && conv.last_message) {
                 const maxChars = 37;
@@ -2616,6 +2617,14 @@ function applyConversationUpdate(conv) {
             }
     if (time && (conv.last_message_at || conv.updated_at)) {
         time.textContent = formatTime(conv.last_message_at || conv.updated_at);
+    }
+
+    if (avatarContainer) {
+        if (conv.contact_avatar) {
+            avatarContainer.innerHTML = `<img src="${escapeHtml(conv.contact_avatar)}" alt="${escapeHtml(conv.contact_name || '')}" class="h-45px w-45px rounded" style="object-fit: cover;">`;
+        } else {
+            avatarContainer.textContent = getInitials(conv.contact_name || 'NN');
+        }
     }
 
     const unreadCount = conv.unread_count || 0;
@@ -2969,7 +2978,11 @@ function updateChatHeader(conversation) {
     // Atualizar avatar
     const avatarLabel = header.querySelector('.symbol-label');
     if (avatarLabel) {
-        avatarLabel.textContent = initials;
+        if (conversation.contact_avatar) {
+            avatarLabel.innerHTML = `<img src="${escapeHtml(conversation.contact_avatar)}" alt="${escapeHtml(contactName)}" class="h-45px w-45px rounded" style="object-fit: cover;">`;
+        } else {
+            avatarLabel.textContent = initials;
+        }
     }
     
     // Atualizar nome
@@ -3904,13 +3917,17 @@ function refreshConversationList(params = null) {
                 });
             }
             
+    const avatarHtml = conv.contact_avatar
+        ? `<div class="symbol-label"><img src="${escapeHtml(conv.contact_avatar)}" alt="${escapeHtml(name)}" class="h-45px w-45px rounded" style="object-fit: cover;"></div>`
+        : `<div class="symbol-label bg-light-primary text-primary fw-bold">${initials}</div>`;
+
             html += `
                 <div class="conversation-item ${isActive ? 'active' : ''} ${pinned ? 'pinned' : ''}" 
                      data-conversation-id="${conv.id}"
                      data-onclick="selectConversation">
                     <div class="d-flex gap-3 w-100">
                         <div class="symbol symbol-45px flex-shrink-0">
-                            <div class="symbol-label bg-light-primary text-primary fw-bold">${initials}</div>
+                            ${avatarHtml}
                         </div>
                         <div class="flex-grow-1 min-w-0">
                             <div class="conversation-item-header">

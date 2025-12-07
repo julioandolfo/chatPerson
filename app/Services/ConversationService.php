@@ -836,6 +836,38 @@ class ConversationService
                         $attachmentPath = '/' . ltrim($firstAttachment['path'], '/');
                         $attachmentUrl = $baseUrl . $attachmentPath;
                         
+                        // LOG: Debug da URL gerada
+                        error_log("DEBUG WhatsApp - URL do anexo gerada: " . $attachmentUrl);
+                        error_log("DEBUG WhatsApp - Path do anexo: " . $firstAttachment['path']);
+                        error_log("DEBUG WhatsApp - Tipo: " . ($firstAttachment['type'] ?? 'document'));
+                        
+                        // Verificar se arquivo existe fisicamente
+                        $filePath = $_SERVER['DOCUMENT_ROOT'] . $attachmentPath;
+                        if (!file_exists($filePath)) {
+                            error_log("ERRO WhatsApp - Arquivo NÃO existe: " . $filePath);
+                        } else {
+                            error_log("DEBUG WhatsApp - Arquivo existe: " . $filePath . " (" . filesize($filePath) . " bytes)");
+                            
+                            // Testar se a URL está acessível publicamente
+                            $ch = curl_init($attachmentUrl);
+                            curl_setopt_array($ch, [
+                                CURLOPT_RETURNTRANSFER => true,
+                                CURLOPT_NOBODY => true,
+                                CURLOPT_TIMEOUT => 5,
+                                CURLOPT_SSL_VERIFYPEER => false
+                            ]);
+                            curl_exec($ch);
+                            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                            curl_close($ch);
+                            
+                            if ($httpCode === 200) {
+                                error_log("DEBUG WhatsApp - URL acessível publicamente (HTTP 200)");
+                            } else {
+                                error_log("ERRO WhatsApp - URL NÃO acessível publicamente (HTTP {$httpCode})");
+                                error_log("ERRO WhatsApp - Quepasa não conseguirá baixar este arquivo!");
+                            }
+                        }
+                        
                         $options['media_url'] = $attachmentUrl;
                         $options['media_type'] = $firstAttachment['type'] ?? 'document';
                         

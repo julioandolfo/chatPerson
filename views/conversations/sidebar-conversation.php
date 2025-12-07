@@ -148,6 +148,17 @@
                         <span class="sidebar-info-value" data-field="channel">-</span>
                     </div>
                     
+                    <!-- Informações WhatsApp (mostrar apenas se canal for WhatsApp) -->
+                    <div class="sidebar-info-item" id="sidebar-whatsapp-info" style="display: none;">
+                        <span class="sidebar-info-label">Integração:</span>
+                        <span class="sidebar-info-value" data-field="whatsapp_account_name">-</span>
+                    </div>
+                    
+                    <div class="sidebar-info-item" id="sidebar-whatsapp-phone" style="display: none;">
+                        <span class="sidebar-info-label">Número WhatsApp:</span>
+                        <span class="sidebar-info-value" data-field="whatsapp_account_phone">-</span>
+                    </div>
+                    
                     <div class="sidebar-info-item" id="sidebar-department-item" style="display: none;">
                         <span class="sidebar-info-label">Setor:</span>
                         <span class="sidebar-info-value" data-field="department_name">-</span>

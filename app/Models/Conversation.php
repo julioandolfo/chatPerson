@@ -58,6 +58,7 @@ class Conversation extends Model
             $sql = "SELECT c.*, 
                        ct.name as contact_name, ct.phone as contact_phone, ct.email as contact_email, ct.avatar as contact_avatar,
                        u.name as agent_name, u.email as agent_email,
+                       wa.name as whatsapp_account_name, wa.phone_number as whatsapp_account_phone,
                        (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact' AND m.read_at IS NULL) as unread_count,
                        (SELECT content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message,
                        (SELECT created_at FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message_at,
@@ -67,6 +68,7 @@ class Conversation extends Model
                 FROM conversations c
                 LEFT JOIN contacts ct ON c.contact_id = ct.id
                 LEFT JOIN users u ON c.agent_id = u.id
+                LEFT JOIN whatsapp_accounts wa ON c.whatsapp_account_id = wa.id
                 LEFT JOIN conversation_tags ctt ON c.id = ctt.conversation_id
                 LEFT JOIN tags t ON ctt.tag_id = t.id
                 WHERE 1=1";
@@ -308,10 +310,12 @@ class Conversation extends Model
         $sql = "SELECT c.*, 
                        ct.name as contact_name, ct.phone as contact_phone, ct.email as contact_email, ct.avatar as contact_avatar,
                        u.name as agent_name, u.email as agent_email, u.avatar as agent_avatar,
+                       wa.name as whatsapp_account_name, wa.phone_number as whatsapp_account_phone,
                        (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact' AND m.read_at IS NULL) as unread_count
                 FROM conversations c
                 LEFT JOIN contacts ct ON c.contact_id = ct.id
                 LEFT JOIN users u ON c.agent_id = u.id
+                LEFT JOIN whatsapp_accounts wa ON c.whatsapp_account_id = wa.id
                 WHERE c.id = ?";
         
         return Database::fetch($sql, [$id]);

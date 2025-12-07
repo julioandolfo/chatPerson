@@ -10,6 +10,22 @@ $pctDist = $cs['percentage_distribution'] ?? [];
 $reassign = $cs['reassignment'] ?? [];
 ?>
 <form id="kt_settings_conversations_form" class="form">
+    <!--begin::Configurações de Chat-->
+    <div class="mb-10">
+        <h4 class="fw-bold mb-4">Configurações de Chat</h4>
+        <div class="fv-row mb-7">
+            <label class="d-flex align-items-center">
+                <input type="checkbox" name="chat_agent_name_enabled" class="form-check-input me-2" 
+                       <?= \App\Services\SettingService::get('chat_agent_name_enabled', false) ? 'checked' : '' ?> />
+                <span class="fw-semibold fs-6">Habilitar envio do nome do agente por padrão</span>
+            </label>
+            <div class="form-text">Quando habilitado, o nome do agente será enviado em negrito (*Nome*) antes da mensagem por padrão. O agente pode ativar/desativar individualmente no chat.</div>
+        </div>
+    </div>
+    <!--end::Configurações de Chat-->
+    
+    <div class="separator separator-dashed my-10"></div>
+    
     <!--begin::Limites Globais-->
     <div class="mb-10">
         <h4 class="fw-bold mb-4">Limites Globais</h4>

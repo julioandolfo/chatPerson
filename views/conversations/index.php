@@ -1736,6 +1736,12 @@ body.dark-mode .swal2-content {
                             <span class="path4"></span>
                         </i>
                     </button>
+                    <button class="btn btn-sm btn-icon btn-light-primary" id="agentNameToggle" title="Enviar nome do agente" onclick="toggleAgentName()">
+                        <i class="ki-duotone ki-user fs-3" id="agentNameToggleIcon">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                    </button>
                 </div>
                 
                 <div class="position-relative">
@@ -3277,12 +3283,43 @@ function updateConversationSidebar(conversation, tags) {
     
     const conversationChannelEl = sidebar.querySelector('[data-field="channel"]');
     if (conversationChannelEl) {
-        const channelText = {
-            'whatsapp': '📱 WhatsApp',
-            'email': '✉️ Email',
-            'chat': '💬 Chat'
-        }[conversation.channel] || conversation.channel;
-        conversationChannelEl.textContent = channelText;
+        if (conversation.channel === 'whatsapp') {
+            // Ícone WhatsApp SVG
+            const whatsappIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#25D366" style="vertical-align: middle; margin-right: 4px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>`;
+            conversationChannelEl.innerHTML = whatsappIcon + ' WhatsApp';
+            
+            // Mostrar informações do WhatsApp
+            const whatsappInfoItem = sidebar.querySelector('#sidebar-whatsapp-info');
+            const whatsappPhoneItem = sidebar.querySelector('#sidebar-whatsapp-phone');
+            
+            if (whatsappInfoItem && conversation.whatsapp_account_name) {
+                const accountNameEl = whatsappInfoItem.querySelector('[data-field="whatsapp_account_name"]');
+                if (accountNameEl) {
+                    accountNameEl.textContent = conversation.whatsapp_account_name;
+                }
+                whatsappInfoItem.style.display = 'flex';
+            }
+            
+            if (whatsappPhoneItem && conversation.whatsapp_account_phone) {
+                const accountPhoneEl = whatsappPhoneItem.querySelector('[data-field="whatsapp_account_phone"]');
+                if (accountPhoneEl) {
+                    accountPhoneEl.textContent = conversation.whatsapp_account_phone;
+                }
+                whatsappPhoneItem.style.display = 'flex';
+            }
+        } else {
+            const channelText = {
+                'email': '✉️ Email',
+                'chat': '💬 Chat'
+            }[conversation.channel] || conversation.channel;
+            conversationChannelEl.textContent = channelText;
+            
+            // Ocultar informações WhatsApp se não for WhatsApp
+            const whatsappInfoItem = sidebar.querySelector('#sidebar-whatsapp-info');
+            const whatsappPhoneItem = sidebar.querySelector('#sidebar-whatsapp-phone');
+            if (whatsappInfoItem) whatsappInfoItem.style.display = 'none';
+            if (whatsappPhoneItem) whatsappPhoneItem.style.display = 'none';
+        }
     }
     
     // Atualizar setor
@@ -5557,6 +5594,13 @@ function sendMessage() {
     // O backend processa o quoted_message_id separadamente
     let finalMessage = message; // Texto que será enviado ao backend (apenas o digitado)
     
+    // Adicionar nome do agente em negrito se toggle estiver ativo
+    const agentNameToggle = document.getElementById('agentNameToggle');
+    if (agentNameToggle && agentNameToggle.classList.contains('active')) {
+        const agentName = '<?= htmlspecialchars(\App\Helpers\Auth::user()["name"] ?? "Agente", ENT_QUOTES) ?>';
+        finalMessage = `*${agentName}*\n\n${message}`;
+    }
+    
     // Para preview otimista, formatar com reply se houver
     let previewMessage = message;
     if (replyContext) {
@@ -7001,6 +7045,43 @@ function useTemplateQuick(templateId) {
         hideTemplateQuickSelect();
     });
 }
+
+// Toggle nome do agente
+function toggleAgentName() {
+    const toggle = document.getElementById('agentNameToggle');
+    const icon = document.getElementById('agentNameToggleIcon');
+    
+    if (toggle.classList.contains('active')) {
+        toggle.classList.remove('active');
+        toggle.classList.remove('btn-primary');
+        toggle.classList.add('btn-light-primary');
+        icon.classList.remove('text-primary');
+        localStorage.setItem('agentNameEnabled', 'false');
+    } else {
+        toggle.classList.add('active');
+        toggle.classList.remove('btn-light-primary');
+        toggle.classList.add('btn-primary');
+        icon.classList.add('text-primary');
+        localStorage.setItem('agentNameEnabled', 'true');
+    }
+}
+
+// Carregar estado inicial do toggle do nome do agente
+document.addEventListener('DOMContentLoaded', function() {
+    const defaultEnabled = <?= json_encode(\App\Services\SettingService::get('chat_agent_name_enabled', false)) ?>;
+    const savedState = localStorage.getItem('agentNameEnabled');
+    const isEnabled = savedState !== null ? savedState === 'true' : defaultEnabled;
+    
+    const toggle = document.getElementById('agentNameToggle');
+    const icon = document.getElementById('agentNameToggleIcon');
+    
+    if (isEnabled && toggle) {
+        toggle.classList.add('active');
+        toggle.classList.remove('btn-light-primary');
+        toggle.classList.add('btn-primary');
+        if (icon) icon.classList.add('text-primary');
+    }
+});
 
 // Modal de Variáveis
 function showVariablesModal() {

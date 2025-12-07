@@ -348,6 +348,9 @@ class SettingsController
         try {
             $data = Request::post();
             
+            // Salvar configuração de nome do agente no chat
+            SettingService::set('chat_agent_name_enabled', isset($data['chat_agent_name_enabled']), 'boolean', 'general');
+            
             // Processar dados do formulário e converter para estrutura esperada
             $settings = [
                 'global_limits' => [

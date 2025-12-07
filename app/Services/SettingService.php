@@ -77,6 +77,7 @@ class SettingService
             'auto_assign_conversations' => Setting::get('auto_assign_conversations', false),
             'conversation_timeout_minutes' => Setting::get('conversation_timeout_minutes', 30),
             'openai_api_key' => Setting::get('openai_api_key', ''),
+            'chat_agent_name_enabled' => Setting::get('chat_agent_name_enabled', false),
         ];
     }
 

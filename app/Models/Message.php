@@ -245,13 +245,20 @@ class Message extends Model
      */
     public static function getStatusUpdatesSince(?string $since = null): array
     {
-        $sql = "SELECT id, conversation_id, status, delivered_at, read_at, updated_at FROM messages";
+        // Tabela messages não tem updated_at, então vamos buscar por delivered_at ou read_at
+        $sql = "SELECT id, conversation_id, status, delivered_at, read_at, created_at 
+                FROM messages 
+                WHERE sender_type = 'agent'"; // Apenas mensagens enviadas por agentes (que podem ter status)
         $params = [];
+        
         if ($since) {
-            $sql .= " WHERE updated_at > ?";
+            // Buscar mensagens que foram entregues ou lidas após o timestamp
+            $sql .= " AND (delivered_at > ? OR read_at > ?)";
+            $params[] = $since;
             $params[] = $since;
         }
-        $sql .= " ORDER BY updated_at DESC LIMIT 200";
+        
+        $sql .= " ORDER BY created_at DESC LIMIT 200";
 
         return Database::fetchAll($sql, $params);
     }

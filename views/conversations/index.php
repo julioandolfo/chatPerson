@@ -2727,7 +2727,8 @@ function updateConversationListPreview(conversationId, lastMessage) {
         
         if (preview) {
             const content = lastMessage.content || '';
-            preview.textContent = content.substring(0, 60) + (content.length > 60 ? '...' : '');
+            const maxChars = 37;
+            preview.textContent = content.substring(0, maxChars) + (content.length > maxChars ? '...' : '');
         }
         if (time) {
             time.textContent = 'Agora';
@@ -7990,7 +7991,8 @@ if (typeof window.wsClient !== 'undefined') {
             
             if (preview) {
                 const content = data.message.content || '';
-                preview.textContent = content.substring(0, 60) + (content.length > 60 ? '...' : '');
+                const maxChars = 37;
+                preview.textContent = content.substring(0, maxChars) + (content.length > maxChars ? '...' : '');
             }
             if (time) time.textContent = 'Agora';
             

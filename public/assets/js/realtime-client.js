@@ -260,6 +260,7 @@ class RealtimeClient {
         }
 
         if (updates.message_status_updates) {
+            console.log('RealtimeClient: status updates recebidos (polling):', updates.message_status_updates);
             updates.message_status_updates.forEach(msu => {
                 this.emit('message_status_updated', {
                     conversation_id: msu.conversation_id,

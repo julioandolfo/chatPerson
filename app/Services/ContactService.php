@@ -393,8 +393,10 @@ class ContactService
             $token = $account['quepasa_token'] ?? $account['api_key'] ?? null;
             $instanceId = $account['instance_id'] ?? null;
 
+            \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - Debug conta ID={$account['id']}: api_url=" . ($apiUrl ?: 'VAZIO') . ", instance_id=" . ($instanceId ?: 'VAZIO') . ", token=" . ($token ? 'PRESENTE' : 'VAZIO'));
+
             if (empty($apiUrl) || empty($token) || empty($instanceId)) {
-                \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - dados insuficientes (apiUrl/instanceId/token) para contato {$contactId}");
+                \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - dados insuficientes para contato {$contactId}. Campos da conta: api_url=" . ($apiUrl ?: 'VAZIO') . ", instance_id=" . ($instanceId ?: 'VAZIO') . ", token=" . ($token ? 'PRESENTE' : 'VAZIO'));
                 return null;
             }
 

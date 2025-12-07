@@ -409,6 +409,7 @@ class ContactService
             }
 
             $url = "{$apiUrl}/instances/{$instanceId}/contacts/{$number}/photo";
+            \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - Requisitando avatar: url={$url}, contactId={$contactId}");
 
             $ch = curl_init($url);
             curl_setopt_array($ch, [
@@ -427,6 +428,8 @@ class ContactService
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
             curl_close($ch);
+
+            \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - Resposta: httpCode={$httpCode}, contentType={$contentType}");
 
             if ($httpCode !== 200 || empty($response)) {
                 return null;

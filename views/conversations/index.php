@@ -2715,6 +2715,9 @@ function updateConversationListPreview(conversationId, lastMessage) {
 }
 
 function selectConversation(id) {
+    // Atualizar conversa selecionada globalmente
+    currentConversationId = parseInt(id);
+
     // Marcar conversa como ativa na lista
     document.querySelectorAll('.conversation-item').forEach(item => {
         item.classList.remove('active');
@@ -5388,6 +5391,14 @@ function sendMessage() {
     
     // Obter conversationId da variável global atualizada ou do PHP
     let conversationId = window.currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+    // Fallback: tentar pegar da conversa ativa no DOM
+    if (!conversationId) {
+        const activeItem = document.querySelector('.conversation-item.active');
+        if (activeItem) {
+            conversationId = parseInt(activeItem.getAttribute('data-conversation-id'));
+            window.currentConversationId = conversationId;
+        }
+    }
     if (!conversationId) {
         console.error('Nenhuma conversa selecionada');
         alert('Por favor, selecione uma conversa primeiro');

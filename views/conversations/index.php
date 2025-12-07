@@ -8810,12 +8810,21 @@ if (!window.__realtimeGlobalNewConvListener) {
     window.__realtimeGlobalNewConvListener = true;
     window.addEventListener('realtime:new_conversation', (e) => {
         console.log('Nova conversa recebida (evento global):', e.detail);
+        
+        // Verificar se a conversa passa pelos filtros ativos antes de adicionar
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // Se há filtros ativos, não adicionar automaticamente (esperar próxima atualização de badges)
+        if (urlParams.toString().length > 0) {
+            console.log('Filtros ativos detectados. Conversa será adicionada apenas se passar pelos filtros no próximo refresh.');
+            return; // Não adicionar dinamicamente quando há filtros
+        }
+        
         try {
             addConversationToList(e.detail);
         } catch (err) {
             console.error('Erro ao adicionar nova conversa (evento global):', err);
             // Preservar filtros ao recarregar
-            const urlParams = new URLSearchParams(window.location.search);
             refreshConversationList(urlParams);
         }
     });
@@ -9008,6 +9017,26 @@ function refreshConversationBadges() {
     })
     .then(data => {
         if (data.success && data.conversations) {
+            // Obter IDs das conversas que devem estar na lista (segundo o filtro atual)
+            const validConversationIds = new Set(data.conversations.map(c => c.id));
+            
+            // Remover conversas que NÃO passam pelo filtro atual
+            const allConversationItems = document.querySelectorAll('.conversation-item[data-conversation-id]');
+            allConversationItems.forEach(item => {
+                const conversationId = parseInt(item.getAttribute('data-conversation-id'));
+                const currentConversationId = window.currentConversationId ?? parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+                
+                // Não remover a conversa atual
+                if (conversationId === currentConversationId) {
+                    return;
+                }
+                
+                // Se a conversa não está na lista válida, removê-la
+                if (!validConversationIds.has(conversationId)) {
+                    item.remove();
+                }
+            });
+            
             // Atualizar badges de não lidas em cada conversa da lista
             data.conversations.forEach(conv => {
                 const conversationItem = document.querySelector(`[data-conversation-id="${conv.id}"]`);

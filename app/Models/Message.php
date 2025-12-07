@@ -171,6 +171,14 @@ class Message extends Model
         // Log para debug (remover em produção se necessário)
         if ($affected > 0) {
             error_log("Marcadas {$affected} mensagens como lidas na conversa {$conversationId}");
+
+            // Invalidar cache de conversas para refletir unread_count atualizado
+            try {
+                \App\Services\ConversationService::invalidateCache($conversationId);
+            } catch (\Throwable $e) {
+                // Evitar quebra; apenas logar
+                error_log("Erro ao invalidar cache após marcar como lida: " . $e->getMessage());
+            }
         }
         
         return $affected > 0;

@@ -516,7 +516,18 @@ class WhatsAppService
                 
                 // Incluir mídia se houver
                 $hasMedia = false;
-                if (!empty($options['media_url'])) {
+                // Se tivermos base64, priorizar base64 e não enviar URL
+                if (!empty($options['media_base64'])) {
+                    $payload['media'] = [
+                        'base64' => $options['media_base64'],
+                        'type' => $options['media_type'] ?? 'document'
+                    ];
+                    if (!empty($options['media_mime'])) {
+                        $payload['media']['mimetype'] = $options['media_mime'];
+                    }
+                    $hasMedia = true;
+                } elseif (!empty($options['media_url'])) {
+                    // Caso não haja base64, usar URL
                     $payload['media'] = [
                         'url' => $options['media_url'],
                         'type' => $options['media_type'] ?? 'image'
@@ -526,18 +537,7 @@ class WhatsAppService
                     }
                     $hasMedia = true;
                 }
-                // Fallback: enviar em base64 se disponível (ajuda quando o servidor externo não consegue baixar a URL)
-                if (!empty($options['media_base64'])) {
-                    $payload['media'] = $payload['media'] ?? [];
-                    $payload['media']['base64'] = $options['media_base64'];
-                    if (empty($payload['media']['type'])) {
-                        $payload['media']['type'] = $options['media_type'] ?? 'document';
-                    }
-                    if (!empty($options['media_mime'])) {
-                        $payload['media']['mimetype'] = $options['media_mime'];
-                    }
-                    $hasMedia = true;
-                }
+
                 // Se não houver mídia nem texto (por segurança), garantir um espaço
                 if (!$hasMedia && empty($payload['text'])) {
                     $payload['text'] = ' ';

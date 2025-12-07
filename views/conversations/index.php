@@ -1296,7 +1296,7 @@ body.dark-mode .swal2-content {
                     ?>
                     <div class="conversation-item <?= $isActive ? 'active' : '' ?> <?= !empty($conv['pinned']) ? 'pinned' : '' ?>" 
                          data-conversation-id="<?= $conv['id'] ?>"
-                         data-onclick="selectConversation"
+                         data-onclick="selectConversation">
                         <div class="d-flex gap-3 w-100">
                             <!-- Avatar -->
                             <div class="symbol symbol-45px flex-shrink-0">
@@ -8526,26 +8526,25 @@ function useAIResponse(index, responseId = null) {
                        document.body.classList.contains('dark-mode') ||
                        window.matchMedia('(prefers-color-scheme: dark)').matches;
     
-    const tokensText = response.tokens_used
-        ? ' • ' + response.tokens_used.toLocaleString('pt-BR') + ' tokens'
-        : '';
-    const costText = response.cost
-        ? ' • R$ ' + response.cost.toFixed(4).replace('.', ',')
-        : '';
+    // Construir HTML de forma segura
+    const agentName = escapeHtml(response.agent_name || 'Assistente IA');
+    const responseText = escapeHtml(response.text || '');
+    const tokensText = response.tokens_used ? ' • ' + response.tokens_used.toLocaleString('pt-BR') + ' tokens' : '';
+    const costText = response.cost ? ' • R$ ' + response.cost.toFixed(4).replace('.', ',') : '';
+    
+    const htmlContent = '<div class="text-start">' +
+        '<div class="alert alert-info mb-4" style="white-space: pre-wrap; text-align: left;">' + responseText + '</div>' +
+        '<div class="text-muted fs-7">' +
+        '<i class="ki-duotone ki-abstract-26 fs-6 me-1">' +
+        '<span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span>' +
+        '</i>' +
+        agentName + tokensText + costText +
+        '</div>' +
+        '</div>';
     
     Swal.fire({
         title: 'Preview da Resposta',
-        html: `
-            <div class="text-start">
-                <div class="alert alert-info mb-4" style="white-space: pre-wrap; text-align: left;">${escapeHtml(response.text)}</div>
-                <div class="text-muted fs-7">
-                    <i class="ki-duotone ki-abstract-26 fs-6 me-1">
-                        <span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span>
-                    </i>
-                    ${escapeHtml(response.agent_name || 'Assistente IA')}${tokensText}${costText}
-                </div>
-            </div>
-        `,
+        html: htmlContent,
         icon: 'info',
         showCancelButton: true,
         confirmButtonText: 'Usar esta Resposta',

@@ -1367,7 +1367,7 @@ body.dark-mode .swal2-content {
                                     echo '-';
                                 }
                                 ?>
-                                <button type="button" class="btn btn-sm btn-icon btn-light p-0" 
+                                <button type="button" class="btn btn-sm btn-icon btn-light p-0 conversation-item-pin" 
                                         onclick="event.stopPropagation(); togglePin(<?= $conv['id'] ?>, <?= !empty($conv['pinned']) ? 'true' : 'false' ?>)" 
                                         title="<?= !empty($conv['pinned']) ? 'Desfixar' : 'Fixar' ?>">
                                     <i class="ki-duotone ki-pin fs-7 <?= !empty($conv['pinned']) ? 'text-warning' : 'text-muted' ?>">
@@ -2716,7 +2716,10 @@ function ensurePinButton(conversationItem, pinned, conversationId) {
     const timeContainer = conversationItem.querySelector('.conversation-item-time');
     if (!timeContainer) return;
 
-    let btn = timeContainer.querySelector('.conversation-item-pin');
+    // Primeiro, remover TODOS os botões de fixar existentes para evitar duplicação
+    const existingButtons = conversationItem.querySelectorAll('.conversation-item-pin');
+    existingButtons.forEach(btn => btn.remove());
+
     const iconClass = pinned ? 'text-warning' : 'text-muted';
     const title = pinned ? 'Desfixar' : 'Fixar';
 
@@ -2731,18 +2734,10 @@ function ensurePinButton(conversationItem, pinned, conversationId) {
         </button>
     `;
 
-    if (!btn) {
-        timeContainer.insertAdjacentHTML('beforeend', btnHtml);
-    } else {
-        btn.setAttribute('onclick', `event.stopPropagation(); togglePin(${conversationId}, ${pinned ? 'true' : 'false'})`);
-        btn.setAttribute('title', title);
-        const icon = btn.querySelector('i');
-        if (icon) {
-            icon.classList.remove('text-warning', 'text-muted');
-            icon.classList.add(iconClass);
-        }
-    }
+    // Sempre inserir um novo botão no local correto (dentro de timeContainer)
+    timeContainer.insertAdjacentHTML('beforeend', btnHtml);
 
+    // Atualizar classe do item
     if (pinned) {
         conversationItem.classList.add('pinned');
     } else {

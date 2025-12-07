@@ -27,10 +27,14 @@ class ConversationController
         $filters = [
             'status' => $_GET['status'] ?? null,
             'channel' => $_GET['channel'] ?? null,
+            'channels' => isset($_GET['channels']) && is_array($_GET['channels']) ? $_GET['channels'] : (!empty($_GET['channel']) ? [$_GET['channel']] : null),
             'search' => $_GET['search'] ?? null,
             'agent_id' => $_GET['agent_id'] ?? null,
             'department_id' => $_GET['department_id'] ?? null,
             'tag_id' => $_GET['tag_id'] ?? null,
+            'tag_ids' => isset($_GET['tag_ids']) && is_array($_GET['tag_ids']) ? array_map('intval', $_GET['tag_ids']) : (!empty($_GET['tag_id']) ? [(int)$_GET['tag_id']] : null),
+            'whatsapp_account_id' => $_GET['whatsapp_account_id'] ?? null,
+            'whatsapp_account_ids' => isset($_GET['whatsapp_account_ids']) && is_array($_GET['whatsapp_account_ids']) ? array_map('intval', $_GET['whatsapp_account_ids']) : (!empty($_GET['whatsapp_account_id']) ? [(int)$_GET['whatsapp_account_id']] : null),
             'unanswered' => isset($_GET['unanswered']) && $_GET['unanswered'] === '1' ? true : null,
             'answered' => isset($_GET['answered']) && $_GET['answered'] === '1' ? true : null,
             'date_from' => $_GET['date_from'] ?? null,
@@ -42,13 +46,17 @@ class ConversationController
             'offset' => $_GET['offset'] ?? 0
         ];
 
-        // Remover filtros vazios (exceto pinned que pode ser false)
+        // Remover filtros vazios (exceto pinned que pode ser false e arrays que podem estar vazios)
         $filters = array_filter($filters, function($value, $key) {
             if ($key === 'pinned') {
                 return $value !== null; // Manter pinned mesmo se for false
             }
             if ($key === 'search') {
                 return $value !== null && trim($value) !== ''; // Manter busca mesmo se tiver espaços
+            }
+            // Manter arrays mesmo se vazios (serão processados depois)
+            if (in_array($key, ['channels', 'tag_ids', 'whatsapp_account_ids']) && is_array($value)) {
+                return true; // Manter arrays para processamento
             }
             return $value !== null && $value !== '';
         }, ARRAY_FILTER_USE_BOTH);
@@ -87,6 +95,7 @@ class ConversationController
             $agents = User::getActiveAgents();
             $departments = \App\Models\Department::all();
             $tags = \App\Models\Tag::all();
+            $whatsappAccounts = \App\Models\WhatsAppAccount::getActive();
             
             // Se houver ID de conversa na URL, carregar para exibir no chat
             $selectedConversationId = $_GET['id'] ?? null;
@@ -116,6 +125,7 @@ class ConversationController
                 'agents' => $agents,
                 'departments' => $departments ?? [],
                 'tags' => $tags ?? [],
+                'whatsappAccounts' => $whatsappAccounts ?? [],
                 'filters' => $filters,
                 'selectedConversation' => $selectedConversation,
                 'selectedConversationId' => $selectedConversationId
@@ -792,6 +802,104 @@ class ConversationController
             }
             
             Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * Listar participantes de uma conversa
+     */
+    public function getParticipants(int $id): void
+    {
+        Permission::abortIfCannot('conversations.view.own');
+        
+        try {
+            $participants = \App\Models\ConversationParticipant::getByConversation($id);
+            
+            Response::json([
+                'success' => true,
+                'participants' => $participants
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Adicionar participante a uma conversa
+     */
+    public function addParticipant(int $id): void
+    {
+        Permission::abortIfCannot('conversations.edit.own');
+        
+        try {
+            $data = Request::post();
+            $userId = (int)($data['user_id'] ?? 0);
+            
+            if (!$userId) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'ID do usuário é obrigatório'
+                ], 400);
+                return;
+            }
+            
+            $addedBy = \App\Helpers\Auth::id();
+            $success = \App\Models\ConversationParticipant::addParticipant($id, $userId, $addedBy);
+            
+            if ($success) {
+                // Invalidar cache da conversa
+                ConversationService::invalidateCache($id);
+                
+                Response::json([
+                    'success' => true,
+                    'message' => 'Participante adicionado com sucesso'
+                ]);
+            } else {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro ao adicionar participante'
+                ], 400);
+            }
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Remover participante de uma conversa
+     */
+    public function removeParticipant(int $id, int $userId): void
+    {
+        Permission::abortIfCannot('conversations.edit.own');
+        
+        try {
+            $success = \App\Models\ConversationParticipant::removeParticipant($id, $userId);
+            
+            if ($success) {
+                // Invalidar cache da conversa
+                ConversationService::invalidateCache($id);
+                
+                Response::json([
+                    'success' => true,
+                    'message' => 'Participante removido com sucesso'
+                ]);
+            } else {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro ao remover participante'
+                ], 400);
+            }
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
         }
     }
 }

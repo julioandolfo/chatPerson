@@ -2435,6 +2435,38 @@ body.dark-mode .swal2-content {
     </div>
 </div>
 
+<!-- MODAL: Adicionar Participante -->
+<div class="modal fade" id="kt_modal_add_participant" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-500px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Adicionar Participante</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="mb-5">
+                    <label class="form-label fw-semibold">Selecione o usuário:</label>
+                    <select id="participant_user_select" class="form-select form-select-solid">
+                        <option value="">Selecione um usuário...</option>
+                        <?php foreach ($agents ?? [] as $agent): ?>
+                            <option value="<?= $agent['id'] ?>"><?= htmlspecialchars($agent['name']) ?> (<?= htmlspecialchars($agent['email']) ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="d-flex justify-content-end">
+                    <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="addParticipantToConversation()">Adicionar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: Filtros Avançados -->
 <div class="modal fade" id="kt_modal_advanced_filters" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered mw-700px">
@@ -2448,8 +2480,74 @@ body.dark-mode .swal2-content {
                     </i>
                 </div>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
                 <form id="advancedFiltersForm">
+                    <!-- Canais (Multi-select) -->
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold mb-2">Canais:</label>
+                        <div class="border rounded p-3" style="max-height: 120px; overflow-y: auto; background: var(--bs-gray-100);">
+                            <label class="form-check form-check-custom form-check-solid mb-2">
+                                <input class="form-check-input" type="checkbox" name="channels[]" value="whatsapp" id="filter_channel_whatsapp" <?= (is_array($filters['channels'] ?? []) && in_array('whatsapp', $filters['channels'])) || ($filters['channel'] ?? '') === 'whatsapp' ? 'checked' : '' ?>>
+                                <span class="form-check-label">📱 WhatsApp</span>
+                            </label>
+                            <label class="form-check form-check-custom form-check-solid mb-2">
+                                <input class="form-check-input" type="checkbox" name="channels[]" value="email" id="filter_channel_email" <?= (is_array($filters['channels'] ?? []) && in_array('email', $filters['channels'])) || ($filters['channel'] ?? '') === 'email' ? 'checked' : '' ?>>
+                                <span class="form-check-label">✉️ Email</span>
+                            </label>
+                            <label class="form-check form-check-custom form-check-solid">
+                                <input class="form-check-input" type="checkbox" name="channels[]" value="chat" id="filter_channel_chat" <?= (is_array($filters['channels'] ?? []) && in_array('chat', $filters['channels'])) || ($filters['channel'] ?? '') === 'chat' ? 'checked' : '' ?>>
+                                <span class="form-check-label">💬 Chat</span>
+                            </label>
+                        </div>
+                        <div class="form-text">Selecione um ou mais canais</div>
+                    </div>
+                    
+                    <!-- Integrações WhatsApp (mostrar apenas se WhatsApp selecionado) -->
+                    <div class="mb-5" id="whatsapp_accounts_filter" style="display: none;">
+                        <label class="form-label fw-semibold mb-2">Integrações WhatsApp:</label>
+                        <div class="border rounded p-3" style="max-height: 150px; overflow-y: auto; background: var(--bs-gray-100);">
+                            <?php 
+                            $whatsappAccounts = \App\Models\WhatsAppAccount::getActive();
+                            $selectedAccounts = is_array($filters['whatsapp_account_ids'] ?? []) ? $filters['whatsapp_account_ids'] : (!empty($filters['whatsapp_account_id']) ? [$filters['whatsapp_account_id']] : []);
+                            if (empty($whatsappAccounts)): ?>
+                                <div class="text-muted fs-7">Nenhuma integração WhatsApp cadastrada</div>
+                            <?php else: ?>
+                                <?php foreach ($whatsappAccounts as $account): ?>
+                                    <label class="form-check form-check-custom form-check-solid mb-2">
+                                        <input class="form-check-input" type="checkbox" name="whatsapp_account_ids[]" value="<?= $account['id'] ?>" <?= in_array($account['id'], $selectedAccounts) ? 'checked' : '' ?>>
+                                        <span class="form-check-label">
+                                            <?= htmlspecialchars($account['name']) ?> 
+                                            <span class="text-muted fs-7">(<?= htmlspecialchars($account['phone_number']) ?>)</span>
+                                        </span>
+                                    </label>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </div>
+                        <div class="form-text">Filtrar por número/integração específica do WhatsApp</div>
+                    </div>
+                    
+                    <!-- Tags (Multi-select) -->
+                    <?php if (!empty($tags)): ?>
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold mb-2">Tags:</label>
+                        <div class="border rounded p-3" style="max-height: 200px; overflow-y: auto; background: var(--bs-gray-100);">
+                            <?php 
+                            $selectedTags = is_array($filters['tag_ids'] ?? []) ? $filters['tag_ids'] : (!empty($filters['tag_id']) ? [$filters['tag_id']] : []);
+                            foreach ($tags as $tag): ?>
+                                <label class="form-check form-check-custom form-check-solid mb-2">
+                                    <input class="form-check-input" type="checkbox" name="tag_ids[]" value="<?= $tag['id'] ?>" <?= in_array($tag['id'], $selectedTags) ? 'checked' : '' ?>>
+                                    <span class="form-check-label">
+                                        <span class="badge badge-sm" style="background-color: <?= htmlspecialchars($tag['color'] ?? '#009ef7') ?>20; color: <?= htmlspecialchars($tag['color'] ?? '#009ef7') ?>;">
+                                            <?= htmlspecialchars($tag['name']) ?>
+                                        </span>
+                                    </span>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
+                        <div class="form-text">Selecione uma ou mais tags</div>
+                    </div>
+                    <?php endif; ?>
+                    
                     <!-- Status de Resposta -->
                     <div class="mb-5">
                         <label class="form-label fw-semibold">Status de Resposta:</label>
@@ -3636,6 +3734,12 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('conversationSidebar')?.classList.add('open');
     }
     
+    // Listener para checkboxes de canais no modal de filtros avançados
+    const channelCheckboxes = document.querySelectorAll('input[name="channels[]"]');
+    channelCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateWhatsAppAccountsFilter);
+    });
+    
     // Inicializar seletor rápido de templates
     initTemplateQuickSelect();
     
@@ -4128,6 +4232,23 @@ function formatTime(dateString) {
 function openAdvancedFilters() {
     const modal = new bootstrap.Modal(document.getElementById('kt_modal_advanced_filters'));
     modal.show();
+    
+    // Verificar se WhatsApp está selecionado e mostrar/ocultar filtro de integrações
+    updateWhatsAppAccountsFilter();
+}
+
+// Atualizar visibilidade do filtro de integrações WhatsApp
+function updateWhatsAppAccountsFilter() {
+    const whatsappCheckbox = document.getElementById('filter_channel_whatsapp');
+    const whatsappFilter = document.getElementById('whatsapp_accounts_filter');
+    
+    if (whatsappCheckbox && whatsappFilter) {
+        if (whatsappCheckbox.checked) {
+            whatsappFilter.style.display = 'block';
+        } else {
+            whatsappFilter.style.display = 'none';
+        }
+    }
 }
 
 function applyAdvancedFilters() {
@@ -4139,15 +4260,29 @@ function applyAdvancedFilters() {
     // Filtros básicos (manter)
     const search = document.getElementById('kt_conversations_search')?.value || '';
     const status = document.getElementById('filter_status')?.value || '';
-    const channel = document.getElementById('filter_channel')?.value || '';
     const department = document.getElementById('filter_department')?.value || '';
-    const tag = document.getElementById('filter_tag')?.value || '';
     
     if (search) params.append('search', search);
     if (status) params.append('status', status);
-    if (channel) params.append('channel', channel);
     if (department) params.append('department_id', department);
-    if (tag) params.append('tag_id', tag);
+    
+    // Canais (multi-select)
+    const channels = formData.getAll('channels[]');
+    if (channels.length > 0) {
+        channels.forEach(ch => params.append('channels[]', ch));
+    }
+    
+    // Tags (multi-select)
+    const tagIds = formData.getAll('tag_ids[]');
+    if (tagIds.length > 0) {
+        tagIds.forEach(tagId => params.append('tag_ids[]', tagId));
+    }
+    
+    // Integrações WhatsApp (multi-select)
+    const whatsappAccountIds = formData.getAll('whatsapp_account_ids[]');
+    if (whatsappAccountIds.length > 0) {
+        whatsappAccountIds.forEach(accId => params.append('whatsapp_account_ids[]', accId));
+    }
     
     // Filtros avançados
     const responseStatus = formData.get('response_status');

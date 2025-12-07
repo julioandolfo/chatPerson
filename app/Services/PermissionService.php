@@ -193,6 +193,26 @@ class PermissionService
             return true;
         }
 
+        // Verificar se é participante da conversa
+        if (isset($conversation['participants_data']) && !empty($conversation['participants_data'])) {
+            $participants = explode('|||', $conversation['participants_data']);
+            foreach ($participants as $participant) {
+                if (!empty($participant)) {
+                    $parts = explode(':', $participant);
+                    if (isset($parts[0]) && (int)$parts[0] === $userId) {
+                        return true; // Usuário é participante
+                    }
+                }
+            }
+        }
+        
+        // Verificar também via tabela de participantes (fallback)
+        if (class_exists('\App\Models\ConversationParticipant')) {
+            if (\App\Models\ConversationParticipant::isParticipant($conversation['id'], $userId)) {
+                return true;
+            }
+        }
+
         // Verificar se é própria conversa
         if (isset($conversation['agent_id']) && $conversation['agent_id'] == $userId) {
             return self::hasPermission($userId, 'conversations.view.own');

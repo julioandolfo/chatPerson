@@ -60,6 +60,9 @@ Router::post('/conversations/{id}/pin', [ConversationController::class, 'pin'], 
 Router::post('/conversations/{id}/unpin', [ConversationController::class, 'unpin'], ['Authentication']);
 Router::get('/conversations/{id}/search-messages', [ConversationController::class, 'searchMessages'], ['Authentication']);
 Router::get('/conversations/{id}/messages', [ConversationController::class, 'getMessages'], ['Authentication']);
+Router::get('/conversations/{id}/participants', [ConversationController::class, 'getParticipants'], ['Authentication']);
+Router::post('/conversations/{id}/participants', [ConversationController::class, 'addParticipant'], ['Authentication']);
+Router::delete('/conversations/{id}/participants/{userId}', [ConversationController::class, 'removeParticipant'], ['Authentication']);
 
 // Rotas de Busca Global
 Router::get('/search/global', [SearchController::class, 'global'], ['Authentication']);

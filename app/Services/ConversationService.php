@@ -169,9 +169,26 @@ class ConversationService
             throw $e;
         }
         
-        // Filtrar por permissões
+        // Filtrar por permissões e participantes
         $filtered = [];
+        $participantConversationIds = [];
+        
+        // Obter IDs de conversas onde o usuário é participante
+        if (class_exists('\App\Models\ConversationParticipant')) {
+            $participantConversationIds = \App\Models\ConversationParticipant::getConversationsByParticipant($userId);
+        }
+        
         foreach ($conversations as $conversation) {
+            // Verificar se é participante
+            $isParticipant = in_array($conversation['id'], $participantConversationIds);
+            
+            // Se for participante, sempre pode ver
+            if ($isParticipant) {
+                $filtered[] = $conversation;
+                continue;
+            }
+            
+            // Caso contrário, verificar permissões normais
             if (\App\Services\PermissionService::canViewConversation($userId, $conversation)) {
                 $filtered[] = $conversation;
             }

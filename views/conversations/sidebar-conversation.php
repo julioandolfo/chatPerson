@@ -177,6 +177,26 @@
                 
                 <div class="separator my-5"></div>
                 
+                <!-- Participantes -->
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">Participantes</div>
+                    
+                    <div class="participants-list d-flex flex-wrap gap-2 mb-3" id="participants-list">
+                        <div class="text-muted fs-7">Carregando...</div>
+                    </div>
+                    
+                    <button class="btn btn-sm btn-light-primary w-100" id="sidebar-add-participant-btn" style="display: none;" onclick="showAddParticipantModal()">
+                        <i class="ki-duotone ki-plus fs-5">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        Adicionar Participante
+                    </button>
+                </div>
+                
+                <div class="separator my-5"></div>
+                
                 <!-- Tags -->
                 <div class="sidebar-section">
                     <div class="sidebar-section-title">Tags</div>

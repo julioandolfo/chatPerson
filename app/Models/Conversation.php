@@ -63,6 +63,7 @@ class Conversation extends Model
                        (SELECT content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message,
                        (SELECT created_at FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message_at,
                        GROUP_CONCAT(DISTINCT CONCAT(t.id, ':', t.name, ':', COALESCE(t.color, '#009ef7')) SEPARATOR '|||') as tags_data,
+                       GROUP_CONCAT(DISTINCT CONCAT(cp.user_id, ':', cp_user.name) SEPARATOR '|||') as participants_data,
                        COALESCE(c.pinned, 0) as pinned,
                        c.pinned_at
                 FROM conversations c
@@ -71,6 +72,8 @@ class Conversation extends Model
                 LEFT JOIN whatsapp_accounts wa ON c.whatsapp_account_id = wa.id
                 LEFT JOIN conversation_tags ctt ON c.id = ctt.conversation_id
                 LEFT JOIN tags t ON ctt.tag_id = t.id
+                LEFT JOIN conversation_participants cp ON c.id = cp.conversation_id AND cp.removed_at IS NULL
+                LEFT JOIN users cp_user ON cp.user_id = cp_user.id
                 WHERE 1=1";
         
         $params = [];
@@ -81,7 +84,12 @@ class Conversation extends Model
             $params[] = $filters['status'];
         }
         
-        if (!empty($filters['channel'])) {
+        // Filtro por canal (suporta array para multi-select)
+        if (!empty($filters['channels']) && is_array($filters['channels'])) {
+            $placeholders = implode(',', array_fill(0, count($filters['channels']), '?'));
+            $sql .= " AND c.channel IN ($placeholders)";
+            $params = array_merge($params, $filters['channels']);
+        } elseif (!empty($filters['channel'])) {
             $sql .= " AND c.channel = ?";
             $params[] = $filters['channel'];
         }
@@ -96,9 +104,24 @@ class Conversation extends Model
             $params[] = $filters['department_id'];
         }
         
-        if (!empty($filters['tag_id'])) {
+        // Filtro por tags (suporta array para multi-select)
+        if (!empty($filters['tag_ids']) && is_array($filters['tag_ids'])) {
+            $placeholders = implode(',', array_fill(0, count($filters['tag_ids']), '?'));
+            $sql .= " AND EXISTS (SELECT 1 FROM conversation_tags ctt2 WHERE ctt2.conversation_id = c.id AND ctt2.tag_id IN ($placeholders))";
+            $params = array_merge($params, $filters['tag_ids']);
+        } elseif (!empty($filters['tag_id'])) {
             $sql .= " AND EXISTS (SELECT 1 FROM conversation_tags ctt2 WHERE ctt2.conversation_id = c.id AND ctt2.tag_id = ?)";
             $params[] = $filters['tag_id'];
+        }
+        
+        // Filtro por conta WhatsApp (suporta array para multi-select)
+        if (!empty($filters['whatsapp_account_ids']) && is_array($filters['whatsapp_account_ids'])) {
+            $placeholders = implode(',', array_fill(0, count($filters['whatsapp_account_ids']), '?'));
+            $sql .= " AND c.whatsapp_account_id IN ($placeholders)";
+            $params = array_merge($params, $filters['whatsapp_account_ids']);
+        } elseif (!empty($filters['whatsapp_account_id'])) {
+            $sql .= " AND c.whatsapp_account_id = ?";
+            $params[] = $filters['whatsapp_account_id'];
         }
         
         // Busca avançada (nome, telefone, email E mensagens)

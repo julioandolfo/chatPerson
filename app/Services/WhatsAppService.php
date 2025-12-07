@@ -508,6 +508,11 @@ class WhatsAppService
                         'url' => $options['media_url'],
                         'type' => $options['media_type'] ?? 'image'
                     ];
+                    
+                    // Se houver caption/legenda, adicionar ao payload
+                    if (!empty($options['caption'])) {
+                        $payload['text'] = $options['caption'];
+                    }
                 }
                 
                 Logger::quepasa("sendMessage - Iniciando envio");

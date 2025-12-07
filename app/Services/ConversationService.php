@@ -820,12 +820,32 @@ class ConversationService
                 // Obter contato para pegar o telefone
                 $contact = \App\Models\Contact::find($conversation['contact_id']);
                 if ($contact && !empty($contact['phone'])) {
+                    // Preparar opções para envio
+                    $options = [];
+                    
+                    // Se houver anexo (imagem, vídeo, áudio, documento), enviar via mídia
+                    if (!empty($attachmentsData)) {
+                        $firstAttachment = $attachmentsData[0];
+                        
+                        // Construir URL pública do anexo
+                        $baseUrl = rtrim(\App\Helpers\Url::to('/'), '/');
+                        $attachmentUrl = $baseUrl . '/' . ltrim($firstAttachment['path'], '/');
+                        
+                        $options['media_url'] = $attachmentUrl;
+                        $options['media_type'] = $firstAttachment['type'] ?? 'document';
+                        
+                        // Para Quepasa, se for imagem/vídeo/áudio e houver legenda, usar content como caption
+                        if (!empty($content)) {
+                            $options['caption'] = $content;
+                        }
+                    }
+                    
                     // Enviar mensagem via WhatsApp
                     $whatsappResult = \App\Services\WhatsAppService::sendMessage(
                         $conversation['whatsapp_account_id'],
                         $contact['phone'],
                         $content,
-                        []
+                        $options
                     );
                     
                     // Atualizar status e external_id da mensagem

@@ -2435,12 +2435,12 @@ body.dark-mode .swal2-content {
     </div>
 </div>
 
-<!-- MODAL: Adicionar Participante -->
-<div class="modal fade" id="kt_modal_add_participant" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered mw-500px">
+<!-- MODAL: Gerenciar Participantes -->
+<div class="modal fade" id="kt_modal_participants" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-650px">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="fw-bold">Adicionar Participante</h2>
+                <h2 class="fw-bold">Gerenciar Participantes</h2>
                 <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
                     <i class="ki-duotone ki-cross fs-1">
                         <span class="path1"></span>
@@ -2449,18 +2449,21 @@ body.dark-mode .swal2-content {
                 </div>
             </div>
             <div class="modal-body">
+                <div class="mb-5" id="currentParticipants">
+                    <!-- Participantes atuais serão inseridos aqui -->
+                </div>
+                <div class="separator my-5"></div>
                 <div class="mb-5">
-                    <label class="form-label fw-semibold">Selecione o usuário:</label>
-                    <select id="participant_user_select" class="form-select form-select-solid">
-                        <option value="">Selecione um usuário...</option>
-                        <?php foreach ($agents ?? [] as $agent): ?>
-                            <option value="<?= $agent['id'] ?>"><?= htmlspecialchars($agent['name']) ?> (<?= htmlspecialchars($agent['email']) ?>)</option>
-                        <?php endforeach; ?>
-                    </select>
+                    <label class="form-label fw-semibold mb-2">Adicionar Participante:</label>
+                    <div class="d-flex gap-2">
+                        <select id="participantUserSelect" class="form-select form-select-solid flex-grow-1">
+                            <option value="">Selecione um usuário...</option>
+                        </select>
+                        <button type="button" class="btn btn-primary" id="addParticipantBtn" onclick="addParticipant()">Adicionar</button>
+                    </div>
                 </div>
                 <div class="d-flex justify-content-end">
-                    <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-primary" onclick="addParticipantToConversation()">Adicionar</button>
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
                 </div>
             </div>
         </div>
@@ -3466,6 +3469,71 @@ function updateConversationSidebar(conversation, tags) {
         createdAtEl.textContent = formattedDate;
     }
     
+    // Atualizar participantes
+    const participantsContainer = sidebar.querySelector('#participants-list');
+    const addParticipantBtn = sidebar.querySelector('#sidebar-add-participant-btn');
+    if (participantsContainer && conversation.id) {
+        // Mostrar loading
+        participantsContainer.innerHTML = '<div class="text-muted fs-7">Carregando...</div>';
+        
+        // Buscar participantes via AJAX
+        fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversation.id}/participants`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Erro ao carregar participantes');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success && data.participants) {
+                if (data.participants.length > 0) {
+                    participantsContainer.innerHTML = data.participants.map(p => {
+                        const initials = (p.user_name || 'U').charAt(0).toUpperCase();
+                        return `
+                            <div class="d-flex align-items-center gap-2 p-2 border rounded mb-2" style="background: var(--bs-gray-100);">
+                                <div class="symbol symbol-30px symbol-circle">
+                                    <div class="symbol-label bg-light-primary text-primary fw-bold fs-7">
+                                        ${initials}
+                                    </div>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold fs-7">${escapeHtml(p.user_name || 'Usuário')}</div>
+                                    ${p.user_email ? `<div class="text-muted fs-8">${escapeHtml(p.user_email)}</div>` : ''}
+                                </div>
+                                <button type="button" class="btn btn-sm btn-icon btn-light-danger p-0" 
+                                        onclick="removeParticipant(${conversation.id}, ${p.user_id})" 
+                                        title="Remover participante">
+                                    <i class="ki-duotone ki-cross fs-7">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                </button>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    participantsContainer.innerHTML = '<div class="text-muted fs-7">Nenhum participante adicional</div>';
+                }
+                
+                if (addParticipantBtn) {
+                    addParticipantBtn.style.display = 'block';
+                    addParticipantBtn.setAttribute('onclick', `showAddParticipantModal(${conversation.id})`);
+                }
+            } else {
+                participantsContainer.innerHTML = '<div class="text-muted fs-7">Erro ao carregar participantes</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar participantes:', error);
+            participantsContainer.innerHTML = '<div class="text-muted fs-7">Erro ao carregar participantes</div>';
+        });
+    }
+    
     // Atualizar tags
     const tagsContainer = sidebar.querySelector('.conversation-tags-list');
     if (tagsContainer) {
@@ -3828,8 +3896,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         loadConversationDetails(currentConversationId);
                     }
                     
-                    // Recarregar lista de conversas
-                    refreshConversationList();
+                    // Recarregar lista de conversas (preservando filtros)
+                    const urlParams = new URLSearchParams(window.location.search);
+                    refreshConversationList(urlParams);
                 } else {
                     throw new Error(data.message || 'Erro ao escalar conversa');
                 }
@@ -4005,8 +4074,17 @@ function applyFilters() {
     if (department) params.append('department_id', department);
     if (tag) params.append('tag_id', tag);
     
-    // Manter filtros avançados da URL e preservar ID da conversa selecionada
+    // Manter filtros avançados da URL (incluindo arrays multi-select)
     const urlParams = new URLSearchParams(window.location.search);
+    
+    // Preservar filtros multi-select (arrays)
+    ['channels[]', 'tag_ids[]', 'whatsapp_account_ids[]'].forEach(key => {
+        urlParams.getAll(key).forEach(value => {
+            params.append(key, value);
+        });
+    });
+    
+    // Preservar filtros avançados simples
     ['unanswered', 'answered', 'date_from', 'date_to', 'pinned', 'order_by', 'order_dir'].forEach(key => {
         if (urlParams.has(key)) {
             params.append(key, urlParams.get(key));
@@ -4035,6 +4113,11 @@ function refreshConversationList(params = null) {
         return;
     }
     
+    // Se params não foi fornecido, usar filtros da URL atual preservando TODOS os parâmetros
+    if (!params) {
+        params = new URLSearchParams(window.location.search);
+    }
+    
     // Mostrar loading
     const originalContent = conversationsList.innerHTML;
     conversationsList.innerHTML = `
@@ -4046,16 +4129,25 @@ function refreshConversationList(params = null) {
         </div>
     `;
     
-    // Construir URL
+    // Construir URL preservando TODOS os filtros
     let url = '<?= \App\Helpers\Url::to('/conversations') ?>';
-    if (params) {
+    
+    // Se params é URLSearchParams, converter para string
+    if (params instanceof URLSearchParams) {
+        const paramsString = params.toString();
+        if (paramsString) {
+            url += '?' + paramsString;
+        }
+    } else if (params && typeof params === 'string') {
+        url += '?' + params;
+    } else if (params) {
         url += '?' + params.toString();
     } else {
         // Usar parâmetros da URL atual
         url += window.location.search;
     }
     
-    // Adicionar header para retornar JSON
+    // Adicionar header para retornar JSON (sem sobrescrever filtros existentes)
     url += (url.includes('?') ? '&' : '?') + 'format=json';
     
     console.log('Buscando conversas na URL:', url);
@@ -8003,6 +8095,178 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// Modal de Participantes
+function showAddParticipantModal(conversationId) {
+    const modal = new bootstrap.Modal(document.getElementById('kt_modal_participants'));
+    modal.show();
+    
+    // Salvar ID da conversa
+    document.getElementById('kt_modal_participants').dataset.conversationId = conversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+    
+    // Carregar participantes e usuários disponíveis
+    loadParticipantsForConversation();
+}
+
+function loadParticipantsForConversation() {
+    const conversationId = document.getElementById('kt_modal_participants').dataset.conversationId;
+    
+    // Carregar participantes atuais
+    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/participants`)
+        .then(response => response.json())
+        .then(data => {
+            const currentParticipantsDiv = document.getElementById('currentParticipants');
+            
+            if (data.success && data.participants && data.participants.length > 0) {
+                let html = '<div class="w-100 mb-3"><strong>Participantes Atuais:</strong></div>';
+                data.participants.forEach(p => {
+                    const initials = (p.user_name || 'U').charAt(0).toUpperCase();
+                    html += `
+                        <div class="d-flex align-items-center gap-2 p-2 border rounded mb-2" style="background: var(--bs-gray-100);">
+                            <div class="symbol symbol-30px symbol-circle">
+                                <div class="symbol-label bg-light-primary text-primary fw-bold fs-7">
+                                    ${initials}
+                                </div>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold fs-7">${escapeHtml(p.user_name || 'Usuário')}</div>
+                                ${p.user_email ? `<div class="text-muted fs-8">${escapeHtml(p.user_email)}</div>` : ''}
+                            </div>
+                            <button type="button" class="btn btn-sm btn-icon btn-light-danger p-0" 
+                                    onclick="removeParticipant(${conversationId}, ${p.user_id})" 
+                                    title="Remover participante">
+                                <i class="ki-duotone ki-cross fs-7">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                            </button>
+                        </div>
+                    `;
+                });
+                currentParticipantsDiv.innerHTML = html;
+            } else {
+                currentParticipantsDiv.innerHTML = '<div class="w-100 text-muted">Nenhum participante adicional</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar participantes:', error);
+            const currentParticipantsDiv = document.getElementById('currentParticipants');
+            if (currentParticipantsDiv) {
+                currentParticipantsDiv.innerHTML = '<div class="text-danger">Erro ao carregar participantes</div>';
+            }
+        });
+    
+    // Carregar usuários disponíveis (agentes)
+    fetch('<?= \App\Helpers\Url::to("/agents") ?>?format=json', {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById('participantUserSelect');
+            
+            if (!data.success || !data.agents || data.agents.length === 0) {
+                if (select) {
+                    select.innerHTML = '<option value="">Nenhum usuário disponível</option>';
+                }
+                return;
+            }
+            
+            if (select) {
+                select.innerHTML = '<option value="">Selecione um usuário...</option>';
+                data.agents.forEach(user => {
+                    select.innerHTML += `<option value="${user.id}">${escapeHtml(user.name || user.email || 'Usuário')} ${user.email ? `(${escapeHtml(user.email)})` : ''}</option>`;
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar usuários:', error);
+            const select = document.getElementById('participantUserSelect');
+            if (select) {
+                select.innerHTML = '<option value="">Erro ao carregar usuários</option>';
+            }
+        });
+}
+
+function removeParticipant(conversationId, userId) {
+    if (!confirm('Tem certeza que deseja remover este participante?')) {
+        return;
+    }
+    
+    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/participants/${userId}`, {
+        method: 'DELETE',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Recarregar participantes
+            loadParticipantsForConversation();
+            // Atualizar sidebar se estiver aberto
+            if (window.currentConversationId == conversationId) {
+                updateConversationSidebar(window.currentConversation);
+            }
+        } else {
+            alert('Erro ao remover participante: ' + (data.message || 'Erro desconhecido'));
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao remover participante:', error);
+        alert('Erro ao remover participante');
+    });
+}
+
+function addParticipant() {
+    const conversationId = document.getElementById('kt_modal_participants').dataset.conversationId;
+    const userId = document.getElementById('participantUserSelect').value;
+    
+    if (!userId) {
+        alert('Por favor, selecione um usuário');
+        return;
+    }
+    
+    const btn = document.getElementById('addParticipantBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Adicionando...';
+    
+    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/participants`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({ user_id: userId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Limpar select
+            document.getElementById('participantUserSelect').value = '';
+            // Recarregar participantes
+            loadParticipantsForConversation();
+            // Atualizar sidebar se estiver aberto
+            if (window.currentConversationId == conversationId) {
+                updateConversationSidebar(window.currentConversation);
+            }
+        } else {
+            alert('Erro ao adicionar participante: ' + (data.message || 'Erro desconhecido'));
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao adicionar participante:', error);
+        alert('Erro ao adicionar participante');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = 'Adicionar';
+    });
+}
+
 // Upload de arquivo
 function attachFile() {
     const input = document.createElement('input');
@@ -8372,9 +8636,10 @@ if (typeof window.wsClient !== 'undefined') {
                 list.insertBefore(conversationItem, list.firstChild);
             }
         } else {
-            // Se não existe na lista, fazer refresh para forçar render
+            // Se não existe na lista, fazer refresh para forçar render (preservando filtros)
             console.log('new_message: conversa não encontrada na lista, atualizando lista');
-            refreshConversationList();
+            const urlParams = new URLSearchParams(window.location.search);
+            refreshConversationList(urlParams);
         }
         
         // Se é a conversa atual, adicionar mensagem dinamicamente
@@ -8442,8 +8707,9 @@ if (typeof window.wsClient !== 'undefined') {
             }
         } catch (err) {
             console.error('Erro ao adicionar nova conversa na lista:', err);
-            // Fallback: recarregar lista por AJAX
-            refreshConversationList();
+            // Fallback: recarregar lista por AJAX (preservando filtros)
+            const urlParams = new URLSearchParams(window.location.search);
+            refreshConversationList(urlParams);
         }
     });
     
@@ -8548,7 +8814,9 @@ if (!window.__realtimeGlobalNewConvListener) {
             addConversationToList(e.detail);
         } catch (err) {
             console.error('Erro ao adicionar nova conversa (evento global):', err);
-            refreshConversationList();
+            // Preservar filtros ao recarregar
+            const urlParams = new URLSearchParams(window.location.search);
+            refreshConversationList(urlParams);
         }
     });
 }
@@ -8681,8 +8949,25 @@ function addConversationToList(conv) {
  * Atualizar badges de não lidas nas conversas da lista (sem recarregar toda a lista)
  */
 function refreshConversationBadges() {
-    // Buscar lista atualizada de conversas
+    // Buscar lista atualizada de conversas - PRESERVAR TODOS OS FILTROS DA URL
     const urlParams = new URLSearchParams(window.location.search);
+    
+    // Criar params preservando TODOS os filtros da URL atual
+    const params = new URLSearchParams();
+    
+    // Preservar todos os parâmetros da URL atual (incluindo arrays)
+    urlParams.forEach((value, key) => {
+        // Para arrays (channels[], tag_ids[], whatsapp_account_ids[]), adicionar cada valor
+        if (key.endsWith('[]')) {
+            // Se já existe, adicionar mais um valor
+            params.append(key, value);
+        } else {
+            // Parâmetros simples
+            params.set(key, value);
+        }
+    });
+    
+    // Garantir que filtros básicos também sejam preservados se não estiverem na URL
     const filters = {
         status: urlParams.get('status') || '',
         channel: urlParams.get('channel') || '',
@@ -8698,12 +8983,15 @@ function refreshConversationBadges() {
         order_dir: urlParams.get('order_dir') || ''
     };
     
-    const params = new URLSearchParams();
+    // Adicionar filtros básicos apenas se não estiverem já nos params
     Object.keys(filters).forEach(key => {
-        if (filters[key]) {
+        if (filters[key] && !params.has(key)) {
             params.append(key, filters[key]);
         }
     });
+    
+    // Adicionar format=json aos params
+    params.append('format', 'json');
     
     fetch(`<?= \App\Helpers\Url::to('/conversations') ?>?${params.toString()}`, {
         headers: {

@@ -812,17 +812,23 @@ class ConversationController
     {
         Permission::abortIfCannot('conversations.view.own');
         
+        // Limpar output buffer para garantir resposta JSON limpa
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
         try {
             $participants = \App\Models\ConversationParticipant::getByConversation($id);
             
             Response::json([
                 'success' => true,
-                'participants' => $participants
+                'participants' => $participants ?: []
             ]);
         } catch (\Exception $e) {
             Response::json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
+                'participants' => []
             ], 400);
         }
     }

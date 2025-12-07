@@ -2750,9 +2750,9 @@ function selectConversation(id) {
             setupInfiniteScroll();
             
             // Inscrever no WebSocket para esta conversa
-            if (typeof window.wsClient !== 'undefined' && window.wsClient.connected) {
+            if (typeof window.wsClient !== 'undefined' && window.wsClient.connected && window.wsClient.currentMode === 'websocket') {
                 window.wsClient.subscribe(id);
-                // Parar polling se WebSocket estiver conectado
+                // Parar polling apenas se o modo for websocket
                 stopPolling();
             } else {
                 // Se WebSocket não estiver disponível, iniciar polling
@@ -7991,9 +7991,9 @@ if (typeof window.wsClient !== 'undefined') {
     // Inscrever na conversa atual
 const currentConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     if (currentConversationId) {
-        if (window.wsClient.connected) {
+        if (window.wsClient.connected && window.wsClient.currentMode === 'websocket') {
             window.wsClient.subscribe(currentConversationId);
-            stopPolling(); // Parar polling se WebSocket estiver conectado
+            stopPolling(); // Parar polling apenas se WebSocket estiver conectado
         } else {
             // Se WebSocket não estiver conectado, usar polling
             startPolling(currentConversationId);

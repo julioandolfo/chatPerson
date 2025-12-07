@@ -8117,10 +8117,13 @@ function addConversationToList(conv) {
         return;
     }
 
+    console.log('addConversationToList chamado com:', conv);
+
     // Verificar se a conversa já existe na lista
     const existingItem = document.querySelector(`[data-conversation-id="${conv.id}"]`);
     if (existingItem) {
         // Se já existe, apenas atualizar e mover para o topo
+        console.log('Conversa já existe na lista, atualizando e movendo para topo:', conv.id);
         applyConversationUpdate(conv);
         moveConversationToTop(conv.id);
         return;
@@ -8206,6 +8209,7 @@ function addConversationToList(conv) {
     
     // Adicionar ao topo da lista
     conversationsList.insertAdjacentHTML('afterbegin', conversationHtml);
+    console.log('Conversa adicionada ao topo:', conv.id);
     
     // Inscrever na nova conversa para receber atualizações
     if (typeof window.wsClient !== 'undefined') {

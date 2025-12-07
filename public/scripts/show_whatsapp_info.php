@@ -140,81 +140,41 @@ $accounts = Database::fetchAll("SELECT * FROM whatsapp_accounts ORDER BY id");
                         <td><?= $account['quepasa_trackid'] ? htmlspecialchars($account['quepasa_trackid']) : '<span class="empty">VAZIO</span>' ?></td>
                     </tr>
                     <tr>
-                        <td>Instance ID (atual):</td>
-                        <td><?= $account['instance_id'] ? '<span class="filled">' . htmlspecialchars($account['instance_id']) . '</span>' : '<span class="empty">VAZIO ❌</span>' ?></td>
+                        <td>Quepasa ChatID (WID):</td>
+                        <td><?= $account['quepasa_chatid'] ? '<span class="filled">' . htmlspecialchars($account['quepasa_chatid']) . '</span>' : '<span class="empty">VAZIO ❌</span>' ?></td>
+                    </tr>
+                    <tr>
+                        <td>Quepasa Token:</td>
+                        <td><?= $account['quepasa_token'] ? '<span class="filled">***' . substr($account['quepasa_token'], -8) . '</span>' : '<span class="empty">VAZIO ❌</span>' ?></td>
                     </tr>
                 </table>
                 
-                <?php if (empty($account['instance_id'])): ?>
-                    <div class="recommendation">
-                        <strong>📌 Recomendação:</strong><br>
-                        Use o valor de <strong>Quepasa TrackID</strong> como instance_id, pois é o que você define na criação da instância.
-                    </div>
-                    
-                    <h3>🔧 Possíveis valores para instance_id:</h3>
-                    <ul>
-                        <?php if (!empty($account['quepasa_trackid'])): ?>
-                            <li><strong>quepasa_trackid:</strong> <?= htmlspecialchars($account['quepasa_trackid']) ?> ⭐ (Recomendado)</li>
-                        <?php endif; ?>
-                        
-                        <?php if (!empty($account['quepasa_user'])): ?>
-                            <li><strong>quepasa_user:</strong> <?= htmlspecialchars($account['quepasa_user']) ?></li>
-                        <?php endif; ?>
-                        
-                        <?php
-                        // Extrair da URL
-                        $urlParts = parse_url($account['api_url']);
-                        $path = $urlParts['path'] ?? '';
-                        $pathSegments = array_filter(explode('/', trim($path, '/')));
-                        if (!empty($pathSegments)):
-                            $urlInstance = end($pathSegments);
-                        ?>
-                            <li><strong>url_path:</strong> <?= htmlspecialchars($urlInstance) ?></li>
-                        <?php endif; ?>
-                    </ul>
-                    
-                    <h3>💾 SQL para atualizar:</h3>
-                    <?php
-                    $recommendedValue = $account['quepasa_trackid'] ?? $account['quepasa_user'] ?? ($urlInstance ?? 'SEU_INSTANCE_ID');
-                    ?>
-                    <div class="sql">
-UPDATE whatsapp_accounts <br>
-SET instance_id = '<?= addslashes($recommendedValue) ?>' <br>
-WHERE id = <?= $account['id'] ?>;
-                    </div>
-                    
-                    <p>
-                        <a href="?update=<?= $account['id'] ?>&value=<?= urlencode($recommendedValue) ?>" 
-                           onclick="return confirm('Confirma atualizar instance_id para: <?= addslashes($recommendedValue) ?>?')"
-                           style="background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; display: inline-block;">
-                            ✅ Atualizar Automaticamente
-                        </a>
-                    </p>
-                <?php else: ?>
+                <?php if ($account['status'] === 'active'): ?>
                     <div style="background: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; margin: 15px 0;">
-                        ✅ <strong>Instance ID já configurado!</strong> Nenhuma ação necessária.
+                        ✅ <strong>Conta conectada e ativa!</strong><br>
+                        Configuração está OK. O sistema usará endpoint <code>/v3/bot/{token}/picinfo</code> ou <code>/v4/bot/{token}/picinfo</code> para buscar avatares.
+                    </div>
+                <?php else: ?>
+                    <div style="background: #fff3e0; border-left: 4px solid #ff9800; padding: 15px; margin: 15px 0;">
+                        ⚠️ <strong>Conta inativa!</strong><br>
+                        Conecte via QR Code para ativar a conta e começar a receber mensagens.
                     </div>
                 <?php endif; ?>
+                
+                <div class="recommendation">
+                    <strong>ℹ️ Informação:</strong><br>
+                    Esta instalação do Quepasa usa formato <strong>single-instance</strong> (sem instance_id).<br>
+                    Para buscar avatares, o sistema utiliza:
+                    <ul style="margin: 10px 0 0 20px;">
+                        <li>Endpoint: <code>GET /v3/bot/:token/picinfo</code> ou <code>/v4/bot/:token/picinfo</code></li>
+                        <li>Header: <code>X-QUEPASA-CHATID: {chatId}</code></li>
+                        <li>Header: <code>X-QUEPASA-TOKEN: {token}</code></li>
+                    </ul>
+                </div>
             </div>
         <?php endforeach; ?>
     <?php endif; ?>
     
-    <?php
-    // Processar atualização se solicitada
-    if (isset($_GET['update']) && isset($_GET['value'])) {
-        $accountId = (int)$_GET['update'];
-        $instanceId = trim($_GET['value']);
-        
-        if ($accountId > 0 && !empty($instanceId)) {
-            try {
-                WhatsAppAccount::update($accountId, ['instance_id' => $instanceId]);
-                echo "<script>alert('✅ Instance ID atualizado com sucesso!'); window.location.href = window.location.pathname;</script>";
-            } catch (\Exception $e) {
-                echo "<script>alert('❌ Erro: " . addslashes($e->getMessage()) . "');</script>";
-            }
-        }
-    }
-    ?>
 </body>
 </html>
 

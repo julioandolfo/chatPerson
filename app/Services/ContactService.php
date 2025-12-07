@@ -391,86 +391,84 @@ class ContactService
 
             $apiUrl = rtrim($account['api_url'] ?? '', '/');
             $token = $account['quepasa_token'] ?? $account['api_key'] ?? null;
-            $instanceId = $account['instance_id'] ?? null;
 
-            \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - Debug conta ID={$account['id']}: api_url=" . ($apiUrl ?: 'VAZIO') . ", instance_id=" . ($instanceId ?: 'VAZIO') . ", token=" . ($token ? 'PRESENTE' : 'VAZIO'));
+            \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - Debug conta ID={$account['id']}: api_url=" . ($apiUrl ?: 'VAZIO') . ", token=" . ($token ? 'PRESENTE' : 'VAZIO'));
 
-            if (empty($apiUrl) || empty($token) || empty($instanceId)) {
-                \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - dados insuficientes para contato {$contactId}. Campos da conta: api_url=" . ($apiUrl ?: 'VAZIO') . ", instance_id=" . ($instanceId ?: 'VAZIO') . ", token=" . ($token ? 'PRESENTE' : 'VAZIO'));
+            if (empty($apiUrl) || empty($token)) {
+                \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - dados insuficientes para contato {$contactId}. Campos da conta: api_url=" . ($apiUrl ?: 'VAZIO') . ", token=" . ($token ? 'PRESENTE' : 'VAZIO'));
                 return null;
             }
 
-            // Extrair número limpo
-            $number = null;
-            if ($phone) {
-                $number = preg_replace('/\D+/', '', $phone);
+            // Preparar chatId para o header X-QUEPASA-CHATID
+            // Deve estar no formato: 5511999999999@c.us ou similar
+            $quepasaChatId = null;
+            if ($chatId) {
+                // Se chatId já tem @, usar direto
+                $quepasaChatId = $chatId;
+            } elseif ($phone) {
+                // Se só tem phone, adicionar @s.whatsapp.net
+                $cleanPhone = preg_replace('/\D+/', '', $phone);
+                $quepasaChatId = $cleanPhone . '@s.whatsapp.net';
             }
-            if (!$number && $chatId) {
-                $number = preg_replace('/\D+/', '', $chatId);
-            }
-            if (empty($number)) {
+            
+            if (!$quepasaChatId) {
+                \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - chatId não fornecido para contato {$contactId}");
                 return null;
             }
+            
+            // Tentar v4 primeiro, depois v3
+            $versions = ['v4', 'v3'];
+            $avatarUrl = null;
+            
+            foreach ($versions as $version) {
+                $url = "{$apiUrl}/{$version}/bot/{$token}/picinfo";
+                \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - Tentando {$version}: {$url} com chatId={$quepasaChatId}");
+                
+                $ch = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 10,
+                    CURLOPT_HTTPHEADER => [
+                        "X-QUEPASA-CHATID: {$quepasaChatId}",
+                        "X-QUEPASA-TOKEN: {$token}",
+                        'Accept: application/json'
+                    ],
+                    CURLOPT_FOLLOWLOCATION => true,
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_SSL_VERIFYHOST => false
+                ]);
 
-            $url = "{$apiUrl}/instances/{$instanceId}/contacts/{$number}/photo";
-            \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - Requisitando avatar: url={$url}, contactId={$contactId}");
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+                curl_close($ch);
 
-            $ch = curl_init($url);
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 10,
-                CURLOPT_HTTPHEADER => [
-                    'Accept: application/json',
-                    'Authorization: Bearer ' . $token,
-                ],
-                CURLOPT_FOLLOWLOCATION => true,
-                CURLOPT_SSL_VERIFYPEER => false,
-                CURLOPT_SSL_VERIFYHOST => false
-            ]);
+                \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - {$version} Resposta: httpCode={$httpCode}, contentType={$contentType}");
 
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-            curl_close($ch);
-
-            \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - Resposta: httpCode={$httpCode}, contentType={$contentType}");
-
-            if ($httpCode !== 200 || empty($response)) {
-                \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - HTTP {$httpCode} sem corpo para contato {$contactId}");
-                return null;
-            }
-
-            // Se veio JSON com url/base64
-            if (strpos($contentType, 'application/json') !== false) {
-                $json = json_decode($response, true);
-                $photoUrl = $json['data']['url'] ?? $json['photo'] ?? null;
-                if ($photoUrl) {
-                    if (str_starts_with($photoUrl, 'data:image')) {
-                        return self::saveAvatarFromBase64($contactId, $photoUrl);
+                if ($httpCode === 200 && !empty($response)) {
+                    // Tentar decodificar JSON
+                    $json = json_decode($response, true);
+                    if ($json && isset($json['url'])) {
+                        $photoUrl = $json['url'];
+                        \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - Avatar encontrado via {$version}: {$photoUrl}");
+                        
+                        // Baixar e salvar avatar
+                        $avatarUrl = self::downloadAvatarFromUrl($contactId, $photoUrl);
+                        if ($avatarUrl) {
+                            return $avatarUrl;
+                        }
+                    } elseif ($json) {
+                        \App\Helpers\Logger::quepasa("fetchQuepasaAvatar - {$version} JSON sem 'url': " . json_encode($json));
                     }
-                    return self::downloadAvatarFromUrl($contactId, $photoUrl);
                 }
-                return null;
-            }
-
-            // Se veio imagem binária
-            if (strpos($contentType, 'image/') !== false) {
-                $uploadDir = __DIR__ . '/../../public/assets/media/avatars/contacts/';
-                if (!is_dir($uploadDir)) {
-                    mkdir($uploadDir, 0755, true);
+                
+                // Se v4 não funcionar, tentar v3
+                if ($version === 'v4' && $httpCode !== 200) {
+                    continue;
                 }
-                $ext = 'jpg';
-                if (strpos($contentType, 'png') !== false) $ext = 'png';
-                elseif (strpos($contentType, 'gif') !== false) $ext = 'gif';
-                elseif (strpos($contentType, 'webp') !== false) $ext = 'webp';
-
-                $filename = 'whatsapp_' . $contactId . '_' . time() . '.' . $ext;
-                $filepath = $uploadDir . $filename;
-                if (file_put_contents($filepath, $response)) {
-                    $avatarUrl = \App\Helpers\Url::asset('media/avatars/contacts/' . $filename);
-                    \App\Models\Contact::update($contactId, ['avatar' => $avatarUrl]);
-                    return $avatarUrl;
-                }
+                
+                // Se chegou aqui e já tentou v3, parar
+                break;
             }
 
             return null;

@@ -1233,6 +1233,7 @@ body.dark-mode .swal2-content {
                                         <option value="open" <?= ($filters['status'] ?? '') === 'open' ? 'selected' : '' ?>>Abertas</option>
                 <option value="resolved" <?= ($filters['status'] ?? '') === 'resolved' ? 'selected' : '' ?>>Resolvidas</option>
                                         <option value="closed" <?= ($filters['status'] ?? '') === 'closed' ? 'selected' : '' ?>>Fechadas</option>
+                <option value="unanswered" <?= !empty($filters['unanswered']) ? 'selected' : '' ?>>🔴 Não respondidas</option>
                                     </select>
             
             <select id="filter_channel" class="form-select form-select-sm form-select-solid" style="width: auto;">
@@ -4064,7 +4065,14 @@ function applyFilters() {
     
     const params = new URLSearchParams();
     if (search) params.append('search', search);
-    if (status) params.append('status', status);
+    
+    // Tratar status especial "unanswered"
+    if (status === 'unanswered') {
+        params.append('unanswered', '1');
+    } else if (status) {
+        params.append('status', status);
+    }
+    
     if (channel) params.append('channel', channel);
     if (department) params.append('department_id', department);
     if (tag) params.append('tag_id', tag);
@@ -4079,8 +4087,8 @@ function applyFilters() {
         });
     });
     
-    // Preservar filtros avançados simples
-    ['unanswered', 'answered', 'date_from', 'date_to', 'pinned', 'order_by', 'order_dir'].forEach(key => {
+    // Preservar filtros avançados simples (não preservar unanswered pois já foi tratado acima)
+    ['answered', 'date_from', 'date_to', 'pinned', 'order_by', 'order_dir'].forEach(key => {
         if (urlParams.has(key)) {
             params.append(key, urlParams.get(key));
         }

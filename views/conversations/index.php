@@ -2486,16 +2486,20 @@ body.dark-mode .swal2-content {
                     <div class="mb-5">
                         <label class="form-label fw-semibold mb-2">Canais:</label>
                         <div class="border rounded p-3" style="max-height: 120px; overflow-y: auto; background: var(--bs-gray-100);">
+                            <?php 
+                            $selectedChannels = is_array($filters['channels'] ?? null) ? $filters['channels'] : [];
+                            $legacyChannel = $filters['channel'] ?? '';
+                            ?>
                             <label class="form-check form-check-custom form-check-solid mb-2">
-                                <input class="form-check-input" type="checkbox" name="channels[]" value="whatsapp" id="filter_channel_whatsapp" <?= (is_array($filters['channels'] ?? []) && in_array('whatsapp', $filters['channels'])) || ($filters['channel'] ?? '') === 'whatsapp' ? 'checked' : '' ?>>
+                                <input class="form-check-input" type="checkbox" name="channels[]" value="whatsapp" id="filter_channel_whatsapp" <?= (in_array('whatsapp', $selectedChannels)) || $legacyChannel === 'whatsapp' ? 'checked' : '' ?>>
                                 <span class="form-check-label">📱 WhatsApp</span>
                             </label>
                             <label class="form-check form-check-custom form-check-solid mb-2">
-                                <input class="form-check-input" type="checkbox" name="channels[]" value="email" id="filter_channel_email" <?= (is_array($filters['channels'] ?? []) && in_array('email', $filters['channels'])) || ($filters['channel'] ?? '') === 'email' ? 'checked' : '' ?>>
+                                <input class="form-check-input" type="checkbox" name="channels[]" value="email" id="filter_channel_email" <?= (in_array('email', $selectedChannels)) || $legacyChannel === 'email' ? 'checked' : '' ?>>
                                 <span class="form-check-label">✉️ Email</span>
                             </label>
                             <label class="form-check form-check-custom form-check-solid">
-                                <input class="form-check-input" type="checkbox" name="channels[]" value="chat" id="filter_channel_chat" <?= (is_array($filters['channels'] ?? []) && in_array('chat', $filters['channels'])) || ($filters['channel'] ?? '') === 'chat' ? 'checked' : '' ?>>
+                                <input class="form-check-input" type="checkbox" name="channels[]" value="chat" id="filter_channel_chat" <?= (in_array('chat', $selectedChannels)) || $legacyChannel === 'chat' ? 'checked' : '' ?>>
                                 <span class="form-check-label">💬 Chat</span>
                             </label>
                         </div>
@@ -2508,7 +2512,12 @@ body.dark-mode .swal2-content {
                         <div class="border rounded p-3" style="max-height: 150px; overflow-y: auto; background: var(--bs-gray-100);">
                             <?php 
                             $whatsappAccounts = \App\Models\WhatsAppAccount::getActive();
-                            $selectedAccounts = is_array($filters['whatsapp_account_ids'] ?? []) ? $filters['whatsapp_account_ids'] : (!empty($filters['whatsapp_account_id']) ? [$filters['whatsapp_account_id']] : []);
+                            $selectedAccounts = [];
+                            if (isset($filters['whatsapp_account_ids']) && is_array($filters['whatsapp_account_ids'])) {
+                                $selectedAccounts = $filters['whatsapp_account_ids'];
+                            } elseif (!empty($filters['whatsapp_account_id'])) {
+                                $selectedAccounts = [(int)$filters['whatsapp_account_id']];
+                            }
                             if (empty($whatsappAccounts)): ?>
                                 <div class="text-muted fs-7">Nenhuma integração WhatsApp cadastrada</div>
                             <?php else: ?>
@@ -2532,7 +2541,12 @@ body.dark-mode .swal2-content {
                         <label class="form-label fw-semibold mb-2">Tags:</label>
                         <div class="border rounded p-3" style="max-height: 200px; overflow-y: auto; background: var(--bs-gray-100);">
                             <?php 
-                            $selectedTags = is_array($filters['tag_ids'] ?? []) ? $filters['tag_ids'] : (!empty($filters['tag_id']) ? [$filters['tag_id']] : []);
+                            $selectedTags = [];
+                            if (isset($filters['tag_ids']) && is_array($filters['tag_ids'])) {
+                                $selectedTags = $filters['tag_ids'];
+                            } elseif (!empty($filters['tag_id'])) {
+                                $selectedTags = [(int)$filters['tag_id']];
+                            }
                             foreach ($tags as $tag): ?>
                                 <label class="form-check form-check-custom form-check-solid mb-2">
                                     <input class="form-check-input" type="checkbox" name="tag_ids[]" value="<?= $tag['id'] ?>" <?= in_array($tag['id'], $selectedTags) ? 'checked' : '' ?>>

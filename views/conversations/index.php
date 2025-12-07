@@ -5785,11 +5785,17 @@ async function sendAudioMessage(audioBlob, conversationId) {
             body: formData
         });
         
-        const data = await response.json();
+        // Garantir que temos JSON; se não, capturar texto para debug
+        let data;
+        try {
+            data = await response.json();
+        } catch (jsonErr) {
+            const text = await response.text();
+            throw new Error(`Resposta não é JSON. HTTP ${response.status}. Corpo: ${text.substring(0, 500)}`);
+        }
         
         if (data.success && data.message) {
-            // Adicionar mensagem ao chat
-                addMessageToChat(data.message);
+            addMessageToChat(data.message);
         } else {
             throw new Error(data.message || 'Erro ao enviar áudio');
         }

@@ -879,22 +879,6 @@ class ConversationService
                         } else {
                             $options['media_name'] = basename($firstAttachment['path']);
                         }
-
-                        // Enviar também em base64 (fallback para casos em que a URL não é baixada externamente)
-                        // Limite prudente para não estourar payload (12MB)
-                        $maxBase64Size = 12 * 1024 * 1024;
-                        if (file_exists($filePath)) {
-                            $fileSize = filesize($filePath);
-                            if ($fileSize !== false && $fileSize <= $maxBase64Size) {
-                                $fileContent = file_get_contents($filePath);
-                                if ($fileContent !== false) {
-                                    $options['media_base64'] = base64_encode($fileContent);
-                                    error_log("DEBUG WhatsApp - Anexo enviado em base64 (tamanho {$fileSize} bytes)");
-                                }
-                            } else {
-                                error_log("DEBUG WhatsApp - Base64 ignorado (arquivo muito grande: {$fileSize} bytes)");
-                            }
-                        }
                         
                         // Para Quepasa, se for imagem/vídeo/áudio e houver legenda, usar content como caption
                         if (!empty($content)) {

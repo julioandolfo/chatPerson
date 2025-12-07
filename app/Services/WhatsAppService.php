@@ -511,37 +511,17 @@ class WhatsAppService
                 }
                 
                 $payload = [
+                    'chatId' => $to . '@s.whatsapp.net',
                     'text' => $caption
                 ];
                 
-                // Incluir mídia se houver
-                $hasMedia = false;
-                // Se tivermos base64, priorizar base64 e não enviar URL
-                if (!empty($options['media_base64'])) {
-                    $payload['media'] = [
-                        'base64' => $options['media_base64'],
-                        'type' => $options['media_type'] ?? 'document'
-                    ];
-                    if (!empty($options['media_mime'])) {
-                        $payload['media']['mimetype'] = $options['media_mime'];
+                // Incluir mídia se houver (usar campo 'url' diretamente conforme documentação Quepasa)
+                if (!empty($options['media_url'])) {
+                    $payload['url'] = $options['media_url'];
+                    // fileName é opcional, usado quando o nome não pode ser inferido
+                    if (!empty($options['media_name'])) {
+                        $payload['fileName'] = $options['media_name'];
                     }
-                    $hasMedia = true;
-                    Logger::quepasa("sendMessage - Enviando mídia em base64");
-                } elseif (!empty($options['media_url'])) {
-                    // Caso não haja base64, usar URL
-                    $payload['media'] = [
-                        'url' => $options['media_url'],
-                        'type' => $options['media_type'] ?? 'image'
-                    ];
-                    if (!empty($options['media_mime'])) {
-                        $payload['media']['mimetype'] = $options['media_mime'];
-                    }
-                    $hasMedia = true;
-                }
-
-                // Se não houver mídia nem texto (por segurança), garantir um espaço
-                if (!$hasMedia && empty($payload['text'])) {
-                    $payload['text'] = ' ';
                 }
                 
                 Logger::quepasa("sendMessage - Iniciando envio");

@@ -8024,6 +8024,17 @@ if (typeof window.wsClient !== 'undefined') {
             refreshConversationList();
         }
     });
+
+    // Fallback: ouvir evento global disparado pelo RealtimeClient (polling)
+    window.addEventListener('realtime:new_conversation', (e) => {
+        console.log('Nova conversa recebida (evento global):', e.detail);
+        try {
+            addConversationToList(e.detail);
+        } catch (err) {
+            console.error('Erro ao adicionar nova conversa (evento global):', err);
+            refreshConversationList();
+        }
+    });
     
     window.wsClient.on('conversation_updated', (data) => {
         // Usar variável global para refletir a conversa selecionada após navegação AJAX

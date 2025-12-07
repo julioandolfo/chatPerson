@@ -240,6 +240,13 @@ class RealtimeClient {
                 this.emit('new_conversation', {
                     conversation: conv
                 });
+                
+                // Disparar evento global para listeners externos (fallback para UI)
+                try {
+                    window.dispatchEvent(new CustomEvent('realtime:new_conversation', { detail: conv }));
+                } catch (e) {
+                    console.error('Erro ao disparar evento global de nova conversa:', e);
+                }
             });
         }
 

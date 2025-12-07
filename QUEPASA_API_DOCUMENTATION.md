@@ -135,7 +135,7 @@ Accept: application/json
 }
 ```
 
-### 2. Enviar Arquivo por URL (Imagem, Vídeo, Documento)
+### 2. Enviar Arquivo por URL (Imagem, Vídeo, Áudio, Documento)
 
 ```json
 {
@@ -150,7 +150,7 @@ Accept: application/json
 - A URL DEVE ser absoluta (começar com `https://` ou `http://`)
 - O campo `text` NÃO pode estar vazio (use pelo menos `" "` se não houver legenda)
 - O servidor Quepasa baixa o arquivo automaticamente e envia como anexo
-- O tipo de mídia (imagem, vídeo, documento) é detectado automaticamente pelo MIME type
+- O tipo de mídia (imagem, vídeo, áudio, documento) é detectado automaticamente pelo MIME type
 - **Para áudio:** Veja exemplo abaixo usando `content` com base64
 
 ### 2.1. Enviar Áudio (Recomendado: usar base64)

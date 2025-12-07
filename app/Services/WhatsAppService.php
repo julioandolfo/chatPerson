@@ -520,38 +520,47 @@ class WhatsAppService
                     $mediaType = $options['media_type'] ?? 'document';
                     $mediaMime = $options['media_mime'] ?? null;
                     
-                    // Para áudio, usar 'content' com base64 para garantir que seja tratado como áudio
-                    // e não como documento para download
+                    // Para áudio, usar 'content' com base64 para garantir que seja tratado como áudio executável
+                    // e não como documento para download (conforme documentação Quepasa)
                     if ($mediaType === 'audio' && !empty($mediaMime)) {
                         try {
+                            Logger::quepasa("sendMessage - Convertendo áudio para base64 para garantir execução");
+                            
                             // Baixar arquivo e converter para base64
-                            $ch = curl_init($options['media_url']);
-                            curl_setopt_array($ch, [
+                            $chDownload = curl_init($options['media_url']);
+                            curl_setopt_array($chDownload, [
                                 CURLOPT_RETURNTRANSFER => true,
                                 CURLOPT_TIMEOUT => 30,
                                 CURLOPT_SSL_VERIFYPEER => false,
-                                CURLOPT_SSL_VERIFYHOST => false
+                                CURLOPT_SSL_VERIFYHOST => false,
+                                CURLOPT_FOLLOWLOCATION => true
                             ]);
-                            $fileContent = curl_exec($ch);
-                            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                            curl_close($ch);
+                            $fileContent = curl_exec($chDownload);
+                            $httpCodeDownload = curl_getinfo($chDownload, CURLINFO_HTTP_CODE);
+                            curl_close($chDownload);
                             
-                            if ($httpCode === 200 && !empty($fileContent)) {
+                            if ($httpCodeDownload === 200 && !empty($fileContent)) {
                                 $base64Content = base64_encode($fileContent);
                                 $payload['content'] = "data:{$mediaMime};base64,{$base64Content}";
-                                Logger::quepasa("sendMessage - Áudio convertido para base64 (tamanho: " . strlen($fileContent) . " bytes)");
+                                Logger::quepasa("sendMessage - Áudio convertido para base64 (tamanho: " . strlen($fileContent) . " bytes, MIME: {$mediaMime})");
                             } else {
                                 // Fallback: usar URL se não conseguir baixar
-                                Logger::quepasa("sendMessage - Erro ao baixar áudio para base64 (HTTP {$httpCode}), usando URL como fallback");
+                                Logger::quepasa("sendMessage - Erro ao baixar áudio para base64 (HTTP {$httpCodeDownload}), usando URL como fallback");
                                 $payload['url'] = $options['media_url'];
+                                if (!empty($options['media_name'])) {
+                                    $payload['fileName'] = $options['media_name'];
+                                }
                             }
                         } catch (\Exception $e) {
                             // Fallback: usar URL se houver erro
                             Logger::quepasa("sendMessage - Erro ao converter áudio para base64: " . $e->getMessage() . ", usando URL como fallback");
                             $payload['url'] = $options['media_url'];
+                            if (!empty($options['media_name'])) {
+                                $payload['fileName'] = $options['media_name'];
+                            }
                         }
                     } else {
-                        // Para outros tipos (imagem, vídeo, documento), usar URL
+                        // Para outros tipos (imagem, vídeo, documento), usar URL diretamente
                         $payload['url'] = $options['media_url'];
                         // fileName é opcional, usado quando o nome não pode ser inferido
                         if (!empty($options['media_name'])) {

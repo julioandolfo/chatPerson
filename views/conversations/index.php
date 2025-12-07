@@ -8024,17 +8024,6 @@ if (typeof window.wsClient !== 'undefined') {
             refreshConversationList();
         }
     });
-
-    // Fallback: ouvir evento global disparado pelo RealtimeClient (polling)
-    window.addEventListener('realtime:new_conversation', (e) => {
-        console.log('Nova conversa recebida (evento global):', e.detail);
-        try {
-            addConversationToList(e.detail);
-        } catch (err) {
-            console.error('Erro ao adicionar nova conversa (evento global):', err);
-            refreshConversationList();
-        }
-    });
     
     window.wsClient.on('conversation_updated', (data) => {
         // Usar variável global para refletir a conversa selecionada após navegação AJAX
@@ -8116,6 +8105,20 @@ const currentConversationId = parsePhpJson('<?= json_encode($selectedConversatio
     let conversationListUpdateInterval = setInterval(() => {
         refreshConversationBadges();
     }, 10000); // 10 segundos
+}
+
+// Fallback global (sempre ativo): ouvir evento disparado pelo RealtimeClient (polling)
+if (!window.__realtimeGlobalNewConvListener) {
+    window.__realtimeGlobalNewConvListener = true;
+    window.addEventListener('realtime:new_conversation', (e) => {
+        console.log('Nova conversa recebida (evento global):', e.detail);
+        try {
+            addConversationToList(e.detail);
+        } catch (err) {
+            console.error('Erro ao adicionar nova conversa (evento global):', err);
+            refreshConversationList();
+        }
+    });
 }
 
 /**

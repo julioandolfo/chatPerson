@@ -95,7 +95,8 @@ class RealtimeController
             }
             
             // Verificar permissão sem usar abortIfCannot (que pode gerar HTML)
-            if (!\App\Helpers\Permission::can('conversations.view.own')) {
+            // Permitir quem tem view.own ou view.all
+            if (!\App\Helpers\Permission::can('conversations.view.own') && !\App\Helpers\Permission::can('conversations.view.all')) {
                 Response::json([
                     'success' => false,
                     'message' => 'Acesso negado'

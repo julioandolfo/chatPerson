@@ -499,8 +499,19 @@ class WhatsAppService
                     'X-QUEPASA-CHATID: ' . ($to . '@s.whatsapp.net')
                 ];
                 
+                // Garantir texto (caption) não vazio
+                $caption = $message;
+                if (!empty($options['caption'])) {
+                    $caption = $options['caption'];
+                } elseif (empty($caption) && !empty($options['media_name'])) {
+                    $caption = $options['media_name'];
+                }
+                if (empty($caption)) {
+                    $caption = 'arquivo';
+                }
+                
                 $payload = [
-                    'text' => $message
+                    'text' => $caption
                 ];
                 
                 // Incluir mídia se houver
@@ -509,19 +520,8 @@ class WhatsAppService
                         'url' => $options['media_url'],
                         'type' => $options['media_type'] ?? 'image'
                     ];
-                    
-                    // Se houver caption/legenda, usar como text
-                    if (!empty($options['caption'])) {
-                        $payload['text'] = $options['caption'];
-                    } 
-                    // Se não houver caption nem message, usar espaço (Quepasa exige text não vazio)
-                    elseif (empty($payload['text'])) {
-                        $payload['text'] = ' '; // Espaço único para satisfazer validação da API
-                    }
-                } else {
-                    // Mensagem só de texto: garantir texto não vazio
-                    if (empty($payload['text'])) {
-                        $payload['text'] = ' ';
+                    if (!empty($options['media_mime'])) {
+                        $payload['media']['mimetype'] = $options['media_mime'];
                     }
                 }
                 

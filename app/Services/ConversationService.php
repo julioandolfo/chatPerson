@@ -870,6 +870,15 @@ class ConversationService
                         
                         $options['media_url'] = $attachmentUrl;
                         $options['media_type'] = $firstAttachment['type'] ?? 'document';
+                        if (!empty($firstAttachment['mime_type'])) {
+                            $options['media_mime'] = $firstAttachment['mime_type'];
+                        }
+                        // Nome do arquivo para fallback de caption
+                        if (!empty($firstAttachment['filename'])) {
+                            $options['media_name'] = $firstAttachment['filename'];
+                        } else {
+                            $options['media_name'] = basename($firstAttachment['path']);
+                        }
                         
                         // Para Quepasa, se for imagem/vídeo/áudio e houver legenda, usar content como caption
                         if (!empty($content)) {

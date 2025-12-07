@@ -95,7 +95,7 @@ class ConversationController
             if ($selectedConversationId) {
                 // Marcar mensagens como lidas quando a conversa é aberta (mesmo via URL direta)
                 $userId = \App\Helpers\Auth::id();
-                if ($userId && !$demoMode) {
+                if ($userId) {
                     try {
                         \App\Models\Message::markAsRead((int)$selectedConversationId, $userId);
                     } catch (\Exception $e) {

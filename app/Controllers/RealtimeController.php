@@ -30,12 +30,20 @@ class RealtimeController
             // Mas verificar se usuário está autenticado para retornar dados completos
             
             $settings = SettingService::getDefaultWebSocketSettings();
-            
+
+            // Se o WebSocket estiver desabilitado, forçar modo polling (mas manter tempo real ativo)
+            $enabled = $settings['websocket_enabled'] ?? true;
+            $connectionType = $settings['websocket_connection_type'] ?? 'auto';
+            if (!$enabled && $connectionType === 'auto') {
+                $connectionType = 'polling';
+            }
+
             Response::json([
                 'success' => true,
                 'config' => [
-                    'enabled' => $settings['websocket_enabled'] ?? true,
-                    'connectionType' => $settings['websocket_connection_type'] ?? 'auto',
+                    // Mantém tempo real ativo se polling estiver disponível, mesmo com websocket desabilitado
+                    'enabled' => $enabled || $connectionType === 'polling',
+                    'connectionType' => $connectionType,
                     'websocketPort' => (int)($settings['websocket_port'] ?? 8080),
                     'websocketPath' => $settings['websocket_path'] ?? '/ws',
                     'websocketCustomUrl' => $settings['websocket_custom_url'] ?? '',

@@ -7,6 +7,7 @@
 namespace App\Services;
 
 use App\Helpers\Logger;
+use App\Services\SettingService;
 
 class WebSocketService
 {
@@ -21,6 +22,16 @@ class WebSocketService
      */
     public static function broadcast(string $event, array $data, ?array $targets = null): void
     {
+        // Respeitar configuração: se WebSocket estiver desabilitado ou em modo polling, não tentar enviar
+        $settings = SettingService::getDefaultWebSocketSettings();
+        $websocketEnabled = $settings['websocket_enabled'] ?? true;
+        $connectionType = $settings['websocket_connection_type'] ?? 'auto';
+
+        if (!$websocketEnabled || $connectionType === 'polling') {
+            Logger::log("WebSocket Broadcast ignorado ({$event}) - WebSocket desabilitado/mode polling");
+            return;
+        }
+
         try {
             $message = json_encode([
                 'event' => $event,

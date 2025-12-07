@@ -8030,8 +8030,29 @@ if (typeof window.wsClient !== 'undefined') {
         }
         
         // Atualizar item e mover para topo (lista refletindo última atividade)
-        applyConversationUpdate(data.conversation || { id: data.conversation_id, unread_count: data.unread_count });
-        moveConversationToTop(data.conversation_id);
+        // Se a conversa ainda não existe na lista (ex.: criada agora), criar e adicionar
+        const existingItem = document.querySelector(`[data-conversation-id="${data.conversation_id}"]`);
+        if (!existingItem) {
+            if (data.conversation) {
+                addConversationToList(data.conversation);
+            } else {
+                // Dados mínimos para criar
+                addConversationToList({
+                    id: data.conversation_id,
+                    last_message: data.last_message || '',
+                    last_message_at: data.updated_at || new Date().toISOString(),
+                    updated_at: data.updated_at || new Date().toISOString(),
+                    contact_name: data.contact_name || 'Contato',
+                    channel: data.channel || 'whatsapp',
+                    unread_count: data.unread_count || 0,
+                    tags_data: null,
+                    pinned: 0
+                });
+            }
+        } else {
+            applyConversationUpdate(data.conversation || { id: data.conversation_id, unread_count: data.unread_count });
+            moveConversationToTop(data.conversation_id);
+        }
     });
     
     // Inscrever na conversa atual

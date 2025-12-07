@@ -515,12 +515,48 @@ class WhatsAppService
                     'text' => $caption
                 ];
                 
-                // Incluir mídia se houver (usar campo 'url' diretamente conforme documentação Quepasa)
+                // Incluir mídia se houver
                 if (!empty($options['media_url'])) {
-                    $payload['url'] = $options['media_url'];
-                    // fileName é opcional, usado quando o nome não pode ser inferido
-                    if (!empty($options['media_name'])) {
-                        $payload['fileName'] = $options['media_name'];
+                    $mediaType = $options['media_type'] ?? 'document';
+                    $mediaMime = $options['media_mime'] ?? null;
+                    
+                    // Para áudio, usar 'content' com base64 para garantir que seja tratado como áudio
+                    // e não como documento para download
+                    if ($mediaType === 'audio' && !empty($mediaMime)) {
+                        try {
+                            // Baixar arquivo e converter para base64
+                            $ch = curl_init($options['media_url']);
+                            curl_setopt_array($ch, [
+                                CURLOPT_RETURNTRANSFER => true,
+                                CURLOPT_TIMEOUT => 30,
+                                CURLOPT_SSL_VERIFYPEER => false,
+                                CURLOPT_SSL_VERIFYHOST => false
+                            ]);
+                            $fileContent = curl_exec($ch);
+                            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                            curl_close($ch);
+                            
+                            if ($httpCode === 200 && !empty($fileContent)) {
+                                $base64Content = base64_encode($fileContent);
+                                $payload['content'] = "data:{$mediaMime};base64,{$base64Content}";
+                                Logger::quepasa("sendMessage - Áudio convertido para base64 (tamanho: " . strlen($fileContent) . " bytes)");
+                            } else {
+                                // Fallback: usar URL se não conseguir baixar
+                                Logger::quepasa("sendMessage - Erro ao baixar áudio para base64 (HTTP {$httpCode}), usando URL como fallback");
+                                $payload['url'] = $options['media_url'];
+                            }
+                        } catch (\Exception $e) {
+                            // Fallback: usar URL se houver erro
+                            Logger::quepasa("sendMessage - Erro ao converter áudio para base64: " . $e->getMessage() . ", usando URL como fallback");
+                            $payload['url'] = $options['media_url'];
+                        }
+                    } else {
+                        // Para outros tipos (imagem, vídeo, documento), usar URL
+                        $payload['url'] = $options['media_url'];
+                        // fileName é opcional, usado quando o nome não pode ser inferido
+                        if (!empty($options['media_name'])) {
+                            $payload['fileName'] = $options['media_name'];
+                        }
                     }
                 }
                 

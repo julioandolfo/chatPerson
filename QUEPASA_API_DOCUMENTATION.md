@@ -60,7 +60,9 @@ Accept: application/json
 | `location` | object | Não | Objeto JSON com dados de localização (latitude, longitude, name, address, url) |
 | `contact` | object | Não | Objeto JSON com dados de contato (phone, name, vcard) |
 
-**⚠️ IMPORTANTE:** O campo `text` NÃO pode estar vazio quando enviando mídia via `url`. Se não houver legenda (`caption`), use pelo menos um espaço `" "` ou o nome do arquivo.
+**⚠️ IMPORTANTE:** 
+- O campo `text` NÃO pode estar vazio quando enviando mídia via `url`. Se não houver legenda (`caption`), use pelo menos um espaço `" "` ou o nome do arquivo.
+- **Para áudio:** Recomenda-se usar `content` com base64 (`data:audio/mpeg;base64,...`) ao invés de `url` para garantir que o WhatsApp trate como áudio executável e não como documento para download.
 
 #### Objeto `location`
 
@@ -133,7 +135,7 @@ Accept: application/json
 }
 ```
 
-### 2. Enviar Arquivo por URL (Imagem, Vídeo, Áudio, Documento)
+### 2. Enviar Arquivo por URL (Imagem, Vídeo, Documento)
 
 ```json
 {
@@ -148,7 +150,29 @@ Accept: application/json
 - A URL DEVE ser absoluta (começar com `https://` ou `http://`)
 - O campo `text` NÃO pode estar vazio (use pelo menos `" "` se não houver legenda)
 - O servidor Quepasa baixa o arquivo automaticamente e envia como anexo
-- O tipo de mídia (imagem, vídeo, áudio, documento) é detectado automaticamente pelo MIME type
+- O tipo de mídia (imagem, vídeo, documento) é detectado automaticamente pelo MIME type
+- **Para áudio:** Veja exemplo abaixo usando `content` com base64
+
+### 2.1. Enviar Áudio (Recomendado: usar base64)
+
+Para garantir que o áudio seja tratado como áudio executável e não como documento para download, use `content` com base64:
+
+```json
+{
+  "chatId": "5511999999999@s.whatsapp.net",
+  "text": "Legenda do áudio (opcional)",
+  "content": "data:audio/mpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD..."
+}
+```
+
+**Por que usar base64 para áudio?**
+- Quando usado `url`, o Quepasa pode detectar incorretamente e enviar como documento
+- Usando `content` com base64, garantimos que o WhatsApp trate como áudio executável
+- O formato é: `data:<mime_type>;base64,<base64_data>`
+- Exemplos de MIME types para áudio:
+  - `audio/mpeg` (MP3)
+  - `audio/wav` (WAV)
+  - `audio/ogg` (OGG)
 
 ### 3. Enviar Conteúdo Base64
 

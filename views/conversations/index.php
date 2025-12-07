@@ -7851,21 +7851,21 @@ if (typeof window.wsClient !== 'undefined') {
                 const msgId = parseInt(data.message_id) || 0;
                 if (!isNaN(convId)) {
                     fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${convId}?last_message_id=${msgId}`)
-                    .then(res => res.json())
-                    .then(result => {
-                        if (result.success && result.conversation && result.conversation.messages) {
-                            const updatedMessage = result.conversation.messages.find(m => m.id == data.message_id);
-                            if (updatedMessage) {
-                                // Atualizar status
-                                const newStatusHtml = renderMessageStatusHtml(updatedMessage);
-                                if (newStatusHtml) {
-                                    statusElement.outerHTML = newStatusHtml;
+                        .then(res => res.json())
+                        .then(result => {
+                            if (result.success && result.conversation && result.conversation.messages) {
+                                const updatedMessage = result.conversation.messages.find(m => m.id == data.message_id);
+                                if (updatedMessage) {
+                                    // Atualizar status
+                                    const newStatusHtml = renderMessageStatusHtml(updatedMessage);
+                                    if (newStatusHtml) {
+                                        statusElement.outerHTML = newStatusHtml;
+                                    }
                                 }
                             }
-                        }
-                    })
-                    .catch(err => console.error('Erro ao atualizar status:', err));
-            }
+                        })
+                        .catch(err => console.error('Erro ao atualizar status:', err));
+                }
         }
     });
     

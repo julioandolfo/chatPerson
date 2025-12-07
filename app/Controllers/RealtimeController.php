@@ -184,6 +184,10 @@ class RealtimeController
                 $checkedCount = 0;
                 $maxChecks = 50; // Limitar para não sobrecarregar
                 
+                // Se lastUpdateTime for 0 ou muito antigo, verificar conversas criadas nos últimos 30 segundos
+                $checkRecentThreshold = time() - 30; // Últimos 30 segundos
+                $shouldCheckRecent = ($lastUpdateTime === 0 || ($lastUpdateTime / 1000) < $checkRecentThreshold);
+                
                 if (is_array($userConversations)) {
                     foreach ($userConversations as $conv) {
                         if ($checkedCount >= $maxChecks) break;
@@ -205,15 +209,37 @@ class RealtimeController
                         $isNewConversation = false;
                         if (isset($conv['created_at'])) {
                             $createdAt = strtotime($conv['created_at']);
-                            if ($createdAt !== false && $createdAt > ($lastUpdateTime / 1000)) {
-                                $isNewConversation = true;
+                            if ($createdAt !== false) {
+                                // Se for verificação recente, considerar nova se criada nos últimos 30s
+                                if ($shouldCheckRecent && $createdAt > $checkRecentThreshold) {
+                                    $isNewConversation = true;
+                                } elseif ($createdAt > ($lastUpdateTime / 1000)) {
+                                    $isNewConversation = true;
+                                }
                             }
                         }
 
-                        if ($updatedAt > ($lastUpdateTime / 1000)) {
+                        // Verificar se conversa foi atualizada ou é nova
+                        $shouldInclude = false;
+                        if ($isNewConversation) {
+                            $shouldInclude = true;
+                        } elseif ($updatedAt > ($lastUpdateTime / 1000)) {
+                            $shouldInclude = true;
+                        } elseif ($shouldCheckRecent && $updatedAt > $checkRecentThreshold) {
+                            // Se estamos verificando conversas recentes, incluir se atualizada nos últimos 30s
+                            $shouldInclude = true;
+                        }
+
+                        if ($shouldInclude) {
                             // Verificar se já não está na lista de updates
                             $exists = false;
                             foreach ($updates['conversation_updates'] as $update) {
+                                if ($update['id'] == $conv['id']) {
+                                    $exists = true;
+                                    break;
+                                }
+                            }
+                            foreach ($updates['new_conversations'] as $update) {
                                 if ($update['id'] == $conv['id']) {
                                     $exists = true;
                                     break;
@@ -226,13 +252,16 @@ class RealtimeController
                                     'status' => $conv['status'] ?? 'open',
                                     'unread_count' => $conv['unread_count'] ?? 0,
                                     'updated_at' => $conv['updated_at'],
+                                    'created_at' => $conv['created_at'] ?? $conv['updated_at'],
                                     'contact_name' => $conv['contact_name'] ?? null,
                                     'contact_phone' => $conv['contact_phone'] ?? null,
                                     'contact_avatar' => $conv['contact_avatar'] ?? null,
                                     'last_message' => $conv['last_message'] ?? null,
                                     'last_message_at' => $conv['last_message_at'] ?? null,
                                     'channel' => $conv['channel'] ?? 'whatsapp',
-                                    'agent_name' => $conv['agent_name'] ?? null
+                                    'agent_name' => $conv['agent_name'] ?? null,
+                                    'tags_data' => $conv['tags_data'] ?? null,
+                                    'pinned' => $conv['pinned'] ?? 0
                                 ];
                                 
                                 if ($isNewConversation) {

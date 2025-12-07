@@ -8012,7 +8012,7 @@ if (typeof window.wsClient !== 'undefined') {
     window.wsClient.on('new_conversation', (data) => {
         // Adicionar nova conversa à lista sem recarregar a página
         if (data.conversation) {
-            refreshConversationList();
+            addConversationToList(data.conversation);
         }
     });
     
@@ -8075,6 +8075,116 @@ const currentConversationId = parsePhpJson('<?= json_encode($selectedConversatio
     let conversationListUpdateInterval = setInterval(() => {
         refreshConversationBadges();
     }, 10000); // 10 segundos
+}
+
+/**
+ * Adicionar nova conversa à lista dinamicamente (sem recarregar tudo)
+ */
+function addConversationToList(conv) {
+    const conversationsList = document.querySelector('.conversations-list-items');
+    if (!conversationsList) {
+        console.error('Elemento .conversations-list-items não encontrado!');
+        return;
+    }
+
+    // Verificar se a conversa já existe na lista
+    const existingItem = document.querySelector(`[data-conversation-id="${conv.id}"]`);
+    if (existingItem) {
+        // Se já existe, apenas atualizar e mover para o topo
+        applyConversationUpdate(conv);
+        moveConversationToTop(conv.id);
+        return;
+    }
+
+    // Verificar se há mensagem vazia ou estado de "sem conversas"
+    const emptyState = conversationsList.querySelector('.text-center');
+    if (emptyState) {
+        conversationsList.innerHTML = '';
+    }
+
+    // Preparar dados da conversa
+    const channelIcon = conv.channel === 'whatsapp' 
+        ? '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#25D366" style="vertical-align: middle;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>'
+        : conv.channel === 'email' ? '✉️' : '💬';
+    
+    const channelName = conv.channel === 'whatsapp' ? 'WhatsApp' : (conv.channel === 'email' ? 'Email' : 'Chat');
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const selectedConversationId = urlParams.get('id') ? parseInt(urlParams.get('id')) : null;
+    const isActive = selectedConversationId == conv.id;
+    
+    const name = conv.contact_name || 'NN';
+    const parts = name.split(' ');
+    const initials = (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
+    
+    const lastMessage = conv.last_message || '';
+    const maxCharsPreview = 37;
+    const lastMessagePreview = lastMessage.length > maxCharsPreview ? lastMessage.substring(0, maxCharsPreview) + '...' : lastMessage;
+    
+    const unreadCount = conv.unread_count || 0;
+    const pinned = conv.pinned || 0;
+    
+    // Tags
+    let tagsHtml = '';
+    if (conv.tags_data) {
+        const tags = conv.tags_data.split('|||');
+        tags.slice(0, 2).forEach(tagStr => {
+            const [tagId, tagName, tagColor] = tagStr.split(':');
+            if (tagName) {
+                tagsHtml += `<span class="badge badge-sm" style="background-color: ${tagColor || '#009ef7'}20; color: ${tagColor || '#009ef7'};">${escapeHtml(tagName)}</span>`;
+            }
+        });
+    }
+    
+    // Criar HTML do item
+    const conversationHtml = `
+        <div class="conversation-item ${isActive ? 'active' : ''} ${pinned ? 'pinned' : ''}" 
+             data-conversation-id="${conv.id}"
+             data-onclick="selectConversation">
+            <div class="d-flex gap-3 w-100">
+                <div class="symbol symbol-45px flex-shrink-0">
+                    <div class="symbol-label bg-light-primary text-primary fw-bold">${initials}</div>
+                </div>
+                <div class="flex-grow-1 min-w-0">
+                    <div class="conversation-item-header">
+                        <div class="conversation-item-name d-flex align-items-center gap-2">
+                            ${pinned ? '<i class="ki-duotone ki-pin fs-7 text-warning" title="Fixada"><span class="path1"></span><span class="path2"></span></i>' : ''}
+                            ${escapeHtml(name)}
+                        </div>
+                        <div class="conversation-item-time d-flex align-items-center gap-2">
+                            ${formatTime(conv.last_message_at || conv.updated_at)}
+                            <button type="button" class="btn btn-sm btn-icon btn-light p-0" 
+                                    onclick="event.stopPropagation(); togglePin(${conv.id}, ${pinned ? 'true' : 'false'})" 
+                                    title="${pinned ? 'Desfixar' : 'Fixar'}">
+                                <i class="ki-duotone ki-pin fs-7 ${pinned ? 'text-warning' : 'text-muted'}">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="conversation-item-preview">${escapeHtml(lastMessagePreview || 'Sem mensagens')}</div>
+                    <div class="conversation-item-meta">
+                        <span class="conversation-item-channel">${channelIcon} ${channelName}</span>
+                        ${tagsHtml}
+                        ${unreadCount > 0 ? `<span class="conversation-item-badge">${unreadCount}</span>` : ''}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Adicionar ao topo da lista
+    conversationsList.insertAdjacentHTML('afterbegin', conversationHtml);
+    
+    // Inscrever na nova conversa para receber atualizações
+    if (typeof window.wsClient !== 'undefined') {
+        if (window.wsClient.connected && window.wsClient.currentMode === 'websocket') {
+            window.wsClient.subscribe(conv.id);
+        }
+    }
+    
+    console.log('Nova conversa adicionada à lista:', conv.id);
 }
 
 /**

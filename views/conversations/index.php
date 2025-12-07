@@ -2730,15 +2730,15 @@ function updateConversationListPreview(conversationId, lastMessage) {
             const maxChars = 37;
             preview.textContent = content.substring(0, maxChars) + (content.length > maxChars ? '...' : '');
         }
-        if (time) {
-            time.textContent = 'Agora';
+        if (time && lastMessage.created_at) {
+            // Usar formatTime com o timestamp real da mensagem
+            time.textContent = formatTime(lastMessage.created_at);
+            // Atualizar data-updated-at para ordenação correta
+            conversationItem.setAttribute('data-updated-at', lastMessage.created_at);
         }
         
-        // Mover para o topo
-        const list = conversationItem.parentElement;
-        if (list && conversationItem !== list.firstElementChild) {
-            list.insertBefore(conversationItem, list.firstElementChild);
-        }
+        // Resortear lista após atualizar
+        sortConversationList();
     }
 }
 
@@ -5553,11 +5553,15 @@ function updateConversationInList(conversationId, lastMessage) {
             const maxChars = 37;
             preview.textContent = lastMessage.substring(0, maxChars) + (lastMessage.length > maxChars ? '...' : '');
         }
-        if (time) time.textContent = 'Agora';
+        if (time) {
+            // Usar formatTime para tempo relativo (Agora, 1min, etc)
+            time.textContent = formatTime(new Date().toISOString());
+            // Atualizar data-updated-at
+            conversationItem.setAttribute('data-updated-at', new Date().toISOString());
+        }
         
-        // Mover para o topo da lista
-        const list = conversationItem.parentElement;
-        list.insertBefore(conversationItem, list.firstChild);
+        // Resortear lista após atualizar
+        sortConversationList();
     }
 }
 
@@ -7980,6 +7984,7 @@ function toggleConversationSidebar() {
 // WebSocket - Atualizar em tempo real
 if (typeof window.wsClient !== 'undefined') {
     window.wsClient.on('new_message', (data) => {
+        console.log('Handler new_message acionado:', data);
         const currentConversationId = window.currentConversationId ?? parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
         
         // Atualizar lista de conversas

@@ -338,10 +338,28 @@ class WhatsAppService
                                     // Chatid encontrado - atualizar no banco
                                     $wasConnected = !empty($account['quepasa_chatid']); // Verificar se já estava conectado antes
                                     
-                                    WhatsAppAccount::update($accountId, [
+                                    // Tentar extrair instance_id da resposta se ainda não tiver
+                                    $instanceId = $account['instance_id'] ?? null;
+                                    if (empty($instanceId) && isset($jsonResponse['instanceId'])) {
+                                        $instanceId = $jsonResponse['instanceId'];
+                                    } elseif (empty($instanceId) && isset($jsonResponse['instance_id'])) {
+                                        $instanceId = $jsonResponse['instance_id'];
+                                    } elseif (empty($instanceId) && isset($jsonResponse['id'])) {
+                                        // Às vezes o ID da instância vem como 'id'
+                                        $instanceId = $jsonResponse['id'];
+                                    }
+                                    
+                                    $updateData = [
                                         'quepasa_chatid' => $chatid,
                                         'status' => 'active'
-                                    ]);
+                                    ];
+                                    
+                                    if (!empty($instanceId)) {
+                                        $updateData['instance_id'] = $instanceId;
+                                        Logger::quepasa("getConnectionStatus - Instance ID encontrado: {$instanceId}");
+                                    }
+                                    
+                                    WhatsAppAccount::update($accountId, $updateData);
                                     
                                     Logger::quepasa("getConnectionStatus - Chatid/WID encontrado via {$endpoint}: {$chatid}");
                                     
@@ -819,6 +837,16 @@ class WhatsAppService
                     'quepasa_chatid' => $wid,
                     'status' => 'active'
                 ]);
+            }
+            
+            // Tentar extrair instance_id do payload se não tiver ainda
+            if (empty($account['instance_id'])) {
+                $instanceId = $payload['instanceId'] ?? $payload['instance_id'] ?? null;
+                if (!empty($instanceId)) {
+                    WhatsAppAccount::update($account['id'], ['instance_id' => $instanceId]);
+                    $account['instance_id'] = $instanceId;
+                    Logger::quepasa("processWebhook - Instance ID salvo: {$instanceId}");
+                }
             }
 
             // Processar mensagem recebida

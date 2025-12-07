@@ -227,6 +227,7 @@ class RealtimeClient {
      */
     processPollingUpdates(updates) {
         if (updates.new_messages) {
+            console.log('RealtimeClient: new_messages recebidas (polling):', updates.new_messages);
             updates.new_messages.forEach(msg => {
                 this.emit('new_message', {
                     conversation_id: msg.conversation_id,

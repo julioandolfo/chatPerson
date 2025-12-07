@@ -264,8 +264,9 @@ ob_start();
 
 .conversation-item-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
+    gap: 8px;
     margin-bottom: 6px;
 }
 
@@ -273,11 +274,21 @@ ob_start();
     font-weight: 600;
     font-size: 14px;
     color: var(--bs-text-dark);
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .conversation-item-time {
     font-size: 12px;
     color: var(--bs-text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .conversation-item-preview {
@@ -2707,10 +2718,19 @@ function selectConversation(id) {
             
             // Atualizar mensagens
             const messages = data.messages || [];
-            if (messages.length > 0) {
-                oldestMessageId = messages[0].id; // Primeira mensagem (mais antiga)
-            }
-            updateChatMessages(messages, true);
+    if (messages.length > 0) {
+        oldestMessageId = messages[0].id; // Primeira mensagem (mais antiga)
+        // Garantir lastMessageId para polling incremental
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg && lastMsg.id) {
+            lastMessageId = lastMsg.id;
+        }
+    } else {
+        // Sem mensagens, zera controles
+        oldestMessageId = null;
+        lastMessageId = 0;
+    }
+    updateChatMessages(messages, true);
             
             // Atualizar sidebar
             updateConversationSidebar(data.conversation, data.tags || []);

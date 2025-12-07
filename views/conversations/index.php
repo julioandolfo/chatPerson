@@ -2575,6 +2575,45 @@ function moveConversationToTop(conversationId) {
     }
 }
 
+// Garantir que o botão de fixar exista e reflita o estado
+function ensurePinButton(conversationItem, pinned, conversationId) {
+    const timeContainer = conversationItem.querySelector('.conversation-item-time');
+    if (!timeContainer) return;
+
+    let btn = timeContainer.querySelector('.conversation-item-pin');
+    const iconClass = pinned ? 'text-warning' : 'text-muted';
+    const title = pinned ? 'Desfixar' : 'Fixar';
+
+    const btnHtml = `
+        <button type="button" class="btn btn-sm btn-icon btn-light p-0 conversation-item-pin" 
+                onclick="event.stopPropagation(); togglePin(${conversationId}, ${pinned ? 'true' : 'false'})" 
+                title="${title}">
+            <i class="ki-duotone ki-pin fs-7 ${iconClass}">
+                <span class="path1"></span>
+                <span class="path2"></span>
+            </i>
+        </button>
+    `;
+
+    if (!btn) {
+        timeContainer.insertAdjacentHTML('beforeend', btnHtml);
+    } else {
+        btn.setAttribute('onclick', `event.stopPropagation(); togglePin(${conversationId}, ${pinned ? 'true' : 'false'})`);
+        btn.setAttribute('title', title);
+        const icon = btn.querySelector('i');
+        if (icon) {
+            icon.classList.remove('text-warning', 'text-muted');
+            icon.classList.add(iconClass);
+        }
+    }
+
+    if (pinned) {
+        conversationItem.classList.add('pinned');
+    } else {
+        conversationItem.classList.remove('pinned');
+    }
+}
+
 // Atualizar atributos de data (updated_at) e resortear a lista
 function updateConversationMeta(conversationItem, conv) {
     if (!conversationItem || !conv) return;
@@ -2607,6 +2646,7 @@ function applyConversationUpdate(conv) {
             const time = conversationItem.querySelector('.conversation-item-time');
             const badge = conversationItem.querySelector('.conversation-item-badge');
             const avatarContainer = conversationItem.querySelector('.symbol-label');
+            const pinned = conv.pinned === 1 || conv.pinned === true;
 
             if (preview && conv.last_message) {
                 const maxChars = 37;
@@ -2628,12 +2668,7 @@ function applyConversationUpdate(conv) {
     }
 
     // Garantir botão de fixar e classe pinned
-    ensurePinButton(conversationItem, conv.pinned === 1 || conv.pinned === true, conv.id);
-    if (conv.pinned === 1 || conv.pinned === true) {
-        conversationItem.classList.add('pinned');
-    } else {
-        conversationItem.classList.remove('pinned');
-    }
+    ensurePinButton(conversationItem, pinned, conv.id);
 
     const unreadCount = conv.unread_count || 0;
     if (unreadCount > 0) {
@@ -3902,8 +3937,10 @@ function refreshConversationList(params = null) {
             const channelName = conv.channel === 'whatsapp' ? 'WhatsApp' : (conv.channel === 'email' ? 'Email' : 'Chat');
             
             const isActive = selectedConversationId == conv.id;
-            const name = conv.contact_name || 'NN';
-            const parts = name.split(' ');
+            const nameRaw = conv.contact_name || 'NN';
+            const maxName = 25;
+            const name = nameRaw.length > maxName ? nameRaw.substring(0, maxName) + '...' : nameRaw;
+            const parts = nameRaw.split(' ');
             const initials = (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
             
             const lastMessage = conv.last_message || '';
@@ -8289,8 +8326,10 @@ function addConversationToList(conv) {
     const selectedConversationId = urlParams.get('id') ? parseInt(urlParams.get('id')) : null;
     const isActive = selectedConversationId == conv.id;
     
-    const name = conv.contact_name || 'NN';
-    const parts = name.split(' ');
+    const nameRaw = conv.contact_name || 'NN';
+    const maxName = 25;
+    const name = nameRaw.length > maxName ? nameRaw.substring(0, maxName) + '...' : nameRaw;
+    const parts = nameRaw.split(' ');
     const initials = (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
     
     const lastMessage = conv.last_message || '';
@@ -8462,6 +8501,8 @@ function refreshConversationBadges() {
                     
                     // Atualizar meta e resortear
                     updateConversationMeta(conversationItem, conv);
+                    // Garantir botão de fixar após updates
+                    ensurePinButton(conversationItem, conv.pinned === 1 || conv.pinned === true, conv.id);
                     sortConversationList();
                 }
             });

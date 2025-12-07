@@ -264,9 +264,11 @@ ob_start();
 
 .conversation-item-header {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 8px;
+    flex-wrap: nowrap;
+    min-width: 0;
     margin-bottom: 6px;
 }
 
@@ -289,6 +291,11 @@ ob_start();
     gap: 6px;
     flex-shrink: 0;
     white-space: nowrap;
+}
+
+.conversation-item-time .btn,
+.conversation-item-time button {
+    flex-shrink: 0;
 }
 
 .conversation-item-preview {
@@ -2516,6 +2523,67 @@ let isLoadingMessages = false;
 let hasMoreMessages = true;
 let oldestMessageId = null;
 let currentConversationId = null;
+
+// Garantir inscrição no cliente de tempo real para conversas da lista (necessário no modo polling)
+function subscribeVisibleConversations() {
+    if (typeof window.wsClient === 'undefined') return;
+    const items = document.querySelectorAll('.conversation-item[data-conversation-id]');
+    items.forEach(item => {
+        const id = parseInt(item.getAttribute('data-conversation-id'));
+        if (!isNaN(id)) {
+            window.wsClient.subscribe(id);
+        }
+    });
+}
+
+// Remover badge (não lidas) de uma conversa na lista
+function removeConversationBadge(conversationId) {
+    if (!conversationId) return;
+    const conversationItem = document.querySelector(`[data-conversation-id="${conversationId}"]`);
+    if (!conversationItem) return;
+    const badge = conversationItem.querySelector('.conversation-item-badge');
+    if (badge) badge.remove();
+}
+
+// Mover conversa para o topo da lista
+function moveConversationToTop(conversationId) {
+    const list = document.querySelector('.conversations-list-items');
+    const conversationItem = document.querySelector(`[data-conversation-id="${conversationId}"]`);
+    if (list && conversationItem) {
+        list.insertBefore(conversationItem, list.firstChild);
+    }
+}
+
+// Atualizar preview/tempo/badge de um item de conversa com dados recebidos
+function applyConversationUpdate(conv) {
+    const conversationItem = document.querySelector(`[data-conversation-id="${conv.id}"]`);
+    if (!conversationItem) return;
+
+    const preview = conversationItem.querySelector('.conversation-item-preview');
+    const time = conversationItem.querySelector('.conversation-item-time');
+    const badge = conversationItem.querySelector('.conversation-item-badge');
+
+    if (preview && conv.last_message) {
+        const content = conv.last_message.substring(0, 60);
+        preview.textContent = content + (conv.last_message.length > 60 ? '...' : '');
+    }
+    if (time && (conv.last_message_at || conv.updated_at)) {
+        time.textContent = formatTime(conv.last_message_at || conv.updated_at);
+    }
+
+    const unreadCount = conv.unread_count || 0;
+    if (unreadCount > 0) {
+        if (badge) {
+            badge.textContent = unreadCount;
+        } else {
+            const badgeHtml = `<span class="conversation-item-badge">${unreadCount}</span>`;
+            const meta = conversationItem.querySelector('.conversation-item-meta');
+            if (meta) meta.insertAdjacentHTML('beforeend', badgeHtml);
+        }
+    } else if (badge) {
+        badge.remove();
+    }
+}
 
 // Helper para converter valores vindos do PHP em JSON válido
 function parsePhpJson(value) {
@@ -7838,7 +7906,7 @@ function toggleConversationSidebar() {
 // WebSocket - Atualizar em tempo real
 if (typeof window.wsClient !== 'undefined') {
     window.wsClient.on('new_message', (data) => {
-        const currentConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+        const currentConversationId = window.currentConversationId ?? parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
         
         // Atualizar lista de conversas
         const conversationItem = document.querySelector(`[data-conversation-id="${data.conversation_id}"]`);
@@ -7919,30 +7987,9 @@ if (typeof window.wsClient !== 'undefined') {
     // Handler para conversa atualizada (marca como lida, etc)
     window.wsClient.on('conversation_updated', (data) => {
         if (data && data.conversation_id) {
-            const conversationItem = document.querySelector(`[data-conversation-id="${data.conversation_id}"]`);
-            if (conversationItem) {
-                // Atualizar badge de não lidas
-                const badge = conversationItem.querySelector('.conversation-item-badge');
-                const unreadCount = parseInt(data.unread_count) || 0;
-                
-                if (unreadCount > 0) {
-                    if (badge) {
-                        badge.textContent = unreadCount;
-                    } else {
-                        // Adicionar badge se não existir
-                        const badgeHtml = `<span class="conversation-item-badge">${unreadCount}</span>`;
-                        const metaDiv = conversationItem.querySelector('.d-flex.flex-column.flex-grow-1');
-                        if (metaDiv) {
-                            metaDiv.insertAdjacentHTML('beforeend', badgeHtml);
-                        }
-                    }
-                } else {
-                    // Remover badge se não houver mensagens não lidas
-                    if (badge) {
-                        badge.remove();
-                    }
-                }
-            }
+            // Atualiza badge/preview/tempo
+            applyConversationUpdate(data.conversation || { id: data.conversation_id, unread_count: data.unread_count });
+            // Move para topo se não for a conversa atual (feito no handler abaixo)
         }
     });
 
@@ -7967,30 +8014,17 @@ if (typeof window.wsClient !== 'undefined') {
             return; // Não atualizar badge se for a conversa atual
         }
         
-        // Atualizar badge de não lidas na lista apenas se não for a conversa atual
-        const conversationItem = document.querySelector(`[data-conversation-id="${data.conversation_id}"]`);
-        if (conversationItem) {
-            const badge = conversationItem.querySelector('.conversation-item-badge');
-            const unreadCount = data.conversation?.unread_count || 0;
-            
-            if (unreadCount > 0) {
-                if (badge) {
-                    badge.textContent = unreadCount;
-                } else {
-                    const badgeHtml = `<span class="conversation-item-badge">${unreadCount}</span>`;
-                    const meta = conversationItem.querySelector('.conversation-item-meta');
-                    if (meta) meta.insertAdjacentHTML('beforeend', badgeHtml);
-                }
-            } else {
-                // Remover badge se não houver mensagens não lidas
-                if (badge) badge.remove();
-            }
-        }
+        // Atualizar item e mover para topo (lista refletindo última atividade)
+        applyConversationUpdate(data.conversation || { id: data.conversation_id, unread_count: data.unread_count });
+        moveConversationToTop(data.conversation_id);
     });
     
     // Inscrever na conversa atual
 const currentConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     if (currentConversationId) {
+        // Se a conversa foi aberta diretamente por URL, remover badge na lista
+        removeConversationBadge(currentConversationId);
+
         if (window.wsClient.connected && window.wsClient.currentMode === 'websocket') {
             window.wsClient.subscribe(currentConversationId);
             stopPolling(); // Parar polling apenas se WebSocket estiver conectado
@@ -8110,6 +8144,9 @@ function refreshConversationBadges() {
                     }
                 }
             });
+
+            // Reinscrever conversas visíveis para receber eventos de polling/new_message
+            subscribeVisibleConversations();
         }
     })
     .catch(error => {

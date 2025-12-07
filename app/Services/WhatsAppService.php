@@ -526,6 +526,7 @@ class WhatsAppService
                         $payload['media']['mimetype'] = $options['media_mime'];
                     }
                     $hasMedia = true;
+                    Logger::quepasa("sendMessage - Enviando mídia em base64");
                 } elseif (!empty($options['media_url'])) {
                     // Caso não haja base64, usar URL
                     $payload['media'] = [

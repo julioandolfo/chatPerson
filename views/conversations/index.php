@@ -2633,6 +2633,12 @@ function selectConversation(id) {
     const conversationItem = document.querySelector(`[data-conversation-id="${id}"]`);
     if (conversationItem) {
         conversationItem.classList.add('active');
+        
+        // Remover badge de não lidas imediatamente (otimista - antes da resposta do servidor)
+        const badge = conversationItem.querySelector('.conversation-item-badge');
+        if (badge) {
+            badge.remove();
+        }
     }
     
     // Mostrar header e input (se estiverem ocultos)
@@ -7881,6 +7887,36 @@ if (typeof window.wsClient !== 'undefined') {
         }
     });
     
+    // Handler para conversa atualizada (marca como lida, etc)
+    window.wsClient.on('conversation_updated', (data) => {
+        if (data && data.conversation_id) {
+            const conversationItem = document.querySelector(`[data-conversation-id="${data.conversation_id}"]`);
+            if (conversationItem) {
+                // Atualizar badge de não lidas
+                const badge = conversationItem.querySelector('.conversation-item-badge');
+                const unreadCount = parseInt(data.unread_count) || 0;
+                
+                if (unreadCount > 0) {
+                    if (badge) {
+                        badge.textContent = unreadCount;
+                    } else {
+                        // Adicionar badge se não existir
+                        const badgeHtml = `<span class="conversation-item-badge">${unreadCount}</span>`;
+                        const metaDiv = conversationItem.querySelector('.d-flex.flex-column.flex-grow-1');
+                        if (metaDiv) {
+                            metaDiv.insertAdjacentHTML('beforeend', badgeHtml);
+                        }
+                    }
+                } else {
+                    // Remover badge se não houver mensagens não lidas
+                    if (badge) {
+                        badge.remove();
+                    }
+                }
+            }
+        }
+    });
+
     // Handler para novas conversas criadas
     window.wsClient.on('new_conversation', (data) => {
         // Adicionar nova conversa à lista sem recarregar a página

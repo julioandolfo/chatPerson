@@ -797,6 +797,38 @@ class ConversationService
 
         $messageId = Message::createMessage($messageData);
 
+        // **ENVIAR PARA WHATSAPP** se a mensagem for do agente e canal for WhatsApp
+        if ($senderType === 'agent' && $conversation['channel'] === 'whatsapp' && !empty($conversation['whatsapp_account_id'])) {
+            try {
+                // Obter contato para pegar o telefone
+                $contact = \App\Models\Contact::find($conversation['contact_id']);
+                if ($contact && !empty($contact['phone'])) {
+                    // Enviar mensagem via WhatsApp
+                    $whatsappResult = \App\Services\WhatsAppService::sendMessage(
+                        $conversation['whatsapp_account_id'],
+                        $contact['phone'],
+                        $content,
+                        []
+                    );
+                    
+                    // Atualizar status e external_id da mensagem
+                    if ($whatsappResult['success']) {
+                        Message::update($messageId, [
+                            'external_id' => $whatsappResult['message_id'] ?? null,
+                            'status' => 'sent'
+                        ]);
+                    }
+                }
+            } catch (\Exception $e) {
+                error_log("Erro ao enviar mensagem para WhatsApp: " . $e->getMessage());
+                // Marcar mensagem como erro
+                Message::update($messageId, [
+                    'status' => 'error',
+                    'error_message' => $e->getMessage()
+                ]);
+            }
+        }
+
         // Log de atividade
         try {
             if (class_exists('\App\Services\ActivityService')) {

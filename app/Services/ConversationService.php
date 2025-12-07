@@ -841,12 +841,13 @@ class ConversationService
                         error_log("DEBUG WhatsApp - Path do anexo: " . $firstAttachment['path']);
                         error_log("DEBUG WhatsApp - Tipo: " . ($firstAttachment['type'] ?? 'document'));
                         
-                        // Verificar se arquivo existe fisicamente
-                        $filePath = $_SERVER['DOCUMENT_ROOT'] . $attachmentPath;
+                        // Verificar se arquivo existe fisicamente (usar caminho absoluto baseado no projeto)
+                        $filePath = __DIR__ . '/../../public' . $attachmentPath;
                         if (!file_exists($filePath)) {
                             error_log("ERRO WhatsApp - Arquivo NÃO existe: " . $filePath);
                         } else {
-                            error_log("DEBUG WhatsApp - Arquivo existe: " . $filePath . " (" . filesize($filePath) . " bytes)");
+                            $fileSize = filesize($filePath);
+                            error_log("DEBUG WhatsApp - Arquivo existe: " . $filePath . " (" . $fileSize . " bytes)");
                             
                             // Testar se a URL está acessível publicamente
                             $ch = curl_init($attachmentUrl);
@@ -890,10 +891,14 @@ class ConversationService
                                 if ($fileContent !== false) {
                                     $options['media_base64'] = base64_encode($fileContent);
                                     error_log("DEBUG WhatsApp - Anexo enviado em base64 (tamanho {$fileSize} bytes)");
+                                } else {
+                                    error_log("ERRO WhatsApp - Falha ao ler conteúdo do arquivo para base64");
                                 }
                             } else {
                                 error_log("DEBUG WhatsApp - Base64 ignorado (arquivo muito grande: {$fileSize} bytes)");
                             }
+                        } else {
+                            error_log("ERRO WhatsApp - Arquivo não encontrado para base64: " . $filePath);
                         }
                         
                         // Para Quepasa, se for imagem/vídeo/áudio e houver legenda, usar content como caption

@@ -1898,17 +1898,17 @@ body.dark-mode .swal2-content {
                     <!-- Funcionalidade: Gerar Resposta -->
                     <div class="card card-flush shadow-sm mb-7" id="aiFeatureGenerateResponse">
                         <div class="card-header border-0 pt-5">
-                            <div class="card-title">
+                <div class="card-title">
                                 <div class="d-flex align-items-center">
                                     <div class="symbol symbol-45px me-3">
                                         <div class="symbol-label bg-light-primary">
                                             <i class="ki-duotone ki-message-text text-primary fs-2x">
-                                                <span class="path1"></span>
-                                                <span class="path2"></span>
+                            <span class="path1"></span>
+                            <span class="path2"></span>
                                                 <span class="path3"></span>
-                                            </i>
-                                        </div>
-                                    </div>
+                        </i>
+                    </div>
+                </div>
                                     <div>
                                         <h3 class="fw-bold mb-1">Gerar Resposta</h3>
                                         <p class="text-muted fs-7 mb-0">Gera sugestões inteligentes baseadas no contexto da conversa</p>
@@ -1921,9 +1921,9 @@ body.dark-mode .swal2-content {
                                 <div class="col-md-6">
                                     <label class="form-label fw-semibold mb-2">
                                         <i class="ki-duotone ki-notepad fs-6 text-muted me-1">
-                                            <span class="path1"></span>
-                                            <span class="path2"></span>
-                                        </i>
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
                                         Tom da Resposta
                                     </label>
                                     <select id="aiResponseTone" class="form-select form-select-solid">
@@ -1966,8 +1966,8 @@ body.dark-mode .swal2-content {
                                             <span class="path2"></span>
                                         </i>
                                         Histórico
-                                    </button>
-                                </div>
+                        </button>
+                            </div>
                                 <div id="aiResponseSuggestions" class="mb-4"></div>
                             </div>
                             
@@ -2068,19 +2068,19 @@ body.dark-mode .swal2-content {
                     <div class="mb-5">
                         <label class="form-label fw-semibold">Tipo de Mensagem:</label>
                         <select id="filterMessageType" class="form-select form-select-solid">
-                            <option value="">Todos</option>
+                                        <option value="">Todos</option>
                             <option value="note">Apenas Notas Internas</option>
-                        </select>
-                    </div>
+                                    </select>
+                                </div>
                     
                     <div class="mb-5">
                         <label class="form-label fw-semibold">Remetente:</label>
                         <select id="filterSenderType" class="form-select form-select-solid">
-                            <option value="">Todos</option>
+                                        <option value="">Todos</option>
                             <option value="contact">Contato</option>
                             <option value="agent">Agente</option>
-                        </select>
-                    </div>
+                                    </select>
+                                </div>
                     
                     <div class="mb-5">
                         <label class="form-label fw-semibold">Data Inicial:</label>
@@ -2302,34 +2302,34 @@ body.dark-mode .swal2-content {
             <div class="modal-body">
                 <form id="assignForm">
                     <div class="mb-5">
-                        <label class="form-label fw-semibold">Agente:</label>
+                                    <label class="form-label fw-semibold">Agente:</label>
                         <select id="assignAgent" class="form-select form-select-solid" required>
                             <option value="">Selecione um agente...</option>
                             <?php if (!empty($agents)): ?>
-                                <?php foreach ($agents as $agent): ?>
+                                        <?php foreach ($agents as $agent): ?>
                                     <option value="<?= $agent['id'] ?>">
-                                        <?= htmlspecialchars($agent['name']) ?>
+                                                <?= htmlspecialchars($agent['name']) ?>
                                         <?php if (!empty($agent['email'])): ?>
                                             (<?= htmlspecialchars($agent['email']) ?>)
                 <?php endif; ?>
-                                    </option>
-                                <?php endforeach; ?>
+                                            </option>
+                                        <?php endforeach; ?>
                             <?php endif; ?>
-                        </select>
-            </div>
+                                    </select>
+                                </div>
                     <div class="mb-5">
                         <label class="form-label fw-semibold">Setor (opcional):</label>
                         <select id="assignDepartment" class="form-select form-select-solid">
                             <option value="">Manter setor atual</option>
-                            <?php if (!empty($departments)): ?>
-                                <?php foreach ($departments as $dept): ?>
+                                <?php if (!empty($departments)): ?>
+                                        <?php foreach ($departments as $dept): ?>
                                     <option value="<?= $dept['id'] ?>">
-                                        <?= htmlspecialchars($dept['name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
+                                                <?= htmlspecialchars($dept['name']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
                             <?php endif; ?>
-                        </select>
-        </div>
+                                    </select>
+                                </div>
                     <div class="d-flex justify-content-end">
                         <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
                         <button type="submit" class="btn btn-primary">Atribuir</button>
@@ -2377,14 +2377,14 @@ body.dark-mode .swal2-content {
                                         <?= htmlspecialchars($agent['name']) ?>
                                         <?php if (!empty($agent['email'])): ?>
                                             (<?= htmlspecialchars($agent['email']) ?>)
-                                        <?php endif; ?>
-                                    </option>
-                                <?php endforeach; ?>
+                                <?php endif; ?>
+                                            </option>
+                                        <?php endforeach; ?>
                             <?php endif; ?>
-                        </select>
+                                    </select>
                         <div class="form-text">Deixe em branco para atribuição automática baseada em disponibilidade e carga de trabalho.</div>
-                    </div>
-                    <div class="d-flex justify-content-end">
+                                </div>
+                                <div class="d-flex justify-content-end">
                         <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
                         <button type="submit" class="btn btn-warning">
                             <i class="ki-duotone ki-arrow-up fs-5 me-1">
@@ -2393,12 +2393,12 @@ body.dark-mode .swal2-content {
                             </i>
                             Escalar Agora
                         </button>
-                    </div>
+                                </div>
                 </form>
-            </div>
-        </div>
-    </div>
-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
 <!-- MODAL: Gerenciar Tags -->
 <div class="modal fade" id="kt_modal_tags" tabindex="-1" aria-hidden="true">
@@ -2411,7 +2411,7 @@ body.dark-mode .swal2-content {
                         <span class="path1"></span>
                         <span class="path2"></span>
                     </i>
-                </div>
+            </div>
             </div>
             <div class="modal-body">
                 <div class="mb-5">
@@ -2444,15 +2444,15 @@ body.dark-mode .swal2-content {
                 <h2 class="fw-bold">Gerenciar Participantes</h2>
                 <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
                     <i class="ki-duotone ki-cross fs-1">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                    </i>
-                </div>
-            </div>
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                    </div>
+                                                </div>
             <div class="modal-body">
                 <div class="mb-5" id="currentParticipants">
                     <!-- Participantes atuais serão inseridos aqui -->
-                </div>
+                                                        </div>
                 <div class="separator my-5"></div>
                 <div class="mb-5">
                     <label class="form-label fw-semibold mb-2">Adicionar Participante:</label>
@@ -2461,8 +2461,8 @@ body.dark-mode .swal2-content {
                             <option value="">Selecione um usuário...</option>
                         </select>
                         <button type="button" class="btn btn-primary" id="addParticipantBtn" onclick="addParticipant()">Adicionar</button>
-                    </div>
-                </div>
+                                                </div>
+                                            </div>
                 <div class="d-flex justify-content-end">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
                 </div>
@@ -2490,7 +2490,7 @@ body.dark-mode .swal2-content {
                     <div class="mb-5">
                         <label class="form-label fw-semibold mb-2">Canais:</label>
                         <div class="border rounded p-3" style="max-height: 120px; overflow-y: auto; background: var(--bs-gray-100);">
-                            <?php 
+                                            <?php
                             $selectedChannels = is_array($filters['channels'] ?? null) ? $filters['channels'] : [];
                             $legacyChannel = $filters['channel'] ?? '';
                             ?>
@@ -2524,7 +2524,7 @@ body.dark-mode .swal2-content {
                             }
                             if (empty($whatsappAccounts)): ?>
                                 <div class="text-muted fs-7">Nenhuma integração WhatsApp cadastrada</div>
-                            <?php else: ?>
+                                            <?php else: ?>
                                 <?php foreach ($whatsappAccounts as $account): ?>
                                     <label class="form-check form-check-custom form-check-solid mb-2">
                                         <input class="form-check-input" type="checkbox" name="whatsapp_account_ids[]" value="<?= $account['id'] ?>" <?= in_array($account['id'], $selectedAccounts) ? 'checked' : '' ?>>
@@ -2534,7 +2534,7 @@ body.dark-mode .swal2-content {
                                         </span>
                                     </label>
                                 <?php endforeach; ?>
-                            <?php endif; ?>
+                                            <?php endif; ?>
                         </div>
                         <div class="form-text">Filtrar por número/integração específica do WhatsApp</div>
                     </div>
@@ -2560,11 +2560,11 @@ body.dark-mode .swal2-content {
                                         </span>
                                     </span>
                                 </label>
-                            <?php endforeach; ?>
-                        </div>
+                                <?php endforeach; ?>
+                    </div>
                         <div class="form-text">Selecione uma ou mais tags</div>
                     </div>
-                    <?php endif; ?>
+                <?php endif; ?>
                     
                     <!-- Status de Resposta -->
                     <div class="mb-5">
@@ -2582,8 +2582,8 @@ body.dark-mode .swal2-content {
                                 <input class="form-check-input" type="radio" name="response_status" value="answered" <?= !empty($filters['answered']) ? 'checked' : '' ?>>
                                 <span class="form-check-label">Respondidas</span>
                             </label>
-                        </div>
-                    </div>
+            </div>
+        </div>
                     
                     <!-- Período -->
                     <div class="row mb-5">

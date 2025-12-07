@@ -15,7 +15,7 @@ class AttachmentService
     private static array $allowedTypes = [
         'image' => ['jpg', 'jpeg', 'png', 'gif', 'webp'],
         'video' => ['mp4', 'webm', 'ogg'],
-        'audio' => ['mp3', 'wav', 'ogg'],
+        'audio' => ['mp3', 'wav', 'ogg', 'webm'], // webm (audio/webm) será convertido para ogg/opus
         'document' => ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'csv']
     ];
 
@@ -59,7 +59,21 @@ class AttachmentService
             throw new \Exception('Erro ao salvar arquivo');
         }
 
-        // Retornar informações do arquivo
+        // Se for áudio webm, converter para ogg/opus para compatibilidade com WhatsApp
+        if ($fileType === 'audio' && (str_contains($mimeType, 'webm') || $extension === 'webm')) {
+            $conversion = self::convertWebmToOpus($filepath, $conversationDir);
+            if ($conversion['success']) {
+                $filename = $conversion['filename'];
+                $filepath = $conversion['filepath'];
+                $mimeType = $conversion['mime_type'];
+                $extension = 'ogg';
+                $file['size'] = $conversion['size'];
+            } else {
+                Logger::quepasa('AttachmentService - Conversão webm->ogg falhou, mantendo arquivo original: ' . $conversion['error']);
+            }
+        }
+
+        // Retornar informações do arquivo (considerando possível conversão)
         return [
             'filename' => $filename,
             'original_name' => $file['name'],
@@ -95,8 +109,13 @@ class AttachmentService
     {
         foreach (self::$allowedTypes as $type => $extensions) {
             if (in_array($extension, $extensions)) {
-                // Verificar MIME type também
                 $mimePrefix = explode('/', $mimeType)[0];
+                
+                // Caso especial: webm gravado como áudio (audio/webm)
+                if ($extension === 'webm' && $mimePrefix === 'audio') {
+                    return 'audio';
+                }
+
                 if ($type === 'image' && $mimePrefix === 'image') return 'image';
                 if ($type === 'video' && $mimePrefix === 'video') return 'video';
                 if ($type === 'audio' && $mimePrefix === 'audio') return 'audio';
@@ -177,8 +196,11 @@ class AttachmentService
             'image/webp' => 'webp',
             'video/mp4' => 'mp4',
             'video/webm' => 'webm',
+            'audio/webm' => 'webm',
             'audio/mpeg' => 'mp3',
             'audio/wav' => 'wav',
+            'audio/ogg' => 'ogg',
+            'audio/ogg; codecs=opus' => 'ogg',
             'application/pdf' => 'pdf',
             'application/msword' => 'doc',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
@@ -186,6 +208,39 @@ class AttachmentService
         ];
         
         return $mimeMap[$mimeType] ?? null;
+    }
+
+    /**
+     * Converter áudio WebM para OGG/Opus (compatibilidade com player nativo do WhatsApp)
+     */
+    private static function convertWebmToOpus(string $sourcePath, string $conversationDir): array
+    {
+        $targetFilename = uniqid('msg_', true) . '_' . time() . '.ogg';
+        $targetPath = $conversationDir . $targetFilename;
+
+        // Verificar ffmpeg
+        $ffmpegPath = trim((string) shell_exec('command -v ffmpeg'));
+        if (empty($ffmpegPath)) {
+            return ['success' => false, 'error' => 'ffmpeg não encontrado no PATH'];
+        }
+
+        $cmd = escapeshellcmd($ffmpegPath) . ' -y -i ' . escapeshellarg($sourcePath) . ' -c:a libopus -b:a 96k -vn ' . escapeshellarg($targetPath) . ' 2>&1';
+        exec($cmd, $output, $exitCode);
+
+        if ($exitCode !== 0 || !file_exists($targetPath) || filesize($targetPath) === 0) {
+            return ['success' => false, 'error' => 'ffmpeg falhou: ' . implode("\n", $output)];
+        }
+
+        // Remover original
+        @unlink($sourcePath);
+
+        return [
+            'success' => true,
+            'filename' => $targetFilename,
+            'filepath' => $targetPath,
+            'mime_type' => 'audio/ogg; codecs=opus',
+            'size' => filesize($targetPath)
+        ];
     }
 
     /**

@@ -1344,7 +1344,7 @@ body.dark-mode .swal2-content {
                                         <?php endif; ?>
                                                         <?php
                                                         $nameRaw = $conv['contact_name'] ?? 'Sem nome';
-                                                        $maxName = 25;
+                                                        $maxName = 22;
                                                         $displayName = mb_strlen($nameRaw) > $maxName ? mb_substr($nameRaw, 0, $maxName) . '...' : $nameRaw;
                                                         echo htmlspecialchars($displayName);
                                                         ?>
@@ -3223,26 +3223,27 @@ function updateConversationSidebar(conversation, tags) {
     sidebar.dataset.conversationId = conversation.id;
     
     // Atualizar avatar ou iniciais do contato
-    const avatarContainer = sidebar.querySelector('.sidebar-contact-avatar');
-    if (avatarContainer) {
+    const initialsEl = sidebar.querySelector('#sidebar-contact-initials');
+    if (initialsEl) {
+        // Pegar o elemento pai (symbol-label)
+        const symbolLabel = initialsEl.closest('.symbol-label') || initialsEl.parentElement;
+        
         if (conversation.contact_avatar) {
-            // Mostrar imagem do avatar
-            avatarContainer.innerHTML = `<img src="${escapeHtml(conversation.contact_avatar)}" alt="Avatar" class="w-100 h-100 rounded" style="object-fit: cover;">`;
+            // Substituir por imagem do avatar
+            symbolLabel.innerHTML = `<img src="${escapeHtml(conversation.contact_avatar)}" alt="Avatar" class="w-100 h-100 rounded" style="object-fit: cover;">`;
         } else if (conversation.contact_name) {
-            // Mostrar iniciais
+            // Atualizar iniciais
             const name = conversation.contact_name;
             const parts = name.split(' ');
             const initials = (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
-            avatarContainer.innerHTML = `<div id="sidebar-contact-initials" class="symbol-label bg-light-primary text-primary fw-bold">${initials}</div>`;
-        }
-    } else {
-        // Fallback: atualizar iniciais se elemento antigo existir
-        const initialsEl = sidebar.querySelector('#sidebar-contact-initials');
-        if (initialsEl && conversation.contact_name) {
-            const name = conversation.contact_name;
-            const parts = name.split(' ');
-            const initials = (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
-            initialsEl.textContent = initials;
+            
+            // Se já é um elemento de iniciais, apenas atualizar texto
+            if (initialsEl.id === 'sidebar-contact-initials') {
+                initialsEl.textContent = initials;
+            } else {
+                // Caso contrário, recriar elemento de iniciais
+                symbolLabel.innerHTML = `<div id="sidebar-contact-initials" class="symbol-label bg-light-primary text-primary fw-bold">${initials}</div>`;
+            }
         }
     }
     
@@ -3969,7 +3970,7 @@ function refreshConversationList(params = null) {
             
             const isActive = selectedConversationId == conv.id;
             const nameRaw = conv.contact_name || 'NN';
-            const maxName = 25;
+            const maxName = 22;
             const name = nameRaw.length > maxName ? nameRaw.substring(0, maxName) + '...' : nameRaw;
             const parts = nameRaw.split(' ');
             const initials = (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
@@ -8362,7 +8363,7 @@ function addConversationToList(conv) {
     const isActive = selectedConversationId == conv.id;
     
     const nameRaw = conv.contact_name || 'NN';
-    const maxName = 25;
+    const maxName = 22;
     const name = nameRaw.length > maxName ? nameRaw.substring(0, maxName) + '...' : nameRaw;
     const parts = nameRaw.split(' ');
     const initials = (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();

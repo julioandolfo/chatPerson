@@ -2627,6 +2627,14 @@ function applyConversationUpdate(conv) {
         }
     }
 
+    // Garantir botão de fixar e classe pinned
+    ensurePinButton(conversationItem, conv.pinned === 1 || conv.pinned === true, conv.id);
+    if (conv.pinned === 1 || conv.pinned === true) {
+        conversationItem.classList.add('pinned');
+    } else {
+        conversationItem.classList.remove('pinned');
+    }
+
     const unreadCount = conv.unread_count || 0;
     if (unreadCount > 0) {
         if (badge) {
@@ -3935,17 +3943,17 @@ function refreshConversationList(params = null) {
                                     ${pinned ? '<i class="ki-duotone ki-pin fs-7 text-warning" title="Fixada"><span class="path1"></span><span class="path2"></span></i>' : ''}
                                     ${escapeHtml(name)}
                                 </div>
-                                <div class="conversation-item-time d-flex align-items-center gap-2">
-                                    ${formatTime(conv.last_message_at || conv.updated_at)}
-                                    <button type="button" class="btn btn-sm btn-icon btn-light p-0" 
-                                            onclick="event.stopPropagation(); togglePin(${conv.id}, ${pinned ? 'true' : 'false'})" 
-                                            title="${pinned ? 'Desfixar' : 'Fixar'}">
-                                        <i class="ki-duotone ki-pin fs-7 ${pinned ? 'text-warning' : 'text-muted'}">
-                                            <span class="path1"></span>
-                                            <span class="path2"></span>
-                                        </i>
-                                    </button>
-                                </div>
+                    <div class="conversation-item-time d-flex align-items-center gap-2">
+                        ${formatTime(conv.last_message_at || conv.updated_at)}
+                        <button type="button" class="btn btn-sm btn-icon btn-light p-0 conversation-item-pin" 
+                                onclick="event.stopPropagation(); togglePin(${conv.id}, ${pinned ? 'true' : 'false'})" 
+                                title="${pinned ? 'Desfixar' : 'Fixar'}">
+                            <i class="ki-duotone ki-pin fs-7 ${pinned ? 'text-warning' : 'text-muted'}">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                        </button>
+                    </div>
                             </div>
                             <div class="conversation-item-preview">${escapeHtml(lastMessagePreview || 'Sem mensagens')}</div>
                             ${conv.search_match_type ? `
@@ -5590,6 +5598,9 @@ function updateConversationInList(conversationId, lastMessage) {
             // Atualizar data-updated-at
             conversationItem.setAttribute('data-updated-at', new Date().toISOString());
         }
+        
+        // Garantir botão de fixar
+        ensurePinButton(conversationItem, conversationItem.classList.contains('pinned'), conversationId);
         
         // Resortear lista após atualizar
         sortConversationList();
@@ -8024,6 +8035,7 @@ if (typeof window.wsClient !== 'undefined') {
             const preview = conversationItem.querySelector('.conversation-item-preview');
             const time = conversationItem.querySelector('.conversation-item-time');
             const badge = conversationItem.querySelector('.conversation-item-badge');
+            const pinned = conversationItem.classList.contains('pinned');
             
             if (preview) {
                 const content = data.message.content || '';
@@ -8048,6 +8060,9 @@ if (typeof window.wsClient !== 'undefined') {
                 }
             }
             
+            // Garantir botão de fixar
+            ensurePinButton(conversationItem, pinned, data.conversation_id);
+
             // Mover conversa para o topo se não for a atual
             if (currentConversationId != data.conversation_id) {
                 const list = conversationItem.parentElement;
@@ -8194,7 +8209,7 @@ const currentConversationId = parsePhpJson('<?= json_encode($selectedConversatio
     // Atualizar tempos relativos a cada 30 segundos
     let timeUpdateInterval = setInterval(() => {
         updateConversationTimes();
-    }, 30000); // 30 segundos // 10 segundos
+    }, 30000); // 30 segundos
     
     // Carregar funcionalidades do Assistente IA quando modal for aberto
     const aiAssistantModal = document.getElementById('kt_modal_ai_assistant');
@@ -8214,6 +8229,11 @@ const currentConversationId = parsePhpJson('<?= json_encode($selectedConversatio
     let conversationListUpdateInterval = setInterval(() => {
         refreshConversationBadges();
     }, 10000); // 10 segundos
+
+    // Atualizar tempos relativos a cada 30 segundos (modo polling)
+    let timeUpdateInterval = setInterval(() => {
+        updateConversationTimes();
+    }, 30000); // 30 segundos
 }
 
 // Fallback global (sempre ativo): ouvir evento disparado pelo RealtimeClient (polling)
@@ -8293,6 +8313,10 @@ function addConversationToList(conv) {
     }
     
     // Criar HTML do item
+    const avatarHtml = conv.contact_avatar
+        ? `<div class="symbol-label"><img src="${escapeHtml(conv.contact_avatar)}" alt="${escapeHtml(name)}" class="h-45px w-45px rounded" style="object-fit: cover;"></div>`
+        : `<div class="symbol-label bg-light-primary text-primary fw-bold">${initials}</div>`;
+
     const conversationHtml = `
         <div class="conversation-item ${isActive ? 'active' : ''} ${pinned ? 'pinned' : ''}" 
              data-conversation-id="${conv.id}"
@@ -8300,7 +8324,7 @@ function addConversationToList(conv) {
              data-onclick="selectConversation">
             <div class="d-flex gap-3 w-100">
                 <div class="symbol symbol-45px flex-shrink-0">
-                    <div class="symbol-label bg-light-primary text-primary fw-bold">${initials}</div>
+                    ${avatarHtml}
                 </div>
                 <div class="flex-grow-1 min-w-0">
                     <div class="conversation-item-header">
@@ -8310,7 +8334,7 @@ function addConversationToList(conv) {
                         </div>
                         <div class="conversation-item-time d-flex align-items-center gap-2">
                             ${formatTime(conv.last_message_at || conv.updated_at)}
-                            <button type="button" class="btn btn-sm btn-icon btn-light p-0" 
+                            <button type="button" class="btn btn-sm btn-icon btn-light p-0 conversation-item-pin" 
                                     onclick="event.stopPropagation(); togglePin(${conv.id}, ${pinned ? 'true' : 'false'})" 
                                     title="${pinned ? 'Desfixar' : 'Fixar'}">
                                 <i class="ki-duotone ki-pin fs-7 ${pinned ? 'text-warning' : 'text-muted'}">

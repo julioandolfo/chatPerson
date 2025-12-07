@@ -264,10 +264,9 @@ ob_start();
 }
 
 .conversation-item-header {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    display: flex;
     align-items: center;
-    column-gap: 8px;
+    gap: 8px;
     min-width: 0;
     margin-bottom: 6px;
 }
@@ -286,7 +285,7 @@ ob_start();
 .conversation-item-time {
     font-size: 12px;
     color: var(--bs-text-muted);
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 6px;
     flex-shrink: 0;
@@ -306,6 +305,7 @@ ob_start();
     white-space: nowrap;
     margin-bottom: 8px;
     max-width: 100%;
+    display: block;
 }
 
 .conversation-item-search-match {

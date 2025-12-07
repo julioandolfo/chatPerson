@@ -4,10 +4,25 @@
  * Execute via navegador ou CLI para atualizar o instance_id
  */
 
-require_once __DIR__ . '/../../bootstrap.php';
+// Definir ambiente CLI
+if (php_sapi_name() !== 'cli') {
+    header('Content-Type: text/plain; charset=utf-8');
+}
+
+// Carregar autoload e configurações
+require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../../config/database.php';
 
 use App\Models\WhatsAppAccount;
 use App\Helpers\Logger;
+use App\Helpers\Database;
+
+// Inicializar conexão com banco
+try {
+    Database::getInstance();
+} catch (\Exception $e) {
+    die("❌ Erro ao conectar ao banco de dados: " . $e->getMessage() . "\n");
+}
 
 // ID da conta WhatsApp para atualizar (ajuste conforme necessário)
 $accountId = 12; // Altere para o ID correto da sua conta

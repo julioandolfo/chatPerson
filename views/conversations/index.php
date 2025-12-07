@@ -7877,6 +7877,7 @@ if (typeof window.wsClient !== 'undefined') {
                         })
                         .catch(err => console.error('Erro ao atualizar status:', err));
                 }
+            }
         }
     });
     

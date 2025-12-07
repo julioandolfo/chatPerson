@@ -8011,9 +8011,17 @@ if (typeof window.wsClient !== 'undefined') {
     // Handler para novas conversas criadas
     window.wsClient.on('new_conversation', (data) => {
         console.log('Nova conversa recebida (WS/Poll):', data);
-        // Adicionar nova conversa à lista sem recarregar a página
-        if (data.conversation) {
-            addConversationToList(data.conversation);
+        try {
+            // Adicionar nova conversa à lista sem recarregar a página
+            if (data.conversation) {
+                addConversationToList(data.conversation);
+            } else {
+                console.warn('new_conversation sem campo conversation', data);
+            }
+        } catch (err) {
+            console.error('Erro ao adicionar nova conversa na lista:', err);
+            // Fallback: recarregar lista por AJAX
+            refreshConversationList();
         }
     });
     

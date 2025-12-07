@@ -411,6 +411,12 @@ document.getElementById('kt_modal_new_contact_form')?.addEventListener('submit',
         alert('Erro ao salvar contato');
     });
 });
+
+// Abrir contato para edição
+function editContact(id) {
+    if (!id) return;
+    window.location.href = '<?= \App\Helpers\Url::to('/contacts/') ?>' + id;
+}
 </script>
 
 <?php 

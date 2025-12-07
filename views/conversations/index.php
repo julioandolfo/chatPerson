@@ -8515,6 +8515,13 @@ function useAIResponse(index, responseId = null) {
                        document.body.classList.contains('dark-mode') ||
                        window.matchMedia('(prefers-color-scheme: dark)').matches;
     
+    const tokensText = response.tokens_used
+        ? ' • ' + response.tokens_used.toLocaleString('pt-BR') + ' tokens'
+        : '';
+    const costText = response.cost
+        ? ' • R$ ' + response.cost.toFixed(4).replace('.', ',')
+        : '';
+    
     Swal.fire({
         title: 'Preview da Resposta',
         html: `
@@ -8524,9 +8531,7 @@ function useAIResponse(index, responseId = null) {
                     <i class="ki-duotone ki-abstract-26 fs-6 me-1">
                         <span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span>
                     </i>
-                    ${escapeHtml(response.agent_name || 'Assistente IA')}
-                    ${response.tokens_used ? ` • ${response.tokens_used.toLocaleString('pt-BR')} tokens` : ''}
-                    ${response.cost ? ` • R$ ${response.cost.toFixed(4).replace('.', ',')}` : ''}
+                    ${escapeHtml(response.agent_name || 'Assistente IA')}${tokensText}${costText}
                 </div>
             </div>
         `,

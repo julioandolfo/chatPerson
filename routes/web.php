@@ -63,6 +63,17 @@ Router::get('/conversations/{id}/messages', [ConversationController::class, 'get
 Router::get('/conversations/{id}/participants', [ConversationController::class, 'getParticipants'], ['Authentication']);
 Router::post('/conversations/{id}/participants', [ConversationController::class, 'addParticipant'], ['Authentication']);
 Router::delete('/conversations/{id}/participants/{userId}', [ConversationController::class, 'removeParticipant'], ['Authentication']);
+// Rotas de ações de conversa
+Router::post('/conversations/{id}/mark-read', [ConversationController::class, 'markRead'], ['Authentication']);
+Router::post('/conversations/{id}/mark-unread', [ConversationController::class, 'markUnread'], ['Authentication']);
+// Rotas de mensagens agendadas
+Router::post('/conversations/{id}/schedule-message', [ConversationController::class, 'scheduleMessage'], ['Authentication']);
+Router::get('/conversations/{id}/scheduled-messages', [ConversationController::class, 'getScheduledMessages'], ['Authentication']);
+Router::delete('/conversations/{id}/scheduled-messages/{messageId}', [ConversationController::class, 'cancelScheduledMessage'], ['Authentication']);
+// Rotas de lembretes
+Router::post('/conversations/{id}/reminders', [ConversationController::class, 'createReminder'], ['Authentication']);
+Router::get('/conversations/{id}/reminders', [ConversationController::class, 'getReminders'], ['Authentication']);
+Router::post('/reminders/{reminderId}/resolve', [ConversationController::class, 'resolveReminder'], ['Authentication']);
 
 // Rotas de Busca Global
 Router::get('/search/global', [SearchController::class, 'global'], ['Authentication']);

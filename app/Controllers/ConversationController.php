@@ -716,6 +716,229 @@ class ConversationController
     }
     
     /**
+     * Marcar conversa como lida
+     */
+    public function markRead(int $id): void
+    {
+        Permission::abortIfCannot('conversations.edit.own');
+        
+        try {
+            $conversation = \App\Models\Conversation::find($id);
+            if (!$conversation) {
+                Response::json(['success' => false, 'message' => 'Conversa não encontrada'], 404);
+                return;
+            }
+            
+            $userId = \App\Helpers\Auth::id();
+            \App\Models\Message::markAsRead($id, $userId);
+            
+            // Invalidar cache
+            \App\Services\ConversationService::invalidateCache($id);
+            
+            Response::json(['success' => true, 'message' => 'Conversa marcada como lida']);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+    
+    /**
+     * Marcar conversa como não lida
+     */
+    public function markUnread(int $id): void
+    {
+        Permission::abortIfCannot('conversations.edit.own');
+        
+        try {
+            $conversation = \App\Models\Conversation::find($id);
+            if (!$conversation) {
+                Response::json(['success' => false, 'message' => 'Conversa não encontrada'], 404);
+                return;
+            }
+            
+            // Marcar todas mensagens do contato como não lidas (remover read_at)
+            $sql = "UPDATE messages 
+                    SET read_at = NULL 
+                    WHERE conversation_id = ? 
+                    AND sender_type = 'contact'";
+            
+            \App\Helpers\Database::execute($sql, [$id]);
+            
+            // Invalidar cache
+            \App\Services\ConversationService::invalidateCache($id);
+            
+            Response::json(['success' => true, 'message' => 'Conversa marcada como não lida']);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+    
+    /**
+     * Agendar mensagem
+     */
+    public function scheduleMessage(int $id): void
+    {
+        Permission::abortIfCannot('conversations.edit.own');
+        
+        try {
+            // Verificar se é JSON ou FormData
+            $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+            $isJson = strpos($contentType, 'application/json') !== false;
+            
+            if ($isJson) {
+                $data = \App\Helpers\Request::json();
+                $attachments = $data['attachments'] ?? [];
+            } else {
+                // FormData
+                $data = $_POST;
+                $attachments = [];
+                
+                // Processar anexo se houver
+                if (!empty($_FILES['attachment'])) {
+                    $file = $_FILES['attachment'];
+                    if ($file['error'] === UPLOAD_ERR_OK) {
+                        $attachmentData = \App\Services\AttachmentService::upload([
+                            'name' => $file['name'],
+                            'type' => $file['type'],
+                            'tmp_name' => $file['tmp_name'],
+                            'error' => $file['error'],
+                            'size' => $file['size']
+                        ], $id);
+                        $attachments[] = $attachmentData;
+                    }
+                }
+            }
+            
+            $content = $data['content'] ?? '';
+            $scheduledAt = $data['scheduled_at'] ?? '';
+            $cancelIfResolved = !empty($data['cancel_if_resolved']);
+            $cancelIfResponded = !empty($data['cancel_if_responded']);
+            
+            if (empty($scheduledAt)) {
+                Response::json(['success' => false, 'message' => 'Data/hora agendada é obrigatória'], 400);
+                return;
+            }
+            
+            $userId = \App\Helpers\Auth::id();
+            $messageId = \App\Services\ScheduledMessageService::schedule(
+                $id,
+                $userId,
+                $content,
+                $scheduledAt,
+                $attachments,
+                $cancelIfResolved,
+                $cancelIfResponded
+            );
+            
+            Response::json([
+                'success' => true, 
+                'message' => 'Mensagem agendada com sucesso',
+                'scheduled_message_id' => $messageId
+            ]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+    
+    /**
+     * Obter mensagens agendadas de uma conversa
+     */
+    public function getScheduledMessages(int $id): void
+    {
+        Permission::abortIfCannot('conversations.view.own');
+        
+        try {
+            $status = \App\Helpers\Request::get('status'); // opcional: 'pending', 'sent', 'cancelled', 'failed'
+            $messages = \App\Services\ScheduledMessageService::getByConversation($id, $status);
+            
+            Response::json(['success' => true, 'messages' => $messages]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+    
+    /**
+     * Cancelar mensagem agendada
+     */
+    public function cancelScheduledMessage(int $id, int $messageId): void
+    {
+        Permission::abortIfCannot('conversations.edit.own');
+        
+        try {
+            $userId = \App\Helpers\Auth::id();
+            \App\Services\ScheduledMessageService::cancel($messageId, $userId);
+            
+            Response::json(['success' => true, 'message' => 'Mensagem agendada cancelada']);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+    
+    /**
+     * Criar lembrete
+     */
+    public function createReminder(int $id): void
+    {
+        Permission::abortIfCannot('conversations.edit.own');
+        
+        try {
+            $data = \App\Helpers\Request::json();
+            
+            $reminderAt = $data['reminder_at'] ?? '';
+            $note = $data['note'] ?? null;
+            
+            if (empty($reminderAt)) {
+                Response::json(['success' => false, 'message' => 'Data/hora do lembrete é obrigatória'], 400);
+                return;
+            }
+            
+            $userId = \App\Helpers\Auth::id();
+            $reminderId = \App\Services\ReminderService::create($id, $userId, $reminderAt, $note);
+            
+            Response::json([
+                'success' => true, 
+                'message' => 'Lembrete criado com sucesso',
+                'reminder_id' => $reminderId
+            ]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+    
+    /**
+     * Obter lembretes de uma conversa
+     */
+    public function getReminders(int $id): void
+    {
+        Permission::abortIfCannot('conversations.view.own');
+        
+        try {
+            $onlyActive = \App\Helpers\Request::get('only_active') === '1';
+            $reminders = \App\Services\ReminderService::getByConversation($id, $onlyActive);
+            
+            Response::json(['success' => true, 'reminders' => $reminders]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+    
+    /**
+     * Marcar lembrete como resolvido
+     */
+    public function resolveReminder(int $reminderId): void
+    {
+        Permission::abortIfCannot('conversations.edit.own');
+        
+        try {
+            $userId = \App\Helpers\Auth::id();
+            \App\Services\ReminderService::markAsResolved($reminderId, $userId);
+            
+            Response::json(['success' => true, 'message' => 'Lembrete marcado como resolvido']);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+    
+    /**
      * Buscar mensagens dentro de uma conversa
      */
     public function searchMessages(int $id): void

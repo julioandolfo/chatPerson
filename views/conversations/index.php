@@ -1368,14 +1368,57 @@ body.dark-mode .swal2-content {
                                     echo '-';
                                 }
                                 ?>
-                                <button type="button" class="btn btn-sm btn-icon btn-light p-0 conversation-item-pin" 
-                                        onclick="event.stopPropagation(); togglePin(<?= $conv['id'] ?>, <?= !empty($conv['pinned']) ? 'true' : 'false' ?>)" 
-                                        title="<?= !empty($conv['pinned']) ? 'Desfixar' : 'Fixar' ?>">
-                                    <i class="ki-duotone ki-pin fs-7 <?= !empty($conv['pinned']) ? 'text-warning' : 'text-muted' ?>">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                </button>
+                                <div class="dropdown conversation-item-actions">
+                                    <button type="button" class="btn btn-sm btn-icon btn-light p-0" 
+                                            data-bs-toggle="dropdown" 
+                                            aria-expanded="false"
+                                            onclick="event.stopPropagation();">
+                                        <i class="ki-duotone ki-dots-vertical fs-7 text-muted">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end" data-conversation-id="<?= $conv['id'] ?>">
+                                        <li>
+                                            <a class="dropdown-item" href="#" onclick="event.stopPropagation(); togglePin(<?= $conv['id'] ?>, <?= !empty($conv['pinned']) ? 'true' : 'false' ?>); return false;">
+                                                <i class="ki-duotone ki-pin fs-7 me-2 <?= !empty($conv['pinned']) ? 'text-warning' : '' ?>">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                <?= !empty($conv['pinned']) ? 'Desfixar' : 'Fixar' ?>
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="#" onclick="event.stopPropagation(); markConversationAsRead(<?= $conv['id'] ?>); return false;">
+                                                <i class="ki-duotone ki-check fs-7 me-2 text-success">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                Marcar como Lido
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="#" onclick="event.stopPropagation(); markConversationAsUnread(<?= $conv['id'] ?>); return false;">
+                                                <i class="ki-duotone ki-eye-slash fs-7 me-2 text-danger">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                Marcar como Não Lido
+                                            </a>
+                                        </li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <a class="dropdown-item" href="#" onclick="event.stopPropagation(); showReminderModal(<?= $conv['id'] ?>); return false;">
+                                                <i class="ki-duotone ki-notification-bing fs-7 me-2 text-primary">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                Agendar Lembrete
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
                             </div>
                         </div>
                         <div class="conversation-item-preview">
@@ -1706,6 +1749,14 @@ body.dark-mode .swal2-content {
                             <line x1="12" y1="19" x2="12" y2="23"></line>
                             <line x1="8" y1="23" x2="16" y2="23"></line>
                         </svg>
+                    </button>
+                    <button class="btn btn-sm btn-icon btn-light-primary" title="Agendar mensagem" onclick="showScheduleMessageModal()">
+                        <i class="ki-duotone ki-calendar-tick fs-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                            <span class="path4"></span>
+                        </i>
                     </button>
                     <button class="btn btn-sm btn-icon btn-light-primary" title="Emoji" onclick="toggleEmoji()">
                         <i class="ki-duotone ki-emoji-happy fs-3">
@@ -2471,6 +2522,116 @@ body.dark-mode .swal2-content {
     </div>
 </div>
 
+<!-- MODAL: Agendar Mensagem -->
+<div class="modal fade" id="kt_modal_schedule_message" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-650px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Agendar Mensagem</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <form id="scheduleMessageForm">
+                    <input type="hidden" id="schedule_conversation_id" name="conversation_id">
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold mb-2">Mensagem:</label>
+                        <textarea class="form-control form-control-solid" id="schedule_message_content" name="content" rows="5" placeholder="Digite sua mensagem aqui..."></textarea>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold mb-2">Anexar arquivo (opcional):</label>
+                        <input type="file" class="form-control form-control-solid" id="schedule_message_attachment" name="attachment" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt">
+                        <div class="form-text">Você pode anexar imagens, vídeos, áudios ou documentos</div>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold mb-2">Data e Hora:</label>
+                        <div class="row">
+                            <div class="col-6">
+                                <input type="date" class="form-control form-control-solid" id="schedule_message_date" name="date" required>
+                            </div>
+                            <div class="col-6">
+                                <input type="time" class="form-control form-control-solid" id="schedule_message_time" name="time" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold mb-3">Opções:</label>
+                        <div class="form-check form-check-custom form-check-solid mb-2">
+                            <input class="form-check-input" type="checkbox" id="schedule_cancel_if_resolved" name="cancel_if_resolved">
+                            <label class="form-check-label" for="schedule_cancel_if_resolved">
+                                Cancelar se conversa foi resolvida
+                            </label>
+                        </div>
+                        <div class="form-check form-check-custom form-check-solid">
+                            <input class="form-check-input" type="checkbox" id="schedule_cancel_if_responded" name="cancel_if_responded">
+                            <label class="form-check-label" for="schedule_cancel_if_responded">
+                                Cancelar se já foi respondida
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Agendar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Agendar Lembrete -->
+<div class="modal fade" id="kt_modal_reminder" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-500px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Agendar Lembrete</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <form id="reminderForm">
+                    <input type="hidden" id="reminder_conversation_id" name="conversation_id">
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold mb-2">Data e Hora do Lembrete:</label>
+                        <div class="row">
+                            <div class="col-6">
+                                <input type="date" class="form-control form-control-solid" id="reminder_date" name="date" required>
+                            </div>
+                            <div class="col-6">
+                                <input type="time" class="form-control form-control-solid" id="reminder_time" name="time" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold mb-2">Nota (opcional):</label>
+                        <textarea class="form-control form-control-solid" id="reminder_note" name="note" rows="3" placeholder="Ex: Verificar se cliente respondeu"></textarea>
+                    </div>
+                    
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Criar Lembrete</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: Filtros Avançados -->
 <div class="modal fade" id="kt_modal_advanced_filters" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered mw-700px">
@@ -2712,31 +2873,76 @@ function moveConversationToTop(conversationId) {
     }
 }
 
-// Garantir que o botão de fixar exista e reflita o estado
-function ensurePinButton(conversationItem, pinned, conversationId) {
+// Garantir que o dropdown de ações exista e reflita o estado
+function ensureActionsDropdown(conversationItem, pinned, conversationId) {
     const timeContainer = conversationItem.querySelector('.conversation-item-time');
     if (!timeContainer) return;
 
-    // Primeiro, remover TODOS os botões de fixar existentes para evitar duplicação
-    const existingButtons = conversationItem.querySelectorAll('.conversation-item-pin');
-    existingButtons.forEach(btn => btn.remove());
+    // Remover dropdown existente se houver
+    const existingDropdown = conversationItem.querySelector('.conversation-item-actions');
+    if (existingDropdown) {
+        existingDropdown.remove();
+    }
 
-    const iconClass = pinned ? 'text-warning' : 'text-muted';
-    const title = pinned ? 'Desfixar' : 'Fixar';
+    const pinText = pinned ? 'Desfixar' : 'Fixar';
+    const pinIconClass = pinned ? 'text-warning' : '';
 
-    const btnHtml = `
-        <button type="button" class="btn btn-sm btn-icon btn-light p-0 conversation-item-pin" 
-                onclick="event.stopPropagation(); togglePin(${conversationId}, ${pinned ? 'true' : 'false'})" 
-                title="${title}">
-            <i class="ki-duotone ki-pin fs-7 ${iconClass}">
-                <span class="path1"></span>
-                <span class="path2"></span>
-            </i>
-        </button>
+    const dropdownHtml = `
+        <div class="dropdown conversation-item-actions">
+            <button type="button" class="btn btn-sm btn-icon btn-light p-0" 
+                    data-bs-toggle="dropdown" 
+                    aria-expanded="false"
+                    onclick="event.stopPropagation();">
+                <i class="ki-duotone ki-dots-vertical fs-7 text-muted">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                    <span class="path3"></span>
+                </i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" data-conversation-id="${conversationId}">
+                <li>
+                    <a class="dropdown-item" href="#" onclick="event.stopPropagation(); togglePin(${conversationId}, ${pinned ? 'true' : 'false'}); return false;">
+                        <i class="ki-duotone ki-pin fs-7 me-2 ${pinIconClass}">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        ${pinText}
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item" href="#" onclick="event.stopPropagation(); markConversationAsRead(${conversationId}); return false;">
+                        <i class="ki-duotone ki-check fs-7 me-2 text-success">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Marcar como Lido
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item" href="#" onclick="event.stopPropagation(); markConversationAsUnread(${conversationId}); return false;">
+                        <i class="ki-duotone ki-eye-slash fs-7 me-2 text-danger">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Marcar como Não Lido
+                    </a>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <a class="dropdown-item" href="#" onclick="event.stopPropagation(); showReminderModal(${conversationId}); return false;">
+                        <i class="ki-duotone ki-notification-bing fs-7 me-2 text-primary">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Agendar Lembrete
+                    </a>
+                </li>
+            </ul>
+        </div>
     `;
 
-    // Sempre inserir um novo botão no local correto (dentro de timeContainer)
-    timeContainer.insertAdjacentHTML('beforeend', btnHtml);
+    // Inserir dropdown no timeContainer
+    timeContainer.insertAdjacentHTML('beforeend', dropdownHtml);
 
     // Atualizar classe do item
     if (pinned) {
@@ -2800,7 +3006,7 @@ function applyConversationUpdate(conv) {
     }
 
     // Garantir botão de fixar e classe pinned
-    ensurePinButton(conversationItem, pinned, conv.id);
+            ensureActionsDropdown(conversationItem, pinned, conv.id);
 
     const unreadCount = conv.unread_count || 0;
     if (unreadCount > 0) {
@@ -4264,14 +4470,57 @@ function refreshConversationList(params = null) {
                                 </div>
                     <div class="conversation-item-time d-flex align-items-center gap-2">
                         ${formatTime(conv.last_message_at || conv.updated_at)}
-                        <button type="button" class="btn btn-sm btn-icon btn-light p-0 conversation-item-pin" 
-                                onclick="event.stopPropagation(); togglePin(${conv.id}, ${pinned ? 'true' : 'false'})" 
-                                title="${pinned ? 'Desfixar' : 'Fixar'}">
-                            <i class="ki-duotone ki-pin fs-7 ${pinned ? 'text-warning' : 'text-muted'}">
-                                <span class="path1"></span>
-                                <span class="path2"></span>
-                            </i>
-                        </button>
+                        <div class="dropdown conversation-item-actions">
+                            <button type="button" class="btn btn-sm btn-icon btn-light p-0" 
+                                    data-bs-toggle="dropdown" 
+                                    aria-expanded="false"
+                                    onclick="event.stopPropagation();">
+                                <i class="ki-duotone ki-dots-vertical fs-7 text-muted">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end" data-conversation-id="${conv.id}">
+                                <li>
+                                    <a class="dropdown-item" href="#" onclick="event.stopPropagation(); togglePin(${conv.id}, ${pinned ? 'true' : 'false'}); return false;">
+                                        <i class="ki-duotone ki-pin fs-7 me-2 ${pinned ? 'text-warning' : ''}">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        ${pinned ? 'Desfixar' : 'Fixar'}
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="#" onclick="event.stopPropagation(); markConversationAsRead(${conv.id}); return false;">
+                                        <i class="ki-duotone ki-check fs-7 me-2 text-success">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        Marcar como Lido
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="#" onclick="event.stopPropagation(); markConversationAsUnread(${conv.id}); return false;">
+                                        <i class="ki-duotone ki-eye-slash fs-7 me-2 text-danger">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        Marcar como Não Lido
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item" href="#" onclick="event.stopPropagation(); showReminderModal(${conv.id}); return false;">
+                                        <i class="ki-duotone ki-notification-bing fs-7 me-2 text-primary">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        Agendar Lembrete
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                             </div>
                             <div class="conversation-item-preview">${escapeHtml(lastMessagePreview || 'Sem mensagens')}</div>
@@ -4442,8 +4691,25 @@ function togglePin(conversationId, isPinned) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Recarregar página para atualizar lista
-            window.location.reload();
+            // Atualizar UI sem recarregar página
+            const conversationItem = document.querySelector(`[data-conversation-id="${conversationId}"]`);
+            if (conversationItem) {
+                const newPinnedState = !isPinned;
+                ensureActionsDropdown(conversationItem, newPinnedState, conversationId);
+                sortConversationList();
+            }
+            
+            // Toast de sucesso
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'success',
+                    title: data.message || (isPinned ? 'Conversa desfixada' : 'Conversa fixada'),
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 2000
+                });
+            }
         } else {
             alert('Erro ao ' + (isPinned ? 'desfixar' : 'fixar') + ' conversa: ' + (data.message || 'Erro desconhecido'));
         }
@@ -4452,6 +4718,183 @@ function togglePin(conversationId, isPinned) {
         console.error('Erro:', error);
         alert('Erro ao ' + (isPinned ? 'desfixar' : 'fixar') + ' conversa');
     });
+}
+
+// Marcar conversa como lida
+function markConversationAsRead(conversationId) {
+    fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/mark-read`, {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Remover badge de não lido
+            const conversationItem = document.querySelector(`[data-conversation-id="${conversationId}"]`);
+            if (conversationItem) {
+                const badge = conversationItem.querySelector('.conversation-item-badge');
+                if (badge) badge.remove();
+            }
+            
+            // Atualizar contador global
+            if (typeof updateUnreadCount === 'function') {
+                updateUnreadCount();
+            }
+            
+            // Toast de sucesso
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Conversa marcada como lida',
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 2000
+                });
+            }
+        } else {
+            alert('Erro ao marcar como lida: ' + (data.message || 'Erro desconhecido'));
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao marcar conversa como lida');
+    });
+}
+
+// Marcar conversa como não lida
+function markConversationAsUnread(conversationId) {
+    fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/mark-unread`, {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Adicionar badge de não lido
+            const conversationItem = document.querySelector(`[data-conversation-id="${conversationId}"]`);
+            if (conversationItem) {
+                const meta = conversationItem.querySelector('.conversation-item-meta');
+                if (meta && !meta.querySelector('.conversation-item-badge')) {
+                    const badge = document.createElement('span');
+                    badge.className = 'conversation-item-badge';
+                    badge.textContent = '1';
+                    meta.appendChild(badge);
+                }
+            }
+            
+            // Atualizar contador global
+            if (typeof updateUnreadCount === 'function') {
+                updateUnreadCount();
+            }
+            
+            // Toast de sucesso
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Conversa marcada como não lida',
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 2000
+                });
+            }
+        } else {
+            alert('Erro ao marcar como não lida: ' + (data.message || 'Erro desconhecido'));
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao marcar conversa como não lida');
+    });
+}
+
+// Mostrar modal de agendar mensagem
+function showScheduleMessageModal() {
+    const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+    if (!conversationId) {
+        alert('Selecione uma conversa primeiro');
+        return;
+    }
+    
+    const modal = document.getElementById('kt_modal_schedule_message');
+    if (!modal) {
+        console.error('Modal de agendar mensagem não encontrado');
+        return;
+    }
+    
+    // Limpar formulário
+    const form = modal.querySelector('#scheduleMessageForm');
+    if (form) form.reset();
+    
+    // Definir conversation_id
+    const conversationIdInput = modal.querySelector('#schedule_conversation_id');
+    if (conversationIdInput) {
+        conversationIdInput.value = conversationId;
+    }
+    
+    // Definir data/hora mínima (hoje, agora)
+    const dateInput = modal.querySelector('#schedule_message_date');
+    const timeInput = modal.querySelector('#schedule_message_time');
+    if (dateInput) {
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0];
+        dateInput.value = dateStr;
+        dateInput.min = dateStr;
+    }
+    if (timeInput) {
+        const now = new Date();
+        const timeStr = now.toTimeString().slice(0, 5);
+        timeInput.value = timeStr;
+    }
+    
+    // Abrir modal
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+}
+
+// Mostrar modal de agendar lembrete
+function showReminderModal(conversationId) {
+    const modal = document.getElementById('kt_modal_reminder');
+    if (!modal) {
+        console.error('Modal de lembrete não encontrado');
+        return;
+    }
+    
+    // Limpar formulário
+    const form = modal.querySelector('#reminderForm');
+    if (form) form.reset();
+    
+    // Definir conversation_id
+    const conversationIdInput = modal.querySelector('#reminder_conversation_id');
+    if (conversationIdInput) {
+        conversationIdInput.value = conversationId;
+    }
+    
+    // Definir data/hora mínima (hoje, agora)
+    const dateInput = modal.querySelector('#reminder_date');
+    const timeInput = modal.querySelector('#reminder_time');
+    if (dateInput) {
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0];
+        dateInput.value = dateStr;
+        dateInput.min = dateStr;
+    }
+    if (timeInput) {
+        const now = new Date();
+        const timeStr = now.toTimeString().slice(0, 5);
+        timeInput.value = timeStr;
+    }
+    
+    // Abrir modal
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
 }
 
 // Buscar mensagens dentro da conversa
@@ -5980,8 +6423,8 @@ function updateConversationInList(conversationId, lastMessage) {
             conversationItem.setAttribute('data-updated-at', new Date().toISOString());
         }
         
-        // Garantir botão de fixar
-        ensurePinButton(conversationItem, conversationItem.classList.contains('pinned'), conversationId);
+        // Garantir dropdown de ações
+        ensureActionsDropdown(conversationItem, conversationItem.classList.contains('pinned'), conversationId);
         
         // Resortear lista após atualizar
         sortConversationList();
@@ -8650,8 +9093,8 @@ if (typeof window.wsClient !== 'undefined') {
                 }
             }
             
-            // Garantir botão de fixar
-            ensurePinButton(conversationItem, pinned, data.conversation_id);
+            // Garantir dropdown de ações
+            ensureActionsDropdown(conversationItem, pinned, data.conversation_id);
 
             // Mover conversa para o topo se não for a atual
             if (currentConversationId != data.conversation_id) {
@@ -8939,14 +9382,57 @@ function addConversationToList(conv) {
                         </div>
                         <div class="conversation-item-time d-flex align-items-center gap-2">
                             ${formatTime(conv.last_message_at || conv.updated_at)}
-                            <button type="button" class="btn btn-sm btn-icon btn-light p-0 conversation-item-pin" 
-                                    onclick="event.stopPropagation(); togglePin(${conv.id}, ${pinned ? 'true' : 'false'})" 
-                                    title="${pinned ? 'Desfixar' : 'Fixar'}">
-                                <i class="ki-duotone ki-pin fs-7 ${pinned ? 'text-warning' : 'text-muted'}">
-                                    <span class="path1"></span>
-                                    <span class="path2"></span>
-                                </i>
-                            </button>
+                            <div class="dropdown conversation-item-actions">
+                                <button type="button" class="btn btn-sm btn-icon btn-light p-0" 
+                                        data-bs-toggle="dropdown" 
+                                        aria-expanded="false"
+                                        onclick="event.stopPropagation();">
+                                    <i class="ki-duotone ki-dots-vertical fs-7 text-muted">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end" data-conversation-id="${conv.id}">
+                                    <li>
+                                        <a class="dropdown-item" href="#" onclick="event.stopPropagation(); togglePin(${conv.id}, ${pinned ? 'true' : 'false'}); return false;">
+                                            <i class="ki-duotone ki-pin fs-7 me-2 ${pinned ? 'text-warning' : ''}">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                            </i>
+                                            ${pinned ? 'Desfixar' : 'Fixar'}
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="#" onclick="event.stopPropagation(); markConversationAsRead(${conv.id}); return false;">
+                                            <i class="ki-duotone ki-check fs-7 me-2 text-success">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                            </i>
+                                            Marcar como Lido
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="#" onclick="event.stopPropagation(); markConversationAsUnread(${conv.id}); return false;">
+                                            <i class="ki-duotone ki-eye-slash fs-7 me-2 text-danger">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                            </i>
+                                            Marcar como Não Lido
+                                        </a>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item" href="#" onclick="event.stopPropagation(); showReminderModal(${conv.id}); return false;">
+                                            <i class="ki-duotone ki-notification-bing fs-7 me-2 text-primary">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                            </i>
+                                            Agendar Lembrete
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
                     <div class="conversation-item-preview">${escapeHtml(lastMessagePreview || 'Sem mensagens')}</div>
@@ -9107,8 +9593,8 @@ function refreshConversationBadges() {
                     
                     // Atualizar meta e resortear
                     updateConversationMeta(conversationItem, conv);
-                    // Garantir botão de fixar após updates
-                    ensurePinButton(conversationItem, conv.pinned === 1 || conv.pinned === true, conv.id);
+                    // Garantir dropdown de ações após updates
+                    ensureActionsDropdown(conversationItem, conv.pinned === 1 || conv.pinned === true, conv.id);
                     sortConversationList();
                 }
             });
@@ -10422,6 +10908,164 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Inicializar seletor rápido de templates
     initTemplateQuickSelect();
+    
+    // Formulário de agendar mensagem
+    const scheduleMessageForm = document.getElementById('scheduleMessageForm');
+    if (scheduleMessageForm) {
+        scheduleMessageForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const conversationId = document.getElementById('schedule_conversation_id').value;
+            const content = document.getElementById('schedule_message_content').value;
+            const date = document.getElementById('schedule_message_date').value;
+            const time = document.getElementById('schedule_message_time').value;
+            const cancelIfResolved = document.getElementById('schedule_cancel_if_resolved').checked;
+            const cancelIfResponded = document.getElementById('schedule_cancel_if_responded').checked;
+            
+            if (!content.trim() && !document.getElementById('schedule_message_attachment').files.length) {
+                alert('Digite uma mensagem ou anexe um arquivo');
+                return;
+            }
+            
+            if (!date || !time) {
+                alert('Selecione data e hora');
+                return;
+            }
+            
+            const scheduledAt = `${date} ${time}:00`;
+            const scheduledDate = new Date(scheduledAt);
+            const now = new Date();
+            
+            if (scheduledDate <= now) {
+                alert('Data/hora deve ser no futuro');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('content', content);
+            formData.append('scheduled_at', scheduledAt);
+            formData.append('cancel_if_resolved', cancelIfResolved ? '1' : '0');
+            formData.append('cancel_if_responded', cancelIfResponded ? '1' : '0');
+            
+            // Adicionar anexo se houver
+            const attachment = document.getElementById('schedule_message_attachment').files[0];
+            if (attachment) {
+                formData.append('attachment', attachment);
+            }
+            
+            try {
+                const response = await fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/schedule-message`, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+                
+                const responseText = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (jsonErr) {
+                    throw new Error(`Resposta não é JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
+                }
+                
+                if (data.success) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_schedule_message'));
+                    if (modal) modal.hide();
+                    
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Mensagem agendada!',
+                            text: `Mensagem será enviada em ${new Date(scheduledAt).toLocaleString('pt-BR')}`,
+                            toast: true,
+                            position: 'top-end',
+                            showConfirmButton: false,
+                            timer: 3000
+                        });
+                    }
+                } else {
+                    alert('Erro ao agendar mensagem: ' + (data.message || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao agendar mensagem: ' + error.message);
+            }
+        });
+    }
+    
+    // Formulário de criar lembrete
+    const reminderForm = document.getElementById('reminderForm');
+    if (reminderForm) {
+        reminderForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const conversationId = document.getElementById('reminder_conversation_id').value;
+            const date = document.getElementById('reminder_date').value;
+            const time = document.getElementById('reminder_time').value;
+            const note = document.getElementById('reminder_note').value;
+            
+            if (!date || !time) {
+                alert('Selecione data e hora');
+                return;
+            }
+            
+            const reminderAt = `${date} ${time}:00`;
+            const reminderDate = new Date(reminderAt);
+            const now = new Date();
+            
+            if (reminderDate <= now) {
+                alert('Data/hora deve ser no futuro');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/reminders`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        reminder_at: reminderAt,
+                        note: note || null
+                    })
+                });
+                
+                const responseText = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (jsonErr) {
+                    throw new Error(`Resposta não é JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
+                }
+                
+                if (data.success) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_reminder'));
+                    if (modal) modal.hide();
+                    
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Lembrete criado!',
+                            text: `Lembrete será exibido em ${new Date(reminderAt).toLocaleString('pt-BR')}`,
+                            toast: true,
+                            position: 'top-end',
+                            showConfirmButton: false,
+                            timer: 3000
+                        });
+                    }
+                } else {
+                    alert('Erro ao criar lembrete: ' + (data.message || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao criar lembrete: ' + error.message);
+            }
+        });
+    }
     
     // Inicializar seletor rápido de variáveis (ao digitar {{)
     const messageInput = document.getElementById('messageInput');

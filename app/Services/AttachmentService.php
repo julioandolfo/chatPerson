@@ -60,17 +60,32 @@ class AttachmentService
         }
 
         // Se for áudio webm, converter para ogg/opus para compatibilidade com WhatsApp
+        Logger::quepasa("AttachmentService::upload - Verificando conversão: fileType={$fileType}, mimeType={$mimeType}, extension={$extension}");
         if ($fileType === 'audio' && (str_contains($mimeType, 'webm') || $extension === 'webm')) {
+            Logger::quepasa("AttachmentService::upload - ÁUDIO WEBM DETECTADO! Iniciando conversão para OGG/Opus...");
+            Logger::quepasa("AttachmentService::upload - Arquivo original: {$filepath} (" . filesize($filepath) . " bytes)");
+            
             $conversion = self::convertWebmToOpus($filepath, $conversationDir);
+            
+            Logger::quepasa("AttachmentService::upload - Resultado da conversão: " . json_encode($conversion));
+            
             if ($conversion['success']) {
                 $filename = $conversion['filename'];
                 $filepath = $conversion['filepath'];
                 $mimeType = $conversion['mime_type'];
                 $extension = 'ogg';
                 $file['size'] = $conversion['size'];
+                
+                Logger::quepasa("AttachmentService::upload - ✅ CONVERSÃO BEM-SUCEDIDA!");
+                Logger::quepasa("AttachmentService::upload - Arquivo convertido: {$filepath} ({$file['size']} bytes)");
+                Logger::quepasa("AttachmentService::upload - Novo mime_type: {$mimeType}");
+                Logger::quepasa("AttachmentService::upload - Nova extensão: {$extension}");
             } else {
-                Logger::quepasa('AttachmentService - Conversão webm->ogg falhou, mantendo arquivo original: ' . $conversion['error']);
+                Logger::quepasa("AttachmentService::upload - ❌ CONVERSÃO FALHOU: " . $conversion['error']);
+                Logger::quepasa("AttachmentService::upload - Mantendo arquivo original: {$filepath}");
             }
+        } else {
+            Logger::quepasa("AttachmentService::upload - Não é áudio webm, pulando conversão");
         }
 
         // Retornar informações do arquivo (considerando possível conversão)
@@ -215,31 +230,86 @@ class AttachmentService
      */
     private static function convertWebmToOpus(string $sourcePath, string $conversationDir): array
     {
+        Logger::quepasa("AttachmentService::convertWebmToOpus - INICIANDO conversão");
+        Logger::quepasa("AttachmentService::convertWebmToOpus - Arquivo origem: {$sourcePath}");
+        Logger::quepasa("AttachmentService::convertWebmToOpus - Arquivo existe: " . (file_exists($sourcePath) ? 'SIM' : 'NÃO'));
+        Logger::quepasa("AttachmentService::convertWebmToOpus - Tamanho origem: " . (file_exists($sourcePath) ? filesize($sourcePath) : 0) . " bytes");
+        
         $targetFilename = uniqid('msg_', true) . '_' . time() . '.ogg';
         $targetPath = $conversationDir . $targetFilename;
+        
+        Logger::quepasa("AttachmentService::convertWebmToOpus - Arquivo destino: {$targetPath}");
 
         // Verificar ffmpeg
+        Logger::quepasa("AttachmentService::convertWebmToOpus - Verificando se ffmpeg está disponível...");
         $ffmpegPath = trim((string) shell_exec('command -v ffmpeg'));
+        
         if (empty($ffmpegPath)) {
+            // Tentar outros caminhos comuns
+            $possiblePaths = ['ffmpeg', '/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg', 'C:\\ffmpeg\\bin\\ffmpeg.exe'];
+            foreach ($possiblePaths as $path) {
+                if (file_exists($path) || shell_exec("which {$path} 2>/dev/null")) {
+                    $ffmpegPath = $path;
+                    Logger::quepasa("AttachmentService::convertWebmToOpus - ffmpeg encontrado em: {$ffmpegPath}");
+                    break;
+                }
+            }
+        }
+        
+        if (empty($ffmpegPath)) {
+            Logger::quepasa("AttachmentService::convertWebmToOpus - ❌ ffmpeg NÃO encontrado no PATH");
+            Logger::quepasa("AttachmentService::convertWebmToOpus - Tentando executar 'ffmpeg -version' para verificar...");
+            $versionCheck = shell_exec('ffmpeg -version 2>&1');
+            Logger::quepasa("AttachmentService::convertWebmToOpus - Resultado 'ffmpeg -version': " . substr($versionCheck ?? 'NENHUM RESULTADO', 0, 200));
             return ['success' => false, 'error' => 'ffmpeg não encontrado no PATH'];
         }
+        
+        Logger::quepasa("AttachmentService::convertWebmToOpus - ✅ ffmpeg encontrado: {$ffmpegPath}");
+        
+        // Verificar versão do ffmpeg
+        $versionOutput = shell_exec(escapeshellcmd($ffmpegPath) . ' -version 2>&1');
+        Logger::quepasa("AttachmentService::convertWebmToOpus - Versão ffmpeg: " . substr($versionOutput ?? 'NÃO DISPONÍVEL', 0, 100));
 
         $cmd = escapeshellcmd($ffmpegPath) . ' -y -i ' . escapeshellarg($sourcePath) . ' -c:a libopus -b:a 96k -vn ' . escapeshellarg($targetPath) . ' 2>&1';
+        Logger::quepasa("AttachmentService::convertWebmToOpus - Comando: {$cmd}");
+        
+        Logger::quepasa("AttachmentService::convertWebmToOpus - Executando conversão...");
         exec($cmd, $output, $exitCode);
+        
+        Logger::quepasa("AttachmentService::convertWebmToOpus - Exit code: {$exitCode}");
+        Logger::quepasa("AttachmentService::convertWebmToOpus - Output: " . implode("\n", $output));
 
-        if ($exitCode !== 0 || !file_exists($targetPath) || filesize($targetPath) === 0) {
-            return ['success' => false, 'error' => 'ffmpeg falhou: ' . implode("\n", $output)];
+        if ($exitCode !== 0) {
+            Logger::quepasa("AttachmentService::convertWebmToOpus - ❌ ffmpeg retornou erro (exit code: {$exitCode})");
+            return ['success' => false, 'error' => 'ffmpeg falhou (exit code ' . $exitCode . '): ' . implode("\n", array_slice($output, 0, 10))];
         }
+        
+        if (!file_exists($targetPath)) {
+            Logger::quepasa("AttachmentService::convertWebmToOpus - ❌ Arquivo destino NÃO foi criado: {$targetPath}");
+            return ['success' => false, 'error' => 'Arquivo destino não foi criado'];
+        }
+        
+        $targetSize = filesize($targetPath);
+        if ($targetSize === 0) {
+            Logger::quepasa("AttachmentService::convertWebmToOpus - ❌ Arquivo destino está VAZIO (0 bytes)");
+            @unlink($targetPath);
+            return ['success' => false, 'error' => 'Arquivo destino está vazio'];
+        }
+        
+        Logger::quepasa("AttachmentService::convertWebmToOpus - ✅ Arquivo convertido criado: {$targetPath} ({$targetSize} bytes)");
 
         // Remover original
+        Logger::quepasa("AttachmentService::convertWebmToOpus - Removendo arquivo original: {$sourcePath}");
         @unlink($sourcePath);
 
+        Logger::quepasa("AttachmentService::convertWebmToOpus - ✅ CONVERSÃO CONCLUÍDA COM SUCESSO!");
+        
         return [
             'success' => true,
             'filename' => $targetFilename,
             'filepath' => $targetPath,
             'mime_type' => 'audio/ogg; codecs=opus',
-            'size' => filesize($targetPath)
+            'size' => $targetSize
         ];
     }
 

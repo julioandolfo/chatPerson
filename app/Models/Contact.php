@@ -28,11 +28,87 @@ class Contact extends Model
     protected bool $timestamps = true;
 
     /**
-     * Buscar por telefone
+     * Buscar por telefone (busca exata)
      */
     public static function findByPhone(string $phone): ?array
     {
         return self::whereFirst('phone', '=', $phone);
+    }
+
+    /**
+     * Buscar por telefone normalizado
+     * Normaliza o número fornecido e busca no banco
+     * Também tenta buscar variações comuns (com/sem sufixos WhatsApp)
+     */
+    public static function findByPhoneNormalized(string $phone): ?array
+    {
+        // Normalizar o número fornecido
+        $normalized = self::normalizePhoneNumber($phone);
+        
+        if (empty($normalized)) {
+            return null;
+        }
+        
+        // Buscar exatamente pelo número normalizado
+        $contact = self::whereFirst('phone', '=', $normalized);
+        if ($contact) {
+            return $contact;
+        }
+        
+        // Buscar variações comuns (com sufixos WhatsApp)
+        $variations = [
+            $normalized . '@s.whatsapp.net',
+            $normalized . '@lid',
+            $normalized . '@c.us',
+            '+' . $normalized,
+            $normalized
+        ];
+        
+        foreach ($variations as $variation) {
+            $contact = self::whereFirst('phone', '=', $variation);
+            if ($contact) {
+                return $contact;
+            }
+        }
+        
+        // Buscar usando LIKE para números que começam com o normalizado
+        // (pode ter sufixos ou prefixos)
+        $sql = "SELECT * FROM contacts WHERE phone LIKE ? OR phone LIKE ? LIMIT 1";
+        $contact = \App\Helpers\Database::fetch($sql, [
+            $normalized . '%',
+            '%' . $normalized
+        ]);
+        
+        return $contact ?: null;
+    }
+
+    /**
+     * Normalizar número de telefone (mesma lógica do WhatsAppService)
+     */
+    public static function normalizePhoneNumber(string $phone): string
+    {
+        if (empty($phone)) {
+            return '';
+        }
+        
+        // Remover sufixos comuns do WhatsApp
+        $phone = str_replace('@s.whatsapp.net', '', $phone);
+        $phone = str_replace('@lid', '', $phone); // Linked ID (contatos não salvos)
+        $phone = str_replace('@c.us', '', $phone); // Contato comum
+        $phone = str_replace('@g.us', '', $phone); // Grupo
+        
+        // Remover caracteres especiais comuns
+        $phone = str_replace(['+', '-', ' ', '(', ')', '.', '_'], '', $phone);
+        
+        // Extrair apenas dígitos (pode ter : para separar device ID)
+        if (strpos($phone, ':') !== false) {
+            $phone = explode(':', $phone)[0];
+        }
+        
+        // Remover + se ainda estiver presente
+        $phone = ltrim($phone, '+');
+        
+        return $phone;
     }
 
     /**

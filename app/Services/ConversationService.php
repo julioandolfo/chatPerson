@@ -11,6 +11,7 @@ use App\Models\Contact;
 use App\Models\Message;
 use App\Models\User;
 use App\Helpers\Validator;
+use App\Helpers\Logger;
 
 class ConversationService
 {
@@ -825,7 +826,17 @@ class ConversationService
                     
                     // Se houver anexo (imagem, vídeo, áudio, documento), enviar via mídia
                     if (!empty($attachmentsData)) {
+                        Logger::quepasa("ConversationService::sendMessage - Processando anexos para envio WhatsApp");
+                        Logger::quepasa("ConversationService::sendMessage - Total de anexos: " . count($attachmentsData));
+                        
                         $firstAttachment = $attachmentsData[0];
+                        
+                        Logger::quepasa("ConversationService::sendMessage - Primeiro anexo:");
+                        Logger::quepasa("ConversationService::sendMessage -   path: " . ($firstAttachment['path'] ?? 'NULL'));
+                        Logger::quepasa("ConversationService::sendMessage -   type: " . ($firstAttachment['type'] ?? 'NULL'));
+                        Logger::quepasa("ConversationService::sendMessage -   mime_type: " . ($firstAttachment['mime_type'] ?? 'NULL'));
+                        Logger::quepasa("ConversationService::sendMessage -   filename: " . ($firstAttachment['filename'] ?? 'NULL'));
+                        Logger::quepasa("ConversationService::sendMessage -   extension: " . ($firstAttachment['extension'] ?? 'NULL'));
                         
                         // Construir URL ABSOLUTA do anexo
                         $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
@@ -878,6 +889,23 @@ class ConversationService
                             $options['media_name'] = $firstAttachment['filename'];
                         } else {
                             $options['media_name'] = basename($firstAttachment['path']);
+                        }
+                        
+                        Logger::quepasa("ConversationService::sendMessage - Opções preparadas para WhatsAppService:");
+                        Logger::quepasa("ConversationService::sendMessage -   media_url: {$options['media_url']}");
+                        Logger::quepasa("ConversationService::sendMessage -   media_type: {$options['media_type']}");
+                        Logger::quepasa("ConversationService::sendMessage -   media_mime: " . ($options['media_mime'] ?? 'NULL'));
+                        Logger::quepasa("ConversationService::sendMessage -   media_name: " . ($options['media_name'] ?? 'NULL'));
+                        
+                        // Verificar se é áudio e se mime_type está correto
+                        if ($options['media_type'] === 'audio') {
+                            Logger::quepasa("ConversationService::sendMessage - ⚠️ É ÁUDIO! Verificando mime_type...");
+                            if (empty($options['media_mime']) || !str_contains($options['media_mime'], 'ogg')) {
+                                Logger::quepasa("ConversationService::sendMessage - ⚠️ ATENÇÃO: mime_type não é OGG! mime_type=" . ($options['media_mime'] ?? 'NULL'));
+                                Logger::quepasa("ConversationService::sendMessage - ⚠️ Verificar se conversão foi executada corretamente!");
+                            } else {
+                                Logger::quepasa("ConversationService::sendMessage - ✅ mime_type está correto (OGG): {$options['media_mime']}");
+                            }
                         }
                         
                         // Para Quepasa, se for imagem/vídeo/áudio e houver legenda, usar content como caption

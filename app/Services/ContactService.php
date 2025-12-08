@@ -43,8 +43,27 @@ class ContactService
             throw new \Exception('Dados inválidos: ' . implode(', ', $flatErrors));
         }
 
-        // Buscar ou criar contato
-        $contact = Contact::findOrCreate($data);
+        // Normalizar número de telefone se fornecido
+        if (!empty($data['phone'])) {
+            $data['phone'] = Contact::normalizePhoneNumber($data['phone']);
+        }
+
+        // Buscar ou criar contato (usar busca normalizada para evitar duplicatas)
+        if (!empty($data['phone'])) {
+            $existing = Contact::findByPhoneNormalized($data['phone']);
+            if ($existing) {
+                // Atualizar contato existente
+                Contact::update($existing['id'], $data);
+                $contact = Contact::find($existing['id']);
+            } else {
+                // Criar novo contato
+                $contactId = Contact::create($data);
+                $contact = Contact::find($contactId);
+            }
+        } else {
+            // Se não tem telefone, usar método padrão
+            $contact = Contact::findOrCreate($data);
+        }
         
         // Se foi criado novo contato, executar automações
         if ($contact && isset($contact['id'])) {
@@ -138,6 +157,11 @@ class ContactService
         
         if (!empty($flatErrors)) {
             throw new \Exception('Dados inválidos: ' . implode(', ', $flatErrors));
+        }
+
+        // Normalizar número de telefone se fornecido
+        if (!empty($data['phone'])) {
+            $data['phone'] = Contact::normalizePhoneNumber($data['phone']);
         }
 
         // Obter contato antes da atualização para detectar mudanças

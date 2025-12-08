@@ -12,6 +12,41 @@ use App\Helpers\Logger;
 class WhatsAppService
 {
     /**
+     * Normalizar número de telefone do WhatsApp
+     * Remove sufixos como @s.whatsapp.net, @lid, @c.us, @g.us, etc.
+     * Remove caracteres especiais e deixa apenas dígitos
+     * 
+     * @param string $phone Número no formato do WhatsApp (ex: "553588987594@s.whatsapp.net", "276553028132899@lid")
+     * @return string Número normalizado (ex: "553588987594", "276553028132899")
+     */
+    public static function normalizePhoneNumber(string $phone): string
+    {
+        if (empty($phone)) {
+            return '';
+        }
+        
+        // Remover sufixos comuns do WhatsApp
+        $phone = str_replace('@s.whatsapp.net', '', $phone);
+        $phone = str_replace('@lid', '', $phone); // Linked ID (contatos não salvos)
+        $phone = str_replace('@c.us', '', $phone); // Contato comum
+        $phone = str_replace('@g.us', '', $phone); // Grupo
+        
+        // Remover caracteres especiais comuns
+        $phone = str_replace(['+', '-', ' ', '(', ')', '.', '_'], '', $phone);
+        
+        // Extrair apenas dígitos (pode ter : para separar device ID)
+        // Ex: "553591970289:86" -> extrair apenas "553591970289"
+        if (strpos($phone, ':') !== false) {
+            $phone = explode(':', $phone)[0];
+        }
+        
+        // Remover + se ainda estiver presente
+        $phone = ltrim($phone, '+');
+        
+        return $phone;
+    }
+
+    /**
      * Criar conta WhatsApp
      */
     public static function createAccount(array $data): int
@@ -521,7 +556,15 @@ class WhatsAppService
                     $mediaMime = $options['media_mime'] ?? null;
                     $mediaName = $options['media_name'] ?? null;
                     
+                    Logger::quepasa("sendMessage - MÍDIA DETECTADA:");
+                    Logger::quepasa("sendMessage - media_type: {$mediaType}");
+                    Logger::quepasa("sendMessage - media_mime: " . ($mediaMime ?? 'NULL'));
+                    Logger::quepasa("sendMessage - media_name: " . ($mediaName ?? 'NULL'));
+                    Logger::quepasa("sendMessage - media_url: {$options['media_url']}");
+                    
                     if ($mediaType === 'audio') {
+                        Logger::quepasa("sendMessage - ✅ É ÁUDIO! Preparando envio como PTT...");
+                        
                         // Enviar como áudio PTT (opção recomendada pelo Quepasa/WhatsApp)
                         $payload['audio'] = [
                             'url' => $options['media_url'],
@@ -529,15 +572,26 @@ class WhatsAppService
                             'filename' => $mediaName ?: 'audio.ogg',
                             'ptt' => true
                         ];
+                        
+                        Logger::quepasa("sendMessage - Payload audio configurado:");
+                        Logger::quepasa("sendMessage -   url: {$payload['audio']['url']}");
+                        Logger::quepasa("sendMessage -   mimetype: {$payload['audio']['mimetype']}");
+                        Logger::quepasa("sendMessage -   filename: {$payload['audio']['filename']}");
+                        Logger::quepasa("sendMessage -   ptt: true");
+                        
                         // Para áudio, não enviar url/fileName no nível raiz para evitar ser tratado como documento
                         unset($payload['url'], $payload['fileName'], $payload['content']);
+                        Logger::quepasa("sendMessage - Campos url/fileName/content removidos do payload raiz");
                     } else {
+                        Logger::quepasa("sendMessage - Não é áudio, enviando como mídia normal (imagem/vídeo/documento)");
                         // Para imagem/vídeo/documento manter envio por URL
                         $payload['url'] = $options['media_url'];
                         if (!empty($mediaName)) {
                             $payload['fileName'] = $mediaName;
                         }
                     }
+                } else {
+                    Logger::quepasa("sendMessage - Nenhuma mídia detectada nas opções");
                 }
                 
                 Logger::quepasa("sendMessage - Iniciando envio");
@@ -761,12 +815,10 @@ class WhatsAppService
                 $from = $payload['chat']['id'];
             }
             
-            // Extrair número de telefone do from (remover @s.whatsapp.net)
+            // Extrair número de telefone do from (normalizar)
             $fromPhone = null;
             if ($from) {
-                $fromPhone = str_replace('@s.whatsapp.net', '', $from);
-                // Remover + se presente
-                $fromPhone = ltrim($fromPhone, '+');
+                $fromPhone = self::normalizePhoneNumber($from);
             }
             
             Logger::quepasa("processWebhook - Payload recebido: trackid={$trackid}, chatid={$chatid}, from={$from}, fromPhone={$fromPhone}");
@@ -916,17 +968,68 @@ class WhatsAppService
                 }
             }
 
-            // Processar mensagem recebida
+            // Verificar se mensagem foi enviada DO número conectado (não recebida)
+            // Quando você envia do celular conectado, o webhook recebe:
+            // - chatid/wid = número conectado (origem)
+            // - from = número de destino (para quem você enviou)
+            $isMessageFromConnectedNumber = false;
+            $connectedNumberNormalized = self::normalizePhoneNumber($account['phone_number']);
+            
+            // Comparar chatid/wid com número da conta conectada
+            // O chatid pode ter formato: "553591970289:87@s.whatsapp.net"
+            // Precisamos extrair apenas o número antes dos dois pontos
+            if ($chatid) {
+                $chatidClean = str_replace('@s.whatsapp.net', '', $chatid);
+                $chatidNumber = explode(':', $chatidClean)[0];
+                $chatidNumberNormalized = self::normalizePhoneNumber($chatidNumber);
+                
+                // Comparar números normalizados
+                // Se correspondem exatamente OU se os primeiros 10-11 dígitos correspondem, é o mesmo número
+                if ($chatidNumberNormalized === $connectedNumberNormalized) {
+                    $isMessageFromConnectedNumber = true;
+                    Logger::quepasa("processWebhook - Mensagem ENVIADA do número conectado detectada (exato): chatid={$chatidNumberNormalized}, account={$connectedNumberNormalized}");
+                } else {
+                    // Comparar prefixos (primeiros 10-11 dígitos) para casos onde há diferença de formatação
+                    $minLength = min(strlen($chatidNumberNormalized), strlen($connectedNumberNormalized));
+                    $prefixLength = min(11, max(10, $minLength - 1)); // Comparar pelo menos 10 dígitos
+                    
+                    $chatidPrefix = substr($chatidNumberNormalized, 0, $prefixLength);
+                    $accountPrefix = substr($connectedNumberNormalized, 0, $prefixLength);
+                    
+                    if ($chatidPrefix === $accountPrefix && strlen($chatidPrefix) >= 10) {
+                        $isMessageFromConnectedNumber = true;
+                        Logger::quepasa("processWebhook - Mensagem ENVIADA do número conectado detectada (por prefixo): chatid={$chatidNumberNormalized}, account={$connectedNumberNormalized}, prefix={$chatidPrefix}");
+                    }
+                }
+            }
+            
+            // Verificar também campo fromme/frominternal se existir no payload
+            if (!$isMessageFromConnectedNumber) {
+                $fromme = $payload['fromme'] ?? $payload['from_internal'] ?? $payload['frominternal'] ?? false;
+                if ($fromme === true || $fromme === 'true' || $fromme === 1) {
+                    $isMessageFromConnectedNumber = true;
+                    Logger::quepasa("processWebhook - Mensagem ENVIADA detectada via campo fromme/frominternal");
+                }
+            }
+            
+            // Se detectou que foi enviada do número conectado, mas não consegue identificar destinatário,
+            // simplesmente ignorar (não processar como mensagem recebida)
+            if ($isMessageFromConnectedNumber) {
+                Logger::quepasa("processWebhook - Mensagem ENVIADA do número conectado detectada. Verificando se pode identificar destinatário...");
+            }
+            
+            // Processar mensagem recebida ou enviada
             // Formato novo do Quepasa: chat.id ou chat.phone
             $from = $payload['from'] ?? $payload['phone'] ?? null;
             if (!$from && isset($payload['chat'])) {
                 $from = $payload['chat']['id'] ?? $payload['chat']['phone'] ?? null;
             }
             
+            // Se mensagem foi ENVIADA do número conectado, 'from' é o DESTINATÁRIO
+            // Se mensagem foi RECEBIDA, 'from' é o REMETENTE
             $fromPhone = null;
             if ($from) {
-                $fromPhone = str_replace('@s.whatsapp.net', '', $from);
-                $fromPhone = ltrim($fromPhone, '+'); // Remover + se presente
+                $fromPhone = self::normalizePhoneNumber($from);
             }
             
             $message = $payload['text'] ?? $payload['message'] ?? $payload['caption'] ?? '';
@@ -981,10 +1084,9 @@ class WhatsAppService
             if ($isGroup && $author) {
                 $from = $author;
             }
-            // Reprocessar fromPhone com novos dados
+            // Reprocessar fromPhone com novos dados (normalizar)
             if ($from) {
-                $fromPhone = str_replace(['@s.whatsapp.net', '@c.us', '@g.us'], '', $from);
-                $fromPhone = ltrim($fromPhone, '+');
+                $fromPhone = self::normalizePhoneNumber($from);
             }
             
             // Media / arquivos
@@ -1026,16 +1128,203 @@ class WhatsAppService
                 $message = $payload['caption'];
             }
 
-            Logger::quepasa("processWebhook - Processando mensagem: fromPhone={$fromPhone}, message={$message}, messageId={$messageId}, isGroup=" . ($isGroup ? 'true' : 'false'));
+            Logger::quepasa("processWebhook - Processando mensagem: fromPhone={$fromPhone}, message={$message}, messageId={$messageId}, isGroup=" . ($isGroup ? 'true' : 'false') . ", isMessageFromConnectedNumber=" . ($isMessageFromConnectedNumber ? 'true' : 'false'));
             
             if (!$fromPhone || (empty($message) && !$mediaUrl && empty($location))) {
                 Logger::error("WhatsApp webhook: dados incompletos (fromPhone: " . ($fromPhone ?? 'NULL') . ", message: " . ($message ?? 'NULL') . ", mediaUrl: " . ($mediaUrl ?? 'NULL') . ")");
                 return;
             }
 
+            // Se mensagem foi ENVIADA do número conectado, tratar como mensagem outgoing
+            if ($isMessageFromConnectedNumber) {
+                Logger::quepasa("processWebhook - Mensagem ENVIADA do número conectado detectada. Tratando como mensagem outgoing.");
+                
+                // Log completo do payload para debug
+                Logger::quepasa("processWebhook - Payload completo (mensagem enviada): " . json_encode($payload, JSON_PRETTY_PRINT));
+                
+                // Tentar obter número real do destinatário de vários campos possíveis
+                $realRecipientPhone = null;
+                
+                // 1. Verificar campo 'to' (destinatário)
+                $to = $payload['to'] ?? $quepasaData['to'] ?? null;
+                if ($to) {
+                    $realRecipientPhone = self::normalizePhoneNumber($to);
+                    Logger::quepasa("processWebhook - Número real encontrado em 'to': {$realRecipientPhone}");
+                }
+                
+                // 2. Verificar campo 'chat.phone' (pode ter número real)
+                if (!$realRecipientPhone && isset($payload['chat']['phone'])) {
+                    $realRecipientPhone = self::normalizePhoneNumber($payload['chat']['phone']);
+                    Logger::quepasa("processWebhook - Número real encontrado em 'chat.phone': {$realRecipientPhone}");
+                }
+                
+                // 3. Verificar campo 'participant.phone' (em grupos ou conversas)
+                if (!$realRecipientPhone && isset($payload['participant']['phone'])) {
+                    $realRecipientPhone = self::normalizePhoneNumber($payload['participant']['phone']);
+                    Logger::quepasa("processWebhook - Número real encontrado em 'participant.phone': {$realRecipientPhone}");
+                }
+                
+                // 4. Se from é @lid, tentar buscar número real via API do Quepasa
+                if (!$realRecipientPhone && str_ends_with($from, '@lid')) {
+                    Logger::quepasa("processWebhook - 'from' é @lid ({$from}), tentando buscar número real via API Quepasa...");
+                    try {
+                        $realRecipientPhone = self::getPhoneFromLinkedId($account, $from);
+                        if ($realRecipientPhone) {
+                            Logger::quepasa("processWebhook - Número real obtido via API: {$realRecipientPhone}");
+                        } else {
+                            Logger::quepasa("processWebhook - Não foi possível obter número real via API para {$from}");
+                        }
+                    } catch (\Exception $e) {
+                        Logger::quepasa("processWebhook - Erro ao buscar número real via API: " . $e->getMessage());
+                    }
+                }
+                
+                // 5. Se ainda não tem número real, verificar se fromPhone é válido (não é só @lid ou @g.us)
+                if (!$realRecipientPhone) {
+                    // Se fromPhone termina com @lid ou @g.us e não conseguimos obter número real, ignorar
+                    if (str_ends_with($from, '@lid') || str_ends_with($from, '@g.us') || str_ends_with($from, '@c.us')) {
+                        Logger::quepasa("processWebhook - Não foi possível identificar número real do destinatário (from={$from}). Ignorando mensagem enviada do número conectado.");
+                        return; // Ignorar mensagem se não conseguir identificar destinatário
+                    }
+                    // Se não é @lid/@g.us, usar o fromPhone normalizado
+                    $realRecipientPhone = $fromPhone;
+                    Logger::quepasa("processWebhook - Usando fromPhone normalizado como fallback: {$realRecipientPhone}");
+                }
+                
+                // Validar se número real é válido (deve ter pelo menos 10 dígitos)
+                if (strlen($realRecipientPhone) < 10 || !preg_match('/^\d+$/', $realRecipientPhone)) {
+                    Logger::quepasa("processWebhook - Número destinatário inválido ({$realRecipientPhone}). Ignorando mensagem enviada do número conectado.");
+                    return; // Ignorar se número não é válido
+                }
+                
+                // Usar número real encontrado
+                $recipientPhone = $realRecipientPhone;
+                Logger::quepasa("processWebhook - Número destinatário final: {$recipientPhone} (original from: {$from})");
+                
+                // Buscar contato pelo destinatário (número real)
+                Logger::quepasa("processWebhook - Buscando contato destinatário pelo telefone normalizado: {$recipientPhone}");
+                $contact = \App\Models\Contact::findByPhoneNormalized($recipientPhone);
+                
+                if (!$contact) {
+                    // Criar contato para o destinatário se não existir
+                    $contactName = $payload['chat']['title'] ?? $payload['chat']['name'] ?? $payload['name'] ?? $recipientPhone;
+                    $whatsappId = $payload['from'] ?? $from; // Manter o @lid original no whatsapp_id
+                    if (!str_ends_with($whatsappId, '@s.whatsapp.net') && !str_ends_with($whatsappId, '@lid') && !str_ends_with($whatsappId, '@c.us')) {
+                        $whatsappId .= '@s.whatsapp.net';
+                    }
+                    
+                    $normalizedPhone = \App\Models\Contact::normalizePhoneNumber($recipientPhone);
+                    Logger::quepasa("processWebhook - Criando contato destinatário: name={$contactName}, phone={$normalizedPhone}, whatsapp_id={$whatsappId}");
+                    $contactId = \App\Models\Contact::create([
+                        'name' => $contactName,
+                        'phone' => $normalizedPhone,
+                        'whatsapp_id' => $whatsappId,
+                        'email' => null
+                    ]);
+                    $contact = \App\Models\Contact::find($contactId);
+                }
+                
+                // Buscar conversa existente com esse contato
+                Logger::quepasa("processWebhook - Buscando conversa existente: contact_id={$contact['id']}, channel=whatsapp, account_id={$account['id']}");
+                $conversation = \App\Models\Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['id']);
+                
+                if (!$conversation) {
+                    Logger::quepasa("processWebhook - Conversa não encontrada, criando nova para mensagem enviada...");
+                    try {
+                        $conversation = \App\Services\ConversationService::create([
+                            'contact_id' => $contact['id'],
+                            'channel' => 'whatsapp',
+                            'whatsapp_account_id' => $account['id']
+                        ]);
+                    } catch (\Exception $e) {
+                        Logger::quepasa("Erro ao criar conversa via ConversationService: " . $e->getMessage());
+                        $conversationId = \App\Models\Conversation::create([
+                            'contact_id' => $contact['id'],
+                            'channel' => 'whatsapp',
+                            'whatsapp_account_id' => $account['id'],
+                            'status' => 'open'
+                        ]);
+                        $conversation = \App\Models\Conversation::find($conversationId);
+                    }
+                }
+                
+                // Processar anexos/mídia
+                $attachments = [];
+                if ($mediaUrl) {
+                    try {
+                        $attachment = \App\Services\AttachmentService::saveFromUrl(
+                            $mediaUrl, 
+                            $conversation['id'], 
+                            $filename
+                        );
+                        if (!empty($attachment)) {
+                            if ($mimetype) $attachment['mime_type'] = $mimetype;
+                            if ($size) $attachment['size'] = $size;
+                        }
+                        $attachments[] = $attachment;
+                    } catch (\Exception $e) {
+                        Logger::quepasa("Erro ao salvar mídia do WhatsApp: " . $e->getMessage());
+                    }
+                }
+                
+                // Criar mensagem como OUTGOING (enviada pelo sistema/agente)
+                // Usar usuário atual ou usuário padrão do sistema
+                $userId = \App\Helpers\Auth::id();
+                if (!$userId) {
+                    // Se não tem usuário logado, buscar primeiro admin/agente ativo
+                    $defaultUser = \App\Helpers\Database::fetch(
+                        "SELECT id FROM users WHERE status = 'active' AND role IN ('admin', 'super_admin', 'agent') ORDER BY id ASC LIMIT 1"
+                    );
+                    $userId = $defaultUser['id'] ?? null;
+                }
+                
+                Logger::quepasa("processWebhook - Criando mensagem OUTGOING: conversation_id={$conversation['id']}, sender_type=agent, sender_id={$userId}");
+                
+                try {
+                    $messageId = \App\Services\ConversationService::sendMessage(
+                        $conversation['id'],
+                        $message ?: '',
+                        'agent', // sender_type = agent (outgoing)
+                        $userId, // sender_id = usuário atual ou padrão
+                        $attachments
+                    );
+                    
+                    Logger::quepasa("processWebhook - Mensagem OUTGOING criada com sucesso: messageId={$messageId}");
+                } catch (\Exception $e) {
+                    Logger::quepasa("Erro ao criar mensagem outgoing via ConversationService: " . $e->getMessage());
+                    // Fallback: criar mensagem diretamente
+                    $messageData = [
+                        'conversation_id' => $conversation['id'],
+                        'sender_type' => 'agent',
+                        'sender_id' => $userId,
+                        'content' => $message ?: '',
+                        'message_type' => !empty($attachments) ? ($attachments[0]['type'] ?? $messageType ?? 'text') : ($messageType ?? 'text'),
+                        'external_id' => $messageId,
+                        'quoted_message_id' => $quotedMessageId ?? null,
+                        'quoted_text' => $quotedMessageText ?? null
+                    ];
+                    
+                    if ($location) {
+                        $messageData['content'] = json_encode($location);
+                        $messageData['message_type'] = 'location';
+                    }
+                    
+                    if (!empty($attachments)) {
+                        $messageData['attachments'] = $attachments;
+                    }
+                    
+                    $messageId = \App\Models\Message::createMessage($messageData);
+                }
+                
+                Logger::quepasa("processWebhook - Mensagem ENVIADA processada com sucesso: fromPhone={$fromPhone}, message={$message}, conversationId={$conversation['id']}");
+                return; // Sair aqui, não processar como mensagem recebida
+            }
+
+            // Se chegou aqui, é mensagem RECEBIDA (não enviada do número conectado)
             // Criar ou atualizar contato
-            Logger::quepasa("processWebhook - Buscando contato pelo telefone: {$fromPhone}");
-            $contact = \App\Models\Contact::findByPhone($fromPhone);
+            Logger::quepasa("processWebhook - Buscando contato pelo telefone normalizado: {$fromPhone}");
+            // Usar busca normalizada para evitar duplicatas
+            $contact = \App\Models\Contact::findByPhoneNormalized($fromPhone);
             
             // Extrair nome do contato do payload (chat.title)
             $contactName = $payload['chat']['title'] ?? $payload['chat']['name'] ?? $payload['name'] ?? null;
@@ -1049,14 +1338,17 @@ class WhatsAppService
             
             if (!$contact) {
                 $whatsappId = ($payload['from'] ?? $payload['phone'] ?? $fromPhone);
-                if (!str_ends_with($whatsappId, '@s.whatsapp.net')) {
+                if (!str_ends_with($whatsappId, '@s.whatsapp.net') && !str_ends_with($whatsappId, '@lid')) {
                     $whatsappId .= '@s.whatsapp.net';
                 }
                 
-                Logger::quepasa("processWebhook - Criando novo contato: name={$contactName}, phone={$fromPhone}");
+                // Garantir que salvamos o número normalizado
+                $normalizedPhone = \App\Models\Contact::normalizePhoneNumber($fromPhone);
+                
+                Logger::quepasa("processWebhook - Criando novo contato: name={$contactName}, phone={$normalizedPhone} (normalizado de {$fromPhone})");
                 $contactId = \App\Models\Contact::create([
                     'name' => $contactName,
-                    'phone' => $fromPhone,
+                    'phone' => $normalizedPhone, // Salvar sempre normalizado
                     'whatsapp_id' => $whatsappId,
                     'email' => null
                 ]);
@@ -1389,6 +1681,73 @@ class WhatsAppService
             Logger::quepasa("processAckWebhook - ACK atualizado: {$messageId} -> ack={$ack}, status={$status}");
         } catch (\Exception $e) {
             Logger::error("WhatsApp processAckWebhook Error: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Obter número de telefone real a partir de um Linked ID (@lid)
+     * Tenta buscar via API do Quepasa usando o chat.id
+     */
+    private static function getPhoneFromLinkedId(array $account, string $linkedId): ?string
+    {
+        try {
+            if ($account['provider'] !== 'quepasa' || empty($account['quepasa_token'])) {
+                return null;
+            }
+
+            $apiUrl = rtrim($account['api_url'], '/');
+            $token = $account['quepasa_token'];
+            
+            // Tentar endpoints possíveis para obter informações do contato
+            $endpoints = [
+                "/v4/bot/{$token}/contact/{$linkedId}",
+                "/v3/bot/{$token}/contact/{$linkedId}",
+                "/contact/{$linkedId}",
+                "/chat/{$linkedId}"
+            ];
+
+            foreach ($endpoints as $endpoint) {
+                $url = $apiUrl . $endpoint;
+                $headers = [
+                    'Accept: application/json',
+                    'X-QUEPASA-TOKEN: ' . $token,
+                    'X-QUEPASA-TRACKID: ' . ($account['quepasa_trackid'] ?? $account['name'])
+                ];
+
+                $ch = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 5,
+                    CURLOPT_HTTPHEADER => $headers,
+                    CURLOPT_FOLLOWLOCATION => true,
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_SSL_VERIFYHOST => false
+                ]);
+
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+
+                if ($httpCode === 200 && !empty($response)) {
+                    $data = json_decode($response, true);
+                    if ($data) {
+                        // Tentar extrair número de vários campos possíveis
+                        $phone = $data['phone'] ?? $data['number'] ?? $data['jid'] ?? $data['id'] ?? null;
+                        if ($phone) {
+                            $normalized = self::normalizePhoneNumber($phone);
+                            if ($normalized && !str_ends_with($normalized, '@lid')) {
+                                Logger::quepasa("getPhoneFromLinkedId - Número encontrado via {$endpoint}: {$normalized}");
+                                return $normalized;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            Logger::quepasa("getPhoneFromLinkedId - Erro: " . $e->getMessage());
+            return null;
         }
     }
 }

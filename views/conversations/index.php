@@ -5693,7 +5693,18 @@ const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? 
         // Iniciar gravação
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
+
+            // Tentar preferir OGG/Opus; se não suportar, cair para WebM/Opus
+            let mimeType = '';
+            const preferred = 'audio/ogg;codecs=opus';
+            const fallback = 'audio/webm;codecs=opus';
+            if (MediaRecorder.isTypeSupported(preferred)) {
+                mimeType = preferred;
+            } else if (MediaRecorder.isTypeSupported(fallback)) {
+                mimeType = fallback;
+            }
+
+            mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
             audioChunks = [];
             
             mediaRecorder.ondataavailable = (event) => {
@@ -5701,7 +5712,9 @@ const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? 
             };
             
             mediaRecorder.onstop = async () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                // Usar o tipo real gravado; se não existir, cair para webm
+                const recordedType = mediaRecorder.mimeType || 'audio/webm';
+                const audioBlob = new Blob(audioChunks, { type: recordedType });
                 await sendAudioMessage(audioBlob, conversationId);
                 
                 // Parar stream

@@ -268,13 +268,21 @@ class AttachmentService
     {
         Logger::quepasa("AttachmentService::isWebmAudioOnly - Verificando se {$filepath} é apenas áudio...");
         
+        // Verificar se arquivo existe
+        if (!file_exists($filepath)) {
+            Logger::quepasa("AttachmentService::isWebmAudioOnly - Arquivo não existe, assumindo que é vídeo");
+            return false;
+        }
+        
         // Método 1: Verificar se tem ffprobe disponível (mais preciso)
-        $ffprobePath = trim((string) shell_exec('command -v ffprobe'));
+        $ffprobePath = trim((string) shell_exec('command -v ffprobe 2>/dev/null'));
         if (empty($ffprobePath)) {
             $possiblePaths = ['ffprobe', '/usr/bin/ffprobe', '/usr/local/bin/ffprobe', 'C:\\ffmpeg\\bin\\ffprobe.exe'];
             foreach ($possiblePaths as $path) {
-                if (file_exists($path) || shell_exec("which {$path} 2>/dev/null")) {
+                $test = shell_exec("which {$path} 2>/dev/null");
+                if ($test || file_exists($path)) {
                     $ffprobePath = $path;
+                    Logger::quepasa("AttachmentService::isWebmAudioOnly - ffprobe encontrado em: {$ffprobePath}");
                     break;
                 }
             }
@@ -283,13 +291,15 @@ class AttachmentService
         if (!empty($ffprobePath)) {
             Logger::quepasa("AttachmentService::isWebmAudioOnly - Usando ffprobe para verificar streams...");
             $cmd = escapeshellcmd($ffprobePath) . ' -v error -select_streams v:0 -show_entries stream=codec_type -of json ' . escapeshellarg($filepath) . ' 2>&1';
-            exec($cmd, $output, $exitCode);
             
-            $outputStr = implode("\n", $output);
-            Logger::quepasa("AttachmentService::isWebmAudioOnly - ffprobe output: " . substr($outputStr, 0, 200));
+            // Usar método mais simples e rápido (sem JSON para evitar parsing lento)
+            $cmd2 = escapeshellcmd($ffprobePath) . ' -v error -select_streams v:0 -show_entries stream=codec_type -of default=noprint_wrappers=1 ' . escapeshellarg($filepath) . ' 2>&1';
+            $output2 = shell_exec($cmd2);
             
-            // Se não encontrou stream de vídeo, é apenas áudio
-            if (strpos($outputStr, 'codec_type') === false || strpos($outputStr, '"codec_type":"video"') === false) {
+            Logger::quepasa("AttachmentService::isWebmAudioOnly - ffprobe output: " . substr($output2 ?? 'VAZIO', 0, 200));
+            
+            // Se não encontrou stream de vídeo (output vazio ou sem codec_type=video), é apenas áudio
+            if (empty(trim($output2)) || strpos($output2, 'codec_type=video') === false) {
                 Logger::quepasa("AttachmentService::isWebmAudioOnly - ✅ Nenhum stream de vídeo encontrado - é apenas áudio");
                 return true;
             } else {
@@ -298,24 +308,23 @@ class AttachmentService
             }
         }
         
-        // Método 2: Heurística baseada em tamanho/nome (fallback)
+        // Método 2: Heurística baseada em tamanho/nome (fallback rápido)
         // Arquivos de áudio gravados geralmente são menores que vídeos
-        // E podem ter nomes que indicam áudio (audio_, record_, etc)
         $filename = basename($filepath);
         $size = filesize($filepath);
         
-        Logger::quepasa("AttachmentService::isWebmAudioOnly - Fallback: filename={$filename}, size={$size} bytes");
+        Logger::quepasa("AttachmentService::isWebmAudioOnly - ffprobe não disponível, usando heurística: filename={$filename}, size={$size} bytes");
         
         // Se nome contém indicadores de áudio
-        if (stripos($filename, 'audio') !== false || stripos($filename, 'record') !== false) {
-            Logger::quepasa("AttachmentService::isWebmAudioOnly - Nome sugere áudio, assumindo que é apenas áudio");
+        if (stripos($filename, 'audio') !== false || stripos($filename, 'record') !== false || stripos($filename, 'msg_') !== false) {
+            Logger::quepasa("AttachmentService::isWebmAudioOnly - Nome sugere áudio (contém 'audio', 'record' ou 'msg_'), assumindo que é apenas áudio");
             return true;
         }
         
         // Se tamanho é pequeno (< 5MB), provavelmente é áudio
         // Vídeos geralmente são maiores
         if ($size < 5 * 1024 * 1024) {
-            Logger::quepasa("AttachmentService::isWebmAudioOnly - Tamanho pequeno ({$size} bytes), assumindo que é apenas áudio");
+            Logger::quepasa("AttachmentService::isWebmAudioOnly - Tamanho pequeno ({$size} bytes < 5MB), assumindo que é apenas áudio");
             return true;
         }
         

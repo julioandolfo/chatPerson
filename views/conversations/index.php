@@ -5786,12 +5786,13 @@ async function sendAudioMessage(audioBlob, conversationId) {
         });
         
         // Garantir que temos JSON; se não, capturar texto para debug
+        // IMPORTANTE: Ler o texto primeiro e depois tentar fazer parse JSON para evitar "body stream already read"
+        const responseText = await response.text();
         let data;
         try {
-            data = await response.json();
+            data = JSON.parse(responseText);
         } catch (jsonErr) {
-            const text = await response.text();
-            throw new Error(`Resposta não é JSON. HTTP ${response.status}. Corpo: ${text.substring(0, 500)}`);
+            throw new Error(`Resposta não é JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
         }
         
         if (data.success && data.message) {

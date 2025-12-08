@@ -22,7 +22,7 @@ class AttachmentService
     /**
      * Upload de arquivo
      */
-    public static function upload(array $file, int $conversationId, int $messageId = null): array
+    public static function upload(array $file, int $conversationId, ?int $messageId = null): array
     {
         // Validar arquivo
         if ($file['error'] !== UPLOAD_ERR_OK) {
@@ -180,7 +180,7 @@ class AttachmentService
     /**
      * Salvar anexo de URL (para WhatsApp)
      */
-    public static function saveFromUrl(string $url, int $conversationId, string $originalName = null): array
+    public static function saveFromUrl(string $url, int $conversationId, ?string $originalName = null): array
     {
         // Baixar arquivo
         $ch = curl_init($url);

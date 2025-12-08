@@ -60,9 +60,38 @@ class AttachmentService
         }
 
         // Se for áudio webm, converter para ogg/opus para compatibilidade com WhatsApp
+        // IMPORTANTE: Arquivos gravados como áudio podem vir como video/webm (sem stream de vídeo)
+        // Precisamos verificar se é realmente apenas áudio
         Logger::quepasa("AttachmentService::upload - Verificando conversão: fileType={$fileType}, mimeType={$mimeType}, extension={$extension}");
+        
+        $isAudioWebm = false;
+        
+        // Caso 1: Já detectado como áudio
         if ($fileType === 'audio' && (str_contains($mimeType, 'webm') || $extension === 'webm')) {
-            Logger::quepasa("AttachmentService::upload - ÁUDIO WEBM DETECTADO! Iniciando conversão para OGG/Opus...");
+            $isAudioWebm = true;
+            Logger::quepasa("AttachmentService::upload - Detectado como áudio webm (fileType=audio)");
+        }
+        
+        // Caso 2: Detectado como video/webm mas pode ser apenas áudio (gravação de áudio do navegador)
+        if (!$isAudioWebm && $extension === 'webm' && str_contains($mimeType, 'webm')) {
+            Logger::quepasa("AttachmentService::upload - Arquivo webm detectado, verificando se é apenas áudio...");
+            
+            // Verificar se arquivo tem apenas stream de áudio (sem vídeo)
+            // Usar ffprobe se disponível, ou verificar tamanho/nome do arquivo
+            $isAudioOnly = self::isWebmAudioOnly($filepath);
+            
+            if ($isAudioOnly) {
+                $isAudioWebm = true;
+                Logger::quepasa("AttachmentService::upload - Confirmado: é áudio webm (sem stream de vídeo)");
+                // Atualizar fileType para audio
+                $fileType = 'audio';
+            } else {
+                Logger::quepasa("AttachmentService::upload - É vídeo webm (tem stream de vídeo), não converter");
+            }
+        }
+        
+        if ($isAudioWebm) {
+            Logger::quepasa("AttachmentService::upload - ✅ ÁUDIO WEBM DETECTADO! Iniciando conversão para OGG/Opus...");
             Logger::quepasa("AttachmentService::upload - Arquivo original: {$filepath} (" . filesize($filepath) . " bytes)");
             
             $conversion = self::convertWebmToOpus($filepath, $conversationDir);
@@ -89,16 +118,23 @@ class AttachmentService
         }
 
         // Retornar informações do arquivo (considerando possível conversão)
-        return [
+        $result = [
             'filename' => $filename,
             'original_name' => $file['name'],
             'path' => 'assets/media/attachments/' . $conversationId . '/' . $filename,
             'url' => \App\Helpers\Url::to('assets/media/attachments/' . $conversationId . '/' . $filename),
-            'type' => $fileType,
-            'mime_type' => $mimeType,
+            'type' => $fileType, // Pode ter sido atualizado para 'audio' se era 'video' mas era apenas áudio
+            'mime_type' => $mimeType, // Pode ter sido atualizado para 'audio/ogg; codecs=opus' após conversão
             'size' => $file['size'],
-            'extension' => $extension
+            'extension' => $extension // Pode ter sido atualizado para 'ogg' após conversão
         ];
+        
+        Logger::quepasa("AttachmentService::upload - Retornando informações do arquivo:");
+        Logger::quepasa("AttachmentService::upload -   type: {$result['type']}");
+        Logger::quepasa("AttachmentService::upload -   mime_type: {$result['mime_type']}");
+        Logger::quepasa("AttachmentService::upload -   extension: {$result['extension']}");
+        
+        return $result;
     }
 
     /**
@@ -223,6 +259,68 @@ class AttachmentService
         ];
         
         return $mimeMap[$mimeType] ?? null;
+    }
+
+    /**
+     * Verificar se arquivo WebM contém apenas áudio (sem stream de vídeo)
+     */
+    private static function isWebmAudioOnly(string $filepath): bool
+    {
+        Logger::quepasa("AttachmentService::isWebmAudioOnly - Verificando se {$filepath} é apenas áudio...");
+        
+        // Método 1: Verificar se tem ffprobe disponível (mais preciso)
+        $ffprobePath = trim((string) shell_exec('command -v ffprobe'));
+        if (empty($ffprobePath)) {
+            $possiblePaths = ['ffprobe', '/usr/bin/ffprobe', '/usr/local/bin/ffprobe', 'C:\\ffmpeg\\bin\\ffprobe.exe'];
+            foreach ($possiblePaths as $path) {
+                if (file_exists($path) || shell_exec("which {$path} 2>/dev/null")) {
+                    $ffprobePath = $path;
+                    break;
+                }
+            }
+        }
+        
+        if (!empty($ffprobePath)) {
+            Logger::quepasa("AttachmentService::isWebmAudioOnly - Usando ffprobe para verificar streams...");
+            $cmd = escapeshellcmd($ffprobePath) . ' -v error -select_streams v:0 -show_entries stream=codec_type -of json ' . escapeshellarg($filepath) . ' 2>&1';
+            exec($cmd, $output, $exitCode);
+            
+            $outputStr = implode("\n", $output);
+            Logger::quepasa("AttachmentService::isWebmAudioOnly - ffprobe output: " . substr($outputStr, 0, 200));
+            
+            // Se não encontrou stream de vídeo, é apenas áudio
+            if (strpos($outputStr, 'codec_type') === false || strpos($outputStr, '"codec_type":"video"') === false) {
+                Logger::quepasa("AttachmentService::isWebmAudioOnly - ✅ Nenhum stream de vídeo encontrado - é apenas áudio");
+                return true;
+            } else {
+                Logger::quepasa("AttachmentService::isWebmAudioOnly - ❌ Stream de vídeo encontrado - é vídeo");
+                return false;
+            }
+        }
+        
+        // Método 2: Heurística baseada em tamanho/nome (fallback)
+        // Arquivos de áudio gravados geralmente são menores que vídeos
+        // E podem ter nomes que indicam áudio (audio_, record_, etc)
+        $filename = basename($filepath);
+        $size = filesize($filepath);
+        
+        Logger::quepasa("AttachmentService::isWebmAudioOnly - Fallback: filename={$filename}, size={$size} bytes");
+        
+        // Se nome contém indicadores de áudio
+        if (stripos($filename, 'audio') !== false || stripos($filename, 'record') !== false) {
+            Logger::quepasa("AttachmentService::isWebmAudioOnly - Nome sugere áudio, assumindo que é apenas áudio");
+            return true;
+        }
+        
+        // Se tamanho é pequeno (< 5MB), provavelmente é áudio
+        // Vídeos geralmente são maiores
+        if ($size < 5 * 1024 * 1024) {
+            Logger::quepasa("AttachmentService::isWebmAudioOnly - Tamanho pequeno ({$size} bytes), assumindo que é apenas áudio");
+            return true;
+        }
+        
+        Logger::quepasa("AttachmentService::isWebmAudioOnly - Não foi possível determinar, assumindo que é vídeo");
+        return false;
     }
 
     /**

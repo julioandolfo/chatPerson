@@ -273,6 +273,12 @@ class AttachmentService
             Logger::quepasa("AttachmentService::isWebmAudioOnly - Arquivo não existe, assumindo que é vídeo");
             return false;
         }
+
+        // Verificar se funções de execução estão disponíveis
+        if (!self::areExecFunctionsAvailable()) {
+            Logger::quepasa("AttachmentService::isWebmAudioOnly - shell_exec/exec desabilitadas; pulando ffprobe e assumindo que é vídeo");
+            return false;
+        }
         
         // Método 1: Verificar se tem ffprobe disponível (mais preciso)
         $ffprobePath = trim((string) shell_exec('command -v ffprobe 2>/dev/null'));
@@ -341,6 +347,12 @@ class AttachmentService
         Logger::quepasa("AttachmentService::convertWebmToOpus - Arquivo origem: {$sourcePath}");
         Logger::quepasa("AttachmentService::convertWebmToOpus - Arquivo existe: " . (file_exists($sourcePath) ? 'SIM' : 'NÃO'));
         Logger::quepasa("AttachmentService::convertWebmToOpus - Tamanho origem: " . (file_exists($sourcePath) ? filesize($sourcePath) : 0) . " bytes");
+
+        // Verificar se funções de execução estão disponíveis
+        if (!self::areExecFunctionsAvailable()) {
+            Logger::quepasa("AttachmentService::convertWebmToOpus - ❌ shell_exec/exec desabilitadas; não é possível converter áudio");
+            return ['success' => false, 'error' => 'funções de shell desabilitadas (shell_exec/exec)'];
+        }
         
         $targetFilename = uniqid('msg_', true) . '_' . time() . '.ogg';
         $targetPath = $conversationDir . $targetFilename;
@@ -418,6 +430,25 @@ class AttachmentService
             'mime_type' => 'audio/ogg; codecs=opus',
             'size' => $targetSize
         ];
+    }
+
+    /**
+     * Verificar se shell_exec/exec estão disponíveis e não desabilitadas
+     */
+    private static function areExecFunctionsAvailable(): bool
+    {
+        if (!function_exists('shell_exec') || !function_exists('exec')) {
+            return false;
+        }
+
+        $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+        $disabled = array_filter($disabled);
+
+        if (in_array('shell_exec', $disabled, true) || in_array('exec', $disabled, true)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

@@ -565,6 +565,12 @@ class WhatsAppService
                     if ($mediaType === 'audio') {
                         Logger::quepasa("sendMessage - ✅ É ÁUDIO! Preparando envio como PTT...");
                         
+                        // Se veio como video/webm mas é áudio, alinhar o mimetype para audio/webm
+                        if (!empty($mediaMime) && str_contains($mediaMime, 'video/webm')) {
+                            Logger::quepasa("sendMessage - Ajustando mimetype de video/webm para audio/webm (áudio detectado)");
+                            $mediaMime = 'audio/webm';
+                        }
+                        
                         // Enviar como áudio PTT (opção recomendada pelo Quepasa/WhatsApp)
                         $payload['audio'] = [
                             'url' => $options['media_url'],

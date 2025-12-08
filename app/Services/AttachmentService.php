@@ -117,6 +117,12 @@ class AttachmentService
             Logger::quepasa("AttachmentService::upload - Não é áudio webm, pulando conversão");
         }
 
+        // Ajuste: se identificamos como áudio mas mime veio como video/webm, alinhar para audio/webm
+        if ($fileType === 'audio' && str_contains($mimeType, 'video/webm')) {
+            $mimeType = 'audio/webm';
+            Logger::quepasa("AttachmentService::upload - Ajustando mime_type de video/webm para audio/webm (arquivo marcado como áudio)");
+        }
+
         // Retornar informações do arquivo (considerando possível conversão)
         $result = [
             'filename' => $filename,

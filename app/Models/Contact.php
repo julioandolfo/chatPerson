@@ -49,37 +49,64 @@ class Contact extends Model
             return null;
         }
         
-        // Buscar exatamente pelo número normalizado
-        $contact = self::whereFirst('phone', '=', $normalized);
-        if ($contact) {
-            return $contact;
+        // Gerar variantes de número (com e sem 9º dígito de celular)
+        $variants = [];
+
+        $variants[] = $normalized; // sempre incluir normalizado
+
+        // Remover código do país para trabalhar com DDD + número
+        $national = $normalized;
+        if (strpos($normalized, '55') === 0) {
+            $national = substr($normalized, 2);
+        }
+
+        // Se tem 10 dígitos (possivelmente sem o 9º dígito do celular), gerar com 9
+        if (strlen($national) === 10) {
+            $with9 = '55' . substr($national, 0, 2) . '9' . substr($national, 2);
+            $variants[] = $with9;
+        }
+
+        // Se tem 11 dígitos e já tem 9 no início do número, gerar variante sem o 9
+        if (strlen($national) === 11 && substr($national, 2, 1) === '9') {
+            $without9 = '55' . substr($national, 0, 2) . substr($national, 3);
+            $variants[] = $without9;
+        }
+
+        // Unificar e remover duplicatas
+        $variants = array_values(array_unique($variants));
+
+        // Para cada variante, buscar variações comuns (sufixos WhatsApp e +)
+        foreach ($variants as $variant) {
+            $candidates = [
+                $variant,
+                '+' . $variant,
+                $variant . '@s.whatsapp.net',
+                $variant . '@lid',
+                $variant . '@c.us'
+            ];
+
+            foreach ($candidates as $candidate) {
+                $contact = self::whereFirst('phone', '=', $candidate);
+                if ($contact) {
+                    return $contact;
+                }
+            }
         }
         
-        // Buscar variações comuns (com sufixos WhatsApp)
-        $variations = [
-            $normalized . '@s.whatsapp.net',
-            $normalized . '@lid',
-            $normalized . '@c.us',
-            '+' . $normalized,
-            $normalized
-        ];
-        
-        foreach ($variations as $variation) {
-            $contact = self::whereFirst('phone', '=', $variation);
+        // Buscar usando LIKE para números que contenham alguma variante
+        foreach ($variants as $variant) {
+            $sql = "SELECT * FROM contacts WHERE phone LIKE ? OR phone LIKE ? LIMIT 1";
+            $contact = \App\Helpers\Database::fetch($sql, [
+                $variant . '%',
+                '%' . $variant
+            ]);
+            
             if ($contact) {
                 return $contact;
             }
         }
         
-        // Buscar usando LIKE para números que começam com o normalizado
-        // (pode ter sufixos ou prefixos)
-        $sql = "SELECT * FROM contacts WHERE phone LIKE ? OR phone LIKE ? LIMIT 1";
-        $contact = \App\Helpers\Database::fetch($sql, [
-            $normalized . '%',
-            '%' . $normalized
-        ]);
-        
-        return $contact ?: null;
+        return null;
     }
 
     /**

@@ -3074,6 +3074,15 @@ window.addEventListener('unhandledrejection', function(event) {
     }
 });
 
+// Fallback para avatares faltando (404) -> usa avatar em branco
+window.addEventListener('error', function(e) {
+    const target = e.target;
+    if (target && target.tagName === 'IMG' && target.src && target.src.indexOf('/media/avatars/contacts/') !== -1) {
+        target.onerror = null;
+        target.src = '<?= \App\Helpers\Url::asset('media/avatars/blank.png') ?>';
+    }
+}, true);
+
 // Selecionar conversa (carregar via AJAX sem recarregar página)
 // Sistema de Polling (fallback quando WebSocket não está disponível)
 // Declarar variáveis e funções ANTES de serem usadas

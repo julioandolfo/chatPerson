@@ -1317,6 +1317,37 @@ body.dark-mode .swal2-content {
 }
 </style>
 
+<!-- Script inline para definir função ANTES do HTML do botão -->
+<script>
+// Definir função IMEDIATAMENTE para estar disponível quando o HTML for renderizado
+(function() {
+    // Mostrar modal de nova conversa
+    window.showNewConversationModal = function() {
+        const modal = document.getElementById('kt_modal_new_conversation');
+        if (!modal) {
+            console.error('Modal de nova conversa não encontrado');
+            return;
+        }
+        
+        // Limpar formulário
+        const form = modal.querySelector('#newConversationForm');
+        if (form) form.reset();
+        
+        // Abrir modal
+        const bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
+        
+        // Focar no campo nome
+        setTimeout(() => {
+            const nameInput = modal.querySelector('#new_contact_name');
+            if (nameInput) nameInput.focus();
+        }, 300);
+    };
+    
+    console.log('showNewConversationModal definida no escopo global');
+})();
+</script>
+
 <div class="conversations-layout">
     
     <!-- COLUNA 1: LISTA DE CONVERSAS -->
@@ -2974,28 +3005,12 @@ body.dark-mode .swal2-content {
 </div>
 
 <script>
-// Selecionar conversa (carregar via AJAX sem recarregar página)
-// Sistema de Polling (fallback quando WebSocket não está disponível)
-// Declarar variáveis e funções ANTES de serem usadas
-let pollingInterval = null;
-let lastMessageId = null;
-let currentPollingConversationId = null;
+// ============================================
+// FUNÇÕES GLOBAIS - DEFINIR PRIMEIRO
+// ============================================
 
-// Sistema de Paginação Infinita
-let isLoadingMessages = false;
-let hasMoreMessages = true;
-let oldestMessageId = null;
-let currentConversationId = null;
-let currentContactAvatar = null; // Avatar do contato da conversa atual
-
-// Se já vier um ID da URL/PHP, setar na inicialização
-const initialConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
-if (initialConversationId) {
-    currentConversationId = initialConversationId;
-    currentContactAvatar = parsePhpJson('<?= json_encode($selectedConversation['contact_avatar'] ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
-}
-
-// Mostrar modal de nova conversa (definir cedo para estar disponível globalmente)
+// Mostrar modal de nova conversa (definir IMEDIATAMENTE para estar disponível globalmente)
+// Esta função DEVE estar definida antes de qualquer HTML que possa tentar usá-la
 function showNewConversationModal() {
     const modal = document.getElementById('kt_modal_new_conversation');
     if (!modal) {
@@ -3018,8 +3033,33 @@ function showNewConversationModal() {
     }, 300);
 }
 
-// Garantir que a função esteja no escopo global
+// Garantir que a função esteja no escopo global IMEDIATAMENTE
 window.showNewConversationModal = showNewConversationModal;
+
+// ============================================
+// VARIÁVEIS E OUTRAS FUNÇÕES
+// ============================================
+
+// Selecionar conversa (carregar via AJAX sem recarregar página)
+// Sistema de Polling (fallback quando WebSocket não está disponível)
+// Declarar variáveis e funções ANTES de serem usadas
+let pollingInterval = null;
+let lastMessageId = null;
+let currentPollingConversationId = null;
+
+// Sistema de Paginação Infinita
+let isLoadingMessages = false;
+let hasMoreMessages = true;
+let oldestMessageId = null;
+let currentConversationId = null;
+let currentContactAvatar = null; // Avatar do contato da conversa atual
+
+// Se já vier um ID da URL/PHP, setar na inicialização
+const initialConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+if (initialConversationId) {
+    currentConversationId = initialConversationId;
+    currentContactAvatar = parsePhpJson('<?= json_encode($selectedConversation['contact_avatar'] ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+}
 
 // Função para adicionar event listener ao botão (funciona mesmo se DOM já estiver carregado)
 function attachNewConversationButton() {

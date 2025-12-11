@@ -11287,12 +11287,16 @@ document.addEventListener('DOMContentLoaded', function() {
     // Formulário de nova conversa
     const newConversationForm = document.getElementById('newConversationForm');
     if (newConversationForm) {
+        console.log('✅ Anexando listener ao formulário de nova conversa');
         newConversationForm.addEventListener('submit', async function(e) {
             e.preventDefault();
+            console.log('📝 Formulário de nova conversa submetido');
             
             const name = document.getElementById('new_contact_name').value.trim();
             const phone = document.getElementById('new_contact_phone').value.trim();
             const message = document.getElementById('new_conversation_message').value.trim();
+            
+            console.log('📋 Dados do formulário:', { name, phone, message });
             
             if (!name || !phone || !message) {
                 alert('Preencha todos os campos');
@@ -11307,6 +11311,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Formatar telefone completo (+55 + DDD + número)
             const fullPhone = '55' + phone;
+            console.log('📞 Telefone formatado:', fullPhone);
             
             const submitBtn = newConversationForm.querySelector('button[type="submit"]');
             const indicator = submitBtn.querySelector('.indicator-label');
@@ -11317,6 +11322,8 @@ document.addEventListener('DOMContentLoaded', function() {
             indicator.style.display = 'none';
             progress.style.display = 'inline-block';
             submitBtn.disabled = true;
+            
+            console.log('🚀 Enviando requisição para criar nova conversa...');
             
             try {
                 const response = await fetch('<?= \App\Helpers\Url::to("/conversations/new") ?>', {
@@ -11333,15 +11340,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     })
                 });
                 
+                console.log('📡 Resposta HTTP:', response.status, response.statusText);
+                
                 const responseText = await response.text();
+                console.log('📄 Resposta texto (primeiros 500 chars):', responseText.substring(0, 500));
+                
                 let data;
                 try {
                     data = JSON.parse(responseText);
+                    console.log('✅ Resposta JSON parseada:', data);
                 } catch (jsonErr) {
+                    console.error('❌ Erro ao fazer parse do JSON:', jsonErr);
                     throw new Error(`Resposta não é JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
                 }
                 
                 if (data.success) {
+                    console.log('✅ Conversa criada com sucesso!', data);
+                    
                     const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_new_conversation'));
                     if (modal) modal.hide();
                     
@@ -11350,8 +11365,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Redirecionar para a nova conversa
                     if (data.conversation_id) {
+                        console.log('🔄 Redirecionando para conversa:', data.conversation_id);
                         window.location.href = '<?= \App\Helpers\Url::to("/conversations") ?>?id=' + data.conversation_id;
                     } else {
+                        console.log('🔄 Recarregando lista de conversas...');
                         // Recarregar lista de conversas
                         refreshConversationList();
                         
@@ -11368,6 +11385,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                 } else {
+                    console.error('Erro na resposta:', data);
                     // Mostrar aviso sobre agente atribuído
                     if (data.existing_agent) {
                         if (typeof Swal !== 'undefined') {
@@ -11386,9 +11404,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
             } catch (error) {
-                console.error('Erro:', error);
+                console.error('Erro capturado:', error);
                 alert('Erro ao criar conversa: ' + error.message);
             } finally {
+                console.log('Finalizando requisição, escondendo loading...');
                 // Esconder loading
                 submitBtn.removeAttribute('data-kt-indicator');
                 indicator.style.display = 'inline-block';
@@ -11396,6 +11415,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 submitBtn.disabled = false;
             }
         });
+    } else {
+        console.warn('Formulário newConversationForm não encontrado');
     }
     
     // Formulário de agendar mensagem
@@ -11491,120 +11512,6 @@ document.addEventListener('DOMContentLoaded', function() {
             let value = e.target.value.replace(/\D/g, ''); // Remove tudo que não é dígito
             if (value.length > 11) value = value.substring(0, 11); // Limita a 11 dígitos
             e.target.value = value;
-        });
-    }
-    
-    // Formulário de nova conversa
-    const newConversationForm = document.getElementById('newConversationForm');
-    if (newConversationForm) {
-        newConversationForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const name = document.getElementById('new_contact_name').value.trim();
-            const phone = document.getElementById('new_contact_phone').value.trim();
-            const message = document.getElementById('new_conversation_message').value.trim();
-            
-            if (!name || !phone || !message) {
-                alert('Preencha todos os campos');
-                return;
-            }
-            
-            // Validar telefone (deve ter pelo menos 10 dígitos - DDD + número)
-            if (phone.length < 10 || phone.length > 11) {
-                alert('Telefone inválido. Digite DDD + número (ex: 11987654321)');
-                return;
-            }
-            
-            // Formatar telefone completo (+55 + DDD + número)
-            const fullPhone = '55' + phone;
-            
-            const submitBtn = newConversationForm.querySelector('button[type="submit"]');
-            const indicator = submitBtn.querySelector('.indicator-label');
-            const progress = submitBtn.querySelector('.indicator-progress');
-            
-            // Mostrar loading
-            submitBtn.setAttribute('data-kt-indicator', 'on');
-            indicator.style.display = 'none';
-            progress.style.display = 'inline-block';
-            submitBtn.disabled = true;
-            
-            try {
-                const response = await fetch('<?= \App\Helpers\Url::to("/conversations/new") ?>', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        name: name,
-                        phone: fullPhone,
-                        message: message
-                    })
-                });
-                
-                const responseText = await response.text();
-                let data;
-                try {
-                    data = JSON.parse(responseText);
-                } catch (jsonErr) {
-                    throw new Error(`Resposta não é JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
-                }
-                
-                if (data.success) {
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_new_conversation'));
-                    if (modal) modal.hide();
-                    
-                    // Limpar formulário
-                    newConversationForm.reset();
-                    
-                    // Redirecionar para a nova conversa
-                    if (data.conversation_id) {
-                        window.location.href = '<?= \App\Helpers\Url::to("/conversations") ?>?id=' + data.conversation_id;
-                    } else {
-                        // Recarregar lista de conversas
-                        refreshConversationList();
-                        
-                        if (typeof Swal !== 'undefined') {
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Conversa criada!',
-                                text: 'Mensagem enviada com sucesso',
-                                toast: true,
-                                position: 'top-end',
-                                showConfirmButton: false,
-                                timer: 3000
-                            });
-                        }
-                    }
-                } else {
-                    // Mostrar aviso sobre agente atribuído
-                    if (data.existing_agent) {
-                        if (typeof Swal !== 'undefined') {
-                            Swal.fire({
-                                icon: 'warning',
-                                title: 'Conversa já atribuída',
-                                html: `<p>${data.message}</p>`,
-                                confirmButtonText: 'OK',
-                                confirmButtonColor: '#009ef7'
-                            });
-                        } else {
-                            alert(data.message);
-                        }
-                    } else {
-                        alert('Erro ao criar conversa: ' + (data.message || 'Erro desconhecido'));
-                    }
-                }
-            } catch (error) {
-                console.error('Erro:', error);
-                alert('Erro ao criar conversa: ' + error.message);
-            } finally {
-                // Esconder loading
-                submitBtn.removeAttribute('data-kt-indicator');
-                indicator.style.display = 'inline-block';
-                progress.style.display = 'none';
-                submitBtn.disabled = false;
-            }
         });
     }
     

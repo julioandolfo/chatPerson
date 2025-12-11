@@ -1332,7 +1332,7 @@ body.dark-mode .swal2-content {
                             </i>
                     <input type="text" id="kt_conversations_search" class="form-control form-control-solid ps-10" placeholder="Buscar conversas e mensagens..." value="<?= htmlspecialchars($filters['search'] ?? '') ?>">
                 </div>
-                <button type="button" class="btn btn-sm btn-icon btn-primary" onclick="showNewConversationModal()" title="Nova conversa">
+                <button type="button" class="btn btn-sm btn-icon btn-primary" id="btn_new_conversation" title="Nova conversa">
                     <i class="ki-duotone ki-plus fs-2">
                         <span class="path1"></span>
                         <span class="path2"></span>
@@ -3020,6 +3020,16 @@ function showNewConversationModal() {
 
 // Garantir que a função esteja no escopo global
 window.showNewConversationModal = showNewConversationModal;
+
+// Event listener para botão de nova conversa (ao invés de onclick inline)
+document.addEventListener('DOMContentLoaded', function() {
+    const btnNewConversation = document.getElementById('btn_new_conversation');
+    if (btnNewConversation) {
+        btnNewConversation.addEventListener('click', function() {
+            showNewConversationModal();
+        });
+    }
+});
 
 // Garantir inscrição no cliente de tempo real para conversas da lista (necessário no modo polling)
 function subscribeVisibleConversations() {
@@ -11289,7 +11299,22 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                 } else {
-                    alert('Erro ao criar conversa: ' + (data.message || 'Erro desconhecido'));
+                    // Mostrar aviso sobre agente atribuído
+                    if (data.existing_agent) {
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                icon: 'warning',
+                                title: 'Conversa já atribuída',
+                                html: `<p>${data.message}</p>`,
+                                confirmButtonText: 'OK',
+                                confirmButtonColor: '#009ef7'
+                            });
+                        } else {
+                            alert(data.message);
+                        }
+                    } else {
+                        alert('Erro ao criar conversa: ' + (data.message || 'Erro desconhecido'));
+                    }
                 }
             } catch (error) {
                 console.error('Erro:', error);
@@ -11484,7 +11509,22 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                 } else {
-                    alert('Erro ao criar conversa: ' + (data.message || 'Erro desconhecido'));
+                    // Mostrar aviso sobre agente atribuído
+                    if (data.existing_agent) {
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                icon: 'warning',
+                                title: 'Conversa já atribuída',
+                                html: `<p>${data.message}</p>`,
+                                confirmButtonText: 'OK',
+                                confirmButtonColor: '#009ef7'
+                            });
+                        } else {
+                            alert(data.message);
+                        }
+                    } else {
+                        alert('Erro ao criar conversa: ' + (data.message || 'Erro desconhecido'));
+                    }
                 }
             } catch (error) {
                 console.error('Erro:', error);

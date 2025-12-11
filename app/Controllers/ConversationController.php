@@ -412,6 +412,8 @@ class ConversationController
                 return;
             }
             
+            $currentUserId = \App\Helpers\Auth::id();
+            
             // Verificar se já existe conversa com esse contato e canal
             $existingConversation = \App\Models\Conversation::findByContactAndChannel(
                 $contact['id'], 
@@ -419,7 +421,37 @@ class ConversationController
                 $whatsappAccount['id']
             );
             
+            // Se existe conversa, verificar se está atribuída a outro agente humano
             if ($existingConversation) {
+                $existingAgentId = $existingConversation['agent_id'] ?? null;
+                
+                // Verificar se está atribuída a agente de IA (não considerar IA como agente)
+                $isAIAssigned = false;
+                try {
+                    $aiConversation = \App\Models\AIConversation::getByConversationId($existingConversation['id']);
+                    if ($aiConversation && $aiConversation['status'] === 'active') {
+                        $isAIAssigned = true;
+                    }
+                } catch (\Exception $e) {
+                    // Ignorar erro
+                }
+                
+                // Se está atribuída a outro agente humano (não IA e não é o usuário atual)
+                if ($existingAgentId && $existingAgentId != $currentUserId && !$isAIAssigned) {
+                    $existingAgent = \App\Models\User::find($existingAgentId);
+                    $existingAgentName = $existingAgent ? $existingAgent['name'] : 'Outro agente';
+                    
+                    // Apenas avisar, não criar
+                    Response::json([
+                        'success' => false,
+                        'message' => "Já existe uma conversa com este contato atribuída ao agente: {$existingAgentName}",
+                        'existing_agent' => $existingAgentName,
+                        'existing_conversation_id' => $existingConversation['id']
+                    ], 400);
+                    return;
+                }
+                
+                // Se está atribuída ao usuário atual ou é IA, usar a conversa existente
                 $conversationId = $existingConversation['id'];
             } else {
                 // Criar nova conversa
@@ -427,7 +459,7 @@ class ConversationController
                     'contact_id' => $contact['id'],
                     'channel' => 'whatsapp',
                     'whatsapp_account_id' => $whatsappAccount['id'],
-                    'agent_id' => \App\Helpers\Auth::id()
+                    'agent_id' => $currentUserId
                 ]);
                 
                 $conversationId = $conversation['id'];
@@ -438,7 +470,7 @@ class ConversationController
                 $conversationId,
                 $message,
                 'agent',
-                \App\Helpers\Auth::id()
+                $currentUserId
             );
             
             Response::json([

@@ -101,7 +101,18 @@ class Automation extends Model
         if (!empty($triggerData)) {
             $filtered = [];
             foreach ($automations as $automation) {
-                $config = json_decode($automation['trigger_config'], true);
+                // Evitar warning de json_decode com null/empty e tratar erro de decode
+                $configRaw = $automation['trigger_config'] ?? '';
+                if ($configRaw === null || $configRaw === '') {
+                    $config = [];
+                } else {
+                    $config = json_decode($configRaw, true);
+                    if (json_last_error() !== JSON_ERROR_NONE) {
+                        error_log('Automation::getActiveByTrigger - JSON inválido em trigger_config: ' . json_last_error_msg());
+                        $config = [];
+                    }
+                }
+
                 if (self::matchesTriggerConfig($config, $triggerData)) {
                     $filtered[] = $automation;
                 }

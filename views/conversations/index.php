@@ -3040,6 +3040,40 @@ window.showNewConversationModal = showNewConversationModal;
 // VARIÁVEIS E OUTRAS FUNÇÕES
 // ============================================
 
+// Log inicial para saber se o script principal carregou
+console.log('conversations.js iniciado');
+
+// Capturar erros globais para diagnosticar rapidamente
+window.onerror = function(message, source, lineno, colno, error) {
+    console.error('Erro global capturado:', { message, source, lineno, colno, error });
+    // Mostrar alerta mínimo para o usuário perceber
+    try {
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro de script',
+            html: `<div style="text-align:left;font-size:12px;">${message}<br><small>${source}:${lineno}:${colno}</small></div>`,
+            confirmButtonText: 'OK'
+        });
+    } catch (e) {
+        alert('Erro de script: ' + message + ' (' + source + ':' + lineno + ')');
+    }
+    return false;
+};
+
+window.addEventListener('unhandledrejection', function(event) {
+    console.error('Promise rejeitada não tratada:', event.reason);
+    try {
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro inesperado',
+            html: `<div style="text-align:left;font-size:12px;">${(event.reason && event.reason.message) ? event.reason.message : event.reason}</div>`,
+            confirmButtonText: 'OK'
+        });
+    } catch (e) {
+        alert('Erro inesperado: ' + (event.reason && event.reason.message ? event.reason.message : event.reason));
+    }
+});
+
 // Selecionar conversa (carregar via AJAX sem recarregar página)
 // Sistema de Polling (fallback quando WebSocket não está disponível)
 // Declarar variáveis e funções ANTES de serem usadas

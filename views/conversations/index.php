@@ -11308,16 +11308,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Inicializar seletor rápido de templates
     initTemplateQuickSelect();
     
-    // Máscara de telefone brasileiro (DDD + número)
-    const phoneInput = document.getElementById('new_contact_phone');
-    if (phoneInput) {
-        phoneInput.addEventListener('input', function(e) {
-            let value = e.target.value.replace(/\D/g, ''); // Remove tudo que não é dígito
-            if (value.length > 11) value = value.substring(0, 11); // Limita a 11 dígitos
-            e.target.value = value;
-        });
-    }
-    
     // Formulário de nova conversa
     const newConversationForm = document.getElementById('newConversationForm');
     if (newConversationForm) {

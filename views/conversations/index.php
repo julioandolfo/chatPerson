@@ -1332,7 +1332,7 @@ body.dark-mode .swal2-content {
                             </i>
                     <input type="text" id="kt_conversations_search" class="form-control form-control-solid ps-10" placeholder="Buscar conversas e mensagens..." value="<?= htmlspecialchars($filters['search'] ?? '') ?>">
                 </div>
-                <button type="button" class="btn btn-sm btn-icon btn-primary" id="btn_new_conversation" title="Nova conversa">
+                <button type="button" class="btn btn-sm btn-icon btn-primary" id="btn_new_conversation" title="Nova conversa" onclick="if(typeof showNewConversationModal === 'function') { showNewConversationModal(); } else { console.error('showNewConversationModal não está definida'); }">
                     <i class="ki-duotone ki-plus fs-2">
                         <span class="path1"></span>
                         <span class="path2"></span>
@@ -3021,15 +3021,44 @@ function showNewConversationModal() {
 // Garantir que a função esteja no escopo global
 window.showNewConversationModal = showNewConversationModal;
 
-// Event listener para botão de nova conversa (ao invés de onclick inline)
-document.addEventListener('DOMContentLoaded', function() {
+// Função para adicionar event listener ao botão (funciona mesmo se DOM já estiver carregado)
+function attachNewConversationButton() {
     const btnNewConversation = document.getElementById('btn_new_conversation');
     if (btnNewConversation) {
-        btnNewConversation.addEventListener('click', function() {
-            showNewConversationModal();
-        });
+        // Verificar se já tem listener (evitar duplicação)
+        if (btnNewConversation.dataset.listenerAttached === 'true') {
+            console.log('Listener já está anexado ao botão');
+            return;
+        }
+        
+        // Adicionar listener diretamente (sem clonar para preservar onclick)
+        btnNewConversation.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Botão de nova conversa clicado (event listener)');
+            if (typeof showNewConversationModal === 'function') {
+                showNewConversationModal();
+            } else {
+                console.error('showNewConversationModal não está definida');
+            }
+        }, true); // Usar capture phase para garantir que execute
+        
+        // Marcar como anexado
+        btnNewConversation.dataset.listenerAttached = 'true';
+        
+        console.log('Event listener adicionado ao botão de nova conversa');
+    } else {
+        console.warn('Botão de nova conversa não encontrado');
     }
-});
+}
+
+// Tentar adicionar o listener imediatamente (se DOM já estiver pronto)
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', attachNewConversationButton);
+} else {
+    // DOM já está pronto, executar imediatamente
+    setTimeout(attachNewConversationButton, 100); // Pequeno delay para garantir que tudo está pronto
+}
 
 // Garantir inscrição no cliente de tempo real para conversas da lista (necessário no modo polling)
 function subscribeVisibleConversations() {

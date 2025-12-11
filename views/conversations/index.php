@@ -1324,14 +1324,22 @@ body.dark-mode .swal2-content {
         
         <!-- Header com busca -->
         <div class="conversations-list-header">
-            <div class="position-relative">
-                <i class="ki-duotone ki-magnifier fs-3 text-gray-500 position-absolute top-50 translate-middle ms-6">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                        </i>
-                <input type="text" id="kt_conversations_search" class="form-control form-control-solid ps-10" placeholder="Buscar conversas e mensagens..." value="<?= htmlspecialchars($filters['search'] ?? '') ?>">
-                    </div>
+            <div class="d-flex gap-2">
+                <div class="position-relative flex-grow-1">
+                    <i class="ki-duotone ki-magnifier fs-3 text-gray-500 position-absolute top-50 translate-middle ms-6">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                    <input type="text" id="kt_conversations_search" class="form-control form-control-solid ps-10" placeholder="Buscar conversas e mensagens..." value="<?= htmlspecialchars($filters['search'] ?? '') ?>">
                 </div>
+                <button type="button" class="btn btn-sm btn-icon btn-primary" onclick="showNewConversationModal()" title="Nova conversa">
+                    <i class="ki-duotone ki-plus fs-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </button>
+            </div>
+        </div>
         
         <!-- Filtros -->
         <div class="conversations-list-filters">
@@ -2734,6 +2742,55 @@ body.dark-mode .swal2-content {
                     <div class="d-flex justify-content-end">
                         <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
                         <button type="submit" class="btn btn-primary">Criar Lembrete</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Nova Conversa -->
+<div class="modal fade" id="kt_modal_new_conversation" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-650px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Nova Conversa</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <form id="newConversationForm">
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold mb-2">Nome do Contato:</label>
+                        <input type="text" class="form-control form-control-solid" id="new_contact_name" name="name" placeholder="Nome completo" required>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold mb-2">Telefone:</label>
+                        <div class="input-group">
+                            <span class="input-group-text">+55</span>
+                            <input type="text" class="form-control form-control-solid" id="new_contact_phone" name="phone" placeholder="DDD + Número (ex: 11987654321)" maxlength="11" required>
+                        </div>
+                        <div class="form-text">Digite apenas DDD e número (ex: 11987654321)</div>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold mb-2">Mensagem:</label>
+                        <textarea class="form-control form-control-solid" id="new_conversation_message" name="message" rows="4" placeholder="Digite sua mensagem aqui..." required></textarea>
+                    </div>
+                    
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <span class="indicator-label">Enviar Mensagem</span>
+                            <span class="indicator-progress">Enviando...
+                                <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                            </span>
+                        </button>
                     </div>
                 </form>
             </div>
@@ -4991,6 +5048,29 @@ function markConversationAsUnread(conversationId) {
         console.error('Erro:', error);
         alert('Erro ao marcar conversa como não lida');
     });
+}
+
+// Mostrar modal de nova conversa
+function showNewConversationModal() {
+    const modal = document.getElementById('kt_modal_new_conversation');
+    if (!modal) {
+        console.error('Modal de nova conversa não encontrado');
+        return;
+    }
+    
+    // Limpar formulário
+    const form = modal.querySelector('#newConversationForm');
+    if (form) form.reset();
+    
+    // Abrir modal
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+    
+    // Focar no campo nome
+    setTimeout(() => {
+        const nameInput = modal.querySelector('#new_contact_name');
+        if (nameInput) nameInput.focus();
+    }, 300);
 }
 
 // Mostrar modal de agendar mensagem
@@ -11112,6 +11192,115 @@ document.addEventListener('DOMContentLoaded', function() {
     // Inicializar seletor rápido de templates
     initTemplateQuickSelect();
     
+    // Máscara de telefone brasileiro (DDD + número)
+    const phoneInput = document.getElementById('new_contact_phone');
+    if (phoneInput) {
+        phoneInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, ''); // Remove tudo que não é dígito
+            if (value.length > 11) value = value.substring(0, 11); // Limita a 11 dígitos
+            e.target.value = value;
+        });
+    }
+    
+    // Formulário de nova conversa
+    const newConversationForm = document.getElementById('newConversationForm');
+    if (newConversationForm) {
+        newConversationForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('new_contact_name').value.trim();
+            const phone = document.getElementById('new_contact_phone').value.trim();
+            const message = document.getElementById('new_conversation_message').value.trim();
+            
+            if (!name || !phone || !message) {
+                alert('Preencha todos os campos');
+                return;
+            }
+            
+            // Validar telefone (deve ter pelo menos 10 dígitos - DDD + número)
+            if (phone.length < 10 || phone.length > 11) {
+                alert('Telefone inválido. Digite DDD + número (ex: 11987654321)');
+                return;
+            }
+            
+            // Formatar telefone completo (+55 + DDD + número)
+            const fullPhone = '55' + phone;
+            
+            const submitBtn = newConversationForm.querySelector('button[type="submit"]');
+            const indicator = submitBtn.querySelector('.indicator-label');
+            const progress = submitBtn.querySelector('.indicator-progress');
+            
+            // Mostrar loading
+            submitBtn.setAttribute('data-kt-indicator', 'on');
+            indicator.style.display = 'none';
+            progress.style.display = 'inline-block';
+            submitBtn.disabled = true;
+            
+            try {
+                const response = await fetch('<?= \App\Helpers\Url::to("/conversations/new") ?>', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        phone: fullPhone,
+                        message: message
+                    })
+                });
+                
+                const responseText = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (jsonErr) {
+                    throw new Error(`Resposta não é JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
+                }
+                
+                if (data.success) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_new_conversation'));
+                    if (modal) modal.hide();
+                    
+                    // Limpar formulário
+                    newConversationForm.reset();
+                    
+                    // Redirecionar para a nova conversa
+                    if (data.conversation_id) {
+                        window.location.href = '<?= \App\Helpers\Url::to("/conversations") ?>?id=' + data.conversation_id;
+                    } else {
+                        // Recarregar lista de conversas
+                        refreshConversationList();
+                        
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Conversa criada!',
+                                text: 'Mensagem enviada com sucesso',
+                                toast: true,
+                                position: 'top-end',
+                                showConfirmButton: false,
+                                timer: 3000
+                            });
+                        }
+                    }
+                } else {
+                    alert('Erro ao criar conversa: ' + (data.message || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao criar conversa: ' + error.message);
+            } finally {
+                // Esconder loading
+                submitBtn.removeAttribute('data-kt-indicator');
+                indicator.style.display = 'inline-block';
+                progress.style.display = 'none';
+                submitBtn.disabled = false;
+            }
+        });
+    }
+    
     // Formulário de agendar mensagem
     const scheduleMessageForm = document.getElementById('scheduleMessageForm');
     if (scheduleMessageForm) {
@@ -11194,6 +11383,115 @@ document.addEventListener('DOMContentLoaded', function() {
             } catch (error) {
                 console.error('Erro:', error);
                 alert('Erro ao agendar mensagem: ' + error.message);
+            }
+        });
+    }
+    
+    // Máscara de telefone brasileiro (DDD + número)
+    const phoneInput = document.getElementById('new_contact_phone');
+    if (phoneInput) {
+        phoneInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, ''); // Remove tudo que não é dígito
+            if (value.length > 11) value = value.substring(0, 11); // Limita a 11 dígitos
+            e.target.value = value;
+        });
+    }
+    
+    // Formulário de nova conversa
+    const newConversationForm = document.getElementById('newConversationForm');
+    if (newConversationForm) {
+        newConversationForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('new_contact_name').value.trim();
+            const phone = document.getElementById('new_contact_phone').value.trim();
+            const message = document.getElementById('new_conversation_message').value.trim();
+            
+            if (!name || !phone || !message) {
+                alert('Preencha todos os campos');
+                return;
+            }
+            
+            // Validar telefone (deve ter pelo menos 10 dígitos - DDD + número)
+            if (phone.length < 10 || phone.length > 11) {
+                alert('Telefone inválido. Digite DDD + número (ex: 11987654321)');
+                return;
+            }
+            
+            // Formatar telefone completo (+55 + DDD + número)
+            const fullPhone = '55' + phone;
+            
+            const submitBtn = newConversationForm.querySelector('button[type="submit"]');
+            const indicator = submitBtn.querySelector('.indicator-label');
+            const progress = submitBtn.querySelector('.indicator-progress');
+            
+            // Mostrar loading
+            submitBtn.setAttribute('data-kt-indicator', 'on');
+            indicator.style.display = 'none';
+            progress.style.display = 'inline-block';
+            submitBtn.disabled = true;
+            
+            try {
+                const response = await fetch('<?= \App\Helpers\Url::to("/conversations/new") ?>', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        phone: fullPhone,
+                        message: message
+                    })
+                });
+                
+                const responseText = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (jsonErr) {
+                    throw new Error(`Resposta não é JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
+                }
+                
+                if (data.success) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_new_conversation'));
+                    if (modal) modal.hide();
+                    
+                    // Limpar formulário
+                    newConversationForm.reset();
+                    
+                    // Redirecionar para a nova conversa
+                    if (data.conversation_id) {
+                        window.location.href = '<?= \App\Helpers\Url::to("/conversations") ?>?id=' + data.conversation_id;
+                    } else {
+                        // Recarregar lista de conversas
+                        refreshConversationList();
+                        
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Conversa criada!',
+                                text: 'Mensagem enviada com sucesso',
+                                toast: true,
+                                position: 'top-end',
+                                showConfirmButton: false,
+                                timer: 3000
+                            });
+                        }
+                    }
+                } else {
+                    alert('Erro ao criar conversa: ' + (data.message || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao criar conversa: ' + error.message);
+            } finally {
+                // Esconder loading
+                submitBtn.removeAttribute('data-kt-indicator');
+                indicator.style.display = 'inline-block';
+                progress.style.display = 'none';
+                submitBtn.disabled = false;
             }
         });
     }

@@ -363,6 +363,97 @@ class ConversationController
     }
 
     /**
+     * Criar nova conversa com contato e mensagem
+     */
+    public function newConversation(): void
+    {
+        Permission::abortIfCannot('conversations.create');
+        
+        try {
+            $data = \App\Helpers\Request::json();
+            
+            $name = trim($data['name'] ?? '');
+            $phone = trim($data['phone'] ?? '');
+            $message = trim($data['message'] ?? '');
+            
+            if (empty($name) || empty($phone) || empty($message)) {
+                Response::json(['success' => false, 'message' => 'Preencha todos os campos'], 400);
+                return;
+            }
+            
+            // Normalizar telefone (remover +55 se presente, garantir formato correto)
+            $phone = preg_replace('/^\+?55/', '', $phone); // Remove +55 do início
+            $phone = preg_replace('/\D/', '', $phone); // Remove caracteres não numéricos
+            
+            if (strlen($phone) < 10 || strlen($phone) > 11) {
+                Response::json(['success' => false, 'message' => 'Telefone inválido. Digite DDD + número'], 400);
+                return;
+            }
+            
+            // Formatar telefone completo com +55
+            $fullPhone = '55' . $phone;
+            
+            // Criar ou encontrar contato
+            $contact = \App\Services\ContactService::createOrUpdate([
+                'name' => $name,
+                'phone' => $fullPhone,
+                'whatsapp_id' => $fullPhone . '@s.whatsapp.net'
+            ]);
+            
+            if (!$contact || !isset($contact['id'])) {
+                Response::json(['success' => false, 'message' => 'Erro ao criar contato'], 500);
+                return;
+            }
+            
+            // Buscar conta WhatsApp padrão ou primeira disponível
+            $whatsappAccount = \App\Models\WhatsAppAccount::getFirstActive();
+            if (!$whatsappAccount) {
+                Response::json(['success' => false, 'message' => 'Nenhuma conta WhatsApp ativa encontrada'], 400);
+                return;
+            }
+            
+            // Verificar se já existe conversa com esse contato e canal
+            $existingConversation = \App\Models\Conversation::findByContactAndChannel(
+                $contact['id'], 
+                'whatsapp', 
+                $whatsappAccount['id']
+            );
+            
+            if ($existingConversation) {
+                $conversationId = $existingConversation['id'];
+            } else {
+                // Criar nova conversa
+                $conversation = \App\Services\ConversationService::create([
+                    'contact_id' => $contact['id'],
+                    'channel' => 'whatsapp',
+                    'whatsapp_account_id' => $whatsappAccount['id'],
+                    'agent_id' => \App\Helpers\Auth::id()
+                ]);
+                
+                $conversationId = $conversation['id'];
+            }
+            
+            // Enviar mensagem
+            $messageId = \App\Services\ConversationService::sendMessage(
+                $conversationId,
+                $message,
+                'agent',
+                \App\Helpers\Auth::id()
+            );
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Conversa criada e mensagem enviada com sucesso',
+                'conversation_id' => $conversationId,
+                'message_id' => $messageId
+            ]);
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error("Erro ao criar nova conversa: " . $e->getMessage());
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
      * Atribuir conversa a agente
      */
     public function assign(int $id): void

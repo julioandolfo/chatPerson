@@ -27,5 +27,14 @@ class WhatsAppAccount extends Model
     {
         return self::where('status', '=', 'active');
     }
+
+    /**
+     * Obter primeira conta ativa
+     */
+    public static function getFirstActive(): ?array
+    {
+        $accounts = self::getActive();
+        return !empty($accounts) ? $accounts[0] : null;
+    }
 }
 

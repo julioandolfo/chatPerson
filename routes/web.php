@@ -44,6 +44,7 @@ Router::get('/dashboard/chart-data', [DashboardController::class, 'getChartData'
 Router::get('/dashboard/export', [DashboardController::class, 'exportReport'], ['Authentication']);
 Router::get('/conversations', [ConversationController::class, 'index'], ['Authentication']);
 Router::post('/conversations', [ConversationController::class, 'store'], ['Authentication']);
+Router::post('/conversations/new', [ConversationController::class, 'newConversation'], ['Authentication']);
 Router::get('/conversations/{id}', [ConversationController::class, 'show'], ['Authentication']);
 Router::delete('/conversations/{id}', [ConversationController::class, 'destroy'], ['Authentication']);
 // Rota alternativa para exibir conversa na lista (usado no layout Chatwoot)

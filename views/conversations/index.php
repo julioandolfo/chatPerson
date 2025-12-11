@@ -309,17 +309,25 @@ ob_start();
 .conversation-item-actions .btn {
     opacity: 0.6;
     transition: opacity 0.2s ease, background-color 0.2s ease;
-    padding: 4px 6px !important;
-    min-width: 28px;
-    height: 28px;
+    padding: 6px 8px !important;
+    min-width: 32px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
+.conversation-item-actions .btn i {
+    font-size: 1.25rem !important; /* fs-5 equivalente */
+}
+
 .conversation-item-actions .btn:hover {
-    opacity: 1;
+    opacity: 1 !important;
     background-color: var(--bs-gray-200) !important;
+}
+
+.conversation-item-actions .btn:hover i {
+    color: var(--bs-primary) !important;
 }
 
 .conversation-item:hover .conversation-item-actions .btn {
@@ -1472,10 +1480,12 @@ body.dark-mode .swal2-content {
                                             data-bs-toggle="dropdown" 
                                             aria-expanded="false"
                                             onclick="event.stopPropagation();">
-                                        <i class="ki-duotone ki-dots-vertical fs-7 text-muted">
+                                        <i class="ki-duotone ki-setting-2 text-muted">
                                             <span class="path1"></span>
                                             <span class="path2"></span>
                                             <span class="path3"></span>
+                                            <span class="path4"></span>
+                                            <span class="path5"></span>
                                         </i>
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-end" data-conversation-id="<?= $conv['id'] ?>">
@@ -3034,10 +3044,12 @@ function ensureActionsDropdown(conversationItem, pinned, conversationId, preserv
                     data-bs-toggle="dropdown" 
                     aria-expanded="false"
                     onclick="event.stopPropagation();">
-                <i class="ki-duotone ki-dots-vertical fs-7 text-muted">
+                <i class="ki-duotone ki-setting-2 text-muted">
                     <span class="path1"></span>
                     <span class="path2"></span>
                     <span class="path3"></span>
+                    <span class="path4"></span>
+                    <span class="path5"></span>
                 </i>
             </button>
             <ul class="dropdown-menu dropdown-menu-end" data-conversation-id="${conversationId}">
@@ -4639,10 +4651,12 @@ function refreshConversationList(params = null) {
                                     data-bs-toggle="dropdown" 
                                     aria-expanded="false"
                                     onclick="event.stopPropagation();">
-                                <i class="ki-duotone ki-dots-vertical fs-7 text-muted">
+                                <i class="ki-duotone ki-setting-2 text-muted">
                                     <span class="path1"></span>
                                     <span class="path2"></span>
                                     <span class="path3"></span>
+                                    <span class="path4"></span>
+                                    <span class="path5"></span>
                                 </i>
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end" data-conversation-id="${conv.id}">
@@ -4981,7 +4995,8 @@ function markConversationAsUnread(conversationId) {
 
 // Mostrar modal de agendar mensagem
 function showScheduleMessageModal() {
-    const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+    // Usar variável JavaScript global que é atualizada dinamicamente
+    const conversationId = currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     if (!conversationId) {
         alert('Selecione uma conversa primeiro');
         return;
@@ -6015,7 +6030,8 @@ function cancelReply() {
 async function forwardMessage(messageId) {
     if (!messageId) return;
     
-const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+    // Usar variável JavaScript global que é atualizada dinamicamente
+    const conversationId = currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     if (!conversationId) {
         alert('Selecione uma conversa primeiro');
         return;
@@ -6289,7 +6305,8 @@ let isRecording = false;
 // Gravar áudio
 async function toggleAudioRecording() {
     const btn = document.getElementById('recordAudioBtn');
-const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+    // Usar variável JavaScript global que é atualizada dinamicamente
+    const conversationId = currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     
     if (!conversationId) {
         alert('Selecione uma conversa primeiro');
@@ -8915,8 +8932,8 @@ function attachFile() {
 }
 
 function uploadFile(file) {
-    // Usar helper seguro para parsear ID
-    const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+    // Usar variável JavaScript global que é atualizada dinamicamente
+    const conversationId = currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     
     if (!conversationId) {
         alert('Selecione uma conversa primeiro');
@@ -9551,10 +9568,12 @@ function addConversationToList(conv) {
                                         data-bs-toggle="dropdown" 
                                         aria-expanded="false"
                                         onclick="event.stopPropagation();">
-                                    <i class="ki-duotone ki-dots-vertical fs-7 text-muted">
+                                    <i class="ki-duotone ki-setting-2 text-muted">
                                         <span class="path1"></span>
                                         <span class="path2"></span>
                                         <span class="path3"></span>
+                                        <span class="path4"></span>
+                                        <span class="path5"></span>
                                     </i>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end" data-conversation-id="${conv.id}">

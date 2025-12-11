@@ -2995,6 +2995,32 @@ if (initialConversationId) {
     currentContactAvatar = parsePhpJson('<?= json_encode($selectedConversation['contact_avatar'] ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
 }
 
+// Mostrar modal de nova conversa (definir cedo para estar disponível globalmente)
+function showNewConversationModal() {
+    const modal = document.getElementById('kt_modal_new_conversation');
+    if (!modal) {
+        console.error('Modal de nova conversa não encontrado');
+        return;
+    }
+    
+    // Limpar formulário
+    const form = modal.querySelector('#newConversationForm');
+    if (form) form.reset();
+    
+    // Abrir modal
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+    
+    // Focar no campo nome
+    setTimeout(() => {
+        const nameInput = modal.querySelector('#new_contact_name');
+        if (nameInput) nameInput.focus();
+    }, 300);
+}
+
+// Garantir que a função esteja no escopo global
+window.showNewConversationModal = showNewConversationModal;
+
 // Garantir inscrição no cliente de tempo real para conversas da lista (necessário no modo polling)
 function subscribeVisibleConversations() {
     if (typeof window.wsClient === 'undefined') return;
@@ -5048,29 +5074,6 @@ function markConversationAsUnread(conversationId) {
         console.error('Erro:', error);
         alert('Erro ao marcar conversa como não lida');
     });
-}
-
-// Mostrar modal de nova conversa
-function showNewConversationModal() {
-    const modal = document.getElementById('kt_modal_new_conversation');
-    if (!modal) {
-        console.error('Modal de nova conversa não encontrado');
-        return;
-    }
-    
-    // Limpar formulário
-    const form = modal.querySelector('#newConversationForm');
-    if (form) form.reset();
-    
-    // Abrir modal
-    const bsModal = new bootstrap.Modal(modal);
-    bsModal.show();
-    
-    // Focar no campo nome
-    setTimeout(() => {
-        const nameInput = modal.querySelector('#new_contact_name');
-        if (nameInput) nameInput.focus();
-    }, 300);
 }
 
 // Mostrar modal de agendar mensagem

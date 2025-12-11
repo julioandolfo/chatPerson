@@ -3054,6 +3054,15 @@ let oldestMessageId = null;
 let currentConversationId = null;
 let currentContactAvatar = null; // Avatar do contato da conversa atual
 
+// Helper para converter valores vindos do PHP em JSON válido
+function parsePhpJson(value) {
+    try {
+        return JSON.parse(value);
+    } catch (e) {
+        return null;
+    }
+}
+
 // Se já vier um ID da URL/PHP, setar na inicialização
 const initialConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
 if (initialConversationId) {
@@ -3350,15 +3359,6 @@ function applyConversationUpdate(conv) {
     // Atualizar meta e resortear
     updateConversationMeta(conversationItem, conv);
     sortConversationList();
-}
-
-// Helper para converter valores vindos do PHP em JSON válido
-function parsePhpJson(value) {
-    try {
-        return JSON.parse(value);
-    } catch (e) {
-        return null;
-    }
 }
 
 /**

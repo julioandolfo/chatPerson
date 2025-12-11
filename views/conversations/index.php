@@ -303,6 +303,7 @@ ob_start();
 .conversation-item-actions {
     position: relative;
     z-index: 10;
+    display: inline-block; /* Garantir que dropdown seja posicionado em relação ao botão */
 }
 
 .conversation-item-actions .btn {
@@ -330,13 +331,42 @@ ob_start();
     top: 100% !important;
     right: 0 !important;
     left: auto !important;
-    margin-top: 4px;
+    margin-top: 2px !important;
+    margin-right: 0 !important;
     min-width: 200px;
     z-index: 1050 !important;
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
     border: 1px solid var(--bs-border-color);
     max-height: none !important; /* Não limitar altura */
     overflow: visible !important; /* Permitir que todas as opções apareçam */
+    transform: none !important; /* Remover transformações que podem afastar */
+}
+
+/* Estilos para modo dark */
+[data-bs-theme="dark"] .conversation-item-actions .dropdown-menu,
+.dark-mode .conversation-item-actions .dropdown-menu,
+body.dark-mode .conversation-item-actions .dropdown-menu {
+    background-color: var(--bs-gray-800) !important;
+    border-color: var(--bs-gray-700) !important;
+}
+
+[data-bs-theme="dark"] .conversation-item-actions .dropdown-item,
+.dark-mode .conversation-item-actions .dropdown-item,
+body.dark-mode .conversation-item-actions .dropdown-item {
+    color: var(--bs-white) !important;
+}
+
+[data-bs-theme="dark"] .conversation-item-actions .dropdown-item:hover,
+.dark-mode .conversation-item-actions .dropdown-item:hover,
+body.dark-mode .conversation-item-actions .dropdown-item:hover {
+    background-color: var(--bs-gray-700) !important;
+    color: var(--bs-white) !important;
+}
+
+[data-bs-theme="dark"] .conversation-item-actions .dropdown-divider,
+.dark-mode .conversation-item-actions .dropdown-divider,
+body.dark-mode .conversation-item-actions .dropdown-divider {
+    border-color: var(--bs-gray-700) !important;
 }
 
 /* Garantir que o dropdown não seja cortado pela altura da linha */
@@ -2942,10 +2972,52 @@ function moveConversationToTop(conversationId) {
     }
 }
 
+// Verificar se há dropdown aberto em uma conversa
+function hasOpenDropdown(conversationId) {
+    const conversationItem = document.querySelector(`[data-conversation-id="${conversationId}"]`);
+    if (!conversationItem) return false;
+    const dropdown = conversationItem.querySelector('.conversation-item-actions');
+    if (!dropdown) return false;
+    // Verificar múltiplas formas de detectar dropdown aberto
+    return dropdown.classList.contains('show') || 
+           dropdown.querySelector('.dropdown-menu.show') ||
+           dropdown.dataset.isOpen === 'true' ||
+           dropdown.querySelector('button[aria-expanded="true"]') !== null;
+}
+
+// Preservar dropdown aberto durante atualizações
+function preserveOpenDropdown(conversationId) {
+    const conversationItem = document.querySelector(`[data-conversation-id="${conversationId}"]`);
+    if (!conversationItem) return null;
+    const dropdown = conversationItem.querySelector('.conversation-item-actions');
+    if (!dropdown) return null;
+    const isOpen = dropdown.classList.contains('show') || dropdown.querySelector('.dropdown-menu.show');
+    return isOpen ? conversationId : null;
+}
+
+// Restaurar dropdown aberto após atualização
+function restoreOpenDropdown(conversationId) {
+    if (!conversationId) return;
+    setTimeout(() => {
+        const conversationItem = document.querySelector(`[data-conversation-id="${conversationId}"]`);
+        if (!conversationItem) return;
+        const dropdown = conversationItem.querySelector('.conversation-item-actions');
+        if (!dropdown) return;
+        const button = dropdown.querySelector('button[data-bs-toggle="dropdown"]');
+        if (button) {
+            const bsDropdown = bootstrap.Dropdown.getInstance(button) || new bootstrap.Dropdown(button);
+            bsDropdown.show();
+        }
+    }, 50);
+}
+
 // Garantir que o dropdown de ações exista e reflita o estado
-function ensureActionsDropdown(conversationItem, pinned, conversationId) {
+function ensureActionsDropdown(conversationItem, pinned, conversationId, preserveOpen = false) {
     const timeContainer = conversationItem.querySelector('.conversation-item-time');
     if (!timeContainer) return;
+
+    // Verificar se dropdown está aberto antes de remover
+    const wasOpen = preserveOpen && hasOpenDropdown(conversationId);
 
     // Remover dropdown existente se houver
     const existingDropdown = conversationItem.querySelector('.conversation-item-actions');
@@ -3013,6 +3085,11 @@ function ensureActionsDropdown(conversationItem, pinned, conversationId) {
     // Inserir dropdown no timeContainer
     timeContainer.insertAdjacentHTML('beforeend', dropdownHtml);
 
+    // Restaurar dropdown aberto se estava aberto antes
+    if (wasOpen) {
+        restoreOpenDropdown(conversationId);
+    }
+
     // Atualizar classe do item
     if (pinned) {
         conversationItem.classList.add('pinned');
@@ -3049,6 +3126,9 @@ function applyConversationUpdate(conv) {
     const conversationItem = document.querySelector(`[data-conversation-id="${conv.id}"]`);
     if (!conversationItem) return;
 
+    // Preservar dropdown aberto se estiver aberto
+    const wasOpen = hasOpenDropdown(conv.id);
+
             const preview = conversationItem.querySelector('.conversation-item-preview');
             const time = conversationItem.querySelector('.conversation-item-time');
             const badge = conversationItem.querySelector('.conversation-item-badge');
@@ -3063,7 +3143,10 @@ function applyConversationUpdate(conv) {
                 preview.textContent = content;
             }
     if (time && (conv.last_message_at || conv.updated_at)) {
-        time.textContent = formatTime(conv.last_message_at || conv.updated_at);
+        // Não atualizar o tempo se dropdown estiver aberto (evita fechar)
+        if (!wasOpen) {
+            time.textContent = formatTime(conv.last_message_at || conv.updated_at);
+        }
     }
 
     if (avatarContainer) {
@@ -3074,8 +3157,8 @@ function applyConversationUpdate(conv) {
         }
     }
 
-    // Garantir botão de fixar e classe pinned
-            ensureActionsDropdown(conversationItem, pinned, conv.id);
+    // Garantir botão de fixar e classe pinned (preservar dropdown aberto)
+            ensureActionsDropdown(conversationItem, pinned, conv.id, wasOpen);
 
     const unreadCount = conv.unread_count || 0;
     if (unreadCount > 0) {
@@ -3195,6 +3278,9 @@ function checkForNewMessages(conversationId) {
 function updateConversationListPreview(conversationId, lastMessage) {
     const conversationItem = document.querySelector(`[data-conversation-id="${conversationId}"]`);
     if (conversationItem && lastMessage) {
+        // Preservar dropdown aberto se estiver aberto
+        const wasOpen = hasOpenDropdown(conversationId);
+        
         const preview = conversationItem.querySelector('.conversation-item-preview');
         const time = conversationItem.querySelector('.conversation-item-time');
         
@@ -3204,18 +3290,23 @@ function updateConversationListPreview(conversationId, lastMessage) {
             preview.textContent = content.substring(0, maxChars) + (content.length > maxChars ? '...' : '');
         }
         if (time && lastMessage.created_at) {
-            // Usar formatTime com o timestamp real da mensagem
-            time.textContent = formatTime(lastMessage.created_at);
-            // Atualizar data-updated-at para ordenação correta
+            // Não atualizar o tempo se dropdown estiver aberto (evita fechar)
+            if (!wasOpen) {
+                // Usar formatTime com o timestamp real da mensagem
+                time.textContent = formatTime(lastMessage.created_at);
+            }
+            // Atualizar data-updated-at para ordenação correta (sempre)
             conversationItem.setAttribute('data-updated-at', lastMessage.created_at);
         }
         
-        // Garantir dropdown de ações está atualizado
+        // Garantir dropdown de ações está atualizado (preservar se estava aberto)
         const pinned = conversationItem.classList.contains('pinned');
-        ensureActionsDropdown(conversationItem, pinned, conversationId);
+        ensureActionsDropdown(conversationItem, pinned, conversationId, wasOpen);
         
-        // Resortear lista após atualizar
-        sortConversationList();
+        // Resortear lista após atualizar (mas preservar posição se dropdown aberto)
+        if (!wasOpen) {
+            sortConversationList();
+        }
     }
 }
 
@@ -10978,6 +11069,26 @@ document.addEventListener('DOMContentLoaded', function() {
             loadAIAssistantFeatures();
         });
     }
+    
+    // Preservar dropdowns abertos durante atualizações
+    // Usar delegação de eventos para dropdowns dinâmicos
+    document.addEventListener('show.bs.dropdown', function(e) {
+        const dropdown = e.target.closest('.conversation-item-actions');
+        if (dropdown) {
+            const conversationId = dropdown.querySelector('[data-conversation-id]')?.getAttribute('data-conversation-id');
+            if (conversationId) {
+                // Marcar que este dropdown está aberto
+                dropdown.dataset.isOpen = 'true';
+            }
+        }
+    });
+    
+    document.addEventListener('hide.bs.dropdown', function(e) {
+        const dropdown = e.target.closest('.conversation-item-actions');
+        if (dropdown) {
+            dropdown.dataset.isOpen = 'false';
+        }
+    });
     
     // Inicializar seletor rápido de templates
     initTemplateQuickSelect();

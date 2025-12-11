@@ -370,7 +370,8 @@ class ConversationController
         Permission::abortIfCannot('conversations.create');
         
         try {
-            $data = \App\Helpers\Request::json();
+            // Aceitar tanto JSON quanto form-data (Request::post já trata JSON)
+            $data = \App\Helpers\Request::post();
             
             $name = trim($data['name'] ?? '');
             $phone = trim($data['phone'] ?? '');

@@ -225,6 +225,7 @@ ob_start();
 .conversations-list-items {
     flex: 1;
     overflow-y: auto;
+    overflow-x: visible; /* Permitir que dropdowns não sejam cortados */
 }
 
 .conversation-item {
@@ -233,7 +234,7 @@ ob_start();
     cursor: pointer;
     transition: background 0.15s ease;
     position: relative;
-    overflow: hidden; /* evita overflow horizontal com textos longos */
+    overflow: visible; /* Permitir que dropdown apareça completamente */
 }
 
 .conversation-item:hover {
@@ -290,11 +291,79 @@ ob_start();
     gap: 6px;
     flex-shrink: 0;
     white-space: nowrap;
+    position: relative;
 }
 
 .conversation-item-time .btn,
 .conversation-item-time button {
     flex-shrink: 0;
+}
+
+/* Dropdown de ações - melhor visibilidade e overflow */
+.conversation-item-actions {
+    position: relative;
+    z-index: 10;
+}
+
+.conversation-item-actions .btn {
+    opacity: 0.6;
+    transition: opacity 0.2s ease, background-color 0.2s ease;
+    padding: 4px 6px !important;
+    min-width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.conversation-item-actions .btn:hover {
+    opacity: 1;
+    background-color: var(--bs-gray-200) !important;
+}
+
+.conversation-item:hover .conversation-item-actions .btn {
+    opacity: 0.8;
+}
+
+.conversation-item-actions .dropdown-menu {
+    position: absolute !important;
+    top: 100% !important;
+    right: 0 !important;
+    left: auto !important;
+    margin-top: 4px;
+    min-width: 200px;
+    z-index: 1050 !important;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--bs-border-color);
+    max-height: none !important; /* Não limitar altura */
+    overflow: visible !important; /* Permitir que todas as opções apareçam */
+}
+
+/* Garantir que o dropdown não seja cortado pela altura da linha */
+.conversation-item {
+    overflow: visible !important;
+}
+
+/* Garantir que o dropdown apareça acima de outros elementos */
+.conversation-item-actions.show .dropdown-menu {
+    display: block !important;
+}
+
+/* Garantir que o container da lista não corte o dropdown */
+.conversations-list-items {
+    overflow-y: auto;
+    overflow-x: visible;
+    position: relative;
+}
+
+/* Garantir que o dropdown apareça acima de outros itens */
+.conversation-item-actions {
+    position: relative;
+    z-index: 10;
+}
+
+.conversation-item-actions.show {
+    z-index: 1051;
 }
 
 .conversation-item-preview {
@@ -3140,6 +3209,10 @@ function updateConversationListPreview(conversationId, lastMessage) {
             // Atualizar data-updated-at para ordenação correta
             conversationItem.setAttribute('data-updated-at', lastMessage.created_at);
         }
+        
+        // Garantir dropdown de ações está atualizado
+        const pinned = conversationItem.classList.contains('pinned');
+        ensureActionsDropdown(conversationItem, pinned, conversationId);
         
         // Resortear lista após atualizar
         sortConversationList();

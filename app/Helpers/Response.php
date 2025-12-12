@@ -71,25 +71,37 @@ class Response
             extract($data);
             
             // Construir caminho da view
-            $viewPath = __DIR__ . '/../../views/' . str_replace('.', '/', $view) . '.php';
+            $originalPath = __DIR__ . '/../../views/' . str_replace('.', '/', $view) . '.php';
+            $baseDir = dirname($originalPath);
             
-            // Normalizar caminho (resolver .. e .)
-            $viewPath = realpath($viewPath);
-            
-            if ($debug) {
-                $originalPath = __DIR__ . '/../../views/' . str_replace('.', '/', $view) . '.php';
-                error_log("Response::view - View: {$view}, Original Path: {$originalPath}, Resolved Path: " . ($viewPath ?: 'null') . ", Exists: " . ($viewPath && file_exists($viewPath) ? 'yes' : 'no'));
+            // Criar diretório se não existir
+            if (!is_dir($baseDir)) {
+                if ($debug) {
+                    error_log("Response::view - Criando diretório: {$baseDir}");
+                }
+                if (!mkdir($baseDir, 0755, true)) {
+                    throw new \RuntimeException("Não foi possível criar o diretório: {$baseDir}");
+                }
             }
             
-            if (!$viewPath || !file_exists($viewPath)) {
-                $originalPath = __DIR__ . '/../../views/' . str_replace('.', '/', $view) . '.php';
-                $baseDir = dirname($originalPath);
+            // Normalizar caminho (resolver .. e .)
+            $viewPath = realpath($originalPath);
+            
+            // Se realpath falhar, usar o caminho original
+            if (!$viewPath) {
+                $viewPath = $originalPath;
+            }
+            
+            if ($debug) {
+                error_log("Response::view - View: {$view}, Original Path: {$originalPath}, Resolved Path: {$viewPath}, Exists: " . (file_exists($viewPath) ? 'yes' : 'no'));
+            }
+            
+            if (!file_exists($viewPath)) {
                 $baseDirExists = is_dir($baseDir);
                 $baseDirReal = realpath($baseDir);
                 
                 $errorMsg = "View não encontrada: {$view}\n";
-                $errorMsg .= "Caminho original: {$originalPath}\n";
-                $errorMsg .= "Caminho resolvido: " . ($viewPath ?: 'null') . "\n";
+                $errorMsg .= "Caminho esperado: {$viewPath}\n";
                 $errorMsg .= "Diretório base: {$baseDir} (existe: " . ($baseDirExists ? 'sim' : 'não') . ")\n";
                 if ($baseDirReal) {
                     $errorMsg .= "Diretório base resolvido: {$baseDirReal}\n";
@@ -98,8 +110,13 @@ class Response
                 // Listar arquivos no diretório se existir
                 if ($baseDirExists && is_readable($baseDir)) {
                     $files = scandir($baseDir);
-                    $errorMsg .= "Arquivos no diretório: " . implode(', ', array_filter($files, function($f) { return $f !== '.' && $f !== '..'; })) . "\n";
+                    $filesList = array_filter($files, function($f) { return $f !== '.' && $f !== '..'; });
+                    $errorMsg .= "Arquivos no diretório: " . (empty($filesList) ? 'nenhum' : implode(', ', $filesList)) . "\n";
                 }
+                
+                $errorMsg .= "\n⚠️ SOLUÇÃO: Certifique-se de que o arquivo foi sincronizado para o Docker.\n";
+                $errorMsg .= "   Se estiver usando volumes, reinicie o container Docker.\n";
+                $errorMsg .= "   Ou copie manualmente: docker cp views/logs/index.php container:/var/www/html/views/logs/index.php";
                 
                 throw new \RuntimeException($errorMsg);
             }

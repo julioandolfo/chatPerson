@@ -533,6 +533,15 @@ class WhatsAppService
                     'X-QUEPASA-TRACKID: ' . ($account['quepasa_trackid'] ?? $account['name']),
                     'X-QUEPASA-CHATID: ' . ($to . '@s.whatsapp.net')
                 ];
+
+                // Logs adicionais para debug (sem expor token completo)
+                $maskedToken = self::maskToken($account['quepasa_token'] ?? '');
+                Logger::quepasa("sendMessage - Provider=quepasa | apiUrl={$apiUrl} | chatId={$to}@s.whatsapp.net | trackId=" . ($account['quepasa_trackid'] ?? $account['name']) . " | token=" . $maskedToken);
+                Logger::quepasa("sendMessage - Provider headers raw (sem token completo): " . json_encode([
+                    'X-QUEPASA-TOKEN' => $maskedToken,
+                    'X-QUEPASA-TRACKID' => ($account['quepasa_trackid'] ?? $account['name']),
+                    'X-QUEPASA-CHATID' => ($to . '@s.whatsapp.net')
+                ]));
                 
                 // Garantir texto (caption) não vazio
                 // Para áudio, a API Quepasa exige um campo text não vazio. Usamos um espaço para evitar exibir filename.
@@ -644,6 +653,11 @@ class WhatsAppService
                 Logger::quepasa("sendMessage - URL: {$url}");
                 Logger::quepasa("sendMessage - To: {$to}");
                 Logger::quepasa("sendMessage - Payload: " . json_encode($payload));
+                Logger::quepasa("sendMessage - Headers: " . json_encode([
+                    'X-QUEPASA-TOKEN' => $maskedToken,
+                    'X-QUEPASA-TRACKID' => ($account['quepasa_trackid'] ?? $account['name']),
+                    'X-QUEPASA-CHATID' => ($to . '@s.whatsapp.net')
+                ]));
             } else {
                 throw new \InvalidArgumentException('Provider não suportado');
             }
@@ -664,12 +678,14 @@ class WhatsAppService
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+            $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+            $responseLen = strlen($response ?? '');
             $error = curl_error($ch);
             curl_close($ch);
 
-            Logger::quepasa("sendMessage - HTTP Code: {$httpCode}");
+            Logger::quepasa("sendMessage - HTTP Code: {$httpCode} | Content-Type: " . ($contentType ?: 'null') . " | RespLen: {$responseLen}");
             Logger::quepasa("sendMessage - Effective URL: {$effectiveUrl}");
-            Logger::quepasa("sendMessage - Response: " . substr($response, 0, 500));
+            Logger::quepasa("sendMessage - Response Preview: " . substr($response ?? '', 0, 500));
 
             if ($error) {
                 Logger::quepasa("sendMessage - Erro cURL: {$error}");

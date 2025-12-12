@@ -537,12 +537,12 @@ class WhatsAppService
                 // Garantir texto (caption) não vazio
                 // Para áudio, a API Quepasa exige um campo text não vazio. Usamos um espaço para evitar exibir filename.
                 $caption = $options['caption'] ?? $message ?? '';
+                // Para áudio, a API precisa de texto não vazio; usamos fallback amigável
                 if ($caption === '' && !empty($options['media_name'])) {
-                    // Em vez do nome do arquivo, usa espaço para não aparecer texto visível
-                    $caption = ' ';
+                    $caption = 'Áudio'; // evita exibir o nome do arquivo
                 }
                 if ($caption === '') {
-                    $caption = ' ';
+                    $caption = 'Áudio';
                 }
                 
                 $payload = [
@@ -571,10 +571,16 @@ class WhatsAppService
                             $mediaMime = 'audio/webm';
                         }
                         
+                        // Forçar URL https se disponível (evita bloqueio de mídia por http)
+                        $mediaUrl = $options['media_url'];
+                        if (str_starts_with($mediaUrl, 'http://')) {
+                            $mediaUrlHttps = preg_replace('/^http:/i', 'https:', $mediaUrl);
+                            $mediaUrl = $mediaUrlHttps ?: $mediaUrl;
+                        }
                         // Enviar como áudio PTT (opção recomendada pelo Quepasa/WhatsApp)
                         $payload['audio'] = [
-                            'url' => $options['media_url'],
-                            'mimetype' => $mediaMime ?: 'audio/ogg; codecs=opus',
+                            'url' => $mediaUrl,
+                            'mimetype' => $mediaMime ?: 'audio/ogg',
                             'filename' => $mediaName ?: 'audio.ogg',
                             'ptt' => true
                         ];

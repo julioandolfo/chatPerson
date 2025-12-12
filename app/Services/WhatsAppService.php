@@ -544,14 +544,13 @@ class WhatsAppService
                 ]));
                 
                 // Garantir texto (caption) não vazio
-                // Para áudio, a API Quepasa exige um campo text não vazio. Usamos um espaço para evitar exibir filename.
+                // API exige texto não vazio; usamos caractere invisível para não aparecer como mensagem separada
                 $caption = $options['caption'] ?? $message ?? '';
-                // Para áudio, a API precisa de texto não vazio; usamos fallback amigável
                 if ($caption === '' && !empty($options['media_name'])) {
-                    $caption = 'Áudio'; // evita exibir o nome do arquivo
+                    $caption = "\u{200B}"; // zero-width space
                 }
                 if ($caption === '') {
-                    $caption = 'Áudio';
+                    $caption = "\u{200B}";
                 }
                 
                 $payload = [
@@ -1178,6 +1177,22 @@ class WhatsAppService
             $mimetype = $quepasaData['mimeType'] ?? $payload['mimetype'] ?? $payload['mime_type'] ?? null;
             $filename = $quepasaData['fileName'] ?? $quepasaData['filename'] ?? $payload['filename'] ?? $payload['media_name'] ?? null;
             $size = $quepasaData['size'] ?? $payload['size'] ?? null;
+
+            // Novo formato possível: media ou audio dentro do payload/data
+            if (isset($quepasaData['media']) && is_array($quepasaData['media'])) {
+                $mediaUrl = $quepasaData['media']['url'] ?? $mediaUrl;
+                $mimetype = $quepasaData['media']['mimeType'] ?? $quepasaData['media']['mimetype'] ?? $mimetype;
+                $filename = $quepasaData['media']['fileName'] ?? $quepasaData['media']['filename'] ?? $filename;
+                $size = $quepasaData['media']['size'] ?? $size;
+            }
+            if (isset($quepasaData['audio']) && is_array($quepasaData['audio'])) {
+                $mediaUrl = $quepasaData['audio']['url'] ?? $mediaUrl;
+                $mimetype = $quepasaData['audio']['mimeType'] ?? $quepasaData['audio']['mimetype'] ?? $mimetype ?? 'audio/ogg';
+                $filename = $quepasaData['audio']['fileName'] ?? $quepasaData['audio']['filename'] ?? $filename;
+                $size = $quepasaData['audio']['size'] ?? $size;
+            }
+
+            Logger::quepasa("processWebhook - media detect: url=" . ($mediaUrl ?: 'NULL') . ", mimetype=" . ($mimetype ?: 'NULL') . ", filename=" . ($filename ?: 'NULL') . ", size=" . ($size ?: 'NULL') . ", messageType={$messageType}");
             $quotedMsg = $quepasaData['quotedMsg'] ?? null;
             $quotedMessageId = $quotedMsg['id'] ?? ($payload['quoted'] ?? $payload['quoted_message_id'] ?? null);
             $quotedMessageText = $quotedMsg['body'] ?? ($payload['quoted_text'] ?? null);

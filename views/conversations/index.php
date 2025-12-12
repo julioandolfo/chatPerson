@@ -69,16 +69,16 @@ function renderAttachment($attachment) {
         $html .= '</div>';
     } elseif ($type === 'audio') {
         // Player de áudio ultra compacto estilo WhatsApp
-        $html .= '<div class="attachment audio-attachment" style="max-width: 250px; margin: 0;">';
-        $html .= '<div class="d-flex align-items-center" style="background: rgba(0,0,0,0.15); border-radius: 20px; padding: 4px 8px !important;">';
-        $html .= '<div class="me-2" style="flex-shrink: 0;">';
+        $html .= '<div class="attachment audio-attachment" style="max-width: 280px; margin: 0;">';
+        $html .= '<div class="d-flex align-items-center gap-2" style="background: var(--bs-gray-100); border-radius: 18px; padding: 6px 10px !important;">';
+        $html .= '<div class="me-1" style="flex-shrink: 0;">';
         $html .= '<i class="ki-duotone ki-music fs-4 text-primary" style="min-width: 20px; font-size: 18px !important;">';
         $html .= '<span class="path1"></span>';
         $html .= '<span class="path2"></span>';
         $html .= '</i>';
         $html .= '</div>';
         $html .= '<div class="flex-grow-1" style="min-width: 0;">';
-        $html .= '<audio controls style="width: 100%; height: 24px !important; max-height: 24px !important; min-height: 24px !important; outline: none; display: block;">';
+        $html .= '<audio controls style="width: 100%; height: 32px !important; max-height: 32px !important; min-height: 32px !important; outline: none; display: block;">';
         $html .= '<source src="' . $url . '" type="' . ($attachment['mime_type'] ?? $attachment['mimetype'] ?? 'audio/webm') . '">';
         $html .= 'Seu navegador não suporta áudio.';
         $html .= '</audio>';
@@ -1889,6 +1889,9 @@ body.dark-mode .swal2-content {
                             <span class="path1"></span>
                             <span class="path2"></span>
                         </i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-light-danger d-none" id="cancelRecordingBtn" title="Cancelar gravação" onclick="cancelRecording()">
+                        <i class="ki-duotone ki-cross fs-3"><span class="path1"></span><span class="path2"></span></i>
                     </button>
                     <button class="btn btn-sm btn-icon btn-light-primary" id="recordAudioBtn" title="Gravar áudio" onclick="toggleAudioRecording()">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -6506,6 +6509,8 @@ function scrollToMessage(messageId) {
 let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
+let recordingCanceled = false;
+let currentStream = null;
 
 // Gravar áudio
 async function toggleAudioRecording() {
@@ -6522,6 +6527,7 @@ async function toggleAudioRecording() {
         // Iniciar gravação
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            currentStream = stream;
 
             // Tentar preferir OGG/Opus; se não suportar, cair para WebM/Opus
             let mimeType = '';
@@ -6541,13 +6547,21 @@ async function toggleAudioRecording() {
             };
             
             mediaRecorder.onstop = async () => {
-                // Usar o tipo real gravado; se não existir, cair para webm
-                const recordedType = mediaRecorder.mimeType || 'audio/webm';
-                const audioBlob = new Blob(audioChunks, { type: recordedType });
-                await sendAudioMessage(audioBlob, conversationId);
+                // Se cancelado, não enviar
+                if (recordingCanceled) {
+                    recordingCanceled = false;
+                    audioChunks = [];
+                } else {
+                    const recordedType = mediaRecorder.mimeType || 'audio/webm';
+                    const audioBlob = new Blob(audioChunks, { type: recordedType });
+                    await sendAudioMessage(audioBlob, conversationId);
+                }
                 
                 // Parar stream
-                stream.getTracks().forEach(track => track.stop());
+                if (currentStream) {
+                    currentStream.getTracks().forEach(track => track.stop());
+                    currentStream = null;
+                }
             };
             
             mediaRecorder.start();
@@ -6566,33 +6580,76 @@ async function toggleAudioRecording() {
             
             // Mostrar indicador de gravação
             showRecordingIndicator();
+            showCancelRecordingButton();
             
         } catch (error) {
             console.error('Erro ao acessar microfone:', error);
             alert('Erro ao acessar o microfone. Verifique as permissões.');
         }
     } else {
-        // Parar gravação
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-            mediaRecorder.stop();
-        }
-        isRecording = false;
-        
-        // Restaurar botão
-        btn.classList.remove('btn-danger');
-        btn.classList.add('btn-light-primary');
-        btn.title = 'Gravar áudio';
-        btn.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                <line x1="12" y1="19" x2="12" y2="23"></line>
-                <line x1="8" y1="23" x2="16" y2="23"></line>
-            </svg>
-        `;
-        
-        // Esconder indicador
-        hideRecordingIndicator();
+        stopRecordingAndSend();
+    }
+}
+
+function stopRecordingAndSend() {
+    const btn = document.getElementById('recordAudioBtn');
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+    }
+    isRecording = false;
+    btn.classList.remove('btn-danger');
+    btn.classList.add('btn-light-primary');
+    btn.title = 'Gravar áudio';
+    btn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="23"></line>
+            <line x1="8" y1="23" x2="16" y2="23"></line>
+        </svg>
+    `;
+    hideRecordingIndicator();
+    hideCancelRecordingButton();
+}
+
+function cancelRecording() {
+    if (!isRecording) return;
+    recordingCanceled = true;
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+    }
+    isRecording = false;
+    const btn = document.getElementById('recordAudioBtn');
+    btn.classList.remove('btn-danger');
+    btn.classList.add('btn-light-primary');
+    btn.title = 'Gravar áudio';
+    btn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="23"></line>
+            <line x1="8" y1="23" x2="16" y2="23"></line>
+        </svg>
+    `;
+    if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+        currentStream = null;
+    }
+    hideRecordingIndicator();
+    hideCancelRecordingButton();
+}
+
+function showCancelRecordingButton() {
+    const cancelBtn = document.getElementById('cancelRecordingBtn');
+    if (cancelBtn) {
+        cancelBtn.classList.remove('d-none');
+    }
+}
+
+function hideCancelRecordingButton() {
+    const cancelBtn = document.getElementById('cancelRecordingBtn');
+    if (cancelBtn) {
+        cancelBtn.classList.add('d-none');
     }
 }
 
@@ -9357,18 +9414,18 @@ function renderAttachmentHtml(attachment) {
             </video>
         </div>`;
     } else if (type === 'audio' || (mimeType && mimeType.startsWith('audio/'))) {
-        // Renderização ultra compacta de áudio - estilo WhatsApp
+        // Renderização de áudio - estilo WhatsApp compact
         const audioUrl = url || (attachment.path ? `<?= \App\Helpers\Url::to('/attachments') ?>/${encodeURIComponent(attachment.path)}` : '');
-        html += `<div class="attachment audio-attachment" style="max-width: 250px; margin: 0;">
-            <div class="d-flex align-items-center" style="background: rgba(0,0,0,0.15); border-radius: 20px; padding: 4px 8px;">
-                <div class="me-2" style="flex-shrink: 0;">
+        html += `<div class="attachment audio-attachment" style="max-width: 280px; margin: 0;">
+            <div class="d-flex align-items-center gap-2" style="background: var(--bs-gray-100); border-radius: 18px; padding: 6px 10px;">
+                <div class="me-1" style="flex-shrink: 0;">
                     <i class="ki-duotone ki-music fs-4 text-primary" style="min-width: 20px; font-size: 18px !important;">
                         <span class="path1"></span>
                         <span class="path2"></span>
                     </i>
                 </div>
                 <div class="flex-grow-1" style="min-width: 0;">
-                    <audio controls style="width: 100%; height: 24px; outline: none; display: block;" preload="metadata" onclick="event.stopPropagation();">
+                    <audio controls style="width: 100%; height: 32px; outline: none; display: block;" preload="metadata" onclick="event.stopPropagation();">
                         <source src="${audioUrl}" type="${mimeType || 'audio/webm'}">
                         Seu navegador não suporta o elemento de áudio.
                     </audio>

@@ -577,6 +577,36 @@ class WhatsAppService
                             $mediaUrlHttps = preg_replace('/^http:/i', 'https:', $mediaUrl);
                             $mediaUrl = $mediaUrlHttps ?: $mediaUrl;
                         }
+
+                        // Verificar se o arquivo é acessível (existência local e HEAD remoto)
+                        try {
+                            $publicBase = realpath(__DIR__ . '/../../public');
+                            $pathFromUrl = parse_url($mediaUrl, PHP_URL_PATH) ?: '';
+                            $absolutePath = $publicBase . $pathFromUrl;
+
+                            $existsLocal = file_exists($absolutePath);
+                            $sizeLocal = $existsLocal ? filesize($absolutePath) : 0;
+                            Logger::quepasa("sendMessage - Verificação mídia local: path={$absolutePath}, existe=" . ($existsLocal ? 'sim' : 'não') . ", size={$sizeLocal}");
+
+                            // HEAD remoto
+                            $headCh = curl_init($mediaUrl);
+                            curl_setopt_array($headCh, [
+                                CURLOPT_NOBODY => true,
+                                CURLOPT_RETURNTRANSFER => true,
+                                CURLOPT_TIMEOUT => 10,
+                                CURLOPT_FOLLOWLOCATION => true,
+                                CURLOPT_SSL_VERIFYPEER => false,
+                                CURLOPT_SSL_VERIFYHOST => false,
+                            ]);
+                            curl_exec($headCh);
+                            $headCode = curl_getinfo($headCh, CURLINFO_HTTP_CODE);
+                            $headType = curl_getinfo($headCh, CURLINFO_CONTENT_TYPE);
+                            $headLen = curl_getinfo($headCh, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
+                            curl_close($headCh);
+                            Logger::quepasa("sendMessage - HEAD mídia: code={$headCode}, type=" . ($headType ?: 'null') . ", len=" . ($headLen ?: 'null'));
+                        } catch (\Throwable $t) {
+                            Logger::quepasa("sendMessage - Erro na verificação de mídia: " . $t->getMessage());
+                        }
                         // Enviar como áudio PTT (opção recomendada pelo Quepasa/WhatsApp)
                         $payload['audio'] = [
                             'url' => $mediaUrl,

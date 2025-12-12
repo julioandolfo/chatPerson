@@ -716,6 +716,23 @@ class WhatsAppService
     }
 
     /**
+     * Mascarar token para logs (deixa início e fim visíveis)
+     */
+    private static function maskToken(?string $token): string
+    {
+        if (empty($token)) {
+            return '';
+        }
+        $len = strlen($token);
+        if ($len <= 4) {
+            return str_repeat('*', $len);
+        }
+        $start = substr($token, 0, 2);
+        $end = substr($token, -2);
+        return $start . str_repeat('*', max(0, $len - 4)) . $end;
+    }
+
+    /**
      * Configurar webhook automaticamente após conexão
      */
     private static function configureWebhookAutomatically(int $accountId): void

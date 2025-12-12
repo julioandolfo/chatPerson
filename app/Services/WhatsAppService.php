@@ -585,9 +585,9 @@ class WhatsAppService
                         Logger::quepasa("sendMessage -   filename: {$payload['audio']['filename']}");
                         Logger::quepasa("sendMessage -   ptt: true");
                         
-                        // Para áudio, não enviar url/fileName no nível raiz para evitar ser tratado como documento
-                        unset($payload['url'], $payload['fileName'], $payload['content']);
-                        Logger::quepasa("sendMessage - Campos url/fileName/content removidos do payload raiz");
+                        // Para áudio, não enviar url/fileName/content/text no nível raiz para evitar ser tratado como documento ou texto
+                        unset($payload['url'], $payload['fileName'], $payload['content'], $payload['text']);
+                        Logger::quepasa("sendMessage - Campos url/fileName/content/text removidos do payload raiz");
                     } else {
                         Logger::quepasa("sendMessage - Não é áudio, enviando como mídia normal (imagem/vídeo/documento)");
                         // Para imagem/vídeo/documento manter envio por URL

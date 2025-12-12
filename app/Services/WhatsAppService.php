@@ -570,6 +570,9 @@ class WhatsAppService
                             Logger::quepasa("sendMessage - Ajustando mimetype de video/webm para audio/webm (áudio detectado)");
                             $mediaMime = 'audio/webm';
                         }
+
+                        // Forçar mimetype aceito pelo WhatsApp/Quepasa
+                        $mediaMime = 'audio/ogg';
                         
                         // Forçar URL https se disponível (evita bloqueio de mídia por http)
                         $mediaUrl = $options['media_url'];

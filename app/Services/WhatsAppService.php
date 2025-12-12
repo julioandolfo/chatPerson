@@ -624,19 +624,24 @@ class WhatsAppService
                             'url' => $mediaUrl,
                             'mimetype' => $mediaMime ?: 'audio/ogg',
                             'filename' => $mediaName ?: 'audio.ogg',
-                            'ptt' => true
+                            'ptt' => true,
+                            'voice' => true // reforçar que é áudio/voz
                         ];
+
+                        // Compatibilidade: alguns provedores podem ler url/fileName/type no nível raiz
+                        $payload['type'] = 'audio';
+                        $payload['url'] = $mediaUrl;
+                        $payload['fileName'] = $mediaName ?: 'audio.ogg';
                         
                         Logger::quepasa("sendMessage - Payload audio configurado:");
                         Logger::quepasa("sendMessage -   url: {$payload['audio']['url']}");
                         Logger::quepasa("sendMessage -   mimetype: {$payload['audio']['mimetype']}");
                         Logger::quepasa("sendMessage -   filename: {$payload['audio']['filename']}");
                         Logger::quepasa("sendMessage -   ptt: true");
+                        Logger::quepasa("sendMessage -   voice: true");
                         
-                        // Para áudio, não enviar url/fileName/content no nível raiz para evitar ser tratado como documento
-                        // Mantemos 'text' com espaço para satisfazer a API sem exibir mensagem visível
-                        unset($payload['url'], $payload['fileName'], $payload['content']);
-                        Logger::quepasa("sendMessage - Campos url/fileName/content removidos do payload raiz (text mantido com espaço)");
+                        // Não removemos url/fileName do nível raiz para permitir fallback de entrega como áudio
+                        // Mantemos 'text' com valor amigável
                     } else {
                         Logger::quepasa("sendMessage - Não é áudio, enviando como mídia normal (imagem/vídeo/documento)");
                         // Para imagem/vídeo/documento manter envio por URL

@@ -1178,16 +1178,24 @@ class WhatsAppService
             $filename = $quepasaData['fileName'] ?? $quepasaData['filename'] ?? $payload['filename'] ?? $payload['media_name'] ?? null;
             $size = $quepasaData['size'] ?? $payload['size'] ?? null;
 
-            // Possíveis contêineres de mídia
+            // Possíveis contêineres de mídia (media/audio/attachment/extra)
             $candidates = [
                 $quepasaData['media'] ?? null,
                 $quepasaData['audio'] ?? null,
+                $quepasaData['attachment'] ?? null,
+                $quepasaData['extra'] ?? null,
                 $payload['media'] ?? null,
                 $payload['audio'] ?? null,
+                $payload['attachment'] ?? null,
+                $payload['extra'] ?? null,
                 $payload['data']['media'] ?? null,
                 $payload['data']['audio'] ?? null,
+                $payload['data']['attachment'] ?? null,
+                $payload['data']['extra'] ?? null,
                 $payload['message']['media'] ?? null,
                 $payload['message']['audio'] ?? null,
+                $payload['message']['attachment'] ?? null,
+                $payload['message']['extra'] ?? null,
             ];
             foreach ($candidates as $cand) {
                 if (isset($cand) && is_array($cand)) {
@@ -1198,11 +1206,19 @@ class WhatsAppService
                 }
             }
 
-            // Log se continuar vazio em mensagem de áudio
+            // Logar conteúdo resumido de attachment/extra se áudio vier sem mediaUrl
             if ($messageType === 'audio' && !$mediaUrl) {
+                $attachmentKeys = isset($payload['attachment']) && is_array($payload['attachment']) ? implode(',', array_keys($payload['attachment'])) : 'NULL';
+                $extraKeys = isset($payload['extra']) && is_array($payload['extra']) ? implode(',', array_keys($payload['extra'])) : 'NULL';
                 $topKeys = implode(',', array_keys($payload));
                 $dataKeys = isset($payload['data']) && is_array($payload['data']) ? implode(',', array_keys($payload['data'])) : 'NULL';
-                Logger::quepasa("processWebhook - audio sem mediaUrl - topKeys={$topKeys} | dataKeys={$dataKeys}");
+                Logger::quepasa("processWebhook - audio sem mediaUrl - topKeys={$topKeys} | dataKeys={$dataKeys} | attachmentKeys={$attachmentKeys} | extraKeys={$extraKeys}");
+                if (isset($payload['attachment']) && is_array($payload['attachment'])) {
+                    Logger::quepasa("processWebhook - attachment content: " . json_encode($payload['attachment']));
+                }
+                if (isset($payload['extra']) && is_array($payload['extra'])) {
+                    Logger::quepasa("processWebhook - extra content: " . json_encode($payload['extra']));
+                }
             }
 
             Logger::quepasa("processWebhook - media detect: url=" . ($mediaUrl ?: 'NULL') . ", mimetype=" . ($mimetype ?: 'NULL') . ", filename=" . ($filename ?: 'NULL') . ", size=" . ($size ?: 'NULL') . ", messageType={$messageType}");

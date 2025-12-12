@@ -69,8 +69,8 @@ function renderAttachment($attachment) {
         $html .= '</div>';
     } elseif ($type === 'audio') {
         // Player de áudio ultra compacto estilo WhatsApp
-        $html .= '<div class="attachment audio-attachment" style="max-width: 340px; margin: 0;">';
-        $html .= '<div class="d-flex align-items-center gap-2" style="background: var(--bs-gray-100); border-radius: 18px; padding: 6px 10px !important;">';
+        $html .= '<div class="attachment audio-attachment" style="max-width: 380px; margin: 0;">';
+        $html .= '<div class="d-flex align-items-center gap-2" style="background: var(--bs-gray-100); border-radius: 18px; padding: 8px 12px !important;">';
         $html .= '<div class="me-1" style="flex-shrink: 0;">';
         $html .= '<i class="ki-duotone ki-music fs-4 text-primary" style="min-width: 20px; font-size: 18px !important;">';
         $html .= '<span class="path1"></span>';
@@ -78,7 +78,7 @@ function renderAttachment($attachment) {
         $html .= '</i>';
         $html .= '</div>';
         $html .= '<div class="flex-grow-1" style="min-width: 0;">';
-        $html .= '<audio controls style="width: 100%; height: 32px !important; max-height: 32px !important; min-height: 32px !important; outline: none; display: block;">';
+        $html .= '<audio controls style="width: 100%; height: 30px !important; max-height: 30px !important; min-height: 30px !important; outline: none; display: block;">';
         $html .= '<source src="' . $url . '" type="' . ($attachment['mime_type'] ?? $attachment['mimetype'] ?? 'audio/webm') . '">';
         $html .= 'Seu navegador não suporta áudio.';
         $html .= '</audio>';
@@ -9416,8 +9416,8 @@ function renderAttachmentHtml(attachment) {
     } else if (type === 'audio' || (mimeType && mimeType.startsWith('audio/'))) {
         // Renderização de áudio - estilo WhatsApp compact
         const audioUrl = url || (attachment.path ? `<?= \App\Helpers\Url::to('/attachments') ?>/${encodeURIComponent(attachment.path)}` : '');
-        html += `<div class="attachment audio-attachment" style="max-width: 340px; margin: 0;">
-            <div class="d-flex align-items-center gap-2" style="background: var(--bs-gray-100); border-radius: 18px; padding: 6px 10px;">
+        html += `<div class="attachment audio-attachment" style="max-width: 380px; margin: 0;">
+            <div class="d-flex align-items-center gap-2" style="background: var(--bs-gray-100); border-radius: 18px; padding: 8px 12px;">
                 <div class="me-1" style="flex-shrink: 0;">
                     <i class="ki-duotone ki-music fs-4 text-primary" style="min-width: 20px; font-size: 18px !important;">
                         <span class="path1"></span>
@@ -9425,7 +9425,7 @@ function renderAttachmentHtml(attachment) {
                     </i>
                 </div>
                 <div class="flex-grow-1" style="min-width: 0;">
-                    <audio controls style="width: 100%; height: 32px; outline: none; display: block;" preload="metadata" onclick="event.stopPropagation();">
+                    <audio controls style="width: 100%; height: 30px; outline: none; display: block;" preload="metadata" onclick="event.stopPropagation();">
                         <source src="${audioUrl}" type="${mimeType || 'audio/webm'}">
                         Seu navegador não suporta o elemento de áudio.
                     </audio>

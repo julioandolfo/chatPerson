@@ -73,12 +73,35 @@ class Response
             // Construir caminho da view
             $viewPath = __DIR__ . '/../../views/' . str_replace('.', '/', $view) . '.php';
             
+            // Normalizar caminho (resolver .. e .)
+            $viewPath = realpath($viewPath);
+            
             if ($debug) {
-                error_log("Response::view - View: {$view}, Path: {$viewPath}, Exists: " . (file_exists($viewPath) ? 'yes' : 'no'));
+                $originalPath = __DIR__ . '/../../views/' . str_replace('.', '/', $view) . '.php';
+                error_log("Response::view - View: {$view}, Original Path: {$originalPath}, Resolved Path: " . ($viewPath ?: 'null') . ", Exists: " . ($viewPath && file_exists($viewPath) ? 'yes' : 'no'));
             }
             
-            if (!file_exists($viewPath)) {
-                throw new \RuntimeException("View não encontrada: {$view} (caminho: {$viewPath})");
+            if (!$viewPath || !file_exists($viewPath)) {
+                $originalPath = __DIR__ . '/../../views/' . str_replace('.', '/', $view) . '.php';
+                $baseDir = dirname($originalPath);
+                $baseDirExists = is_dir($baseDir);
+                $baseDirReal = realpath($baseDir);
+                
+                $errorMsg = "View não encontrada: {$view}\n";
+                $errorMsg .= "Caminho original: {$originalPath}\n";
+                $errorMsg .= "Caminho resolvido: " . ($viewPath ?: 'null') . "\n";
+                $errorMsg .= "Diretório base: {$baseDir} (existe: " . ($baseDirExists ? 'sim' : 'não') . ")\n";
+                if ($baseDirReal) {
+                    $errorMsg .= "Diretório base resolvido: {$baseDirReal}\n";
+                }
+                
+                // Listar arquivos no diretório se existir
+                if ($baseDirExists && is_readable($baseDir)) {
+                    $files = scandir($baseDir);
+                    $errorMsg .= "Arquivos no diretório: " . implode(', ', array_filter($files, function($f) { return $f !== '.' && $f !== '..'; })) . "\n";
+                }
+                
+                throw new \RuntimeException($errorMsg);
             }
 
             // Verificar se há output buffer ativo (pode estar bloqueando)

@@ -107,6 +107,9 @@ function seed_roles_and_permissions() {
         ['name' => 'Criar tools de IA', 'slug' => 'ai_tools.create', 'description' => 'Criar tools de IA', 'module' => 'ai_tools'],
         ['name' => 'Editar tools de IA', 'slug' => 'ai_tools.edit', 'description' => 'Editar tools de IA', 'module' => 'ai_tools'],
         ['name' => 'Deletar tools de IA', 'slug' => 'ai_tools.delete', 'description' => 'Deletar tools de IA', 'module' => 'ai_tools'],
+        
+        // Administração
+        ['name' => 'Ver logs do sistema', 'slug' => 'admin.logs', 'description' => 'Visualizar logs do sistema', 'module' => 'admin'],
     ];
     
     $permissionIds = [];

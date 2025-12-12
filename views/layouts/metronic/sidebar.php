@@ -305,6 +305,16 @@
                                       <span class="menu-title">Setores</span>
                                   </a>
                               </div>
+                              <?php if (\App\Helpers\Permission::can('admin.logs')): ?>
+                              <div class="menu-item">
+                                  <a class="menu-link <?= isActive('/logs', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/logs') ?>">
+                                      <span class="menu-bullet">
+                                          <span class="bullet bullet-dot"></span>
+                                      </span>
+                                      <span class="menu-title">Logs do Sistema</span>
+                                  </a>
+                              </div>
+                              <?php endif; ?>
                           </div>
                           <!--end:Menu sub-->
                       </div>

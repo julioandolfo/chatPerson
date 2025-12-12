@@ -28,6 +28,7 @@ use App\Controllers\SearchController;
 use App\Controllers\TestController;
 use App\Controllers\AIAssistantController;
 use App\Controllers\RealtimeController;
+use App\Controllers\LogController;
 
 // Rotas públicas
 Router::get('/', function() {
@@ -272,4 +273,10 @@ Router::get('/activities/{entityType}/{id}', [ActivityController::class, 'getByE
 // Rotas de Tempo Real (WebSocket/Polling)
 Router::get('/api/realtime/config', [RealtimeController::class, 'getConfig'], ['Authentication']);
 Router::post('/api/realtime/poll', [RealtimeController::class, 'poll'], ['Authentication']);
+
+// Rotas de Logs do Sistema
+Router::get('/logs', [LogController::class, 'index'], ['Authentication', 'Permission:admin.logs']);
+Router::get('/logs/view', [LogController::class, 'view'], ['Authentication', 'Permission:admin.logs']);
+Router::get('/logs/download', [LogController::class, 'download'], ['Authentication', 'Permission:admin.logs']);
+Router::post('/logs/clear', [LogController::class, 'clear'], ['Authentication', 'Permission:admin.logs']);
 

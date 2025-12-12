@@ -281,42 +281,45 @@ class AttachmentService
         }
 
         // Verificar se funções de execução estão disponíveis
-        if (!self::areExecFunctionsAvailable()) {
-            Logger::quepasa("AttachmentService::isWebmAudioOnly - shell_exec/exec desabilitadas; pulando ffprobe e assumindo que é vídeo");
-            return false;
+        $execAvailable = self::areExecFunctionsAvailable();
+        if (!$execAvailable) {
+            // Sem shell_exec/exec, não dá para usar ffprobe, mas ainda podemos tentar heurística
+            Logger::quepasa("AttachmentService::isWebmAudioOnly - shell_exec/exec desabilitadas; pulando ffprobe e usando heurística");
         }
         
-        // Método 1: Verificar se tem ffprobe disponível (mais preciso)
-        $ffprobePath = trim((string) shell_exec('command -v ffprobe 2>/dev/null'));
-        if (empty($ffprobePath)) {
-            $possiblePaths = ['ffprobe', '/usr/bin/ffprobe', '/usr/local/bin/ffprobe', 'C:\\ffmpeg\\bin\\ffprobe.exe'];
-            foreach ($possiblePaths as $path) {
-                $test = shell_exec("which {$path} 2>/dev/null");
-                if ($test || file_exists($path)) {
-                    $ffprobePath = $path;
-                    Logger::quepasa("AttachmentService::isWebmAudioOnly - ffprobe encontrado em: {$ffprobePath}");
-                    break;
+        if ($execAvailable) {
+            // Método 1: Verificar se tem ffprobe disponível (mais preciso)
+            $ffprobePath = trim((string) shell_exec('command -v ffprobe 2>/dev/null'));
+            if (empty($ffprobePath)) {
+                $possiblePaths = ['ffprobe', '/usr/bin/ffprobe', '/usr/local/bin/ffprobe', 'C:\\ffmpeg\\bin\\ffprobe.exe'];
+                foreach ($possiblePaths as $path) {
+                    $test = shell_exec("which {$path} 2>/dev/null");
+                    if ($test || file_exists($path)) {
+                        $ffprobePath = $path;
+                        Logger::quepasa("AttachmentService::isWebmAudioOnly - ffprobe encontrado em: {$ffprobePath}");
+                        break;
+                    }
                 }
             }
-        }
-        
-        if (!empty($ffprobePath)) {
-            Logger::quepasa("AttachmentService::isWebmAudioOnly - Usando ffprobe para verificar streams...");
-            $cmd = escapeshellcmd($ffprobePath) . ' -v error -select_streams v:0 -show_entries stream=codec_type -of json ' . escapeshellarg($filepath) . ' 2>&1';
             
-            // Usar método mais simples e rápido (sem JSON para evitar parsing lento)
-            $cmd2 = escapeshellcmd($ffprobePath) . ' -v error -select_streams v:0 -show_entries stream=codec_type -of default=noprint_wrappers=1 ' . escapeshellarg($filepath) . ' 2>&1';
-            $output2 = shell_exec($cmd2);
-            
-            Logger::quepasa("AttachmentService::isWebmAudioOnly - ffprobe output: " . substr($output2 ?? 'VAZIO', 0, 200));
-            
-            // Se não encontrou stream de vídeo (output vazio ou sem codec_type=video), é apenas áudio
-            if (empty(trim($output2)) || strpos($output2, 'codec_type=video') === false) {
-                Logger::quepasa("AttachmentService::isWebmAudioOnly - ✅ Nenhum stream de vídeo encontrado - é apenas áudio");
-                return true;
-            } else {
-                Logger::quepasa("AttachmentService::isWebmAudioOnly - ❌ Stream de vídeo encontrado - é vídeo");
-                return false;
+            if (!empty($ffprobePath)) {
+                Logger::quepasa("AttachmentService::isWebmAudioOnly - Usando ffprobe para verificar streams...");
+                $cmd = escapeshellcmd($ffprobePath) . ' -v error -select_streams v:0 -show_entries stream=codec_type -of json ' . escapeshellarg($filepath) . ' 2>&1';
+                
+                // Usar método mais simples e rápido (sem JSON para evitar parsing lento)
+                $cmd2 = escapeshellcmd($ffprobePath) . ' -v error -select_streams v:0 -show_entries stream=codec_type -of default=noprint_wrappers=1 ' . escapeshellarg($filepath) . ' 2>&1';
+                $output2 = shell_exec($cmd2);
+                
+                Logger::quepasa("AttachmentService::isWebmAudioOnly - ffprobe output: " . substr($output2 ?? 'VAZIO', 0, 200));
+                
+                // Se não encontrou stream de vídeo (output vazio ou sem codec_type=video), é apenas áudio
+                if (empty(trim($output2)) || strpos($output2, 'codec_type=video') === false) {
+                    Logger::quepasa("AttachmentService::isWebmAudioOnly - ✅ Nenhum stream de vídeo encontrado - é apenas áudio");
+                    return true;
+                } else {
+                    Logger::quepasa("AttachmentService::isWebmAudioOnly - ❌ Stream de vídeo encontrado - é vídeo");
+                    return false;
+                }
             }
         }
         

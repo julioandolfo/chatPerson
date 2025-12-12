@@ -535,14 +535,14 @@ class WhatsAppService
                 ];
                 
                 // Garantir texto (caption) não vazio
-                $caption = $message;
-                if (!empty($options['caption'])) {
-                    $caption = $options['caption'];
-                } elseif (empty($caption) && !empty($options['media_name'])) {
-                    $caption = $options['media_name'];
+                // Para áudio, a API Quepasa exige um campo text não vazio. Usamos um espaço para evitar exibir filename.
+                $caption = $options['caption'] ?? $message ?? '';
+                if ($caption === '' && !empty($options['media_name'])) {
+                    // Em vez do nome do arquivo, usa espaço para não aparecer texto visível
+                    $caption = ' ';
                 }
-                if (empty($caption)) {
-                    $caption = 'arquivo';
+                if ($caption === '') {
+                    $caption = ' ';
                 }
                 
                 $payload = [
@@ -585,9 +585,10 @@ class WhatsAppService
                         Logger::quepasa("sendMessage -   filename: {$payload['audio']['filename']}");
                         Logger::quepasa("sendMessage -   ptt: true");
                         
-                        // Para áudio, não enviar url/fileName/content/text no nível raiz para evitar ser tratado como documento ou texto
-                        unset($payload['url'], $payload['fileName'], $payload['content'], $payload['text']);
-                        Logger::quepasa("sendMessage - Campos url/fileName/content/text removidos do payload raiz");
+                        // Para áudio, não enviar url/fileName/content no nível raiz para evitar ser tratado como documento
+                        // Mantemos 'text' com espaço para satisfazer a API sem exibir mensagem visível
+                        unset($payload['url'], $payload['fileName'], $payload['content']);
+                        Logger::quepasa("sendMessage - Campos url/fileName/content removidos do payload raiz (text mantido com espaço)");
                     } else {
                         Logger::quepasa("sendMessage - Não é áudio, enviando como mídia normal (imagem/vídeo/documento)");
                         // Para imagem/vídeo/documento manter envio por URL

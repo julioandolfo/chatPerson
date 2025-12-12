@@ -39,7 +39,7 @@ class ScheduledMessageService
         }
 
         // Validar conteúdo não vazio
-        if (empty(trim($content)) && empty($attachments)) {
+        if (empty(trim($content ?? '')) && empty($attachments)) {
             throw new \InvalidArgumentException('Mensagem não pode estar vazia');
         }
 

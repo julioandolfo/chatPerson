@@ -105,7 +105,7 @@ class UserService
         }
 
         // Hash da senha se fornecida e não vazia
-        if (isset($data['password']) && !empty(trim($data['password']))) {
+        if (isset($data['password']) && !empty(trim($data['password'] ?? ''))) {
             $data['password'] = User::hashPassword($data['password']);
         } else {
             // Remover campo password se vazio para não atualizar

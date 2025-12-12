@@ -313,7 +313,7 @@ class AttachmentService
                 Logger::quepasa("AttachmentService::isWebmAudioOnly - ffprobe output: " . substr($output2 ?? 'VAZIO', 0, 200));
                 
                 // Se não encontrou stream de vídeo (output vazio ou sem codec_type=video), é apenas áudio
-                if (empty(trim($output2)) || strpos($output2, 'codec_type=video') === false) {
+                if (empty(trim($output2 ?? '')) || strpos($output2 ?? '', 'codec_type=video') === false) {
                     Logger::quepasa("AttachmentService::isWebmAudioOnly - ✅ Nenhum stream de vídeo encontrado - é apenas áudio");
                     return true;
                 } else {

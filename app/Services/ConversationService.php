@@ -740,7 +740,7 @@ class ConversationService
         }
 
         // Validar que há conteúdo ou anexos
-        if (empty(trim($content)) && empty($attachments)) {
+        if (empty(trim($content ?? '')) && empty($attachments)) {
             throw new \Exception('Mensagem não pode estar vazia');
         }
         

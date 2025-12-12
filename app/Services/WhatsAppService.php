@@ -1172,24 +1172,37 @@ class WhatsAppService
                 $fromPhone = self::normalizePhoneNumber($from);
             }
             
-            // Media / arquivos
+            // Media / arquivos (vários formatos possíveis)
             $mediaUrl = $quepasaData['url'] ?? $payload['media_url'] ?? $payload['mediaUrl'] ?? $payload['url'] ?? null;
             $mimetype = $quepasaData['mimeType'] ?? $payload['mimetype'] ?? $payload['mime_type'] ?? null;
             $filename = $quepasaData['fileName'] ?? $quepasaData['filename'] ?? $payload['filename'] ?? $payload['media_name'] ?? null;
             $size = $quepasaData['size'] ?? $payload['size'] ?? null;
 
-            // Novo formato possível: media ou audio dentro do payload/data
-            if (isset($quepasaData['media']) && is_array($quepasaData['media'])) {
-                $mediaUrl = $quepasaData['media']['url'] ?? $mediaUrl;
-                $mimetype = $quepasaData['media']['mimeType'] ?? $quepasaData['media']['mimetype'] ?? $mimetype;
-                $filename = $quepasaData['media']['fileName'] ?? $quepasaData['media']['filename'] ?? $filename;
-                $size = $quepasaData['media']['size'] ?? $size;
+            // Possíveis contêineres de mídia
+            $candidates = [
+                $quepasaData['media'] ?? null,
+                $quepasaData['audio'] ?? null,
+                $payload['media'] ?? null,
+                $payload['audio'] ?? null,
+                $payload['data']['media'] ?? null,
+                $payload['data']['audio'] ?? null,
+                $payload['message']['media'] ?? null,
+                $payload['message']['audio'] ?? null,
+            ];
+            foreach ($candidates as $cand) {
+                if (isset($cand) && is_array($cand)) {
+                    $mediaUrl = $cand['url'] ?? $mediaUrl;
+                    $mimetype = $cand['mimeType'] ?? $cand['mimetype'] ?? $mimetype;
+                    $filename = $cand['fileName'] ?? $cand['filename'] ?? $filename;
+                    $size = $cand['size'] ?? $size;
+                }
             }
-            if (isset($quepasaData['audio']) && is_array($quepasaData['audio'])) {
-                $mediaUrl = $quepasaData['audio']['url'] ?? $mediaUrl;
-                $mimetype = $quepasaData['audio']['mimeType'] ?? $quepasaData['audio']['mimetype'] ?? $mimetype ?? 'audio/ogg';
-                $filename = $quepasaData['audio']['fileName'] ?? $quepasaData['audio']['filename'] ?? $filename;
-                $size = $quepasaData['audio']['size'] ?? $size;
+
+            // Log se continuar vazio em mensagem de áudio
+            if ($messageType === 'audio' && !$mediaUrl) {
+                $topKeys = implode(',', array_keys($payload));
+                $dataKeys = isset($payload['data']) && is_array($payload['data']) ? implode(',', array_keys($payload['data'])) : 'NULL';
+                Logger::quepasa("processWebhook - audio sem mediaUrl - topKeys={$topKeys} | dataKeys={$dataKeys}");
             }
 
             Logger::quepasa("processWebhook - media detect: url=" . ($mediaUrl ?: 'NULL') . ", mimetype=" . ($mimetype ?: 'NULL') . ", filename=" . ($filename ?: 'NULL') . ", size=" . ($size ?: 'NULL') . ", messageType={$messageType}");

@@ -69,7 +69,7 @@ function renderAttachment($attachment) {
         $html .= '</div>';
     } elseif ($type === 'audio') {
         // Player de áudio ultra compacto estilo WhatsApp
-        $html .= '<div class="attachment audio-attachment" style="max-width: 280px; margin: 0;">';
+        $html .= '<div class="attachment audio-attachment" style="max-width: 340px; margin: 0;">';
         $html .= '<div class="d-flex align-items-center gap-2" style="background: var(--bs-gray-100); border-radius: 18px; padding: 6px 10px !important;">';
         $html .= '<div class="me-1" style="flex-shrink: 0;">';
         $html .= '<i class="ki-duotone ki-music fs-4 text-primary" style="min-width: 20px; font-size: 18px !important;">';
@@ -9416,7 +9416,7 @@ function renderAttachmentHtml(attachment) {
     } else if (type === 'audio' || (mimeType && mimeType.startsWith('audio/'))) {
         // Renderização de áudio - estilo WhatsApp compact
         const audioUrl = url || (attachment.path ? `<?= \App\Helpers\Url::to('/attachments') ?>/${encodeURIComponent(attachment.path)}` : '');
-        html += `<div class="attachment audio-attachment" style="max-width: 280px; margin: 0;">
+        html += `<div class="attachment audio-attachment" style="max-width: 340px; margin: 0;">
             <div class="d-flex align-items-center gap-2" style="background: var(--bs-gray-100); border-radius: 18px; padding: 6px 10px;">
                 <div class="me-1" style="flex-shrink: 0;">
                     <i class="ki-duotone ki-music fs-4 text-primary" style="min-width: 20px; font-size: 18px !important;">

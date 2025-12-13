@@ -690,16 +690,32 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     word-wrap: break-word;
 }
 
-/* Reduzir padding quando contém apenas áudio */
+/* Reduzir padding quando contém apenas áudio (manter background da bolha) */
 .message-bubble.audio-only {
-    padding: 0 !important;
+    padding: 8px !important;
     line-height: 1 !important;
-    background: transparent !important;
-    border: none !important;
 }
 
 .message-bubble.audio-only .audio-attachment {
     margin: 0;
+}
+
+/* Player de áudio deve herdar cor de fundo da bolha */
+.chat-message.outgoing .audio-attachment > div {
+    background: rgba(255, 255, 255, 0.15) !important;
+}
+
+.chat-message.incoming .audio-attachment > div {
+    background: var(--bs-gray-100) !important;
+}
+
+/* Garantir que botões de ação apareçam sobre o player de áudio */
+.message-content:has(.audio-attachment) {
+    position: relative;
+}
+
+.message-content:has(.audio-attachment) .message-actions {
+    z-index: 10;
 }
 
 /* Badge de mensagem de IA */

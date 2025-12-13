@@ -1218,17 +1218,33 @@ class WhatsAppService
                 // Tentar baixar áudio via API Quepasa/Orbichat
                 // Endpoints possíveis: /attachment/{id}, /download/{wid}, /messages/{id}/download
                 try {
-                    $messageWid = $payload['wid'] ?? $payload['id'] ?? $messageId;
+                    // Logar campos disponíveis para identificar o ID correto da mensagem
+                    Logger::quepasa("processWebhook - Campos disponíveis no payload: id=" . ($payload['id'] ?? 'null') . ", wid=" . ($payload['wid'] ?? 'null') . ", messageId=" . ($messageId ?? 'null'));
+                    
+                    // Usar o ID da mensagem correto (não o wid da conta)
+                    $messageWid = $payload['id'] ?? $messageId;
                     $apiUrl = rtrim($account['api_url'], '/');
                     
                     Logger::quepasa("processWebhook - Tentando baixar áudio via API: messageWid={$messageWid}");
                     
+                    // Extrair apenas o ID se vier com sufixo @s.whatsapp.net
+                    $messageIdOnly = $messageWid;
+                    if (strpos($messageIdOnly, '@') !== false) {
+                        $messageIdOnly = explode('@', $messageIdOnly)[0];
+                    }
+                    
                     // Tentar endpoints comuns (Quepasa/Orbichat)
                     $endpoints = [
                         "/attachment/{$messageWid}",
+                        "/attachment/{$messageIdOnly}",
                         "/download/{$messageWid}",
+                        "/download/{$messageIdOnly}",
                         "/messages/{$messageWid}/download",
-                        "/messages/{$messageWid}/attachment"
+                        "/messages/{$messageIdOnly}/download",
+                        "/messages/{$messageWid}/attachment",
+                        "/messages/{$messageIdOnly}/attachment",
+                        "/{$messageWid}/download",
+                        "/{$messageIdOnly}/download"
                     ];
                     
                     $downloaded = false;
@@ -1257,12 +1273,19 @@ class WhatsAppService
                         $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
                         curl_close($ch);
                         
-                        Logger::quepasa("processWebhook - Endpoint {$endpoint}: HTTP {$httpCode}, Content-Type: " . ($contentType ?: 'null'));
+                        Logger::quepasa("processWebhook - Endpoint {$endpoint}: HTTP {$httpCode}, Content-Type: " . ($contentType ?: 'null') . ", Size: " . strlen($audioData) . " bytes");
                         
                         if ($httpCode === 200 && $audioData && strlen($audioData) > 100) {
                             // Verificar se é áudio válido (não é JSON de erro)
                             $isJson = @json_decode($audioData);
-                            if ($isJson === null && strpos($contentType, 'audio') !== false) {
+                            $isAudio = ($isJson === null && (
+                                strpos($contentType, 'audio') !== false ||
+                                strpos($contentType, 'application/octet-stream') !== false ||
+                                strpos($contentType, 'binary') !== false ||
+                                empty($contentType)
+                            ));
+                            
+                            if ($isAudio) {
                                 Logger::quepasa("processWebhook - ✅ Áudio baixado com sucesso: " . strlen($audioData) . " bytes");
                                 
                                 // Salvar áudio temporariamente

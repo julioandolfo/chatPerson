@@ -391,7 +391,20 @@ class MessageTemplateController
      */
     public function getVariables(): void
     {
-        Permission::abortIfCannot('message_templates.view');
+        // Limpar qualquer output buffer antes de retornar JSON
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
+        // Verificar permissão antes de continuar
+        if (!Permission::can('message_templates.view')) {
+            Response::json([
+                'success' => false,
+                'message' => 'Sem permissão para visualizar templates',
+                'variables' => []
+            ], 403);
+            return;
+        }
         
         try {
             $variables = MessageTemplateService::getAvailableVariables();
@@ -400,6 +413,7 @@ class MessageTemplateController
                 'variables' => $variables
             ]);
         } catch (\Exception $e) {
+            error_log("Erro ao obter variáveis: " . $e->getMessage());
             Response::json([
                 'success' => false,
                 'message' => $e->getMessage(),

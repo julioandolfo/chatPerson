@@ -386,7 +386,7 @@ class SettingsController
                 ],
                 'contact_agents' => [
                     'auto_set_primary_agent_on_first_assignment' => isset($data['auto_set_primary_agent_on_first_assignment']),
-                    'auto_assign_on_reopen' => isset($data['auto_assign_on_reopen'] ?? true),
+                    'auto_assign_on_reopen' => isset($data['auto_assign_on_reopen']) ? (bool)$data['auto_assign_on_reopen'] : true,
                 ],
             ];
             

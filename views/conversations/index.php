@@ -624,6 +624,41 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     color: var(--bs-gray-200) !important;
 }
 
+/* Modal de Variáveis - garantir que fique acima de outros modais */
+#kt_modal_variables {
+    z-index: 10050 !important;
+}
+
+#kt_modal_variables .modal-dialog {
+    z-index: 10051 !important;
+}
+
+#kt_modal_variables .modal-content {
+    z-index: 10052 !important;
+}
+
+#kt_modal_variables.modal.show {
+    z-index: 10050 !important;
+}
+
+body.modal-open #kt_modal_variables {
+    z-index: 10050 !important;
+}
+
+/* Backdrop do modal de variáveis deve ficar acima de outros modais */
+body.modal-open .modal-backdrop:last-of-type {
+    z-index: 10049 !important;
+}
+
+/* Quando o modal de variáveis está aberto, garantir que ele fique acima */
+body:has(#kt_modal_variables.show) #kt_modal_variables {
+    z-index: 10050 !important;
+}
+
+body:has(#kt_modal_variables.show) .modal-backdrop:last-of-type {
+    z-index: 10049 !important;
+}
+
 [data-bs-theme="dark"] #messageSearchResults mark {
     background-color: #ffc107;
     color: #000;
@@ -8800,7 +8835,40 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Modal de Variáveis
 function showVariablesModal() {
-    const modal = new bootstrap.Modal(document.getElementById('kt_modal_variables'));
+    const modalElement = document.getElementById('kt_modal_variables');
+    if (!modalElement) {
+        console.error('Modal de variáveis não encontrado');
+        return;
+    }
+    
+    const modal = new bootstrap.Modal(modalElement);
+    
+    // Garantir z-index alto antes de abrir
+    modalElement.style.zIndex = '10050';
+    const modalDialog = modalElement.querySelector('.modal-dialog');
+    if (modalDialog) {
+        modalDialog.style.zIndex = '10051';
+    }
+    const modalContent = modalElement.querySelector('.modal-content');
+    if (modalContent) {
+        modalContent.style.zIndex = '10052';
+    }
+    
+    // Event listener para quando o modal for mostrado
+    modalElement.addEventListener('shown.bs.modal', function() {
+        // Garantir z-index após mostrar
+        modalElement.style.zIndex = '10050';
+        if (modalDialog) modalDialog.style.zIndex = '10051';
+        if (modalContent) modalContent.style.zIndex = '10052';
+        
+        // Ajustar backdrop se existir
+        const backdrops = document.querySelectorAll('.modal-backdrop');
+        if (backdrops.length > 0) {
+            const lastBackdrop = backdrops[backdrops.length - 1];
+            lastBackdrop.style.zIndex = '10049';
+        }
+    }, { once: true });
+    
     modal.show();
     
     // Carregar variáveis disponíveis
@@ -8821,10 +8889,29 @@ function loadVariables() {
     
     fetch('<?= \App\Helpers\Url::to('/message-templates/variables') ?>', {
         headers: {
-            'X-Requested-With': 'XMLHttpRequest'
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
         }
     })
-    .then(response => response.json())
+    .then(async response => {
+        // Verificar se a resposta é JSON antes de fazer parse
+        const contentType = response.headers.get('content-type') || '';
+        const text = await response.text();
+        
+        if (!contentType.includes('application/json')) {
+            console.error('Resposta não é JSON. Content-Type:', contentType);
+            console.error('Resposta completa:', text.substring(0, 500));
+            throw new Error('Resposta não é JSON. Verifique o console para mais detalhes.');
+        }
+        
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            console.error('Erro ao fazer parse do JSON:', e);
+            console.error('Texto recebido:', text.substring(0, 500));
+            throw new Error('Resposta não é JSON válido. Verifique o console para mais detalhes.');
+        }
+    })
     .then(data => {
         if (data.success && data.variables) {
             renderVariables(data.variables);
@@ -8832,6 +8919,7 @@ function loadVariables() {
             variablesList.innerHTML = `
                 <div class="col-12 text-center text-muted py-10">
                     <div>Nenhuma variável disponível</div>
+                    ${data.message ? `<div class="fs-7 mt-2">${escapeHtml(data.message)}</div>` : ''}
                 </div>
             `;
         }
@@ -8841,6 +8929,8 @@ function loadVariables() {
         variablesList.innerHTML = `
             <div class="col-12 text-center text-danger py-10">
                 <div>Erro ao carregar variáveis</div>
+                <div class="fs-7 mt-2">${escapeHtml(error.message || 'Erro desconhecido')}</div>
+                <div class="fs-8 mt-3 text-muted">Verifique o console para mais detalhes</div>
             </div>
         `;
     });
@@ -9046,37 +9136,6 @@ function insertVariable(variable) {
     if (modal) {
         setTimeout(() => modal.hide(), 500);
     }
-}
-
-function loadVariables() {
-    const variablesList = document.getElementById('variablesList');
-    if (!variablesList) return;
-    
-    // Mostrar loading
-    variablesList.innerHTML = `
-        <div class="col-12 text-center py-10">
-            <span class="spinner-border spinner-border-sm text-primary mb-3" role="status"></span>
-            <div class="text-muted">Carregando variáveis...</div>
-        </div>
-    `;
-    
-    fetch('<?= \App\Helpers\Url::to("/message-templates/variables") ?>', {
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success && data.variables) {
-            renderVariables(data.variables);
-        } else {
-            variablesList.innerHTML = '<div class="col-12 text-center text-muted py-10">Nenhuma variável disponível</div>';
-        }
-    })
-    .catch(error => {
-        console.error('Erro ao carregar variáveis:', error);
-        variablesList.innerHTML = '<div class="col-12 text-center text-danger py-10">Erro ao carregar variáveis</div>';
-    });
 }
 
 function renderVariables(variables) {
@@ -12722,3 +12781,4 @@ if (editContactForm) {
 <?php $content = ob_get_clean(); ?>
 
 <?php include __DIR__ . '/../layouts/metronic/app.php'; ?>
+

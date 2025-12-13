@@ -1233,14 +1233,16 @@ class WhatsAppService
                 }
             }
 
-            // Se áudio vier sem URL mas com attachment, tentar baixar via API
+            // Se mídia (áudio/imagem/vídeo/documento) vier sem URL mas com attachment, tentar baixar via API
             $downloadedFile = null; // Inicializar variável para armazenar arquivo já baixado
-            if ($messageType === 'audio' && !$mediaUrl && isset($payload['attachment'])) {
+            $needsDownload = in_array($messageType, ['audio', 'image', 'video', 'document', 'ptt', 'sticker']) && !$mediaUrl && isset($payload['attachment']);
+            
+            if ($needsDownload) {
                 $attachmentKeys = isset($payload['attachment']) && is_array($payload['attachment']) ? implode(',', array_keys($payload['attachment'])) : 'NULL';
                 $extraKeys = isset($payload['extra']) && is_array($payload['extra']) ? implode(',', array_keys($payload['extra'])) : 'NULL';
                 $topKeys = implode(',', array_keys($payload));
                 $dataKeys = isset($payload['data']) && is_array($payload['data']) ? implode(',', array_keys($payload['data'])) : 'NULL';
-                Logger::quepasa("processWebhook - audio sem mediaUrl - topKeys={$topKeys} | dataKeys={$dataKeys} | attachmentKeys={$attachmentKeys} | extraKeys={$extraKeys}");
+                Logger::quepasa("processWebhook - {$messageType} sem mediaUrl - topKeys={$topKeys} | dataKeys={$dataKeys} | attachmentKeys={$attachmentKeys} | extraKeys={$extraKeys}");
                 Logger::quepasa("processWebhook - attachment content: " . json_encode($payload['attachment']));
                 if (isset($payload['extra']) && is_array($payload['extra'])) {
                     Logger::quepasa("processWebhook - extra content: " . json_encode($payload['extra']));
@@ -1256,7 +1258,7 @@ class WhatsAppService
                     $messageWid = $payload['id'] ?? $messageId;
                     $apiUrl = rtrim($account['api_url'], '/');
                     
-                    Logger::quepasa("processWebhook - Tentando baixar áudio via API: messageWid={$messageWid}");
+                    Logger::quepasa("processWebhook - Tentando baixar {$messageType} via API: messageWid={$messageWid}");
                     
                     // Extrair apenas o ID se vier com sufixo @s.whatsapp.net
                     $messageIdOnly = $messageWid;
@@ -1299,40 +1301,54 @@ class WhatsAppService
                             CURLOPT_SSL_VERIFYHOST => false
                         ]);
                         
-                        $audioData = curl_exec($ch);
+                        $mediaData = curl_exec($ch);
                         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                         $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
                         curl_close($ch);
                         
-                        Logger::quepasa("processWebhook - Endpoint {$endpoint}: HTTP {$httpCode}, Content-Type: " . ($contentType ?: 'null') . ", Size: " . strlen($audioData) . " bytes");
+                        Logger::quepasa("processWebhook - Endpoint {$endpoint}: HTTP {$httpCode}, Content-Type: " . ($contentType ?: 'null') . ", Size: " . strlen($mediaData) . " bytes");
                         
-                        if ($httpCode === 200 && $audioData && strlen($audioData) > 100) {
-                            // Verificar se é áudio válido (não é JSON de erro)
-                            $isJson = @json_decode($audioData);
-                            $isAudio = ($isJson === null && (
+                        if ($httpCode === 200 && $mediaData && strlen($mediaData) > 100) {
+                            // Verificar se é mídia válida (não é JSON de erro)
+                            $isJson = @json_decode($mediaData);
+                            $isValidMedia = ($isJson === null && (
                                 strpos($contentType, 'audio') !== false ||
-                                strpos($contentType, 'application/octet-stream') !== false ||
+                                strpos($contentType, 'image') !== false ||
+                                strpos($contentType, 'video') !== false ||
+                                strpos($contentType, 'application') !== false ||
+                                strpos($contentType, 'octet-stream') !== false ||
                                 strpos($contentType, 'binary') !== false ||
                                 empty($contentType)
                             ));
                             
-                            if ($isAudio) {
-                                Logger::quepasa("processWebhook - ✅ Áudio baixado com sucesso: " . strlen($audioData) . " bytes");
+                            if ($isValidMedia) {
+                                Logger::quepasa("processWebhook - ✅ {$messageType} baixado com sucesso: " . strlen($mediaData) . " bytes");
                                 
-                                // Salvar áudio temporariamente
+                                // Salvar mídia temporariamente
                                 $tempDir = __DIR__ . '/../../public/assets/media/attachments/temp';
                                 if (!is_dir($tempDir)) {
                                     mkdir($tempDir, 0755, true);
                                 }
                                 
-                                $extension = 'ogg';
-                                if ($payload['attachment']['mime']) {
-                                    if (strpos($payload['attachment']['mime'], 'opus') !== false) $extension = 'ogg';
-                                    elseif (strpos($payload['attachment']['mime'], 'mpeg') !== false) $extension = 'mp3';
+                                // Determinar extensão baseada no mime type
+                                $extension = 'bin';
+                                $attachmentMime = $payload['attachment']['mime'] ?? $mimetype ?? $contentType;
+                                if ($attachmentMime) {
+                                    if (strpos($attachmentMime, 'opus') !== false || strpos($attachmentMime, 'ogg') !== false) $extension = 'ogg';
+                                    elseif (strpos($attachmentMime, 'mpeg') !== false) $extension = 'mp3';
+                                    elseif (strpos($attachmentMime, 'mp4') !== false) $extension = 'mp4';
+                                    elseif (strpos($attachmentMime, 'webm') !== false) $extension = 'webm';
+                                    elseif (strpos($attachmentMime, 'jpeg') !== false || strpos($attachmentMime, 'jpg') !== false) $extension = 'jpg';
+                                    elseif (strpos($attachmentMime, 'png') !== false) $extension = 'png';
+                                    elseif (strpos($attachmentMime, 'gif') !== false) $extension = 'gif';
+                                    elseif (strpos($attachmentMime, 'webp') !== false) $extension = 'webp';
+                                    elseif (strpos($attachmentMime, 'pdf') !== false) $extension = 'pdf';
+                                    elseif (strpos($attachmentMime, 'document') !== false || strpos($attachmentMime, 'msword') !== false) $extension = 'doc';
+                                    elseif (strpos($attachmentMime, 'sheet') !== false || strpos($attachmentMime, 'excel') !== false) $extension = 'xls';
                                 }
                                 
-                                $tempFile = $tempDir . '/audio_' . $messageIdOnly . '_' . time() . '.' . $extension;
-                                file_put_contents($tempFile, $audioData);
+                                $tempFile = $tempDir . '/' . $messageType . '_' . $messageIdOnly . '_' . time() . '.' . $extension;
+                                file_put_contents($tempFile, $mediaData);
                                 
                                 // Criar caminho relativo para salvar no banco (sem /public/)
                                 $relativePath = 'assets/media/attachments/temp/' . basename($tempFile);
@@ -1343,11 +1359,11 @@ class WhatsAppService
                                 $basePath = \App\Helpers\Url::to('/' . $relativePath);
                                 $mediaUrl = $protocol . '://' . $host . $basePath;
                                 
-                                $mimetype = $payload['attachment']['mime'] ?? 'audio/ogg';
+                                $mimetype = $payload['attachment']['mime'] ?? $attachmentMime ?? $contentType;
                                 $filename = basename($tempFile);
-                                $size = strlen($audioData);
+                                $size = strlen($mediaData);
                                 
-                                Logger::quepasa("processWebhook - Áudio salvo em: {$tempFile}");
+                                Logger::quepasa("processWebhook - {$messageType} salvo em: {$tempFile}");
                                 Logger::quepasa("processWebhook - Caminho relativo: {$relativePath}");
                                 Logger::quepasa("processWebhook - URL pública absoluta: {$mediaUrl}");
                                 
@@ -1368,10 +1384,10 @@ class WhatsAppService
                     }
                     
                     if (!$downloaded) {
-                        Logger::quepasa("processWebhook - ❌ Não foi possível baixar o áudio. Tentativas: " . count($endpoints));
+                        Logger::quepasa("processWebhook - ❌ Não foi possível baixar o {$messageType}. Tentativas: " . count($endpoints));
                     }
                 } catch (\Exception $e) {
-                    Logger::quepasa("processWebhook - Erro ao baixar áudio: " . $e->getMessage());
+                    Logger::quepasa("processWebhook - Erro ao baixar {$messageType}: " . $e->getMessage());
                 }
             }
 
@@ -1534,22 +1550,35 @@ class WhatsAppService
                 $attachments = [];
                 if ($mediaUrl) {
                     try {
-                        // Se o arquivo já foi baixado via API (áudio), preparar attachment como array
+                        // Se o arquivo já foi baixado via API, preparar attachment como array
                         if (isset($downloadedFile) && !empty($downloadedFile['local_path'])) {
                             Logger::quepasa("processWebhook - Preparando attachment OUTGOING de arquivo já baixado: {$downloadedFile['local_path']}");
+                            
+                            // Detectar tipo de mídia baseado no mime type
+                            $attachmentType = 'document';
+                            $attachmentMimeType = $downloadedFile['mime_type'] ?? $mimetype;
+                            if ($attachmentMimeType) {
+                                if (strpos($attachmentMimeType, 'audio') !== false) $attachmentType = 'audio';
+                                elseif (strpos($attachmentMimeType, 'image') !== false) $attachmentType = 'image';
+                                elseif (strpos($attachmentMimeType, 'video') !== false) $attachmentType = 'video';
+                            }
+                            
+                            // Extrair extensão do filename
+                            $attachmentFilename = $downloadedFile['filename'] ?? $filename;
+                            $attachmentExtension = pathinfo($attachmentFilename, PATHINFO_EXTENSION) ?: 'bin';
                             
                             // Attachments são arrays que vão no campo JSON da mensagem
                             $attachment = [
                                 'path' => $downloadedFile['path'],
-                                'type' => 'audio',
-                                'mime_type' => $downloadedFile['mime_type'] ?? $mimetype,
-                                'mimetype' => $downloadedFile['mime_type'] ?? $mimetype,
+                                'type' => $attachmentType,
+                                'mime_type' => $attachmentMimeType,
+                                'mimetype' => $attachmentMimeType,
                                 'size' => $downloadedFile['size'] ?? $size,
-                                'filename' => $downloadedFile['filename'] ?? $filename,
-                                'extension' => 'ogg',
+                                'filename' => $attachmentFilename,
+                                'extension' => $attachmentExtension,
                                 'url' => $downloadedFile['url']
                             ];
-                            Logger::quepasa("processWebhook - ✅ Attachment OUTGOING preparado: " . json_encode($attachment));
+                            Logger::quepasa("processWebhook - ✅ Attachment OUTGOING preparado ({$attachmentType}): " . json_encode($attachment));
                             $attachments[] = $attachment;
                         } else {
                             $attachment = \App\Services\AttachmentService::saveFromUrl(
@@ -1777,23 +1806,36 @@ class WhatsAppService
             $attachments = [];
             if ($mediaUrl) {
                 try {
-                    // Se o arquivo já foi baixado via API (áudio), criar attachment diretamente
+                    // Se o arquivo já foi baixado via API, criar attachment diretamente
                     if (isset($downloadedFile) && !empty($downloadedFile['local_path'])) {
                         Logger::quepasa("processWebhook - Criando attachment a partir de arquivo já baixado: {$downloadedFile['local_path']}");
                         Logger::quepasa("processWebhook - downloadedFile: " . json_encode($downloadedFile));
                         
+                        // Detectar tipo de mídia baseado no mime type
+                        $attachmentType = 'document';
+                        $attachmentMimeType = $downloadedFile['mime_type'] ?? $mimetype;
+                        if ($attachmentMimeType) {
+                            if (strpos($attachmentMimeType, 'audio') !== false) $attachmentType = 'audio';
+                            elseif (strpos($attachmentMimeType, 'image') !== false) $attachmentType = 'image';
+                            elseif (strpos($attachmentMimeType, 'video') !== false) $attachmentType = 'video';
+                        }
+                        
+                        // Extrair extensão do filename
+                        $attachmentFilename = $downloadedFile['filename'] ?? $filename;
+                        $attachmentExtension = pathinfo($attachmentFilename, PATHINFO_EXTENSION) ?: 'bin';
+                        
                         // Attachments não são salvos em tabela separada, são arrays que vão no campo JSON da mensagem
                         $attachment = [
                             'path' => $downloadedFile['path'],
-                            'type' => 'audio',
-                            'mime_type' => $downloadedFile['mime_type'] ?? $mimetype,
-                            'mimetype' => $downloadedFile['mime_type'] ?? $mimetype,
+                            'type' => $attachmentType,
+                            'mime_type' => $attachmentMimeType,
+                            'mimetype' => $attachmentMimeType,
                             'size' => $downloadedFile['size'] ?? $size,
-                            'filename' => $downloadedFile['filename'] ?? $filename,
-                            'extension' => 'ogg',
+                            'filename' => $attachmentFilename,
+                            'extension' => $attachmentExtension,
                             'url' => $downloadedFile['url']
                         ];
-                        Logger::quepasa("processWebhook - ✅ Attachment preparado para mensagem: " . json_encode($attachment));
+                        Logger::quepasa("processWebhook - ✅ Attachment preparado para mensagem ({$attachmentType}): " . json_encode($attachment));
                         $attachments[] = $attachment;
                     } else {
                         // Arquivo externo (não baixado ainda), usar saveFromUrl

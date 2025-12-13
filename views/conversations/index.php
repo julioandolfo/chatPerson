@@ -59,10 +59,10 @@ function renderAttachment($attachment) {
         $html .= '</a>';
     } elseif ($type === 'video') {
         $html .= '<div class="lazy-video-container" data-src="' . $url . '" data-type="' . ($attachment['mime_type'] ?? $attachment['mimetype'] ?? 'video/mp4') . '">';
-        $html .= '<div class="lazy-video-placeholder" style="max-width: 300px; max-height: 50px; border-radius: 8px; background: #f0f0f0; display: flex; align-items: center; justify-content: center; cursor: pointer; min-height: 50px;">';
-        $html .= '<i class="ki-duotone ki-play fs-2 text-primary"><span class="path1"></span><span class="path2"></span></i>';
+        $html .= '<div class="lazy-video-placeholder" style="max-width: 300px; max-height: 200px; border-radius: 8px; background: #f0f0f0; display: flex; align-items: center; justify-content: center; cursor: pointer; min-height: 200px;">';
+        $html .= '<i class="ki-duotone ki-play fs-2x text-primary"><span class="path1"></span><span class="path2"></span></i>';
         $html .= '</div>';
-        $html .= '<video controls style="max-width: 300px; max-height: 50px; border-radius: 8px; display: none;" preload="none">';
+        $html .= '<video controls style="max-width: 300px; max-height: 200px; border-radius: 8px; display: none;" preload="none">';
         $html .= '<source src="" type="' . ($attachment['mime_type'] ?? $attachment['mimetype'] ?? 'video/mp4') . '">';
         $html .= 'Seu navegador não suporta vídeo.';
         $html .= '</video>';
@@ -9437,10 +9437,10 @@ function renderAttachmentHtml(attachment) {
         </a>`;
     } else if (type === 'video') {
         html += `<div class="lazy-video-container" data-src="${url}" data-type="${mimeType || 'video/mp4'}" onclick="event.stopPropagation();">
-            <div class="lazy-video-placeholder" style="max-width: 300px; max-height: 50px; border-radius: 8px; background: #f0f0f0; display: flex; align-items: center; justify-content: center; cursor: pointer; min-height: 50px;">
-                <i class="ki-duotone ki-play fs-2 text-primary"><span class="path1"></span><span class="path2"></span></i>
+            <div class="lazy-video-placeholder" style="max-width: 300px; max-height: 200px; border-radius: 8px; background: #f0f0f0; display: flex; align-items: center; justify-content: center; cursor: pointer; min-height: 200px;">
+                <i class="ki-duotone ki-play fs-2x text-primary"><span class="path1"></span><span class="path2"></span></i>
             </div>
-            <video controls style="max-width: 300px; max-height: 50px; border-radius: 8px; display: none;" preload="none">
+            <video controls style="max-width: 300px; max-height: 200px; border-radius: 8px; display: none;" preload="none">
                 <source src="" type="${mimeType || 'video/mp4'}">
                 Seu navegador não suporta vídeo.
             </video>

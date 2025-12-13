@@ -13,6 +13,41 @@ use App\Models\User;
 class ConversationController
 {
     /**
+     * Preparar resposta JSON (desabilita display_errors e limpa buffer)
+     * Retorna array com configurações antigas para restaurar no finally
+     */
+    private function prepareJsonResponse(): array
+    {
+        // Desabilitar display de erros para evitar HTML no JSON
+        $oldDisplayErrors = ini_get('display_errors');
+        $oldErrorReporting = error_reporting();
+        ini_set('display_errors', '0');
+        error_reporting(0);
+        
+        // Limpar qualquer output anterior
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
+        // Iniciar novo buffer
+        ob_start();
+        
+        return [
+            'display_errors' => $oldDisplayErrors,
+            'error_reporting' => $oldErrorReporting
+        ];
+    }
+    
+    /**
+     * Restaurar configurações após resposta JSON
+     */
+    private function restoreAfterJsonResponse(array $config): void
+    {
+        ini_set('display_errors', $config['display_errors']);
+        error_reporting($config['error_reporting']);
+    }
+    
+    /**
      * Listar conversas
      */
     public function index(): void
@@ -495,25 +530,24 @@ class ConversationController
      */
     public function assign(int $id): void
     {
-        // Limpar qualquer output anterior
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
-        
-        // Verificar permissão sem abortar (retornar JSON se não tiver)
-        if (!Permission::can('conversations.assign.all') && !Permission::can('conversations.assign.own')) {
-            Response::json([
-                'success' => false,
-                'message' => 'Sem permissão para atribuir conversas'
-            ], 403);
-            return;
-        }
+        $config = $this->prepareJsonResponse();
         
         try {
+            // Verificar permissão sem abortar (retornar JSON se não tiver)
+            if (!Permission::can('conversations.assign.all') && !Permission::can('conversations.assign.own')) {
+                ob_end_clean();
+                Response::json([
+                    'success' => false,
+                    'message' => 'Sem permissão para atribuir conversas'
+                ], 403);
+                return;
+            }
+            
             // Ler dados (JSON ou form-data)
             $agentId = \App\Helpers\Request::post('agent_id');
             
             if (!$agentId) {
+                ob_end_clean();
                 Response::json([
                     'success' => false,
                     'message' => 'Agente não informado'
@@ -524,6 +558,7 @@ class ConversationController
             // Verificar se conversa existe
             $conversation = \App\Models\Conversation::find($id);
             if (!$conversation) {
+                ob_end_clean();
                 Response::json([
                     'success' => false,
                     'message' => 'Conversa não encontrada'
@@ -534,6 +569,7 @@ class ConversationController
             // Verificar se agente existe
             $agent = User::find($agentId);
             if (!$agent) {
+                ob_end_clean();
                 Response::json([
                     'success' => false,
                     'message' => 'Agente não encontrado'
@@ -544,12 +580,15 @@ class ConversationController
             // Atribuir forçadamente (ignora limites) quando é atribuição manual
             $conversation = ConversationService::assignToAgent($id, $agentId, true);
             
+            ob_end_clean();
+            
             Response::json([
                 'success' => true,
                 'message' => 'Conversa atribuída com sucesso',
                 'conversation' => $conversation
             ]);
         } catch (\Exception $e) {
+            ob_end_clean();
             error_log("ConversationController::assign - Erro: " . $e->getMessage());
             error_log("ConversationController::assign - Trace: " . $e->getTraceAsString());
             
@@ -557,6 +596,8 @@ class ConversationController
                 'success' => false,
                 'message' => 'Erro ao atribuir conversa: ' . $e->getMessage()
             ], 500);
+        } finally {
+            $this->restoreAfterJsonResponse($config);
         }
     }
 
@@ -1650,10 +1691,41 @@ class ConversationController
      */
     public function removeParticipant(int $id, int $userId): void
     {
-        Permission::abortIfCannot('conversations.edit.own');
+        // Desabilitar display de erros para evitar HTML no JSON (importante para APIs)
+        $oldDisplayErrors = ini_get('display_errors');
+        $oldErrorReporting = error_reporting();
+        ini_set('display_errors', '0');
+        error_reporting(0);
+        
+        // Limpar qualquer output anterior
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
+        // Iniciar novo buffer para capturar qualquer output indesejado
+        ob_start();
         
         try {
+            error_log("ConversationController::removeParticipant - INÍCIO - ConversationID: {$id}, UserID: {$userId}");
+            
+            // Verificar permissão sem abortar (retornar JSON se não tiver)
+            if (!Permission::can('conversations.edit.own') && !Permission::can('conversations.edit.all')) {
+                error_log("ConversationController::removeParticipant - Sem permissão");
+                ob_end_clean();
+                Response::json([
+                    'success' => false,
+                    'message' => 'Sem permissão para editar conversas'
+                ], 403);
+                return;
+            }
+            
+            error_log("ConversationController::removeParticipant - Chamando ConversationParticipant::removeParticipant");
             $success = \App\Models\ConversationParticipant::removeParticipant($id, $userId);
+            
+            error_log("ConversationController::removeParticipant - Success: " . ($success ? 'true' : 'false'));
+            
+            // Limpar buffer antes de enviar JSON
+            ob_end_clean();
             
             if ($success) {
                 // Invalidar cache da conversa
@@ -1670,10 +1742,20 @@ class ConversationController
                 ], 400);
             }
         } catch (\Exception $e) {
+            // Limpar buffer em caso de erro
+            ob_end_clean();
+            
+            error_log("ConversationController::removeParticipant - Erro: " . $e->getMessage());
+            error_log("ConversationController::removeParticipant - Trace: " . $e->getTraceAsString());
+            
             Response::json([
                 'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
+                'message' => 'Erro ao remover participante: ' . $e->getMessage()
+            ], 500);
+        } finally {
+            // Restaurar configurações originais
+            ini_set('display_errors', $oldDisplayErrors);
+            error_reporting($oldErrorReporting);
         }
     }
 }

@@ -1523,9 +1523,9 @@ body.dark-mode .swal2-content {
             <div class="d-flex flex-wrap align-items-center gap-2 py-2">
                 <select id="filter_status" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 120px;">
                     <option value="">Todas</option>
-                    <option value="open" <?= ($filters['status'] ?? '') === 'open' ? 'selected' : '' ?>>Abertas</option>
-                    <option value="resolved" <?= ($filters['status'] ?? '') === 'resolved' ? 'selected' : '' ?>>Resolvidas</option>
-                    <option value="closed" <?= ($filters['status'] ?? '') === 'closed' ? 'selected' : '' ?>>Fechadas</option>
+                    <option value="open" <?= ($filters['status'] ?? 'open') === 'open' ? 'selected' : '' ?>>Abertas</option>
+                    <option value="resolved" <?= ($filters['status'] ?? 'open') === 'resolved' ? 'selected' : '' ?>>Resolvidas</option>
+                    <option value="closed" <?= ($filters['status'] ?? 'open') === 'closed' ? 'selected' : '' ?>>Fechadas</option>
                     <option value="unanswered" <?= !empty($filters['unanswered']) ? 'selected' : '' ?>>🔴 Não respondidas</option>
                 </select>
                 
@@ -5645,7 +5645,8 @@ function applyAdvancedFilters() {
 }
 
 function clearAllFilters() {
-    window.location.href = '<?= \App\Helpers\Url::to('/conversations') ?>';
+    // Redirecionar para a página com status=open como padrão
+    window.location.href = '<?= \App\Helpers\Url::to('/conversations') ?>?status=open';
 }
 
 function togglePin(conversationId, isPinned) {
@@ -9533,13 +9534,23 @@ document.getElementById('assignForm')?.addEventListener('submit', function(e) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
         },
         body: JSON.stringify({
             agent_id: parseInt(agentId),
             department_id: departmentId ? parseInt(departmentId) : null
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            return response.text().then(text => {
+                console.error('Erro na resposta:', text);
+                throw new Error(`HTTP ${response.status}: ${text.substring(0, 100)}`);
+            });
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             bootstrap.Modal.getInstance(document.getElementById('kt_modal_assign')).hide();
@@ -9979,7 +9990,15 @@ function addParticipant() {
         },
         body: JSON.stringify({ user_id: userId })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            return response.text().then(text => {
+                console.error('Erro na resposta:', text);
+                throw new Error(`HTTP ${response.status}: ${text.substring(0, 100)}`);
+            });
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             // Limpar select
@@ -9990,13 +10009,25 @@ function addParticipant() {
             if (window.currentConversationId == conversationId) {
                 updateConversationSidebar(window.currentConversation);
             }
+            
+            // Toast de sucesso
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Participante adicionado!',
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 2000
+                });
+            }
         } else {
             alert('Erro ao adicionar participante: ' + (data.message || 'Erro desconhecido'));
         }
     })
     .catch(error => {
         console.error('Erro ao adicionar participante:', error);
-        alert('Erro ao adicionar participante');
+        alert('Erro ao adicionar participante: ' + error.message);
     })
     .finally(() => {
         btn.disabled = false;

@@ -25,7 +25,7 @@ class ConversationController
         
         // Obter filtros da requisição
         $filters = [
-            'status' => $_GET['status'] ?? null,
+            'status' => $_GET['status'] ?? 'open', // Padrão: Abertas
             'channel' => $_GET['channel'] ?? null,
             'channels' => isset($_GET['channels']) && is_array($_GET['channels']) ? $_GET['channels'] : (!empty($_GET['channel']) ? [$_GET['channel']] : null),
             'search' => $_GET['search'] ?? null,
@@ -495,11 +495,24 @@ class ConversationController
      */
     public function assign(int $id): void
     {
+        // Verificar permissão sem abortar (retornar JSON se não tiver)
+        if (!Permission::can('conversations.assign.all') && !Permission::can('conversations.assign.own')) {
+            Response::json([
+                'success' => false,
+                'message' => 'Sem permissão para atribuir conversas'
+            ], 403);
+            return;
+        }
+        
         try {
             $agentId = $_POST['agent_id'] ?? null;
             
             if (!$agentId) {
-                throw new \Exception('Agente não informado');
+                Response::json([
+                    'success' => false,
+                    'message' => 'Agente não informado'
+                ], 400);
+                return;
             }
 
             $conversation = ConversationService::assignToAgent($id, $agentId);
@@ -1493,10 +1506,17 @@ class ConversationController
      */
     public function addParticipant(int $id): void
     {
-        Permission::abortIfCannot('conversations.edit.own');
+        // Verificar permissão sem abortar (retornar JSON se não tiver)
+        if (!Permission::can('conversations.edit.own') && !Permission::can('conversations.edit.all')) {
+            Response::json([
+                'success' => false,
+                'message' => 'Sem permissão para editar conversas'
+            ], 403);
+            return;
+        }
         
         try {
-            $data = Request::post();
+            $data = \App\Helpers\Request::post();
             $userId = (int)($data['user_id'] ?? 0);
             
             if (!$userId) {

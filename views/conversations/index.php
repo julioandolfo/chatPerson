@@ -9856,7 +9856,15 @@ function showAddParticipantModal(conversationId) {
 }
 
 function loadParticipantsForConversation() {
-    const conversationId = document.getElementById('kt_modal_participants').dataset.conversationId;
+    const modalElement = document.getElementById('kt_modal_participants');
+    const conversationId = modalElement.dataset.conversationId || window.currentConversationId;
+    
+    if (!conversationId || conversationId === 'undefined' || conversationId === 'null') {
+        console.error('loadParticipantsForConversation: conversationId inválido:', conversationId);
+        return;
+    }
+    
+    console.log('loadParticipantsForConversation: conversationId =', conversationId);
     
     // Carregar participantes atuais
     fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/participants`, {
@@ -10002,9 +10010,9 @@ function removeParticipant(conversationId, userId) {
         if (data.success) {
             // Recarregar participantes
             loadParticipantsForConversation();
-            // Atualizar sidebar se estiver aberto
+            // Recarregar a conversa inteira para atualizar sidebar
             if (window.currentConversationId == conversationId) {
-                updateConversationSidebar(window.currentConversation);
+                loadConversation(conversationId);
             }
         } else {
             alert('Erro ao remover participante: ' + (data.message || 'Erro desconhecido'));
@@ -10017,8 +10025,14 @@ function removeParticipant(conversationId, userId) {
 }
 
 function addParticipant() {
-    const conversationId = document.getElementById('kt_modal_participants').dataset.conversationId;
+    const modalElement = document.getElementById('kt_modal_participants');
+    const conversationId = modalElement.dataset.conversationId || window.currentConversationId;
     const userId = document.getElementById('participantUserSelect').value;
+    
+    if (!conversationId || conversationId === 'undefined' || conversationId === 'null') {
+        alert('ID da conversa não encontrado');
+        return;
+    }
     
     if (!userId) {
         alert('Por favor, selecione um usuário');
@@ -10067,9 +10081,9 @@ function addParticipant() {
             document.getElementById('participantUserSelect').value = '';
             // Recarregar participantes
             loadParticipantsForConversation();
-            // Atualizar sidebar se estiver aberto
+            // Recarregar a conversa inteira para atualizar sidebar
             if (window.currentConversationId == conversationId) {
-                updateConversationSidebar(window.currentConversation);
+                loadConversation(conversationId);
             }
             
             // Toast de sucesso

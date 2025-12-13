@@ -1547,11 +1547,23 @@ class ConversationController
     /**
      * Listar participantes de uma conversa
      */
-    public function getParticipants(int $id): void
+    public function getParticipants($id): void
     {
         $config = $this->prepareJsonResponse();
         
         try {
+            // Converter ID para int e validar
+            $conversationId = (int)$id;
+            if ($conversationId <= 0) {
+                ob_end_clean();
+                Response::json([
+                    'success' => false,
+                    'message' => 'ID de conversa inválido',
+                    'participants' => []
+                ], 400);
+                return;
+            }
+            
             // Verificar permissão
             if (!Permission::can('conversations.view.own') && !Permission::can('conversations.view.all')) {
                 ob_end_clean();
@@ -1562,7 +1574,7 @@ class ConversationController
                 return;
             }
             
-            $participants = \App\Models\ConversationParticipant::getByConversation($id);
+            $participants = \App\Models\ConversationParticipant::getByConversation($conversationId);
             
             ob_end_clean();
             Response::json([

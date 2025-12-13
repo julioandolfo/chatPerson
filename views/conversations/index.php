@@ -386,6 +386,29 @@ ob_start();
     z-index: auto !important;
 }
 
+/* Corrigir z-index dos modais e backdrop */
+.modal {
+    z-index: 1055 !important;
+}
+
+.modal-backdrop {
+    z-index: 1050 !important;
+}
+
+.modal-backdrop.show {
+    z-index: 1050 !important;
+}
+
+/* Garantir que o modal fique acima do backdrop */
+.modal.show {
+    z-index: 1055 !important;
+}
+
+.modal-dialog {
+    z-index: 1056 !important;
+    position: relative;
+}
+
 /* Estilos para modo dark */
 [data-bs-theme="dark"] .conversation-item-actions .dropdown-menu,
 .dark-mode .conversation-item-actions .dropdown-menu,

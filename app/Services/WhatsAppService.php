@@ -1685,6 +1685,18 @@ class WhatsAppService
                     Logger::quepasa("Erro ao buscar avatar: " . $e->getMessage());
                 }
             } else {
+                // Atualizar whatsapp_id se vier com @lid e for diferente do armazenado
+                $currentWhatsappId = $payload['from'] ?? $payload['phone'] ?? $fromPhone;
+                if (!str_ends_with($currentWhatsappId, '@s.whatsapp.net') && !str_ends_with($currentWhatsappId, '@lid')) {
+                    $currentWhatsappId .= '@s.whatsapp.net';
+                }
+                
+                if (!empty($currentWhatsappId) && $currentWhatsappId !== $contact['whatsapp_id']) {
+                    Logger::quepasa("processWebhook - Atualizando whatsapp_id do contato: {$contact['whatsapp_id']} -> {$currentWhatsappId}");
+                    \App\Models\Contact::update($contact['id'], ['whatsapp_id' => $currentWhatsappId]);
+                    $contact['whatsapp_id'] = $currentWhatsappId;
+                }
+                
                 // Atualizar nome APENAS se:
                 // 1. Veio no payload (chat.title)
                 // 2. O contato não tem nome cadastrado (nome igual ao telefone)
@@ -1786,20 +1798,26 @@ class WhatsAppService
                             ];
                             Logger::quepasa("processWebhook - Dados do attachment a criar: " . json_encode($attachmentData));
                             
-                            $attachmentId = \App\Models\Attachment::create($attachmentData);
-                            Logger::quepasa("processWebhook - Attachment create retornou ID: {$attachmentId}");
-                            
-                            if ($attachmentId) {
-                                $attachment = \App\Models\Attachment::find($attachmentId);
-                                if ($attachment) {
-                                    Logger::quepasa("processWebhook - ✅ Attachment criado com sucesso: ID={$attachmentId}");
-                                    Logger::quepasa("processWebhook - Attachment data: " . json_encode($attachment));
-                                    $attachments[] = $attachment;
+                            try {
+                                $attachmentId = \App\Models\Attachment::create($attachmentData);
+                                Logger::quepasa("processWebhook - Attachment create retornou ID: " . ($attachmentId ?? 'NULL'));
+                                
+                                if ($attachmentId) {
+                                    $attachment = \App\Models\Attachment::find($attachmentId);
+                                    if ($attachment) {
+                                        Logger::quepasa("processWebhook - ✅ Attachment criado com sucesso: ID={$attachmentId}");
+                                        Logger::quepasa("processWebhook - Attachment data: " . json_encode($attachment));
+                                        $attachments[] = $attachment;
+                                    } else {
+                                        Logger::quepasa("processWebhook - ❌ Attachment criado mas não encontrado ao buscar: ID={$attachmentId}");
+                                    }
                                 } else {
-                                    Logger::quepasa("processWebhook - ❌ Attachment criado mas não encontrado ao buscar: ID={$attachmentId}");
+                                    Logger::quepasa("processWebhook - ❌ Attachment::create retornou ID null/false");
                                 }
-                            } else {
-                                Logger::quepasa("processWebhook - ❌ Attachment::create retornou ID null/false");
+                            } catch (\Exception $createEx) {
+                                Logger::quepasa("processWebhook - ❌ Exception ao criar attachment: " . $createEx->getMessage());
+                                Logger::quepasa("processWebhook - Stack: " . $createEx->getTraceAsString());
+                                throw $createEx;
                             }
                         } catch (\Exception $e) {
                             Logger::quepasa("processWebhook - ❌ Erro ao criar attachment: " . $e->getMessage());

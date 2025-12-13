@@ -85,8 +85,8 @@ class Router
         // Debug (descomente para debug)
         // error_log("Method: {$method}, URI Original: " . parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) . ", URI Processado: {$uri}, BasePath: {$basePath}");
 
-        // Debug temporário
-        $debug = ($_ENV['APP_DEBUG'] ?? 'true') === 'true';
+        // Debug temporário (DESABILITADO para APIs JSON)
+        $debug = false; // ($_ENV['APP_DEBUG'] ?? 'true') === 'true';
         if ($debug) {
             error_log("Router: Method={$method}, URI={$uri}, BasePath={$basePath}, Routes=" . count(self::$routes));
         }

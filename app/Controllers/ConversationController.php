@@ -1549,26 +1549,37 @@ class ConversationController
      */
     public function getParticipants(int $id): void
     {
-        Permission::abortIfCannot('conversations.view.own');
-        
-        // Limpar output buffer para garantir resposta JSON limpa
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
+        $config = $this->prepareJsonResponse();
         
         try {
+            // Verificar permissão
+            if (!Permission::can('conversations.view.own') && !Permission::can('conversations.view.all')) {
+                ob_end_clean();
+                Response::json([
+                    'success' => false,
+                    'message' => 'Sem permissão para visualizar conversas'
+                ], 403);
+                return;
+            }
+            
             $participants = \App\Models\ConversationParticipant::getByConversation($id);
             
+            ob_end_clean();
             Response::json([
                 'success' => true,
                 'participants' => $participants ?: []
             ]);
         } catch (\Exception $e) {
+            ob_end_clean();
+            error_log("ConversationController::getParticipants - Erro: " . $e->getMessage());
+            
             Response::json([
                 'success' => false,
                 'message' => $e->getMessage(),
                 'participants' => []
-            ], 400);
+            ], 500);
+        } finally {
+            $this->restoreAfterJsonResponse($config);
         }
     }
 

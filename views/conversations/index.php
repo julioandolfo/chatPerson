@@ -9859,8 +9859,34 @@ function loadParticipantsForConversation() {
     const conversationId = document.getElementById('kt_modal_participants').dataset.conversationId;
     
     // Carregar participantes atuais
-    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/participants`)
-        .then(response => response.json())
+    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/participants`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+        .then(response => {
+            // Primeiro, pegar o texto da resposta
+            return response.text().then(text => {
+                console.log('=== RESPOSTA BRUTA (getParticipants) ===');
+                console.log('Status:', response.status);
+                console.log('Primeiros 300 chars:', text.substring(0, 300));
+                
+                if (!response.ok) {
+                    console.error('❌ Resposta com erro:', text);
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                // Tentar fazer parse do JSON
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    console.error('❌ Erro ao fazer parse do JSON:', e);
+                    console.error('Texto completo:', text);
+                    throw new Error('Resposta não é JSON válido');
+                }
+            });
+        })
         .then(data => {
             const currentParticipantsDiv = document.getElementById('currentParticipants');
             

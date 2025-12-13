@@ -680,6 +680,48 @@ body:has(#kt_modal_templates.show) .modal-backdrop:last-of-type {
     z-index: 1049 !important;
 }
 
+/* Modal de Templates Pessoais - garantir z-index correto */
+#kt_modal_personal_templates {
+    z-index: 1055 !important;
+}
+
+#kt_modal_personal_templates.modal.show {
+    z-index: 1055 !important;
+}
+
+#kt_modal_personal_templates .modal-dialog {
+    z-index: 1056 !important;
+}
+
+#kt_modal_personal_templates .modal-content {
+    z-index: 1057 !important;
+}
+
+body:has(#kt_modal_personal_templates.show) .modal-backdrop:last-of-type {
+    z-index: 1054 !important;
+}
+
+/* Modal de Formulário de Template Pessoal - garantir z-index correto */
+#kt_modal_personal_template_form {
+    z-index: 1060 !important;
+}
+
+#kt_modal_personal_template_form.modal.show {
+    z-index: 1060 !important;
+}
+
+#kt_modal_personal_template_form .modal-dialog {
+    z-index: 1061 !important;
+}
+
+#kt_modal_personal_template_form .modal-content {
+    z-index: 1062 !important;
+}
+
+body:has(#kt_modal_personal_template_form.show) .modal-backdrop:last-of-type {
+    z-index: 1059 !important;
+}
+
 [data-bs-theme="dark"] #messageSearchResults mark {
     background-color: #ffc107;
     color: #000;
@@ -2597,12 +2639,12 @@ body.dark-mode .swal2-content {
                         </i>
                         Novo Template
                     </button>
-                    <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <button type="button" class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal" aria-label="Fechar">
                         <i class="ki-duotone ki-cross fs-1">
                             <span class="path1"></span>
                             <span class="path2"></span>
                         </i>
-                    </div>
+                    </button>
                 </div>
             </div>
             <div class="modal-body">
@@ -2640,12 +2682,12 @@ body.dark-mode .swal2-content {
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="fw-bold" id="personalTemplateFormTitle">Novo Template Pessoal</h2>
-                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                <button type="button" class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal" aria-label="Fechar">
                     <i class="ki-duotone ki-cross fs-1">
                         <span class="path1"></span>
                         <span class="path2"></span>
                     </i>
-                </div>
+                </button>
             </div>
             <div class="modal-body">
                 <form id="personalTemplateForm">
@@ -7529,8 +7571,23 @@ function showTemplatesModal() {
 
 // Modal de Templates Pessoais
 function showPersonalTemplatesModal() {
-    const modal = new bootstrap.Modal(document.getElementById('kt_modal_personal_templates'));
-    modal.show();
+    const modalElement = document.getElementById('kt_modal_personal_templates');
+    if (!modalElement) {
+        console.error('Modal de templates pessoais não encontrado');
+        return;
+    }
+    
+    // Verificar se já existe uma instância do modal
+    let modal = bootstrap.Modal.getInstance(modalElement);
+    
+    // Se não existe, criar nova instância
+    if (!modal) {
+        modal = new bootstrap.Modal(modalElement, {
+            backdrop: true,
+            keyboard: true,
+            focus: true
+        });
+    }
     
     // Fechar modal de templates se estiver aberto
     const templatesModal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_templates'));
@@ -7538,8 +7595,16 @@ function showPersonalTemplatesModal() {
         templatesModal.hide();
     }
     
-    // Carregar templates pessoais
-    loadPersonalTemplates();
+    // Limpar qualquer listener anterior e adicionar novo
+    const loadPersonalTemplatesHandler = function() {
+        loadPersonalTemplates();
+        modalElement.removeEventListener('shown.bs.modal', loadPersonalTemplatesHandler);
+    };
+    
+    modalElement.addEventListener('shown.bs.modal', loadPersonalTemplatesHandler, { once: true });
+    
+    // Mostrar modal
+    modal.show();
 }
 
 // Carregar templates pessoais
@@ -7662,10 +7727,15 @@ function renderPersonalTemplates(templates) {
     
     templatesList.innerHTML = html;
     
-    // Adicionar busca em tempo real
+    // Adicionar busca em tempo real - remover listener anterior se existir e adicionar novo
     const searchInput = document.getElementById('personalTemplateSearch');
     if (searchInput) {
-        searchInput.addEventListener('input', function() {
+        // Clonar elemento para remover todos os listeners
+        const newInput = searchInput.cloneNode(true);
+        searchInput.parentNode.replaceChild(newInput, searchInput);
+        
+        // Adicionar novo listener
+        newInput.addEventListener('input', function() {
             const searchTerm = this.value.toLowerCase();
             const rows = templatesList.querySelectorAll('tr');
             rows.forEach(row => {
@@ -7678,12 +7748,42 @@ function renderPersonalTemplates(templates) {
 
 // Mostrar modal de criar template pessoal
 function showCreatePersonalTemplateModal() {
-    document.getElementById('personalTemplateFormTitle').textContent = 'Novo Template Pessoal';
-    document.getElementById('personalTemplateForm').reset();
-    document.getElementById('personalTemplateId').value = '';
-    document.getElementById('personalTemplateActive').checked = true;
+    const modalElement = document.getElementById('kt_modal_personal_template_form');
+    if (!modalElement) {
+        console.error('Modal de formulário de template pessoal não encontrado');
+        return;
+    }
     
-    const modal = new bootstrap.Modal(document.getElementById('kt_modal_personal_template_form'));
+    // Resetar formulário
+    const formTitle = document.getElementById('personalTemplateFormTitle');
+    const form = document.getElementById('personalTemplateForm');
+    const templateId = document.getElementById('personalTemplateId');
+    const templateActive = document.getElementById('personalTemplateActive');
+    
+    if (formTitle) formTitle.textContent = 'Novo Template Pessoal';
+    if (form) form.reset();
+    if (templateId) templateId.value = '';
+    if (templateActive) templateActive.checked = true;
+    
+    // Verificar se já existe uma instância do modal
+    let modal = bootstrap.Modal.getInstance(modalElement);
+    
+    // Se não existe, criar nova instância
+    if (!modal) {
+        modal = new bootstrap.Modal(modalElement, {
+            backdrop: true,
+            keyboard: true,
+            focus: true
+        });
+    }
+    
+    // Fechar modal de templates pessoais se estiver aberto
+    const personalTemplatesModal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_personal_templates'));
+    if (personalTemplatesModal) {
+        personalTemplatesModal.hide();
+    }
+    
+    // Mostrar modal
     modal.show();
 }
 

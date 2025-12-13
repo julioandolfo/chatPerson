@@ -543,8 +543,7 @@ class WhatsAppService
                     'X-QUEPASA-CHATID' => ($to . '@s.whatsapp.net')
                 ]));
                 
-                // Garantir texto (caption) não vazio
-                // API exige texto não vazio; usamos caractere invisível para não aparecer como mensagem separada
+                // Garantir texto/caption
                 $caption = $options['caption'] ?? $message ?? '';
                 if ($caption === '' && !empty($options['media_name'])) {
                     $caption = "\u{200B}"; // zero-width space
@@ -624,7 +623,8 @@ class WhatsAppService
                             'mimetype' => $mediaMime ?: 'audio/ogg',
                             'filename' => $mediaName ?: 'audio.ogg',
                             'ptt' => true,
-                            'voice' => true // reforçar que é áudio/voz
+                            'voice' => true, // reforçar que é áudio/voz
+                            'caption' => $caption
                         ];
 
                         // Compatibilidade: alguns provedores podem ler url/fileName/type no nível raiz
@@ -638,9 +638,11 @@ class WhatsAppService
                         Logger::quepasa("sendMessage -   filename: {$payload['audio']['filename']}");
                         Logger::quepasa("sendMessage -   ptt: true");
                         Logger::quepasa("sendMessage -   voice: true");
-                        
-                        // Não removemos url/fileName do nível raiz para permitir fallback de entrega como áudio
-                        // Mantemos 'text' com valor amigável
+
+                        // Se não há mensagem de texto, evitar enviar texto separado; deixar apenas áudio com caption
+                        if (empty($message) && empty($options['caption'])) {
+                            unset($payload['text']);
+                        }
                     } else {
                         Logger::quepasa("sendMessage - Não é áudio, enviando como mídia normal (imagem/vídeo/documento)");
                         // Para imagem/vídeo/documento manter envio por URL

@@ -9949,7 +9949,29 @@ function removeParticipant(conversationId, userId) {
             'Accept': 'application/json'
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        // Primeiro, pegar o texto da resposta
+        return response.text().then(text => {
+            console.log('=== RESPOSTA BRUTA (removeParticipant) ===');
+            console.log('Status:', response.status);
+            console.log('Content-Type:', response.headers.get('Content-Type'));
+            console.log('Primeiros 500 chars:', text.substring(0, 500));
+            
+            if (!response.ok) {
+                console.error('❌ Resposta com erro:', text);
+                throw new Error(`HTTP ${response.status}: ${text.substring(0, 100)}`);
+            }
+            
+            // Tentar fazer parse do JSON
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                console.error('❌ Erro ao fazer parse do JSON:', e);
+                console.error('Texto completo da resposta:', text);
+                throw new Error('Resposta não é JSON válido: ' + text.substring(0, 200));
+            }
+        });
+    })
     .then(data => {
         if (data.success) {
             // Recarregar participantes
@@ -9964,7 +9986,7 @@ function removeParticipant(conversationId, userId) {
     })
     .catch(error => {
         console.error('Erro ao remover participante:', error);
-        alert('Erro ao remover participante');
+        alert('Erro ao remover participante: ' + error.message);
     });
 }
 
@@ -9991,13 +10013,27 @@ function addParticipant() {
         body: JSON.stringify({ user_id: userId })
     })
     .then(response => {
-        if (!response.ok) {
-            return response.text().then(text => {
-                console.error('Erro na resposta:', text);
+        // Primeiro, pegar o texto da resposta
+        return response.text().then(text => {
+            console.log('=== RESPOSTA BRUTA (addParticipant) ===');
+            console.log('Status:', response.status);
+            console.log('Content-Type:', response.headers.get('Content-Type'));
+            console.log('Primeiros 500 chars:', text.substring(0, 500));
+            
+            if (!response.ok) {
+                console.error('❌ Resposta com erro:', text);
                 throw new Error(`HTTP ${response.status}: ${text.substring(0, 100)}`);
-            });
-        }
-        return response.json();
+            }
+            
+            // Tentar fazer parse do JSON
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                console.error('❌ Erro ao fazer parse do JSON:', e);
+                console.error('Texto completo da resposta:', text);
+                throw new Error('Resposta não é JSON válido: ' + text.substring(0, 200));
+            }
+        });
     })
     .then(data => {
         if (data.success) {

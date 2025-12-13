@@ -6,6 +6,12 @@
 // Habilitar exibição de erros em desenvolvimento
 error_reporting(E_ALL);
 
+// Garantir que o diretório de logs existe
+$logsDir = __DIR__ . '/../logs';
+if (!is_dir($logsDir)) {
+    mkdir($logsDir, 0755, true);
+}
+
 // Para requisições AJAX/API (JSON), desabilitar display_errors para evitar HTML na resposta
 $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
 $acceptsJson = !empty($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false;
@@ -14,8 +20,12 @@ $isJsonRequest = $isAjax || $acceptsJson || (isset($_SERVER['CONTENT_TYPE']) && 
 if ($isJsonRequest) {
     // Para APIs, logar erros mas NÃO exibir (para evitar HTML no JSON)
     ini_set('display_errors', '0');
+    ini_set('display_startup_errors', '0');
     ini_set('log_errors', '1');
-    ini_set('error_log', __DIR__ . '/../logs/app.log');
+    ini_set('error_log', $logsDir . '/app.log');
+    
+    // Iniciar buffer de output para capturar qualquer saída indesejada
+    ob_start();
 } else {
     // Para páginas HTML, exibir erros normalmente
     ini_set('display_errors', '1');

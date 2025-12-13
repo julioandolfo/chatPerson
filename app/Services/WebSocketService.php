@@ -41,7 +41,7 @@ class WebSocketService
 
             // Em produção, isso seria enviado via servidor WebSocket real
             // Por enquanto, apenas logamos
-            Logger::log("WebSocket Broadcast: {$event} - " . substr($message, 0, 200));
+            // Logger::log("WebSocket Broadcast: {$event} - " . substr($message, 0, 200));
             
             // TODO: Implementar conexão real com servidor WebSocket
             // self::sendToWebSocketServer($message, $targets);
@@ -77,7 +77,7 @@ class WebSocketService
      */
     public static function notifyNewConversation(array $conversation): void
     {
-        Logger::log("WebSocketService::notifyNewConversation - conversationId={$conversation['id']}, contactName=" . ($conversation['contact_name'] ?? 'N/A'));
+        // Logger::log("WebSocketService::notifyNewConversation - conversationId={$conversation['id']}, contactName=" . ($conversation['contact_name'] ?? 'N/A'));
         self::broadcast('new_conversation', [
             'conversation' => $conversation
         ]);

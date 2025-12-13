@@ -1577,19 +1577,9 @@ class ConversationController
      */
     public function addParticipant(int $id): void
     {
-        // Desabilitar display de erros para evitar HTML no JSON (importante para APIs)
-        $oldDisplayErrors = ini_get('display_errors');
-        $oldErrorReporting = error_reporting();
-        ini_set('display_errors', '0');
-        error_reporting(0);
+        error_log("=== addParticipant CHAMADO === ConversationID: {$id}");
         
-        // Limpar qualquer output anterior
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
-        
-        // Iniciar novo buffer para capturar qualquer output indesejado
-        ob_start();
+        $config = $this->prepareJsonResponse();
         
         try {
             error_log("ConversationController::addParticipant - INÍCIO - ConversationID: {$id}");
@@ -1680,9 +1670,7 @@ class ConversationController
                 'message' => 'Erro ao adicionar participante: ' . $e->getMessage()
             ], 500);
         } finally {
-            // Restaurar configurações originais
-            ini_set('display_errors', $oldDisplayErrors);
-            error_reporting($oldErrorReporting);
+            $this->restoreAfterJsonResponse($config);
         }
     }
 
@@ -1691,19 +1679,9 @@ class ConversationController
      */
     public function removeParticipant(int $id, int $userId): void
     {
-        // Desabilitar display de erros para evitar HTML no JSON (importante para APIs)
-        $oldDisplayErrors = ini_get('display_errors');
-        $oldErrorReporting = error_reporting();
-        ini_set('display_errors', '0');
-        error_reporting(0);
+        error_log("=== removeParticipant CHAMADO === ConversationID: {$id}, UserID: {$userId}");
         
-        // Limpar qualquer output anterior
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
-        
-        // Iniciar novo buffer para capturar qualquer output indesejado
-        ob_start();
+        $config = $this->prepareJsonResponse();
         
         try {
             error_log("ConversationController::removeParticipant - INÍCIO - ConversationID: {$id}, UserID: {$userId}");
@@ -1753,9 +1731,7 @@ class ConversationController
                 'message' => 'Erro ao remover participante: ' . $e->getMessage()
             ], 500);
         } finally {
-            // Restaurar configurações originais
-            ini_set('display_errors', $oldDisplayErrors);
-            error_reporting($oldErrorReporting);
+            $this->restoreAfterJsonResponse($config);
         }
     }
 }

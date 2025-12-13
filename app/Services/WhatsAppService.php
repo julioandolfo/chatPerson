@@ -1711,15 +1711,26 @@ class WhatsAppService
             }
             
             if (!$contact) {
+                // Extrair whatsapp_id do payload (pode ser @lid, @s.whatsapp.net ou @g.us)
                 $whatsappId = ($payload['from'] ?? $payload['phone'] ?? $fromPhone);
-                if (!str_ends_with($whatsappId, '@s.whatsapp.net') && !str_ends_with($whatsappId, '@lid')) {
+                
+                Logger::quepasa("processWebhook - whatsapp_id antes da verificação: '{$whatsappId}'");
+                
+                // Só adicionar sufixo se não tiver nenhum
+                if (!str_ends_with($whatsappId, '@s.whatsapp.net') && 
+                    !str_ends_with($whatsappId, '@lid') && 
+                    !str_ends_with($whatsappId, '@g.us') &&
+                    !str_ends_with($whatsappId, '@c.us')) {
                     $whatsappId .= '@s.whatsapp.net';
+                    Logger::quepasa("processWebhook - Adicionado sufixo @s.whatsapp.net");
                 }
+                
+                Logger::quepasa("processWebhook - whatsapp_id final: '{$whatsappId}'");
                 
                 // Garantir que salvamos o número normalizado
                 $normalizedPhone = \App\Models\Contact::normalizePhoneNumber($fromPhone);
                 
-                Logger::quepasa("processWebhook - Criando novo contato: name={$contactName}, phone={$normalizedPhone} (normalizado de {$fromPhone})");
+                Logger::quepasa("processWebhook - Criando novo contato: name={$contactName}, phone={$normalizedPhone} (normalizado de {$fromPhone}), whatsapp_id={$whatsappId}");
                 $contactId = \App\Models\Contact::create([
                     'name' => $contactName,
                     'phone' => $normalizedPhone, // Salvar sempre normalizado
@@ -1758,8 +1769,14 @@ class WhatsAppService
                 Logger::quepasa("processWebhook - Verificando whatsapp_id: atual='{$contact['whatsapp_id']}', payload='{$currentWhatsappId}'");
                 
                 // Se vier whatsapp_id diferente, atualizar (importante para @lid)
+                // SEMPRE atualizar se vier do payload e for diferente
                 if (!empty($currentWhatsappId) && $currentWhatsappId !== $contact['whatsapp_id']) {
                     Logger::quepasa("processWebhook - ✅ Atualizando whatsapp_id do contato {$contact['id']}: '{$contact['whatsapp_id']}' -> '{$currentWhatsappId}'");
+                    \App\Models\Contact::update($contact['id'], ['whatsapp_id' => $currentWhatsappId]);
+                    $contact['whatsapp_id'] = $currentWhatsappId;
+                } elseif (empty($contact['whatsapp_id']) && !empty($currentWhatsappId)) {
+                    // Se o contato não tem whatsapp_id mas veio no payload, adicionar
+                    Logger::quepasa("processWebhook - ✅ Adicionando whatsapp_id ao contato {$contact['id']}: '{$currentWhatsappId}'");
                     \App\Models\Contact::update($contact['id'], ['whatsapp_id' => $currentWhatsappId]);
                     $contact['whatsapp_id'] = $currentWhatsappId;
                 } else {

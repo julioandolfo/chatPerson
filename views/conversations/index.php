@@ -362,12 +362,28 @@ ob_start();
     margin-top: 2px !important;
     margin-right: 0 !important;
     min-width: 200px;
-    z-index: 10000 !important;
+    z-index: 1030 !important;
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
     border: 1px solid var(--bs-border-color);
     max-height: none !important;
     overflow: visible !important;
     transform: none !important;
+}
+
+/* Garantir z-index também para o dropdown container */
+.conversation-item-actions .dropdown.show {
+    z-index: 1029 !important;
+}
+
+.conversation-item-actions {
+    z-index: 1028 !important;
+    position: relative !important;
+}
+
+/* Garantir que conversação lista não crie novo stacking context */
+.conversations-list {
+    position: relative;
+    z-index: auto !important;
 }
 
 /* Estilos para modo dark */
@@ -5726,6 +5742,9 @@ function clearAllFilters() {
 }
 
 function togglePin(conversationId, isPinned) {
+    // Fechar o dropdown imediatamente
+    closeAllDropdowns();
+    
     const url = isPinned 
         ? `<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/unpin`
         : `<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/pin`;
@@ -5769,8 +5788,25 @@ function togglePin(conversationId, isPinned) {
     });
 }
 
+// Função auxiliar para fechar todos os dropdowns
+function closeAllDropdowns() {
+    const dropdowns = document.querySelectorAll('.dropdown.show');
+    dropdowns.forEach(dropdown => {
+        const toggleBtn = dropdown.querySelector('[data-bs-toggle="dropdown"]');
+        if (toggleBtn) {
+            const bsDropdown = bootstrap.Dropdown.getInstance(toggleBtn);
+            if (bsDropdown) {
+                bsDropdown.hide();
+            }
+        }
+    });
+}
+
 // Marcar conversa como lida
 function markConversationAsRead(conversationId) {
+    // Fechar o dropdown imediatamente
+    closeAllDropdowns();
+    
     fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/mark-read`, {
         method: 'POST',
         headers: {
@@ -5816,6 +5852,9 @@ function markConversationAsRead(conversationId) {
 
 // Marcar conversa como não lida
 function markConversationAsUnread(conversationId) {
+    // Fechar o dropdown imediatamente
+    closeAllDropdowns();
+    
     fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/mark-unread`, {
         method: 'POST',
         headers: {

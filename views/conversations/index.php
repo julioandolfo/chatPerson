@@ -222,12 +222,19 @@ ob_start();
 }
 
 .conversations-list-filters {
-    padding: 15px 20px;
+    padding: 0;
     border-bottom: 1px solid var(--bs-border-color);
     flex-shrink: 0;
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
+}
+
+.conversations-list-filters .card {
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.conversations-list-filters .card-body {
+    padding: 15px 20px;
 }
 
 .conversations-list-items {
@@ -342,6 +349,21 @@ ob_start();
     opacity: 0.8;
 }
 
+.conversation-item-actions {
+    position: relative;
+    z-index: 10;
+    display: inline-block;
+}
+
+.conversation-item-actions .dropdown {
+    position: relative;
+    z-index: 1000;
+}
+
+.conversation-item-actions .dropdown.show {
+    z-index: 10000 !important;
+}
+
 .conversation-item-actions .dropdown-menu {
     position: absolute !important;
     top: 100% !important;
@@ -350,12 +372,12 @@ ob_start();
     margin-top: 2px !important;
     margin-right: 0 !important;
     min-width: 200px;
-    z-index: 1050 !important;
+    z-index: 10000 !important;
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
     border: 1px solid var(--bs-border-color);
-    max-height: none !important; /* Não limitar altura */
-    overflow: visible !important; /* Permitir que todas as opções apareçam */
-    transform: none !important; /* Remover transformações que podem afastar */
+    max-height: none !important;
+    overflow: visible !important;
+    transform: none !important;
 }
 
 /* Estilos para modo dark */
@@ -1434,22 +1456,24 @@ body.dark-mode .swal2-content {
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <div class="dropdown">
-                        <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="ki-duotone ki-profile-user fs-6 me-1">
                                 <span class="path1"></span>
                                 <span class="path2"></span>
                             </i>
                             Atribuir
                         </button>
-                        <ul class="dropdown-menu">
+                        <ul class="dropdown-menu dropdown-menu-end" style="z-index: 10000;">
                             <?php if (!empty($agents)): ?>
                                 <?php foreach ($agents as $agent): ?>
                                     <li>
-                                        <a class="dropdown-item" href="#" onclick="event.preventDefault(); bulkAssignAgent(<?= $agent['id'] ?>, '<?= htmlspecialchars($agent['name'], ENT_QUOTES) ?>');">
+                                        <a class="dropdown-item text-gray-800" href="#" onclick="event.preventDefault(); bulkAssignAgent(<?= $agent['id'] ?>, '<?= htmlspecialchars($agent['name'], ENT_QUOTES) ?>');">
                                             <?= htmlspecialchars($agent['name']) ?>
                                         </a>
                                     </li>
                                 <?php endforeach; ?>
+                            <?php else: ?>
+                                <li><span class="dropdown-item-text text-muted">Nenhum agente disponível</span></li>
                             <?php endif; ?>
                         </ul>
                     </div>
@@ -1494,89 +1518,117 @@ body.dark-mode .swal2-content {
         </div>
         
         <!-- Filtros -->
-        <div class="conversations-list-filters">
-            <select id="filter_status" class="form-select form-select-sm form-select-solid" style="width: auto;">
-                <option value="">Todas</option>
-                                        <option value="open" <?= ($filters['status'] ?? '') === 'open' ? 'selected' : '' ?>>Abertas</option>
-                <option value="resolved" <?= ($filters['status'] ?? '') === 'resolved' ? 'selected' : '' ?>>Resolvidas</option>
-                                        <option value="closed" <?= ($filters['status'] ?? '') === 'closed' ? 'selected' : '' ?>>Fechadas</option>
-                <option value="unanswered" <?= !empty($filters['unanswered']) ? 'selected' : '' ?>>🔴 Não respondidas</option>
-                                    </select>
-            
-            <select id="filter_channel" class="form-select form-select-sm form-select-solid" style="width: auto;">
-                <option value="">Canais</option>
-                <option value="whatsapp" <?= ($filters['channel'] ?? '') === 'whatsapp' ? 'selected' : '' ?>>📱 WhatsApp</option>
-                <option value="email" <?= ($filters['channel'] ?? '') === 'email' ? 'selected' : '' ?>>✉️ Email</option>
-                <option value="chat" <?= ($filters['channel'] ?? '') === 'chat' ? 'selected' : '' ?>>💬 Chat</option>
-                                    </select>
-            
-                                <?php if (!empty($departments)): ?>
-            <select id="filter_department" class="form-select form-select-sm form-select-solid" style="width: auto;">
-                <option value="">Setores</option>
-                                        <?php foreach ($departments as $dept): ?>
-                                            <option value="<?= $dept['id'] ?>" <?= ($filters['department_id'] ?? '') == $dept['id'] ? 'selected' : '' ?>>
-                                                <?= htmlspecialchars($dept['name']) ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
+        <div class="conversations-list-filters mb-4">
+            <div class="card card-flush">
+                <div class="card-body py-3">
+                    <div class="d-flex flex-wrap align-items-center gap-3">
+                        <!-- Grupo: Status -->
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="form-label fw-semibold text-gray-700 mb-0 fs-7" style="min-width: 60px;">Status:</label>
+                            <select id="filter_status" class="form-select form-select-sm form-select-solid" style="min-width: 140px;">
+                                <option value="">Todas</option>
+                                <option value="open" <?= ($filters['status'] ?? '') === 'open' ? 'selected' : '' ?>>Abertas</option>
+                                <option value="resolved" <?= ($filters['status'] ?? '') === 'resolved' ? 'selected' : '' ?>>Resolvidas</option>
+                                <option value="closed" <?= ($filters['status'] ?? '') === 'closed' ? 'selected' : '' ?>>Fechadas</option>
+                                <option value="unanswered" <?= !empty($filters['unanswered']) ? 'selected' : '' ?>>🔴 Não respondidas</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Grupo: Canal -->
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="form-label fw-semibold text-gray-700 mb-0 fs-7" style="min-width: 60px;">Canal:</label>
+                            <select id="filter_channel" class="form-select form-select-sm form-select-solid" style="min-width: 140px;">
+                                <option value="">Todos</option>
+                                <option value="whatsapp" <?= ($filters['channel'] ?? '') === 'whatsapp' ? 'selected' : '' ?>>📱 WhatsApp</option>
+                                <option value="email" <?= ($filters['channel'] ?? '') === 'email' ? 'selected' : '' ?>>✉️ Email</option>
+                                <option value="chat" <?= ($filters['channel'] ?? '') === 'chat' ? 'selected' : '' ?>>💬 Chat</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Grupo: Setor -->
+                        <?php if (!empty($departments)): ?>
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="form-label fw-semibold text-gray-700 mb-0 fs-7" style="min-width: 60px;">Setor:</label>
+                            <select id="filter_department" class="form-select form-select-sm form-select-solid" style="min-width: 160px;">
+                                <option value="">Todos</option>
+                                <?php foreach ($departments as $dept): ?>
+                                    <option value="<?= $dept['id'] ?>" <?= ($filters['department_id'] ?? '') == $dept['id'] ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($dept['name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <?php endif; ?>
+                        
+                        <!-- Grupo: Tag -->
+                        <?php if (!empty($tags)): ?>
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="form-label fw-semibold text-gray-700 mb-0 fs-7" style="min-width: 60px;">Tag:</label>
+                            <select id="filter_tag" class="form-select form-select-sm form-select-solid" style="min-width: 160px;">
+                                <option value="">Todas</option>
+                                <?php foreach ($tags as $tag): ?>
+                                    <option value="<?= $tag['id'] ?>" <?= ($filters['tag_id'] ?? '') == $tag['id'] ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($tag['name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <?php endif; ?>
+                        
+                        <!-- Grupo: Agente -->
+                        <?php 
+                        $canViewAllConversations = \App\Helpers\Permission::can('conversations.view.all');
+                        $currentUserId = \App\Helpers\Auth::id();
+                        ?>
+                        <?php if ($canViewAllConversations || !empty($agents)): ?>
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="form-label fw-semibold text-gray-700 mb-0 fs-7" style="min-width: 60px;">Agente:</label>
+                            <select id="filter_agent" class="form-select form-select-sm form-select-solid" style="min-width: 180px;">
+                                <option value="">Todos</option>
+                                <option value="unassigned" <?= ($filters['agent_id'] ?? '') === 'unassigned' ? 'selected' : '' ?>>🔴 Não atribuídas</option>
+                                <?php if ($canViewAllConversations && !empty($agents)): ?>
+                                    <?php foreach ($agents as $agent): ?>
+                                        <option value="<?= $agent['id'] ?>" <?= ($filters['agent_id'] ?? '') == $agent['id'] ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($agent['name']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                <?php elseif (!$canViewAllConversations && $currentUserId): ?>
+                                    <?php 
+                                    $currentUser = \App\Models\User::find($currentUserId);
+                                    if ($currentUser): ?>
+                                        <option value="<?= $currentUser['id'] ?>" <?= ($filters['agent_id'] ?? '') == $currentUser['id'] ? 'selected' : '' ?>>
+                                            Minhas conversas
+                                        </option>
+                                    <?php endif; ?>
                                 <?php endif; ?>
-            
-                                <?php if (!empty($tags)): ?>
-            <select id="filter_tag" class="form-select form-select-sm form-select-solid" style="width: auto;">
-                <option value="">Tags</option>
-                                        <?php foreach ($tags as $tag): ?>
-                                            <option value="<?= $tag['id'] ?>" <?= ($filters['tag_id'] ?? '') == $tag['id'] ? 'selected' : '' ?>>
-                                                <?= htmlspecialchars($tag['name']) ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                <?php endif; ?>
-            
-            <?php 
-            // Verificar permissões para filtrar por agente
-            $canViewAllConversations = \App\Helpers\Permission::can('conversations.view.all');
-            $currentUserId = \App\Helpers\Auth::id();
-            ?>
-            <?php if ($canViewAllConversations || !empty($agents)): ?>
-            <select id="filter_agent" class="form-select form-select-sm form-select-solid" style="width: auto;">
-                <option value="">Agentes</option>
-                <option value="unassigned" <?= ($filters['agent_id'] ?? '') === 'unassigned' ? 'selected' : '' ?>>🔴 Não atribuídas</option>
-                <?php if ($canViewAllConversations && !empty($agents)): ?>
-                    <?php foreach ($agents as $agent): ?>
-                        <option value="<?= $agent['id'] ?>" <?= ($filters['agent_id'] ?? '') == $agent['id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($agent['name']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                <?php elseif (!$canViewAllConversations && $currentUserId): ?>
-                    <?php 
-                    // Agente só pode ver suas próprias conversas
-                    $currentUser = \App\Models\User::find($currentUserId);
-                    if ($currentUser): ?>
-                        <option value="<?= $currentUser['id'] ?>" <?= ($filters['agent_id'] ?? '') == $currentUser['id'] ? 'selected' : '' ?>>
-                            Minhas conversas
-                        </option>
-                    <?php endif; ?>
-                <?php endif; ?>
-            </select>
-            <?php endif; ?>
-            
-            <button type="button" class="btn btn-sm btn-light-primary" onclick="openAdvancedFilters()" title="Filtros Avançados">
-                <i class="ki-duotone ki-filter fs-6">
-                    <span class="path1"></span>
-                    <span class="path2"></span>
-                </i>
-                Filtros
-            </button>
-            
-            <?php if (!empty($filters['unanswered']) || !empty($filters['answered']) || !empty($filters['date_from']) || !empty($filters['date_to']) || isset($filters['pinned'])): ?>
-            <button type="button" class="btn btn-sm btn-light-danger" onclick="clearAllFilters()" title="Limpar Filtros">
-                <i class="ki-duotone ki-cross fs-6">
-                    <span class="path1"></span>
-                    <span class="path2"></span>
-                </i>
-            </button>
-            <?php endif; ?>
-                                </div>
+                            </select>
+                        </div>
+                        <?php endif; ?>
+                        
+                        <!-- Botões de ação -->
+                        <div class="d-flex align-items-center gap-2 ms-auto">
+                            <button type="button" class="btn btn-sm btn-light-primary" onclick="openAdvancedFilters()" title="Filtros Avançados">
+                                <i class="ki-duotone ki-filter fs-6 me-1">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Filtros
+                            </button>
+                            
+                            <?php if (!empty($filters['unanswered']) || !empty($filters['answered']) || !empty($filters['date_from']) || !empty($filters['date_to']) || isset($filters['pinned'])): ?>
+                            <button type="button" class="btn btn-sm btn-light-danger" onclick="clearAllFilters()" title="Limpar Filtros">
+                                <i class="ki-duotone ki-cross fs-6 me-1">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Limpar
+                            </button>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
         
         <!-- Lista de conversas -->
         <div class="conversations-list-items">
@@ -2913,6 +2965,82 @@ body.dark-mode .swal2-content {
                 <div class="d-flex justify-content-end">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Editar Contato Inline -->
+<div class="modal fade" id="kt_modal_edit_contact" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-600px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Editar Contato</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <form id="editContactForm">
+                    <input type="hidden" id="editContactId" value="">
+                    
+                    <div class="row mb-5">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold required">Nome</label>
+                            <input type="text" class="form-control form-control-solid" id="editContactName" name="name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Sobrenome</label>
+                            <input type="text" class="form-control form-control-solid" id="editContactLastName" name="last_name">
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-5">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Email</label>
+                            <input type="email" class="form-control form-control-solid" id="editContactEmail" name="email">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Telefone</label>
+                            <input type="text" class="form-control form-control-solid" id="editContactPhone" name="phone" placeholder="Ex: 5511999999999">
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-5">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Cidade</label>
+                            <input type="text" class="form-control form-control-solid" id="editContactCity" name="city">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">País</label>
+                            <input type="text" class="form-control form-control-solid" id="editContactCountry" name="country">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold">Empresa</label>
+                        <input type="text" class="form-control form-control-solid" id="editContactCompany" name="company">
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold">Bio</label>
+                        <textarea class="form-control form-control-solid" id="editContactBio" name="bio" rows="3" placeholder="Informações adicionais sobre o contato..."></textarea>
+                    </div>
+                    
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="ki-duotone ki-check fs-5 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Salvar Alterações
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -4504,7 +4632,7 @@ function updateConversationTimeline(conversationId) {
         </div>
     `;
     
-    // Buscar atividades da conversa e notas em paralelo
+    // Buscar atividades da conversa, notas e timeline em paralelo
     Promise.all([
         fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}`, {
             headers: {
@@ -4517,9 +4645,15 @@ function updateConversationTimeline(conversationId) {
                 'X-Requested-With': 'XMLHttpRequest',
                 'Accept': 'application/json'
             }
-        }).then(r => r.json()).catch(() => ({ success: true, notes: [] }))
+        }).then(r => r.json()).catch(() => ({ success: true, notes: [] })),
+        fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/timeline`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        }).then(r => r.json()).catch(() => ({ success: true, events: [] }))
     ])
-        .then(([data, notesData]) => {
+        .then(([data, notesData, timelineData]) => {
             if (!data.success || !data.conversation) {
                 timelineContainer.innerHTML = '<div class="text-muted fs-7 text-center py-5">Erro ao carregar timeline</div>';
                 return;
@@ -4528,6 +4662,7 @@ function updateConversationTimeline(conversationId) {
             const conv = data.conversation;
             const messages = data.messages || [];
             const notes = notesData.success ? (notesData.notes || []) : [];
+            const timelineEvents = timelineData.success ? (timelineData.events || []) : [];
             
             // Combinar todos os eventos em um array para ordenar por data
             const events = [];
@@ -4540,24 +4675,32 @@ function updateConversationTimeline(conversationId) {
                     icon: 'ki-message-text-2',
                     color: 'primary',
                     title: 'Conversa criada',
-                    description: null
+                    description: null,
+                    user_name: null
                 });
             }
             
-            // Atribuição
-            if (conv.agent_id && conv.agent_name) {
+            // Atribuição (verificar se não há evento mais recente de atividades)
+            const hasRecentAssignment = timelineEvents.some(e => e.type === 'assigned');
+            if (conv.agent_id && conv.agent_name && !hasRecentAssignment) {
                 events.push({
                     type: 'assigned',
                     date: conv.updated_at || conv.created_at,
                     icon: 'ki-profile-user',
                     color: 'info',
                     title: `Atribuída a ${escapeHtml(conv.agent_name)}`,
-                    description: null
+                    description: null,
+                    user_name: null
                 });
             }
             
-            // Mensagens importantes (primeira e última)
-            if (messages.length > 0) {
+            // Adicionar eventos da timeline (atividades)
+            timelineEvents.forEach(event => {
+                events.push(event);
+            });
+            
+            // Mensagens importantes (primeira e última) - apenas se não houver muitas mensagens
+            if (messages.length > 0 && messages.length <= 50) {
                 const firstMsg = messages[0];
                 const lastMsg = messages[messages.length - 1];
                 
@@ -4568,7 +4711,8 @@ function updateConversationTimeline(conversationId) {
                         icon: 'ki-message',
                         color: 'success',
                         title: 'Primeira mensagem',
-                        description: null
+                        description: null,
+                        user_name: null
                     });
                 }
                 
@@ -4579,7 +4723,8 @@ function updateConversationTimeline(conversationId) {
                         icon: 'ki-message',
                         color: 'warning',
                         title: 'Última mensagem',
-                        description: null
+                        description: null,
+                        user_name: null
                     });
                 }
             }
@@ -4597,20 +4742,42 @@ function updateConversationTimeline(conversationId) {
                     userInitials: userInitials,
                     noteId: note.id,
                     userId: note.user_id,
-                    isPrivate: note.is_private
+                    isPrivate: note.is_private,
+                    user_name: note.user_name
                 });
             });
             
-            // Status
-            if (conv.status === 'closed' && conv.resolved_at) {
+            // Status - verificar se não há evento mais recente
+            const hasRecentStatusChange = timelineEvents.some(e => e.type === 'closed' || e.type === 'reopened');
+            if (conv.status === 'closed' && conv.resolved_at && !hasRecentStatusChange) {
                 events.push({
                     type: 'closed',
                     date: conv.resolved_at,
                     icon: 'ki-cross-circle',
                     color: 'dark',
                     title: 'Conversa fechada',
-                    description: null
+                    description: null,
+                    user_name: null
                 });
+            }
+            
+            // Adicionar evento de reabertura se status for open mas havia evento de fechamento
+            if (conv.status === 'open' && timelineEvents.some(e => e.type === 'closed')) {
+                const lastClosed = timelineEvents.filter(e => e.type === 'closed').sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+                if (lastClosed) {
+                    const reopenedEvent = timelineEvents.find(e => e.type === 'reopened' && new Date(e.date) > new Date(lastClosed.date));
+                    if (!reopenedEvent) {
+                        events.push({
+                            type: 'reopened',
+                            date: conv.updated_at || new Date().toISOString(),
+                            icon: 'ki-entrance-right',
+                            color: 'success',
+                            title: 'Conversa reaberta',
+                            description: null,
+                            user_name: null
+                        });
+                    }
+                }
             }
             
             // Ordenar eventos por data (mais recente primeiro)
@@ -4648,6 +4815,10 @@ function updateConversationTimeline(conversationId) {
                         </div>
                     `;
                 } else {
+                    // Determinar se mostra nome do usuário
+                    const showUserName = event.user_name && event.type !== 'note';
+                    const userInfo = showUserName ? `<div class="text-muted fs-8 mt-1">por ${escapeHtml(event.user_name)}</div>` : '';
+                    
                     timelineHtml += `
                         <div class="timeline-item">
                             <div class="timeline-line ${lineClass}"></div>
@@ -4657,13 +4828,16 @@ function updateConversationTimeline(conversationId) {
                                         <span class="path1"></span>
                                         <span class="path2"></span>
                                         ${event.icon.includes('message-text') ? '<span class="path3"></span>' : ''}
+                                        ${event.icon.includes('arrows-circle') ? '<span class="path3"></span><span class="path4"></span>' : ''}
+                                        ${event.icon.includes('entrance-right') ? '<span class="path3"></span>' : ''}
                                     </i>
                                 </div>
                             </div>
                             <div class="timeline-content mb-10">
                                 <div class="fw-semibold text-gray-800">${event.title}</div>
                                 ${event.description ? `<div class="text-muted fs-7 mt-1">${event.description}</div>` : ''}
-                                <div class="text-muted fs-7">${formatDateTime(event.date)}</div>
+                                ${userInfo}
+                                <div class="text-muted fs-7 mt-1">${formatDateTime(event.date)}</div>
                             </div>
                         </div>
                     `;
@@ -12411,6 +12585,117 @@ async function bulkReopenConversations() {
             colorScheme: isDarkMode ? 'dark' : 'light'
         });
     }
+}
+
+// Formulário de edição de contato
+const editContactForm = document.getElementById('editContactForm');
+if (editContactForm) {
+    editContactForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const contactId = document.getElementById('editContactId').value;
+        if (!contactId) {
+            return;
+        }
+        
+        const formData = new FormData(this);
+        
+        // Mostrar loading
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Salvando...';
+        
+        fetch(`<?= \App\Helpers\Url::to('/contacts') ?>/${contactId}`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Fechar modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_edit_contact'));
+                if (modal) {
+                    modal.hide();
+                }
+                
+                // Atualizar sidebar
+                if (window.currentConversation && window.currentConversation.contact_id == contactId) {
+                    // Recarregar dados do contato
+                    fetch(`<?= \App\Helpers\Url::to('/contacts') ?>/${contactId}`, {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        }
+                    })
+                    .then(r => r.json())
+                    .then(result => {
+                        if (result.success && result.contact) {
+                            // Atualizar campos no sidebar
+                            const sidebar = document.getElementById('kt_conversation_sidebar');
+                            if (sidebar) {
+                                const nameEl = sidebar.querySelector('[data-field="contact_name"]');
+                                const emailEl = sidebar.querySelector('[data-field="contact_email"]');
+                                const phoneEl = sidebar.querySelector('[data-field="contact_phone"]');
+                                
+                                if (nameEl) {
+                                    nameEl.textContent = result.contact.name || '-';
+                                }
+                                if (emailEl) {
+                                    emailEl.textContent = result.contact.email || '-';
+                                }
+                                if (phoneEl) {
+                                    phoneEl.textContent = result.contact.phone || '-';
+                                }
+                                
+                                // Atualizar iniciais
+                                const initialsEl = sidebar.querySelector('#sidebar-contact-initials');
+                                if (initialsEl && result.contact.name) {
+                                    const initials = result.contact.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                                    initialsEl.textContent = initials || 'NN';
+                                }
+                            }
+                        }
+                    });
+                }
+                
+                const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
+                                   document.body.classList.contains('dark-mode') ||
+                                   window.matchMedia('(prefers-color-scheme: dark)').matches;
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso!',
+                    text: data.message || 'Contato atualizado com sucesso',
+                    colorScheme: isDarkMode ? 'dark' : 'light',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+            } else {
+                throw new Error(data.message || 'Erro ao atualizar contato');
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
+                               document.body.classList.contains('dark-mode') ||
+                               window.matchMedia('(prefers-color-scheme: dark)').matches;
+            
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: error.message || 'Erro ao atualizar contato',
+                colorScheme: isDarkMode ? 'dark' : 'light'
+            });
+        })
+        .finally(() => {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        });
+    });
 }
 </script>
 

@@ -1145,6 +1145,181 @@ class ConversationController
     }
 
     /**
+     * Obter timeline completa de uma conversa
+     */
+    public function getTimeline(int $id): void
+    {
+        Permission::abortIfCannot('conversations.view.own');
+        
+        try {
+            $conversation = \App\Models\Conversation::findWithRelations($id);
+            if (!$conversation) {
+                throw new \Exception('Conversa não encontrada');
+            }
+            
+            $events = [];
+            
+            // Buscar atividades da tabela activities
+            if (class_exists('\App\Models\Activity')) {
+                $activities = \App\Models\Activity::getByEntity('conversation', $id);
+                
+                foreach ($activities as $activity) {
+                    $metadata = $activity['metadata'] ?? [];
+                    
+                    switch ($activity['activity_type']) {
+                        case 'tag_added':
+                            $tagName = $metadata['tag_name'] ?? ($activity['description'] ?? 'Tag');
+                            $events[] = [
+                                'type' => 'tag_added',
+                                'date' => $activity['created_at'],
+                                'icon' => 'ki-tag',
+                                'color' => 'success',
+                                'title' => "Tag '{$tagName}' adicionada",
+                                'description' => null,
+                                'user_name' => $activity['user_name'] ?? null
+                            ];
+                            break;
+                        case 'tag_removed':
+                            $tagName = $metadata['tag_name'] ?? ($activity['description'] ?? 'Tag');
+                            $events[] = [
+                                'type' => 'tag_removed',
+                                'date' => $activity['created_at'],
+                                'icon' => 'ki-tag',
+                                'color' => 'danger',
+                                'title' => "Tag '{$tagName}' removida",
+                                'description' => null,
+                                'user_name' => $activity['user_name'] ?? null
+                            ];
+                            break;
+                        case 'participant_added':
+                            $events[] = [
+                                'type' => 'participant_added',
+                                'date' => $activity['created_at'],
+                                'icon' => 'ki-profile-user',
+                                'color' => 'info',
+                                'title' => $activity['description'] ?? 'Participante adicionado',
+                                'description' => null,
+                                'user_name' => $activity['user_name'] ?? null
+                            ];
+                            break;
+                        case 'participant_removed':
+                            $events[] = [
+                                'type' => 'participant_removed',
+                                'date' => $activity['created_at'],
+                                'icon' => 'ki-profile-user',
+                                'color' => 'warning',
+                                'title' => $activity['description'] ?? 'Participante removido',
+                                'description' => null,
+                                'user_name' => $activity['user_name'] ?? null
+                            ];
+                            break;
+                        case 'department_changed':
+                        case 'department_assigned':
+                            $events[] = [
+                                'type' => 'department_changed',
+                                'date' => $activity['created_at'],
+                                'icon' => 'ki-arrows-circle',
+                                'color' => 'primary',
+                                'title' => $activity['description'] ?? 'Setor alterado',
+                                'description' => null,
+                                'user_name' => $activity['user_name'] ?? null
+                            ];
+                            break;
+                        case 'stage_moved':
+                        case 'funnel_stage_changed':
+                            $events[] = [
+                                'type' => 'funnel_stage_changed',
+                                'date' => $activity['created_at'],
+                                'icon' => 'ki-arrow-right',
+                                'color' => 'info',
+                                'title' => $activity['description'] ?? 'Estágio do funil alterado',
+                                'description' => null,
+                                'user_name' => $activity['user_name'] ?? null
+                            ];
+                            break;
+                        case 'conversation_assigned':
+                            $events[] = [
+                                'type' => 'assigned',
+                                'date' => $activity['created_at'],
+                                'icon' => 'ki-profile-user',
+                                'color' => 'info',
+                                'title' => $activity['description'] ?? 'Conversa atribuída',
+                                'description' => null,
+                                'user_name' => $activity['user_name'] ?? null
+                            ];
+                            break;
+                        case 'conversation_closed':
+                            $events[] = [
+                                'type' => 'closed',
+                                'date' => $activity['created_at'],
+                                'icon' => 'ki-cross-circle',
+                                'color' => 'dark',
+                                'title' => 'Conversa fechada',
+                                'description' => null,
+                                'user_name' => $activity['user_name'] ?? null
+                            ];
+                            break;
+                        case 'conversation_reopened':
+                            $events[] = [
+                                'type' => 'reopened',
+                                'date' => $activity['created_at'],
+                                'icon' => 'ki-entrance-right',
+                                'color' => 'success',
+                                'title' => 'Conversa reaberta',
+                                'description' => null,
+                                'user_name' => $activity['user_name'] ?? null
+                            ];
+                            break;
+                    }
+                }
+            }
+            
+            // Buscar mensagens de sistema que indicam mudanças
+            $systemMessages = \App\Models\Message::where('conversation_id', '=', $id)
+                                                 ->where('message_type', '=', 'system')
+                                                 ->orderBy('created_at', 'DESC');
+            
+            foreach ($systemMessages as $msg) {
+                $content = strip_tags($msg['content'] ?? '');
+                
+                // Detectar tipo de mudança pelo conteúdo
+                if (strpos($content, 'Setor alterado') !== false || strpos($content, 'setor') !== false) {
+                    // Verificar se já não temos evento de mudança de setor mais recente
+                    $hasRecentDeptChange = false;
+                    foreach ($events as $event) {
+                        if ($event['type'] === 'department_changed' && strtotime($event['date']) >= strtotime($msg['created_at'])) {
+                            $hasRecentDeptChange = true;
+                            break;
+                        }
+                    }
+                    if (!$hasRecentDeptChange) {
+                        $events[] = [
+                            'type' => 'department_changed',
+                            'date' => $msg['created_at'],
+                            'icon' => 'ki-arrows-circle',
+                            'color' => 'primary',
+                            'title' => 'Setor alterado',
+                            'description' => $content,
+                            'user_name' => null
+                        ];
+                    }
+                }
+            }
+            
+            Response::json([
+                'success' => true,
+                'events' => $events
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'events' => []
+            ], 400);
+        }
+    }
+
+    /**
      * Atualizar nota
      */
     public function updateNote(int $id, int $noteId): void

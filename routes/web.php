@@ -59,6 +59,7 @@ Router::post('/conversations/{id}/notes', [ConversationController::class, 'creat
 Router::get('/conversations/{id}/notes', [ConversationController::class, 'getNotes'], ['Authentication']);
 Router::put('/conversations/{id}/notes/{noteId}', [ConversationController::class, 'updateNote'], ['Authentication']);
 Router::delete('/conversations/{id}/notes/{noteId}', [ConversationController::class, 'deleteNote'], ['Authentication']);
+Router::get('/conversations/{id}/timeline', [ConversationController::class, 'getTimeline'], ['Authentication']);
 // Rotas de tags movidas para após as rotas de tags (linhas 192-199)
 Router::post('/conversations/{id}/messages', [ConversationController::class, 'sendMessage'], ['Authentication']);
 Router::get('/conversations/for-forwarding', [ConversationController::class, 'listForForwarding'], ['Authentication']);

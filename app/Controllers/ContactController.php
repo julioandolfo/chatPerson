@@ -55,7 +55,24 @@ class ContactController
             $contact = \App\Models\Contact::find($id);
             
             if (!$contact) {
+                // Se for requisição AJAX, retornar JSON
+                if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+                    Response::json([
+                        'success' => false,
+                        'message' => 'Contato não encontrado'
+                    ], 404);
+                    return;
+                }
                 Response::notFound('Contato não encontrado');
+                return;
+            }
+
+            // Se for requisição AJAX, retornar JSON
+            if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+                Response::json([
+                    'success' => true,
+                    'contact' => $contact
+                ]);
                 return;
             }
 
@@ -67,6 +84,14 @@ class ContactController
                 'conversations' => $conversations
             ]);
         } catch (\Exception $e) {
+            // Se for requisição AJAX, retornar JSON
+            if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+                Response::json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 500);
+                return;
+            }
             Response::view('errors/404', [
                 'message' => $e->getMessage()
             ], 404);

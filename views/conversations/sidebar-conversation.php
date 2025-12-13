@@ -375,8 +375,73 @@
 <script>
 // Funções de ação do sidebar
 function editContact(contactId) {
-    window.location.href = '<?= \App\Helpers\Url::to("/contacts") ?>/' + contactId;
+    const contactIdValue = contactId || window.currentConversation?.contact_id || 0;
+    if (!contactIdValue) {
+        const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
+                           document.body.classList.contains('dark-mode') ||
+                           window.matchMedia('(prefers-color-scheme: dark)').matches;
+        
+        Swal.fire({
+            icon: 'warning',
+            title: 'Atenção',
+            text: 'Contato não encontrado',
+            colorScheme: isDarkMode ? 'dark' : 'light'
+        });
+        return;
+    }
+    
+    // Carregar dados do contato
+    fetch(`<?= \App\Helpers\Url::to('/contacts') ?>/${contactIdValue}`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Erro ao carregar contato');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (!data.success || !data.contact) {
+            throw new Error('Erro ao carregar dados do contato');
+        }
+        
+        const contact = data.contact;
+        
+        // Preencher formulário
+        document.getElementById('editContactId').value = contact.id;
+        document.getElementById('editContactName').value = contact.name || '';
+        document.getElementById('editContactLastName').value = contact.last_name || '';
+        document.getElementById('editContactEmail').value = contact.email || '';
+        document.getElementById('editContactPhone').value = contact.phone || '';
+        document.getElementById('editContactCity').value = contact.city || '';
+        document.getElementById('editContactCountry').value = contact.country || '';
+        document.getElementById('editContactCompany').value = contact.company || '';
+        document.getElementById('editContactBio').value = contact.bio || '';
+        
+        // Abrir modal
+        const modal = new bootstrap.Modal(document.getElementById('kt_modal_edit_contact'));
+        modal.show();
+    })
+    .catch(error => {
+        console.error('Erro ao carregar contato:', error);
+        const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
+                           document.body.classList.contains('dark-mode') ||
+                           window.matchMedia('(prefers-color-scheme: dark)').matches;
+        
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro ao carregar dados do contato: ' + error.message,
+            colorScheme: isDarkMode ? 'dark' : 'light'
+        });
+    });
 }
+
+// Tornar função disponível globalmente
+window.editContact = editContact;
 
 function assignConversation(conversationId) {
     // TODO: Implementar modal de atribuição

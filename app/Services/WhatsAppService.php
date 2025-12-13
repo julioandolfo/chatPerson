@@ -1307,12 +1307,12 @@ class WhatsAppService
                                 // Criar caminho relativo para salvar no banco (sem /public/)
                                 $relativePath = 'assets/media/attachments/temp/' . basename($tempFile);
                                 
-                                // Criar URL absoluta para acesso externo
-                                $publicUrl = \App\Helpers\Url::to('/' . $relativePath);
+                                // Criar URL absoluta completa com protocolo e domínio
+                                $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                                $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                                $basePath = \App\Helpers\Url::to('/' . $relativePath);
+                                $mediaUrl = $protocol . '://' . $host . $basePath;
                                 
-                                // Mover para diretório final de attachments (organizado por conversa)
-                                // Por enquanto, manter em temp e criar attachment diretamente
-                                $mediaUrl = $publicUrl; // URL absoluta HTTP
                                 $mimetype = $payload['attachment']['mime'] ?? 'audio/ogg';
                                 $filename = basename($tempFile);
                                 $size = strlen($audioData);
@@ -1508,18 +1508,23 @@ class WhatsAppService
                         if (isset($downloadedFile) && !empty($downloadedFile['local_path'])) {
                             Logger::quepasa("processWebhook - Criando attachment a partir de arquivo já baixado (OUTGOING): {$downloadedFile['local_path']}");
                             
-                            $attachmentId = \App\Models\Attachment::create([
-                                'conversation_id' => $conversation['id'],
-                                'path' => $downloadedFile['path'],
-                                'type' => 'audio',
-                                'mime_type' => $downloadedFile['mime_type'] ?? $mimetype,
-                                'size' => $downloadedFile['size'] ?? $size,
-                                'filename' => $downloadedFile['filename'] ?? $filename
-                            ]);
-                            
-                            $attachment = \App\Models\Attachment::find($attachmentId);
-                            Logger::quepasa("processWebhook - Attachment OUTGOING criado: ID={$attachmentId}");
-                            $attachments[] = $attachment;
+                            try {
+                                $attachmentId = \App\Models\Attachment::create([
+                                    'conversation_id' => $conversation['id'],
+                                    'path' => $downloadedFile['path'],
+                                    'type' => 'audio',
+                                    'mime_type' => $downloadedFile['mime_type'] ?? $mimetype,
+                                    'size' => $downloadedFile['size'] ?? $size,
+                                    'filename' => $downloadedFile['filename'] ?? $filename
+                                ]);
+                                
+                                $attachment = \App\Models\Attachment::find($attachmentId);
+                                Logger::quepasa("processWebhook - Attachment OUTGOING criado com sucesso: ID={$attachmentId}");
+                                $attachments[] = $attachment;
+                            } catch (\Exception $e) {
+                                Logger::quepasa("processWebhook - ❌ Erro ao criar attachment OUTGOING: " . $e->getMessage());
+                                throw $e;
+                            }
                         } else {
                             $attachment = \App\Services\AttachmentService::saveFromUrl(
                                 $mediaUrl, 
@@ -1737,19 +1742,25 @@ class WhatsAppService
                     if (isset($downloadedFile) && !empty($downloadedFile['local_path'])) {
                         Logger::quepasa("processWebhook - Criando attachment a partir de arquivo já baixado: {$downloadedFile['local_path']}");
                         
-                        // Criar attachment diretamente no banco sem baixar novamente
-                        $attachmentId = \App\Models\Attachment::create([
-                            'conversation_id' => $conversation['id'],
-                            'path' => $downloadedFile['path'],
-                            'type' => 'audio',
-                            'mime_type' => $downloadedFile['mime_type'] ?? $mimetype,
-                            'size' => $downloadedFile['size'] ?? $size,
-                            'filename' => $downloadedFile['filename'] ?? $filename
-                        ]);
-                        
-                        $attachment = \App\Models\Attachment::find($attachmentId);
-                        Logger::quepasa("processWebhook - Attachment criado: ID={$attachmentId}");
-                        $attachments[] = $attachment;
+                        try {
+                            // Criar attachment diretamente no banco sem baixar novamente
+                            $attachmentId = \App\Models\Attachment::create([
+                                'conversation_id' => $conversation['id'],
+                                'path' => $downloadedFile['path'],
+                                'type' => 'audio',
+                                'mime_type' => $downloadedFile['mime_type'] ?? $mimetype,
+                                'size' => $downloadedFile['size'] ?? $size,
+                                'filename' => $downloadedFile['filename'] ?? $filename
+                            ]);
+                            
+                            $attachment = \App\Models\Attachment::find($attachmentId);
+                            Logger::quepasa("processWebhook - Attachment criado com sucesso: ID={$attachmentId}");
+                            Logger::quepasa("processWebhook - Attachment data: " . json_encode($attachment));
+                            $attachments[] = $attachment;
+                        } catch (\Exception $e) {
+                            Logger::quepasa("processWebhook - ❌ Erro ao criar attachment: " . $e->getMessage());
+                            throw $e;
+                        }
                     } else {
                         // Arquivo externo (não baixado ainda), usar saveFromUrl
                         $attachment = \App\Services\AttachmentService::saveFromUrl(
@@ -1770,6 +1781,7 @@ class WhatsAppService
             }
 
             // Criar mensagem usando ConversationService (com todas as integrações)
+            Logger::quepasa("processWebhook - Preparando criação de mensagem: conversationId={$conversation['id']}, contactId={$contact['id']}, attachmentsCount=" . count($attachments));
             try {
                 $messageId = \App\Services\ConversationService::sendMessage(
                     $conversation['id'],
@@ -1779,10 +1791,13 @@ class WhatsAppService
                     $attachments
                 );
                 
+                Logger::quepasa("processWebhook - ✅ Mensagem criada com sucesso: messageId={$messageId}");
+                
                 // Se mensagem foi criada com sucesso, automações já foram executadas pelo ConversationService
                 // Não precisa chamar AutomationService novamente
             } catch (\Exception $e) {
                 Logger::quepasa("Erro ao criar mensagem via ConversationService: " . $e->getMessage());
+                Logger::quepasa("processWebhook - Stack trace: " . $e->getTraceAsString());
                 // Fallback: criar mensagem diretamente se ConversationService falhar
                 $messageData = [
                     'conversation_id' => $conversation['id'],

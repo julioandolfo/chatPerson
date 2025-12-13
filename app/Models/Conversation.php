@@ -94,9 +94,15 @@ class Conversation extends Model
             $params[] = $filters['channel'];
         }
         
-        if (!empty($filters['agent_id'])) {
-            $sql .= " AND c.agent_id = ?";
-            $params[] = $filters['agent_id'];
+        // Filtro por agente (0 ou '0' significa não atribuídas)
+        if (isset($filters['agent_id'])) {
+            $agentId = $filters['agent_id'];
+            if ($agentId === '0' || $agentId === 0 || $agentId === 'unassigned') {
+                $sql .= " AND (c.agent_id IS NULL OR c.agent_id = 0)";
+            } else {
+                $sql .= " AND c.agent_id = ?";
+                $params[] = $agentId;
+            }
         }
         
         if (!empty($filters['department_id'])) {
@@ -124,7 +130,7 @@ class Conversation extends Model
             $params[] = $filters['whatsapp_account_id'];
         }
         
-        // Busca avançada (nome, telefone, email E mensagens)
+        // Busca avançada (nome, telefone, email, mensagens, tags, participantes)
         $searchTerm = null;
         if (!empty($filters['search'])) {
             $searchTerm = trim($filters['search']);
@@ -138,12 +144,28 @@ class Conversation extends Model
                         SELECT 1 FROM messages m 
                         WHERE m.conversation_id = c.id 
                         AND m.content LIKE ?
+                    ) OR
+                    EXISTS (
+                        SELECT 1 FROM conversation_tags ctt_search 
+                        INNER JOIN tags t_search ON ctt_search.tag_id = t_search.id
+                        WHERE ctt_search.conversation_id = c.id 
+                        AND t_search.name LIKE ?
+                    ) OR
+                    EXISTS (
+                        SELECT 1 FROM conversation_participants cp_search 
+                        INNER JOIN users u_search ON cp_search.user_id = u_search.id
+                        WHERE cp_search.conversation_id = c.id 
+                        AND cp_search.removed_at IS NULL
+                        AND (u_search.name LIKE ? OR u_search.email LIKE ?)
                     )
                 )";
                 $params[] = $search;
                 $params[] = $search;
                 $params[] = $search;
                 $params[] = $search;
+                $params[] = $search; // tags
+                $params[] = $search; // participantes nome
+                $params[] = $search; // participantes email
                 
                 // Log para debug
                 \App\Helpers\Log::debug("Aplicando filtro de busca: '{$searchTerm}'", 'conversas.log');
@@ -275,8 +297,36 @@ class Conversation extends Model
                     $matchType = 'email';
                     $matchText = $conversation['contact_email'];
                 }
+                // Verificar tags
+                elseif (!empty($conversation['tags_data'])) {
+                    $tagsData = explode('|||', $conversation['tags_data']);
+                    foreach ($tagsData as $tagData) {
+                        if (!empty($tagData)) {
+                            $parts = explode(':', $tagData, 3);
+                            if (count($parts) >= 2 && mb_stripos($parts[1], $searchTerm) !== false) {
+                                $matchType = 'tag';
+                                $matchText = $parts[1];
+                                break;
+                            }
+                        }
+                    }
+                }
+                // Verificar participantes
+                elseif (!empty($conversation['participants_data'])) {
+                    $participantsData = explode('|||', $conversation['participants_data']);
+                    foreach ($participantsData as $participantData) {
+                        if (!empty($participantData)) {
+                            $parts = explode(':', $participantData, 2);
+                            if (count($parts) >= 2 && mb_stripos($parts[1], $searchTerm) !== false) {
+                                $matchType = 'participant';
+                                $matchText = $parts[1];
+                                break;
+                            }
+                        }
+                    }
+                }
                 // Verificar mensagens
-                else {
+                if ($matchType === null) {
                     // Buscar mensagem que contém o termo
                     $messageSql = "SELECT content FROM messages WHERE conversation_id = ? AND content LIKE ? LIMIT 1";
                     $messageParams = [$conversation['id'], "%{$searchTerm}%"];

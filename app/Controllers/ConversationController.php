@@ -29,7 +29,7 @@ class ConversationController
             'channel' => $_GET['channel'] ?? null,
             'channels' => isset($_GET['channels']) && is_array($_GET['channels']) ? $_GET['channels'] : (!empty($_GET['channel']) ? [$_GET['channel']] : null),
             'search' => $_GET['search'] ?? null,
-            'agent_id' => $_GET['agent_id'] ?? null,
+            'agent_id' => isset($_GET['agent_id']) ? ($_GET['agent_id'] === '0' || $_GET['agent_id'] === 0 ? '0' : $_GET['agent_id']) : null,
             'department_id' => $_GET['department_id'] ?? null,
             'tag_id' => $_GET['tag_id'] ?? null,
             'tag_ids' => isset($_GET['tag_ids']) && is_array($_GET['tag_ids']) ? array_map('intval', $_GET['tag_ids']) : (!empty($_GET['tag_id']) ? [(int)$_GET['tag_id']] : null),
@@ -50,6 +50,9 @@ class ConversationController
         $filters = array_filter($filters, function($value, $key) {
             if ($key === 'pinned') {
                 return $value !== null; // Manter pinned mesmo se for false
+            }
+            if ($key === 'agent_id') {
+                return $value !== null && $value !== ''; // Manter agent_id mesmo se for '0' (não atribuídas)
             }
             if ($key === 'search') {
                 return $value !== null && trim($value) !== ''; // Manter busca mesmo se tiver espaços
@@ -503,6 +506,31 @@ class ConversationController
             Response::json([
                 'success' => true,
                 'message' => 'Conversa atribuída com sucesso',
+                'conversation' => $conversation
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Atualizar setor da conversa
+     */
+    public function updateDepartment(int $id): void
+    {
+        try {
+            Permission::abortIfCannot('conversations.edit');
+            
+            $departmentId = isset($_POST['department_id']) && $_POST['department_id'] !== '' ? (int)$_POST['department_id'] : null;
+
+            $conversation = ConversationService::updateDepartment($id, $departmentId);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Setor atualizado com sucesso',
                 'conversation' => $conversation
             ]);
         } catch (\Exception $e) {
@@ -1062,6 +1090,110 @@ class ConversationController
         }
     }
     
+    /**
+     * Criar nota interna em uma conversa
+     */
+    public function createNote(int $id): void
+    {
+        Permission::abortIfCannot('conversations.edit.own');
+        
+        try {
+            $userId = \App\Helpers\Auth::id();
+            $content = $_POST['content'] ?? '';
+            $isPrivate = isset($_POST['is_private']) && $_POST['is_private'] === '1';
+            
+            if (empty(trim($content))) {
+                throw new \Exception('Conteúdo da nota não pode estar vazio');
+            }
+            
+            $note = \App\Services\ConversationNoteService::create($id, $userId, $content, $isPrivate);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Nota criada com sucesso',
+                'note' => $note
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Listar notas de uma conversa
+     */
+    public function getNotes(int $id): void
+    {
+        Permission::abortIfCannot('conversations.view.own');
+        
+        try {
+            $userId = \App\Helpers\Auth::id();
+            $notes = \App\Services\ConversationNoteService::list($id, $userId);
+            
+            Response::json([
+                'success' => true,
+                'notes' => $notes
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Atualizar nota
+     */
+    public function updateNote(int $id, int $noteId): void
+    {
+        Permission::abortIfCannot('conversations.edit.own');
+        
+        try {
+            $userId = \App\Helpers\Auth::id();
+            $content = $_POST['content'] ?? '';
+            
+            $note = \App\Services\ConversationNoteService::update($noteId, $userId, $content);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Nota atualizada com sucesso',
+                'note' => $note
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Deletar nota
+     */
+    public function deleteNote(int $id, int $noteId): void
+    {
+        Permission::abortIfCannot('conversations.edit.own');
+        
+        try {
+            $userId = \App\Helpers\Auth::id();
+            
+            \App\Services\ConversationNoteService::delete($noteId, $userId);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Nota deletada com sucesso'
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
     /**
      * Buscar mensagens dentro de uma conversa
      */

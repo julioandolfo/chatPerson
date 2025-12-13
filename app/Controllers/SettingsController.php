@@ -384,6 +384,10 @@ class SettingsController
                     'reassign_on_agent_offline' => isset($data['reassign_on_agent_offline']),
                     'max_reassignments' => (int)($data['max_reassignments'] ?? 3),
                 ],
+                'contact_agents' => [
+                    'auto_set_primary_agent_on_first_assignment' => isset($data['auto_set_primary_agent_on_first_assignment']),
+                    'auto_assign_on_reopen' => isset($data['auto_assign_on_reopen'] ?? true),
+                ],
             ];
             
             if (ConversationSettingsService::saveSettings($settings)) {

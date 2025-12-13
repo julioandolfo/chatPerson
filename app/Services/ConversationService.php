@@ -60,24 +60,53 @@ class ConversationService
         $aiAgentId = null;
         
         if (!$agentId) {
-            // Tentar atribuição automática usando configurações
+            // PRIMEIRO: Verificar se há agente atribuído ao contato (conversa fechada anterior)
             try {
-                $assignedId = \App\Services\ConversationSettingsService::autoAssignConversation(
-                    0, // conversationId ainda não existe
-                    $data['department_id'] ?? null,
-                    $data['funnel_id'] ?? null,
-                    $data['stage_id'] ?? null
+                $contactAgentId = \App\Services\ContactAgentService::shouldAutoAssignOnConversation(
+                    $data['contact_id']
                 );
                 
-                // Se ID for negativo, é um agente de IA
-                if ($assignedId !== null && $assignedId < 0) {
-                    $aiAgentId = abs($assignedId);
-                    $agentId = null; // Não atribuir a usuário humano
-                } else {
-                    $agentId = $assignedId;
+                if ($contactAgentId) {
+                    $agentId = $contactAgentId;
+                    Logger::debug("Agente atribuído automaticamente do contato: {$agentId}", 'conversas.log');
                 }
             } catch (\Exception $e) {
-                error_log("Erro ao atribuir automaticamente: " . $e->getMessage());
+                error_log("Erro ao verificar agente do contato: " . $e->getMessage());
+            }
+            
+            // Se ainda não tem agente, tentar atribuição automática usando configurações
+            if (!$agentId) {
+                try {
+                    $assignedId = \App\Services\ConversationSettingsService::autoAssignConversation(
+                        0, // conversationId ainda não existe
+                        $data['department_id'] ?? null,
+                        $data['funnel_id'] ?? null,
+                        $data['stage_id'] ?? null
+                    );
+                    
+                    // Se ID for negativo, é um agente de IA
+                    if ($assignedId !== null && $assignedId < 0) {
+                        $aiAgentId = abs($assignedId);
+                        $agentId = null; // Não atribuir a usuário humano
+                    } else {
+                        $agentId = $assignedId;
+                    }
+                } catch (\Exception $e) {
+                    error_log("Erro ao atribuir automaticamente: " . $e->getMessage());
+                }
+            }
+        }
+        
+        // Se foi atribuído a agente humano e é primeira atribuição, atualizar agente principal do contato
+        if ($agentId && empty($data['agent_id'])) {
+            try {
+                \App\Services\ContactAgentService::updatePrimaryOnFirstAssignment(
+                    $data['contact_id'],
+                    $agentId,
+                    true
+                );
+            } catch (\Exception $e) {
+                error_log("Erro ao atualizar agente principal: " . $e->getMessage());
             }
         }
         
@@ -422,6 +451,19 @@ class ConversationService
         $oldAgentId = $conversation['agent_id'] ?? null;
         Conversation::update($conversationId, ['agent_id' => $agentId]);
         
+        // Se é primeira atribuição (não tinha agente antes), atualizar agente principal do contato
+        if (!$oldAgentId) {
+            try {
+                \App\Services\ContactAgentService::updatePrimaryOnFirstAssignment(
+                    $conversation['contact_id'],
+                    $agentId,
+                    true
+                );
+            } catch (\Exception $e) {
+                error_log("Erro ao atualizar agente principal: " . $e->getMessage());
+            }
+        }
+        
         // Invalidar cache de conversas
         self::invalidateCache($conversationId);
         
@@ -469,6 +511,68 @@ class ConversationService
             error_log("Erro ao logar atividade: " . $e->getMessage());
         }
 
+        return $conversation;
+    }
+
+    /**
+     * Atualizar setor da conversa
+     */
+    public static function updateDepartment(int $conversationId, ?int $departmentId): array
+    {
+        // Obter conversa para verificar contexto
+        $conversation = Conversation::find($conversationId);
+        if (!$conversation) {
+            throw new \Exception('Conversa não encontrada');
+        }
+        
+        // Verificar se setor existe (se fornecido)
+        if ($departmentId !== null) {
+            $department = \App\Models\Department::find($departmentId);
+            if (!$department) {
+                throw new \Exception('Setor não encontrado');
+            }
+        }
+
+        // Atualizar setor
+        $oldDepartmentId = $conversation['department_id'] ?? null;
+        Conversation::update($conversationId, ['department_id' => $departmentId]);
+        
+        // Invalidar cache de conversas
+        self::invalidateCache($conversationId);
+        
+        // Obter conversa atualizada para notificar via WebSocket
+        $conversation = Conversation::findWithRelations($conversationId);
+        
+        // Criar mensagem de sistema informando mudança de setor
+        try {
+            $oldDepartmentName = $oldDepartmentId ? (\App\Models\Department::find($oldDepartmentId)['name'] ?? 'Sem setor') : 'Sem setor';
+            $newDepartmentName = $departmentId ? (\App\Models\Department::find($departmentId)['name'] ?? 'Sem setor') : 'Sem setor';
+            
+            self::sendMessage(
+                $conversationId,
+                "🔄 Setor alterado de '{$oldDepartmentName}' para '{$newDepartmentName}'.",
+                'system',
+                null,
+                [],
+                'system'
+            );
+        } catch (\Exception $e) {
+            error_log("Erro ao criar mensagem de sistema: " . $e->getMessage());
+        }
+        
+        try {
+            \App\Helpers\WebSocket::notifyConversationUpdated($conversationId, $conversation);
+        } catch (\Exception $e) {
+            error_log("Erro ao notificar WebSocket: " . $e->getMessage());
+        }
+        
+        // Executar automações para atualização
+        try {
+            \App\Services\AutomationService::executeForConversationUpdated($conversationId, ['department_id' => $departmentId]);
+        } catch (\Exception $e) {
+            error_log("Erro ao executar automações: " . $e->getMessage());
+        }
+        
         return $conversation;
     }
 
@@ -683,15 +787,55 @@ class ConversationService
     {
         // Obter conversa antes de reabrir para atualizar contagem do agente
         $conversation = Conversation::find($conversationId);
-        $agentId = $conversation['agent_id'] ?? null;
+        if (!$conversation) {
+            throw new \Exception('Conversa não encontrada');
+        }
         
-        if (Conversation::update($conversationId, ['status' => 'open'])) {
+        $oldAgentId = $conversation['agent_id'] ?? null;
+        
+        // Verificar se deve atribuir automaticamente ao agente do contato
+        $shouldAssignToContactAgent = false;
+        $contactAgentId = null;
+        
+        try {
+            $contactAgentId = \App\Services\ContactAgentService::shouldAutoAssignOnConversation(
+                $conversation['contact_id'],
+                $conversationId
+            );
+            
+            if ($contactAgentId) {
+                $shouldAssignToContactAgent = true;
+            }
+        } catch (\Exception $e) {
+            error_log("Erro ao verificar agente do contato ao reabrir: " . $e->getMessage());
+        }
+        
+        // Preparar dados de atualização
+        $updateData = [
+            'status' => 'open',
+            'resolved_at' => null
+        ];
+        
+        // Se deve atribuir ao agente do contato, atualizar agent_id
+        if ($shouldAssignToContactAgent && $contactAgentId) {
+            $updateData['agent_id'] = $contactAgentId;
+            Logger::debug("Conversa reaberta atribuída automaticamente ao agente do contato: {$contactAgentId}", 'conversas.log');
+        }
+        
+        if (Conversation::update($conversationId, $updateData)) {
             // Invalidar cache de conversas
             self::invalidateCache($conversationId);
             
             // Atualizar contagem de conversas do agente
-            if ($agentId) {
-                User::updateConversationsCount($agentId);
+            $finalAgentId = $shouldAssignToContactAgent && $contactAgentId ? $contactAgentId : $oldAgentId;
+            if ($finalAgentId && $finalAgentId != $oldAgentId) {
+                // Se mudou de agente, atualizar contagem de ambos
+                if ($oldAgentId) {
+                    User::updateConversationsCount($oldAgentId);
+                }
+                User::updateConversationsCount($finalAgentId);
+            } elseif ($finalAgentId) {
+                User::updateConversationsCount($finalAgentId);
             }
             
             // Obter conversa atualizada para notificar via WebSocket

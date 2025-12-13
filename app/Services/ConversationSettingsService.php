@@ -107,6 +107,12 @@ class ConversationSettingsService
                 'max_reassignments' => 3, // máximo de reatribuições por conversa
             ],
             
+            // Agentes do Contato
+            'contact_agents' => [
+                'auto_set_primary_agent_on_first_assignment' => true, // Definir agente principal automaticamente na primeira atribuição
+                'auto_assign_on_reopen' => true, // Atribuir automaticamente ao agente principal quando conversa fechada for reaberta
+            ],
+            
             // Priorização
             'prioritization' => [
                 'enabled' => true,

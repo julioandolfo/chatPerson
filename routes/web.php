@@ -51,9 +51,14 @@ Router::delete('/conversations/{id}', [ConversationController::class, 'destroy']
 // Rota alternativa para exibir conversa na lista (usado no layout Chatwoot)
 Router::get('/conversations/list/{id}', [ConversationController::class, 'index'], ['Authentication']);
 Router::post('/conversations/{id}/assign', [ConversationController::class, 'assign'], ['Authentication']);
+Router::post('/conversations/{id}/update-department', [ConversationController::class, 'updateDepartment'], ['Authentication']);
 Router::post('/conversations/{id}/escalate', [ConversationController::class, 'escalate'], ['Authentication']);
 Router::post('/conversations/{id}/close', [ConversationController::class, 'close'], ['Authentication']);
 Router::post('/conversations/{id}/reopen', [ConversationController::class, 'reopen'], ['Authentication']);
+Router::post('/conversations/{id}/notes', [ConversationController::class, 'createNote'], ['Authentication']);
+Router::get('/conversations/{id}/notes', [ConversationController::class, 'getNotes'], ['Authentication']);
+Router::put('/conversations/{id}/notes/{noteId}', [ConversationController::class, 'updateNote'], ['Authentication']);
+Router::delete('/conversations/{id}/notes/{noteId}', [ConversationController::class, 'deleteNote'], ['Authentication']);
 // Rotas de tags movidas para após as rotas de tags (linhas 192-199)
 Router::post('/conversations/{id}/messages', [ConversationController::class, 'sendMessage'], ['Authentication']);
 Router::get('/conversations/for-forwarding', [ConversationController::class, 'listForForwarding'], ['Authentication']);
@@ -95,6 +100,11 @@ Router::get('/contacts/{id}', [ContactController::class, 'show'], ['Authenticati
 Router::post('/contacts/{id}', [ContactController::class, 'update'], ['Authentication']);
 Router::post('/contacts/{id}/avatar', [ContactController::class, 'uploadAvatar'], ['Authentication']);
 Router::delete('/contacts/{id}', [ContactController::class, 'destroy'], ['Authentication']);
+// Rotas de Agentes do Contato
+Router::get('/contacts/{id}/agents', [ContactAgentController::class, 'index'], ['Authentication']);
+Router::post('/contacts/{id}/agents', [ContactAgentController::class, 'store'], ['Authentication']);
+Router::post('/contacts/{id}/agents/set-primary', [ContactAgentController::class, 'setPrimary'], ['Authentication']);
+Router::delete('/contacts/{id}/agents/{agentId}', [ContactAgentController::class, 'destroy'], ['Authentication']);
 
 // Rotas de Funis
 Router::get('/funnels', [FunnelController::class, 'index'], ['Authentication']);

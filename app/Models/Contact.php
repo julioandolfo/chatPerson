@@ -22,7 +22,8 @@ class Contact extends Model
         'social_media',
         'avatar', 
         'custom_attributes',
-        'last_activity_at'
+        'last_activity_at',
+        'primary_agent_id'
     ];
     protected array $hidden = [];
     protected bool $timestamps = true;

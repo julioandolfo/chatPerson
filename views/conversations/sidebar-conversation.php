@@ -134,6 +134,38 @@
                 
                 <div class="separator my-5"></div>
                 
+                <!-- Agentes do Contato -->
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title d-flex justify-content-between align-items-center">
+                        <span>Agentes do Contato</span>
+                        <button class="btn btn-sm btn-icon btn-light-primary p-0" id="sidebar-manage-contact-agents-btn" style="display: none;" onclick="manageContactAgents(0)" title="Gerenciar agentes">
+                            <i class="ki-duotone ki-setting-3 fs-6">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                        </button>
+                    </div>
+                    
+                    <div id="contact-agents-list" class="mb-3">
+                        <div class="text-muted fs-7">Nenhum agente atribuído</div>
+                    </div>
+                    
+                    <div class="alert alert-info d-flex align-items-start p-3 mb-0" style="font-size: 0.75rem;">
+                        <i class="ki-duotone ki-information-5 fs-6 me-2 mt-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div>
+                            <div class="fw-semibold mb-1">Atribuição Automática</div>
+                            <div>Quando uma conversa fechada for reaberta ou o contato chamar novamente, será atribuído automaticamente ao agente principal.</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="separator my-5"></div>
+                
                 <!-- Informações da Conversa -->
                 <div class="sidebar-section">
                     <div class="sidebar-section-title">Conversa</div>
@@ -352,9 +384,24 @@ function assignConversation(conversationId) {
 }
 
 function changeDepartment(conversationId) {
-    // TODO: Implementar modal de mudança de setor
-    alert('Modal de mudança de setor em desenvolvimento');
+    const modal = new bootstrap.Modal(document.getElementById('kt_modal_change_department'));
+    const conversationIdValue = conversationId || window.currentConversationId || 0;
+    document.getElementById('changeDepartmentConversationId').value = conversationIdValue;
+    
+    // Carregar setor atual da conversa do sidebar
+    const departmentNameEl = document.querySelector('[data-field="department_name"]');
+    const currentDepartmentId = departmentNameEl?.dataset.departmentId || '';
+    
+    const selectEl = document.getElementById('changeDepartmentSelect');
+    if (selectEl) {
+        selectEl.value = currentDepartmentId || '';
+    }
+    
+    modal.show();
 }
+
+// Tornar função disponível globalmente
+window.changeDepartment = changeDepartment;
 
 function manageTags(conversationId) {
     // TODO: Implementar modal de gerenciamento de tags
@@ -421,15 +468,94 @@ function markAsSpam(conversationId) {
 }
 
 function addNote(conversationId) {
-    const noteText = document.getElementById('newNoteText').value.trim();
+    const noteText = document.getElementById('newNoteText');
+    const content = noteText?.value.trim() || '';
     
-    if (!noteText) {
-        alert('Digite uma nota antes de salvar');
+    if (!content) {
+        const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
+                           document.body.classList.contains('dark-mode') ||
+                           window.matchMedia('(prefers-color-scheme: dark)').matches;
+        
+        Swal.fire({
+            icon: 'warning',
+            title: 'Atenção',
+            text: 'Digite uma nota antes de salvar',
+            colorScheme: isDarkMode ? 'dark' : 'light'
+        });
         return;
     }
     
-    // TODO: Implementar endpoint de notas
-    alert('Funcionalidade de notas em desenvolvimento');
+    const conversationIdValue = conversationId || window.currentConversationId || 0;
+    const btn = document.getElementById('sidebar-add-note-btn');
+    const originalText = btn?.innerHTML || '';
+    
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Salvando...';
+    }
+    
+    const formData = new FormData();
+    formData.append('content', content);
+    formData.append('is_private', '0'); // Por padrão, notas são públicas
+    
+    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationIdValue}/notes`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Limpar campo de texto
+            if (noteText) {
+                noteText.value = '';
+            }
+            
+            const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
+                               document.body.classList.contains('dark-mode') ||
+                               window.matchMedia('(prefers-color-scheme: dark)').matches;
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso!',
+                text: data.message || 'Nota adicionada com sucesso',
+                colorScheme: isDarkMode ? 'dark' : 'light',
+                timer: 2000,
+                showConfirmButton: false
+            });
+            
+            // Recarregar timeline
+            if (typeof loadTimeline === 'function') {
+                loadTimeline(conversationIdValue);
+            }
+        } else {
+            throw new Error(data.message || 'Erro ao adicionar nota');
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
+                           document.body.classList.contains('dark-mode') ||
+                           window.matchMedia('(prefers-color-scheme: dark)').matches;
+        
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: error.message || 'Erro ao adicionar nota',
+            colorScheme: isDarkMode ? 'dark' : 'light'
+        });
+    })
+    .finally(() => {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    });
 }
+
+// Tornar função disponível globalmente
+window.addNote = addNote;
 </script>
 

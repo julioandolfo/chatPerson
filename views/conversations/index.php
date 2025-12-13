@@ -86,7 +86,15 @@ function renderAttachment($attachment) {
         $html .= '</div>';
         $html .= '</div>';
     } else {
-        $downloadUrl = \App\Helpers\Url::to('/attachments/' . urlencode($attachment['path'] ?? '') . '/download');
+        // Para documentos, usar URL direta se o arquivo estiver em assets/
+        $attachmentPath = $attachment['path'] ?? '';
+        if (strpos($attachmentPath, 'assets/') === 0) {
+            // Caminho direto para arquivo público
+            $downloadUrl = \App\Helpers\Url::to('/' . $attachmentPath);
+        } else {
+            // Rota de download para arquivos fora de assets/
+            $downloadUrl = \App\Helpers\Url::to('/attachments/' . urlencode($attachmentPath) . '/download');
+        }
         $html .= '<a href="' . $downloadUrl . '" target="_blank" class="d-flex align-items-center gap-2 p-2 border rounded" style="text-decoration: none; color: inherit; background: rgba(255,255,255,0.05);">';
         $html .= '<i class="ki-duotone ki-file fs-2">';
         $html .= '<span class="path1"></span>';
@@ -1404,6 +1412,87 @@ body.dark-mode .swal2-content {
             </div>
         </div>
         
+        <!-- Barra de Ações em Massa (oculta por padrão) -->
+        <div id="bulkActionsBar" class="bulk-actions-bar d-none mb-3 p-3 bg-light-primary rounded">
+            <div class="d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="fw-semibold text-primary" id="bulkSelectionCount">0 conversas selecionadas</span>
+                    <button type="button" class="btn btn-sm btn-light" onclick="selectAllConversations()">
+                        <i class="ki-duotone ki-check-square fs-6 me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Selecionar todas
+                    </button>
+                    <button type="button" class="btn btn-sm btn-light" onclick="clearBulkSelection()">
+                        <i class="ki-duotone ki-cross fs-6 me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Limpar
+                    </button>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="ki-duotone ki-profile-user fs-6 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Atribuir
+                        </button>
+                        <ul class="dropdown-menu">
+                            <?php if (!empty($agents)): ?>
+                                <?php foreach ($agents as $agent): ?>
+                                    <li>
+                                        <a class="dropdown-item" href="#" onclick="event.preventDefault(); bulkAssignAgent(<?= $agent['id'] ?>, '<?= htmlspecialchars($agent['name'], ENT_QUOTES) ?>');">
+                                            <?= htmlspecialchars($agent['name']) ?>
+                                        </a>
+                                    </li>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </ul>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="ki-duotone ki-tag fs-6 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Adicionar Tag
+                        </button>
+                        <ul class="dropdown-menu">
+                            <?php if (!empty($tags)): ?>
+                                <?php foreach ($tags as $tag): ?>
+                                    <li>
+                                        <a class="dropdown-item" href="#" onclick="event.preventDefault(); bulkAddTag(<?= $tag['id'] ?>, '<?= htmlspecialchars($tag['name'], ENT_QUOTES) ?>');">
+                                            <span class="badge badge-sm" style="background-color: <?= htmlspecialchars($tag['color'] ?? '#009ef7') ?>20; color: <?= htmlspecialchars($tag['color'] ?? '#009ef7') ?>;">
+                                                <?= htmlspecialchars($tag['name']) ?>
+                                            </span>
+                                        </a>
+                                    </li>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </ul>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-warning" onclick="bulkCloseConversations()">
+                        <i class="ki-duotone ki-cross-circle fs-6 me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Fechar
+                    </button>
+                    <button type="button" class="btn btn-sm btn-info" onclick="bulkReopenConversations()">
+                        <i class="ki-duotone ki-arrow-right fs-6 me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Reabrir
+                    </button>
+                </div>
+            </div>
+        </div>
+        
         <!-- Filtros -->
         <div class="conversations-list-filters">
             <select id="filter_status" class="form-select form-select-sm form-select-solid" style="width: auto;">
@@ -1442,6 +1531,34 @@ body.dark-mode .swal2-content {
                                         <?php endforeach; ?>
                                     </select>
                                 <?php endif; ?>
+            
+            <?php 
+            // Verificar permissões para filtrar por agente
+            $canViewAllConversations = \App\Helpers\Permission::can('conversations.view.all');
+            $currentUserId = \App\Helpers\Auth::id();
+            ?>
+            <?php if ($canViewAllConversations || !empty($agents)): ?>
+            <select id="filter_agent" class="form-select form-select-sm form-select-solid" style="width: auto;">
+                <option value="">Agentes</option>
+                <option value="unassigned" <?= ($filters['agent_id'] ?? '') === 'unassigned' ? 'selected' : '' ?>>🔴 Não atribuídas</option>
+                <?php if ($canViewAllConversations && !empty($agents)): ?>
+                    <?php foreach ($agents as $agent): ?>
+                        <option value="<?= $agent['id'] ?>" <?= ($filters['agent_id'] ?? '') == $agent['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($agent['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                <?php elseif (!$canViewAllConversations && $currentUserId): ?>
+                    <?php 
+                    // Agente só pode ver suas próprias conversas
+                    $currentUser = \App\Models\User::find($currentUserId);
+                    if ($currentUser): ?>
+                        <option value="<?= $currentUser['id'] ?>" <?= ($filters['agent_id'] ?? '') == $currentUser['id'] ? 'selected' : '' ?>>
+                            Minhas conversas
+                        </option>
+                    <?php endif; ?>
+                <?php endif; ?>
+            </select>
+            <?php endif; ?>
             
             <button type="button" class="btn btn-sm btn-light-primary" onclick="openAdvancedFilters()" title="Filtros Avançados">
                 <i class="ki-duotone ki-filter fs-6">
@@ -1496,6 +1613,13 @@ body.dark-mode .swal2-content {
                          data-conversation-id="<?= $conv['id'] ?>"
                          data-onclick="selectConversation">
                         <div class="d-flex gap-3 w-100">
+                            <!-- Checkbox para seleção em massa -->
+                            <div class="flex-shrink-0 d-flex align-items-center">
+                                <label class="form-check form-check-custom form-check-solid">
+                                    <input class="form-check-input conversation-checkbox" type="checkbox" value="<?= $conv['id'] ?>" 
+                                           onclick="event.stopPropagation(); toggleBulkSelection();">
+                                </label>
+                            </div>
                             <!-- Avatar -->
                             <div class="symbol symbol-45px flex-shrink-0">
                                 <?php
@@ -2634,6 +2758,52 @@ body.dark-mode .swal2-content {
                     </div>
                 </div>
 
+<!-- MODAL: Mudar Setor -->
+<div class="modal fade" id="kt_modal_change_department" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-500px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Mudar Setor</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <form id="changeDepartmentForm">
+                    <input type="hidden" id="changeDepartmentConversationId" value="">
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold">Setor:</label>
+                        <select id="changeDepartmentSelect" class="form-select form-select-solid">
+                            <option value="">Sem setor</option>
+                            <?php if (!empty($departments)): ?>
+                                <?php foreach ($departments as $dept): ?>
+                                    <option value="<?= $dept['id'] ?>">
+                                        <?= htmlspecialchars($dept['name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </select>
+                        <div class="form-text">Selecione um setor para esta conversa ou deixe "Sem setor" para remover.</div>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="ki-duotone ki-check fs-5 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Salvar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: Gerenciar Tags -->
 <div class="modal fade" id="kt_modal_tags" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered mw-650px">
@@ -2664,6 +2834,84 @@ body.dark-mode .swal2-content {
                 <div class="d-flex justify-content-end">
                     <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Fechar</button>
                     <button type="button" class="btn btn-primary" onclick="saveTags()">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Gerenciar Agentes do Contato -->
+<div class="modal fade" id="kt_modal_contact_agents" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-600px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Gerenciar Agentes do Contato</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info d-flex align-items-start p-4 mb-5">
+                    <i class="ki-duotone ki-information-5 fs-2x me-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div>
+                        <div class="fw-semibold mb-1">Atribuição Automática</div>
+                        <div class="fs-7">Quando uma conversa fechada for reaberta ou o contato chamar novamente após ter conversa fechada, será atribuído automaticamente ao agente principal.</div>
+                    </div>
+                </div>
+                
+                <input type="hidden" id="contactAgentsModalContactId" value="">
+                
+                <div class="mb-5">
+                    <label class="form-label fw-semibold mb-3">Agentes Atribuídos:</label>
+                    <div id="contactAgentsList" class="border rounded p-3" style="min-height: 100px; max-height: 300px; overflow-y: auto;">
+                        <div class="text-muted fs-7 text-center py-3">Carregando...</div>
+                    </div>
+                </div>
+                
+                <div class="separator my-5"></div>
+                
+                <div class="mb-5">
+                    <label class="form-label fw-semibold mb-3">Adicionar Novo Agente:</label>
+                    <div class="d-flex gap-2">
+                        <select id="addContactAgentSelect" class="form-select form-select-solid flex-grow-1">
+                            <option value="">Selecione um agente...</option>
+                            <?php if (!empty($agents)): ?>
+                                <?php foreach ($agents as $agent): ?>
+                                    <option value="<?= $agent['id'] ?>">
+                                        <?= htmlspecialchars($agent['name']) ?>
+                                        <?php if (!empty($agent['email'])): ?>
+                                            (<?= htmlspecialchars($agent['email']) ?>)
+                                        <?php endif; ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </select>
+                        <button type="button" class="btn btn-primary" onclick="addContactAgentFromModal()">
+                            <i class="ki-duotone ki-plus fs-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            Adicionar
+                        </button>
+                    </div>
+                    <div class="form-check mt-3">
+                        <input class="form-check-input" type="checkbox" id="addAsPrimaryAgent" value="1">
+                        <label class="form-check-label" for="addAsPrimaryAgent">
+                            Definir como agente principal
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-end">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
                 </div>
             </div>
         </div>
@@ -4256,15 +4504,22 @@ function updateConversationTimeline(conversationId) {
         </div>
     `;
     
-    // Buscar atividades da conversa (mensagens, atribuições, fechamentos, etc)
-    fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}`, {
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-            'Accept': 'application/json'
-        }
-    })
-        .then(response => response.json())
-        .then(data => {
+    // Buscar atividades da conversa e notas em paralelo
+    Promise.all([
+        fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        }).then(r => r.json()),
+        fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/notes`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        }).then(r => r.json()).catch(() => ({ success: true, notes: [] }))
+    ])
+        .then(([data, notesData]) => {
             if (!data.success || !data.conversation) {
                 timelineContainer.innerHTML = '<div class="text-muted fs-7 text-center py-5">Erro ao carregar timeline</div>';
                 return;
@@ -4272,50 +4527,33 @@ function updateConversationTimeline(conversationId) {
             
             const conv = data.conversation;
             const messages = data.messages || [];
-            let timelineHtml = '';
+            const notes = notesData.success ? (notesData.notes || []) : [];
+            
+            // Combinar todos os eventos em um array para ordenar por data
+            const events = [];
             
             // Evento de criação
             if (conv.created_at) {
-                const date = new Date(conv.created_at);
-                timelineHtml += `
-                    <div class="timeline-item">
-                        <div class="timeline-line w-40px"></div>
-                        <div class="timeline-icon symbol symbol-circle symbol-40px">
-                            <div class="symbol-label bg-light-primary">
-                                <i class="ki-duotone ki-message-text-2 fs-2 text-primary">
-                                    <span class="path1"></span>
-                                    <span class="path2"></span>
-                                    <span class="path3"></span>
-                                </i>
-                            </div>
-                        </div>
-                        <div class="timeline-content mb-10">
-                            <div class="fw-semibold text-gray-800">Conversa criada</div>
-                            <div class="text-muted fs-7">${formatDateTime(conv.created_at)}</div>
-                        </div>
-                    </div>
-                `;
+                events.push({
+                    type: 'created',
+                    date: conv.created_at,
+                    icon: 'ki-message-text-2',
+                    color: 'primary',
+                    title: 'Conversa criada',
+                    description: null
+                });
             }
             
             // Atribuição
-            if (conv.assigned_to && conv.assigned_at) {
-                timelineHtml += `
-                    <div class="timeline-item">
-                        <div class="timeline-line w-40px"></div>
-                        <div class="timeline-icon symbol symbol-circle symbol-40px">
-                            <div class="symbol-label bg-light-info">
-                                <i class="ki-duotone ki-profile-user fs-2 text-info">
-                                    <span class="path1"></span>
-                                    <span class="path2"></span>
-                                </i>
-                            </div>
-                        </div>
-                        <div class="timeline-content mb-10">
-                            <div class="fw-semibold text-gray-800">Atribuída a ${escapeHtml(conv.agent_name || 'Agente')}</div>
-                            <div class="text-muted fs-7">${formatDateTime(conv.assigned_at)}</div>
-                        </div>
-                    </div>
-                `;
+            if (conv.agent_id && conv.agent_name) {
+                events.push({
+                    type: 'assigned',
+                    date: conv.updated_at || conv.created_at,
+                    icon: 'ki-profile-user',
+                    color: 'info',
+                    title: `Atribuída a ${escapeHtml(conv.agent_name)}`,
+                    description: null
+                });
             }
             
             // Mensagens importantes (primeira e última)
@@ -4324,66 +4562,113 @@ function updateConversationTimeline(conversationId) {
                 const lastMsg = messages[messages.length - 1];
                 
                 if (firstMsg && firstMsg.id !== lastMsg?.id) {
-                    timelineHtml += `
-                        <div class="timeline-item">
-                            <div class="timeline-line w-40px"></div>
-                            <div class="timeline-icon symbol symbol-circle symbol-40px">
-                                <div class="symbol-label bg-light-success">
-                                    <i class="ki-duotone ki-message fs-2 text-success">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                </div>
-                            </div>
-                            <div class="timeline-content mb-10">
-                                <div class="fw-semibold text-gray-800">Primeira mensagem</div>
-                                <div class="text-muted fs-7">${formatDateTime(firstMsg.created_at)}</div>
-                            </div>
-                        </div>
-                    `;
+                    events.push({
+                        type: 'first_message',
+                        date: firstMsg.created_at,
+                        icon: 'ki-message',
+                        color: 'success',
+                        title: 'Primeira mensagem',
+                        description: null
+                    });
                 }
                 
                 if (lastMsg) {
+                    events.push({
+                        type: 'last_message',
+                        date: lastMsg.created_at,
+                        icon: 'ki-message',
+                        color: 'warning',
+                        title: 'Última mensagem',
+                        description: null
+                    });
+                }
+            }
+            
+            // Notas internas
+            notes.forEach(note => {
+                const userInitials = getInitials(note.user_name || 'U');
+                events.push({
+                    type: 'note',
+                    date: note.created_at,
+                    icon: 'ki-note-edit',
+                    color: 'secondary',
+                    title: `Nota por ${escapeHtml(note.user_name || 'Usuário')}`,
+                    description: escapeHtml(note.content),
+                    userInitials: userInitials,
+                    noteId: note.id,
+                    userId: note.user_id,
+                    isPrivate: note.is_private
+                });
+            });
+            
+            // Status
+            if (conv.status === 'closed' && conv.resolved_at) {
+                events.push({
+                    type: 'closed',
+                    date: conv.resolved_at,
+                    icon: 'ki-cross-circle',
+                    color: 'dark',
+                    title: 'Conversa fechada',
+                    description: null
+                });
+            }
+            
+            // Ordenar eventos por data (mais recente primeiro)
+            events.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            // Gerar HTML da timeline
+            let timelineHtml = '';
+            events.forEach((event, index) => {
+                const isLast = index === events.length - 1;
+                const lineClass = isLast ? '' : 'w-40px';
+                
+                if (event.type === 'note') {
                     timelineHtml += `
                         <div class="timeline-item">
-                            <div class="timeline-line w-40px"></div>
+                            <div class="timeline-line ${lineClass}"></div>
                             <div class="timeline-icon symbol symbol-circle symbol-40px">
-                                <div class="symbol-label bg-light-warning">
-                                    <i class="ki-duotone ki-message fs-2 text-warning">
+                                <div class="symbol-label bg-light-${event.color}">
+                                    ${event.userInitials ? `
+                                        <div class="symbol-label bg-light-${event.color} text-${event.color} fw-bold fs-7">
+                                            ${event.userInitials}
+                                        </div>
+                                    ` : `
+                                        <i class="ki-duotone ${event.icon} fs-2 text-${event.color}">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                    `}
+                                </div>
+                            </div>
+                            <div class="timeline-content mb-10">
+                                <div class="fw-semibold text-gray-800">${event.title}</div>
+                                ${event.description ? `<div class="text-gray-700 fs-7 mt-2 p-3 bg-light rounded">${event.description}</div>` : ''}
+                                <div class="text-muted fs-7 mt-1">${formatDateTime(event.date)}</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    timelineHtml += `
+                        <div class="timeline-item">
+                            <div class="timeline-line ${lineClass}"></div>
+                            <div class="timeline-icon symbol symbol-circle symbol-40px">
+                                <div class="symbol-label bg-light-${event.color}">
+                                    <i class="ki-duotone ${event.icon} fs-2 text-${event.color}">
                                         <span class="path1"></span>
                                         <span class="path2"></span>
+                                        ${event.icon.includes('message-text') ? '<span class="path3"></span>' : ''}
                                     </i>
                                 </div>
                             </div>
                             <div class="timeline-content mb-10">
-                                <div class="fw-semibold text-gray-800">Última mensagem</div>
-                                <div class="text-muted fs-7">${formatDateTime(lastMsg.created_at)}</div>
+                                <div class="fw-semibold text-gray-800">${event.title}</div>
+                                ${event.description ? `<div class="text-muted fs-7 mt-1">${event.description}</div>` : ''}
+                                <div class="text-muted fs-7">${formatDateTime(event.date)}</div>
                             </div>
                         </div>
                     `;
                 }
-            }
-            
-            // Status
-            if (conv.status === 'closed' && conv.closed_at) {
-                timelineHtml += `
-                    <div class="timeline-item">
-                        <div class="timeline-line w-40px"></div>
-                        <div class="timeline-icon symbol symbol-circle symbol-40px">
-                            <div class="symbol-label bg-light-dark">
-                                <i class="ki-duotone ki-cross-circle fs-2 text-dark">
-                                    <span class="path1"></span>
-                                    <span class="path2"></span>
-                                </i>
-                            </div>
-                        </div>
-                        <div class="timeline-content mb-10">
-                            <div class="fw-semibold text-gray-800">Conversa fechada</div>
-                            <div class="text-muted fs-7">${formatDateTime(conv.closed_at)}</div>
-                        </div>
-                    </div>
-                `;
-            }
+            });
             
             if (timelineHtml === '') {
                 timelineHtml = '<div class="text-muted fs-7 text-center py-5">Nenhum evento na timeline</div>';
@@ -4395,6 +4680,16 @@ function updateConversationTimeline(conversationId) {
             console.error('Erro ao carregar timeline:', error);
             timelineContainer.innerHTML = '<div class="text-muted fs-7 text-center py-5">Erro ao carregar timeline</div>';
         });
+}
+
+// Função auxiliar para obter iniciais do nome
+function getInitials(name) {
+    if (!name) return 'U';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
 }
 
 function formatDateTime(dateString) {
@@ -4661,6 +4956,13 @@ document.getElementById('kt_conversations_search')?.addEventListener('input', fu
     }, 500);
 });
 
+// Event listeners para filtros dropdown
+document.getElementById('filter_status')?.addEventListener('change', applyFilters);
+document.getElementById('filter_channel')?.addEventListener('change', applyFilters);
+document.getElementById('filter_department')?.addEventListener('change', applyFilters);
+document.getElementById('filter_tag')?.addEventListener('change', applyFilters);
+document.getElementById('filter_agent')?.addEventListener('change', applyFilters);
+
 document.getElementById('kt_conversations_search')?.addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
         e.preventDefault();
@@ -4684,6 +4986,7 @@ function applyFilters() {
     const channel = document.getElementById('filter_channel')?.value || '';
     const department = document.getElementById('filter_department')?.value || '';
     const tag = document.getElementById('filter_tag')?.value || '';
+    const agent = document.getElementById('filter_agent')?.value || '';
     
     const params = new URLSearchParams();
     if (search) params.append('search', search);
@@ -4698,6 +5001,14 @@ function applyFilters() {
     if (channel) params.append('channel', channel);
     if (department) params.append('department_id', department);
     if (tag) params.append('tag_id', tag);
+    
+    // Tratar filtro de agente
+    if (agent === 'unassigned') {
+        // Para "Não atribuídas", enviar agent_id=0 ou null (será tratado no backend)
+        params.append('agent_id', '0');
+    } else if (agent) {
+        params.append('agent_id', agent);
+    }
     
     // Manter filtros avançados da URL (incluindo arrays multi-select)
     const urlParams = new URLSearchParams(window.location.search);
@@ -4875,6 +5186,13 @@ function refreshConversationList(params = null) {
                      data-conversation-id="${conv.id}"
                      data-onclick="selectConversation">
                     <div class="d-flex gap-3 w-100">
+                        <!-- Checkbox para seleção em massa -->
+                        <div class="flex-shrink-0 d-flex align-items-center">
+                            <label class="form-check form-check-custom form-check-solid">
+                                <input class="form-check-input conversation-checkbox" type="checkbox" value="${conv.id}" 
+                                       onclick="event.stopPropagation(); toggleBulkSelection();">
+                            </label>
+                        </div>
                         <div class="symbol symbol-45px flex-shrink-0">
                             ${avatarHtml}
                         </div>
@@ -4942,7 +5260,7 @@ function refreshConversationList(params = null) {
                     </div>
                             </div>
                             <div class="conversation-item-preview">${escapeHtml(lastMessagePreview || 'Sem mensagens')}</div>
-                            ${conv.search_match_type ? `
+                                        ${conv.search_match_type ? `
                                 <div class="conversation-item-search-match mt-1">
                                     <span class="badge badge-sm badge-light-info">
                                         <i class="ki-duotone ki-magnifier fs-7 me-1">
@@ -4952,6 +5270,8 @@ function refreshConversationList(params = null) {
                                         ${conv.search_match_type === 'name' ? 'Nome' : 
                                           conv.search_match_type === 'phone' ? 'Telefone' : 
                                           conv.search_match_type === 'email' ? 'Email' : 
+                                          conv.search_match_type === 'tag' ? 'Tag' :
+                                          conv.search_match_type === 'participant' ? 'Participante' :
                                           'Mensagem'}: 
                                         <span class="fw-semibold">${escapeHtml((conv.search_match_text || '').substring(0, 40))}${(conv.search_match_text || '').length > 40 ? '...' : ''}</span>
                                     </span>
@@ -5036,11 +5356,30 @@ function applyAdvancedFilters() {
     // Filtros básicos (manter)
     const search = document.getElementById('kt_conversations_search')?.value || '';
     const status = document.getElementById('filter_status')?.value || '';
+    const channel = document.getElementById('filter_channel')?.value || '';
     const department = document.getElementById('filter_department')?.value || '';
+    const tag = document.getElementById('filter_tag')?.value || '';
+    const agent = document.getElementById('filter_agent')?.value || '';
     
     if (search) params.append('search', search);
-    if (status) params.append('status', status);
+    
+    // Tratar status especial "unanswered"
+    if (status === 'unanswered') {
+        params.append('unanswered', '1');
+    } else if (status) {
+        params.append('status', status);
+    }
+    
+    if (channel) params.append('channel', channel);
     if (department) params.append('department_id', department);
+    if (tag) params.append('tag_id', tag);
+    
+    // Tratar filtro de agente
+    if (agent === 'unassigned') {
+        params.append('agent_id', '0');
+    } else if (agent) {
+        params.append('agent_id', agent);
+    }
     
     // Canais (multi-select)
     const channels = formData.getAll('channels[]');
@@ -8844,6 +9183,88 @@ document.getElementById('assignForm')?.addEventListener('submit', function(e) {
     });
 });
 
+// Submeter mudança de setor
+document.getElementById('changeDepartmentForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const conversationId = document.getElementById('changeDepartmentConversationId').value || 
+                          window.currentConversationId || 
+                          parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+    const departmentId = document.getElementById('changeDepartmentSelect').value || null;
+    
+    const btn = this.querySelector('button[type="submit"]');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Salvando...';
+    
+    const formData = new FormData();
+    if (departmentId) {
+        formData.append('department_id', departmentId);
+    } else {
+        formData.append('department_id', '');
+    }
+    
+    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/update-department`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('kt_modal_change_department')).hide();
+            
+            const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
+                               document.body.classList.contains('dark-mode') ||
+                               window.matchMedia('(prefers-color-scheme: dark)').matches;
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso!',
+                text: data.message || 'Setor atualizado com sucesso',
+                colorScheme: isDarkMode ? 'dark' : 'light',
+                timer: 2000,
+                showConfirmButton: false
+            });
+            
+            // Recarregar detalhes da conversa
+            if (window.currentConversationId) {
+                if (typeof loadConversationDetails === 'function') {
+                    loadConversationDetails(window.currentConversationId);
+                }
+            }
+            
+            // Recarregar lista de conversas (preservando filtros)
+            const urlParams = new URLSearchParams(window.location.search);
+            if (typeof refreshConversationList === 'function') {
+                refreshConversationList(urlParams);
+            } else {
+                window.location.reload();
+            }
+        } else {
+            throw new Error(data.message || 'Erro ao atualizar setor');
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
+                           document.body.classList.contains('dark-mode') ||
+                           window.matchMedia('(prefers-color-scheme: dark)').matches;
+        
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: error.message || 'Erro ao atualizar setor',
+            colorScheme: isDarkMode ? 'dark' : 'light'
+        });
+        
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    });
+});
+
 // Modal de Tags
 function manageTags(conversationId) {
     const modal = new bootstrap.Modal(document.getElementById('kt_modal_tags'));
@@ -9465,7 +9886,16 @@ function renderAttachmentHtml(attachment) {
             </div>
         </div>`;
     } else {
-        const downloadUrl = `<?= \App\Helpers\Url::to('/attachments') ?>/${encodeURIComponent(attachment.path || '')}/download`;
+        // Para documentos, usar URL direta se o arquivo estiver em assets/
+        const attachmentPath = attachment.path || '';
+        let downloadUrl;
+        if (attachmentPath.startsWith('assets/')) {
+            // Caminho direto para arquivo público
+            downloadUrl = `<?= \App\Helpers\Url::to('/') ?>${attachmentPath}`;
+        } else {
+            // Rota de download para arquivos fora de assets/
+            downloadUrl = `<?= \App\Helpers\Url::to('/attachments') ?>/${encodeURIComponent(attachmentPath)}/download`;
+        }
         html += `<a href="${downloadUrl}" target="_blank" class="d-flex align-items-center gap-2 p-2 border rounded" style="text-decoration: none; color: inherit; background: rgba(255,255,255,0.05);" onclick="event.stopPropagation();">
             <i class="ki-duotone ki-file fs-2">
                 <span class="path1"></span>
@@ -9571,11 +10001,8 @@ if (typeof window.wsClient !== 'undefined') {
             // Garantir dropdown de ações
             ensureActionsDropdown(conversationItem, pinned, data.conversation_id);
 
-            // Mover conversa para o topo se não for a atual
-            if (currentConversationId != data.conversation_id) {
-                const list = conversationItem.parentElement;
-                list.insertBefore(conversationItem, list.firstChild);
-            }
+            // Reordenar lista após atualização (respeita timestamp e pinned)
+            sortConversationList();
         } else {
             // Se não existe na lista, fazer refresh para forçar render (preservando filtros)
             console.log('new_message: conversa não encontrada na lista, atualizando lista');
@@ -9689,7 +10116,7 @@ if (typeof window.wsClient !== 'undefined') {
             }
         } else {
             applyConversationUpdate(data.conversation || { id: data.conversation_id, unread_count: data.unread_count });
-            moveConversationToTop(data.conversation_id);
+            // moveConversationToTop removido - applyConversationUpdate já ordena via sortConversationList()
         }
     });
     
@@ -9786,10 +10213,9 @@ function addConversationToList(conv) {
     // Verificar se a conversa já existe na lista
     const existingItem = document.querySelector(`[data-conversation-id="${conv.id}"]`);
     if (existingItem) {
-        // Se já existe, apenas atualizar e mover para o topo
-        console.log('Conversa já existe na lista, atualizando e movendo para topo:', conv.id);
+        // Se já existe, apenas atualizar (applyConversationUpdate já ordena via sortConversationList)
+        console.log('Conversa já existe na lista, atualizando:', conv.id);
         applyConversationUpdate(conv);
-        moveConversationToTop(conv.id);
         return;
     }
 
@@ -9846,6 +10272,13 @@ function addConversationToList(conv) {
              data-updated-at="${conv.last_message_at || conv.updated_at || new Date().toISOString()}"
              data-onclick="selectConversation">
             <div class="d-flex gap-3 w-100">
+                <!-- Checkbox para seleção em massa -->
+                <div class="flex-shrink-0 d-flex align-items-center">
+                    <label class="form-check form-check-custom form-check-solid">
+                        <input class="form-check-input conversation-checkbox" type="checkbox" value="${conv.id}" 
+                               onclick="event.stopPropagation(); toggleBulkSelection();">
+                    </label>
+                </div>
                 <div class="symbol symbol-45px flex-shrink-0">
                     ${avatarHtml}
                 </div>
@@ -9969,6 +10402,7 @@ function refreshConversationBadges() {
         search: urlParams.get('search') || '',
         department_id: urlParams.get('department_id') || '',
         tag_id: urlParams.get('tag_id') || '',
+        agent_id: urlParams.get('agent_id') || '',
         unanswered: urlParams.get('unanswered') || '',
         answered: urlParams.get('answered') || '',
         date_from: urlParams.get('date_from') || '',
@@ -10047,8 +10481,7 @@ function refreshConversationBadges() {
                                 meta.insertAdjacentHTML('beforeend', badgeHtml);
                             }
                         }
-                        // Se chegou mensagem não lida, trazer para o topo
-                        moveConversationToTop(conv.id);
+                        // A ordenação correta será feita por sortConversationList() abaixo
                     } else {
                         // Remover badge se não houver mensagens não lidas
                         if (badge) {
@@ -11725,6 +12158,260 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// ============================================
+// AÇÕES EM MASSA
+// ============================================
+
+// Obter conversas selecionadas
+function getSelectedConversations() {
+    const checkboxes = document.querySelectorAll('.conversation-checkbox:checked');
+    return Array.from(checkboxes).map(cb => parseInt(cb.value));
+}
+
+// Atualizar contador e barra de ações
+function toggleBulkSelection() {
+    const selected = getSelectedConversations();
+    const bulkBar = document.getElementById('bulkActionsBar');
+    const countEl = document.getElementById('bulkSelectionCount');
+    
+    if (bulkBar && countEl) {
+        if (selected.length > 0) {
+            bulkBar.classList.remove('d-none');
+            countEl.textContent = `${selected.length} conversa${selected.length > 1 ? 's' : ''} selecionada${selected.length > 1 ? 's' : ''}`;
+        } else {
+            bulkBar.classList.add('d-none');
+        }
+    }
+}
+
+// Selecionar todas as conversas
+function selectAllConversations() {
+    document.querySelectorAll('.conversation-checkbox').forEach(cb => {
+        cb.checked = true;
+    });
+    toggleBulkSelection();
+}
+
+// Limpar seleção
+function clearBulkSelection() {
+    document.querySelectorAll('.conversation-checkbox').forEach(cb => {
+        cb.checked = false;
+    });
+    toggleBulkSelection();
+}
+
+// Atribuir conversas a agente
+async function bulkAssignAgent(agentId, agentName) {
+    const selected = getSelectedConversations();
+    if (selected.length === 0) {
+        alert('Selecione pelo menos uma conversa');
+        return;
+    }
+    
+    const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
+                       document.body.classList.contains('dark-mode') ||
+                       window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    if (!confirm(`Atribuir ${selected.length} conversa(s) para ${agentName}?`)) {
+        return;
+    }
+    
+    try {
+        const promises = selected.map(id => 
+            fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${id}/assign`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ agent_id: agentId })
+            }).then(r => r.json())
+        );
+        
+        const results = await Promise.all(promises);
+        const success = results.filter(r => r.success).length;
+        const failed = results.filter(r => !r.success).length;
+        
+        Swal.fire({
+            icon: success > 0 ? 'success' : 'error',
+            title: success > 0 ? 'Sucesso!' : 'Erro',
+            text: `${success} conversa(s) atribuída(s) com sucesso${failed > 0 ? `. ${failed} falharam.` : '.'}`,
+            colorScheme: isDarkMode ? 'dark' : 'light'
+        });
+        
+        clearBulkSelection();
+        if (typeof refreshConversationList === 'function') {
+            const urlParams = new URLSearchParams(window.location.search);
+            refreshConversationList(urlParams);
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro ao atribuir conversas',
+            colorScheme: isDarkMode ? 'dark' : 'light'
+        });
+    }
+}
+
+// Adicionar tag em massa
+async function bulkAddTag(tagId, tagName) {
+    const selected = getSelectedConversations();
+    if (selected.length === 0) {
+        alert('Selecione pelo menos uma conversa');
+        return;
+    }
+    
+    const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
+                       document.body.classList.contains('dark-mode') ||
+                       window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    try {
+        const promises = selected.map(id => 
+            fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${id}/tags`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ tag_id: tagId })
+            }).then(r => r.json())
+        );
+        
+        const results = await Promise.all(promises);
+        const success = results.filter(r => r.success).length;
+        const failed = results.filter(r => !r.success).length;
+        
+        Swal.fire({
+            icon: success > 0 ? 'success' : 'error',
+            title: success > 0 ? 'Sucesso!' : 'Erro',
+            text: `Tag "${tagName}" adicionada em ${success} conversa(s)${failed > 0 ? `. ${failed} falharam.` : '.'}`,
+            colorScheme: isDarkMode ? 'dark' : 'light'
+        });
+        
+        clearBulkSelection();
+        if (typeof refreshConversationList === 'function') {
+            const urlParams = new URLSearchParams(window.location.search);
+            refreshConversationList(urlParams);
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro ao adicionar tag',
+            colorScheme: isDarkMode ? 'dark' : 'light'
+        });
+    }
+}
+
+// Fechar conversas em massa
+async function bulkCloseConversations() {
+    const selected = getSelectedConversations();
+    if (selected.length === 0) {
+        alert('Selecione pelo menos uma conversa');
+        return;
+    }
+    
+    const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
+                       document.body.classList.contains('dark-mode') ||
+                       window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    if (!confirm(`Fechar ${selected.length} conversa(s)?`)) {
+        return;
+    }
+    
+    try {
+        const promises = selected.map(id => 
+            fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${id}/close`, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            }).then(r => r.json())
+        );
+        
+        const results = await Promise.all(promises);
+        const success = results.filter(r => r.success).length;
+        const failed = results.filter(r => !r.success).length;
+        
+        Swal.fire({
+            icon: success > 0 ? 'success' : 'error',
+            title: success > 0 ? 'Sucesso!' : 'Erro',
+            text: `${success} conversa(s) fechada(s)${failed > 0 ? `. ${failed} falharam.` : '.'}`,
+            colorScheme: isDarkMode ? 'dark' : 'light'
+        });
+        
+        clearBulkSelection();
+        if (typeof refreshConversationList === 'function') {
+            const urlParams = new URLSearchParams(window.location.search);
+            refreshConversationList(urlParams);
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro ao fechar conversas',
+            colorScheme: isDarkMode ? 'dark' : 'light'
+        });
+    }
+}
+
+// Reabrir conversas em massa
+async function bulkReopenConversations() {
+    const selected = getSelectedConversations();
+    if (selected.length === 0) {
+        alert('Selecione pelo menos uma conversa');
+        return;
+    }
+    
+    const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
+                       document.body.classList.contains('dark-mode') ||
+                       window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    if (!confirm(`Reabrir ${selected.length} conversa(s)?`)) {
+        return;
+    }
+    
+    try {
+        const promises = selected.map(id => 
+            fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${id}/reopen`, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            }).then(r => r.json())
+        );
+        
+        const results = await Promise.all(promises);
+        const success = results.filter(r => r.success).length;
+        const failed = results.filter(r => !r.success).length;
+        
+        Swal.fire({
+            icon: success > 0 ? 'success' : 'error',
+            title: success > 0 ? 'Sucesso!' : 'Erro',
+            text: `${success} conversa(s) reaberta(s)${failed > 0 ? `. ${failed} falharam.` : '.'}`,
+            colorScheme: isDarkMode ? 'dark' : 'light'
+        });
+        
+        clearBulkSelection();
+        if (typeof refreshConversationList === 'function') {
+            const urlParams = new URLSearchParams(window.location.search);
+            refreshConversationList(urlParams);
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro ao reabrir conversas',
+            colorScheme: isDarkMode ? 'dark' : 'light'
+        });
+    }
+}
 </script>
 
 <?php $content = ob_get_clean(); ?>

@@ -94,8 +94,28 @@ class Conversation extends Model
             $params[] = $filters['channel'];
         }
         
-        // Filtro por agente (0 ou '0' significa não atribuídas)
-        if (isset($filters['agent_id'])) {
+        // Filtro por agente (suporta array para multi-select)
+        if (!empty($filters['agent_ids']) && is_array($filters['agent_ids'])) {
+            $hasUnassigned = in_array('unassigned', $filters['agent_ids']);
+            $agentIds = array_filter($filters['agent_ids'], function($id) {
+                return $id !== 'unassigned' && $id !== '0';
+            });
+            
+            if ($hasUnassigned && !empty($agentIds)) {
+                // Tem ambos: não atribuídas E agentes específicos
+                $placeholders = implode(',', array_fill(0, count($agentIds), '?'));
+                $sql .= " AND ((c.agent_id IS NULL OR c.agent_id = 0) OR c.agent_id IN ($placeholders))";
+                $params = array_merge($params, array_map('intval', $agentIds));
+            } elseif ($hasUnassigned) {
+                // Apenas não atribuídas
+                $sql .= " AND (c.agent_id IS NULL OR c.agent_id = 0)";
+            } elseif (!empty($agentIds)) {
+                // Apenas agentes específicos
+                $placeholders = implode(',', array_fill(0, count($agentIds), '?'));
+                $sql .= " AND c.agent_id IN ($placeholders)";
+                $params = array_merge($params, array_map('intval', $agentIds));
+            }
+        } elseif (isset($filters['agent_id'])) {
             $agentId = $filters['agent_id'];
             if ($agentId === '0' || $agentId === 0 || $agentId === 'unassigned') {
                 $sql .= " AND (c.agent_id IS NULL OR c.agent_id = 0)";

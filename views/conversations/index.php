@@ -222,19 +222,9 @@ ob_start();
 }
 
 .conversations-list-filters {
-    padding: 0;
+    padding: 10px 20px;
     border-bottom: 1px solid var(--bs-border-color);
     flex-shrink: 0;
-}
-
-.conversations-list-filters .card {
-    border: none;
-    border-radius: 0;
-    box-shadow: none;
-}
-
-.conversations-list-filters .card-body {
-    padding: 15px 20px;
 }
 
 .conversations-list-items {
@@ -1518,115 +1508,87 @@ body.dark-mode .swal2-content {
         </div>
         
         <!-- Filtros -->
-        <div class="conversations-list-filters mb-4">
-            <div class="card card-flush">
-                <div class="card-body py-3">
-                    <div class="d-flex flex-wrap align-items-center gap-3">
-                        <!-- Grupo: Status -->
-                        <div class="d-flex align-items-center gap-2">
-                            <label class="form-label fw-semibold text-gray-700 mb-0 fs-7" style="min-width: 60px;">Status:</label>
-                            <select id="filter_status" class="form-select form-select-sm form-select-solid" style="min-width: 140px;">
-                                <option value="">Todas</option>
-                                <option value="open" <?= ($filters['status'] ?? '') === 'open' ? 'selected' : '' ?>>Abertas</option>
-                                <option value="resolved" <?= ($filters['status'] ?? '') === 'resolved' ? 'selected' : '' ?>>Resolvidas</option>
-                                <option value="closed" <?= ($filters['status'] ?? '') === 'closed' ? 'selected' : '' ?>>Fechadas</option>
-                                <option value="unanswered" <?= !empty($filters['unanswered']) ? 'selected' : '' ?>>🔴 Não respondidas</option>
-                            </select>
-                        </div>
-                        
-                        <!-- Grupo: Canal -->
-                        <div class="d-flex align-items-center gap-2">
-                            <label class="form-label fw-semibold text-gray-700 mb-0 fs-7" style="min-width: 60px;">Canal:</label>
-                            <select id="filter_channel" class="form-select form-select-sm form-select-solid" style="min-width: 140px;">
-                                <option value="">Todos</option>
-                                <option value="whatsapp" <?= ($filters['channel'] ?? '') === 'whatsapp' ? 'selected' : '' ?>>📱 WhatsApp</option>
-                                <option value="email" <?= ($filters['channel'] ?? '') === 'email' ? 'selected' : '' ?>>✉️ Email</option>
-                                <option value="chat" <?= ($filters['channel'] ?? '') === 'chat' ? 'selected' : '' ?>>💬 Chat</option>
-                            </select>
-                        </div>
-                        
-                        <!-- Grupo: Setor -->
-                        <?php if (!empty($departments)): ?>
-                        <div class="d-flex align-items-center gap-2">
-                            <label class="form-label fw-semibold text-gray-700 mb-0 fs-7" style="min-width: 60px;">Setor:</label>
-                            <select id="filter_department" class="form-select form-select-sm form-select-solid" style="min-width: 160px;">
-                                <option value="">Todos</option>
-                                <?php foreach ($departments as $dept): ?>
-                                    <option value="<?= $dept['id'] ?>" <?= ($filters['department_id'] ?? '') == $dept['id'] ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($dept['name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <?php endif; ?>
-                        
-                        <!-- Grupo: Tag -->
-                        <?php if (!empty($tags)): ?>
-                        <div class="d-flex align-items-center gap-2">
-                            <label class="form-label fw-semibold text-gray-700 mb-0 fs-7" style="min-width: 60px;">Tag:</label>
-                            <select id="filter_tag" class="form-select form-select-sm form-select-solid" style="min-width: 160px;">
-                                <option value="">Todas</option>
-                                <?php foreach ($tags as $tag): ?>
-                                    <option value="<?= $tag['id'] ?>" <?= ($filters['tag_id'] ?? '') == $tag['id'] ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($tag['name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <?php endif; ?>
-                        
-                        <!-- Grupo: Agente -->
+        <div class="conversations-list-filters">
+            <div class="d-flex flex-wrap align-items-center gap-2 py-2">
+                <select id="filter_status" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 120px;">
+                    <option value="">Todas</option>
+                    <option value="open" <?= ($filters['status'] ?? '') === 'open' ? 'selected' : '' ?>>Abertas</option>
+                    <option value="resolved" <?= ($filters['status'] ?? '') === 'resolved' ? 'selected' : '' ?>>Resolvidas</option>
+                    <option value="closed" <?= ($filters['status'] ?? '') === 'closed' ? 'selected' : '' ?>>Fechadas</option>
+                    <option value="unanswered" <?= !empty($filters['unanswered']) ? 'selected' : '' ?>>🔴 Não respondidas</option>
+                </select>
+                
+                <select id="filter_channel" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 120px;">
+                    <option value="">Canais</option>
+                    <option value="whatsapp" <?= ($filters['channel'] ?? '') === 'whatsapp' ? 'selected' : '' ?>>📱 WhatsApp</option>
+                    <option value="email" <?= ($filters['channel'] ?? '') === 'email' ? 'selected' : '' ?>>✉️ Email</option>
+                    <option value="chat" <?= ($filters['channel'] ?? '') === 'chat' ? 'selected' : '' ?>>💬 Chat</option>
+                </select>
+                
+                <?php if (!empty($departments)): ?>
+                <select id="filter_department" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 140px;">
+                    <option value="">Setores</option>
+                    <?php foreach ($departments as $dept): ?>
+                        <option value="<?= $dept['id'] ?>" <?= ($filters['department_id'] ?? '') == $dept['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($dept['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <?php endif; ?>
+                
+                <?php if (!empty($tags)): ?>
+                <select id="filter_tag" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 140px;">
+                    <option value="">Tags</option>
+                    <?php foreach ($tags as $tag): ?>
+                        <option value="<?= $tag['id'] ?>" <?= ($filters['tag_id'] ?? '') == $tag['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($tag['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <?php endif; ?>
+                
+                <?php 
+                $canViewAllConversations = \App\Helpers\Permission::can('conversations.view.all');
+                $currentUserId = \App\Helpers\Auth::id();
+                ?>
+                <?php if ($canViewAllConversations || !empty($agents)): ?>
+                <select id="filter_agent" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 160px;">
+                    <option value="">Agentes</option>
+                    <option value="unassigned" <?= ($filters['agent_id'] ?? '') === 'unassigned' ? 'selected' : '' ?>>🔴 Não atribuídas</option>
+                    <?php if ($canViewAllConversations && !empty($agents)): ?>
+                        <?php foreach ($agents as $agent): ?>
+                            <option value="<?= $agent['id'] ?>" <?= ($filters['agent_id'] ?? '') == $agent['id'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($agent['name']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    <?php elseif (!$canViewAllConversations && $currentUserId): ?>
                         <?php 
-                        $canViewAllConversations = \App\Helpers\Permission::can('conversations.view.all');
-                        $currentUserId = \App\Helpers\Auth::id();
-                        ?>
-                        <?php if ($canViewAllConversations || !empty($agents)): ?>
-                        <div class="d-flex align-items-center gap-2">
-                            <label class="form-label fw-semibold text-gray-700 mb-0 fs-7" style="min-width: 60px;">Agente:</label>
-                            <select id="filter_agent" class="form-select form-select-sm form-select-solid" style="min-width: 180px;">
-                                <option value="">Todos</option>
-                                <option value="unassigned" <?= ($filters['agent_id'] ?? '') === 'unassigned' ? 'selected' : '' ?>>🔴 Não atribuídas</option>
-                                <?php if ($canViewAllConversations && !empty($agents)): ?>
-                                    <?php foreach ($agents as $agent): ?>
-                                        <option value="<?= $agent['id'] ?>" <?= ($filters['agent_id'] ?? '') == $agent['id'] ? 'selected' : '' ?>>
-                                            <?= htmlspecialchars($agent['name']) ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                <?php elseif (!$canViewAllConversations && $currentUserId): ?>
-                                    <?php 
-                                    $currentUser = \App\Models\User::find($currentUserId);
-                                    if ($currentUser): ?>
-                                        <option value="<?= $currentUser['id'] ?>" <?= ($filters['agent_id'] ?? '') == $currentUser['id'] ? 'selected' : '' ?>>
-                                            Minhas conversas
-                                        </option>
-                                    <?php endif; ?>
-                                <?php endif; ?>
-                            </select>
-                        </div>
+                        $currentUser = \App\Models\User::find($currentUserId);
+                        if ($currentUser): ?>
+                            <option value="<?= $currentUser['id'] ?>" <?= ($filters['agent_id'] ?? '') == $currentUser['id'] ? 'selected' : '' ?>>
+                                Minhas conversas
+                            </option>
                         <?php endif; ?>
-                        
-                        <!-- Botões de ação -->
-                        <div class="d-flex align-items-center gap-2 ms-auto">
-                            <button type="button" class="btn btn-sm btn-light-primary" onclick="openAdvancedFilters()" title="Filtros Avançados">
-                                <i class="ki-duotone ki-filter fs-6 me-1">
-                                    <span class="path1"></span>
-                                    <span class="path2"></span>
-                                </i>
-                                Filtros
-                            </button>
-                            
-                            <?php if (!empty($filters['unanswered']) || !empty($filters['answered']) || !empty($filters['date_from']) || !empty($filters['date_to']) || isset($filters['pinned'])): ?>
-                            <button type="button" class="btn btn-sm btn-light-danger" onclick="clearAllFilters()" title="Limpar Filtros">
-                                <i class="ki-duotone ki-cross fs-6 me-1">
-                                    <span class="path1"></span>
-                                    <span class="path2"></span>
-                                </i>
-                                Limpar
-                            </button>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
+                    <?php endif; ?>
+                </select>
+                <?php endif; ?>
+                
+                <button type="button" class="btn btn-sm btn-light-primary" onclick="openAdvancedFilters()" title="Filtros Avançados">
+                    <i class="ki-duotone ki-filter fs-6 me-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Filtros
+                </button>
+                
+                <?php if (!empty($filters['unanswered']) || !empty($filters['answered']) || !empty($filters['date_from']) || !empty($filters['date_to']) || isset($filters['pinned'])): ?>
+                <button type="button" class="btn btn-sm btn-light-danger" onclick="clearAllFilters()" title="Limpar Filtros">
+                    <i class="ki-duotone ki-cross fs-6">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </button>
+                <?php endif; ?>
             </div>
         </div>
         
@@ -3334,6 +3296,57 @@ body.dark-mode .swal2-content {
                         <div class="form-text">Selecione uma ou mais tags</div>
                     </div>
                 <?php endif; ?>
+                    
+                    <!-- Agentes (Multi-select) -->
+                    <?php 
+                    $canViewAllConversations = \App\Helpers\Permission::can('conversations.view.all');
+                    $currentUserId = \App\Helpers\Auth::id();
+                    ?>
+                    <?php if ($canViewAllConversations || !empty($agents)): ?>
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold mb-2">Agentes Atribuídos:</label>
+                        <div class="border rounded p-3" style="max-height: 200px; overflow-y: auto; background: var(--bs-gray-100);">
+                            <?php 
+                            $selectedAgents = [];
+                            if (isset($filters['agent_ids']) && is_array($filters['agent_ids'])) {
+                                $selectedAgents = $filters['agent_ids'];
+                            } elseif (!empty($filters['agent_id']) && $filters['agent_id'] !== 'unassigned') {
+                                $selectedAgents = [(int)$filters['agent_id']];
+                            }
+                            
+                            // Opção para não atribuídas
+                            ?>
+                            <label class="form-check form-check-custom form-check-solid mb-2">
+                                <input class="form-check-input" type="checkbox" name="agent_ids[]" value="unassigned" <?= (!empty($filters['agent_id']) && $filters['agent_id'] === 'unassigned') || in_array('unassigned', $selectedAgents) ? 'checked' : '' ?>>
+                                <span class="form-check-label">🔴 Não atribuídas</span>
+                            </label>
+                            
+                            <?php if ($canViewAllConversations && !empty($agents)): ?>
+                                <?php foreach ($agents as $agent): ?>
+                                    <label class="form-check form-check-custom form-check-solid mb-2">
+                                        <input class="form-check-input" type="checkbox" name="agent_ids[]" value="<?= $agent['id'] ?>" <?= in_array($agent['id'], $selectedAgents) ? 'checked' : '' ?>>
+                                        <span class="form-check-label">
+                                            <?= htmlspecialchars($agent['name']) ?>
+                                            <?php if (!empty($agent['email'])): ?>
+                                                <span class="text-muted fs-7">(<?= htmlspecialchars($agent['email']) ?>)</span>
+                                            <?php endif; ?>
+                                        </span>
+                                    </label>
+                                <?php endforeach; ?>
+                            <?php elseif (!$canViewAllConversations && $currentUserId): ?>
+                                <?php 
+                                $currentUser = \App\Models\User::find($currentUserId);
+                                if ($currentUser): ?>
+                                    <label class="form-check form-check-custom form-check-solid mb-2">
+                                        <input class="form-check-input" type="checkbox" name="agent_ids[]" value="<?= $currentUser['id'] ?>" <?= in_array($currentUser['id'], $selectedAgents) ? 'checked' : '' ?>>
+                                        <span class="form-check-label">Minhas conversas</span>
+                                    </label>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
+                        <div class="form-text">Selecione um ou mais agentes</div>
+                    </div>
+                    <?php endif; ?>
                     
                     <!-- Status de Resposta -->
                     <div class="mb-5">
@@ -5548,13 +5561,6 @@ function applyAdvancedFilters() {
     if (department) params.append('department_id', department);
     if (tag) params.append('tag_id', tag);
     
-    // Tratar filtro de agente
-    if (agent === 'unassigned') {
-        params.append('agent_id', '0');
-    } else if (agent) {
-        params.append('agent_id', agent);
-    }
-    
     // Canais (multi-select)
     const channels = formData.getAll('channels[]');
     if (channels.length > 0) {
@@ -5565,6 +5571,20 @@ function applyAdvancedFilters() {
     const tagIds = formData.getAll('tag_ids[]');
     if (tagIds.length > 0) {
         tagIds.forEach(tagId => params.append('tag_ids[]', tagId));
+    }
+    
+    // Agentes (multi-select) - substituir filtro simples se houver seleção múltipla
+    const agentIds = formData.getAll('agent_ids[]');
+    if (agentIds.length > 0) {
+        // Usar multiselect de agentes (substitui filtro simples)
+        agentIds.forEach(agentId => params.append('agent_ids[]', agentId));
+    } else {
+        // Se não houver multiselect, usar filtro simples
+        if (agent === 'unassigned') {
+            params.append('agent_id', '0');
+        } else if (agent) {
+            params.append('agent_id', agent);
+        }
     }
     
     // Integrações WhatsApp (multi-select)

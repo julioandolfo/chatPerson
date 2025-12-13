@@ -30,6 +30,7 @@ class ConversationController
             'channels' => isset($_GET['channels']) && is_array($_GET['channels']) ? $_GET['channels'] : (!empty($_GET['channel']) ? [$_GET['channel']] : null),
             'search' => $_GET['search'] ?? null,
             'agent_id' => isset($_GET['agent_id']) ? ($_GET['agent_id'] === '0' || $_GET['agent_id'] === 0 ? '0' : $_GET['agent_id']) : null,
+            'agent_ids' => isset($_GET['agent_ids']) && is_array($_GET['agent_ids']) ? $_GET['agent_ids'] : (!empty($_GET['agent_id']) && $_GET['agent_id'] !== '0' ? [$_GET['agent_id']] : null),
             'department_id' => $_GET['department_id'] ?? null,
             'tag_id' => $_GET['tag_id'] ?? null,
             'tag_ids' => isset($_GET['tag_ids']) && is_array($_GET['tag_ids']) ? array_map('intval', $_GET['tag_ids']) : (!empty($_GET['tag_id']) ? [(int)$_GET['tag_id']] : null),
@@ -58,7 +59,7 @@ class ConversationController
                 return $value !== null && trim($value) !== ''; // Manter busca mesmo se tiver espaços
             }
             // Manter arrays mesmo se vazios (serão processados depois)
-            if (in_array($key, ['channels', 'tag_ids', 'whatsapp_account_ids']) && is_array($value)) {
+            if (in_array($key, ['channels', 'tag_ids', 'whatsapp_account_ids', 'agent_ids']) && is_array($value)) {
                 return true; // Manter arrays para processamento
             }
             return $value !== null && $value !== '';

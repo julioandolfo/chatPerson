@@ -495,6 +495,11 @@ class ConversationController
      */
     public function assign(int $id): void
     {
+        // Limpar qualquer output anterior
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
         // Verificar permissão sem abortar (retornar JSON se não tiver)
         if (!Permission::can('conversations.assign.all') && !Permission::can('conversations.assign.own')) {
             Response::json([
@@ -505,13 +510,34 @@ class ConversationController
         }
         
         try {
-            $agentId = $_POST['agent_id'] ?? null;
+            // Ler dados (JSON ou form-data)
+            $agentId = \App\Helpers\Request::post('agent_id');
             
             if (!$agentId) {
                 Response::json([
                     'success' => false,
                     'message' => 'Agente não informado'
                 ], 400);
+                return;
+            }
+            
+            // Verificar se conversa existe
+            $conversation = \App\Models\Conversation::find($id);
+            if (!$conversation) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Conversa não encontrada'
+                ], 404);
+                return;
+            }
+            
+            // Verificar se agente existe
+            $agent = User::find($agentId);
+            if (!$agent) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Agente não encontrado'
+                ], 404);
                 return;
             }
 
@@ -523,10 +549,13 @@ class ConversationController
                 'conversation' => $conversation
             ]);
         } catch (\Exception $e) {
+            error_log("ConversationController::assign - Erro: " . $e->getMessage());
+            error_log("ConversationController::assign - Trace: " . $e->getTraceAsString());
+            
             Response::json([
                 'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
+                'message' => 'Erro ao atribuir conversa: ' . $e->getMessage()
+            ], 500);
         }
     }
 
@@ -1506,6 +1535,11 @@ class ConversationController
      */
     public function addParticipant(int $id): void
     {
+        // Limpar qualquer output anterior
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
         // Verificar permissão sem abortar (retornar JSON se não tiver)
         if (!Permission::can('conversations.edit.own') && !Permission::can('conversations.edit.all')) {
             Response::json([
@@ -1516,14 +1550,34 @@ class ConversationController
         }
         
         try {
-            $data = \App\Helpers\Request::post();
-            $userId = (int)($data['user_id'] ?? 0);
+            // Ler dados (JSON ou form-data)
+            $userId = (int)\App\Helpers\Request::post('user_id');
             
             if (!$userId) {
                 Response::json([
                     'success' => false,
                     'message' => 'ID do usuário é obrigatório'
                 ], 400);
+                return;
+            }
+            
+            // Verificar se conversação existe
+            $conversation = \App\Models\Conversation::find($id);
+            if (!$conversation) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Conversa não encontrada'
+                ], 404);
+                return;
+            }
+            
+            // Verificar se usuário existe
+            $user = \App\Models\User::find($userId);
+            if (!$user) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Usuário não encontrado'
+                ], 404);
                 return;
             }
             
@@ -1541,14 +1595,17 @@ class ConversationController
             } else {
                 Response::json([
                     'success' => false,
-                    'message' => 'Erro ao adicionar participante'
+                    'message' => 'Erro ao adicionar participante. Talvez ele já faça parte da conversa.'
                 ], 400);
             }
         } catch (\Exception $e) {
+            error_log("ConversationController::addParticipant - Erro: " . $e->getMessage());
+            error_log("ConversationController::addParticipant - Trace: " . $e->getTraceAsString());
+            
             Response::json([
                 'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
+                'message' => 'Erro ao adicionar participante: ' . $e->getMessage()
+            ], 500);
         }
     }
 

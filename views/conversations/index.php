@@ -678,12 +678,8 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
 
 /* Reduzir padding quando contém apenas áudio */
 .message-bubble.audio-only {
-    padding: 4px 8px !important;
-    line-height: 1 !important;
-}
-
-.message-bubble.audio-only .audio-attachment {
-    margin: 0;
+    padding: 10px 12px !important;
+    line-height: 1.2 !important;
 }
 
 /* Badge de mensagem de IA */
@@ -742,18 +738,27 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     border-left-color: #818cf8;
 }
 
-/* Forçar altura mínima do player de áudio */
-.audio-attachment audio {
-    height: 24px !important;
-    max-height: 24px !important;
-    min-height: 24px !important;
-    display: block !important;
+/* Player de áudio - layout unificado */
+.audio-attachment {
+    max-width: 420px;
+    margin: 0;
+    line-height: 1;
 }
 
-/* Altura máxima para vídeos */
-.attachment-item video,
-.attachment video {
-    max-height: 50px !important;
+.audio-attachment > div {
+    padding: 10px 14px !important;
+    line-height: 1.1;
+    display: flex;
+    align-items: center;
+    background: var(--bs-gray-100);
+    border-radius: 18px;
+}
+
+.audio-attachment audio {
+    height: 34px !important;
+    max-height: 34px !important;
+    min-height: 34px !important;
+    display: block !important;
 }
 
 /* Lazy loading styles */
@@ -796,20 +801,6 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
 
 .lazy-video-container .lazy-video-placeholder.loaded {
     display: none !important;
-}
-
-/* Reduzir ainda mais o container de áudio */
-.audio-attachment {
-    max-width: 250px;
-    margin: 0;
-    line-height: 1;
-}
-
-.audio-attachment > div {
-    padding: 4px 8px !important;
-    line-height: 1;
-    display: flex;
-    align-items: center;
 }
 
 /* Garantir que o ícone não aumente a altura */
@@ -1890,8 +1881,8 @@ body.dark-mode .swal2-content {
                             <span class="path2"></span>
                         </i>
                     </button>
-                    <button type="button" class="btn btn-sm btn-light-danger d-none" id="cancelRecordingBtn" title="Cancelar gravação" onclick="cancelRecording()">
-                        <i class="ki-duotone ki-cross fs-3"><span class="path1"></span><span class="path2"></span></i>
+                    <button type="button" class="btn btn-sm btn-light-secondary d-none" id="cancelRecordingBtn" title="Cancelar gravação" onclick="cancelRecording()">
+                        <i class="ki-duotone ki-cross-circle fs-3"><span class="path1"></span><span class="path2"></span></i>
                     </button>
                     <button class="btn btn-sm btn-icon btn-light-primary" id="recordAudioBtn" title="Gravar áudio" onclick="toggleAudioRecording()">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -6568,11 +6559,11 @@ async function toggleAudioRecording() {
             isRecording = true;
             
             // Atualizar botão
-            btn.classList.add('btn-danger');
-            btn.classList.remove('btn-light-primary');
-            btn.title = 'Parar gravação';
+            btn.classList.remove('btn-light-primary', 'btn-danger');
+            btn.classList.add('btn-success');
+            btn.title = 'Parar e enviar áudio';
             btn.innerHTML = `
-                <i class="ki-duotone ki-cross fs-3">
+                <i class="ki-duotone ki-send fs-3">
                     <span class="path1"></span>
                     <span class="path2"></span>
                 </i>
@@ -6597,7 +6588,7 @@ function stopRecordingAndSend() {
         mediaRecorder.stop();
     }
     isRecording = false;
-    btn.classList.remove('btn-danger');
+    btn.classList.remove('btn-success', 'btn-danger');
     btn.classList.add('btn-light-primary');
     btn.title = 'Gravar áudio';
     btn.innerHTML = `
@@ -6620,7 +6611,7 @@ function cancelRecording() {
     }
     isRecording = false;
     const btn = document.getElementById('recordAudioBtn');
-    btn.classList.remove('btn-danger');
+    btn.classList.remove('btn-success', 'btn-danger');
     btn.classList.add('btn-light-primary');
     btn.title = 'Gravar áudio';
     btn.innerHTML = `

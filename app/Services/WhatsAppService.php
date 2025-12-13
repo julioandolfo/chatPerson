@@ -543,18 +543,13 @@ class WhatsAppService
                     'X-QUEPASA-CHATID' => ($to . '@s.whatsapp.net')
                 ]));
                 
-                // Garantir texto/caption
+                // Garantir texto/caption (somente se houver texto de fato)
                 $caption = $options['caption'] ?? $message ?? '';
-                if ($caption === '' && !empty($options['media_name'])) {
-                    $caption = "\u{200B}"; // zero-width space
-                }
-                if ($caption === '') {
-                    $caption = "\u{200B}";
-                }
+                $captionTrim = trim((string)$caption);
                 
                 $payload = [
                     'chatId' => $to . '@s.whatsapp.net',
-                    'text' => $caption
+                    'text' => $captionTrim === '' ? null : $captionTrim
                 ];
                 
                 // Incluir mídia se houver
@@ -624,7 +619,7 @@ class WhatsAppService
                             'filename' => $mediaName ?: 'audio.ogg',
                             'ptt' => true,
                             'voice' => true, // reforçar que é áudio/voz
-                            'caption' => $caption
+                            'caption' => $captionTrim === '' ? null : $captionTrim
                         ];
 
                         // Compatibilidade: alguns provedores podem ler url/fileName/type no nível raiz
@@ -639,8 +634,8 @@ class WhatsAppService
                         Logger::quepasa("sendMessage -   ptt: true");
                         Logger::quepasa("sendMessage -   voice: true");
 
-                        // Se não há mensagem de texto, evitar enviar texto separado; deixar apenas áudio com caption
-                        if (empty($message) && empty($options['caption'])) {
+                        // Remover texto quando não há caption real para evitar mensagem vazia
+                        if ($captionTrim === '') {
                             unset($payload['text']);
                         }
                     } else {

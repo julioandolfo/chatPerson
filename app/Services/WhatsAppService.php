@@ -1160,18 +1160,9 @@ class WhatsAppService
             
             // Processar tipo de mensagem e metadados
             $messageType = $payload['type'] ?? 'text';
-            $isGroup = $payload['isGroup'] ?? ($payload['chat']['isGroup'] ?? false);
-            $groupName = $payload['groupName'] ?? ($payload['chat']['groupName'] ?? null);
             $forwarded = $payload['forwarded'] ?? false;
             $quotedMessageId = $payload['quoted'] ?? $payload['quoted_message_id'] ?? null;
             $quotedMessageText = $payload['quoted_text'] ?? null;
-            
-            // Verificar se mensagens de grupo são permitidas (usar isGroup detectado do payload)
-            $allowGroupMessages = \App\Services\SettingService::get('whatsapp_allow_group_messages', true);
-            if ($isGroup && !$allowGroupMessages) {
-                Logger::quepasa("processWebhook - Mensagem de grupo ignorada (grupos desabilitados): groupName={$groupName}");
-                return;
-            }
             
             // Suportar formato do Quepasa (event/data) e campos completos
             $quepasaData = $payload;
@@ -1184,16 +1175,69 @@ class WhatsAppService
             $message = $quepasaData['body'] ?? $payload['text'] ?? $payload['message'] ?? $payload['caption'] ?? $message;
             $from = $quepasaData['from'] ?? ($payload['from'] ?? $payload['chat']['id'] ?? null);
             $to = $quepasaData['to'] ?? null;
-            // Detectar grupo apenas pelo formato novo: flag isGroup ou sufixo @g.us
-            $isGroup = (bool)($quepasaData['isGroup'] ?? false);
+            
+            // Detectar grupo corretamente: flag isGroup ou sufixo @g.us
+            $isGroup = (bool)($quepasaData['isGroup'] ?? $payload['isGroup'] ?? ($payload['chat']['isGroup'] ?? false));
             $author = $quepasaData['author'] ?? null;
-            if (!$isGroup && $from && strpos($from, '@g.us') !== false) {
-                $isGroup = true;
+            $groupName = $quepasaData['groupName'] ?? $payload['groupName'] ?? ($payload['chat']['groupName'] ?? null);
+            
+            // Verificar se é grupo pelo formato do ID (@g.us) em vários campos possíveis
+            if (!$isGroup) {
+                // Verificar no campo 'from'
+                if ($from && strpos($from, '@g.us') !== false) {
+                    $isGroup = true;
+                    Logger::quepasa("processWebhook - Grupo detectado pelo formato @g.us no campo 'from': {$from}");
+                }
+                
+                // Verificar no campo 'chatid' (variável local)
+                if (!$isGroup && isset($chatid) && $chatid && strpos($chatid, '@g.us') !== false) {
+                    $isGroup = true;
+                    Logger::quepasa("processWebhook - Grupo detectado pelo formato @g.us no campo 'chatid': {$chatid}");
+                }
+                
+                // Verificar no campo 'wid' do payload
+                $wid = $payload['wid'] ?? null;
+                if (!$isGroup && $wid && strpos($wid, '@g.us') !== false) {
+                    $isGroup = true;
+                    Logger::quepasa("processWebhook - Grupo detectado pelo formato @g.us no campo 'wid': {$wid}");
+                }
+                
+                // Verificar no campo 'chat.id'
+                if (!$isGroup && isset($payload['chat']['id']) && strpos($payload['chat']['id'], '@g.us') !== false) {
+                    $isGroup = true;
+                    Logger::quepasa("processWebhook - Grupo detectado pelo formato @g.us no campo 'chat.id': {$payload['chat']['id']}");
+                }
+                
+                // Verificar no campo 'chat.chatId' (formato Quepasa)
+                if (!$isGroup && isset($quepasaData['chat']['chatId']) && strpos($quepasaData['chat']['chatId'], '@g.us') !== false) {
+                    $isGroup = true;
+                    Logger::quepasa("processWebhook - Grupo detectado pelo formato @g.us no campo 'chat.chatId': {$quepasaData['chat']['chatId']}");
+                }
+                
+                // Verificar no campo 'chat.chatid' (alternativo)
+                if (!$isGroup && isset($quepasaData['chat']['chatid']) && strpos($quepasaData['chat']['chatid'], '@g.us') !== false) {
+                    $isGroup = true;
+                    Logger::quepasa("processWebhook - Grupo detectado pelo formato @g.us no campo 'chat.chatid': {$quepasaData['chat']['chatid']}");
+                }
+            }
+            
+            // Verificar se mensagens de grupo são permitidas (APÓS determinar corretamente se é grupo)
+            $allowGroupMessages = \App\Services\SettingService::get('whatsapp_allow_group_messages', true);
+            Logger::quepasa("processWebhook - Verificação de grupos: isGroup=" . ($isGroup ? 'true' : 'false') . ", allowGroupMessages=" . ($allowGroupMessages ? 'true' : 'false') . ", from={$from}, chatid={$chatid}");
+            
+            if ($isGroup && !$allowGroupMessages) {
+                Logger::quepasa("processWebhook - ❌ Mensagem de grupo IGNORADA (grupos desabilitados): from={$from}, chatid={$chatid}, groupName={$groupName}");
+                return;
+            }
+            
+            if ($isGroup && $allowGroupMessages) {
+                Logger::quepasa("processWebhook - ✅ Mensagem de grupo PERMITIDA: from={$from}, groupName={$groupName}");
             }
             // Se for grupo, usar author como remetente
             if ($isGroup && $author) {
                 $from = $author;
             }
+            
             // Reprocessar fromPhone com novos dados (normalizar)
             if ($from) {
                 $fromPhone = self::normalizePhoneNumber($from);

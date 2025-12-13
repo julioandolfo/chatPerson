@@ -659,6 +659,27 @@ body:has(#kt_modal_variables.show) .modal-backdrop:last-of-type {
     z-index: 10049 !important;
 }
 
+/* Modal de Templates - garantir z-index correto */
+#kt_modal_templates {
+    z-index: 1050 !important;
+}
+
+#kt_modal_templates.modal.show {
+    z-index: 1050 !important;
+}
+
+#kt_modal_templates .modal-dialog {
+    z-index: 1051 !important;
+}
+
+#kt_modal_templates .modal-content {
+    z-index: 1052 !important;
+}
+
+body:has(#kt_modal_templates.show) .modal-backdrop:last-of-type {
+    z-index: 1049 !important;
+}
+
 [data-bs-theme="dark"] #messageSearchResults mark {
     background-color: #ffc107;
     color: #000;
@@ -2222,12 +2243,12 @@ body.dark-mode .swal2-content {
                         </i>
                         Meus Templates
                     </button>
-                    <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <button type="button" class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal" aria-label="Fechar">
                         <i class="ki-duotone ki-cross fs-1">
                             <span class="path1"></span>
                             <span class="path2"></span>
                         </i>
-                    </div>
+                    </button>
                 </div>
             </div>
             <div class="modal-body">
@@ -7476,11 +7497,34 @@ function updateConversationInList(conversationId, lastMessage) {
 
 // Modal de Templates
 function showTemplatesModal() {
-    const modal = new bootstrap.Modal(document.getElementById('kt_modal_templates'));
-    modal.show();
+    const modalElement = document.getElementById('kt_modal_templates');
+    if (!modalElement) {
+        console.error('Modal de templates não encontrado');
+        return;
+    }
     
-    // Carregar templates
-    loadTemplates();
+    // Verificar se já existe uma instância do modal
+    let modal = bootstrap.Modal.getInstance(modalElement);
+    
+    // Se não existe, criar nova instância
+    if (!modal) {
+        modal = new bootstrap.Modal(modalElement, {
+            backdrop: true,
+            keyboard: true,
+            focus: true
+        });
+    }
+    
+    // Limpar qualquer listener anterior e adicionar novo
+    const loadTemplatesHandler = function() {
+        loadTemplates();
+        modalElement.removeEventListener('shown.bs.modal', loadTemplatesHandler);
+    };
+    
+    modalElement.addEventListener('shown.bs.modal', loadTemplatesHandler, { once: true });
+    
+    // Mostrar modal
+    modal.show();
 }
 
 // Modal de Templates Pessoais
@@ -8196,11 +8240,30 @@ function useTemplate(templateId) {
 }
 
 function loadTemplates() {
+    const tbody = document.getElementById('templatesList');
+    if (!tbody) {
+        console.error('Elemento templatesList não encontrado');
+        return;
+    }
+    
+    // Mostrar loading
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="3" class="text-center text-muted py-10">
+                <span class="spinner-border spinner-border-sm text-primary mb-3" role="status"></span>
+                <div>Carregando templates...</div>
+            </td>
+        </tr>
+    `;
+    
     fetch('<?= \App\Helpers\Url::to("/message-templates/available") ?>')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
-            const tbody = document.getElementById('templatesList');
-            
             if (!data.success || !data.templates || data.templates.length === 0) {
                 tbody.innerHTML = `
                     <tr>
@@ -8251,25 +8314,36 @@ function loadTemplates() {
             
             tbody.innerHTML = html;
             
-            // Busca de templates
-            document.getElementById('templateSearch').addEventListener('input', function(e) {
-                const search = e.target.value.toLowerCase();
-                const rows = tbody.querySelectorAll('tr');
-                rows.forEach(row => {
-                    const text = row.textContent.toLowerCase();
-                    row.style.display = text.includes(search) ? '' : 'none';
+            // Busca de templates - remover listener anterior se existir e adicionar novo
+            const templateSearchInput = document.getElementById('templateSearch');
+            if (templateSearchInput) {
+                // Clonar elemento para remover todos os listeners
+                const newInput = templateSearchInput.cloneNode(true);
+                templateSearchInput.parentNode.replaceChild(newInput, templateSearchInput);
+                
+                // Adicionar novo listener
+                newInput.addEventListener('input', function(e) {
+                    const search = e.target.value.toLowerCase();
+                    const rows = tbody.querySelectorAll('tr');
+                    rows.forEach(row => {
+                        const text = row.textContent.toLowerCase();
+                        row.style.display = text.includes(search) ? '' : 'none';
+                    });
                 });
-            });
+            }
         })
         .catch(error => {
             console.error('Erro ao carregar templates:', error);
-            document.getElementById('templatesList').innerHTML = `
-                <tr>
-                    <td colspan="4" class="text-center text-danger py-10">
-                        Erro ao carregar templates
-                    </td>
-                </tr>
-            `;
+            const tbody = document.getElementById('templatesList');
+            if (tbody) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="3" class="text-center text-danger py-10">
+                            Erro ao carregar templates: ${error.message || 'Erro desconhecido'}
+                        </td>
+                    </tr>
+                `;
+            }
         });
 }
 
@@ -8437,7 +8511,9 @@ function initTemplateQuickSelect() {
             // Se segurar Shift, abre quick select ao invés do modal
             if (e.shiftKey) {
                 e.preventDefault();
+                e.stopPropagation();
                 showTemplateQuickSelect();
+                return false;
             }
         });
     }

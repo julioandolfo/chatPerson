@@ -633,103 +633,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     color: var(--bs-gray-200) !important;
 }
 
-/* Modal de Variáveis - garantir que fique acima de outros modais */
-#kt_modal_variables {
-    z-index: 10050 !important;
-}
-
-#kt_modal_variables .modal-dialog {
-    z-index: 10051 !important;
-}
-
-#kt_modal_variables .modal-content {
-    z-index: 10052 !important;
-}
-
-#kt_modal_variables.modal.show {
-    z-index: 10050 !important;
-}
-
-body.modal-open #kt_modal_variables {
-    z-index: 10050 !important;
-}
-
-/* Backdrop do modal de variáveis deve ficar acima de outros modais */
-body.modal-open .modal-backdrop:last-of-type {
-    z-index: 10049 !important;
-}
-
-/* Quando o modal de variáveis está aberto, garantir que ele fique acima */
-body:has(#kt_modal_variables.show) #kt_modal_variables {
-    z-index: 10050 !important;
-}
-
-body:has(#kt_modal_variables.show) .modal-backdrop:last-of-type {
-    z-index: 10049 !important;
-}
-
-/* Modal de Templates - garantir z-index correto */
-#kt_modal_templates {
-    z-index: 1050 !important;
-}
-
-#kt_modal_templates.modal.show {
-    z-index: 1050 !important;
-}
-
-#kt_modal_templates .modal-dialog {
-    z-index: 1051 !important;
-}
-
-#kt_modal_templates .modal-content {
-    z-index: 1052 !important;
-}
-
-body:has(#kt_modal_templates.show) .modal-backdrop:last-of-type {
-    z-index: 1049 !important;
-}
-
-/* Modal de Templates Pessoais - garantir z-index correto */
-#kt_modal_personal_templates {
-    z-index: 1055 !important;
-}
-
-#kt_modal_personal_templates.modal.show {
-    z-index: 1055 !important;
-}
-
-#kt_modal_personal_templates .modal-dialog {
-    z-index: 1056 !important;
-}
-
-#kt_modal_personal_templates .modal-content {
-    z-index: 1057 !important;
-}
-
-body:has(#kt_modal_personal_templates.show) .modal-backdrop:last-of-type {
-    z-index: 1054 !important;
-}
-
-/* Modal de Formulário de Template Pessoal - garantir z-index correto */
-#kt_modal_personal_template_form {
-    z-index: 1060 !important;
-}
-
-#kt_modal_personal_template_form.modal.show {
-    z-index: 1060 !important;
-}
-
-#kt_modal_personal_template_form .modal-dialog {
-    z-index: 1061 !important;
-}
-
-#kt_modal_personal_template_form .modal-content {
-    z-index: 1062 !important;
-}
-
-body:has(#kt_modal_personal_template_form.show) .modal-backdrop:last-of-type {
-    z-index: 1059 !important;
-}
+/* Remover z-index customizados - deixar Bootstrap gerenciar */
 
 [data-bs-theme="dark"] #messageSearchResults mark {
     background-color: #ffc107;
@@ -5817,17 +5721,18 @@ function fixModalZIndex() {
         }
     }
     
-    // Garantir z-index correto
+    // Remover z-index inline para deixar Bootstrap gerenciar
     backdrops.forEach(backdrop => {
-        backdrop.style.zIndex = '1040';
+        backdrop.style.removeProperty('z-index');
     });
     
-    // Garantir que modais fiquem acima dos backdrops
     const modals = document.querySelectorAll('.modal');
     modals.forEach(modal => {
-        if (modal.classList.contains('show')) {
-            modal.style.zIndex = '1050';
-        }
+        modal.style.removeProperty('z-index');
+        const dialog = modal.querySelector('.modal-dialog');
+        if (dialog) dialog.style.removeProperty('z-index');
+        const content = modal.querySelector('.modal-content');
+        if (content) content.style.removeProperty('z-index');
     });
 }
 
@@ -9086,33 +8991,6 @@ function showVariablesModal() {
     }
     
     const modal = new bootstrap.Modal(modalElement);
-    
-    // Garantir z-index alto antes de abrir
-    modalElement.style.zIndex = '10050';
-    const modalDialog = modalElement.querySelector('.modal-dialog');
-    if (modalDialog) {
-        modalDialog.style.zIndex = '10051';
-    }
-    const modalContent = modalElement.querySelector('.modal-content');
-    if (modalContent) {
-        modalContent.style.zIndex = '10052';
-    }
-    
-    // Event listener para quando o modal for mostrado
-    modalElement.addEventListener('shown.bs.modal', function() {
-        // Garantir z-index após mostrar
-        modalElement.style.zIndex = '10050';
-        if (modalDialog) modalDialog.style.zIndex = '10051';
-        if (modalContent) modalContent.style.zIndex = '10052';
-        
-        // Ajustar backdrop se existir
-        const backdrops = document.querySelectorAll('.modal-backdrop');
-        if (backdrops.length > 0) {
-            const lastBackdrop = backdrops[backdrops.length - 1];
-            lastBackdrop.style.zIndex = '10049';
-        }
-    }, { once: true });
-    
     modal.show();
     
     // Carregar variáveis disponíveis

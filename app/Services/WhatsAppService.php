@@ -1203,18 +1203,103 @@ class WhatsAppService
                 }
             }
 
-            // Logar conteúdo resumido de attachment/extra se áudio vier sem mediaUrl
-            if ($messageType === 'audio' && !$mediaUrl) {
+            // Se áudio vier sem URL mas com attachment, tentar baixar via API
+            if ($messageType === 'audio' && !$mediaUrl && isset($payload['attachment'])) {
                 $attachmentKeys = isset($payload['attachment']) && is_array($payload['attachment']) ? implode(',', array_keys($payload['attachment'])) : 'NULL';
                 $extraKeys = isset($payload['extra']) && is_array($payload['extra']) ? implode(',', array_keys($payload['extra'])) : 'NULL';
                 $topKeys = implode(',', array_keys($payload));
                 $dataKeys = isset($payload['data']) && is_array($payload['data']) ? implode(',', array_keys($payload['data'])) : 'NULL';
                 Logger::quepasa("processWebhook - audio sem mediaUrl - topKeys={$topKeys} | dataKeys={$dataKeys} | attachmentKeys={$attachmentKeys} | extraKeys={$extraKeys}");
-                if (isset($payload['attachment']) && is_array($payload['attachment'])) {
-                    Logger::quepasa("processWebhook - attachment content: " . json_encode($payload['attachment']));
-                }
+                Logger::quepasa("processWebhook - attachment content: " . json_encode($payload['attachment']));
                 if (isset($payload['extra']) && is_array($payload['extra'])) {
                     Logger::quepasa("processWebhook - extra content: " . json_encode($payload['extra']));
+                }
+                
+                // Tentar baixar áudio via API Quepasa/Orbichat
+                // Endpoints possíveis: /attachment/{id}, /download/{wid}, /messages/{id}/download
+                try {
+                    $messageWid = $payload['wid'] ?? $payload['id'] ?? $messageId;
+                    $apiUrl = rtrim($account['api_url'], '/');
+                    
+                    Logger::quepasa("processWebhook - Tentando baixar áudio via API: messageWid={$messageWid}");
+                    
+                    // Tentar endpoints comuns (Quepasa/Orbichat)
+                    $endpoints = [
+                        "/attachment/{$messageWid}",
+                        "/download/{$messageWid}",
+                        "/messages/{$messageWid}/download",
+                        "/messages/{$messageWid}/attachment"
+                    ];
+                    
+                    $downloaded = false;
+                    foreach ($endpoints as $endpoint) {
+                        $downloadUrl = $apiUrl . $endpoint;
+                        Logger::quepasa("processWebhook - Tentando endpoint: {$downloadUrl}");
+                        
+                        $ch = curl_init($downloadUrl);
+                        $headers = [
+                            'Accept: */*',
+                            'X-QUEPASA-TOKEN: ' . ($account['quepasa_token'] ?? ''),
+                            'X-QUEPASA-TRACKID: ' . ($account['quepasa_trackid'] ?? $account['name'])
+                        ];
+                        
+                        curl_setopt_array($ch, [
+                            CURLOPT_RETURNTRANSFER => true,
+                            CURLOPT_TIMEOUT => 30,
+                            CURLOPT_HTTPHEADER => $headers,
+                            CURLOPT_FOLLOWLOCATION => true,
+                            CURLOPT_SSL_VERIFYPEER => false,
+                            CURLOPT_SSL_VERIFYHOST => false
+                        ]);
+                        
+                        $audioData = curl_exec($ch);
+                        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+                        curl_close($ch);
+                        
+                        Logger::quepasa("processWebhook - Endpoint {$endpoint}: HTTP {$httpCode}, Content-Type: " . ($contentType ?: 'null'));
+                        
+                        if ($httpCode === 200 && $audioData && strlen($audioData) > 100) {
+                            // Verificar se é áudio válido (não é JSON de erro)
+                            $isJson = @json_decode($audioData);
+                            if ($isJson === null && strpos($contentType, 'audio') !== false) {
+                                Logger::quepasa("processWebhook - ✅ Áudio baixado com sucesso: " . strlen($audioData) . " bytes");
+                                
+                                // Salvar áudio temporariamente
+                                $tempDir = __DIR__ . '/../../public/assets/media/attachments/temp';
+                                if (!is_dir($tempDir)) {
+                                    mkdir($tempDir, 0755, true);
+                                }
+                                
+                                $extension = 'ogg';
+                                if ($payload['attachment']['mime']) {
+                                    if (strpos($payload['attachment']['mime'], 'opus') !== false) $extension = 'ogg';
+                                    elseif (strpos($payload['attachment']['mime'], 'mpeg') !== false) $extension = 'mp3';
+                                }
+                                
+                                $tempFile = $tempDir . '/audio_' . $messageWid . '_' . time() . '.' . $extension;
+                                file_put_contents($tempFile, $audioData);
+                                
+                                // Criar URL pública temporária
+                                $mediaUrl = \App\Helpers\Url::to('/assets/media/attachments/temp/' . basename($tempFile));
+                                $mimetype = $payload['attachment']['mime'] ?? 'audio/ogg';
+                                $filename = basename($tempFile);
+                                $size = strlen($audioData);
+                                
+                                Logger::quepasa("processWebhook - Áudio salvo em: {$tempFile}");
+                                Logger::quepasa("processWebhook - URL pública: {$mediaUrl}");
+                                
+                                $downloaded = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (!$downloaded) {
+                        Logger::quepasa("processWebhook - ❌ Não foi possível baixar o áudio. Tentativas: " . count($endpoints));
+                    }
+                } catch (\Exception $e) {
+                    Logger::quepasa("processWebhook - Erro ao baixar áudio: " . $e->getMessage());
                 }
             }
 

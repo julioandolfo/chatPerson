@@ -1204,6 +1204,7 @@ class WhatsAppService
             }
 
             // Se áudio vier sem URL mas com attachment, tentar baixar via API
+            $downloadedFile = null; // Inicializar variável para armazenar arquivo já baixado
             if ($messageType === 'audio' && !$mediaUrl && isset($payload['attachment'])) {
                 $attachmentKeys = isset($payload['attachment']) && is_array($payload['attachment']) ? implode(',', array_keys($payload['attachment'])) : 'NULL';
                 $extraKeys = isset($payload['extra']) && is_array($payload['extra']) ? implode(',', array_keys($payload['extra'])) : 'NULL';
@@ -1300,17 +1301,35 @@ class WhatsAppService
                                     elseif (strpos($payload['attachment']['mime'], 'mpeg') !== false) $extension = 'mp3';
                                 }
                                 
-                                $tempFile = $tempDir . '/audio_' . $messageWid . '_' . time() . '.' . $extension;
+                                $tempFile = $tempDir . '/audio_' . $messageIdOnly . '_' . time() . '.' . $extension;
                                 file_put_contents($tempFile, $audioData);
                                 
-                                // Criar URL pública temporária
-                                $mediaUrl = \App\Helpers\Url::to('/assets/media/attachments/temp/' . basename($tempFile));
+                                // Criar caminho relativo para salvar no banco (sem /public/)
+                                $relativePath = 'assets/media/attachments/temp/' . basename($tempFile);
+                                
+                                // Criar URL absoluta para acesso externo
+                                $publicUrl = \App\Helpers\Url::to('/' . $relativePath);
+                                
+                                // Mover para diretório final de attachments (organizado por conversa)
+                                // Por enquanto, manter em temp e criar attachment diretamente
+                                $mediaUrl = $publicUrl; // URL absoluta HTTP
                                 $mimetype = $payload['attachment']['mime'] ?? 'audio/ogg';
                                 $filename = basename($tempFile);
                                 $size = strlen($audioData);
                                 
                                 Logger::quepasa("processWebhook - Áudio salvo em: {$tempFile}");
-                                Logger::quepasa("processWebhook - URL pública: {$mediaUrl}");
+                                Logger::quepasa("processWebhook - Caminho relativo: {$relativePath}");
+                                Logger::quepasa("processWebhook - URL pública absoluta: {$mediaUrl}");
+                                
+                                // Marcar que o arquivo já está salvo localmente (não precisa baixar novamente)
+                                $downloadedFile = [
+                                    'path' => $relativePath,
+                                    'local_path' => $tempFile,
+                                    'url' => $mediaUrl,
+                                    'mime_type' => $mimetype,
+                                    'filename' => $filename,
+                                    'size' => $size
+                                ];
                                 
                                 $downloaded = true;
                                 break;
@@ -1485,16 +1504,34 @@ class WhatsAppService
                 $attachments = [];
                 if ($mediaUrl) {
                     try {
-                        $attachment = \App\Services\AttachmentService::saveFromUrl(
-                            $mediaUrl, 
-                            $conversation['id'], 
-                            $filename
-                        );
-                        if (!empty($attachment)) {
-                            if ($mimetype) $attachment['mime_type'] = $mimetype;
-                            if ($size) $attachment['size'] = $size;
+                        // Se o arquivo já foi baixado via API (áudio), criar attachment diretamente
+                        if (isset($downloadedFile) && !empty($downloadedFile['local_path'])) {
+                            Logger::quepasa("processWebhook - Criando attachment a partir de arquivo já baixado (OUTGOING): {$downloadedFile['local_path']}");
+                            
+                            $attachmentId = \App\Models\Attachment::create([
+                                'conversation_id' => $conversation['id'],
+                                'path' => $downloadedFile['path'],
+                                'type' => 'audio',
+                                'mime_type' => $downloadedFile['mime_type'] ?? $mimetype,
+                                'size' => $downloadedFile['size'] ?? $size,
+                                'filename' => $downloadedFile['filename'] ?? $filename
+                            ]);
+                            
+                            $attachment = \App\Models\Attachment::find($attachmentId);
+                            Logger::quepasa("processWebhook - Attachment OUTGOING criado: ID={$attachmentId}");
+                            $attachments[] = $attachment;
+                        } else {
+                            $attachment = \App\Services\AttachmentService::saveFromUrl(
+                                $mediaUrl, 
+                                $conversation['id'], 
+                                $filename
+                            );
+                            if (!empty($attachment)) {
+                                if ($mimetype) $attachment['mime_type'] = $mimetype;
+                                if ($size) $attachment['size'] = $size;
+                            }
+                            $attachments[] = $attachment;
                         }
-                        $attachments[] = $attachment;
                     } catch (\Exception $e) {
                         Logger::quepasa("Erro ao salvar mídia do WhatsApp: " . $e->getMessage());
                     }
@@ -1696,17 +1733,37 @@ class WhatsAppService
             $attachments = [];
             if ($mediaUrl) {
                 try {
-                    $attachment = \App\Services\AttachmentService::saveFromUrl(
-                        $mediaUrl, 
-                        $conversation['id'], 
-                        $filename
-                    );
-                    // Enriquecer metadados do attachment se possível
-                    if (!empty($attachment)) {
-                        if ($mimetype) $attachment['mime_type'] = $mimetype;
-                        if ($size) $attachment['size'] = $size;
+                    // Se o arquivo já foi baixado via API (áudio), criar attachment diretamente
+                    if (isset($downloadedFile) && !empty($downloadedFile['local_path'])) {
+                        Logger::quepasa("processWebhook - Criando attachment a partir de arquivo já baixado: {$downloadedFile['local_path']}");
+                        
+                        // Criar attachment diretamente no banco sem baixar novamente
+                        $attachmentId = \App\Models\Attachment::create([
+                            'conversation_id' => $conversation['id'],
+                            'path' => $downloadedFile['path'],
+                            'type' => 'audio',
+                            'mime_type' => $downloadedFile['mime_type'] ?? $mimetype,
+                            'size' => $downloadedFile['size'] ?? $size,
+                            'filename' => $downloadedFile['filename'] ?? $filename
+                        ]);
+                        
+                        $attachment = \App\Models\Attachment::find($attachmentId);
+                        Logger::quepasa("processWebhook - Attachment criado: ID={$attachmentId}");
+                        $attachments[] = $attachment;
+                    } else {
+                        // Arquivo externo (não baixado ainda), usar saveFromUrl
+                        $attachment = \App\Services\AttachmentService::saveFromUrl(
+                            $mediaUrl, 
+                            $conversation['id'], 
+                            $filename
+                        );
+                        // Enriquecer metadados do attachment se possível
+                        if (!empty($attachment)) {
+                            if ($mimetype) $attachment['mime_type'] = $mimetype;
+                            if ($size) $attachment['size'] = $size;
+                        }
+                        $attachments[] = $attachment;
                     }
-                    $attachments[] = $attachment;
                 } catch (\Exception $e) {
                     Logger::quepasa("Erro ao salvar mídia do WhatsApp: " . $e->getMessage());
                 }

@@ -521,6 +521,22 @@ class WhatsAppService
 
         try {
             $apiUrl = rtrim($account['api_url'], '/');
+
+            // Resolver chatId correto (inclui casos @lid)
+            $chatId = $to . '@s.whatsapp.net';
+            // Se existir contato com whatsapp_id, usar
+            try {
+                $contact = \App\Models\Contact::findByPhoneNormalized($to);
+                if (!empty($contact['whatsapp_id'])) {
+                    $chatId = $contact['whatsapp_id'];
+                }
+            } catch (\Throwable $e) {
+                // ignore lookup errors
+            }
+            // Normalizar chatId se vier só números
+            if (!str_contains($chatId, '@')) {
+                $chatId .= '@s.whatsapp.net';
+            }
             
             if ($account['provider'] === 'quepasa') {
                 // Quepasa self-hosted: POST /send (usa campo media para anexos)
@@ -531,16 +547,16 @@ class WhatsAppService
                     'Content-Type: application/json',
                     'X-QUEPASA-TOKEN: ' . $account['quepasa_token'],
                     'X-QUEPASA-TRACKID: ' . ($account['quepasa_trackid'] ?? $account['name']),
-                    'X-QUEPASA-CHATID: ' . ($to . '@s.whatsapp.net')
+                    'X-QUEPASA-CHATID: ' . $chatId
                 ];
 
                 // Logs adicionais para debug (sem expor token completo)
                 $maskedToken = self::maskToken($account['quepasa_token'] ?? '');
-                Logger::quepasa("sendMessage - Provider=quepasa | apiUrl={$apiUrl} | chatId={$to}@s.whatsapp.net | trackId=" . ($account['quepasa_trackid'] ?? $account['name']) . " | token=" . $maskedToken);
+                Logger::quepasa("sendMessage - Provider=quepasa | apiUrl={$apiUrl} | chatId={$chatId} | trackId=" . ($account['quepasa_trackid'] ?? $account['name']) . " | token=" . $maskedToken);
                 Logger::quepasa("sendMessage - Provider headers raw (sem token completo): " . json_encode([
                     'X-QUEPASA-TOKEN' => $maskedToken,
                     'X-QUEPASA-TRACKID' => ($account['quepasa_trackid'] ?? $account['name']),
-                    'X-QUEPASA-CHATID' => ($to . '@s.whatsapp.net')
+                    'X-QUEPASA-CHATID' => $chatId
                 ]));
                 
                 // Garantir texto/caption (somente se houver texto de fato)
@@ -615,8 +631,9 @@ class WhatsAppService
                         // Enviar como áudio PTT (opção recomendada pelo Quepasa/WhatsApp)
                         $payload['audio'] = [
                             'url' => $mediaUrl,
-                            'mimetype' => $mediaMime ?: 'audio/ogg',
-                            'filename' => $mediaName ?: 'audio.ogg',
+                            // Para compatibilidade com Quepasa: usar application/ogg e extensão .ogx
+                            'mimetype' => 'application/ogg',
+                            'filename' => ($mediaName ? preg_replace('/\.ogg$/i', '.ogx', $mediaName) : 'audio.ogx'),
                             'ptt' => true,
                             'voice' => true, // reforçar que é áudio/voz
                             'caption' => $captionTrim === '' ? null : $captionTrim
@@ -625,7 +642,7 @@ class WhatsAppService
                         // Compatibilidade: alguns provedores podem ler url/fileName/type no nível raiz
                         $payload['type'] = 'audio';
                         $payload['url'] = $mediaUrl;
-                        $payload['fileName'] = $mediaName ?: 'audio.ogg';
+                        $payload['fileName'] = ($mediaName ? preg_replace('/\.ogg$/i', '.ogx', $mediaName) : 'audio.ogx');
                         
                         Logger::quepasa("sendMessage - Payload audio configurado:");
                         Logger::quepasa("sendMessage -   url: {$payload['audio']['url']}");
@@ -1778,6 +1795,11 @@ class WhatsAppService
                 } catch (\Exception $e) {
                     Logger::quepasa("Erro ao salvar mídia do WhatsApp: " . $e->getMessage());
                 }
+            }
+
+            // Se não há texto mas há anexos (ex: áudio), usar caractere invisível para não falhar validação
+            if (empty($message) && !empty($attachments)) {
+                $message = "\u{200B}";
             }
 
             // Criar mensagem usando ConversationService (com todas as integrações)

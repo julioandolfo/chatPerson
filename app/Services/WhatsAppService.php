@@ -1716,28 +1716,66 @@ class WhatsAppService
                 
                 Logger::quepasa("processWebhook - whatsapp_id do campo 'from' processado: '{$whatsappId}'");
                 
-                // Só adicionar sufixo se não tiver nenhum
-                if (!str_ends_with($whatsappId, '@s.whatsapp.net') && 
-                    !str_ends_with($whatsappId, '@lid') && 
-                    !str_ends_with($whatsappId, '@g.us') &&
-                    !str_ends_with($whatsappId, '@c.us')) {
-                    $whatsappId .= '@s.whatsapp.net';
-                    Logger::quepasa("processWebhook - Adicionado sufixo @s.whatsapp.net ao whatsapp_id");
+                // Se é um LID (@lid), tentar resolver para número real primeiro
+                $realPhone = null;
+                if (str_ends_with($whatsappId, '@lid')) {
+                    Logger::quepasa("processWebhook - Detectado LID: {$whatsappId}, tentando resolver para número real...");
+                    try {
+                        $realPhone = self::getPhoneFromLinkedId($account, $whatsappId);
+                        if ($realPhone) {
+                            Logger::quepasa("processWebhook - ✅ Número real obtido: {$realPhone}");
+                            
+                            // Buscar se já existe contato com esse número real
+                            $existingContact = \App\Models\Contact::findByPhoneNormalized($realPhone);
+                            if ($existingContact) {
+                                Logger::quepasa("processWebhook - ✅ Contato já existe com número real: ID={$existingContact['id']}, phone={$existingContact['phone']}");
+                                
+                                // Atualizar whatsapp_id do contato existente para incluir também o LID
+                                if ($existingContact['whatsapp_id'] !== $whatsappId) {
+                                    Logger::quepasa("processWebhook - Atualizando whatsapp_id do contato existente para: {$whatsappId}");
+                                    \App\Models\Contact::update($existingContact['id'], ['whatsapp_id' => $whatsappId]);
+                                }
+                                
+                                // Usar o contato existente ao invés de criar um novo
+                                $contact = $existingContact;
+                                $contact['whatsapp_id'] = $whatsappId; // Atualizar no array local também
+                            } else {
+                                Logger::quepasa("processWebhook - Contato não existe com número real, usar número real ao invés do LID: {$realPhone}");
+                                $fromPhone = $realPhone; // Usar o número real
+                            }
+                        } else {
+                            Logger::quepasa("processWebhook - ⚠️ Não foi possível resolver LID para número real, usando LID");
+                        }
+                    } catch (\Exception $e) {
+                        Logger::quepasa("processWebhook - Erro ao resolver LID: " . $e->getMessage());
+                    }
                 }
                 
-                Logger::quepasa("processWebhook - whatsapp_id final: '{$whatsappId}'");
-                
-                // Garantir que salvamos o número normalizado
-                $normalizedPhone = \App\Models\Contact::normalizePhoneNumber($fromPhone);
-                
-                Logger::quepasa("processWebhook - Criando novo contato: name={$contactName}, phone={$normalizedPhone} (normalizado de {$fromPhone}), whatsapp_id={$whatsappId}");
-                $contactId = \App\Models\Contact::create([
-                    'name' => $contactName,
-                    'phone' => $normalizedPhone, // Salvar sempre normalizado
-                    'whatsapp_id' => $whatsappId,
-                    'email' => null
-                ]);
-                $contact = \App\Models\Contact::find($contactId);
+                // Se ainda não encontrou o contato, criar um novo
+                if (!$contact) {
+                    // Só adicionar sufixo se não tiver nenhum
+                    if (!str_ends_with($whatsappId, '@s.whatsapp.net') && 
+                        !str_ends_with($whatsappId, '@lid') && 
+                        !str_ends_with($whatsappId, '@g.us') &&
+                        !str_ends_with($whatsappId, '@c.us')) {
+                        $whatsappId .= '@s.whatsapp.net';
+                        Logger::quepasa("processWebhook - Adicionado sufixo @s.whatsapp.net ao whatsapp_id");
+                    }
+                    
+                    Logger::quepasa("processWebhook - whatsapp_id final: '{$whatsappId}'");
+                    
+                    // Garantir que salvamos o número normalizado
+                    $normalizedPhone = \App\Models\Contact::normalizePhoneNumber($fromPhone);
+                    
+                    Logger::quepasa("processWebhook - Criando novo contato: name={$contactName}, phone={$normalizedPhone} (normalizado de {$fromPhone}), whatsapp_id={$whatsappId}");
+                    $contactId = \App\Models\Contact::create([
+                        'name' => $contactName,
+                        'phone' => $normalizedPhone, // Salvar sempre normalizado
+                        'whatsapp_id' => $whatsappId,
+                        'email' => null
+                    ]);
+                    $contact = \App\Models\Contact::find($contactId);
+                }
                 
                 Logger::quepasa("processWebhook - Contato criado: ID={$contactId}");
                 

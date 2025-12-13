@@ -153,6 +153,7 @@ class ConversationService
         // Obter conversa criada para notificar via WebSocket
         $conversation = Conversation::findWithRelations($id);
         try {
+            Logger::debug("Notificando nova conversa via WebSocket: conversationId={$conversation['id']}, contactId={$conversation['contact_id']}", 'conversas.log');
             \App\Helpers\WebSocket::notifyNewConversation($conversation);
         } catch (\Exception $e) {
             error_log("Erro ao notificar WebSocket: " . $e->getMessage());
@@ -1112,6 +1113,7 @@ class ConversationService
         if ($message) {
             // Notificar via WebSocket
             try {
+                Logger::debug("Notificando nova mensagem via WebSocket: conversationId={$conversationId}, messageId={$messageId}", 'conversas.log');
                 \App\Helpers\WebSocket::notifyNewMessage($conversationId, $message);
             } catch (\Exception $e) {
                 error_log("Erro ao notificar WebSocket: " . $e->getMessage());

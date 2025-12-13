@@ -77,6 +77,7 @@ class WebSocketService
      */
     public static function notifyNewConversation(array $conversation): void
     {
+        Logger::log("WebSocketService::notifyNewConversation - conversationId={$conversation['id']}, contactName=" . ($conversation['contact_name'] ?? 'N/A'));
         self::broadcast('new_conversation', [
             'conversation' => $conversation
         ]);

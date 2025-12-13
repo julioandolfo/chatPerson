@@ -39,20 +39,22 @@ class ConversationParticipant extends Model
         
         if ($removed) {
             // Reativar participante
-            return Database::query(
+            $result = Database::query(
                 "UPDATE conversation_participants 
                  SET removed_at = NULL, added_by = ?, added_at = NOW() 
                  WHERE conversation_id = ? AND user_id = ?",
                 [$addedBy, $conversationId, $userId]
             );
+            return $result !== false; // Retornar bool
         }
         
         // Criar novo participante
-        return Database::query(
+        $result = Database::query(
             "INSERT INTO conversation_participants (conversation_id, user_id, added_by, added_at) 
              VALUES (?, ?, ?, NOW())",
             [$conversationId, $userId, $addedBy]
         );
+        return $result !== false; // Retornar bool
     }
 
     /**
@@ -60,12 +62,13 @@ class ConversationParticipant extends Model
      */
     public static function removeParticipant(int $conversationId, int $userId): bool
     {
-        return Database::query(
+        $result = Database::query(
             "UPDATE conversation_participants 
              SET removed_at = NOW() 
              WHERE conversation_id = ? AND user_id = ? AND removed_at IS NULL",
             [$conversationId, $userId]
         );
+        return $result !== false; // Retornar bool
     }
 
     /**

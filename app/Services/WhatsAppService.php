@@ -1697,8 +1697,67 @@ class WhatsAppService
             // Se chegou aqui, é mensagem RECEBIDA (não enviada do número conectado)
             // Criar ou atualizar contato
             Logger::quepasa("processWebhook - Buscando contato pelo telefone normalizado: {$fromPhone}");
-            // Usar busca normalizada para evitar duplicatas
-            $contact = \App\Models\Contact::findByPhoneNormalized($fromPhone);
+            
+            // Verificar se é um número real (não é LID) e se há conversas recentes com LID deste remetente
+            $contact = null;
+            $isRealNumber = !str_ends_with($from, '@lid');
+            
+            if ($isRealNumber && strlen($fromPhone) >= 10) {
+                // É um número real, buscar normalmente
+                Logger::quepasa("processWebhook - É número real (não LID), buscando por phone={$fromPhone}");
+                $contact = \App\Models\Contact::findByPhoneNormalized($fromPhone);
+                
+                // Se não encontrou por número, verificar se há contato com LID para esta conta
+                if (!$contact) {
+                    Logger::quepasa("processWebhook - Contato com número real não encontrado, verificando se há LID ativo...");
+                    
+                    // Buscar conversas recentes (últimas 24h) desta conta WhatsApp que tenham contatos com @lid
+                    try {
+                        $sql = "SELECT DISTINCT c.* FROM contacts c
+                                INNER JOIN conversations conv ON conv.contact_id = c.id
+                                WHERE conv.whatsapp_account_id = :account_id
+                                AND c.whatsapp_id LIKE '%@lid'
+                                AND conv.updated_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                                ORDER BY conv.updated_at DESC
+                                LIMIT 10";
+                        
+                        $lidContacts = \App\Helpers\Database::query($sql, [
+                            'account_id' => $account['id']
+                        ]);
+                        
+                        if (!empty($lidContacts)) {
+                            Logger::quepasa("processWebhook - Encontrados " . count($lidContacts) . " contatos com LID nas últimas 24h");
+                            
+                            // Para cada contato LID, verificar se o nome é o mesmo
+                            $payloadName = $payload['chat']['title'] ?? $payload['chat']['name'] ?? $payload['name'] ?? null;
+                            
+                            foreach ($lidContacts as $lidContact) {
+                                // Comparar nomes (case-insensitive)
+                                if ($payloadName && strcasecmp($lidContact['name'], $payloadName) === 0) {
+                                    Logger::quepasa("processWebhook - ✅ Encontrado contato LID com mesmo nome: ID={$lidContact['id']}, name={$lidContact['name']}, whatsapp_id={$lidContact['whatsapp_id']}");
+                                    Logger::quepasa("processWebhook - 🔄 Atualizando contato LID com número real: {$fromPhone}");
+                                    
+                                    // Atualizar contato LID com número real
+                                    \App\Models\Contact::update($lidContact['id'], [
+                                        'phone' => $fromPhone,
+                                        'whatsapp_id' => $from
+                                    ]);
+                                    
+                                    $contact = \App\Models\Contact::find($lidContact['id']);
+                                    Logger::quepasa("processWebhook - ✅ Contato atualizado de LID para número real");
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        Logger::quepasa("processWebhook - Erro ao buscar contatos LID: " . $e->getMessage());
+                    }
+                }
+            } else {
+                // É um LID, buscar normalmente
+                Logger::quepasa("processWebhook - É LID, buscando por phone={$fromPhone}");
+                $contact = \App\Models\Contact::findByPhoneNormalized($fromPhone);
+            }
             
             // Extrair nome do contato do payload (chat.title)
             $contactName = $payload['chat']['title'] ?? $payload['chat']['name'] ?? $payload['name'] ?? null;
@@ -1716,35 +1775,80 @@ class WhatsAppService
                 
                 Logger::quepasa("processWebhook - whatsapp_id do campo 'from' processado: '{$whatsappId}'");
                 
-                // Se é um LID (@lid), tentar resolver para número real primeiro
+                // Se é um LID (@lid), SEMPRE tentar resolver para número real primeiro
                 $realPhone = null;
+                $resolvedFromLid = false;
+                
                 if (str_ends_with($whatsappId, '@lid')) {
-                    Logger::quepasa("processWebhook - Detectado LID: {$whatsappId}, tentando resolver para número real...");
+                    Logger::quepasa("processWebhook - ⚠️ Detectado LID: {$whatsappId}, TENTANDO RESOLVER para número real...");
+                    
                     try {
                         $realPhone = self::getPhoneFromLinkedId($account, $whatsappId);
-                        if ($realPhone) {
-                            Logger::quepasa("processWebhook - ✅ Número real obtido: {$realPhone}");
+                        
+                        if ($realPhone && strlen($realPhone) >= 10) {
+                            Logger::quepasa("processWebhook - ✅ Número real RESOLVIDO via API: {$realPhone}");
+                            $resolvedFromLid = true;
                             
                             // Buscar se já existe contato com esse número real
                             $existingContact = \App\Models\Contact::findByPhoneNormalized($realPhone);
                             if ($existingContact) {
                                 Logger::quepasa("processWebhook - ✅ Contato já existe com número real: ID={$existingContact['id']}, phone={$existingContact['phone']}");
                                 
-                                // Atualizar whatsapp_id do contato existente para incluir também o LID
-                                if ($existingContact['whatsapp_id'] !== $whatsappId) {
-                                    Logger::quepasa("processWebhook - Atualizando whatsapp_id do contato existente para: {$whatsappId}");
-                                    \App\Models\Contact::update($existingContact['id'], ['whatsapp_id' => $whatsappId]);
+                                // Atualizar whatsapp_id do contato existente se necessário
+                                // Preferir @s.whatsapp.net sobre @lid
+                                $realWhatsappId = $realPhone . '@s.whatsapp.net';
+                                if ($existingContact['whatsapp_id'] !== $realWhatsappId) {
+                                    Logger::quepasa("processWebhook - Atualizando whatsapp_id do contato existente para: {$realWhatsappId}");
+                                    \App\Models\Contact::update($existingContact['id'], ['whatsapp_id' => $realWhatsappId]);
                                 }
                                 
                                 // Usar o contato existente ao invés de criar um novo
                                 $contact = $existingContact;
-                                $contact['whatsapp_id'] = $whatsappId; // Atualizar no array local também
+                                $contact['whatsapp_id'] = $realWhatsappId;
                             } else {
-                                Logger::quepasa("processWebhook - Contato não existe com número real, usar número real ao invés do LID: {$realPhone}");
-                                $fromPhone = $realPhone; // Usar o número real
+                                Logger::quepasa("processWebhook - Contato não existe, CRIAR COM NÚMERO REAL: {$realPhone}");
+                                $fromPhone = $realPhone; // Usar o número real ao invés do LID
+                                $whatsappId = $realPhone . '@s.whatsapp.net'; // Usar formato padrão
                             }
                         } else {
-                            Logger::quepasa("processWebhook - ⚠️ Não foi possível resolver LID para número real, usando LID");
+                            Logger::quepasa("processWebhook - ⚠️ API não retornou número real válido. Tentando extrair do payload...");
+                            
+                            // Tentar extrair número de outros campos do payload
+                            $possiblePhone = null;
+                            
+                            // Verificar se há número no chat.phone
+                            if (isset($payload['chat']['phone'])) {
+                                $possiblePhone = self::normalizePhoneNumber($payload['chat']['phone']);
+                                Logger::quepasa("processWebhook - Encontrado phone em chat.phone: {$possiblePhone}");
+                            }
+                            
+                            // Verificar chat.jid
+                            if (!$possiblePhone && isset($payload['chat']['jid'])) {
+                                $possiblePhone = self::normalizePhoneNumber($payload['chat']['jid']);
+                                if (!str_contains($possiblePhone, '@lid')) {
+                                    Logger::quepasa("processWebhook - Encontrado phone em chat.jid: {$possiblePhone}");
+                                } else {
+                                    $possiblePhone = null;
+                                }
+                            }
+                            
+                            if ($possiblePhone && strlen($possiblePhone) >= 10 && !str_contains($possiblePhone, '@lid')) {
+                                Logger::quepasa("processWebhook - ✅ Número real extraído do payload: {$possiblePhone}");
+                                $realPhone = $possiblePhone;
+                                $resolvedFromLid = true;
+                                $fromPhone = $realPhone;
+                                $whatsappId = $realPhone . '@s.whatsapp.net';
+                                
+                                // Verificar se já existe contato
+                                $existingContact = \App\Models\Contact::findByPhoneNormalized($realPhone);
+                                if ($existingContact) {
+                                    Logger::quepasa("processWebhook - ✅ Contato já existe: ID={$existingContact['id']}");
+                                    $contact = $existingContact;
+                                }
+                            } else {
+                                Logger::quepasa("processWebhook - ❌ NÃO FOI POSSÍVEL resolver LID. Criando contato temporário com LID.");
+                                Logger::quepasa("processWebhook - ⚠️ ATENÇÃO: Este contato será atualizado quando o número real for revelado.");
+                            }
                         }
                     } catch (\Exception $e) {
                         Logger::quepasa("processWebhook - Erro ao resolver LID: " . $e->getMessage());

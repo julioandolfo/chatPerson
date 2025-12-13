@@ -118,7 +118,7 @@ class SLAMonitoringService
                             // Por enquanto, apenas logar
                             error_log("Conversa {$conversationId} deveria ser reatribuída a agente de IA {$aiAgentId}");
                         } else {
-                            ConversationService::assignToAgent($conversationId, $newAgentId);
+                            ConversationService::assignToAgent($conversationId, $newAgentId, false);
                             $result['reassigned'] = true;
                             
                             // Criar notificação

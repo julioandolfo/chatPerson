@@ -424,7 +424,7 @@ class ConversationService
     /**
      * Atribuir conversa a agente
      */
-    public static function assignToAgent(int $conversationId, int $agentId): array
+    public static function assignToAgent(int $conversationId, int $agentId, bool $forceAssign = false): array
     {
         // Obter conversa para verificar contexto
         $conversation = Conversation::find($conversationId);
@@ -438,14 +438,18 @@ class ConversationService
             throw new \Exception('Agente não encontrado ou inativo');
         }
 
-        // Verificar limites usando ConversationSettingsService
-        if (!\App\Services\ConversationSettingsService::canAssignToAgent(
-            $agentId,
-            $conversation['department_id'] ?? null,
-            $conversation['funnel_id'] ?? null,
-            $conversation['funnel_stage_id'] ?? null
-        )) {
-            throw new \Exception('Agente atingiu o limite máximo de conversas ou não está disponível');
+        // Verificar limites APENAS se não for atribuição forçada (manual)
+        if (!$forceAssign) {
+            if (!\App\Services\ConversationSettingsService::canAssignToAgent(
+                $agentId,
+                $conversation['department_id'] ?? null,
+                $conversation['funnel_id'] ?? null,
+                $conversation['funnel_stage_id'] ?? null
+            )) {
+                throw new \Exception('Agente atingiu o limite máximo de conversas ou não está disponível');
+            }
+        } else {
+            Logger::debug("Atribuição FORÇADA (manual) - ignorando limites e status de disponibilidade", 'conversas.log');
         }
 
         // Atribuir

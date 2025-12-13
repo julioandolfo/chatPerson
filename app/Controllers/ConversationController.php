@@ -541,7 +541,8 @@ class ConversationController
                 return;
             }
 
-            $conversation = ConversationService::assignToAgent($id, $agentId);
+            // Atribuir forçadamente (ignora limites) quando é atribuição manual
+            $conversation = ConversationService::assignToAgent($id, $agentId, true);
             
             Response::json([
                 'success' => true,

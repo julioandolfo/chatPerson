@@ -362,7 +362,7 @@ ob_start();
     margin-top: 2px !important;
     margin-right: 0 !important;
     min-width: 200px;
-    z-index: 1030 !important;
+    z-index: 1000 !important;
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
     border: 1px solid var(--bs-border-color);
     max-height: none !important;
@@ -370,43 +370,13 @@ ob_start();
     transform: none !important;
 }
 
-/* Garantir z-index também para o dropdown container */
-.conversation-item-actions .dropdown.show {
-    z-index: 1029 !important;
-}
-
-.conversation-item-actions {
-    z-index: 1028 !important;
+/* Garantir z-index para o item da conversa */
+.conversation-item {
     position: relative !important;
 }
 
-/* Garantir que conversação lista não crie novo stacking context */
-.conversations-list {
-    position: relative;
-    z-index: auto !important;
-}
-
-/* Corrigir z-index dos modais e backdrop */
-.modal {
-    z-index: 1055 !important;
-}
-
-.modal-backdrop {
-    z-index: 1050 !important;
-}
-
-.modal-backdrop.show {
-    z-index: 1050 !important;
-}
-
-/* Garantir que o modal fique acima do backdrop */
-.modal.show {
-    z-index: 1055 !important;
-}
-
-.modal-dialog {
-    z-index: 1056 !important;
-    position: relative;
+.conversation-item-actions {
+    position: relative !important;
 }
 
 /* Estilos para modo dark */
@@ -5053,6 +5023,16 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('conversationSidebar')?.classList.add('open');
     }
     
+    // Corrigir z-index dos modais e backdrops
+    console.log('Configurando correção de z-index para modais');
+    fixModalZIndex();
+    
+    // Observar quando modais são abertos
+    document.addEventListener('shown.bs.modal', function(e) {
+        console.log('Modal aberto, corrigindo z-index');
+        setTimeout(fixModalZIndex, 100);
+    });
+    
     // Listener para checkboxes de canais no modal de filtros avançados
     const channelCheckboxes = document.querySelectorAll('input[name="channels[]"]');
     channelCheckboxes.forEach(checkbox => {
@@ -5821,6 +5801,32 @@ function closeAllDropdowns() {
             if (bsDropdown) {
                 bsDropdown.hide();
             }
+        }
+    });
+}
+
+// Função para corrigir z-index de modais e backdrops
+function fixModalZIndex() {
+    // Remover backdrops duplicados
+    const backdrops = document.querySelectorAll('.modal-backdrop');
+    if (backdrops.length > 1) {
+        console.warn('Múltiplos backdrops encontrados, removendo duplicados:', backdrops.length);
+        // Manter apenas o último
+        for (let i = 0; i < backdrops.length - 1; i++) {
+            backdrops[i].remove();
+        }
+    }
+    
+    // Garantir z-index correto
+    backdrops.forEach(backdrop => {
+        backdrop.style.zIndex = '1040';
+    });
+    
+    // Garantir que modais fiquem acima dos backdrops
+    const modals = document.querySelectorAll('.modal');
+    modals.forEach(modal => {
+        if (modal.classList.contains('show')) {
+            modal.style.zIndex = '1050';
         }
     });
 }

@@ -563,10 +563,10 @@ class WhatsAppService
                 $caption = $options['caption'] ?? $message ?? '';
                 $captionTrim = trim((string)$caption);
                 
-                $payload = [
-                    'chatId' => $to . '@s.whatsapp.net',
-                    'text' => $captionTrim === '' ? null : $captionTrim
-                ];
+            $payload = [
+                'chatId' => $chatId,
+                'text' => $captionTrim === '' ? null : $captionTrim
+            ];
                 
                 // Incluir mídia se houver
                 if (!empty($options['media_url'])) {
@@ -1535,9 +1535,10 @@ class WhatsAppService
                                     'filename' => $downloadedFile['filename'] ?? $filename
                                 ]);
                                 
-                                $attachment = \App\Models\Attachment::find($attachmentId);
-                                Logger::quepasa("processWebhook - Attachment OUTGOING criado com sucesso: ID={$attachmentId}");
-                                $attachments[] = $attachment;
+                            $attachment = \App\Models\Attachment::find($attachmentId);
+                            Logger::quepasa("processWebhook - Attachment OUTGOING criado com sucesso: ID={$attachmentId}");
+                            Logger::quepasa("processWebhook - Attachment OUTGOING data: " . json_encode($attachment));
+                            $attachments[] = $attachment;
                             } catch (\Exception $e) {
                                 Logger::quepasa("processWebhook - ❌ Erro ao criar attachment OUTGOING: " . $e->getMessage());
                                 throw $e;
@@ -1776,7 +1777,22 @@ class WhatsAppService
                             $attachments[] = $attachment;
                         } catch (\Exception $e) {
                             Logger::quepasa("processWebhook - ❌ Erro ao criar attachment: " . $e->getMessage());
-                            throw $e;
+                            // Se falhar criação direta, tentar fallback usando saveFromUrl com a URL absoluta
+                            try {
+                                $fallbackAttachment = \App\Services\AttachmentService::saveFromUrl(
+                                    $downloadedFile['url'],
+                                    $conversation['id'],
+                                    $downloadedFile['filename'] ?? $filename
+                                );
+                                if (!empty($fallbackAttachment)) {
+                                    if ($downloadedFile['mime_type']) $fallbackAttachment['mime_type'] = $downloadedFile['mime_type'];
+                                    if ($downloadedFile['size']) $fallbackAttachment['size'] = $downloadedFile['size'];
+                                }
+                                $attachments[] = $fallbackAttachment;
+                                Logger::quepasa("processWebhook - Attachment criado via fallback saveFromUrl");
+                            } catch (\Exception $e2) {
+                                Logger::quepasa("processWebhook - ❌ Erro no fallback saveFromUrl: " . $e2->getMessage());
+                            }
                         }
                     } else {
                         // Arquivo externo (não baixado ainda), usar saveFromUrl

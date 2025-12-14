@@ -17,6 +17,10 @@ use App\Services\DashboardService;
 use App\Services\AgentPerformanceService;
 use App\Models\Funnel;
 use App\Models\Tag;
+use App\Models\AutomationExecution;
+use App\Models\Automation;
+use App\Models\AIAssistantLog;
+use App\Models\AIConversation;
 
 class AnalyticsController
 {
@@ -498,6 +502,289 @@ class AnalyticsController
                 'message' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * API: Obter dados de analytics de automações (JSON)
+     */
+    public function getAutomationsData(): void
+    {
+        Permission::abortIfCannot('admin.settings');
+        
+        try {
+            $filters = [
+                'start_date' => Request::get('start_date') ?: date('Y-m-d', strtotime('-30 days')),
+                'end_date' => Request::get('end_date') ?: date('Y-m-d'),
+            ];
+            
+            // Estatísticas gerais de automações
+            $sql = "SELECT 
+                        COUNT(*) as total_executions,
+                        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+                        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+                        SUM(CASE WHEN status = 'running' THEN 1 ELSE 0 END) as running,
+                        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+                        AVG(TIMESTAMPDIFF(SECOND, started_at, completed_at)) as avg_execution_time_seconds
+                    FROM automation_executions
+                    WHERE created_at >= ? AND created_at <= ?";
+            
+            $generalStats = Database::fetch($sql, [$filters['start_date'], $filters['end_date'] . ' 23:59:59']);
+            
+            // Top automações mais executadas
+            $sql = "SELECT 
+                        a.id,
+                        a.name,
+                        COUNT(ae.id) as execution_count,
+                        SUM(CASE WHEN ae.status = 'completed' THEN 1 ELSE 0 END) as completed_count,
+                        SUM(CASE WHEN ae.status = 'failed' THEN 1 ELSE 0 END) as failed_count,
+                        AVG(TIMESTAMPDIFF(SECOND, ae.started_at, ae.completed_at)) as avg_time_seconds
+                    FROM automations a
+                    LEFT JOIN automation_executions ae ON a.id = ae.automation_id 
+                        AND ae.created_at >= ? AND ae.created_at <= ?
+                    GROUP BY a.id, a.name
+                    HAVING execution_count > 0
+                    ORDER BY execution_count DESC
+                    LIMIT 20";
+            
+            $topAutomations = Database::fetchAll($sql, [$filters['start_date'], $filters['end_date'] . ' 23:59:59']);
+            
+            // Evolução de execuções ao longo do tempo
+            $sql = "SELECT 
+                        DATE(created_at) as date,
+                        COUNT(*) as total,
+                        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+                        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed
+                    FROM automation_executions
+                    WHERE created_at >= ? AND created_at <= ?
+                    GROUP BY DATE(created_at)
+                    ORDER BY date ASC";
+            
+            $evolution = Database::fetchAll($sql, [$filters['start_date'], $filters['end_date'] . ' 23:59:59']);
+            
+            // Calcular taxa de sucesso
+            $successRate = 0;
+            if ($generalStats && $generalStats['total_executions'] > 0) {
+                $successRate = round(($generalStats['completed'] / $generalStats['total_executions']) * 100, 2);
+            }
+            
+            Response::json([
+                'success' => true,
+                'general_stats' => $generalStats,
+                'top_automations' => $topAutomations,
+                'evolution' => $evolution,
+                'success_rate' => $successRate
+            ]);
+            
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * API: Obter dados de analytics de IA (JSON)
+     */
+    public function getAIData(): void
+    {
+        Permission::abortIfCannot('admin.settings');
+        
+        try {
+            $filters = [
+                'start_date' => Request::get('start_date') ?: date('Y-m-d', strtotime('-30 days')),
+                'end_date' => Request::get('end_date') ?: date('Y-m-d'),
+            ];
+            
+            $days = max(1, (strtotime($filters['end_date']) - strtotime($filters['start_date'])) / 86400);
+            
+            // Estatísticas gerais do Assistente IA
+            $statsByFeature = AIAssistantLog::getStatsByFeature(null, (int)$days);
+            
+            $totalUses = array_sum(array_column($statsByFeature, 'total_uses'));
+            $totalTokens = array_sum(array_column($statsByFeature, 'total_tokens'));
+            $totalCost = array_sum(array_column($statsByFeature, 'total_cost'));
+            $totalSuccessful = array_sum(array_column($statsByFeature, 'successful_uses'));
+            $totalFailed = array_sum(array_column($statsByFeature, 'failed_uses'));
+            
+            // Estatísticas de Agentes de IA
+            $sql = "SELECT 
+                        a.id,
+                        a.name,
+                        a.model,
+                        COUNT(ac.id) as conversations_count,
+                        SUM(ac.tokens_used) as total_tokens,
+                        SUM(ac.cost) as total_cost,
+                        COUNT(CASE WHEN ac.status = 'completed' THEN 1 END) as completed,
+                        COUNT(CASE WHEN ac.status = 'escalated' THEN 1 END) as escalated
+                    FROM ai_agents a
+                    LEFT JOIN ai_conversations ac ON a.id = ac.ai_agent_id
+                        AND ac.created_at >= ? AND ac.created_at <= ?
+                    GROUP BY a.id, a.name, a.model
+                    HAVING conversations_count > 0
+                    ORDER BY conversations_count DESC
+                    LIMIT 20";
+            
+            $aiAgentsStats = Database::fetchAll($sql, [$filters['start_date'], $filters['end_date'] . ' 23:59:59']);
+            
+            // Evolução de uso ao longo do tempo
+            $usageOverTime = AIAssistantLog::getUsageOverTime((int)$days, 'day');
+            
+            // Custo por modelo
+            $costByModel = AIAssistantLog::getCostByModel((int)$days);
+            
+            Response::json([
+                'success' => true,
+                'assistant_stats' => [
+                    'total_uses' => $totalUses,
+                    'total_tokens' => $totalTokens,
+                    'total_cost' => $totalCost,
+                    'total_successful' => $totalSuccessful,
+                    'total_failed' => $totalFailed,
+                    'success_rate' => $totalUses > 0 ? round(($totalSuccessful / $totalUses) * 100, 2) : 0,
+                    'avg_cost_per_use' => $totalUses > 0 ? round($totalCost / $totalUses, 4) : 0,
+                    'avg_tokens_per_use' => $totalUses > 0 ? round($totalTokens / $totalUses, 0) : 0,
+                    'by_feature' => $statsByFeature
+                ],
+                'ai_agents_stats' => $aiAgentsStats,
+                'usage_over_time' => $usageOverTime,
+                'cost_by_model' => $costByModel
+            ]);
+            
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * API: Obter comparações temporais (mês atual vs anterior)
+     */
+    public function getTimeComparison(): void
+    {
+        Permission::abortIfCannot('admin.settings');
+        
+        try {
+            $filters = [
+                'start_date' => Request::get('start_date') ?: date('Y-m-d', strtotime('-30 days')),
+                'end_date' => Request::get('end_date') ?: date('Y-m-d'),
+            ];
+            
+            // Calcular período anterior (mesmo número de dias)
+            $daysDiff = (strtotime($filters['end_date']) - strtotime($filters['start_date'])) / 86400;
+            $previousStartDate = date('Y-m-d', strtotime($filters['start_date'] . " -{$daysDiff} days"));
+            $previousEndDate = date('Y-m-d', strtotime($filters['start_date'] . ' -1 day'));
+            
+            // Estatísticas do período atual
+            $currentStats = DashboardService::getGeneralStats(null, $filters['start_date'], $filters['end_date'] . ' 23:59:59');
+            
+            // Estatísticas do período anterior
+            $previousStats = DashboardService::getGeneralStats(null, $previousStartDate, $previousEndDate . ' 23:59:59');
+            
+            // Calcular variações percentuais
+            $comparison = [
+                'conversations' => [
+                    'current' => $currentStats['conversations']['total'] ?? 0,
+                    'previous' => $previousStats['conversations']['total'] ?? 0,
+                    'change' => $this->calculatePercentageChange(
+                        $previousStats['conversations']['total'] ?? 0,
+                        $currentStats['conversations']['total'] ?? 0
+                    )
+                ],
+                'open_conversations' => [
+                    'current' => $currentStats['conversations']['open'] ?? 0,
+                    'previous' => $previousStats['conversations']['open'] ?? 0,
+                    'change' => $this->calculatePercentageChange(
+                        $previousStats['conversations']['open'] ?? 0,
+                        $currentStats['conversations']['open'] ?? 0
+                    )
+                ],
+                'closed_conversations' => [
+                    'current' => $currentStats['conversations']['closed'] ?? 0,
+                    'previous' => $previousStats['conversations']['closed'] ?? 0,
+                    'change' => $this->calculatePercentageChange(
+                        $previousStats['conversations']['closed'] ?? 0,
+                        $currentStats['conversations']['closed'] ?? 0
+                    )
+                ],
+                'resolution_rate' => [
+                    'current' => $currentStats['metrics']['resolution_rate'] ?? 0,
+                    'previous' => $previousStats['metrics']['resolution_rate'] ?? 0,
+                    'change' => $this->calculatePercentageChange(
+                        $previousStats['metrics']['resolution_rate'] ?? 0,
+                        $currentStats['metrics']['resolution_rate'] ?? 0
+                    )
+                ],
+                'avg_response_time' => [
+                    'current' => $currentStats['metrics']['avg_first_response_time'] ?? 0,
+                    'previous' => $previousStats['metrics']['avg_first_response_time'] ?? 0,
+                    'change' => $this->calculatePercentageChange(
+                        $previousStats['metrics']['avg_first_response_time'] ?? 0,
+                        $currentStats['metrics']['avg_first_response_time'] ?? 0,
+                        true // Invertido: menor tempo é melhor
+                    )
+                ],
+                'messages' => [
+                    'current' => $currentStats['messages']['total'] ?? 0,
+                    'previous' => $previousStats['messages']['total'] ?? 0,
+                    'change' => $this->calculatePercentageChange(
+                        $previousStats['messages']['total'] ?? 0,
+                        $currentStats['messages']['total'] ?? 0
+                    )
+                ]
+            ];
+            
+            Response::json([
+                'success' => true,
+                'current_period' => [
+                    'start' => $filters['start_date'],
+                    'end' => $filters['end_date']
+                ],
+                'previous_period' => [
+                    'start' => $previousStartDate,
+                    'end' => $previousEndDate
+                ],
+                'comparison' => $comparison
+            ]);
+            
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Calcular variação percentual
+     */
+    private function calculatePercentageChange(float $previous, float $current, bool $inverted = false): array
+    {
+        if ($previous == 0) {
+            return [
+                'percentage' => $current > 0 ? 100 : 0,
+                'value' => $current,
+                'is_positive' => $current > 0
+            ];
+        }
+        
+        $change = (($current - $previous) / $previous) * 100;
+        
+        if ($inverted) {
+            // Para métricas onde menor é melhor (tempo de resposta)
+            $isPositive = $change < 0; // Redução é positiva
+        } else {
+            // Para métricas onde maior é melhor
+            $isPositive = $change > 0;
+        }
+        
+        return [
+            'percentage' => round(abs($change), 2),
+            'value' => round($current - $previous, 2),
+            'is_positive' => $isPositive
+        ];
     }
 }
 

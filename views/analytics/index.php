@@ -125,6 +125,16 @@ ob_start();
                     Funil
                 </a>
             </li>
+            <li class="nav-item mt-2">
+                <a class="nav-link text-active-primary me-10" data-bs-toggle="tab" href="#kt_tab_automations">
+                    Automações
+                </a>
+            </li>
+            <li class="nav-item mt-2">
+                <a class="nav-link text-active-primary me-10" data-bs-toggle="tab" href="#kt_tab_ai">
+                    Inteligência Artificial
+                </a>
+            </li>
         </ul>
 
         <!-- Tab Content -->
@@ -133,6 +143,18 @@ ob_start();
             <!-- Tab: Conversas -->
             <div class="tab-pane fade show active" id="kt_tab_conversations" role="tabpanel">
                 <div class="mt-5">
+                    <!-- Comparação Temporal -->
+                    <div class="card mb-5" id="time-comparison-card" style="display: none;">
+                        <div class="card-header">
+                            <h3 class="card-title">Comparação com Período Anterior</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-5" id="time-comparison-stats">
+                                <!-- Será preenchido via JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Estatísticas Gerais -->
                     <div class="row g-5 mb-5" id="conversations-stats">
                         <div class="col-xl-3">
@@ -565,6 +587,7 @@ ob_start();
 <script>
 let conversationsEvolutionChart, conversationsStatusChart, conversationsChannelChart, messagesEvolutionChart;
 let slaComplianceChart, tagsEvolutionChart, tagsStatusChart, funnelStagesChart;
+let automationsEvolutionChart, aiUsageChart, aiCostModelChart;
 
 document.addEventListener('DOMContentLoaded', function() {
     // Carregar dados iniciais
@@ -592,9 +615,18 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (targetId === '#kt_tab_funnel' && !window.funnelDataLoaded) {
                 loadFunnelData();
                 window.funnelDataLoaded = true;
+            } else if (targetId === '#kt_tab_automations' && !window.automationsDataLoaded) {
+                loadAutomationsData();
+                window.automationsDataLoaded = true;
+            } else if (targetId === '#kt_tab_ai' && !window.aiDataLoaded) {
+                loadAIData();
+                window.aiDataLoaded = true;
             }
         });
     });
+    
+    // Carregar comparação temporal
+    loadTimeComparison();
 });
 
 function loadConversationsData() {
@@ -1161,6 +1193,357 @@ function updateFunnelStagesChart(stages) {
         funnelStagesChart = new ApexCharts(document.querySelector("#chart-funnel-stages"), options);
         funnelStagesChart.render();
     }
+}
+
+function loadAutomationsData() {
+    const form = document.getElementById('analytics-filters-form');
+    const formData = new FormData(form);
+    const params = new URLSearchParams(formData);
+    
+    fetch(`<?= \App\Helpers\Url::to('/analytics/automations/data') ?>?${params.toString()}`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            console.error('Erro ao carregar dados de automações:', data.message);
+            return;
+        }
+        
+        updateAutomationsStats(data.general_stats, data.success_rate);
+        updateAutomationsEvolutionChart(data.evolution);
+        updateTopAutomationsTable(data.top_automations);
+    })
+    .catch(error => {
+        console.error('Erro ao carregar dados de automações:', error);
+    });
+}
+
+function loadAIData() {
+    const form = document.getElementById('analytics-filters-form');
+    const formData = new FormData(form);
+    const params = new URLSearchParams(formData);
+    
+    fetch(`<?= \App\Helpers\Url::to('/analytics/ai/data') ?>?${params.toString()}`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            console.error('Erro ao carregar dados de IA:', data.message);
+            return;
+        }
+        
+        updateAIStats(data.assistant_stats);
+        updateAIUsageChart(data.usage_over_time);
+        updateAICostModelChart(data.cost_by_model);
+        updateAIFeaturesTable(data.assistant_stats.by_feature);
+        updateAIAgentsTable(data.ai_agents_stats);
+    })
+    .catch(error => {
+        console.error('Erro ao carregar dados de IA:', error);
+    });
+}
+
+function loadTimeComparison() {
+    const form = document.getElementById('analytics-filters-form');
+    const formData = new FormData(form);
+    const params = new URLSearchParams(formData);
+    
+    fetch(`<?= \App\Helpers\Url::to('/analytics/comparison') ?>?${params.toString()}`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            console.error('Erro ao carregar comparação temporal:', data.message);
+            return;
+        }
+        
+        updateTimeComparison(data.comparison, data.current_period, data.previous_period);
+    })
+    .catch(error => {
+        console.error('Erro ao carregar comparação temporal:', error);
+    });
+}
+
+function updateAutomationsStats(stats, successRate) {
+    document.getElementById('stat-automations-total').textContent = stats?.total_executions || 0;
+    document.getElementById('stat-automations-success-rate').textContent = (successRate || 0).toFixed(1) + '%';
+    document.getElementById('stat-automations-failed').textContent = stats?.failed || 0;
+    const avgTime = stats?.avg_execution_time_seconds || 0;
+    document.getElementById('stat-automations-avg-time').textContent = avgTime > 0 ? avgTime.toFixed(1) + 's' : '-';
+}
+
+function updateAutomationsEvolutionChart(evolution) {
+    const dates = evolution.map(e => e.date);
+    const total = evolution.map(e => parseInt(e.total || 0));
+    const completed = evolution.map(e => parseInt(e.completed || 0));
+    const failed = evolution.map(e => parseInt(e.failed || 0));
+    
+    const options = {
+        series: [{
+            name: 'Total',
+            data: total
+        }, {
+            name: 'Sucesso',
+            data: completed
+        }, {
+            name: 'Falhas',
+            data: failed
+        }],
+        chart: {
+            height: 300,
+            type: 'line',
+            toolbar: { show: false }
+        },
+        stroke: {
+            width: [3, 2, 2],
+            curve: 'smooth'
+        },
+        xaxis: {
+            categories: dates
+        },
+        colors: ['#00D9FF', '#50CD89', '#F1416C'],
+        legend: {
+            position: 'top'
+        }
+    };
+    
+    if (automationsEvolutionChart) {
+        automationsEvolutionChart.updateOptions(options);
+    } else {
+        automationsEvolutionChart = new ApexCharts(document.querySelector("#chart-automations-evolution"), options);
+        automationsEvolutionChart.render();
+    }
+}
+
+function updateTopAutomationsTable(automations) {
+    const tbody = document.getElementById('top-automations-table');
+    
+    if (!automations || automations.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5"><p class="text-muted">Nenhum dado disponível</p></td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = automations.map((auto, index) => {
+        const successRate = auto.execution_count > 0 
+            ? ((auto.completed_count / auto.execution_count) * 100).toFixed(1) 
+            : '0.0';
+        return `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${escapeHtml(auto.name || '-')}</td>
+                <td>${auto.execution_count || 0}</td>
+                <td>${auto.completed_count || 0}</td>
+                <td>${auto.failed_count || 0}</td>
+                <td><span class="badge badge-light-success">${successRate}%</span></td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function updateAIStats(stats) {
+    document.getElementById('stat-ai-total-uses').textContent = stats.total_uses || 0;
+    document.getElementById('stat-ai-total-cost').textContent = '$' + (parseFloat(stats.total_cost || 0).toFixed(2));
+    document.getElementById('stat-ai-total-tokens').textContent = (stats.total_tokens || 0).toLocaleString();
+    document.getElementById('stat-ai-success-rate').textContent = (stats.success_rate || 0).toFixed(1) + '%';
+}
+
+function updateAIUsageChart(usageOverTime) {
+    const dates = usageOverTime.map(u => u.period);
+    const uses = usageOverTime.map(u => parseInt(u.uses || 0));
+    const tokens = usageOverTime.map(u => parseInt(u.tokens || 0));
+    const cost = usageOverTime.map(u => parseFloat(u.cost || 0));
+    
+    const options = {
+        series: [{
+            name: 'Usos',
+            type: 'column',
+            data: uses
+        }, {
+            name: 'Custo (USD)',
+            type: 'line',
+            data: cost
+        }],
+        chart: {
+            height: 300,
+            type: 'line',
+            toolbar: { show: false }
+        },
+        stroke: {
+            width: [0, 3],
+            curve: 'smooth'
+        },
+        xaxis: {
+            categories: dates
+        },
+        yaxis: [{
+            title: { text: 'Usos' }
+        }, {
+            opposite: true,
+            title: { text: 'Custo (USD)' }
+        }],
+        colors: ['#00D9FF', '#FFC700'],
+        legend: {
+            position: 'top'
+        }
+    };
+    
+    if (aiUsageChart) {
+        aiUsageChart.updateOptions(options);
+    } else {
+        aiUsageChart = new ApexCharts(document.querySelector("#chart-ai-usage"), options);
+        aiUsageChart.render();
+    }
+}
+
+function updateAICostModelChart(costByModel) {
+    const labels = costByModel.map(c => c.model || 'N/A');
+    const values = costByModel.map(c => parseFloat(c.total_cost || 0));
+    
+    const options = {
+        series: values,
+        chart: {
+            type: 'donut',
+            height: 300
+        },
+        labels: labels,
+        colors: ['#00D9FF', '#50CD89', '#F1416C', '#FFC700', '#7239EA'],
+        legend: {
+            position: 'bottom'
+        }
+    };
+    
+    if (aiCostModelChart) {
+        aiCostModelChart.updateSeries(values);
+        aiCostModelChart.updateOptions({ labels: labels });
+    } else {
+        aiCostModelChart = new ApexCharts(document.querySelector("#chart-ai-cost-model"), options);
+        aiCostModelChart.render();
+    }
+}
+
+function updateAIFeaturesTable(features) {
+    const tbody = document.getElementById('ai-features-table');
+    
+    if (!features || features.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5"><p class="text-muted">Nenhum dado disponível</p></td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = features.slice(0, 10).map((feature, index) => {
+        const successRate = feature.total_uses > 0 
+            ? ((feature.successful_uses / feature.total_uses) * 100).toFixed(1) 
+            : '0.0';
+        return `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${escapeHtml(feature.feature_key || '-')}</td>
+                <td>${feature.total_uses || 0}</td>
+                <td>${(feature.total_tokens || 0).toLocaleString()}</td>
+                <td>$${parseFloat(feature.total_cost || 0).toFixed(2)}</td>
+                <td><span class="badge badge-light-success">${successRate}%</span></td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function updateAIAgentsTable(agents) {
+    const tbody = document.getElementById('ai-agents-table');
+    
+    if (!agents || agents.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5"><p class="text-muted">Nenhum dado disponível</p></td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = agents.map((agent, index) => {
+        return `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${escapeHtml(agent.name || '-')}</td>
+                <td><span class="badge badge-light-info">${agent.model || '-'}</span></td>
+                <td>${agent.conversations_count || 0}</td>
+                <td>${(agent.total_tokens || 0).toLocaleString()}</td>
+                <td>$${parseFloat(agent.total_cost || 0).toFixed(2)}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function updateTimeComparison(comparison, currentPeriod, previousPeriod) {
+    const card = document.getElementById('time-comparison-card');
+    const container = document.getElementById('time-comparison-stats');
+    
+    if (!comparison || Object.keys(comparison).length === 0) {
+        card.style.display = 'none';
+        return;
+    }
+    
+    card.style.display = 'block';
+    
+    const metrics = [
+        { key: 'conversations', label: 'Total de Conversas', icon: 'chat' },
+        { key: 'open_conversations', label: 'Conversas Abertas', icon: 'chat-text' },
+        { key: 'closed_conversations', label: 'Conversas Fechadas', icon: 'check-circle' },
+        { key: 'resolution_rate', label: 'Taxa de Resolução', icon: 'chart-simple', suffix: '%' },
+        { key: 'avg_response_time', label: 'Tempo Médio de Resposta', icon: 'time', suffix: ' min', inverted: true },
+        { key: 'messages', label: 'Total de Mensagens', icon: 'message-text' }
+    ];
+    
+    container.innerHTML = metrics.map(metric => {
+        const data = comparison[metric.key] || {};
+        const change = data.change || {};
+        const changeClass = change.is_positive ? 'text-success' : 'text-danger';
+        const changeIcon = change.is_positive ? 'arrow-up' : 'arrow-down';
+        const changeSign = change.is_positive ? '+' : '';
+        
+        return `
+            <div class="col-xl-4">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="symbol symbol-50px me-3">
+                                <div class="symbol-label bg-light-primary">
+                                    <i class="ki-duotone ki-${metric.icon} fs-2x text-primary">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                </div>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="text-gray-500 fw-semibold fs-6 mb-1">${metric.label}</div>
+                                <div class="d-flex align-items-center">
+                                    <div class="fs-2x fw-bold text-gray-800 me-2">
+                                        ${data.current || 0}${metric.suffix || ''}
+                                    </div>
+                                    <div class="${changeClass}">
+                                        <i class="ki-duotone ki-${changeIcon} fs-3">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        ${changeSign}${change.percentage || 0}%
+                                    </div>
+                                </div>
+                                <div class="text-muted fs-7 mt-1">
+                                    Período anterior: ${data.previous || 0}${metric.suffix || ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
 function escapeHtml(text) {

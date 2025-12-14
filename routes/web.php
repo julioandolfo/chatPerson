@@ -71,6 +71,9 @@ Router::get('/analytics/conversations/data', [AnalyticsController::class, 'getCo
 Router::get('/analytics/agents/data', [AnalyticsController::class, 'getAgentsData'], ['Authentication']);
 Router::get('/analytics/tags/data', [AnalyticsController::class, 'getTagsData'], ['Authentication']);
 Router::get('/analytics/funnel/data', [AnalyticsController::class, 'getFunnelData'], ['Authentication']);
+Router::get('/analytics/automations/data', [AnalyticsController::class, 'getAutomationsData'], ['Authentication']);
+Router::get('/analytics/ai/data', [AnalyticsController::class, 'getAIData'], ['Authentication']);
+Router::get('/analytics/comparison', [AnalyticsController::class, 'getTimeComparison'], ['Authentication']);
 // Rotas de tags movidas para após as rotas de tags (linhas 192-199)
 Router::post('/conversations/{id}/messages', [ConversationController::class, 'sendMessage'], ['Authentication']);
 Router::get('/conversations/for-forwarding', [ConversationController::class, 'listForForwarding'], ['Authentication']);

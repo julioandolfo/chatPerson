@@ -10023,6 +10023,10 @@ function removeParticipant(conversationId, userId) {
                 } else if (typeof loadConversation === 'function') {
                     loadConversation(conversationId);
                 }
+                // Atualizar apenas a seção de participantes do sidebar, se existir
+                if (typeof updateConversationSidebar === 'function') {
+                    updateConversationSidebar({ id: conversationId }, []);
+                }
             }
             // Sucesso visual
             if (typeof Swal !== 'undefined') {
@@ -10108,6 +10112,10 @@ function addParticipant() {
                     loadConversationDetails(conversationId);
                 } else if (typeof loadConversation === 'function') {
                     loadConversation(conversationId);
+                }
+                // Atualizar apenas a seção de participantes do sidebar, se existir
+                if (typeof updateConversationSidebar === 'function') {
+                    updateConversationSidebar({ id: conversationId }, []);
                 }
             }
             // Sucesso visual

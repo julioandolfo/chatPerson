@@ -10018,7 +10018,11 @@ function removeParticipant(conversationId, userId) {
             loadParticipantsForConversation(conversationId);
             // Recarregar a conversa inteira para atualizar sidebar
             if (window.currentConversationId == conversationId) {
-                loadConversation(conversationId);
+                if (typeof loadConversationDetails === 'function') {
+                    loadConversationDetails(conversationId);
+                } else if (typeof loadConversation === 'function') {
+                    loadConversation(conversationId);
+                }
             }
             // Sucesso visual
             if (typeof Swal !== 'undefined') {
@@ -10100,7 +10104,11 @@ function addParticipant() {
             loadParticipantsForConversation(conversationId);
             // Recarregar a conversa inteira para atualizar sidebar
             if (window.currentConversationId == conversationId) {
-                loadConversation(conversationId);
+                if (typeof loadConversationDetails === 'function') {
+                    loadConversationDetails(conversationId);
+                } else if (typeof loadConversation === 'function') {
+                    loadConversation(conversationId);
+                }
             }
             // Sucesso visual
             if (typeof Swal !== 'undefined') {

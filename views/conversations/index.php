@@ -9849,21 +9849,27 @@ function showAddParticipantModal(conversationId) {
     modal.show();
     
     // Salvar ID da conversa
-    document.getElementById('kt_modal_participants').dataset.conversationId = conversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+    document.getElementById('kt_modal_participants').dataset.conversationId = conversationId || window.currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+    window.currentConversationId = document.getElementById('kt_modal_participants').dataset.conversationId || window.currentConversationId;
     
     // Carregar participantes e usuários disponíveis
-    loadParticipantsForConversation();
+    loadParticipantsForConversation(window.currentConversationId);
 }
 
-function loadParticipantsForConversation() {
+function loadParticipantsForConversation(conversationIdParam = null) {
     const modalElement = document.getElementById('kt_modal_participants');
-    const conversationId = modalElement.dataset.conversationId || window.currentConversationId;
+    const conversationId = conversationIdParam || (modalElement ? modalElement.dataset.conversationId : null) || window.currentConversationId;
     
     if (!conversationId || conversationId === 'undefined' || conversationId === 'null') {
         console.error('loadParticipantsForConversation: conversationId inválido:', conversationId);
         return;
     }
     
+    // Garantir que o dataset fique sincronizado para as próximas chamadas
+    if (modalElement) {
+        modalElement.dataset.conversationId = conversationId;
+    }
+
     console.log('loadParticipantsForConversation: conversationId =', conversationId);
     
     // Carregar participantes atuais
@@ -10009,7 +10015,7 @@ function removeParticipant(conversationId, userId) {
     .then(data => {
         if (data.success) {
             // Recarregar participantes
-            loadParticipantsForConversation();
+            loadParticipantsForConversation(conversationId);
             // Recarregar a conversa inteira para atualizar sidebar
             if (window.currentConversationId == conversationId) {
                 loadConversation(conversationId);
@@ -10080,7 +10086,7 @@ function addParticipant() {
             // Limpar select
             document.getElementById('participantUserSelect').value = '';
             // Recarregar participantes
-            loadParticipantsForConversation();
+            loadParticipantsForConversation(conversationId);
             // Recarregar a conversa inteira para atualizar sidebar
             if (window.currentConversationId == conversationId) {
                 loadConversation(conversationId);

@@ -1232,12 +1232,20 @@ class ConversationController
     /**
      * Obter timeline completa de uma conversa
      */
-    public function getTimeline(int $id): void
+    public function getTimeline($id): void
     {
+        $conversationId = (int)$id;
+        if ($conversationId <= 0) {
+            Response::json([
+                'success' => false,
+                'message' => 'ID de conversa inválido'
+            ], 400);
+            return;
+        }
         Permission::abortIfCannot('conversations.view.own');
         
         try {
-            $conversation = \App\Models\Conversation::findWithRelations($id);
+            $conversation = \App\Models\Conversation::findWithRelations($conversationId);
             if (!$conversation) {
                 throw new \Exception('Conversa não encontrada');
             }
@@ -1246,7 +1254,7 @@ class ConversationController
             
             // Buscar atividades da tabela activities
             if (class_exists('\App\Models\Activity')) {
-                $activities = \App\Models\Activity::getByEntity('conversation', $id);
+                $activities = \App\Models\Activity::getByEntity('conversation', $conversationId);
                 
                 foreach ($activities as $activity) {
                     $metadata = $activity['metadata'] ?? [];
@@ -1360,9 +1368,10 @@ class ConversationController
             }
             
             // Buscar mensagens de sistema que indicam mudanças
-            $systemMessages = \App\Models\Message::where('conversation_id', '=', $id)
-                                                 ->where('message_type', '=', 'system')
-                                                 ->orderBy('created_at', 'DESC');
+            $systemMessages = \App\Helpers\Database::fetchAll(
+                "SELECT * FROM messages WHERE conversation_id = ? AND message_type = 'system' ORDER BY created_at DESC",
+                [$conversationId]
+            );
             
             foreach ($systemMessages as $msg) {
                 $content = strip_tags($msg['content'] ?? '');

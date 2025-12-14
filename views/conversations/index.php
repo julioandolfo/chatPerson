@@ -10020,6 +10020,17 @@ function removeParticipant(conversationId, userId) {
             if (window.currentConversationId == conversationId) {
                 loadConversation(conversationId);
             }
+            // Sucesso visual
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Participante removido',
+                    timer: 1400,
+                    showConfirmButton: false
+                });
+            } else {
+                alert('Participante removido com sucesso');
+            }
         } else {
             alert('Erro ao remover participante: ' + (data.message || 'Erro desconhecido'));
         }
@@ -10090,6 +10101,17 @@ function addParticipant() {
             // Recarregar a conversa inteira para atualizar sidebar
             if (window.currentConversationId == conversationId) {
                 loadConversation(conversationId);
+            }
+            // Sucesso visual
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Participante adicionado',
+                    timer: 1400,
+                    showConfirmButton: false
+                });
+            } else {
+                alert('Participante adicionado com sucesso');
             }
             
             // Toast de sucesso

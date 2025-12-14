@@ -9670,26 +9670,14 @@ function loadTagsForConversation() {
     fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/tags`)
         .then(response => response.json())
         .then(data => {
-            const currentTagsDiv = document.getElementById('currentTags');
-            
-            if (data.success && data.tags && data.tags.length > 0) {
-                let html = '<div class="w-100 mb-2"><strong>Tags Atuais:</strong></div>';
-                data.tags.forEach(tag => {
-                    const tagNameEscaped = escapeHtml(tag.name).replace(/'/g, "\\'");
-                    html += '<span class="badge badge-lg" style="background-color: ' + tag.color + '20; color: ' + tag.color + '; cursor: pointer;" ';
-                    html += 'onclick="removeTagFromList(' + tag.id + ', \'' + tagNameEscaped + '\')" title="Clique para remover">';
-                    html += escapeHtml(tag.name);
-                    html += '<i class="ki-duotone ki-cross fs-7 ms-1">';
-                    html += '<span class="path1"></span><span class="path2"></span>';
-                    html += '</i></span>';
-                });
-                currentTagsDiv.innerHTML = html;
-            } else {
-                currentTagsDiv.innerHTML = '<div class="w-100 text-muted">Nenhuma tag atribuída</div>';
-            }
+            // Iniciar seleção com as tags atuais
+            selectedTags = data.success && data.tags ? [...data.tags] : [];
+            updateSelectedTagsDisplay();
         })
         .catch(error => {
             console.error('Erro ao carregar tags da conversa:', error);
+            selectedTags = [];
+            updateSelectedTagsDisplay();
         });
     
     // Carregar todas as tags disponíveis
@@ -9754,47 +9742,35 @@ function removeTagFromList(tagId, tagName) {
 
 function updateSelectedTagsDisplay() {
     const currentTagsDiv = document.getElementById('currentTags');
+    const uniqueTags = selectedTags.filter((tag, index, self) =>
+        index === self.findIndex(t => t.id === tag.id)
+    );
     
-    // Carregar tags atuais da conversa
-    const conversationId = document.getElementById('kt_modal_tags').dataset.conversationId;
-    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/tags`)
-        .then(response => response.json())
-        .then(data => {
-            const currentTagIds = data.success && data.tags ? data.tags.map(t => t.id) : [];
-            
-            // Combinar tags atuais com selecionadas (removendo duplicatas)
-            const allTags = [...(data.success && data.tags ? data.tags : []), ...selectedTags];
-            const uniqueTags = allTags.filter((tag, index, self) => 
-                index === self.findIndex(t => t.id === tag.id)
-            );
-            
-            if (uniqueTags.length > 0) {
-                let html = '<div class="w-100 mb-2"><strong>Tags Selecionadas:</strong></div>';
-                uniqueTags.forEach(tag => {
-                    const isCurrent = currentTagIds.includes(tag.id);
-                    html += `
-                        <span class="badge badge-lg ${isCurrent ? '' : 'badge-light-primary'}" 
-                              style="${isCurrent ? `background-color: ${tag.color}20; color: ${tag.color};` : ''} cursor: pointer;" 
-                              onclick="removeTagFromList(${tag.id}, '${escapeHtml(tag.name)}')" title="Clique para remover">
-                            ${escapeHtml(tag.name)}
-                            <i class="ki-duotone ki-cross fs-7 ms-1">
-                                <span class="path1"></span>
-                                <span class="path2"></span>
-                            </i>
-                        </span>
-                    `;
-                });
-                currentTagsDiv.innerHTML = html;
-            } else {
-                currentTagsDiv.innerHTML = '<div class="w-100 text-muted">Nenhuma tag selecionada</div>';
-            }
+    if (uniqueTags.length > 0) {
+        let html = '<div class="w-100 mb-2"><strong>Tags Selecionadas:</strong></div>';
+        uniqueTags.forEach(tag => {
+            html += `
+                <span class="badge badge-lg" 
+                      style="background-color: ${tag.color}20; color: ${tag.color}; cursor: pointer;" 
+                      onclick="removeTagFromList(${tag.id}, '${escapeHtml(tag.name)}')" title="Clique para remover">
+                    ${escapeHtml(tag.name)}
+                    <i class="ki-duotone ki-cross fs-7 ms-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </span>
+            `;
         });
+        currentTagsDiv.innerHTML = html;
+    } else {
+        currentTagsDiv.innerHTML = '<div class="w-100 text-muted">Nenhuma tag selecionada</div>';
+    }
 }
 
 function saveTags() {
     const conversationId = document.getElementById('kt_modal_tags').dataset.conversationId;
     
-    // Carregar tags atuais
+    // Carregar tags atuais para comparar
     fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/tags`)
         .then(response => response.json())
         .then(data => {
@@ -9812,22 +9788,61 @@ function saveTags() {
                 ...toAdd.map(tagId => 
                     fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/tags`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        },
                         body: JSON.stringify({ tag_id: tagId })
                     })
                 ),
                 ...toRemove.map(tagId => 
                     fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/tags/${tagId}`, {
-                        method: 'DELETE'
+                        method: 'DELETE',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        }
                     })
                 )
             ];
             
             Promise.all(promises)
                 .then(() => {
+                    // Buscar tags atualizadas para refletir no sidebar
+                    return fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/tags`, {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        }
+                    }).then(r => r.json());
+                })
+                .then(updated => {
+                    const tags = updated.success && updated.tags ? updated.tags : [];
+                    
+                    // Fechar modal
                     bootstrap.Modal.getInstance(document.getElementById('kt_modal_tags')).hide();
                     selectedTags = [];
-                    window.location.reload();
+                    
+                    // Atualizar sidebar (tags) sem refresh
+                    if (typeof updateConversationSidebar === 'function') {
+                        updateConversationSidebar({ id: conversationId }, tags);
+                    }
+                    
+                    // Atualizar listagem na UI (opcional): recarregar participantes/modal
+                    loadTagsForConversation();
+                    
+                    // Sucesso visual
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Tags atualizadas',
+                            timer: 1400,
+                            showConfirmButton: false
+                        });
+                    } else {
+                        alert('Tags atualizadas com sucesso');
+                    }
                 })
                 .catch(error => {
                     console.error('Erro ao salvar tags:', error);

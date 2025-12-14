@@ -8,6 +8,7 @@ $sla = $cs['sla'] ?? [];
 $dist = $cs['distribution'] ?? [];
 $pctDist = $cs['percentage_distribution'] ?? [];
 $reassign = $cs['reassignment'] ?? [];
+$sentiment = $cs['sentiment_analysis'] ?? [];
 ?>
 <form id="kt_settings_conversations_form" class="form">
     <!--begin::Configurações de Chat-->
@@ -281,6 +282,149 @@ $reassign = $cs['reassignment'] ?? [];
     </div>
     <!--end::Reatribuição-->
     
+    <div class="separator separator-dashed my-10"></div>
+    
+    <!--begin::Análise de Sentimento-->
+    <div class="mb-10">
+        <h4 class="fw-bold mb-4">Análise de Sentimento (OpenAI)</h4>
+        <div class="fv-row mb-7">
+            <label class="d-flex align-items-center">
+                <input type="checkbox" name="sentiment_analysis_enabled" class="form-check-input me-2" 
+                       id="sentiment_analysis_enabled"
+                       <?= ($sentiment['enabled'] ?? false) ? 'checked' : '' ?> />
+                <span class="fw-semibold fs-6">Habilitar análise de sentimento</span>
+            </label>
+            <div class="form-text">Analisa automaticamente o sentimento das conversas usando OpenAI GPT</div>
+        </div>
+        
+        <div id="sentiment_analysis_settings" style="display: <?= ($sentiment['enabled'] ?? false) ? 'block' : 'none' ?>;">
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Modelo OpenAI</label>
+                        <select name="sentiment_analysis_model" class="form-select form-select-solid">
+                            <option value="gpt-3.5-turbo" <?= ($sentiment['model'] ?? 'gpt-3.5-turbo') === 'gpt-3.5-turbo' ? 'selected' : '' ?>>GPT-3.5 Turbo (Recomendado - Mais barato)</option>
+                            <option value="gpt-4" <?= ($sentiment['model'] ?? '') === 'gpt-4' ? 'selected' : '' ?>>GPT-4 (Mais preciso - Mais caro)</option>
+                            <option value="gpt-4-turbo" <?= ($sentiment['model'] ?? '') === 'gpt-4-turbo' ? 'selected' : '' ?>>GPT-4 Turbo</option>
+                        </select>
+                        <div class="form-text">Modelo da OpenAI a usar para análise</div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Temperature</label>
+                        <input type="number" name="sentiment_analysis_temperature" class="form-control form-control-solid" 
+                               value="<?= $sentiment['temperature'] ?? 0.3 ?>" min="0" max="2" step="0.1" />
+                        <div class="form-text">Quanto menor, mais determinístico (padrão: 0.3)</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Intervalo de Verificação (horas)</label>
+                        <input type="number" name="sentiment_check_interval_hours" class="form-control form-control-solid" 
+                               value="<?= $sentiment['check_interval_hours'] ?? 5 ?>" min="1" />
+                        <div class="form-text">A cada quantas horas verificar conversas abertas</div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Idade Máxima da Conversa (dias)</label>
+                        <input type="number" name="sentiment_max_conversation_age_days" class="form-control form-control-solid" 
+                               value="<?= $sentiment['max_conversation_age_days'] ?? 30 ?>" min="1" />
+                        <div class="form-text">Não analisar conversas abertas há mais de X dias</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="fv-row mb-7">
+                <label class="d-flex align-items-center">
+                    <input type="checkbox" name="sentiment_analyze_on_new_message" class="form-check-input me-2" 
+                           <?= ($sentiment['analyze_on_new_message'] ?? true) ? 'checked' : '' ?> />
+                    <span class="fw-semibold fs-6">Analisar automaticamente ao receber nova mensagem</span>
+                </label>
+            </div>
+            
+            <div class="row">
+                <div class="col-lg-4">
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Mín. Mensagens para Analisar</label>
+                        <input type="number" name="sentiment_min_messages_to_analyze" class="form-control form-control-solid" 
+                               value="<?= $sentiment['min_messages_to_analyze'] ?? 3 ?>" min="1" />
+                        <div class="form-text">Mínimo de mensagens do contato para fazer análise</div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Analisar a cada X Mensagens</label>
+                        <input type="number" name="sentiment_analyze_on_message_count" class="form-control form-control-solid" 
+                               value="<?= $sentiment['analyze_on_message_count'] ?? 5 ?>" min="1" />
+                        <div class="form-text">Analisar quando contador de mensagens for múltiplo deste número</div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Analisar Últimas X Mensagens</label>
+                        <input type="number" name="sentiment_analyze_last_messages" class="form-control form-control-solid" 
+                               value="<?= $sentiment['analyze_last_messages'] ?? '' ?>" min="1" 
+                               placeholder="Deixe vazio para toda conversa" />
+                        <div class="form-text">Analisar apenas últimas X mensagens (vazio = toda conversa)</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="fv-row mb-7">
+                <label class="d-flex align-items-center">
+                    <input type="checkbox" name="sentiment_include_emotions" class="form-check-input me-2" 
+                           <?= ($sentiment['include_emotions'] ?? true) ? 'checked' : '' ?> />
+                    <span class="fw-semibold fs-6">Incluir análise de emoções específicas</span>
+                </label>
+            </div>
+            
+            <div class="fv-row mb-7">
+                <label class="d-flex align-items-center">
+                    <input type="checkbox" name="sentiment_include_urgency" class="form-check-input me-2" 
+                           <?= ($sentiment['include_urgency'] ?? true) ? 'checked' : '' ?> />
+                    <span class="fw-semibold fs-6">Incluir nível de urgência</span>
+                </label>
+            </div>
+            
+            <div class="fv-row mb-7">
+                <label class="d-flex align-items-center">
+                    <input type="checkbox" name="sentiment_auto_tag_negative" class="form-check-input me-2" 
+                           id="sentiment_auto_tag_negative"
+                           <?= ($sentiment['auto_tag_negative'] ?? false) ? 'checked' : '' ?> />
+                    <span class="fw-semibold fs-6">Adicionar tag automaticamente quando sentimento negativo</span>
+                </label>
+            </div>
+            
+            <div id="sentiment_tag_select_container" style="display: <?= ($sentiment['auto_tag_negative'] ?? false) ? 'block' : 'none' ?>;">
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2">Tag para Sentimento Negativo</label>
+                    <select name="sentiment_negative_tag_id" class="form-select form-select-solid">
+                        <option value="">Selecione uma tag...</option>
+                        <?php foreach ($tags ?? [] as $tag): ?>
+                            <option value="<?= $tag['id'] ?>" <?= ($sentiment['negative_tag_id'] ?? null) == $tag['id'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($tag['name']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <div class="form-text">Tag que será adicionada automaticamente quando sentimento negativo for detectado</div>
+                </div>
+            </div>
+            
+            <div class="fv-row mb-7">
+                <label class="fw-semibold fs-6 mb-2">Limite de Custo Diário (USD)</label>
+                <input type="number" name="sentiment_cost_limit_per_day" class="form-control form-control-solid" 
+                       value="<?= $sentiment['cost_limit_per_day'] ?? 5.00 ?>" min="0" step="0.01" />
+                <div class="form-text">Limite máximo de custo por dia (0 = ilimitado)</div>
+            </div>
+        </div>
+    </div>
+    <!--end::Análise de Sentimento-->
+    
     <div class="d-flex justify-content-end">
         <button type="submit" class="btn btn-primary">
             <span class="indicator-label">Salvar Configurações</span>
@@ -306,6 +450,24 @@ document.addEventListener("DOMContentLoaded", function() {
     if (percentageEnabled && percentageContainer) {
         percentageEnabled.addEventListener("change", function() {
             percentageContainer.style.display = this.checked ? "block" : "none";
+        });
+    }
+    
+    // Toggle análise de sentimento
+    const sentimentEnabled = document.getElementById("sentiment_analysis_enabled");
+    const sentimentContainer = document.getElementById("sentiment_analysis_settings");
+    if (sentimentEnabled && sentimentContainer) {
+        sentimentEnabled.addEventListener("change", function() {
+            sentimentContainer.style.display = this.checked ? "block" : "none";
+        });
+    }
+    
+    // Toggle tag automática para sentimento negativo
+    const autoTagNegative = document.getElementById("sentiment_auto_tag_negative");
+    const tagSelectContainer = document.getElementById("sentiment_tag_select_container");
+    if (autoTagNegative && tagSelectContainer) {
+        autoTagNegative.addEventListener("change", function() {
+            tagSelectContainer.style.display = this.checked ? "block" : "none";
         });
     }
     

@@ -4416,6 +4416,11 @@ function updateConversationSidebar(conversation, tags) {
         conversationStatusEl.innerHTML = `<span class="badge badge-light-${statusClass}">${statusText}</span>`;
     }
     
+    // Carregar sentimento
+    if (conversation.id) {
+        loadConversationSentiment(conversation.id);
+    }
+    
     const conversationChannelEl = sidebar.querySelector('[data-field="channel"]');
     if (conversationChannelEl) {
         if (conversation.channel === 'whatsapp') {
@@ -4641,6 +4646,9 @@ function updateConversationSidebar(conversation, tags) {
     
     // Atualizar timeline
     updateConversationTimeline(conversation.id);
+
+    // Atualizar histórico (aba Histórico)
+    loadContactHistory(conversation.contact_id);
 }
 
 // Atualizar timeline da conversa
@@ -4880,6 +4888,142 @@ function updateConversationTimeline(conversationId) {
             console.error('Erro ao carregar timeline:', error);
             timelineContainer.innerHTML = '<div class="text-muted fs-7 text-center py-5">Erro ao carregar timeline</div>';
         });
+}
+
+// Histórico do contato (aba Histórico)
+function loadConversationSentiment(conversationId) {
+    if (!conversationId) return;
+    
+    const sentimentInfo = document.getElementById('sentiment-info');
+    const sentimentLabel = document.getElementById('sentiment-label');
+    const sentimentProgress = document.getElementById('sentiment-progress');
+    const sentimentScore = document.getElementById('sentiment-score');
+    
+    if (!sentimentInfo) return;
+    
+    fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/sentiment`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success || !data.sentiment) {
+            sentimentInfo.style.display = 'none';
+            return;
+        }
+        
+        const sentiment = data.sentiment;
+        const score = parseFloat(sentiment.sentiment_score || 0);
+        const label = sentiment.sentiment_label || 'neutral';
+        
+        // Calcular porcentagem para barra de progresso (score de -1 a 1 vira 0 a 100)
+        const percentage = ((score + 1) / 2) * 100;
+        
+        // Determinar cor baseado no sentimento
+        let colorClass = 'secondary';
+        let labelText = 'Neutro';
+        if (label === 'positive') {
+            colorClass = 'success';
+            labelText = 'Positivo';
+        } else if (label === 'negative') {
+            colorClass = 'danger';
+            labelText = 'Negativo';
+        }
+        
+        if (sentimentLabel) sentimentLabel.innerHTML = `<span class="badge badge-light-${colorClass}">${labelText}</span>`;
+        if (sentimentProgress) {
+            sentimentProgress.className = `progress-bar bg-${colorClass}`;
+            sentimentProgress.style.width = `${percentage}%`;
+        }
+        if (sentimentScore) sentimentScore.textContent = `Score: ${score.toFixed(2)}`;
+        
+        sentimentInfo.style.display = 'block';
+    })
+    .catch(error => {
+        console.error('Erro ao carregar sentimento:', error);
+        sentimentInfo.style.display = 'none';
+    });
+}
+
+function loadContactHistory(contactId) {
+    if (!contactId) return;
+    const countEl = document.getElementById('history-conversations-count');
+    const avgEl = document.getElementById('history-avg-time');
+    const csatEl = document.getElementById('history-satisfaction');
+    const listEl = document.getElementById('history-previous-conversations');
+
+    // Placeholders
+    if (countEl) countEl.textContent = '-';
+    if (avgEl) avgEl.textContent = '-';
+    if (csatEl) csatEl.textContent = '-';
+    if (listEl) listEl.innerHTML = `<div class="text-center py-5"><p class="text-muted fs-7">Carregando...</p></div>`;
+
+    fetch(`<?= \App\Helpers\Url::to('/contacts') ?>/${contactId}/history`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) {
+            if (listEl) listEl.innerHTML = `<div class="text-center py-5"><p class="text-muted fs-7">Erro ao carregar histórico</p></div>`;
+            return;
+        }
+        const total = data.total_conversations ?? 0;
+        const avgSec = data.avg_duration_seconds;
+        const csat = data.csat_score; // ainda não implementado (fica null/--)
+        const previous = data.previous_conversations || [];
+
+        if (countEl) countEl.textContent = total;
+        if (avgEl) avgEl.textContent = avgSec !== null ? formatDuration(avgSec) : '-';
+        if (csatEl) csatEl.textContent = csat !== null ? csat : '--';
+
+        if (!previous.length) {
+            if (listEl) listEl.innerHTML = `<div class="text-center py-5"><p class="text-muted fs-7">Nenhuma conversa anterior</p></div>`;
+            return;
+        }
+
+        let html = '';
+        previous.forEach(conv => {
+            const lastMsg = conv.last_message ? escapeHtml(conv.last_message.substring(0, 60)) + (conv.last_message.length > 60 ? '...' : '') : 'Sem mensagens';
+            const updatedAt = conv.updated_at || conv.created_at;
+            html += `
+                <div class="d-flex flex-column p-3 border rounded mb-2 bg-light-dark">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-semibold">Conversa #${conv.id}</span>
+                        <span class="badge badge-light-secondary">${conv.status || ''}</span>
+                    </div>
+                    <div class="text-muted fs-8">${formatDateTime(updatedAt)}</div>
+                    <div class="text-muted fs-8 mt-1">${lastMsg}</div>
+                </div>
+            `;
+        });
+        if (listEl) listEl.innerHTML = html;
+    })
+    .catch(() => {
+        if (listEl) listEl.innerHTML = `<div class="text-center py-5"><p class="text-muted fs-7">Erro ao carregar histórico</p></div>`;
+    });
+}
+
+function formatDuration(seconds) {
+    const sec = Math.max(0, Math.round(seconds));
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+}
+
+function formatDateTime(dt) {
+    if (!dt) return '-';
+    const d = new Date(dt);
+    if (isNaN(d.getTime())) return dt;
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+           ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
 // Função auxiliar para obter iniciais do nome

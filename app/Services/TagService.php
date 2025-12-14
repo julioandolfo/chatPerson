@@ -148,6 +148,15 @@ class TagService
             \App\Services\ConversationService::invalidateCache($conversationId);
         }
 
+        // Registrar atividade no timeline
+        if ($ok && class_exists('\App\Services\ActivityService')) {
+            try {
+                \App\Services\ActivityService::logTagAdded($conversationId, $tagId, \App\Helpers\Auth::id());
+            } catch (\Exception $e) {
+                error_log("Activity log tag_added falhou: " . $e->getMessage());
+            }
+        }
+
         return $ok;
     }
 
@@ -161,6 +170,15 @@ class TagService
         // Invalidar cache de conversa/lista para refletir tags na sidebar e na listagem
         if ($ok && class_exists('\App\Services\ConversationService')) {
             \App\Services\ConversationService::invalidateCache($conversationId);
+        }
+
+        // Registrar atividade no timeline
+        if ($ok && class_exists('\App\Services\ActivityService')) {
+            try {
+                \App\Services\ActivityService::logTagRemoved($conversationId, $tagId, \App\Helpers\Auth::id());
+            } catch (\Exception $e) {
+                error_log("Activity log tag_removed falhou: " . $e->getMessage());
+            }
         }
 
         return $ok;

@@ -44,7 +44,11 @@ class Conversation extends Model
             $params[] = $filters['channel'];
         }
         
-        $sql .= " ORDER BY c.updated_at DESC";
+        // Ordenar já com o mesmo critério usado no frontend:
+        // 1) Fixadas primeiro
+        // 2) Dentro das fixadas, usar pinned_at DESC
+        // 3) Demais conversas por updated_at DESC
+        $sql .= " ORDER BY COALESCE(c.pinned, 0) DESC, c.pinned_at DESC, c.updated_at DESC";
         
         return Database::fetchAll($sql, $params);
     }

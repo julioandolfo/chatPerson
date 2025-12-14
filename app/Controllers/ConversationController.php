@@ -1554,6 +1554,37 @@ class ConversationController
     }
 
     /**
+     * Obter sentimento atual de uma conversa
+     */
+    public function getSentiment($id): void
+    {
+        $config = $this->prepareJsonResponse();
+        
+        try {
+            $conversationId = (int)$id;
+            if ($conversationId <= 0) {
+                ob_end_clean();
+                Response::json(['success' => false, 'message' => 'ID inválido'], 400);
+                return;
+            }
+            
+            Permission::abortIfCannot('conversations.view');
+            
+            $sentiment = \App\Services\SentimentAnalysisService::getCurrentSentiment($conversationId);
+            
+            $this->restoreAfterJsonResponse($config);
+            
+            Response::json([
+                'success' => true,
+                'sentiment' => $sentiment
+            ]);
+        } catch (\Exception $e) {
+            $this->restoreAfterJsonResponse($config);
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Listar participantes de uma conversa
      */
     public function getParticipants($id): void
@@ -1679,6 +1710,15 @@ class ConversationController
             if ($success) {
                 // Invalidar cache da conversa
                 ConversationService::invalidateCache($id);
+
+                // Registrar no timeline
+                if (class_exists('\App\Services\ActivityService')) {
+                    try {
+                        \App\Services\ActivityService::logParticipantAdded($id, $userId, $addedBy);
+                    } catch (\Exception $e) {
+                        error_log("Activity log participant_added falhou: " . $e->getMessage());
+                    }
+                }
                 
                 Response::json([
                     'success' => true,
@@ -1740,6 +1780,16 @@ class ConversationController
             if ($success) {
                 // Invalidar cache da conversa
                 ConversationService::invalidateCache($id);
+
+                // Registrar no timeline
+                if (class_exists('\App\Services\ActivityService')) {
+                    try {
+                        $removedBy = \App\Helpers\Auth::id();
+                        \App\Services\ActivityService::logParticipantRemoved($id, $userId, $removedBy);
+                    } catch (\Exception $e) {
+                        error_log("Activity log participant_removed falhou: " . $e->getMessage());
+                    }
+                }
                 
                 Response::json([
                     'success' => true,

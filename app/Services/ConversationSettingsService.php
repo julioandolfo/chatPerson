@@ -145,6 +145,24 @@ class ConversationSettingsService
                 'enabled' => false,
                 'rules' => [] // [{channel: 'whatsapp', settings: {...}}]
             ],
+            
+            // Análise de Sentimento
+            'sentiment_analysis' => [
+                'enabled' => false,
+                'model' => 'gpt-3.5-turbo',
+                'temperature' => 0.3,
+                'check_interval_hours' => 5,
+                'max_conversation_age_days' => 30,
+                'analyze_on_new_message' => true,
+                'analyze_on_message_count' => 5,
+                'min_messages_to_analyze' => 3,
+                'analyze_last_messages' => null, // null = toda conversa, número = últimas X mensagens
+                'include_emotions' => true,
+                'include_urgency' => true,
+                'auto_tag_negative' => false,
+                'negative_tag_id' => null,
+                'cost_limit_per_day' => 5.00,
+            ],
         ];
     }
 

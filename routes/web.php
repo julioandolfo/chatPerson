@@ -18,6 +18,7 @@ use App\Controllers\RoleController;
 use App\Controllers\DepartmentController;
 use App\Controllers\WebhookController;
 use App\Controllers\TagController;
+use App\Controllers\AnalyticsController;
 use App\Controllers\NotificationController;
 use App\Controllers\MessageTemplateController;
 use App\Controllers\AttachmentController;
@@ -60,6 +61,11 @@ Router::get('/conversations/{id}/notes', [ConversationController::class, 'getNot
 Router::put('/conversations/{id}/notes/{noteId}', [ConversationController::class, 'updateNote'], ['Authentication']);
 Router::delete('/conversations/{id}/notes/{noteId}', [ConversationController::class, 'deleteNote'], ['Authentication']);
 Router::get('/conversations/{id}/timeline', [ConversationController::class, 'getTimeline'], ['Authentication']);
+Router::get('/conversations/{id}/sentiment', [ConversationController::class, 'getSentiment'], ['Authentication']);
+
+// Analytics
+Router::get('/analytics/sentiment', [AnalyticsController::class, 'sentiment'], ['Authentication']);
+Router::get('/analytics/sentiment/data', [AnalyticsController::class, 'getSentimentData'], ['Authentication']);
 // Rotas de tags movidas para após as rotas de tags (linhas 192-199)
 Router::post('/conversations/{id}/messages', [ConversationController::class, 'sendMessage'], ['Authentication']);
 Router::get('/conversations/for-forwarding', [ConversationController::class, 'listForForwarding'], ['Authentication']);
@@ -250,6 +256,7 @@ Router::get('/tags/all', [TagController::class, 'getAll'], ['Authentication']);
 Router::post('/conversations/{id}/tags', [TagController::class, 'addToConversation'], ['Authentication']);
 Router::post('/conversations/{id}/tags/remove', [TagController::class, 'removeFromConversation'], ['Authentication']);
 Router::get('/conversations/{id}/tags', [TagController::class, 'getByConversation'], ['Authentication']);
+Router::get('/contacts/{id}/history', [ContactController::class, 'getHistoryMetrics'], ['Authentication']);
 
 // Rotas de Notificações
 Router::get('/notifications', [NotificationController::class, 'index'], ['Authentication']);

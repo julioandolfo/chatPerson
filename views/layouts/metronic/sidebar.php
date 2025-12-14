@@ -320,6 +320,24 @@
                       </div>
                       <!--end:Menu item-->
                       
+                      <?php if (\App\Helpers\Permission::can('admin.settings')): ?>
+                      <!--begin:Menu item-->
+                      <div class="menu-item">
+                          <a class="menu-link <?= isActive('/analytics', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/analytics/sentiment') ?>" data-title="Analytics">
+                              <span class="menu-icon">
+                                  <i class="ki-duotone ki-chart-simple fs-2">
+                                      <span class="path1"></span>
+                                      <span class="path2"></span>
+                                      <span class="path3"></span>
+                                      <span class="path4"></span>
+                                  </i>
+                              </span>
+                              <span class="menu-title">Analytics</span>
+                          </a>
+                      </div>
+                      <!--end:Menu item-->
+                      <?php endif; ?>
+                      
                       <!--begin:Menu item-->
                       <div class="menu-item">
                           <a class="menu-link <?= isActive('/settings', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/settings') ?>" data-title="Configurações">

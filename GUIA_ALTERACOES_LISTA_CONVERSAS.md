@@ -40,7 +40,7 @@ A lista de conversas é renderizada em **3 contextos diferentes**:
 
 **Localização**: `views/conversations/index.php` - Linhas **~1300-1450**
 
-**Contexto**: 
+**Contexto**:
 ```php
 <?php foreach ($conversations as $conv): ?>
     <div class="conversation-item ...">
@@ -48,6 +48,9 @@ A lista de conversas é renderizada em **3 contextos diferentes**:
     </div>
 <?php endforeach; ?>
 ```
+
+**Ordenação (backend) – manter igual ao frontend**:
+- Use `ORDER BY COALESCE(c.pinned,0) DESC, c.pinned_at DESC, c.updated_at DESC` em `Conversation::getAll()` para que a lista inicial já venha com fixadas no topo e depois por mais recentes. Isso evita “pular” de ordem após alguns segundos quando o JS reordena.
 
 **Quando alterar**:
 - Sempre que mudar a estrutura HTML de um item da lista
@@ -93,7 +96,9 @@ function applyConversationUpdate(conversations) {
 - Deve manter a MESMA estrutura HTML que a renderização PHP
 - Quando adicionar novos campos dinâmicos
 
-**⚠️ IMPORTANTE**: A estrutura HTML aqui DEVE ser idêntica à renderização PHP para manter consistência!
+**⚠️ IMPORTANTE**:
+- A estrutura HTML aqui DEVE ser idêntica à renderização PHP.
+- A ordenação deve seguir o mesmo critério do backend (fixadas primeiro, depois mais recentes). Se ajustar sorting aqui, alinhe também o SQL.
 
 ---
 

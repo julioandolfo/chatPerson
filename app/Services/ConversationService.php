@@ -459,11 +459,14 @@ class ConversationService
         // Se é primeira atribuição (não tinha agente antes), atualizar agente principal do contato
         if (!$oldAgentId) {
             try {
+                // Garantir registro em contact_agents e definir como principal se configurado
                 \App\Services\ContactAgentService::updatePrimaryOnFirstAssignment(
                     $conversation['contact_id'],
                     $agentId,
                     true
                 );
+                // Garantir que o agente esteja na lista de agentes do contato (mesmo que já tivesse primary)
+                \App\Models\ContactAgent::addAgent($conversation['contact_id'], $agentId, false);
             } catch (\Exception $e) {
                 error_log("Erro ao atualizar agente principal: " . $e->getMessage());
             }
@@ -1141,6 +1144,35 @@ class ConversationService
                     error_log("Erro ao processar mensagem com agente de IA: " . $e->getMessage());
                     // Continuar normalmente mesmo se falhar
                 }
+            }
+            
+            // Análise de sentimento automática (se habilitada)
+            try {
+                $settings = \App\Services\ConversationSettingsService::getSettings();
+                $sentimentSettings = $settings['sentiment_analysis'] ?? [];
+                
+                if (!empty($sentimentSettings['enabled']) && !empty($sentimentSettings['analyze_on_new_message'])) {
+                    // Contar mensagens do contato
+                    $messageCount = \App\Models\Message::where('conversation_id', '=', $conversationId)
+                        ->where('sender_type', '=', 'contact')
+                        ->count();
+                    
+                    $minMessages = (int)($sentimentSettings['min_messages_to_analyze'] ?? 3);
+                    $analyzeOnCount = (int)($sentimentSettings['analyze_on_message_count'] ?? 5);
+                    
+                    // Analisar se atingiu mínimo e está no intervalo configurado
+                    if ($messageCount >= $minMessages && ($messageCount % $analyzeOnCount === 0)) {
+                        // Analisar em background (não bloquear resposta)
+                        try {
+                            \App\Services\SentimentAnalysisService::analyzeConversation($conversationId, $messageId);
+                        } catch (\Exception $e) {
+                            Logger::error("Erro ao analisar sentimento: " . $e->getMessage());
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                // Não bloquear se análise falhar
+                Logger::error("Erro ao verificar análise de sentimento: " . $e->getMessage());
             }
         }
         

@@ -175,6 +175,18 @@
                         <span class="sidebar-info-value" data-field="status">-</span>
                     </div>
                     
+                    <!-- Sentimento -->
+                    <div class="sidebar-info-item" id="sentiment-info" style="display: none;">
+                        <span class="sidebar-info-label">Sentimento:</span>
+                        <span class="sidebar-info-value" id="sentiment-label">-</span>
+                        <div class="mt-2">
+                            <div class="progress" style="height: 6px;">
+                                <div class="progress-bar" id="sentiment-progress" role="progressbar" style="width: 50%;"></div>
+                            </div>
+                            <div class="fs-8 text-muted mt-1" id="sentiment-score">Score: -</div>
+                        </div>
+                    </div>
+                    
                     <div class="sidebar-info-item">
                         <span class="sidebar-info-label">Canal:</span>
                         <span class="sidebar-info-value" data-field="channel">-</span>
@@ -340,15 +352,15 @@
                     
                     <div class="d-flex justify-content-between mb-3">
                         <div class="text-center">
-                            <div class="fs-2 fw-bold text-primary">-</div>
+                            <div class="fs-2 fw-bold text-primary" id="history-conversations-count">-</div>
                             <div class="fs-7 text-muted">Conversas</div>
                         </div>
                         <div class="text-center">
-                            <div class="fs-2 fw-bold text-success">-</div>
+                            <div class="fs-2 fw-bold text-success" id="history-avg-time">-</div>
                             <div class="fs-7 text-muted">Tempo Médio</div>
                         </div>
                         <div class="text-center">
-                            <div class="fs-2 fw-bold text-warning">-</div>
+                            <div class="fs-2 fw-bold text-warning" id="history-satisfaction">-</div>
                             <div class="fs-7 text-muted">Satisfação</div>
                         </div>
                     </div>
@@ -360,7 +372,7 @@
                 <div class="sidebar-section">
                     <div class="sidebar-section-title">Conversas Anteriores</div>
                     
-                    <div class="text-center py-5">
+                    <div id="history-previous-conversations" class="text-center py-5">
                         <p class="text-muted fs-7">Nenhuma conversa anterior</p>
                     </div>
                 </div>

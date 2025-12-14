@@ -41,6 +41,7 @@ class SettingsController
         );
         $departments = \App\Models\Department::all();
         $funnels = \App\Models\Funnel::where('status', '=', 'active');
+        $tags = \App\Services\TagService::getAll();
         
         // Dados para aba Assistente IA
         $aiAssistantFeatures = \App\Services\AIAssistantFeatureService::listAll();
@@ -387,6 +388,22 @@ class SettingsController
                 'contact_agents' => [
                     'auto_set_primary_agent_on_first_assignment' => isset($data['auto_set_primary_agent_on_first_assignment']),
                     'auto_assign_on_reopen' => isset($data['auto_assign_on_reopen']) ? (bool)$data['auto_assign_on_reopen'] : true,
+                ],
+                'sentiment_analysis' => [
+                    'enabled' => isset($data['sentiment_analysis_enabled']),
+                    'model' => $data['sentiment_analysis_model'] ?? 'gpt-3.5-turbo',
+                    'temperature' => isset($data['sentiment_analysis_temperature']) ? (float)$data['sentiment_analysis_temperature'] : 0.3,
+                    'check_interval_hours' => isset($data['sentiment_check_interval_hours']) ? (int)$data['sentiment_check_interval_hours'] : 5,
+                    'max_conversation_age_days' => isset($data['sentiment_max_conversation_age_days']) ? (int)$data['sentiment_max_conversation_age_days'] : 30,
+                    'analyze_on_new_message' => isset($data['sentiment_analyze_on_new_message']),
+                    'analyze_on_message_count' => isset($data['sentiment_analyze_on_message_count']) ? (int)$data['sentiment_analyze_on_message_count'] : 5,
+                    'min_messages_to_analyze' => isset($data['sentiment_min_messages_to_analyze']) ? (int)$data['sentiment_min_messages_to_analyze'] : 3,
+                    'analyze_last_messages' => !empty($data['sentiment_analyze_last_messages']) ? (int)$data['sentiment_analyze_last_messages'] : null,
+                    'include_emotions' => isset($data['sentiment_include_emotions']),
+                    'include_urgency' => isset($data['sentiment_include_urgency']),
+                    'auto_tag_negative' => isset($data['sentiment_auto_tag_negative']),
+                    'negative_tag_id' => !empty($data['sentiment_negative_tag_id']) ? (int)$data['sentiment_negative_tag_id'] : null,
+                    'cost_limit_per_day' => isset($data['sentiment_cost_limit_per_day']) ? (float)$data['sentiment_cost_limit_per_day'] : 5.00,
                 ],
             ];
             

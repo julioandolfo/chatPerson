@@ -276,5 +276,63 @@ class ContactController
             ], 400);
         }
     }
+
+    /**
+     * Métricas de histórico do contato (para aba Histórico no sidebar)
+     */
+    public function getHistoryMetrics(int $id): void
+    {
+        Permission::abortIfCannot('contacts.view');
+
+        try {
+            // Verificar se contato existe
+            $contact = \App\Models\Contact::find($id);
+            if (!$contact) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Contato não encontrado'
+                ], 404);
+                return;
+            }
+
+            // Conversas fechadas/resolvidas para métricas
+            $stats = \App\Helpers\Database::fetch("
+                SELECT 
+                    COUNT(*) AS total_conversations,
+                    AVG(TIMESTAMPDIFF(SECOND, created_at, updated_at)) AS avg_duration_seconds
+                FROM conversations
+                WHERE contact_id = ? AND status IN ('closed', 'resolved')
+            ", [$id]);
+
+            // Conversas anteriores (últimas 5 fechadas/resolvidas)
+            $previous = \App\Helpers\Database::fetchAll("
+                SELECT 
+                    c.id,
+                    c.status,
+                    c.created_at,
+                    c.updated_at,
+                    (SELECT content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) AS last_message
+                FROM conversations c
+                WHERE c.contact_id = ? AND c.status IN ('closed', 'resolved')
+                ORDER BY c.updated_at DESC
+                LIMIT 5
+            ", [$id]);
+
+            Response::json([
+                'success' => true,
+                'contact_id' => $id,
+                'total_conversations' => (int)($stats['total_conversations'] ?? 0),
+                'avg_duration_seconds' => $stats['avg_duration_seconds'] !== null ? (int)$stats['avg_duration_seconds'] : null,
+                // Não há CSAT armazenado atualmente; deixar null/--
+                'csat_score' => null,
+                'previous_conversations' => $previous ?: []
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
 

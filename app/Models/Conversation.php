@@ -382,7 +382,7 @@ class Conversation extends Model
                 }
             }
             $conversation['tags'] = $tags;
-            unset($conversation['tags_data']);
+            // Manter tags_data disponível para renderização rápida na lista (JS/PHP)
         }
         
         return $conversations;

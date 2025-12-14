@@ -141,7 +141,14 @@ class TagService
             throw new \InvalidArgumentException('Conversa não encontrada');
         }
 
-        return Tag::addToConversation($conversationId, $tagId);
+        $ok = Tag::addToConversation($conversationId, $tagId);
+
+        // Invalidar cache de conversa/lista para refletir tags na sidebar e na listagem
+        if ($ok && class_exists('\App\Services\ConversationService')) {
+            \App\Services\ConversationService::invalidateCache($conversationId);
+        }
+
+        return $ok;
     }
 
     /**
@@ -149,7 +156,14 @@ class TagService
      */
     public static function removeFromConversation(int $conversationId, int $tagId): bool
     {
-        return Tag::removeFromConversation($conversationId, $tagId);
+        $ok = Tag::removeFromConversation($conversationId, $tagId);
+
+        // Invalidar cache de conversa/lista para refletir tags na sidebar e na listagem
+        if ($ok && class_exists('\App\Services\ConversationService')) {
+            \App\Services\ConversationService::invalidateCache($conversationId);
+        }
+
+        return $ok;
     }
 
     /**

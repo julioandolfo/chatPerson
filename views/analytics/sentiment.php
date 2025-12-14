@@ -2,269 +2,253 @@
 /**
  * Página de Analytics de Sentimento
  */
+$layout = 'layouts.metronic.app';
+$title = 'Analytics de Sentimento';
+
 $filters = $filters ?? [];
 $departments = $departments ?? [];
 $agents = $agents ?? [];
+
+// Content
+ob_start();
 ?>
-<div class="d-flex flex-column flex-column-fluid">
-    <!--begin::Toolbar-->
-    <div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
-        <div id="kt_app_toolbar_container" class="app-container container-xxl d-flex flex-stack">
-            <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
-                <h1 class="page-heading d-flex text-dark fw-bold fs-3 flex-column justify-content-center my-0">
-                    Analytics de Sentimento
-                </h1>
-                <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
-                    <li class="breadcrumb-item text-muted">
-                        <a href="<?= \App\Helpers\Url::to('/dashboard') ?>" class="text-muted text-hover-primary">Dashboard</a>
-                    </li>
-                    <li class="breadcrumb-item">
-                        <span class="bullet bg-gray-400 w-5px h-2px"></span>
-                    </li>
-                    <li class="breadcrumb-item text-muted">Analytics</li>
-                    <li class="breadcrumb-item">
-                        <span class="bullet bg-gray-400 w-5px h-2px"></span>
-                    </li>
-                    <li class="breadcrumb-item text-dark">Sentimento</li>
-                </ul>
-            </div>
+<!--begin::Card-->
+<div class="card">
+    <div class="card-header border-0 pt-6">
+        <div class="card-title">
+            <h3 class="fw-bold m-0">Analytics de Sentimento</h3>
         </div>
     </div>
-    <!--end::Toolbar-->
-
-    <!--begin::Content-->
-    <div id="kt_app_content" class="app-content flex-column-fluid">
-        <div id="kt_app_content_container" class="app-container container-xxl">
-            
-            <!-- Filtros -->
-            <div class="card mb-5">
-                <div class="card-header">
-                    <h3 class="card-title">Filtros</h3>
-                </div>
-                <div class="card-body">
-                    <form id="analytics-filters-form" class="row g-3">
-                        <div class="col-md-3">
-                            <label class="form-label">Data Inicial</label>
-                            <input type="date" name="start_date" class="form-control form-control-solid" 
-                                   value="<?= htmlspecialchars($filters['start_date'] ?? date('Y-m-d', strtotime('-30 days'))) ?>" />
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Data Final</label>
-                            <input type="date" name="end_date" class="form-control form-control-solid" 
-                                   value="<?= htmlspecialchars($filters['end_date'] ?? date('Y-m-d')) ?>" />
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Setor</label>
-                            <select name="department_id" class="form-select form-select-solid">
-                                <option value="">Todos</option>
-                                <?php foreach ($departments as $dept): ?>
-                                    <option value="<?= $dept['id'] ?>" <?= ($filters['department_id'] ?? '') == $dept['id'] ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($dept['name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Agente</label>
-                            <select name="agent_id" class="form-select form-select-solid">
-                                <option value="">Todos</option>
-                                <?php foreach ($agents as $agent): ?>
-                                    <option value="<?= $agent['id'] ?>" <?= ($filters['agent_id'] ?? '') == $agent['id'] ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($agent['name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-12">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="ki-duotone ki-magnifier fs-2">
-                                    <span class="path1"></span>
-                                    <span class="path2"></span>
-                                </i>
-                                Filtrar
-                            </button>
-                            <button type="button" class="btn btn-light" onclick="resetFilters()">
-                                Limpar Filtros
-                            </button>
-                        </div>
-                    </form>
-                </div>
+    <div class="card-body pt-0">
+        
+        <!-- Filtros -->
+        <div class="card mb-5">
+            <div class="card-header">
+                <h3 class="card-title">Filtros</h3>
             </div>
+            <div class="card-body">
+                <form id="analytics-filters-form" class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Data Inicial</label>
+                        <input type="date" name="start_date" class="form-control form-control-solid" 
+                               value="<?= htmlspecialchars($filters['start_date'] ?? date('Y-m-d', strtotime('-30 days'))) ?>" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Data Final</label>
+                        <input type="date" name="end_date" class="form-control form-control-solid" 
+                               value="<?= htmlspecialchars($filters['end_date'] ?? date('Y-m-d')) ?>" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Setor</label>
+                        <select name="department_id" class="form-select form-select-solid">
+                            <option value="">Todos</option>
+                            <?php foreach ($departments as $dept): ?>
+                                <option value="<?= $dept['id'] ?>" <?= ($filters['department_id'] ?? '') == $dept['id'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($dept['name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Agente</label>
+                        <select name="agent_id" class="form-select form-select-solid">
+                            <option value="">Todos</option>
+                            <?php foreach ($agents as $agent): ?>
+                                <option value="<?= $agent['id'] ?>" <?= ($filters['agent_id'] ?? '') == $agent['id'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($agent['name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-12">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="ki-duotone ki-magnifier fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Filtrar
+                        </button>
+                        <button type="button" class="btn btn-light" onclick="resetFilters()">
+                            Limpar Filtros
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
 
-            <!-- Estatísticas Gerais -->
-            <div class="row g-5 mb-5">
-                <div class="col-xl-3">
-                    <div class="card">
-                        <div class="card-body">
-                            <div class="d-flex align-items-center">
-                                <div class="flex-grow-1">
-                                    <div class="text-gray-500 fw-semibold fs-6 mb-1">Total de Análises</div>
-                                    <div class="fs-2hx fw-bold text-gray-800" id="stat-total-analyses">-</div>
-                                </div>
-                                <div class="symbol symbol-50px">
-                                    <div class="symbol-label bg-light-primary">
-                                        <i class="ki-duotone ki-chart-simple fs-2x text-primary">
-                                            <span class="path1"></span>
-                                            <span class="path2"></span>
-                                            <span class="path3"></span>
-                                            <span class="path4"></span>
-                                        </i>
-                                    </div>
-                                </div>
+        <!-- Estatísticas Gerais -->
+        <div class="row g-5 mb-5">
+            <div class="col-xl-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-grow-1">
+                                <div class="text-gray-500 fw-semibold fs-6 mb-1">Total de Análises</div>
+                                <div class="fs-2hx fw-bold text-gray-800" id="stat-total-analyses">-</div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-xl-3">
-                    <div class="card">
-                        <div class="card-body">
-                            <div class="d-flex align-items-center">
-                                <div class="flex-grow-1">
-                                    <div class="text-gray-500 fw-semibold fs-6 mb-1">Sentimento Médio</div>
-                                    <div class="fs-2hx fw-bold text-gray-800" id="stat-avg-sentiment">-</div>
-                                </div>
-                                <div class="symbol symbol-50px">
-                                    <div class="symbol-label bg-light-success">
-                                        <i class="ki-duotone ki-heart fs-2x text-success">
-                                            <span class="path1"></span>
-                                            <span class="path2"></span>
-                                        </i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-xl-3">
-                    <div class="card">
-                        <div class="card-body">
-                            <div class="d-flex align-items-center">
-                                <div class="flex-grow-1">
-                                    <div class="text-gray-500 fw-semibold fs-6 mb-1">Conversas Negativas</div>
-                                    <div class="fs-2hx fw-bold text-danger" id="stat-negative-count">-</div>
-                                </div>
-                                <div class="symbol symbol-50px">
-                                    <div class="symbol-label bg-light-danger">
-                                        <i class="ki-duotone ki-information-5 fs-2x text-danger">
-                                            <span class="path1"></span>
-                                            <span class="path2"></span>
-                                            <span class="path3"></span>
-                                        </i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-xl-3">
-                    <div class="card">
-                        <div class="card-body">
-                            <div class="d-flex align-items-center">
-                                <div class="flex-grow-1">
-                                    <div class="text-gray-500 fw-semibold fs-6 mb-1">Custo Total</div>
-                                    <div class="fs-2hx fw-bold text-gray-800" id="stat-total-cost">-</div>
-                                </div>
-                                <div class="symbol symbol-50px">
-                                    <div class="symbol-label bg-light-warning">
-                                        <i class="ki-duotone ki-dollar fs-2x text-warning">
-                                            <span class="path1"></span>
-                                            <span class="path2"></span>
-                                        </i>
-                                    </div>
+                            <div class="symbol symbol-50px">
+                                <div class="symbol-label bg-light-primary">
+                                    <i class="ki-duotone ki-chart-simple fs-2x text-primary">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                        <span class="path4"></span>
+                                    </i>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-
-            <!-- Gráficos -->
-            <div class="row g-5 mb-5">
-                <div class="col-xl-8">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title">Evolução do Sentimento</h3>
-                        </div>
-                        <div class="card-body">
-                            <div id="chart-evolution" style="height: 300px;"></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-xl-4">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title">Distribuição por Sentimento</h3>
-                        </div>
-                        <div class="card-body">
-                            <div id="chart-distribution" style="height: 300px;"></div>
+            <div class="col-xl-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-grow-1">
+                                <div class="text-gray-500 fw-semibold fs-6 mb-1">Sentimento Médio</div>
+                                <div class="fs-2hx fw-bold text-gray-800" id="stat-avg-sentiment">-</div>
+                            </div>
+                            <div class="symbol symbol-50px">
+                                <div class="symbol-label bg-light-success">
+                                    <i class="ki-duotone ki-heart fs-2x text-success">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-
-            <!-- Distribuição por Urgência -->
-            <div class="row g-5 mb-5">
-                <div class="col-xl-6">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title">Distribuição por Urgência</h3>
-                        </div>
-                        <div class="card-body">
-                            <div id="chart-urgency" style="height: 250px;"></div>
+            <div class="col-xl-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-grow-1">
+                                <div class="text-gray-500 fw-semibold fs-6 mb-1">Conversas Negativas</div>
+                                <div class="fs-2hx fw-bold text-danger" id="stat-negative-count">-</div>
+                            </div>
+                            <div class="symbol symbol-50px">
+                                <div class="symbol-label bg-light-danger">
+                                    <i class="ki-duotone ki-information-5 fs-2x text-danger">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-xl-6">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title">Distribuição Detalhada</h3>
+            </div>
+            <div class="col-xl-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-grow-1">
+                                <div class="text-gray-500 fw-semibold fs-6 mb-1">Custo Total</div>
+                                <div class="fs-2hx fw-bold text-gray-800" id="stat-total-cost">-</div>
+                            </div>
+                            <div class="symbol symbol-50px">
+                                <div class="symbol-label bg-light-warning">
+                                    <i class="ki-duotone ki-dollar fs-2x text-warning">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                </div>
+                            </div>
                         </div>
-                        <div class="card-body">
-                            <div id="distribution-details">
-                                <div class="text-center py-5">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráficos -->
+        <div class="row g-5 mb-5">
+            <div class="col-xl-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Evolução do Sentimento</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="chart-evolution" style="height: 300px;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Distribuição por Sentimento</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="chart-distribution" style="height: 300px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Distribuição por Urgência -->
+        <div class="row g-5 mb-5">
+            <div class="col-xl-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Distribuição por Urgência</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="chart-urgency" style="height: 250px;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Distribuição Detalhada</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="distribution-details">
+                            <div class="text-center py-5">
+                                <p class="text-muted">Carregando...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Conversas Negativas -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Top 20 Conversas com Sentimento Negativo</h3>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
+                        <thead>
+                            <tr class="fw-bold text-muted">
+                                <th class="min-w-100px">Contato</th>
+                                <th class="min-w-100px">Agente</th>
+                                <th class="min-w-100px">Setor</th>
+                                <th class="min-w-80px">Score</th>
+                                <th class="min-w-100px">Urgência</th>
+                                <th class="min-w-150px">Data Análise</th>
+                                <th class="min-w-100px text-end">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="negative-conversations-table">
+                            <tr>
+                                <td colspan="7" class="text-center py-5">
                                     <p class="text-muted">Carregando...</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
-
-            <!-- Top Conversas Negativas -->
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Top 20 Conversas com Sentimento Negativo</h3>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
-                            <thead>
-                                <tr class="fw-bold text-muted">
-                                    <th class="min-w-100px">Contato</th>
-                                    <th class="min-w-100px">Agente</th>
-                                    <th class="min-w-100px">Setor</th>
-                                    <th class="min-w-80px">Score</th>
-                                    <th class="min-w-100px">Urgência</th>
-                                    <th class="min-w-150px">Data Análise</th>
-                                    <th class="min-w-100px text-end">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody id="negative-conversations-table">
-                                <tr>
-                                    <td colspan="7" class="text-center py-5">
-                                        <p class="text-muted">Carregando...</p>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
         </div>
+
     </div>
-    <!--end::Content-->
 </div>
+<!--end::Card-->
 
 <!-- ApexCharts -->
 <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
@@ -558,3 +542,7 @@ function escapeHtml(text) {
 }
 </script>
 
+<?php 
+$content = ob_get_clean(); 
+include __DIR__ . '/../layouts/metronic/app.php';
+?>

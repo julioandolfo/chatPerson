@@ -64,8 +64,13 @@ Router::get('/conversations/{id}/timeline', [ConversationController::class, 'get
 Router::get('/conversations/{id}/sentiment', [ConversationController::class, 'getSentiment'], ['Authentication']);
 
 // Analytics
+Router::get('/analytics', [AnalyticsController::class, 'index'], ['Authentication']);
 Router::get('/analytics/sentiment', [AnalyticsController::class, 'sentiment'], ['Authentication']);
 Router::get('/analytics/sentiment/data', [AnalyticsController::class, 'getSentimentData'], ['Authentication']);
+Router::get('/analytics/conversations/data', [AnalyticsController::class, 'getConversationsData'], ['Authentication']);
+Router::get('/analytics/agents/data', [AnalyticsController::class, 'getAgentsData'], ['Authentication']);
+Router::get('/analytics/tags/data', [AnalyticsController::class, 'getTagsData'], ['Authentication']);
+Router::get('/analytics/funnel/data', [AnalyticsController::class, 'getFunnelData'], ['Authentication']);
 // Rotas de tags movidas para após as rotas de tags (linhas 192-199)
 Router::post('/conversations/{id}/messages', [ConversationController::class, 'sendMessage'], ['Authentication']);
 Router::get('/conversations/for-forwarding', [ConversationController::class, 'listForForwarding'], ['Authentication']);

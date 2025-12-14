@@ -73,6 +73,7 @@ class SettingsController
             'departments' => $departments,
             'funnels' => $funnels,
             'allStages' => $allStages,
+            'tags' => $tags,
             'aiAssistantFeatures' => $aiAssistantFeatures ?? [],
             'aiAgents' => $aiAgents ?? []
         ]);

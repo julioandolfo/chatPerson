@@ -322,8 +322,8 @@
                       
                       <?php if (\App\Helpers\Permission::can('admin.settings')): ?>
                       <!--begin:Menu item-->
-                      <div class="menu-item">
-                          <a class="menu-link <?= isActive('/analytics', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/analytics/sentiment') ?>" data-title="Analytics">
+                      <div data-kt-menu-trigger="click" class="menu-item menu-accordion">
+                          <span class="menu-link <?= isActive('/analytics', $currentUri) ? 'active' : '' ?>" data-title="Analytics">
                               <span class="menu-icon">
                                   <i class="ki-duotone ki-chart-simple fs-2">
                                       <span class="path1"></span>
@@ -333,7 +333,28 @@
                                   </i>
                               </span>
                               <span class="menu-title">Analytics</span>
-                          </a>
+                              <span class="menu-arrow"></span>
+                          </span>
+                          <!--begin:Menu sub-->
+                          <div class="menu-sub menu-sub-accordion">
+                              <div class="menu-item">
+                                  <a class="menu-link <?= isActive('/analytics', $currentUri) && !isActive('/analytics/sentiment', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/analytics') ?>">
+                                      <span class="menu-bullet">
+                                          <span class="bullet bullet-dot"></span>
+                                      </span>
+                                      <span class="menu-title">Geral</span>
+                                  </a>
+                              </div>
+                              <div class="menu-item">
+                                  <a class="menu-link <?= isActive('/analytics/sentiment', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/analytics/sentiment') ?>">
+                                      <span class="menu-bullet">
+                                          <span class="bullet bullet-dot"></span>
+                                      </span>
+                                      <span class="menu-title">Sentimento</span>
+                                  </a>
+                              </div>
+                          </div>
+                          <!--end:Menu sub-->
                       </div>
                       <!--end:Menu item-->
                       <?php endif; ?>

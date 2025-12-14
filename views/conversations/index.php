@@ -5252,7 +5252,7 @@ function applyFilters() {
 }
 
 function refreshConversationList(params = null) {
-    console.log('refreshConversationList chamado com params:', params);
+    console.debug('[TAGS_DEBUG] refreshConversationList start', params instanceof URLSearchParams ? Object.fromEntries(params.entries()) : params);
     const conversationsList = document.querySelector('.conversations-list-items');
     if (!conversationsList) {
         console.error('Elemento .conversations-list-items não encontrado!');
@@ -5293,8 +5293,8 @@ function refreshConversationList(params = null) {
         url += window.location.search;
     }
     
-    // Adicionar header para retornar JSON (sem sobrescrever filtros existentes)
-    url += (url.includes('?') ? '&' : '?') + 'format=json';
+    // Adicionar header para retornar JSON (sem sobrescrever filtros existentes) + cache buster
+    url += (url.includes('?') ? '&' : '?') + 'format=json&_ts=' + Date.now();
     
     console.log('Buscando conversas na URL:', url);
     
@@ -5318,8 +5318,6 @@ function refreshConversationList(params = null) {
         return response.json();
     })
     .then(data => {
-        console.log('Resposta da busca:', data);
-        
         if (!data.success || !data.conversations) {
             console.error('Erro na resposta:', data);
             conversationsList.innerHTML = `
@@ -5332,7 +5330,7 @@ function refreshConversationList(params = null) {
         }
         
         const conversations = data.conversations;
-        console.log('Conversas encontradas:', conversations.length);
+        console.debug('[TAGS_DEBUG] conversas:', conversations.length, 'primeira tags_data:', conversations[0]?.tags_data);
         // Obter ID da conversa selecionada da URL atual
         const urlParams = new URLSearchParams(window.location.search);
         const selectedConversationId = urlParams.get('id') ? parseInt(urlParams.get('id')) : null;
@@ -9844,6 +9842,9 @@ function saveTags() {
                     // Atualizar lista de conversas (tags nos itens) sem refresh
                     if (typeof refreshConversationList === 'function') {
                         const urlParams = new URLSearchParams(window.location.search);
+                        // Cache buster para evitar lista cacheada
+                        urlParams.set('_ts', Date.now().toString());
+                        console.debug('[TAGS_DEBUG] saveTags -> refreshConversationList', Object.fromEntries(urlParams.entries()));
                         refreshConversationList(urlParams);
                     } else {
                         // Fallback: atualizar item atual se existir
@@ -9855,6 +9856,7 @@ function saveTags() {
                                     `<span class="badge badge-sm" style="background-color: ${t.color || '#009ef7'}20; color: ${t.color || '#009ef7'};">${escapeHtml(t.name)}</span>`
                                 ).join('');
                                 tagsContainer.innerHTML = tagsHtml || '';
+                                console.debug('[TAGS_DEBUG] saveTags fallback updated item', { conversationId, tagsCount: tags.length });
                             }
                         }
                     }

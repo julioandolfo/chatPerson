@@ -9839,10 +9839,22 @@ function saveTags() {
                         window.currentConversation.tags = tags;
                     }
                     
-                    // Atualizar lista de conversas (tags nos itens) sem refresh, se disponível
+                    // Atualizar lista de conversas (tags nos itens) sem refresh
                     if (typeof refreshConversationList === 'function') {
                         const urlParams = new URLSearchParams(window.location.search);
                         refreshConversationList(urlParams);
+                    } else {
+                        // Fallback: atualizar item atual se existir
+                        const item = document.querySelector(`[data-conversation-id="${conversationId}"]`);
+                        if (item) {
+                            const tagsContainer = item.querySelector('.conversation-item-tags');
+                            if (tagsContainer) {
+                                const tagsHtml = tags.slice(0, 2).map(t => 
+                                    `<span class="badge badge-sm" style="background-color: ${t.color || '#009ef7'}20; color: ${t.color || '#009ef7'};">${escapeHtml(t.name)}</span>`
+                                ).join('');
+                                tagsContainer.innerHTML = tagsHtml || '';
+                            }
+                        }
                     }
                     
                     // Atualizar listagem na UI (opcional): recarregar participantes/modal

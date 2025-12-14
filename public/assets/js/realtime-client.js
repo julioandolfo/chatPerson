@@ -206,13 +206,6 @@ class RealtimeClient {
             const data = await response.json();
             
             if (data.success && data.updates) {
-                // DEBUG: logs para diagnosticar novas conversas
-                if (data.updates.new_conversations && data.updates.new_conversations.length) {
-                    console.log('RealtimeClient: novas conversas recebidas (polling):', data.updates.new_conversations);
-                }
-                if (data.updates.conversation_updates && data.updates.conversation_updates.length) {
-                    console.log('RealtimeClient: conversation_updates recebidas (polling):', data.updates.conversation_updates);
-                }
                 this.processPollingUpdates(data.updates);
                 this.lastUpdateTime = data.timestamp || Date.now();
             }
@@ -227,7 +220,6 @@ class RealtimeClient {
      */
     processPollingUpdates(updates) {
         if (updates.new_messages) {
-            console.log('RealtimeClient: new_messages recebidas (polling):', updates.new_messages);
             updates.new_messages.forEach(msg => {
                 this.emit('new_message', {
                     conversation_id: msg.conversation_id,
@@ -261,7 +253,6 @@ class RealtimeClient {
         }
 
         if (updates.message_status_updates) {
-            console.log('RealtimeClient: status updates recebidos (polling):', updates.message_status_updates);
             updates.message_status_updates.forEach(msu => {
                 this.emit('message_status_updated', {
                     conversation_id: msu.conversation_id,
@@ -293,7 +284,6 @@ class RealtimeClient {
         if (!this.ws) return;
         
         this.ws.onopen = () => {
-            console.log('WebSocket conectado em:', wsUrl);
             this.isConnected = true;
             this.reconnectAttempts = 0;
             
@@ -321,23 +311,20 @@ class RealtimeClient {
         };
         
         this.ws.onerror = (error) => {
-            console.error('Erro WebSocket:', error);
-            console.error('URL tentada:', wsUrl);
+                console.error('Erro WebSocket:', error);
+                console.error('URL tentada:', wsUrl);
             this.emit('error', error);
             
             // Se falhou com /ws e estamos em auto, tentar polling
             if (this.mode === 'auto' && wsUrl && wsUrl.includes('/ws') && this.reconnectAttempts === 0) {
-                console.log('Falha no WebSocket, alternando para Polling...');
                 this.connectPolling(userId);
                 return;
             }
             
             // Tentar porta direta como fallback
             if (wsUrl && wsUrl.includes('/ws') && this.reconnectAttempts === 0) {
-                console.log('Tentando fallback para porta direta 8080...');
                 setTimeout(() => {
                     const fallbackUrl = `${protocol}//${hostname}:${this.config.websocketPort}`;
-                    console.log('Tentando conectar em:', fallbackUrl);
                     if (this.ws) {
                         this.ws.close();
                     }
@@ -349,12 +336,10 @@ class RealtimeClient {
         };
 
         this.ws.onclose = (event) => {
-            console.log('WebSocket desconectado', event.code, event.reason);
             this.isConnected = false;
             
             // Se estava em modo auto e desconectou, tentar polling
             if (this.mode === 'auto' && event.code !== 1000) {
-                console.log('WebSocket desconectado, alternando para Polling...');
                 this.connectPolling(userId);
                 return;
             }
@@ -373,7 +358,6 @@ class RealtimeClient {
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
             console.error('Máximo de tentativas de reconexão atingido');
             if (this.mode === 'auto') {
-                console.log('Alternando para Polling...');
                 this.connectPolling(this.userId);
             } else {
                 this.emit('reconnect_failed');
@@ -382,7 +366,6 @@ class RealtimeClient {
         }
 
         this.reconnectAttempts++;
-        console.log(`Tentando reconectar (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
 
         setTimeout(() => {
             if (this.userId && this.mode !== 'polling') {

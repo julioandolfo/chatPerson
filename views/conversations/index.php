@@ -9797,12 +9797,14 @@ function saveTags() {
                     })
                 ),
                 ...toRemove.map(tagId => 
-                    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/tags/${tagId}`, {
-                        method: 'DELETE',
+                    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/tags/remove`, {
+                        method: 'POST',
                         headers: {
+                            'Content-Type': 'application/json',
                             'X-Requested-With': 'XMLHttpRequest',
                             'Accept': 'application/json'
-                        }
+                        },
+                        body: JSON.stringify({ tag_id: tagId })
                     })
                 )
             ];
@@ -9827,6 +9829,20 @@ function saveTags() {
                     // Atualizar sidebar (tags) sem refresh
                     if (typeof updateConversationSidebar === 'function') {
                         updateConversationSidebar({ id: conversationId }, tags);
+                    }
+                    
+                    // Atualizar modelos locais em memória (selected/current conversation)
+                    if (window.selectedConversation && window.selectedConversation.id == conversationId) {
+                        window.selectedConversation.tags = tags;
+                    }
+                    if (window.currentConversation && window.currentConversation.id == conversationId) {
+                        window.currentConversation.tags = tags;
+                    }
+                    
+                    // Atualizar lista de conversas (tags nos itens) sem refresh, se disponível
+                    if (typeof refreshConversationList === 'function') {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        refreshConversationList(urlParams);
                     }
                     
                     // Atualizar listagem na UI (opcional): recarregar participantes/modal

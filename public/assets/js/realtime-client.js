@@ -59,7 +59,6 @@ class RealtimeClient {
      */
     async connect(userId) {
         if (!this.config.enabled) {
-            console.log('Tempo real desabilitado nas configurações');
             return;
         }
 
@@ -110,7 +109,6 @@ class RealtimeClient {
         } catch (error) {
             console.error('Erro ao conectar WebSocket:', error);
             if (this.mode === 'auto') {
-                console.log('Falha no WebSocket, usando Polling...');
                 this.connectPolling(userId);
             } else {
                 this.attemptReconnect();
@@ -137,7 +135,7 @@ class RealtimeClient {
         this.isConnected = true;
         this.reconnectAttempts = 0;
 
-        console.log('📡 Modo Polling ativado (verificando a cada ' + this.pollingDelay + 'ms)');
+        // Modo Polling ativado (log silenciado)
 
         // Iniciar polling
         this.startPolling();

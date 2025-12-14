@@ -1758,17 +1758,19 @@ body.dark-mode .swal2-content {
                             <span class="conversation-item-channel">
                                 <?= $channelIcon ?> <?= $channelName ?>
                             </span>
-                                                    <?php if (!empty($conv['tags']) && is_array($conv['tags'])): ?>
-                                <?php foreach (array_slice($conv['tags'], 0, 2) as $tag): ?>
-                                    <span class="badge badge-sm" style="background-color: <?= htmlspecialchars($tag['color'] ?? '#009ef7') ?>20; color: <?= htmlspecialchars($tag['color'] ?? '#009ef7') ?>;">
-                                                                    <?= htmlspecialchars($tag['name']) ?>
-                                                                </span>
-                                                            <?php endforeach; ?>
-                            <?php endif; ?>
+                            <span class="conversation-item-tags d-flex gap-1 flex-wrap">
+                                <?php if (!empty($conv['tags']) && is_array($conv['tags'])): ?>
+                                    <?php foreach (array_slice($conv['tags'], 0, 2) as $tag): ?>
+                                        <span class="badge badge-sm" style="background-color: <?= htmlspecialchars($tag['color'] ?? '#009ef7') ?>20; color: <?= htmlspecialchars($tag['color'] ?? '#009ef7') ?>;">
+                                            <?= htmlspecialchars($tag['name']) ?>
+                                        </span>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </span>
                             <?php if (!empty($conv['unread_count'])): ?>
                                 <span class="conversation-item-badge"><?= $conv['unread_count'] ?></span>
                             <?php endif; ?>
-                                                        </div>
+                        </div>
                             </div><!-- fim flex-grow -->
                         </div><!-- fim d-flex -->
                     </div>
@@ -5487,7 +5489,7 @@ function refreshConversationList(params = null) {
                             ` : ''}
                             <div class="conversation-item-meta">
                                 <span class="conversation-item-channel">${channelIcon} ${channelName}</span>
-                                ${tagsHtml}
+                                <span class="conversation-item-tags d-flex gap-1 flex-wrap">${tagsHtml}</span>
                                 ${unreadCount > 0 ? `<span class="conversation-item-badge">${unreadCount}</span>` : ''}
                             </div>
                         </div>
@@ -10777,13 +10779,10 @@ function addConversationToList(conv) {
         return;
     }
 
-    console.log('addConversationToList chamado com:', conv);
-
     // Verificar se a conversa já existe na lista
     const existingItem = document.querySelector(`[data-conversation-id="${conv.id}"]`);
     if (existingItem) {
         // Se já existe, apenas atualizar (applyConversationUpdate já ordena via sortConversationList)
-        console.log('Conversa já existe na lista, atualizando:', conv.id);
         applyConversationUpdate(conv);
         return;
     }
@@ -10915,11 +10914,11 @@ function addConversationToList(conv) {
                         </div>
                     </div>
                     <div class="conversation-item-preview">${escapeHtml(lastMessagePreview || 'Sem mensagens')}</div>
-                    <div class="conversation-item-meta">
-                        <span class="conversation-item-channel">${channelIcon} ${channelName}</span>
-                        ${tagsHtml}
-                        ${unreadCount > 0 ? `<span class="conversation-item-badge">${unreadCount}</span>` : ''}
-                    </div>
+                        <div class="conversation-item-meta">
+                            <span class="conversation-item-channel">${channelIcon} ${channelName}</span>
+                            <span class="conversation-item-tags d-flex gap-1 flex-wrap">${tagsHtml}</span>
+                            ${unreadCount > 0 ? `<span class="conversation-item-badge">${unreadCount}</span>` : ''}
+                        </div>
                 </div>
             </div>
         </div>

@@ -581,10 +581,11 @@ class WhatsAppService
                 'text' => $captionTrim === '' ? null : $captionTrim
             ];
                 
-                // Reply: se houver quoted_message_id, enviar quotedMessageId e quoted
-                if (!empty($options['quoted_message_id'])) {
-                    $payload['quotedMessageId'] = $options['quoted_message_id'];
-                    $payload['quoted'] = $options['quoted_message_id'];
+                // Reply: usar external_id da mensagem citada (se disponível)
+                $quotedExternalId = $options['quoted_message_external_id'] ?? ($options['quoted_message_id'] ?? null);
+                if (!empty($quotedExternalId)) {
+                    $payload['quotedMessageId'] = $quotedExternalId;
+                    $payload['quoted'] = $quotedExternalId;
                 }
                 
                 // Incluir mídia se houver
@@ -1443,8 +1444,19 @@ class WhatsAppService
 
             Logger::quepasa("processWebhook - media detect: url=" . ($mediaUrl ?: 'NULL') . ", mimetype=" . ($mimetype ?: 'NULL') . ", filename=" . ($filename ?: 'NULL') . ", size=" . ($size ?: 'NULL') . ", messageType={$messageType}");
             $quotedMsg = $quepasaData['quotedMsg'] ?? null;
-            $quotedMessageId = $quotedMsg['id'] ?? ($payload['quoted'] ?? $payload['quoted_message_id'] ?? null);
+            $quotedExternalId = $quotedMsg['id'] ?? ($payload['quoted'] ?? $payload['quoted_message_id'] ?? null);
             $quotedMessageText = $quotedMsg['body'] ?? ($payload['quoted_text'] ?? null);
+            $quotedMessageId = null;
+            if ($quotedExternalId) {
+                $quotedLocal = \App\Models\Message::findByExternalId($quotedExternalId);
+                if ($quotedLocal) {
+                    $quotedMessageId = $quotedLocal['id'];
+                    // Se texto citado não veio no payload, usar texto local
+                    if (empty($quotedMessageText) && !empty($quotedLocal['content'])) {
+                        $quotedMessageText = $quotedLocal['content'];
+                    }
+                }
+            }
             $location = null;
             if (isset($quepasaData['latitude']) && isset($quepasaData['longitude'])) {
                 $location = [

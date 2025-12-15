@@ -976,9 +976,12 @@ class ConversationService
                     // Preparar opções para envio
                     $options = [];
                     
-                    // Se houver reply, enviar referência
+                    // Se houver reply, enviar referência usando external_id da mensagem citada
                     if ($quotedMessageId) {
-                        $options['quoted_message_id'] = $quotedMessageId;
+                        $quoted = Message::find((int)$quotedMessageId);
+                        if (!empty($quoted['external_id'])) {
+                            $options['quoted_message_external_id'] = $quoted['external_id'];
+                        }
                     }
                     
                     // Se houver anexo (imagem, vídeo, áudio, documento), enviar via mídia

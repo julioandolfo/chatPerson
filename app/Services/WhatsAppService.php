@@ -1470,6 +1470,7 @@ class WhatsAppService
             $quotedMessageId = null;
             if ($quotedExternalId) {
                 $quotedLocal = \App\Models\Message::findByExternalId($quotedExternalId);
+                Logger::quepasa("processWebhook - Reply detectado: quotedExternalId={$quotedExternalId}, localFound=" . ($quotedLocal ? 'yes' : 'no'));
                 if ($quotedLocal) {
                     $quotedMessageId = $quotedLocal['id'];
                     // Se texto citado não veio no payload, usar texto local

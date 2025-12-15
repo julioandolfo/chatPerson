@@ -981,6 +981,8 @@ class ConversationService
                         $quoted = Message::find((int)$quotedMessageId);
                         if (!empty($quoted['external_id'])) {
                             $options['quoted_message_external_id'] = $quoted['external_id'];
+                        } else {
+                            Logger::quepasa("ConversationService::sendMessage - ⚠️ quoted sem external_id: quotedMessageId={$quotedMessageId}");
                         }
                     }
                     

@@ -1483,6 +1483,7 @@ class WhatsAppService
                 ?? ($payload['inreply'] ?? null); // campo observado no log
             $quotedMessageText = $quotedMsg['body'] ?? ($payload['quoted_text'] ?? $quepasaData['quotedText'] ?? null);
             $quotedMessageId = null;
+            $quotedSenderName = null;
             if ($quotedExternalId) {
                 $quotedLocal = \App\Models\Message::findByExternalId($quotedExternalId);
                 Logger::quepasa("processWebhook - Reply detectado: quotedExternalId={$quotedExternalId}, localFound=" . ($quotedLocal ? 'yes' : 'no'));
@@ -1491,6 +1492,14 @@ class WhatsAppService
                     // Se texto citado não veio no payload, usar texto local
                     if (empty($quotedMessageText) && !empty($quotedLocal['content'])) {
                         $quotedMessageText = $quotedLocal['content'];
+                    }
+                    // Definir remetente citado
+                    if ($quotedLocal['sender_type'] === 'agent') {
+                        $sender = \App\Models\User::find($quotedLocal['sender_id']);
+                        $quotedSenderName = $sender['name'] ?? 'Agente';
+                    } else {
+                        $contactQuoted = \App\Models\Contact::find($quotedLocal['sender_id']);
+                        $quotedSenderName = $contactQuoted['name'] ?? 'Contato';
                     }
                 }
             }
@@ -1730,7 +1739,8 @@ class WhatsAppService
                         'message_type' => !empty($attachments) ? ($attachments[0]['type'] ?? $messageType ?? 'text') : ($messageType ?? 'text'),
                         'external_id' => $messageId,
                         'quoted_message_id' => $quotedMessageId ?? null,
-                        'quoted_text' => $quotedMessageText ?? null
+                        'quoted_text' => $quotedMessageText ?? null,
+                        'quoted_sender_name' => $quotedSenderName ?? null
                     ];
                     
                     if ($location) {
@@ -2157,7 +2167,8 @@ class WhatsAppService
                     'message_type' => !empty($attachments) ? ($attachments[0]['type'] ?? $messageType ?? 'text') : ($messageType ?? 'text'),
                     'external_id' => $messageId,
                     'quoted_message_id' => $quotedMessageId ?? null,
-                    'quoted_text' => $quotedMessageText ?? null
+                    'quoted_text' => $quotedMessageText ?? null,
+                    'quoted_sender_name' => $quotedSenderName ?? null
                 ];
                 
                 // Se for localização, armazenar como JSON no content

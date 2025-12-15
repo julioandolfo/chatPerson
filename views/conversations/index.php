@@ -558,6 +558,8 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     flex: 1 1 auto;
     min-width: 0; /* Permite que o flex shrink funcione */
     width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
     background: var(--bs-body-bg);
@@ -593,9 +595,12 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
 .chat-messages {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 20px 25px;
     background: var(--bs-gray-100);
     position: relative;
+    width: 100%;
+    max-width: 100%;
 }
 
 /* Indicador de carregamento de mensagens antigas */
@@ -729,6 +734,9 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     display: flex;
     margin-bottom: 20px;
     gap: 10px;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
 }
 
 .chat-message.incoming {
@@ -754,13 +762,19 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
 
 .message-content {
     max-width: 60%;
+    min-width: 0;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    box-sizing: border-box;
 }
 
 /* Permitir que áudios sejam mais largos */
 .chat-message .message-content:has(.audio-only),
 .chat-message .message-content:has(.audio-attachment) {
-    max-width: none !important;
-    min-width: 420px !important;
+    max-width: calc(100% - 20px) !important;
+    min-width: 0 !important;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* Forçar attachment-item a não limitar largura */
@@ -966,6 +980,10 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     justify-content: center;
     margin: 20px 0;
     gap: 12px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    flex-shrink: 0;
 }
 
 .date-separator-line {
@@ -1958,13 +1976,21 @@ body.dark-mode .swal2-content {
                 <?php if (!empty($selectedConversation['messages'])): ?>
                     <?php 
                     $lastDate = null;
+                    $isFirstMessage = true;
                     foreach ($selectedConversation['messages'] as $msg): 
                         $msgCreatedAt = $msg['created_at'] ?? date('Y-m-d H:i:s');
                         
                         // Verificar se precisa adicionar separador de data
-                        if ($lastDate === null || isDifferentDay($lastDate, $msgCreatedAt)) {
+                        // Sempre adicionar antes da primeira mensagem ou quando o dia muda
+                        if ($isFirstMessage || ($lastDate !== null && isDifferentDay($lastDate, $msgCreatedAt))) {
                             echo renderDateSeparator($msgCreatedAt);
                             $lastDate = $msgCreatedAt;
+                            $isFirstMessage = false;
+                        } elseif ($lastDate === null) {
+                            // Garantir que sempre há um separador antes da primeira mensagem
+                            echo renderDateSeparator($msgCreatedAt);
+                            $lastDate = $msgCreatedAt;
+                            $isFirstMessage = false;
                         }
                     ?>
                         <?php
@@ -7149,9 +7175,10 @@ function addMessageToChat(message) {
                     dateSeparatorPosition = insertPosition;
                 }
             }
-        } else if (allMessages.length === 0 || (allMessages.length > 0 && allMessages[allMessages.length - 1].classList.contains('date-separator'))) {
-            // Primeira mensagem ou após um separador
-            needsDateSeparator = false; // Não precisa, já tem separador ou é a primeira
+        } else if (allMessages.length === 0) {
+            // Primeira mensagem - sempre adicionar separador
+            needsDateSeparator = true;
+            dateSeparatorPosition = null;
         } else {
             // Última mensagem - verificar se é de dia diferente da anterior
             const lastMsg = allMessages[allMessages.length - 1];

@@ -584,23 +584,9 @@ class WhatsAppService
                 // Reply: usar external_id da mensagem citada (se disponível)
                 $quotedExternalId = $options['quoted_message_external_id'] ?? ($options['quoted_message_id'] ?? null);
                 if (!empty($quotedExternalId)) {
-                    // Campos de reply (várias variantes para máxima compatibilidade)
-                    $payload['quotedMessageId'] = $quotedExternalId;
-                    $payload['quotedMsgId'] = $quotedExternalId;
-                    $payload['quoted'] = $quotedExternalId;
-                    $payload['replyMessageId'] = $quotedExternalId;
-                    $payload['quotedChatId'] = $chatId;
-                    // Contexto adicional (stanza/participant) que alguns servidores aceitam
-                    $payload['contextInfo'] = [
-                        'stanzaId' => $quotedExternalId,
-                        'participant' => $chatId,
-                        'quotedMessageId' => $quotedExternalId
-                    ];
-                    // Alguns servidores aceitam objeto quotedMessage
-                    $payload['quotedMessage'] = [
-                        'id' => $quotedExternalId,
-                        'stanzaId' => $quotedExternalId,
-                        'participant' => $chatId
+                    // Tentativa com os campos padrões do WhatsApp Cloud (context.message_id)
+                    $payload['context'] = [
+                        'message_id' => $quotedExternalId
                     ];
                 }
                 
@@ -2161,6 +2147,13 @@ class WhatsAppService
                     null,              // messageType
                     $quotedMessageId   // quoted_message_id
                 );
+                
+                // Gravar external_id (id do provedor) na mensagem recém-criada
+                if (!empty($payload['id']) && $messageId) {
+                    \App\Models\Message::update($messageId, [
+                        'external_id' => $payload['id']
+                    ]);
+                }
                 
                 Logger::quepasa("processWebhook - ✅ Mensagem criada com sucesso: messageId={$messageId}");
                 

@@ -2143,12 +2143,15 @@ class WhatsAppService
             Logger::quepasa("processWebhook - Preparando criação de mensagem: conversationId={$conversation['id']}, contactId={$contact['id']}, message='" . substr($message, 0, 50) . "', attachmentsCount=" . count($attachments));
             
             try {
+                // Passar quoted_message_id para registrar reply corretamente
                 $messageId = \App\Services\ConversationService::sendMessage(
                     $conversation['id'],
                     $message ?: '',
                     'contact',
                     $contact['id'],
-                    $attachments
+                    $attachments,
+                    null,              // messageType
+                    $quotedMessageId   // quoted_message_id
                 );
                 
                 Logger::quepasa("processWebhook - ✅ Mensagem criada com sucesso: messageId={$messageId}");

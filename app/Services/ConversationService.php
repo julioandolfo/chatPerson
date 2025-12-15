@@ -976,6 +976,11 @@ class ConversationService
                     // Preparar opções para envio
                     $options = [];
                     
+                    // Se houver reply, enviar referência
+                    if ($quotedMessageId) {
+                        $options['quoted_message_id'] = $quotedMessageId;
+                    }
+                    
                     // Se houver anexo (imagem, vídeo, áudio, documento), enviar via mídia
                     if (!empty($attachmentsData)) {
                         Logger::quepasa("ConversationService::sendMessage - Processando anexos para envio WhatsApp");

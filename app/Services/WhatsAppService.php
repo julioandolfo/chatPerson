@@ -581,6 +581,12 @@ class WhatsAppService
                 'text' => $captionTrim === '' ? null : $captionTrim
             ];
                 
+                // Reply: se houver quoted_message_id, enviar quotedMessageId e quoted
+                if (!empty($options['quoted_message_id'])) {
+                    $payload['quotedMessageId'] = $options['quoted_message_id'];
+                    $payload['quoted'] = $options['quoted_message_id'];
+                }
+                
                 // Incluir mídia se houver
                 if (!empty($options['media_url'])) {
                     $mediaType = $options['media_type'] ?? 'document';

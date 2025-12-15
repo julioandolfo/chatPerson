@@ -287,9 +287,9 @@
 
 ---
 
-### 📈 9. RELATÓRIOS E MÉTRICAS
+### 📈 9. RELATÓRIOS E MÉTRICAS / ANALYTICS
 
-**Status**: ✅ 70% Completo (2025-01-27)
+**Status**: ✅ 95% Completo (2025-01-27)
 
 **O que foi implementado**:
 - ✅ Dashboard com métricas reais e gráficos Chart.js
@@ -303,6 +303,19 @@
 - ✅ Filtros por período (data from/to)
 - ✅ Exportação CSV de relatórios
 - ✅ Métricas de SLA e tempo médio de resposta
+- ✅ **Página de Analytics Completa** (2025-01-27):
+  - ✅ Aba Conversas: Métricas gerais, evolução, status, canais, mensagens, comparação temporal
+  - ✅ Aba Agentes: Ranking, performance, tempo médio de resposta, taxa de resolução
+  - ✅ Aba Sentimento: Link para página detalhada de análise de sentimento
+  - ✅ Aba SLA: Taxas de cumprimento, tempo médio, alertas
+  - ✅ Aba Tags: Uso de tags, evolução, distribuição por status
+  - ✅ Aba Funil: Distribuição por estágios, métricas de conversão
+  - ✅ Aba Automações: Execuções, taxa de sucesso, evolução, top automações
+  - ✅ Aba Inteligência Artificial: Usos, custos, tokens, taxa de sucesso, evolução, custo por modelo, top funcionalidades, agentes de IA
+  - ✅ Comparação temporal (período atual vs anterior) com variações percentuais
+  - ✅ Gráficos interativos com ApexCharts
+  - ✅ Carregamento sob demanda por aba
+  - ✅ Filtros por período, funil e estágio
 
 **O que falta**:
 - [ ] Relatórios detalhados de conversas (PDF, Excel)
@@ -310,7 +323,8 @@
 - [ ] Relatórios detalhados de setores (PDF, Excel)
 - [ ] Relatórios detalhados de funis (PDF, Excel)
 - [ ] Métricas em tempo real (atualização automática)
-- [ ] Gráficos adicionais (funnels, conversões, etc)
+- [ ] Exportação de relatórios da página Analytics (PDF/Excel)
+- [ ] Dashboards personalizáveis
 
 **Prioridade**: 🟢 BAIXA (melhorias)
 
@@ -452,24 +466,86 @@
 
 ### 📋 17. ATIVIDADES E AUDITORIA
 
-**Status**: ⏳ Não implementado
+**Status**: ✅ 80% Completo (2025-01-27)
+
+**O que foi implementado**:
+- ✅ Tabela `activities` (já existia)
+- ✅ Model `Activity` completo
+- ✅ Service `ActivityService` completo
+- ✅ Logging de ações importantes:
+  - ✅ Adição/remoção de participantes
+  - ✅ Adição/remoção de tags
+  - ✅ Atribuição de agentes
+  - ✅ Mudanças de status
+  - ✅ Movimentação no Kanban
+- ✅ **Timeline de atividades** (2025-01-27):
+  - ✅ Exibição de atividades na sidebar da conversa
+  - ✅ Filtros por tipo de atividade
+  - ✅ Formatação visual de atividades
+- ✅ **Histórico do Contato** (2025-01-27):
+  - ✅ Aba "Histórico" na sidebar da conversa
+  - ✅ Estatísticas do contato (total de conversas, tempo médio, satisfação)
+  - ✅ Listagem de conversas anteriores (fechadas/resolvidas)
+  - ✅ Endpoint `/contacts/{id}/history`
 
 **O que falta**:
-- [ ] Tabela `activities`
-- [ ] Model `Activity`
-- [ ] Service `ActivityService`
-- [ ] Logging de ações importantes
-- [ ] Histórico de atividades por conversa
-- [ ] Histórico de atividades por agente
-- [ ] Histórico de atividades por contato
-- [ ] Filtros e busca de atividades
+- [ ] Histórico de atividades por agente (página dedicada)
+- [ ] Histórico de atividades por contato (página dedicada)
+- [ ] Filtros avançados e busca de atividades
 - [ ] Exportação de logs
+- [ ] Campo CSAT/Satisfação (placeholder existe)
 
-**Prioridade**: 🟢 BAIXA
+**Prioridade**: 🟢 BAIXA (melhorias)
 
 ---
 
-### 🤖 18. SISTEMA DE AGENTES DE IA (NOVO)
+### 🧠 19. ANÁLISE DE SENTIMENTO
+
+**Status**: ✅ 90% Completo (2025-01-27)
+
+**O que foi implementado**:
+- ✅ Tabela `conversation_sentiments` (migration 055)
+- ✅ Model `ConversationSentiment` completo
+- ✅ Service `SentimentAnalysisService` completo:
+  - ✅ Análise automática usando OpenAI
+  - ✅ Configurações avançadas (periodicidade, escopo, modelo, temperatura)
+  - ✅ Controle de custos (limite diário)
+  - ✅ Tag automática para sentimento negativo
+  - ✅ Processamento em background (cron)
+- ✅ **Configurações de Análise de Sentimento** (2025-01-27):
+  - ✅ Interface completa na aba "Conversas" de Configurações
+  - ✅ Configuração de periodicidade (horas)
+  - ✅ Idade máxima de conversas para análise (dias)
+  - ✅ Escopo de análise (conversa completa ou últimas X mensagens)
+  - ✅ Inclusão de emoções e urgência
+  - ✅ Tag automática para sentimento negativo (configurável)
+  - ✅ Configuração de modelo OpenAI e temperatura
+  - ✅ Limite de custo diário
+- ✅ **Exibição de Sentimento no Sidebar** (2025-01-27):
+  - ✅ Badge de sentimento (negativo, neutro, positivo)
+  - ✅ Barra de progresso visual
+  - ✅ Score numérico (-1 a 1)
+  - ✅ Nível de urgência
+- ✅ **Página de Analytics de Sentimento** (2025-01-27):
+  - ✅ Endpoint `/analytics/sentiment`
+  - ✅ Visualização de análises por período
+  - ✅ Gráficos de distribuição de sentimento
+  - ✅ Métricas de urgência
+- ✅ **Script de Processamento** (2025-01-27):
+  - ✅ Script `public/scripts/analyze-sentiments.php` para cron
+  - ✅ Processamento de conversas pendentes
+  - ✅ Logs detalhados
+
+**O que falta**:
+- [ ] Validação completa da análise de sentimento (testes)
+- [ ] Alertas automáticos para urgência crítica
+- [ ] Dashboard de sentimento mais detalhado
+
+**Prioridade**: 🟢 BAIXA (melhorias)
+
+---
+
+### 🤖 20. SISTEMA DE AGENTES DE IA (NOVO)
 
 **Status**: ✅ 95% Completo (2025-01-27)
 
@@ -587,8 +663,49 @@
 
 ---
 
-**Última atualização**: 2025-12-05
-**Versão**: 2.2
+**Última atualização**: 2025-01-27
+**Versão**: 2.3
+
+---
+
+## 🆕 ATUALIZAÇÕES RECENTES (2025-01-27)
+
+### ✅ Página de Analytics Completa - IMPLEMENTADO
+- Nova página `/analytics` com 8 abas completas:
+  - Conversas: Métricas gerais, evolução, status, canais, mensagens, comparação temporal
+  - Agentes: Ranking, performance, tempo médio, taxa de resolução
+  - Sentimento: Link para página detalhada
+  - SLA: Taxas de cumprimento, tempo médio, alertas
+  - Tags: Uso, evolução, distribuição por status
+  - Funil: Distribuição por estágios, métricas de conversão
+  - Automações: Execuções, taxa de sucesso, evolução, top automações
+  - Inteligência Artificial: Usos, custos, tokens, taxa de sucesso, evolução, custo por modelo, top funcionalidades, agentes de IA
+- Comparação temporal automática (período atual vs anterior)
+- Gráficos interativos com ApexCharts
+- Carregamento sob demanda por aba
+- Filtros avançados (período, funil, estágio)
+
+### ✅ Análise de Sentimento - IMPLEMENTADO
+- Sistema completo de análise de sentimento usando OpenAI
+- Configurações avançadas (periodicidade, escopo, modelo, temperatura)
+- Controle de custos e limite diário
+- Tag automática para sentimento negativo
+- Exibição no sidebar da conversa
+- Página de Analytics de Sentimento
+- Script de processamento em background (cron)
+
+### ✅ Histórico do Contato - IMPLEMENTADO
+- Aba "Histórico" na sidebar da conversa
+- Estatísticas do contato (total de conversas, tempo médio, satisfação)
+- Listagem de conversas anteriores (fechadas/resolvidas)
+- Endpoint `/contacts/{id}/history`
+
+### ✅ Timeline de Atividades - IMPLEMENTADO
+- Exibição de atividades na sidebar da conversa
+- Logging de adição/remoção de participantes
+- Logging de adição/remoção de tags
+- Filtros por tipo de atividade
+- Formatação visual de atividades
 
 ---
 

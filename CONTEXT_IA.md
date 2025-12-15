@@ -207,6 +207,12 @@ chat/
 #### 27. **ai_conversations** - Logs de Conversas com IA (NOVO)
 - `id`, `conversation_id`, `agent_id`, `message_id`, `ai_response_id`, `prompt_used`, `tools_called` (JSON), `tokens_used`, `cost`, `execution_time_ms`, `created_at`
 
+#### 28. **conversation_sentiments** - Análise de Sentimento (NOVO - 2025-01-27)
+- `id`, `conversation_id`, `message_id`, `sentiment_score` (DECIMAL -1 a 1), `sentiment_label` (negative/neutral/positive), `emotions` (JSON), `urgency_level` (low/medium/high/critical), `confidence`, `analysis_text`, `messages_analyzed`, `tokens_used`, `cost`, `model_used`, `analyzed_at`, `created_at`, `updated_at`
+
+#### 29. **activities** - Logs de Atividades (NOVO - 2025-01-27)
+- `id`, `user_id`, `action_type`, `resource_type`, `resource_id`, `description`, `metadata` (JSON), `ip_address`, `user_agent`, `created_at`
+
 ---
 
 ## 🔐 SISTEMA DE PERMISSÕES
@@ -274,6 +280,96 @@ Nível 0: Super Admin (Acesso Total)
 - Auto-atribuição inteligente
 
 **Documentação completa**: Ver `SISTEMA_REGRAS_COMPLETO.md` seção 2
+
+---
+
+## 📊 SISTEMA DE ANALYTICS E RELATÓRIOS (NOVO - 2025-01-27)
+
+### Página de Analytics (`/analytics`)
+Página completa com 8 abas de métricas e análises:
+
+#### 1. Aba Conversas
+- Métricas gerais (total, abertas, fechadas, taxa de resolução)
+- Evolução ao longo do tempo
+- Distribuição por status
+- Distribuição por canal
+- Evolução de mensagens
+- Comparação temporal (período atual vs anterior)
+
+#### 2. Aba Agentes
+- Ranking de agentes
+- Performance individual
+- Tempo médio de resposta
+- Taxa de resolução
+- Métricas comparativas
+
+#### 3. Aba Sentimento
+- Link para página detalhada de análise de sentimento (`/analytics/sentiment`)
+- Distribuição de sentimento
+- Níveis de urgência
+- Evolução temporal
+
+#### 4. Aba SLA
+- Taxas de cumprimento
+- Tempo médio de resposta
+- Alertas e violações
+
+#### 5. Aba Tags
+- Uso de tags
+- Evolução temporal
+- Distribuição por status
+
+#### 6. Aba Funil
+- Distribuição por estágios
+- Métricas de conversão
+- Tempo médio por estágio
+
+#### 7. Aba Automações
+- Total de execuções
+- Taxa de sucesso
+- Falhas
+- Tempo médio de execução
+- Evolução de execuções
+- Top 20 automações mais executadas
+
+#### 8. Aba Inteligência Artificial
+- Total de usos do assistente IA
+- Custo total (USD)
+- Tokens utilizados
+- Taxa de sucesso
+- Evolução de uso
+- Custo por modelo
+- Top funcionalidades
+- Agentes de IA
+
+### Análise de Sentimento
+- Análise automática usando OpenAI
+- Configurações avançadas (periodicidade, escopo, modelo, temperatura)
+- Controle de custos (limite diário)
+- Tag automática para sentimento negativo
+- Exibição no sidebar da conversa
+- Script de processamento em background (`public/scripts/analyze-sentiments.php`)
+
+### Histórico do Contato
+- Aba "Histórico" na sidebar da conversa
+- Estatísticas do contato (total de conversas, tempo médio, satisfação)
+- Listagem de conversas anteriores (fechadas/resolvidas)
+- Endpoint: `/contacts/{id}/history`
+
+### Timeline de Atividades
+- Exibição de atividades na sidebar da conversa
+- Logging automático de:
+  - Adição/remoção de participantes
+  - Adição/remoção de tags
+  - Atribuição de agentes
+  - Mudanças de status
+  - Movimentação no Kanban
+- Filtros por tipo de atividade
+- Formatação visual de atividades
+
+**Controllers**: `AnalyticsController`, `ContactController`
+**Models**: `ConversationSentiment`, `Activity`
+**Services**: `SentimentAnalysisService`, `ActivityService`
 
 ---
 
@@ -693,8 +789,8 @@ Tools são funções que o agente de IA pode chamar durante a conversa, permitin
 19. ✅ **Interface de Configuração de Estágios** (2025-01-27) - 100%
 
 ### ⏳ Próximas Prioridades
-1. ⏳ **Configurações Avançadas de Conversas** (NOVO)
-2. ⏳ **Sistema de Agentes de IA** (NOVO)
+1. ✅ **Configurações Avançadas de Conversas** (2025-01-27) - CONCLUÍDO
+2. ✅ **Sistema de Agentes de IA** (2025-01-27) - 95% CONCLUÍDO
    - Agentes de atendimento (SDR, CS, CLOSER)
    - **Agentes de Followup** (NOVO - Planejado):
      - Followup de satisfação
@@ -709,5 +805,5 @@ Tools são funções que o agente de IA pode chamar durante a conversa, permitin
 ---
 
 **Última atualização**: 2025-01-27
-**Versão do documento**: 2.0
+**Versão do documento**: 2.1
 

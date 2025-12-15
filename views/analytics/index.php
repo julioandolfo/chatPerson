@@ -1277,14 +1277,22 @@ function loadTimeComparison() {
 }
 
 function updateAutomationsStats(stats, successRate) {
-    document.getElementById('stat-automations-total').textContent = stats?.total_executions || 0;
-    document.getElementById('stat-automations-success-rate').textContent = (successRate || 0).toFixed(1) + '%';
-    document.getElementById('stat-automations-failed').textContent = stats?.failed || 0;
+    const totalEl = document.getElementById('stat-automations-total');
+    const successRateEl = document.getElementById('stat-automations-success-rate');
+    const failedEl = document.getElementById('stat-automations-failed');
+    const avgTimeEl = document.getElementById('stat-automations-avg-time');
+    
+    if (totalEl) totalEl.textContent = stats?.total_executions || 0;
+    if (successRateEl) successRateEl.textContent = (successRate || 0).toFixed(1) + '%';
+    if (failedEl) failedEl.textContent = stats?.failed || 0;
     const avgTime = stats?.avg_execution_time_seconds || 0;
-    document.getElementById('stat-automations-avg-time').textContent = avgTime > 0 ? avgTime.toFixed(1) + 's' : '-';
+    if (avgTimeEl) avgTimeEl.textContent = avgTime > 0 ? avgTime.toFixed(1) + 's' : '-';
 }
 
 function updateAutomationsEvolutionChart(evolution) {
+    const chartEl = document.querySelector("#chart-automations-evolution");
+    if (!chartEl) return;
+    
     const dates = evolution.map(e => e.date);
     const total = evolution.map(e => parseInt(e.total || 0));
     const completed = evolution.map(e => parseInt(e.completed || 0));
@@ -1322,13 +1330,14 @@ function updateAutomationsEvolutionChart(evolution) {
     if (automationsEvolutionChart) {
         automationsEvolutionChart.updateOptions(options);
     } else {
-        automationsEvolutionChart = new ApexCharts(document.querySelector("#chart-automations-evolution"), options);
+        automationsEvolutionChart = new ApexCharts(chartEl, options);
         automationsEvolutionChart.render();
     }
 }
 
 function updateTopAutomationsTable(automations) {
     const tbody = document.getElementById('top-automations-table');
+    if (!tbody) return;
     
     if (!automations || automations.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5"><p class="text-muted">Nenhum dado disponível</p></td></tr>';
@@ -1353,13 +1362,21 @@ function updateTopAutomationsTable(automations) {
 }
 
 function updateAIStats(stats) {
-    document.getElementById('stat-ai-total-uses').textContent = stats.total_uses || 0;
-    document.getElementById('stat-ai-total-cost').textContent = '$' + (parseFloat(stats.total_cost || 0).toFixed(2));
-    document.getElementById('stat-ai-total-tokens').textContent = (stats.total_tokens || 0).toLocaleString();
-    document.getElementById('stat-ai-success-rate').textContent = (stats.success_rate || 0).toFixed(1) + '%';
+    const totalUsesEl = document.getElementById('stat-ai-total-uses');
+    const totalCostEl = document.getElementById('stat-ai-total-cost');
+    const totalTokensEl = document.getElementById('stat-ai-total-tokens');
+    const successRateEl = document.getElementById('stat-ai-success-rate');
+    
+    if (totalUsesEl) totalUsesEl.textContent = stats.total_uses || 0;
+    if (totalCostEl) totalCostEl.textContent = '$' + (parseFloat(stats.total_cost || 0).toFixed(2));
+    if (totalTokensEl) totalTokensEl.textContent = (stats.total_tokens || 0).toLocaleString();
+    if (successRateEl) successRateEl.textContent = (stats.success_rate || 0).toFixed(1) + '%';
 }
 
 function updateAIUsageChart(usageOverTime) {
+    const chartEl = document.querySelector("#chart-ai-usage");
+    if (!chartEl) return;
+    
     const dates = usageOverTime.map(u => u.period);
     const uses = usageOverTime.map(u => parseInt(u.uses || 0));
     const tokens = usageOverTime.map(u => parseInt(u.tokens || 0));
@@ -1402,12 +1419,15 @@ function updateAIUsageChart(usageOverTime) {
     if (aiUsageChart) {
         aiUsageChart.updateOptions(options);
     } else {
-        aiUsageChart = new ApexCharts(document.querySelector("#chart-ai-usage"), options);
+        aiUsageChart = new ApexCharts(chartEl, options);
         aiUsageChart.render();
     }
 }
 
 function updateAICostModelChart(costByModel) {
+    const chartEl = document.querySelector("#chart-ai-cost-model");
+    if (!chartEl) return;
+    
     const labels = costByModel.map(c => c.model || 'N/A');
     const values = costByModel.map(c => parseFloat(c.total_cost || 0));
     
@@ -1428,13 +1448,14 @@ function updateAICostModelChart(costByModel) {
         aiCostModelChart.updateSeries(values);
         aiCostModelChart.updateOptions({ labels: labels });
     } else {
-        aiCostModelChart = new ApexCharts(document.querySelector("#chart-ai-cost-model"), options);
+        aiCostModelChart = new ApexCharts(chartEl, options);
         aiCostModelChart.render();
     }
 }
 
 function updateAIFeaturesTable(features) {
     const tbody = document.getElementById('ai-features-table');
+    if (!tbody) return;
     
     if (!features || features.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5"><p class="text-muted">Nenhum dado disponível</p></td></tr>';
@@ -1460,6 +1481,7 @@ function updateAIFeaturesTable(features) {
 
 function updateAIAgentsTable(agents) {
     const tbody = document.getElementById('ai-agents-table');
+    if (!tbody) return;
     
     if (!agents || agents.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5"><p class="text-muted">Nenhum dado disponível</p></td></tr>';

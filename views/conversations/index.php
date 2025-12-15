@@ -120,6 +120,63 @@ function renderAttachment($attachment) {
 }
 
 /**
+ * Formatar data para exibição (HOJE, ONTEM, ou data formatada)
+ */
+function formatDateLabel($dateString) {
+    $date = new DateTime($dateString);
+    $today = new DateTime();
+    $yesterday = new DateTime('yesterday');
+    
+    $dateOnly = $date->format('Y-m-d');
+    $todayOnly = $today->format('Y-m-d');
+    $yesterdayOnly = $yesterday->format('Y-m-d');
+    
+    if ($dateOnly === $todayOnly) {
+        return 'HOJE';
+    } elseif ($dateOnly === $yesterdayOnly) {
+        return 'ONTEM';
+    } else {
+        // Formato: "DIA X" (ex: "15 de Janeiro de 2025")
+        $months = [
+            1 => 'Janeiro', 2 => 'Fevereiro', 3 => 'Março', 4 => 'Abril',
+            5 => 'Maio', 6 => 'Junho', 7 => 'Julho', 8 => 'Agosto',
+            9 => 'Setembro', 10 => 'Outubro', 11 => 'Novembro', 12 => 'Dezembro'
+        ];
+        $day = (int)$date->format('d');
+        $month = (int)$date->format('m');
+        $year = (int)$date->format('Y');
+        
+        return $day . ' de ' . $months[$month] . ' de ' . $year;
+    }
+}
+
+/**
+ * Verificar se duas datas são de dias diferentes
+ */
+function isDifferentDay($date1, $date2) {
+    if (empty($date1) || empty($date2)) {
+        return false;
+    }
+    
+    $d1 = new DateTime($date1);
+    $d2 = new DateTime($date2);
+    
+    return $d1->format('Y-m-d') !== $d2->format('Y-m-d');
+}
+
+/**
+ * Renderizar separador de data
+ */
+function renderDateSeparator($dateString) {
+    $label = formatDateLabel($dateString);
+    return '<div class="date-separator" data-date="' . htmlspecialchars($dateString) . '">
+        <span class="date-separator-line"></span>
+        <span class="date-separator-label">' . htmlspecialchars($label) . '</span>
+        <span class="date-separator-line"></span>
+    </div>';
+}
+
+/**
  * Renderizar status de mensagem
  */
 function renderMessageStatus($msg) {
@@ -900,6 +957,41 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     color: var(--bs-text-muted);
     margin-top: 4px;
     padding: 0 4px;
+}
+
+/* Separador de data */
+.date-separator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 20px 0;
+    gap: 12px;
+}
+
+.date-separator-line {
+    flex: 1;
+    height: 1px;
+    background: var(--bs-border-color);
+    opacity: 0.5;
+}
+
+.date-separator-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--bs-text-muted);
+    padding: 4px 12px;
+    background: var(--bs-gray-100);
+    border-radius: 12px;
+    white-space: nowrap;
+}
+
+[data-bs-theme="dark"] .date-separator-label {
+    background: var(--bs-gray-800);
+    color: var(--bs-gray-300);
+}
+
+[data-bs-theme="dark"] .date-separator-line {
+    background: var(--bs-gray-700);
 }
 
 .chat-message.incoming .message-time {
@@ -1864,7 +1956,17 @@ body.dark-mode .swal2-content {
         <div class="chat-messages" id="chatMessages">
             <?php if (!empty($selectedConversation)): ?>
                 <?php if (!empty($selectedConversation['messages'])): ?>
-                    <?php foreach ($selectedConversation['messages'] as $msg): ?>
+                    <?php 
+                    $lastDate = null;
+                    foreach ($selectedConversation['messages'] as $msg): 
+                        $msgCreatedAt = $msg['created_at'] ?? date('Y-m-d H:i:s');
+                        
+                        // Verificar se precisa adicionar separador de data
+                        if ($lastDate === null || isDifferentDay($lastDate, $msgCreatedAt)) {
+                            echo renderDateSeparator($msgCreatedAt);
+                            $lastDate = $msgCreatedAt;
+                        }
+                    ?>
                         <?php
                         // Garantir que as chaves existem para evitar warnings
                         $msgType = $msg['type'] ?? 'message';
@@ -2024,7 +2126,10 @@ body.dark-mode .swal2-content {
                             </div>
                         <?php endif; ?>
                         
-                    <?php endforeach; ?>
+                    <?php 
+                        // Atualizar última data processada
+                        $lastDate = $msgCreatedAt;
+                    endforeach; ?>
                                             <?php else: ?>
                     <div class="empty-state">
                         <i class="ki-duotone ki-message-text">
@@ -6642,6 +6747,67 @@ function updateFiltersIndicator() {
     }
 }
 
+/**
+ * Formatar data para exibição (HOJE, ONTEM, ou data formatada) - JavaScript
+ */
+function formatDateLabel(dateString) {
+    if (!dateString) return '';
+    
+    const date = new Date(dateString);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const dateOnly = date.toISOString().split('T')[0];
+    const todayOnly = today.toISOString().split('T')[0];
+    const yesterdayOnly = yesterday.toISOString().split('T')[0];
+    
+    if (dateOnly === todayOnly) {
+        return 'HOJE';
+    } else if (dateOnly === yesterdayOnly) {
+        return 'ONTEM';
+    } else {
+        // Formato: "DIA X" (ex: "15 de Janeiro de 2025")
+        const months = [
+            'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+            'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+        ];
+        const day = date.getDate();
+        const month = months[date.getMonth()];
+        const year = date.getFullYear();
+        
+        return `${day} de ${month} de ${year}`;
+    }
+}
+
+/**
+ * Verificar se duas datas são de dias diferentes - JavaScript
+ */
+function isDifferentDay(date1, date2) {
+    if (!date1 || !date2) return false;
+    
+    const d1 = new Date(date1);
+    const d2 = new Date(date2);
+    
+    return d1.toISOString().split('T')[0] !== d2.toISOString().split('T')[0];
+}
+
+/**
+ * Renderizar separador de data - JavaScript
+ */
+function renderDateSeparator(dateString) {
+    const label = formatDateLabel(dateString);
+    const separator = document.createElement('div');
+    separator.className = 'date-separator';
+    separator.setAttribute('data-date', dateString);
+    separator.innerHTML = `
+        <span class="date-separator-line"></span>
+        <span class="date-separator-label">${escapeHtml(label)}</span>
+        <span class="date-separator-line"></span>
+    `;
+    return separator;
+}
+
 // Adicionar mensagem ao chat dinamicamente
 function addMessageToChat(message) {
     const chatMessages = document.getElementById('chatMessages');
@@ -6894,13 +7060,37 @@ function addMessageToChat(message) {
     const messageTimestamp = message.created_at ? new Date(message.created_at).getTime() : Date.now();
     messageDiv.setAttribute('data-timestamp', messageTimestamp);
     
-    // Inserir mensagem na posição correta baseada no horário (ordem cronológica crescente)
+    // Verificar se precisa adicionar separador de data antes da mensagem
     const allMessages = Array.from(chatMessages.children);
+    let needsDateSeparator = false;
+    let dateSeparatorPosition = null;
     
     // Encontrar posição correta para inserir (ordem crescente por timestamp)
     let insertPosition = null;
+    let previousMessageDate = null;
+    
     for (let i = 0; i < allMessages.length; i++) {
         const existingMsg = allMessages[i];
+        
+        // Verificar se é separador de data
+        if (existingMsg.classList.contains('date-separator')) {
+            const separatorDate = existingMsg.getAttribute('data-date');
+            if (separatorDate && message.created_at) {
+                // Verificar se a mensagem pertence a um dia diferente do separador
+                if (isDifferentDay(separatorDate, message.created_at)) {
+                    const separatorTime = new Date(separatorDate).getTime();
+                    const messageTime = new Date(message.created_at).getTime();
+                    if (messageTime < separatorTime) {
+                        // Mensagem é anterior ao separador, inserir antes dele
+                        insertPosition = existingMsg;
+                        dateSeparatorPosition = existingMsg;
+                        break;
+                    }
+                }
+            }
+            continue;
+        }
+        
         const existingTimestamp = existingMsg.getAttribute('data-timestamp');
         
         if (existingTimestamp) {
@@ -6909,7 +7099,25 @@ function addMessageToChat(message) {
                 // Comparar timestamps: se nova mensagem é mais antiga ou igual, inserir antes
                 if (messageTimestamp <= existingTime) {
                     insertPosition = existingMsg;
+                    
+                    // Verificar se precisa de separador de data
+                    const existingDate = existingMsg.getAttribute('data-date') || 
+                                       (existingMsg.querySelector('.message-time') ? 
+                                        new Date(existingTime).toISOString() : null);
+                    
+                    if (existingDate && message.created_at && isDifferentDay(existingDate, message.created_at)) {
+                        needsDateSeparator = true;
+                        dateSeparatorPosition = existingMsg;
+                    }
                     break;
+                } else {
+                    // Guardar data da mensagem anterior para verificar separador
+                    const existingDate = existingMsg.getAttribute('data-date') || 
+                                       (existingMsg.querySelector('.message-time') ? 
+                                        new Date(existingTime).toISOString() : null);
+                    if (existingDate) {
+                        previousMessageDate = existingDate;
+                    }
                 }
             }
         } else {
@@ -6927,11 +7135,60 @@ function addMessageToChat(message) {
         }
     }
     
-    // Inserir na posição correta ou no final
+    // Verificar se precisa de separador antes da primeira mensagem ou entre mensagens
+    if (!needsDateSeparator && message.created_at) {
+        if (insertPosition) {
+            // Verificar se a mensagem anterior é de um dia diferente
+            const prevElement = insertPosition.previousElementSibling;
+            if (prevElement && !prevElement.classList.contains('date-separator')) {
+                const prevDate = prevElement.getAttribute('data-date') || 
+                               (prevElement.querySelector('.message-time') ? 
+                                new Date(parseInt(prevElement.getAttribute('data-timestamp') || 0)).toISOString() : null);
+                if (prevDate && isDifferentDay(prevDate, message.created_at)) {
+                    needsDateSeparator = true;
+                    dateSeparatorPosition = insertPosition;
+                }
+            }
+        } else if (allMessages.length === 0 || (allMessages.length > 0 && allMessages[allMessages.length - 1].classList.contains('date-separator'))) {
+            // Primeira mensagem ou após um separador
+            needsDateSeparator = false; // Não precisa, já tem separador ou é a primeira
+        } else {
+            // Última mensagem - verificar se é de dia diferente da anterior
+            const lastMsg = allMessages[allMessages.length - 1];
+            if (lastMsg && !lastMsg.classList.contains('date-separator')) {
+                const lastDate = lastMsg.getAttribute('data-date') || 
+                               (lastMsg.querySelector('.message-time') ? 
+                                new Date(parseInt(lastMsg.getAttribute('data-timestamp') || 0)).toISOString() : null);
+                if (lastDate && isDifferentDay(lastDate, message.created_at)) {
+                    needsDateSeparator = true;
+                    dateSeparatorPosition = null; // Inserir antes da mensagem
+                }
+            }
+        }
+    }
+    
+    // Adicionar separador de data se necessário
+    if (needsDateSeparator && message.created_at) {
+        const dateSeparator = renderDateSeparator(message.created_at);
+        if (dateSeparatorPosition) {
+            chatMessages.insertBefore(dateSeparator, dateSeparatorPosition);
+        } else if (insertPosition) {
+            chatMessages.insertBefore(dateSeparator, insertPosition);
+        } else {
+            chatMessages.appendChild(dateSeparator);
+        }
+    }
+    
+    // Inserir mensagem na posição correta ou no final
     if (insertPosition) {
         chatMessages.insertBefore(messageDiv, insertPosition);
     } else {
         chatMessages.appendChild(messageDiv);
+    }
+    
+    // Adicionar atributo data-date para facilitar comparações futuras
+    if (message.created_at) {
+        messageDiv.setAttribute('data-date', message.created_at);
     }
     
     // Atualizar último ID de mensagem conhecido

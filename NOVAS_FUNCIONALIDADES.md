@@ -281,3 +281,35 @@ Sistema completo de agentes de IA que permite criar agentes virtuais especializa
 
 **Última atualização**: 2025-01-27
 
+---
+
+## 🆕 FUNCIONALIDADES IMPLEMENTADAS (2025-01-27)
+
+### ✅ Página de Analytics Completa
+- Nova página `/analytics` com 8 abas completas
+- Métricas de Conversas, Agentes, Sentimento, SLA, Tags, Funil, Automações e IA
+- Comparação temporal automática
+- Gráficos interativos com ApexCharts
+- Carregamento sob demanda por aba
+- Filtros avançados
+
+### ✅ Análise de Sentimento
+- Sistema completo de análise usando OpenAI
+- Configurações avançadas
+- Controle de custos
+- Tag automática para sentimento negativo
+- Exibição no sidebar
+- Script de processamento em background
+
+### ✅ Histórico do Contato
+- Aba "Histórico" na sidebar da conversa
+- Estatísticas do contato
+- Listagem de conversas anteriores
+
+### ✅ Timeline de Atividades
+- Exibição de atividades na sidebar
+- Logging automático de ações importantes
+- Filtros por tipo de atividade
+
+---
+

@@ -2191,7 +2191,28 @@ class WhatsAppService
                 }
             }
 
-            Logger::quepasa("processWebhook - Mensagem processada com sucesso: fromPhone={$fromPhone}, message={$message}, conversationId={$conversation['id']}");
+                Logger::quepasa("processWebhook - Mensagem processada com sucesso: fromPhone={$fromPhone}, message={$message}, conversationId={$conversation['id']}");
+                
+                // Notificar WebSocket sobre nova mensagem com dados de reply (para exibição imediata)
+                try {
+                    $fullMessage = \App\Models\Message::find($messageId);
+                    if ($fullMessage) {
+                        // Converter attachments JSON para array se necessário
+                        if (isset($fullMessage['attachments']) && is_string($fullMessage['attachments'])) {
+                            $decodedAtt = json_decode($fullMessage['attachments'], true);
+                            if (json_last_error() === JSON_ERROR_NONE) {
+                                $fullMessage['attachments'] = $decodedAtt;
+                            }
+                        }
+                        $fullMessage['sender_name'] = $contact['name'] ?? 'Contato';
+                        $fullMessage['quoted_message_id'] = $quotedMessageId ?? null;
+                        $fullMessage['quoted_text'] = $quotedMessageText ?? null;
+                        $fullMessage['quoted_sender_name'] = $quotedSenderName ?? null;
+                        \App\Helpers\WebSocket::notifyNewMessage($conversation['id'], $fullMessage);
+                    }
+                } catch (\Exception $e) {
+                    Logger::quepasa("processWebhook - Erro ao notificar WebSocket com reply: " . $e->getMessage());
+                }
             Logger::log("WhatsApp mensagem processada: {$fromPhone} -> {$message}");
         } catch (\Exception $e) {
             Logger::error("WhatsApp processWebhook Error: " . $e->getMessage());

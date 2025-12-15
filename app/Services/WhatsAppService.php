@@ -584,12 +584,16 @@ class WhatsAppService
                 // Reply: usar external_id da mensagem citada (se disponível)
                 $quotedExternalId = $options['quoted_message_external_id'] ?? ($options['quoted_message_id'] ?? null);
                 if (!empty($quotedExternalId)) {
+                    // Campos de reply suportados
                     $payload['quotedMessageId'] = $quotedExternalId;
                     $payload['quotedMsgId'] = $quotedExternalId;
                     $payload['quoted'] = $quotedExternalId;
                     $payload['replyMessageId'] = $quotedExternalId;
-                    // Alguns provedores exigem o chatId também para reply
                     $payload['quotedChatId'] = $chatId;
+                    // Contexto (alguns provedores usam stanzaId)
+                    $payload['contextInfo'] = [
+                        'stanzaId' => $quotedExternalId
+                    ];
                 }
                 
                 // Incluir mídia se houver

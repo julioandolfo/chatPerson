@@ -5539,16 +5539,20 @@ function refreshConversationList(params = null) {
         params = new URLSearchParams(window.location.search);
     }
     
-    // Mostrar loading
-    const originalContent = conversationsList.innerHTML;
-    conversationsList.innerHTML = `
-        <div class="d-flex align-items-center justify-content-center py-10">
-            <div class="text-center">
-                <span class="spinner-border spinner-border-sm text-primary mb-3" role="status"></span>
-                <div class="text-muted fs-7">Buscando conversas...</div>
+    // Evitar flicker: só mostra spinner no primeiro carregamento
+    const isFirstLoad = conversationsList.dataset.loaded !== '1';
+    
+    // Mostrar loading apenas no primeiro carregamento
+    if (isFirstLoad) {
+        conversationsList.innerHTML = `
+            <div class="d-flex align-items-center justify-content-center py-10">
+                <div class="text-center">
+                    <span class="spinner-border spinner-border-sm text-primary mb-3" role="status"></span>
+                    <div class="text-muted fs-7">Buscando conversas...</div>
+                </div>
             </div>
-        </div>
-    `;
+        `;
+    }
     
     // Construir URL preservando TODOS os filtros
     let url = '<?= \App\Helpers\Url::to('/conversations') ?>';
@@ -5606,6 +5610,22 @@ function refreshConversationList(params = null) {
         
         const conversations = data.conversations;
         console.debug('[TAGS_DEBUG] conversas:', conversations.length, 'primeira tags_data:', conversations[0]?.tags_data);
+        
+        // Calcular assinatura para evitar re-render quando não houver mudanças
+        const signature = JSON.stringify(conversations.map(c => [
+            c.id,
+            c.pinned,
+            c.pinned_at,
+            c.updated_at,
+            c.status,
+            c.unread_count,
+            c.tags_data ? JSON.stringify(c.tags_data) : null
+        ]));
+        if (window.lastConversationListSignature === signature) {
+            return;
+        }
+        window.lastConversationListSignature = signature;
+        
         // Obter ID da conversa selecionada da URL atual
         const urlParams = new URLSearchParams(window.location.search);
         const selectedConversationId = urlParams.get('id') ? parseInt(urlParams.get('id')) : null;
@@ -5772,6 +5792,7 @@ function refreshConversationList(params = null) {
         });
         
         conversationsList.innerHTML = html;
+        conversationsList.dataset.loaded = '1';
     })
     .catch(error => {
         console.error('Erro ao buscar conversas:', error);
@@ -7174,6 +7195,10 @@ function addMessageToChat(message) {
                     needsDateSeparator = true;
                     dateSeparatorPosition = insertPosition;
                 }
+            } else if (!prevElement) {
+                // Não há elemento anterior, primeira mensagem
+                needsDateSeparator = true;
+                dateSeparatorPosition = insertPosition;
             }
         } else if (allMessages.length === 0) {
             // Primeira mensagem - sempre adicionar separador

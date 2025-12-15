@@ -123,6 +123,30 @@ class ConversationController
             
             // Se for requisição AJAX ou formato JSON, retornar apenas JSON com lista de conversas
             if ($isAjax || $isJsonFormat) {
+                // Calcular ETag baseado em campos que alteram a lista (evita re-render se nada mudou)
+                $signaturePayload = array_map(function($c) {
+                    return [
+                        $c['id'] ?? null,
+                        $c['pinned'] ?? null,
+                        $c['pinned_at'] ?? null,
+                        $c['updated_at'] ?? null,
+                        $c['status'] ?? null,
+                        $c['unread_count'] ?? null,
+                        isset($c['tags_data']) ? $c['tags_data'] : null,
+                    ];
+                }, $conversations);
+                
+                $etag = '"' . md5(json_encode($signaturePayload)) . '"';
+                header('Cache-Control: no-cache, must-revalidate');
+                header('ETag: ' . $etag);
+                
+                // Se o cliente já tem a mesma versão, responder 304
+                $ifNoneMatch = $_SERVER['HTTP_IF_NONE_MATCH'] ?? null;
+                if ($ifNoneMatch && trim($ifNoneMatch) === $etag) {
+                    http_response_code(304);
+                    exit;
+                }
+                
                 Response::json([
                     'success' => true,
                     'conversations' => $conversations

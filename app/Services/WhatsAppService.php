@@ -746,11 +746,22 @@ class WhatsAppService
 
             $data = json_decode($response, true);
             
+            // Extrair ID da mensagem retornada (alguns provedores retornam em message.id)
+            $returnedMessageId = $data['id']
+                ?? $data['message_id']
+                ?? ($data['message']['id'] ?? null);
+            
+            if (empty($returnedMessageId)) {
+                Logger::quepasa("sendMessage - ⚠️ message_id não retornado no payload: " . substr($response ?? '', 0, 300));
+            } else {
+                Logger::quepasa("sendMessage - message_id retornado: {$returnedMessageId}");
+            }
+            
             Logger::quepasa("sendMessage - Mensagem enviada com sucesso");
             
             return [
                 'success' => true,
-                'message_id' => $data['id'] ?? $data['message_id'] ?? null,
+                'message_id' => $returnedMessageId,
                 'status' => $data['status'] ?? 'sent'
             ];
         } catch (\Exception $e) {

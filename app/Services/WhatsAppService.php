@@ -585,7 +585,9 @@ class WhatsAppService
                 $quotedExternalId = $options['quoted_message_external_id'] ?? ($options['quoted_message_id'] ?? null);
                 if (!empty($quotedExternalId)) {
                     $payload['quotedMessageId'] = $quotedExternalId;
+                    $payload['quotedMsgId'] = $quotedExternalId;
                     $payload['quoted'] = $quotedExternalId;
+                    $payload['replyMessageId'] = $quotedExternalId;
                     // Alguns provedores exigem o chatId também para reply
                     $payload['quotedChatId'] = $chatId;
                 }
@@ -1462,7 +1464,8 @@ class WhatsAppService
                 ?? ($payload['quoted'] ?? $payload['quoted_message_id'] ?? null)
                 ?? ($payload['quotedMsgId'] ?? $payload['quotedMessageId'] ?? null)
                 ?? ($quepasaData['quotedMsgId'] ?? $quepasaData['quotedMessageId'] ?? null)
-                ?? (($quepasaData['contextInfo']['stanzaId'] ?? null) ?? ($payload['contextInfo']['stanzaId'] ?? null));
+                ?? (($quepasaData['contextInfo']['stanzaId'] ?? null) ?? ($payload['contextInfo']['stanzaId'] ?? null))
+                ?? ($payload['inreply'] ?? null); // campo observado no log
             $quotedMessageText = $quotedMsg['body'] ?? ($payload['quoted_text'] ?? $quepasaData['quotedText'] ?? null);
             $quotedMessageId = null;
             if ($quotedExternalId) {

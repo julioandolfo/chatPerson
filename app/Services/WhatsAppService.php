@@ -586,6 +586,8 @@ class WhatsAppService
                 if (!empty($quotedExternalId)) {
                     $payload['quotedMessageId'] = $quotedExternalId;
                     $payload['quoted'] = $quotedExternalId;
+                    // Alguns provedores exigem o chatId também para reply
+                    $payload['quotedChatId'] = $chatId;
                 }
                 
                 // Incluir mídia se houver
@@ -691,6 +693,9 @@ class WhatsAppService
                 Logger::quepasa("sendMessage - URL: {$url}");
                 Logger::quepasa("sendMessage - To: {$to}");
                 Logger::quepasa("sendMessage - Payload: " . json_encode($payload));
+                if (!empty($options['quoted_message_external_id']) || !empty($options['quoted_message_id'])) {
+                    Logger::quepasa("sendMessage - Reply debug: quoted_external=" . ($options['quoted_message_external_id'] ?? 'null') . " | quoted_id=" . ($options['quoted_message_id'] ?? 'null') . " | quotedChatId=" . ($payload['quotedChatId'] ?? 'null'));
+                }
                 Logger::quepasa("sendMessage - Headers: " . json_encode([
                     'X-QUEPASA-TOKEN' => $maskedToken,
                     'X-QUEPASA-TRACKID' => ($account['quepasa_trackid'] ?? $account['name']),
@@ -938,7 +943,16 @@ class WhatsAppService
                 $fromPhone = self::normalizePhoneNumber($from);
             }
             
+            // Log bruto do webhook (truncado para 8000 chars para evitar log excessivo)
+            $rawInput = file_get_contents('php://input');
+            if ($rawInput !== false) {
+                $rawPreview = mb_substr($rawInput, 0, 8000);
+                Logger::quepasa("processWebhook - Raw body (trunc 8000): " . $rawPreview);
+            }
+            
+            // Log JSON decodificado (truncado) para facilitar inspeção
             Logger::quepasa("processWebhook - Payload recebido: trackid={$trackid}, chatid={$chatid}, from={$from}, fromPhone={$fromPhone}");
+            Logger::quepasa("processWebhook - Payload decoded (trunc 4000): " . mb_substr(json_encode($payload), 0, 4000));
             
             if (!$trackid && !$chatid && !$fromPhone) {
                 Logger::error("WhatsApp webhook sem identificação: " . json_encode($payload));
@@ -1444,8 +1458,12 @@ class WhatsAppService
 
             Logger::quepasa("processWebhook - media detect: url=" . ($mediaUrl ?: 'NULL') . ", mimetype=" . ($mimetype ?: 'NULL') . ", filename=" . ($filename ?: 'NULL') . ", size=" . ($size ?: 'NULL') . ", messageType={$messageType}");
             $quotedMsg = $quepasaData['quotedMsg'] ?? null;
-            $quotedExternalId = $quotedMsg['id'] ?? ($payload['quoted'] ?? $payload['quoted_message_id'] ?? null);
-            $quotedMessageText = $quotedMsg['body'] ?? ($payload['quoted_text'] ?? null);
+            $quotedExternalId = $quotedMsg['id']
+                ?? ($payload['quoted'] ?? $payload['quoted_message_id'] ?? null)
+                ?? ($payload['quotedMsgId'] ?? $payload['quotedMessageId'] ?? null)
+                ?? ($quepasaData['quotedMsgId'] ?? $quepasaData['quotedMessageId'] ?? null)
+                ?? (($quepasaData['contextInfo']['stanzaId'] ?? null) ?? ($payload['contextInfo']['stanzaId'] ?? null));
+            $quotedMessageText = $quotedMsg['body'] ?? ($payload['quoted_text'] ?? $quepasaData['quotedText'] ?? null);
             $quotedMessageId = null;
             if ($quotedExternalId) {
                 $quotedLocal = \App\Models\Message::findByExternalId($quotedExternalId);

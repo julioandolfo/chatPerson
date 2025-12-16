@@ -4814,6 +4814,9 @@ function updateConversationSidebar(conversation, tags) {
 
     // Atualizar histórico (aba Histórico)
     loadContactHistory(conversation.contact_id);
+    
+    // Carregar agentes do contato
+    loadContactAgents(conversation.contact_id);
 }
 
 // Atualizar timeline da conversa
@@ -5213,6 +5216,78 @@ function formatDateTime(dateString) {
     });
 }
 
+// Carregar agentes do contato na sidebar
+function loadContactAgents(contactId) {
+    if (!contactId) return;
+    
+    const agentsListEl = document.getElementById('contact-agents-list');
+    const manageBtn = document.getElementById('sidebar-manage-contact-agents-btn');
+    
+    if (!agentsListEl) return;
+    
+    fetch(`<?= \App\Helpers\Url::to('/contacts') ?>/${contactId}/agents`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success || !data.agents) {
+            agentsListEl.innerHTML = '<div class="text-muted fs-7">Nenhum agente atribuído</div>';
+            if (manageBtn) manageBtn.style.display = 'none';
+            return;
+        }
+        
+        const agents = data.agents || [];
+        
+        if (agents.length === 0) {
+            agentsListEl.innerHTML = '<div class="text-muted fs-7">Nenhum agente atribuído</div>';
+            if (manageBtn) manageBtn.style.display = 'none';
+            return;
+        }
+        
+        // Renderizar lista de agentes
+        let html = '';
+        agents.forEach(agent => {
+            const isPrimary = agent.is_primary == 1 || agent.is_primary === true;
+            const agentName = agent.agent_name || agent.name || 'Agente';
+            const agentEmail = agent.agent_email || agent.email || '';
+            const initials = getInitials(agentName);
+            
+            html += `
+                <div class="d-flex align-items-center gap-2 p-2 border rounded mb-2" style="background: var(--bs-gray-100);">
+                    <div class="symbol symbol-30px symbol-circle">
+                        <div class="symbol-label bg-light-primary text-primary fw-bold fs-7">
+                            ${initials}
+                        </div>
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold fs-7">
+                            ${escapeHtml(agentName)}
+                            ${isPrimary ? '<span class="badge badge-sm badge-primary ms-1">Principal</span>' : ''}
+                        </div>
+                        ${agentEmail ? `<div class="text-muted fs-8">${escapeHtml(agentEmail)}</div>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        
+        agentsListEl.innerHTML = html;
+        
+        // Mostrar botão de gerenciar se tiver permissão
+        if (manageBtn) {
+            manageBtn.setAttribute('onclick', `manageContactAgents(${contactId})`);
+            manageBtn.style.display = '';
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao carregar agentes do contato:', error);
+        agentsListEl.innerHTML = '<div class="text-muted fs-7">Erro ao carregar agentes</div>';
+        if (manageBtn) manageBtn.style.display = 'none';
+    });
+}
+
 
 // Delegação de eventos para conversation-item (resolve problema de função não definida em onclick)
 document.addEventListener('click', function(e) {
@@ -5575,16 +5650,34 @@ function refreshConversationList(params = null) {
         params = new URLSearchParams(window.location.search);
     }
     
-    // Evitar flicker: só mostra spinner no primeiro carregamento
+    // Evitar flicker: só mostra spinner no primeiro carregamento OU quando há filtros aplicados
     const isFirstLoad = conversationsList.dataset.loaded !== '1';
     
-    // Mostrar loading apenas no primeiro carregamento
-    if (isFirstLoad) {
+    // Verificar se há filtros aplicados (não é apenas polling)
+    const hasFilters = params && params instanceof URLSearchParams && (
+        params.has('search') ||
+        params.has('status') ||
+        params.has('channel') ||
+        params.has('department_id') ||
+        params.has('tag_id') ||
+        params.has('agent_id') ||
+        params.has('unanswered') ||
+        params.has('channels[]') ||
+        params.has('tag_ids[]') ||
+        params.has('whatsapp_account_ids[]') ||
+        params.has('answered') ||
+        params.has('date_from') ||
+        params.has('date_to') ||
+        params.has('pinned')
+    );
+    
+    // Mostrar loading apenas no primeiro carregamento OU quando há filtros aplicados (não durante polling)
+    if (isFirstLoad || hasFilters) {
         conversationsList.innerHTML = `
             <div class="d-flex align-items-center justify-content-center py-10">
                 <div class="text-center">
                     <span class="spinner-border spinner-border-sm text-primary mb-3" role="status"></span>
-                    <div class="text-muted fs-7">Buscando conversas...</div>
+                    <div class="text-muted fs-7">Carregando conversas...</div>
                 </div>
             </div>
         `;

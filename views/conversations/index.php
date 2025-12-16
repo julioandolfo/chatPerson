@@ -10188,7 +10188,13 @@ document.getElementById('assignForm')?.addEventListener('submit', function(e) {
     .then(data => {
         if (data.success) {
             bootstrap.Modal.getInstance(document.getElementById('kt_modal_assign')).hide();
-            window.location.reload();
+            
+            // Recarregar conversa para atualizar dados
+            if (currentConversationId == conversationId) {
+                selectConversation(conversationId);
+            } else {
+                window.location.reload();
+            }
         } else {
             alert('Erro ao atribuir conversa: ' + (data.message || 'Erro desconhecido'));
             btn.disabled = false;

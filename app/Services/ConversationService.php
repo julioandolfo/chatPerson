@@ -460,22 +460,32 @@ class ConversationService
         $oldAgentId = $conversation['agent_id'] ?? null;
         Conversation::update($conversationId, ['agent_id' => $agentId]);
         
-        // Se é primeira atribuição (não tinha agente antes), atualizar agente principal do contato
-        if (!$oldAgentId) {
-            try {
-                // Garantir que o agente está na lista de agentes do contato
-                \App\Models\ContactAgent::addAgent($conversation['contact_id'], $agentId, false, 0);
-                
-                // Definir como agente principal se ainda não tiver um
-                // O primeiro agente atribuído SEMPRE se torna o agente principal do contato
-                \App\Services\ContactAgentService::updatePrimaryOnFirstAssignment(
-                    $conversation['contact_id'],
-                    $agentId,
-                    true
-                );
-            } catch (\Exception $e) {
-                error_log("Erro ao atualizar agente principal: " . $e->getMessage());
+        // SEMPRE verificar e adicionar o agente à lista de agentes do contato (primeira atribuição ou reatribuição)
+        // Isso garante que mesmo conversas antigas que já tinham agente atribuído terão o agente na lista do contato
+        try {
+            // Verificar se agente já está na lista de agentes do contato
+            $existingAgents = \App\Models\ContactAgent::getByContact($conversation['contact_id']);
+            $agentExists = false;
+            foreach ($existingAgents as $agent) {
+                if ($agent['agent_id'] == $agentId) {
+                    $agentExists = true;
+                    break;
+                }
             }
+            
+            // Se não existe na lista, adicionar (PRIMEIRA VEZ que este agente é atribuído a este contato)
+            // Isso funciona tanto para primeira atribuição quanto para reatribuição
+            if (!$agentExists) {
+                // Verificar se contato já tem agente principal antes de adicionar
+                $primaryAgent = \App\Models\ContactAgent::getPrimaryAgent($conversation['contact_id']);
+                $isPrimary = !$primaryAgent; // Se não tem principal, este será o principal
+                
+                \App\Models\ContactAgent::addAgent($conversation['contact_id'], $agentId, $isPrimary, 0);
+                error_log("ConversationService: Agente {$agentId} adicionado à lista de agentes do contato {$conversation['contact_id']} (primeira vez)" . ($isPrimary ? " e definido como principal" : ""));
+            }
+        } catch (\Exception $e) {
+            error_log("Erro ao atualizar agente do contato: " . $e->getMessage());
+            error_log("Trace: " . $e->getTraceAsString());
         }
         
         // Invalidar cache de conversas

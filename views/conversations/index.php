@@ -368,6 +368,17 @@ ob_start();
     display: inline-block; /* Garantir que dropdown seja posicionado em relação ao botão */
 }
 
+/* Quando dropdown está aberto, aumentar z-index do item da conversa */
+.conversation-item:has(.conversation-item-actions .dropdown-menu.show) {
+    z-index: 1000 !important;
+    position: relative;
+}
+
+/* Garantir que o dropdown-menu tenha z-index alto */
+.conversation-item-actions .dropdown-menu {
+    z-index: 1050 !important;
+}
+
 .conversation-item-actions .btn {
     opacity: 0.6;
     transition: opacity 0.2s ease, background-color 0.2s ease;
@@ -394,21 +405,6 @@ ob_start();
 
 .conversation-item:hover .conversation-item-actions .btn {
     opacity: 0.8;
-}
-
-.conversation-item-actions {
-    position: relative;
-    z-index: 10;
-    display: inline-block;
-}
-
-.conversation-item-actions .dropdown {
-    position: relative;
-    z-index: 1000;
-}
-
-.conversation-item-actions .dropdown.show {
-    z-index: 10000 !important;
 }
 
 .conversation-item-actions .dropdown-menu {
@@ -3927,14 +3923,20 @@ function sortConversationList() {
     const list = document.querySelector('.conversations-list-items');
     if (!list) return;
     const items = Array.from(list.children);
-    // Ordenar: pinned primeiro, depois updatedAt desc
+    // Ordenar: pinned primeiro, depois updatedAt desc, depois ID desc (critério de desempate)
     items.sort((a, b) => {
         const pinnedA = a.classList.contains('pinned') ? 1 : 0;
         const pinnedB = b.classList.contains('pinned') ? 1 : 0;
         if (pinnedA !== pinnedB) return pinnedB - pinnedA;
+        
         const dateA = Date.parse(a.dataset.updatedAt || '') || 0;
         const dateB = Date.parse(b.dataset.updatedAt || '') || 0;
-        return dateB - dateA;
+        if (dateA !== dateB) return dateB - dateA;
+        
+        // Critério de desempate: ID da conversa (maior primeiro = mais recente)
+        const idA = parseInt(a.dataset.conversationId) || 0;
+        const idB = parseInt(b.dataset.conversationId) || 0;
+        return idB - idA;
     });
     items.forEach(item => list.appendChild(item));
 }
@@ -5286,6 +5288,22 @@ function loadContactAgents(contactId) {
         agentsListEl.innerHTML = '<div class="text-muted fs-7">Erro ao carregar agentes</div>';
         if (manageBtn) manageBtn.style.display = 'none';
     });
+}
+
+/**
+ * Gerenciar agentes do contato (abrir modal)
+ */
+function manageContactAgents(contactId) {
+    if (!contactId) {
+        console.error('ID do contato não informado');
+        return;
+    }
+    
+    // TODO: Implementar modal de gerenciamento de agentes do contato
+    // Por enquanto, mostrar alert
+    alert('Funcionalidade de gerenciamento de agentes do contato em desenvolvimento.\n\nEm breve você poderá:\n- Adicionar novos agentes ao contato\n- Remover agentes\n- Definir agente principal\n- Configurar prioridades');
+    
+    console.log('Gerenciar agentes do contato:', contactId);
 }
 
 

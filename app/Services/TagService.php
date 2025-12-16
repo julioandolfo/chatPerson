@@ -151,7 +151,7 @@ class TagService
         // Registrar atividade no timeline
         if ($ok && class_exists('\App\Services\ActivityService')) {
             try {
-                \App\Services\ActivityService::logTagAdded($conversationId, $tagId, \App\Helpers\Auth::id());
+                \App\Services\ActivityService::logTagAdded($conversationId, $tag['name'], \App\Helpers\Auth::id());
             } catch (\Exception $e) {
                 error_log("Activity log tag_added falhou: " . $e->getMessage());
             }
@@ -165,6 +165,10 @@ class TagService
      */
     public static function removeFromConversation(int $conversationId, int $tagId): bool
     {
+        // Buscar informações da tag ANTES de remover para usar no log
+        $tag = Tag::find($tagId);
+        $tagName = $tag ? $tag['name'] : "Tag #{$tagId}";
+        
         $ok = Tag::removeFromConversation($conversationId, $tagId);
 
         // Invalidar cache de conversa/lista para refletir tags na sidebar e na listagem
@@ -175,7 +179,7 @@ class TagService
         // Registrar atividade no timeline
         if ($ok && class_exists('\App\Services\ActivityService')) {
             try {
-                \App\Services\ActivityService::logTagRemoved($conversationId, $tagId, \App\Helpers\Auth::id());
+                \App\Services\ActivityService::logTagRemoved($conversationId, $tagName, \App\Helpers\Auth::id());
             } catch (\Exception $e) {
                 error_log("Activity log tag_removed falhou: " . $e->getMessage());
             }

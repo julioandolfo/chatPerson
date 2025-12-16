@@ -190,6 +190,40 @@ ob_start();
                     </div>
                 </div>
                 <div class="separator separator-dashed my-5"></div>
+                <h4 class="fw-bold mb-4">Favicon</h4>
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2">Favicon</label>
+                    <div class="d-flex align-items-center gap-5">
+                        <div class="symbol symbol-50px">
+                            <img id="favicon_preview" 
+                                 src="<?= !empty($generalSettings['app_favicon']) ? \App\Helpers\Url::to($generalSettings['app_favicon']) : \App\Helpers\Url::asset('media/logos/favicon.ico') ?>" 
+                                 alt="Favicon" 
+                                 class="w-100 h-100 object-fit-contain" 
+                                 style="max-height: 50px; object-fit: contain;" />
+                        </div>
+                        <div class="flex-grow-1">
+                            <input type="file" 
+                                   id="favicon_upload" 
+                                   name="app_favicon" 
+                                   class="form-control form-control-solid" 
+                                   accept="image/x-icon,image/png,image/jpeg,image/jpg,image/svg+xml" />
+                            <div class="form-text">Formatos aceitos: ICO, PNG, JPG, SVG. Tamanho recomendado: 32x32px ou 16x16px. Tamanho máximo: 500KB</div>
+                            <?php if (!empty($generalSettings['app_favicon'])): ?>
+                                <button type="button" class="btn btn-sm btn-light-danger mt-2" onclick="removeFavicon()">
+                                    <i class="ki-duotone ki-trash fs-5 me-1">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                        <span class="path4"></span>
+                                        <span class="path5"></span>
+                                    </i>
+                                    Remover Favicon
+                                </button>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                <div class="separator separator-dashed my-5"></div>
                 <h4 class="fw-bold mb-4">OpenAI (Agentes de IA)</h4>
                 <div class="fv-row mb-7">
                     <label class="fw-semibold fs-6 mb-2">API Key</label>
@@ -488,6 +522,38 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Preview de favicon ao selecionar arquivo
+    const faviconUpload = document.getElementById('favicon_upload');
+    const faviconPreview = document.getElementById('favicon_preview');
+    if (faviconUpload && faviconPreview) {
+        faviconUpload.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                // Validar tamanho (500KB)
+                if (file.size > 500 * 1024) {
+                    alert('Arquivo muito grande. Tamanho máximo: 500KB');
+                    e.target.value = '';
+                    return;
+                }
+                
+                // Validar tipo
+                const allowedTypes = ['image/x-icon', 'image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
+                if (!allowedTypes.includes(file.type)) {
+                    alert('Tipo de arquivo não permitido. Use ICO, PNG, JPG ou SVG');
+                    e.target.value = '';
+                    return;
+                }
+                
+                // Mostrar preview
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    faviconPreview.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+    
     // Remover logo
     window.removeLogo = function() {
         if (confirm('Tem certeza que deseja remover a logo? O sistema voltará a usar a logo padrão.')) {
@@ -536,20 +602,53 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
                 .then(response => response.json())
                 .then(data => {
-                    if (data.success) {
-                        // Depois do upload, salvar outras configurações
-                        submitForm(generalForm, '" . \App\Helpers\Url::to('/settings/general') . "');
-                    } else {
+                    if (!data.success) {
                         alert('Erro ao fazer upload da logo: ' + (data.message || 'Erro desconhecido'));
+                        return;
                     }
+                    // Continuar com favicon se houver
+                    uploadFaviconIfNeeded();
                 })
                 .catch(error => {
                     console.error('Erro:', error);
                     alert('Erro ao fazer upload da logo');
+                    uploadFaviconIfNeeded();
                 });
             } else {
-                // Sem logo para upload, salvar normalmente
-                submitForm(generalForm, '" . \App\Helpers\Url::to('/settings/general') . "');
+                uploadFaviconIfNeeded();
+            }
+            
+            function uploadFaviconIfNeeded() {
+                const faviconFile = faviconUpload?.files[0];
+                if (faviconFile) {
+                    const formData = new FormData();
+                    formData.append('favicon', faviconFile);
+                    
+                    fetch('" . \App\Helpers\Url::to('/settings/upload-favicon') . "', {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (!data.success) {
+                            alert('Erro ao fazer upload do favicon: ' + (data.message || 'Erro desconhecido'));
+                        }
+                        // Depois do upload, salvar outras configurações
+                        submitForm(generalForm, '" . \App\Helpers\Url::to('/settings/general') . "');
+                    })
+                    .catch(error => {
+                        console.error('Erro:', error);
+                        alert('Erro ao fazer upload do favicon');
+                        // Continuar mesmo assim
+                        submitForm(generalForm, '" . \App\Helpers\Url::to('/settings/general') . "');
+                    });
+                } else {
+                    // Sem favicon para upload, salvar outras configurações
+                    submitForm(generalForm, '" . \App\Helpers\Url::to('/settings/general') . "');
+                }
             }
         });
     }

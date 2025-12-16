@@ -6,6 +6,19 @@
     <title>Login - Sistema Multiatendimento</title>
     <?php 
     try {
+        if (class_exists('App\Services\SettingService')) {
+            $favicon = \App\Services\SettingService::get('app_favicon', '');
+            $faviconUrl = !empty($favicon) ? \App\Helpers\Url::to($favicon) : \App\Helpers\Url::asset('media/logos/favicon.ico');
+        } else {
+            $faviconUrl = \App\Helpers\Url::asset('media/logos/favicon.ico');
+        }
+    } catch (\Throwable $e) {
+        $faviconUrl = \App\Helpers\Url::asset('media/logos/favicon.ico');
+    }
+    ?>
+    <link rel="icon" type="image/x-icon" href="<?= $faviconUrl ?>" />
+    <?php 
+    try {
         if (!class_exists('App\Helpers\Url')) {
             require_once __DIR__ . '/../../app/Helpers/autoload.php';
         }
@@ -180,7 +193,11 @@
                 <div class="d-flex flex-column flex-center py-7 py-lg-15 px-5 px-md-15 w-100">
                     <!--begin::Logo-->
                     <a href="<?= \App\Helpers\Url::to('/') ?>" class="mb-12">
-                        <img alt="Logo" src="<?= \App\Helpers\Url::asset('media/logos/demo3.svg') ?>" class="h-60px" />
+                        <?php 
+                        $appLogo = \App\Services\SettingService::get('app_logo', '');
+                        $logoUrl = !empty($appLogo) ? \App\Helpers\Url::to($appLogo) : \App\Helpers\Url::asset('media/logos/demo3.svg');
+                        ?>
+                        <img alt="Logo" src="<?= $logoUrl ?>" class="h-60px" />
                     </a>
                     <!--end::Logo-->
                     

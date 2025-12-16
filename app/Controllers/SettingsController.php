@@ -190,6 +190,115 @@ class SettingsController
     }
     
     /**
+     * Upload de favicon
+     */
+    public function uploadFavicon(): void
+    {
+        Permission::abortIfCannot('admin.settings');
+        
+        try {
+            if (!isset($_FILES['favicon']) || $_FILES['favicon']['error'] !== UPLOAD_ERR_OK) {
+                throw new \Exception('Nenhum arquivo enviado ou erro no upload');
+            }
+            
+            $file = $_FILES['favicon'];
+            
+            // Validar tamanho (500KB)
+            if ($file['size'] > 500 * 1024) {
+                throw new \Exception('Arquivo muito grande. Tamanho máximo: 500KB');
+            }
+            
+            // Validar tipo
+            $allowedTypes = ['image/x-icon', 'image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
+            $mimeType = mime_content_type($file['tmp_name']);
+            if (!in_array($mimeType, $allowedTypes)) {
+                throw new \Exception('Tipo de arquivo não permitido. Use ICO, PNG, JPG ou SVG');
+            }
+            
+            // Criar diretório se não existir
+            $faviconDir = __DIR__ . '/../../public/assets/media/logos/custom/';
+            if (!is_dir($faviconDir)) {
+                mkdir($faviconDir, 0755, true);
+            }
+            
+            // Obter extensão
+            $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            if (empty($extension)) {
+                // Tentar detectar pela extensão do arquivo
+                $extension = match($mimeType) {
+                    'image/x-icon' => 'ico',
+                    'image/png' => 'png',
+                    'image/jpeg', 'image/jpg' => 'jpg',
+                    'image/svg+xml' => 'svg',
+                    default => 'ico'
+                };
+            }
+            
+            // Gerar nome único
+            $filename = 'favicon_' . time() . '.' . $extension;
+            $filepath = $faviconDir . $filename;
+            
+            // Remover favicon antigo se existir
+            $oldFavicon = SettingService::get('app_favicon', '');
+            if (!empty($oldFavicon) && file_exists(__DIR__ . '/../../public/' . $oldFavicon)) {
+                @unlink(__DIR__ . '/../../public/' . $oldFavicon);
+            }
+            
+            // Mover arquivo
+            if (!move_uploaded_file($file['tmp_name'], $filepath)) {
+                throw new \Exception('Erro ao salvar arquivo');
+            }
+            
+            // Salvar caminho nas configurações
+            $faviconPath = 'assets/media/logos/custom/' . $filename;
+            SettingService::set('app_favicon', $faviconPath, 'string', 'general');
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Favicon enviado com sucesso!',
+                'favicon_path' => $faviconPath,
+                'favicon_url' => \App\Helpers\Url::to($faviconPath)
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+    
+    /**
+     * Remover favicon
+     */
+    public function removeFavicon(): void
+    {
+        Permission::abortIfCannot('admin.settings');
+        
+        try {
+            $faviconPath = SettingService::get('app_favicon', '');
+            
+            if (!empty($faviconPath)) {
+                $fullPath = __DIR__ . '/../../public/' . $faviconPath;
+                if (file_exists($fullPath)) {
+                    @unlink($fullPath);
+                }
+            }
+            
+            SettingService::set('app_favicon', '', 'string', 'general');
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Favicon removido com sucesso!'
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao remover favicon: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
      * Salvar configurações gerais
      */
     public function saveGeneral(): void

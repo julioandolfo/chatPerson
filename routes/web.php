@@ -199,6 +199,8 @@ Router::get('/settings', [SettingsController::class, 'index'], ['Authentication'
 Router::post('/settings/general', [SettingsController::class, 'saveGeneral'], ['Authentication']);
 Router::post('/settings/upload-logo', [SettingsController::class, 'uploadLogo'], ['Authentication']);
 Router::post('/settings/remove-logo', [SettingsController::class, 'removeLogo'], ['Authentication']);
+Router::post('/settings/upload-favicon', [SettingsController::class, 'uploadFavicon'], ['Authentication']);
+Router::post('/settings/remove-favicon', [SettingsController::class, 'removeFavicon'], ['Authentication']);
 Router::post('/settings/email', [SettingsController::class, 'saveEmail'], ['Authentication']);
 Router::post('/settings/whatsapp', [SettingsController::class, 'saveWhatsApp'], ['Authentication']);
 Router::post('/settings/security', [SettingsController::class, 'saveSecurity'], ['Authentication']);

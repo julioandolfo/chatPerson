@@ -71,6 +71,7 @@ class SettingService
         return [
             'app_name' => Setting::get('app_name', 'Sistema Multiatendimento'),
             'app_logo' => Setting::get('app_logo', ''),
+            'app_favicon' => Setting::get('app_favicon', ''),
             'app_timezone' => Setting::get('app_timezone', 'America/Sao_Paulo'),
             'app_locale' => Setting::get('app_locale', 'pt_BR'),
             'max_conversations_per_agent' => Setting::get('max_conversations_per_agent', 10),

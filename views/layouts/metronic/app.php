@@ -4,6 +4,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title><?= $title ?? 'Sistema Multiatendimento' ?></title>
+    <?php 
+    $favicon = \App\Services\SettingService::get('app_favicon', '');
+    $faviconUrl = !empty($favicon) ? \App\Helpers\Url::to($favicon) : \App\Helpers\Url::asset('media/logos/favicon.ico');
+    ?>
+    <link rel="icon" type="image/x-icon" href="<?= $faviconUrl ?>" />
     
     <!--begin::Fonts(mandatory for all pages)-->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,400,500,600,700" />

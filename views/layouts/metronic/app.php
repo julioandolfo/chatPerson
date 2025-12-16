@@ -29,11 +29,16 @@
             --aside-collapsed: 80px;
         }
 
-        /* Fixar largura do aside desktop */
+        /* Fixar largura do aside desktop e posicionar fixo */
         #kt_aside {
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            bottom: 0 !important;
             width: var(--aside-width) !important;
             min-width: var(--aside-width) !important;
             max-width: var(--aside-width) !important;
+            z-index: 100 !important;
         }
 
         /* Layout base: página com aside + conteúdo */

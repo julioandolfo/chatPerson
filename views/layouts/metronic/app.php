@@ -218,51 +218,6 @@
                 }
                 
                 // Drawers são inicializados automaticamente via data-kt-drawer
-                if (sidebarElement && typeof KTDrawer !== 'undefined') {
-                    // Aguardar um pouco mais para garantir que o drawer foi inicializado
-                    setTimeout(function() {
-                        var drawer = KTDrawer.getInstance(sidebarElement);
-                        if (!drawer) {
-                            try {
-                                drawer = new KTDrawer(sidebarElement);
-                            } catch (e) {
-                                console.warn('Erro ao inicializar drawer:', e);
-                            }
-                        }
-                        
-                        // Ajustar conteúdo quando sidebar abrir/fechar
-                        if (drawer) {
-                            sidebarElement.addEventListener('drawer:shown', function() {
-                                document.body.classList.add('sidebar-shown');
-                                updateRightSidebarVisibility();
-                            });
-                            
-                            sidebarElement.addEventListener('drawer:hidden', function() {
-                                document.body.classList.remove('sidebar-shown');
-                                updateRightSidebarVisibility();
-                            });
-                        }
-                        
-                        updateRightSidebarVisibility();
-                    }, 300);
-                }
-                
-                if (sidebarElement) {
-                    updateRightSidebarVisibility();
-                    
-                    const sidebarVisibilityObserver = new MutationObserver(function() {
-                        updateRightSidebarVisibility();
-                    });
-                    
-                    sidebarVisibilityObserver.observe(sidebarElement, {
-                        attributes: true,
-                        attributeFilter: ['class', 'aria-hidden', 'style']
-                    });
-                    
-                    window.addEventListener('resize', function() {
-                        updateRightSidebarVisibility();
-                    });
-                }
                 
                 // Garantir que os modais estão funcionando corretamente
                 // Prevenir erro de backdrop undefined

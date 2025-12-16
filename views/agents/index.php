@@ -6,24 +6,46 @@ ob_start();
 ?>
 <style>
 /* Garantir que dropdowns da tabela apareçam acima do card */
+.table-responsive {
+    overflow: visible !important;
+}
+
+#kt_agents_table tbody tr {
+    position: relative;
+}
+
 #kt_agents_table .dropdown-menu {
     z-index: 1050 !important;
+    position: absolute !important;
 }
 
 /* Quando dropdown está aberto, aumentar z-index da linha da tabela */
 #kt_agents_table tbody tr:has(.dropdown-menu.show) {
-    position: relative;
     z-index: 1050;
 }
 
 /* Alternativa para navegadores que não suportam :has() */
+#kt_agents_table tbody tr .btn-group.show {
+    position: relative;
+    z-index: 1050;
+}
+
 #kt_agents_table tbody tr .dropdown.show {
     position: relative;
     z-index: 1050;
 }
 
-#kt_agents_table tbody tr .dropdown.show .dropdown-menu {
+#kt_agents_table .btn-group .dropdown-menu {
     z-index: 1051 !important;
+}
+
+/* Evitar que o card esconda o dropdown */
+.card {
+    overflow: visible !important;
+}
+
+.card-body {
+    overflow: visible !important;
 }
 </style>
 <!--begin::Card-->

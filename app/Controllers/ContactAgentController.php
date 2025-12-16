@@ -16,7 +16,7 @@ class ContactAgentController
      */
     public function index(int $contactId): void
     {
-        Permission::abortIfCannot('contacts.view.own');
+        Permission::abortIfCannot('contacts.view');
         
         try {
             $agents = ContactAgentService::getAgents($contactId);

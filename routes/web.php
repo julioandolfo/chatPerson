@@ -112,15 +112,19 @@ Router::post('/test/conversation/{id}/message', [TestController::class, 'sendMes
 // Rotas de Contatos
 Router::get('/contacts', [ContactController::class, 'index'], ['Authentication']);
 Router::post('/contacts', [ContactController::class, 'store'], ['Authentication']);
-Router::get('/contacts/{id}', [ContactController::class, 'show'], ['Authentication']);
-Router::post('/contacts/{id}', [ContactController::class, 'update'], ['Authentication']);
-Router::post('/contacts/{id}/avatar', [ContactController::class, 'uploadAvatar'], ['Authentication']);
-Router::delete('/contacts/{id}', [ContactController::class, 'destroy'], ['Authentication']);
+// Rotas ESPECÍFICAS devem vir ANTES das rotas genéricas para evitar conflitos
 // Rotas de Agentes do Contato
 Router::get('/contacts/{id}/agents', [ContactAgentController::class, 'index'], ['Authentication']);
 Router::post('/contacts/{id}/agents', [ContactAgentController::class, 'store'], ['Authentication']);
 Router::post('/contacts/{id}/agents/set-primary', [ContactAgentController::class, 'setPrimary'], ['Authentication']);
 Router::delete('/contacts/{id}/agents/{agentId}', [ContactAgentController::class, 'destroy'], ['Authentication']);
+// Rotas específicas de contato
+Router::post('/contacts/{id}/avatar', [ContactController::class, 'uploadAvatar'], ['Authentication']);
+Router::get('/contacts/{id}/history', [ContactController::class, 'getHistoryMetrics'], ['Authentication']);
+// Rotas genéricas de contato (devem vir por último)
+Router::get('/contacts/{id}', [ContactController::class, 'show'], ['Authentication']);
+Router::post('/contacts/{id}', [ContactController::class, 'update'], ['Authentication']);
+Router::delete('/contacts/{id}', [ContactController::class, 'destroy'], ['Authentication']);
 
 // Rotas de Funis
 Router::get('/funnels', [FunnelController::class, 'index'], ['Authentication']);
@@ -265,7 +269,6 @@ Router::get('/tags/all', [TagController::class, 'getAll'], ['Authentication']);
 Router::post('/conversations/{id}/tags', [TagController::class, 'addToConversation'], ['Authentication']);
 Router::post('/conversations/{id}/tags/remove', [TagController::class, 'removeFromConversation'], ['Authentication']);
 Router::get('/conversations/{id}/tags', [TagController::class, 'getByConversation'], ['Authentication']);
-Router::get('/contacts/{id}/history', [ContactController::class, 'getHistoryMetrics'], ['Authentication']);
 
 // Rotas de Notificações
 Router::get('/notifications', [NotificationController::class, 'index'], ['Authentication']);

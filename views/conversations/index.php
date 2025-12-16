@@ -10191,6 +10191,7 @@ document.getElementById('assignForm')?.addEventListener('submit', function(e) {
             
             // Recarregar conversa para atualizar dados
             if (currentConversationId == conversationId) {
+                // Recarregar conversa completa (inclui agentes do contato)
                 selectConversation(conversationId);
             } else {
                 window.location.reload();

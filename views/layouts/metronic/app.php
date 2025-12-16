@@ -42,6 +42,7 @@
             max-width: 100% !important;
             padding-left: 30px !important;
             padding-right: 30px !important;
+            flex: 1 1 auto !important;
         }
         
         .container-fluid {
@@ -49,6 +50,7 @@
             max-width: 100% !important;
             padding-left: 30px !important;
             padding-right: 30px !important;
+            flex: 1 1 auto !important;
         }
         
         .container-xxl {
@@ -59,12 +61,22 @@
         .wrapper {
             width: 100% !important;
             max-width: 100% !important;
+            flex: 1 1 auto !important;
+            margin: 0 !important;
         }
         
         /* Ajustar o content para ocupar todo espaço */
         .content {
             width: 100% !important;
             max-width: 100% !important;
+            flex: 1 1 auto !important;
+        }
+
+        /* Garantir que a página ocupe todo o espaço, sem reserva para sidebar inexistente */
+        .page {
+            width: 100% !important;
+            max-width: 100% !important;
+            flex: 1 1 auto !important;
         }
 
         .page {

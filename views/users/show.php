@@ -705,7 +705,9 @@ function loadActivities() {
     const activitiesList = document.getElementById("kt_activities_list");
     if (!activitiesList) return;
     
-    fetch('<?= \App\Helpers\Url::to('/activities/user/' . $user['id']) ?>?limit=20')
+    const userId = ' . intval($user['id']) . ';
+    const baseUrl = "' . \App\Helpers\Url::to('/activities/user/') . '";
+    fetch(baseUrl + userId + "?limit=20")
         .then(response => response.json())
         .then(data => {
             if (data.success && data.activities && data.activities.length > 0) {
@@ -1063,15 +1065,18 @@ if (editUserForm) {
 }
 
 function loadPerformanceStats() {
-    const dateFrom = document.getElementById("kt_performance_date_from")?.value;
-    const dateTo = document.getElementById("kt_performance_date_to")?.value;
+    const dateFromEl = document.getElementById("kt_performance_date_from");
+    const dateToEl = document.getElementById("kt_performance_date_to");
+    
+    const dateFrom = dateFromEl ? dateFromEl.value : "";
+    const dateTo = dateToEl ? dateToEl.value : "";
     
     if (!dateFrom || !dateTo) {
         alert("Por favor, selecione as datas de início e fim.");
         return;
     }
     
-    const url = '<?= \App\Helpers\Url::to('/users/' . $user['id']) ?>?date_from=' + dateFrom + '&date_to=' + dateTo;
+    const url = "' . \App\Helpers\Url::to('/users/' . $user['id']) . '?date_from=" + dateFrom + "&date_to=" + dateTo;
     window.location.href = url;
 }
 </script>';

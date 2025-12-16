@@ -579,9 +579,9 @@ ob_start();
 $content = ob_get_clean(); 
 $scripts = '
 <script>
-// Função para editar agente (definida imediatamente para estar disponível antes do DOMContentLoaded)
-(function() {
-    window.editAgent = function(element) {
+// Definir funções globais ANTES de qualquer código
+window.editAgent = function(element) {
+    try {
         const agentId = element.getAttribute("data-agent-id");
         const agentName = element.getAttribute("data-agent-name") || "";
         const agentEmail = element.getAttribute("data-agent-email") || "";
@@ -617,9 +617,13 @@ $scripts = '
         if (modalElement) {
             const modal = new bootstrap.Modal(modalElement);
             modal.show();
+        } else {
+            console.warn("Modal de edição não encontrado");
         }
-    };
-})();
+    } catch(e) {
+        console.error("Erro ao abrir modal de edição:", e);
+    }
+};
 
 document.addEventListener("DOMContentLoaded", function() {
     const table = document.querySelector("#kt_agents_table");

@@ -26,7 +26,7 @@
     <?= $head ?? '' ?>
     <?= $styles ?? '' ?>
 </head>
-<body id="kt_body" class="header-fixed sidebar-enabled">
+<body id="kt_body" class="header-fixed sidebar-enabled" style="--bs-gutter-x: 0">
     <!--begin::Theme mode setup on page load-->
     <script>
         var defaultThemeMode = "light";
@@ -59,7 +59,7 @@
             <!--end::Aside-->
             
             <!--begin::Wrapper-->
-            <div class="wrapper d-flex flex-column flex-row-fluid" id="kt_wrapper">
+            <div class="wrapper d-flex flex-column flex-row-fluid" id="kt_wrapper" style="width: 100%">
                 <!--begin::Header-->
                 <?php include __DIR__ . '/header.php'; ?>
                 <!--end::Header-->
@@ -67,7 +67,7 @@
                 <!--begin::Content-->
                 <div class="content d-flex flex-column flex-column-fluid" id="kt_content">
                     <!--begin::Container-->
-                    <div class="<?= isset($fullWidth) && $fullWidth ? '' : 'container-xxl' ?>" id="kt_content_container" style="<?= isset($fullWidth) && $fullWidth ? 'width: 100%; max-width: 100%; padding: 0;' : '' ?>">
+                    <div class="container-fluid" id="kt_content_container" style="max-width: 100%; width: 100%">
                         <?= $content ?? '' ?>
                     </div>
                     <!--end::Container-->

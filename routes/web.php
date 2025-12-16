@@ -8,6 +8,7 @@ use App\Controllers\AuthController;
 use App\Controllers\DashboardController;
 use App\Controllers\ConversationController;
 use App\Controllers\ContactController;
+use App\Controllers\ContactAgentController;
 use App\Controllers\FunnelController;
 use App\Controllers\AutomationController;
 use App\Controllers\AgentController;

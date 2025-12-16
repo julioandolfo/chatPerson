@@ -44,17 +44,15 @@
             justify-content: flex-start !important;
             width: 100% !important;
             max-width: 100% !important;
-            padding-left: var(--aside-width) !important; /* reserva espaço do menu */
         }
 
-        /* Wrapper ocupa todo espaço e é deslocado à direita do aside */
+        /* Wrapper ocupa todo espaço; deslocamento é feito no body */
         .wrapper {
             flex: 1 1 auto !important;
             width: 100% !important;
             max-width: 100% !important;
             margin: 0 !important;
-            margin-left: 0 !important;
-            padding: 0 0 0 16px !important;
+            padding: 0 16px 0 16px !important;
             box-sizing: border-box !important;
         }
 
@@ -79,19 +77,20 @@
             box-sizing: border-box !important;
         }
 
-        /* Gutters zero no body */
+        /* Gutters zero no body + deslocamento do aside (fixo) */
         body {
             --bs-gutter-x: 0 !important;
+            padding-left: var(--aside-width) !important;
         }
 
         /* Quando o aside estiver minimizado */
+        body.aside-minimize {
+            padding-left: var(--aside-collapsed) !important;
+        }
         body.aside-minimize .wrapper {
             margin-left: 0 !important;
             padding-left: 8px !important;
-        }
-
-        body.aside-minimize .page {
-            padding-left: var(--aside-collapsed) !important;
+            padding-right: 16px !important;
         }
 
         /* Responsivo: em mobile, não deslocar por aside */
@@ -106,8 +105,12 @@
                 max-width: 100% !important;
                 margin-left: 0 !important;
                 padding-left: 0 !important;
+                padding-right: 0 !important;
             }
             .page {
+                padding-left: 0 !important;
+            }
+            body {
                 padding-left: 0 !important;
             }
         }

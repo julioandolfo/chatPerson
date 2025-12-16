@@ -84,7 +84,8 @@ class UserService
             'status' => 'nullable|string|in:active,inactive',
             'availability_status' => 'nullable|string|in:online,offline,away,busy',
             'max_conversations' => 'nullable|integer|min:1',
-            'current_conversations' => 'nullable|integer|min:0'
+            'current_conversations' => 'nullable|integer|min:0',
+            'avatar' => 'nullable|string|max:255'
         ]);
         
         // Converter valores vazios para null
@@ -275,6 +276,65 @@ class UserService
         }
 
         return User::delete($userId);
+    }
+
+    /**
+     * Upload de avatar do usuário
+     */
+    public static function uploadAvatar(int $userId, array $file): string
+    {
+        // Validar arquivo
+        if ($file['error'] !== UPLOAD_ERR_OK) {
+            throw new \Exception('Erro ao fazer upload do arquivo');
+        }
+
+        // Validar tipo de arquivo
+        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mimeType = finfo_file($finfo, $file['tmp_name']);
+        finfo_close($finfo);
+
+        if (!in_array($mimeType, $allowedTypes)) {
+            throw new \Exception('Tipo de arquivo não permitido. Use JPG, PNG, GIF ou WEBP');
+        }
+
+        // Validar tamanho (2MB)
+        if ($file['size'] > 2 * 1024 * 1024) {
+            throw new \Exception('Arquivo muito grande. Tamanho máximo: 2MB');
+        }
+
+        // Criar diretório se não existir
+        $uploadDir = __DIR__ . '/../../public/assets/media/avatars/users/';
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+
+        // Gerar nome único
+        $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+        $filename = 'user_' . $userId . '_' . time() . '.' . $extension;
+        $filepath = $uploadDir . $filename;
+
+        // Mover arquivo
+        if (!move_uploaded_file($file['tmp_name'], $filepath)) {
+            throw new \Exception('Erro ao salvar arquivo');
+        }
+
+        // Remover avatar antigo se existir
+        $user = User::find($userId);
+        if ($user && !empty($user['avatar'])) {
+            $oldPath = __DIR__ . '/../../public' . str_replace(\App\Helpers\Url::basePath(), '', $user['avatar']);
+            if (file_exists($oldPath) && strpos($oldPath, 'users/') !== false) {
+                @unlink($oldPath);
+            }
+        }
+
+        // Retornar URL relativa
+        $avatarUrl = \App\Helpers\Url::asset('media/avatars/users/' . $filename);
+        
+        // Atualizar usuário
+        User::update($userId, ['avatar' => $avatarUrl]);
+
+        return $avatarUrl;
     }
 }
 

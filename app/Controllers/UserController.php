@@ -112,6 +112,11 @@ class UserController
             $data = Request::post();
             $userId = UserService::create($data);
             
+            // Processar upload de avatar se houver
+            if (!empty($_FILES['avatar_file']) && $_FILES['avatar_file']['error'] === UPLOAD_ERR_OK) {
+                UserService::uploadAvatar($userId, $_FILES['avatar_file']);
+            }
+            
             Response::json([
                 'success' => true,
                 'message' => 'Usuário criado com sucesso!',
@@ -139,6 +144,12 @@ class UserController
         
         try {
             $data = Request::post();
+            
+            // Processar upload de avatar se houver
+            if (!empty($_FILES['avatar_file']) && $_FILES['avatar_file']['error'] === UPLOAD_ERR_OK) {
+                $data['avatar'] = UserService::uploadAvatar($id, $_FILES['avatar_file']);
+            }
+            
             if (UserService::update($id, $data)) {
                 Response::json([
                     'success' => true,

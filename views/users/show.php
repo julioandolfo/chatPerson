@@ -620,8 +620,13 @@ ob_start();
                     </i>
                 </div>
             </div>
-            <form id="kt_modal_edit_user_form" class="form">
+            <form id="kt_modal_edit_user_form" class="form" enctype="multipart/form-data">
                 <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Avatar</label>
+                        <input type="file" name="avatar_file" class="form-control form-control-solid" accept="image/*" />
+                        <div class="form-text">JPG, PNG, GIF ou WEBP. Máximo 2MB. Deixe vazio para manter o atual.</div>
+                    </div>
                     <div class="fv-row mb-7">
                         <label class="required fw-semibold fs-6 mb-2">Nome</label>
                         <input type="text" name="name" class="form-control form-control-solid" 
@@ -700,7 +705,7 @@ function loadActivities() {
     const activitiesList = document.getElementById("kt_activities_list");
     if (!activitiesList) return;
     
-    fetch(`<?= \App\Helpers\Url::to('/activities/user/' . $user['id']) ?>?limit=20`)
+    fetch('<?= \App\Helpers\Url::to('/activities/user/' . $user['id']) ?>?limit=20')
         .then(response => response.json())
         .then(data => {
             if (data.success && data.activities && data.activities.length > 0) {
@@ -1066,7 +1071,7 @@ function loadPerformanceStats() {
         return;
     }
     
-    const url = `<?= \App\Helpers\Url::to('/users/' . $user['id']) ?>?date_from=${dateFrom}&date_to=${dateTo}`;
+    const url = '<?= \App\Helpers\Url::to('/users/' . $user['id']) ?>?date_from=' + dateFrom + '&date_to=' + dateTo;
     window.location.href = url;
 }
 </script>';

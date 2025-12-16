@@ -806,8 +806,8 @@ function showStageMetrics(stageId, stageName) {
     dateFrom.setDate(dateFrom.getDate() - 30);
     const dateTo = new Date();
     
-    const baseUrl = \'' . \App\Helpers\Url::to('/funnels/' . ($currentFunnelId ?? 0)) . '\';
-    fetch(baseUrl + \'/stages/metrics?stage_id=\' + stageId + \'&date_from=\' + dateFrom.toISOString().split(\'T\')[0] + \'&date_to=\' + dateTo.toISOString().split(\'T\')[0])
+    const baseUrl = '<?= \App\Helpers\Url::to('/funnels/' . ($currentFunnelId ?? 0)) ?>';
+    fetch(baseUrl + '/stages/metrics?stage_id=' + stageId + '&date_from=' + dateFrom.toISOString().split('T')[0] + '&date_to=' + dateTo.toISOString().split('T')[0])
         .then(response => response.json())
         .then(data => {
             if (data.success && data.metrics) {
@@ -829,18 +829,18 @@ function showStageMetrics(stageId, stageName) {
                                             <div>
                                                 <div class="text-gray-500 fs-7">Conversas Atuais</div>
                                                 <div class="fw-bold fs-3">${m.current_count}</div>
-                                                ${m.max_conversations ? `<div class="text-muted fs-8">de ${m.max_conversations} máximo</div>` : \'\'}
+                                                ${m.max_conversations ? `<div class="text-muted fs-8">de ${m.max_conversations} máximo</div>` : ''}
                                             </div>
                                         </div>
                                         ${m.utilization_rate !== null ? `
                                             <div class="mt-3">
                                                 <div class="progress" style="height: 8px;">
-                                                    <div class="progress-bar ${m.utilization_rate > 90 ? \'bg-danger\' : m.utilization_rate > 70 ? \'bg-warning\' : \'bg-success\'}" 
+                                                    <div class="progress-bar ${m.utilization_rate > 90 ? 'bg-danger' : m.utilization_rate > 70 ? 'bg-warning' : 'bg-success'}" 
                                                          style="width: ${m.utilization_rate}%"></div>
                                                 </div>
                                                 <div class="text-muted fs-8 mt-1">${m.utilization_rate.toFixed(1)}% de utilização</div>
                                             </div>
-                                        ` : \'\'}
+                                        ` : ''}
                                     </div>
                                 </div>
                             </div>
@@ -907,41 +907,41 @@ function showStageMetrics(stageId, stageName) {
                                                 </i>
                                                 <div>
                                                     <div class="text-gray-500 fs-7">Compliance SLA</div>
-                                                    <div class="fw-bold fs-3 ${m.sla_compliance >= 90 ? \'text-success\' : m.sla_compliance >= 70 ? \'text-warning\' : \'text-danger\'}">${m.sla_compliance}%</div>
+                                                    <div class="fw-bold fs-3 ${m.sla_compliance >= 90 ? 'text-success' : m.sla_compliance >= 70 ? 'text-warning' : 'text-danger'}">${m.sla_compliance}%</div>
                                                     <div class="text-muted fs-8">SLA: ${m.sla_hours}h</div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            ` : \'\'}
+                            ` : ''}
                         </div>
                     </div>
                 `;
                 
                 Swal.fire({
                     html: html,
-                    width: \'800px\',
+                    width: '800px',
                     showConfirmButton: true,
-                    confirmButtonText: \'Fechar\',
+                    confirmButtonText: 'Fechar',
                     customClass: {
-                        popup: \'text-start\'
+                        popup: 'text-start'
                     }
                 });
             } else {
                 Swal.fire({
-                    icon: \'error\',
-                    title: \'Erro\',
-                    text: \'Não foi possível carregar as métricas\'
+                    icon: 'error',
+                    title: 'Erro',
+                    text: 'Não foi possível carregar as métricas'
                 });
             }
         })
         .catch(error => {
-            console.error(\'Erro:\', error);
+            console.error('Erro:', error);
             Swal.fire({
-                icon: \'error\',
-                title: \'Erro\',
-                text: \'Erro ao carregar métricas\'
+                icon: 'error',
+                title: 'Erro',
+                text: 'Erro ao carregar métricas'
             });
         });
 }
@@ -952,8 +952,8 @@ function showFunnelMetrics(funnelId) {
     dateFrom.setDate(dateFrom.getDate() - 30);
     const dateTo = new Date();
     
-    const funnelBaseUrl = \'' . \App\Helpers\Url::to('/funnels') . '\';
-    fetch(`${funnelBaseUrl}/${funnelId}/metrics?date_from=${dateFrom.toISOString().split(\'T\')[0]}&date_to=${dateTo.toISOString().split(\'T\')[0]}`)
+    const funnelBaseUrl = '<?= \App\Helpers\Url::to('/funnels') ?>';
+    fetch(`${funnelBaseUrl}/${funnelId}/metrics?date_from=${dateFrom.toISOString().split('T')[0]}&date_to=${dateTo.toISOString().split('T')[0]}`)
         .then(response => response.json())
         .then(data => {
             if (data.success && data.metrics) {
@@ -1019,7 +1019,7 @@ function showFunnelMetrics(funnelId) {
                             <td>${stage.total_in_period}</td>
                             <td>${stage.avg_time_hours}h</td>
                             <td>${stage.conversion_rate}%</td>
-                            <td>${stage.sla_compliance !== null ? `<span class="badge ${stage.sla_compliance >= 90 ? \'badge-light-success\' : stage.sla_compliance >= 70 ? \'badge-light-warning\' : \'badge-light-danger\'}">${stage.sla_compliance}%</span>` : \'-\'}</td>
+                            <td>${stage.sla_compliance !== null ? `<span class="badge ${stage.sla_compliance >= 90 ? 'badge-light-success' : stage.sla_compliance >= 70 ? 'badge-light-warning' : 'badge-light-danger'}">${stage.sla_compliance}%</span>` : '-'}</td>
                         </tr>
                     `;
                 });
@@ -1033,27 +1033,27 @@ function showFunnelMetrics(funnelId) {
                 
                 Swal.fire({
                     html: html,
-                    width: \'1000px\',
+                    width: '1000px',
                     showConfirmButton: true,
-                    confirmButtonText: \'Fechar\',
+                    confirmButtonText: 'Fechar',
                     customClass: {
-                        popup: \'text-start\'
+                        popup: 'text-start'
                     }
                 });
             } else {
                 Swal.fire({
-                    icon: \'error\',
-                    title: \'Erro\',
-                    text: \'Não foi possível carregar as métricas\'
+                    icon: 'error',
+                    title: 'Erro',
+                    text: 'Não foi possível carregar as métricas'
                 });
             }
         })
         .catch(error => {
-            console.error(\'Erro:\', error);
+            console.error('Erro:', error);
             Swal.fire({
-                icon: \'error\',
-                title: \'Erro\',
-                text: \'Erro ao carregar métricas\'
+                icon: 'error',
+                title: 'Erro',
+                text: 'Erro ao carregar métricas'
             });
         });
 }

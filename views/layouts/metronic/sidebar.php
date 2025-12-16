@@ -205,10 +205,11 @@
                 <div data-kt-menu-trigger="click" class="menu-item menu-accordion">
                     <span class="menu-link <?= isActive('/ai-agents', $currentUri) || isActive('/ai-tools', $currentUri) ? 'active' : '' ?>" data-title="Agentes de IA">
                         <span class="menu-icon">
-                            <i class="ki-duotone ki-robot fs-2">
+                            <i class="ki-duotone ki-chip fs-2">
                                 <span class="path1"></span>
                                 <span class="path2"></span>
                                 <span class="path3"></span>
+                                <span class="path4"></span>
                             </i>
                         </span>
                         <span class="menu-title">Agentes de IA</span>

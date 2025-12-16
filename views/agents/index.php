@@ -257,8 +257,13 @@ ob_start();
                     </i>
                 </div>
             </div>
-            <form id="kt_modal_new_agent_form" class="form" action="<?= \App\Helpers\Url::to('/users') ?>" method="POST">
+            <form id="kt_modal_new_agent_form" class="form" action="<?= \App\Helpers\Url::to('/users') ?>" method="POST" enctype="multipart/form-data">
                 <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Avatar</label>
+                        <input type="file" name="avatar_file" class="form-control form-control-solid" accept="image/*" />
+                        <div class="form-text">JPG, PNG, GIF ou WEBP. Máximo 2MB</div>
+                    </div>
                     <div class="fv-row mb-7">
                         <label class="required fw-semibold fs-6 mb-2">Nome</label>
                         <input type="text" name="name" class="form-control form-control-solid" placeholder="Nome completo" required />
@@ -332,9 +337,14 @@ ob_start();
                     </i>
                 </div>
             </div>
-            <form id="kt_modal_edit_agent_form" class="form" method="POST">
+            <form id="kt_modal_edit_agent_form" class="form" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="user_id" id="edit_agent_id" />
                 <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Avatar</label>
+                        <input type="file" name="avatar_file" class="form-control form-control-solid" accept="image/*" />
+                        <div class="form-text">JPG, PNG, GIF ou WEBP. Máximo 2MB. Deixe vazio para manter o atual.</div>
+                    </div>
                     <div class="fv-row mb-7">
                         <label class="required fw-semibold fs-6 mb-2">Nome</label>
                         <input type="text" name="name" id="edit_agent_name" class="form-control form-control-solid" placeholder="Nome completo" required />
@@ -525,6 +535,32 @@ ob_start();
 $content = ob_get_clean(); 
 $scripts = '
 <script>
+// Função para editar agente (definida antes do DOMContentLoaded para estar disponível imediatamente)
+function editAgent(element) {
+    const agentId = element.getAttribute("data-agent-id");
+    const agentName = element.getAttribute("data-agent-name") || "";
+    const agentEmail = element.getAttribute("data-agent-email") || "";
+    const agentRole = element.getAttribute("data-agent-role") || "agent";
+    const agentStatus = element.getAttribute("data-agent-status") || "active";
+    const agentAvailability = element.getAttribute("data-agent-availability") || "offline";
+    const agentMaxConversations = element.getAttribute("data-agent-max-conversations") || "";
+    
+    document.getElementById("edit_agent_id").value = agentId;
+    document.getElementById("edit_agent_name").value = agentName;
+    document.getElementById("edit_agent_email").value = agentEmail;
+    document.getElementById("edit_agent_password").value = "";
+    document.getElementById("edit_agent_role").value = agentRole;
+    document.getElementById("edit_agent_status").value = agentStatus;
+    document.getElementById("edit_agent_availability_status").value = agentAvailability;
+    document.getElementById("edit_agent_max_conversations").value = agentMaxConversations;
+    
+    const form = document.getElementById("kt_modal_edit_agent_form");
+    form.action = "' . \App\Helpers\Url::to('/users') . '/" + agentId;
+    
+    const modal = new bootstrap.Modal(document.getElementById("kt_modal_edit_agent"));
+    modal.show();
+}
+
 document.addEventListener("DOMContentLoaded", function() {
     const table = document.querySelector("#kt_agents_table");
     const searchInput = document.querySelector("[data-kt-filter=\"search\"]");
@@ -558,10 +594,9 @@ document.addEventListener("DOMContentLoaded", function() {
             fetch(form.action, {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
                     "X-Requested-With": "XMLHttpRequest"
                 },
-                body: new URLSearchParams(new FormData(form))
+                body: new FormData(form)
             })
             .then(response => response.json())
             .then(data => {
@@ -583,9 +618,6 @@ document.addEventListener("DOMContentLoaded", function() {
             });
         });
     }
-    
-    // Função para editar agente
-    window.editAgent = function(element) {
         const agentId = element.getAttribute("data-agent-id");
         const agentName = element.getAttribute("data-agent-name") || "";
         const agentEmail = element.getAttribute("data-agent-email") || "";

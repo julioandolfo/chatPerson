@@ -76,38 +76,6 @@
             </div>
             <!--end::Wrapper-->
             
-            <!--begin::Sidebar-->
-            <?php if (!isset($hideRightSidebar) || !$hideRightSidebar): ?>
-            <div id="kt_sidebar" class="sidebar" data-kt-drawer="true" data-kt-drawer-name="sidebar" data-kt-drawer-activate="{default: true, xxl: false}" data-kt-drawer-overlay="true" data-kt-drawer-width="{default:'300px', 'lg': '400px'}" data-kt-drawer-direction="end" data-kt-drawer-toggle="#kt_activities_toggle, #kt_sidebar_toggler">
-                <!--begin::Sidebar Header-->
-                <div class="d-flex align-items-center justify-content-between px-5 py-3 border-bottom">
-                    <h3 class="text-gray-800 fw-bold fs-5 mb-0">Funcionalidades Futuras</h3>
-                    <!-- Botão de toggle será inserido via JavaScript -->
-                </div>
-                <!--end::Sidebar Header-->
-                
-                <!--begin::Sidebar Content-->
-                <div class="d-flex flex-column sidebar-body px-5 py-10" id="kt_sidebar_body">
-                    <!--begin::Sidebar Content-->
-                    <div id="kt_sidebar_content">
-                        <div class="hover-scroll-y" data-kt-scroll="true" data-kt-scroll-height="auto" data-kt-scroll-offset="0px" data-kt-scroll-wrappers="#kt_sidebar_content, #kt_sidebar_body">
-                            <!--begin::Empty state-->
-                            <div class="text-center py-20">
-                                <i class="ki-duotone ki-setting-2 fs-3x text-gray-400 mb-5">
-                                    <span class="path1"></span>
-                                    <span class="path2"></span>
-                                </i>
-                                <div class="text-gray-500 fs-6">Este espaço será utilizado para funcionalidades adicionais</div>
-                            </div>
-                            <!--end::Empty state-->
-                        </div>
-                    </div>
-                    <!--end::Sidebar Content-->
-                </div>
-                <!--end::Sidebar Content-->
-            </div>
-            <?php endif; ?>
-            <!--end::Sidebar-->
         </div>
         <!--end::Page-->
     </div>
@@ -221,86 +189,7 @@
             }
         }
         
-        // Função para toggle do sidebar direito
-        function initRightSidebarToggle() {
-            const rightSidebar = document.getElementById('kt_sidebar');
-            if (!rightSidebar) return;
-            
-            // Criar botão de toggle no header do sidebar direito
-            const sidebarHeader = rightSidebar.querySelector('.border-bottom');
-            if (sidebarHeader) {
-                // Verificar se já existe botão de toggle
-                let toggleBtn = sidebarHeader.querySelector('#kt_right_sidebar_toggle');
-                if (!toggleBtn) {
-                    toggleBtn = document.createElement('button');
-                    toggleBtn.id = 'kt_right_sidebar_toggle';
-                    toggleBtn.className = 'btn btn-icon btn-sm btn-color-gray-500 btn-active-color-primary';
-                    toggleBtn.innerHTML = '<i class="ki-duotone ki-left fs-2"><span class="path1"></span><span class="path2"></span></i>';
-                    toggleBtn.title = 'Recolher/Expandir';
-                    toggleBtn.type = 'button';
-                    
-                    // Inserir no lugar do botão de fechar (substituir)
-                    const closeBtn = sidebarHeader.querySelector('#kt_sidebar_close');
-                    if (closeBtn) {
-                        closeBtn.replaceWith(toggleBtn);
-                    } else {
-                        sidebarHeader.appendChild(toggleBtn);
-                    }
-                }
-                
-                // Função para atualizar ícone do botão
-                function updateToggleIcon(isMinimized) {
-                    if (isMinimized) {
-                        toggleBtn.innerHTML = '<i class="ki-duotone ki-right fs-2"><span class="path1"></span><span class="path2"></span></i>';
-                    } else {
-                        toggleBtn.innerHTML = '<i class="ki-duotone ki-left fs-2"><span class="path1"></span><span class="path2"></span></i>';
-                    }
-                }
-                
-                // Toggle do sidebar direito
-                toggleBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    const isMinimized = rightSidebar.classList.contains('sidebar-minimize');
-                    
-                    if (isMinimized) {
-                        // Expandir
-                        rightSidebar.classList.remove('sidebar-minimize');
-                        document.body.classList.remove('right-sidebar-minimize');
-                        localStorage.setItem('right_sidebar_collapsed', 'false');
-                        updateToggleIcon(false);
-                    } else {
-                        // Recolher
-                        rightSidebar.classList.add('sidebar-minimize');
-                        document.body.classList.add('right-sidebar-minimize');
-                        localStorage.setItem('right_sidebar_collapsed', 'true');
-                        updateToggleIcon(true);
-                    }
-                    
-                    // Forçar atualização do layout
-                    setTimeout(() => {
-                        window.dispatchEvent(new Event('resize'));
-                        // Recalcular layout
-                        if (typeof KTUtil !== 'undefined' && KTUtil.resize) {
-                            KTUtil.resize();
-                        }
-                    }, 300);
-                });
-                
-                // Aplicar estado inicial do sidebar direito
-                const rightSidebarCollapsed = localStorage.getItem('right_sidebar_collapsed') === 'true';
-                if (rightSidebarCollapsed) {
-                    rightSidebar.classList.add('sidebar-minimize');
-                    document.body.classList.add('right-sidebar-minimize');
-                    updateToggleIcon(true);
-                } else {
-                    updateToggleIcon(false);
-                }
-            }
-        }
     </script>
-    <!--end::Sidebar Toggle Script-->
     
     <!--begin::Initialize Metronic Components-->
     <script>
@@ -309,10 +198,6 @@
             // Inicializar toggle do sidebar esquerdo
             initSidebarToggle();
             
-            // Inicializar toggle do sidebar direito
-            setTimeout(() => {
-                initRightSidebarToggle();
-            }, 500);
             // Verificar se Bootstrap está disponível
             if (typeof bootstrap === 'undefined') {
                 console.error('Bootstrap não está carregado!');
@@ -333,82 +218,6 @@
                 }
                 
                 // Drawers são inicializados automaticamente via data-kt-drawer
-                // Mas podemos garantir que o sidebar está funcionando
-                var sidebarElement = document.querySelector('#kt_sidebar');
-                var sidebarCloseBtn = document.querySelector('#kt_sidebar_close');
-
-                function updateRightSidebarVisibility() {
-                    if (!sidebarElement) {
-                        document.body.classList.remove('right-sidebar-visible');
-                        return;
-                    }
-
-                    var isMinimized = sidebarElement.classList.contains('sidebar-minimize');
-                    var computedStyle = window.getComputedStyle(sidebarElement);
-                    var isHidden = computedStyle.display === 'none' ||
-                                   computedStyle.visibility === 'hidden' ||
-                                   sidebarElement.getAttribute('aria-hidden') === 'true';
-
-                    if (!isMinimized && !isHidden) {
-                        document.body.classList.add('right-sidebar-visible');
-                    } else {
-                        document.body.classList.remove('right-sidebar-visible');
-                    }
-                }
-                
-                // Função para fechar o sidebar
-                function closeSidebar() {
-                    if (!sidebarElement) return;
-                    
-                    if (typeof KTDrawer !== 'undefined') {
-                        var drawer = KTDrawer.getInstance(sidebarElement);
-                        if (drawer) {
-                            drawer.hide();
-                            return;
-                        }
-                    }
-                    
-                    // Fallback: usar método direto do Bootstrap drawer se disponível
-                    if (typeof bootstrap !== 'undefined' && bootstrap.Offcanvas) {
-                        var offcanvas = bootstrap.Offcanvas.getInstance(sidebarElement);
-                        if (offcanvas) {
-                            offcanvas.hide();
-                            return;
-                        }
-                    }
-                    
-                    // Fallback manual: esconder sidebar
-                    sidebarElement.classList.remove('show');
-                    sidebarElement.style.display = 'none';
-                    sidebarElement.setAttribute('aria-hidden', 'true');
-                    sidebarElement.removeAttribute('aria-modal');
-                    
-                    // Remover overlay
-                    var overlay = document.querySelector('.drawer-overlay');
-                    if (overlay) {
-                        overlay.remove();
-                    }
-                    
-                    // Remover classe do body
-                    document.body.classList.remove('drawer-on');
-                    document.body.style.overflow = '';
-
-                    updateRightSidebarVisibility();
-                }
-                
-                // Botão de fechar sidebar - usar evento direto com delegação
-                if (sidebarCloseBtn) {
-                    // Usar delegação de evento para garantir que funciona mesmo após re-renderização
-                    document.addEventListener('click', function(e) {
-                        if (e.target.closest('#kt_sidebar_close')) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            closeSidebar();
-                        }
-                    });
-                }
-                
-                // Aguardar inicialização do drawer do Metronic
                 if (sidebarElement && typeof KTDrawer !== 'undefined') {
                     // Aguardar um pouco mais para garantir que o drawer foi inicializado
                     setTimeout(function() {

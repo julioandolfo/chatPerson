@@ -4,6 +4,28 @@ $title = 'Agentes';
 
 ob_start();
 ?>
+<style>
+/* Garantir que dropdowns da tabela apareçam acima do card */
+#kt_agents_table .dropdown-menu {
+    z-index: 1050 !important;
+}
+
+/* Quando dropdown está aberto, aumentar z-index da linha da tabela */
+#kt_agents_table tbody tr:has(.dropdown-menu.show) {
+    position: relative;
+    z-index: 1050;
+}
+
+/* Alternativa para navegadores que não suportam :has() */
+#kt_agents_table tbody tr .dropdown.show {
+    position: relative;
+    z-index: 1050;
+}
+
+#kt_agents_table tbody tr .dropdown.show .dropdown-menu {
+    z-index: 1051 !important;
+}
+</style>
 <!--begin::Card-->
 <div class="card">
     <div class="card-header border-0 pt-6">
@@ -535,31 +557,47 @@ ob_start();
 $content = ob_get_clean(); 
 $scripts = '
 <script>
-// Função para editar agente (definida antes do DOMContentLoaded para estar disponível imediatamente)
-function editAgent(element) {
-    const agentId = element.getAttribute("data-agent-id");
-    const agentName = element.getAttribute("data-agent-name") || "";
-    const agentEmail = element.getAttribute("data-agent-email") || "";
-    const agentRole = element.getAttribute("data-agent-role") || "agent";
-    const agentStatus = element.getAttribute("data-agent-status") || "active";
-    const agentAvailability = element.getAttribute("data-agent-availability") || "offline";
-    const agentMaxConversations = element.getAttribute("data-agent-max-conversations") || "";
-    
-    document.getElementById("edit_agent_id").value = agentId;
-    document.getElementById("edit_agent_name").value = agentName;
-    document.getElementById("edit_agent_email").value = agentEmail;
-    document.getElementById("edit_agent_password").value = "";
-    document.getElementById("edit_agent_role").value = agentRole;
-    document.getElementById("edit_agent_status").value = agentStatus;
-    document.getElementById("edit_agent_availability_status").value = agentAvailability;
-    document.getElementById("edit_agent_max_conversations").value = agentMaxConversations;
-    
-    const form = document.getElementById("kt_modal_edit_agent_form");
-    form.action = "' . \App\Helpers\Url::to('/users') . '/" + agentId;
-    
-    const modal = new bootstrap.Modal(document.getElementById("kt_modal_edit_agent"));
-    modal.show();
-}
+// Função para editar agente (definida imediatamente para estar disponível antes do DOMContentLoaded)
+(function() {
+    window.editAgent = function(element) {
+        const agentId = element.getAttribute("data-agent-id");
+        const agentName = element.getAttribute("data-agent-name") || "";
+        const agentEmail = element.getAttribute("data-agent-email") || "";
+        const agentRole = element.getAttribute("data-agent-role") || "agent";
+        const agentStatus = element.getAttribute("data-agent-status") || "active";
+        const agentAvailability = element.getAttribute("data-agent-availability") || "offline";
+        const agentMaxConversations = element.getAttribute("data-agent-max-conversations") || "";
+        
+        const editIdField = document.getElementById("edit_agent_id");
+        const editNameField = document.getElementById("edit_agent_name");
+        const editEmailField = document.getElementById("edit_agent_email");
+        const editPasswordField = document.getElementById("edit_agent_password");
+        const editRoleField = document.getElementById("edit_agent_role");
+        const editStatusField = document.getElementById("edit_agent_status");
+        const editAvailabilityField = document.getElementById("edit_agent_availability_status");
+        const editMaxConversationsField = document.getElementById("edit_agent_max_conversations");
+        
+        if (editIdField) editIdField.value = agentId;
+        if (editNameField) editNameField.value = agentName;
+        if (editEmailField) editEmailField.value = agentEmail;
+        if (editPasswordField) editPasswordField.value = "";
+        if (editRoleField) editRoleField.value = agentRole;
+        if (editStatusField) editStatusField.value = agentStatus;
+        if (editAvailabilityField) editAvailabilityField.value = agentAvailability;
+        if (editMaxConversationsField) editMaxConversationsField.value = agentMaxConversations;
+        
+        const form = document.getElementById("kt_modal_edit_agent_form");
+        if (form) {
+            form.action = "' . \App\Helpers\Url::to('/users') . '/" + agentId;
+        }
+        
+        const modalElement = document.getElementById("kt_modal_edit_agent");
+        if (modalElement) {
+            const modal = new bootstrap.Modal(modalElement);
+            modal.show();
+        }
+    };
+})();
 
 document.addEventListener("DOMContentLoaded", function() {
     const table = document.querySelector("#kt_agents_table");

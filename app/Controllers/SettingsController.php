@@ -115,14 +115,27 @@ class SettingsController
             $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
             if (empty($extension)) {
                 // Tentar detectar pela extensão do arquivo
-                $extension = match($mimeType) {
-                    'image/png' => 'png',
-                    'image/jpeg', 'image/jpg' => 'jpg',
-                    'image/svg+xml' => 'svg',
-                    'image/gif' => 'gif',
-                    'image/webp' => 'webp',
-                    default => 'png'
-                };
+                switch ($mimeType) {
+                    case 'image/png':
+                        $extension = 'png';
+                        break;
+                    case 'image/jpeg':
+                    case 'image/jpg':
+                        $extension = 'jpg';
+                        break;
+                    case 'image/svg+xml':
+                        $extension = 'svg';
+                        break;
+                    case 'image/gif':
+                        $extension = 'gif';
+                        break;
+                    case 'image/webp':
+                        $extension = 'webp';
+                        break;
+                    default:
+                        $extension = 'png';
+                        break;
+                }
             }
             
             // Gerar nome único
@@ -225,13 +238,24 @@ class SettingsController
             $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
             if (empty($extension)) {
                 // Tentar detectar pela extensão do arquivo
-                $extension = match($mimeType) {
-                    'image/x-icon' => 'ico',
-                    'image/png' => 'png',
-                    'image/jpeg', 'image/jpg' => 'jpg',
-                    'image/svg+xml' => 'svg',
-                    default => 'ico'
-                };
+                switch ($mimeType) {
+                    case 'image/x-icon':
+                        $extension = 'ico';
+                        break;
+                    case 'image/png':
+                        $extension = 'png';
+                        break;
+                    case 'image/jpeg':
+                    case 'image/jpg':
+                        $extension = 'jpg';
+                        break;
+                    case 'image/svg+xml':
+                        $extension = 'svg';
+                        break;
+                    default:
+                        $extension = 'ico';
+                        break;
+                }
             }
             
             // Gerar nome único

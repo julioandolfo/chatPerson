@@ -100,6 +100,10 @@ class ConversationService
         // Se foi atribuído a agente humano e é primeira atribuição, atualizar agente principal do contato
         if ($agentId && empty($data['agent_id'])) {
             try {
+                // Garantir que o agente está na lista de agentes do contato
+                \App\Models\ContactAgent::addAgent($data['contact_id'], $agentId, false, 0);
+                
+                // Definir como agente principal se ainda não tiver um
                 \App\Services\ContactAgentService::updatePrimaryOnFirstAssignment(
                     $data['contact_id'],
                     $agentId,
@@ -459,14 +463,16 @@ class ConversationService
         // Se é primeira atribuição (não tinha agente antes), atualizar agente principal do contato
         if (!$oldAgentId) {
             try {
-                // Garantir registro em contact_agents e definir como principal se configurado
+                // Garantir que o agente está na lista de agentes do contato
+                \App\Models\ContactAgent::addAgent($conversation['contact_id'], $agentId, false, 0);
+                
+                // Definir como agente principal se ainda não tiver um
+                // O primeiro agente atribuído SEMPRE se torna o agente principal do contato
                 \App\Services\ContactAgentService::updatePrimaryOnFirstAssignment(
                     $conversation['contact_id'],
                     $agentId,
                     true
                 );
-                // Garantir que o agente esteja na lista de agentes do contato (mesmo que já tivesse primary)
-                \App\Models\ContactAgent::addAgent($conversation['contact_id'], $agentId, false);
             } catch (\Exception $e) {
                 error_log("Erro ao atualizar agente principal: " . $e->getMessage());
             }
@@ -645,8 +651,28 @@ class ConversationService
             $agentId
         );
 
+        // Verificar se é primeira atribuição (antes estava com IA, não tinha agente humano)
+        $oldAgentId = $conversation['agent_id'] ?? null;
+        
         // Atribuir conversa ao agente humano
         Conversation::update($conversationId, ['agent_id' => $agentId]);
+        
+        // Se é primeira atribuição a um agente humano, atualizar agente principal do contato
+        if (!$oldAgentId || $oldAgentId == 0) {
+            try {
+                // Garantir que o agente está na lista de agentes do contato
+                \App\Models\ContactAgent::addAgent($conversation['contact_id'], $agentId, false, 0);
+                
+                // Definir como agente principal se ainda não tiver um
+                \App\Services\ContactAgentService::updatePrimaryOnFirstAssignment(
+                    $conversation['contact_id'],
+                    $agentId,
+                    true
+                );
+            } catch (\Exception $e) {
+                error_log("Erro ao atualizar agente principal na escalação de IA: " . $e->getMessage());
+            }
+        }
         
         // Invalidar cache
         self::invalidateCache($conversationId);

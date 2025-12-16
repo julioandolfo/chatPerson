@@ -117,6 +117,8 @@ class ContactAgentService
     /**
      * Atualizar agente principal quando conversa é atribuída pela primeira vez
      * (se configurado nas regras)
+     * 
+     * IMPORTANTE: O primeiro agente atribuído a um contato SEMPRE se torna o agente principal
      */
     public static function updatePrimaryOnFirstAssignment(int $contactId, int $agentId, bool $updateIfConfigured = true): void
     {
@@ -132,12 +134,30 @@ class ContactAgentService
             return;
         }
         
+        // PRIMEIRO: Garantir que o agente está na lista de agentes do contato
+        // Verificar se já existe na lista
+        $existingAgents = ContactAgent::getByContact($contactId);
+        $agentExists = false;
+        foreach ($existingAgents as $agent) {
+            if ($agent['agent_id'] == $agentId) {
+                $agentExists = true;
+                break;
+            }
+        }
+        
+        // Se não existe, adicionar à lista
+        if (!$agentExists) {
+            ContactAgent::addAgent($contactId, $agentId, false, 0);
+        }
+        
         // Verificar se contato já tem agente principal
         $primaryAgent = ContactAgent::getPrimaryAgent($contactId);
         
         // Se não tem agente principal, definir este como principal
+        // IMPORTANTE: O primeiro agente atribuído SEMPRE se torna o agente principal
         if (!$primaryAgent) {
             ContactAgent::setPrimaryAgent($contactId, $agentId);
+            error_log("ContactAgentService: Agente {$agentId} definido como principal do contato {$contactId} (primeira atribuição)");
         }
     }
 }

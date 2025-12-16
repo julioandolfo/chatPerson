@@ -95,6 +95,7 @@ ob_start();
 
     <!--begin::Content-->
     <div class="flex-lg-row-fluid">
+        <div class="d-flex flex-column gap-5">
         <!--begin::Card - Roles-->
         <div class="card mb-5 mb-xl-8">
             <div class="card-header border-0 pt-5">
@@ -448,6 +449,7 @@ ob_start();
             </div>
         </div>
         <!--end::Card - Histórico de Atividades-->
+        </div>
     </div>
     <!--end::Content-->
 </div>

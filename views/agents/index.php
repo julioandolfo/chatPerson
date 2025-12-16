@@ -4,6 +4,104 @@ $title = 'Agentes';
 
 ob_start();
 ?>
+<script>
+// Funções globais para dropdown de ações (definidas antes do HTML)
+window.editAgent = function(element) {
+    try {
+        const agentId = element.getAttribute("data-agent-id");
+        const agentName = element.getAttribute("data-agent-name") || "";
+        const agentEmail = element.getAttribute("data-agent-email") || "";
+        const agentRole = element.getAttribute("data-agent-role") || "agent";
+        const agentStatus = element.getAttribute("data-agent-status") || "active";
+        const agentAvailability = element.getAttribute("data-agent-availability") || "offline";
+        const agentMaxConversations = element.getAttribute("data-agent-max-conversations") || "";
+
+        const editIdField = document.getElementById("edit_agent_id");
+        const editNameField = document.getElementById("edit_agent_name");
+        const editEmailField = document.getElementById("edit_agent_email");
+        const editPasswordField = document.getElementById("edit_agent_password");
+        const editRoleField = document.getElementById("edit_agent_role");
+        const editStatusField = document.getElementById("edit_agent_status");
+        const editAvailabilityField = document.getElementById("edit_agent_availability_status");
+        const editMaxConversationsField = document.getElementById("edit_agent_max_conversations");
+
+        if (editIdField) editIdField.value = agentId;
+        if (editNameField) editNameField.value = agentName;
+        if (editEmailField) editEmailField.value = agentEmail;
+        if (editPasswordField) editPasswordField.value = "";
+        if (editRoleField) editRoleField.value = agentRole;
+        if (editStatusField) editStatusField.value = agentStatus;
+        if (editAvailabilityField) editAvailabilityField.value = agentAvailability;
+        if (editMaxConversationsField) editMaxConversationsField.value = agentMaxConversations;
+
+        const form = document.getElementById("kt_modal_edit_agent_form");
+        if (form) {
+            form.action = "<?= \App\Helpers\Url::to('/users') ?>/" + agentId;
+        }
+
+        const modalElement = document.getElementById("kt_modal_edit_agent");
+        if (modalElement) {
+            const modal = new bootstrap.Modal(modalElement);
+            modal.show();
+        }
+    } catch (e) {
+        console.error("Erro ao abrir modal de edição:", e);
+    }
+};
+
+window.quickAssignRole = function(link) {
+    const agentId = link.getAttribute("data-agent-id");
+    document.getElementById("quick_role_agent_user_id").value = agentId;
+    document.getElementById("quick_role_agent_select").value = "";
+
+    const modal = new bootstrap.Modal(document.getElementById("kt_modal_quick_assign_role_agent"));
+    modal.show();
+};
+
+window.quickAssignDepartment = function(link) {
+    const agentId = link.getAttribute("data-agent-id");
+    document.getElementById("quick_dept_agent_user_id").value = agentId;
+    document.getElementById("quick_dept_agent_select").value = "";
+
+    const modal = new bootstrap.Modal(document.getElementById("kt_modal_quick_assign_department_agent"));
+    modal.show();
+};
+
+window.quickChangeAvailability = function(link) {
+    const agentId = link.getAttribute("data-agent-id");
+    const currentAvailability = link.getAttribute("data-agent-availability") || "offline";
+
+    document.getElementById("quick_avail_agent_id").value = agentId;
+    document.getElementById("quick_avail_select").value = currentAvailability;
+
+    const modal = new bootstrap.Modal(document.getElementById("kt_modal_quick_change_availability"));
+    modal.show();
+};
+
+window.deleteAgent = function(agentId, agentName) {
+    if (!confirm('Tem certeza que deseja deletar o agente "' + agentName + '"?\n\nEsta ação não pode ser desfeita.')) {
+        return;
+    }
+
+    fetch("<?= \App\Helpers\Url::to('/users') ?>/" + agentId, {
+        method: "DELETE",
+        headers: {
+            "X-Requested-With": "XMLHttpRequest"
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert("Erro: " + (data.message || "Erro ao deletar agente"));
+        }
+    })
+    .catch(() => {
+        alert("Erro ao deletar agente");
+    });
+};
+</script>
 <style>
 /* Garantir que dropdowns da tabela apareçam acima do card */
 .table-responsive {

@@ -66,6 +66,11 @@
             width: 100% !important;
             max-width: 100% !important;
         }
+
+        .page {
+            width: 100% !important;
+            max-width: 100% !important;
+        }
     </style>
     
     <?= $head ?? '' ?>

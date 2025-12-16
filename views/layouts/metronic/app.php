@@ -25,8 +25,8 @@
     
     <style>
         :root {
-            --aside-width: 270px; /* largura efetiva do menu lateral */
-            --aside-collapsed: 70px;
+            --aside-width: 290px; /* largura efetiva do menu lateral (ajustado para evitar sobreposição) */
+            --aside-collapsed: 80px;
         }
 
         /* Fixar largura do aside desktop */

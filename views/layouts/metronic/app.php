@@ -23,6 +23,51 @@
     <link href="<?= \App\Helpers\Url::asset('css/custom/theme-dark-light-fix.css') ?>" rel="stylesheet" type="text/css" />
     <link href="<?= \App\Helpers\Url::asset('css/custom/sidebar-toggle.css') ?>" rel="stylesheet" type="text/css" />
     
+    <style>
+        /* Garantir que o conteúdo use 100% da largura sem sidebar direito */
+        #kt_wrapper {
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+        }
+        
+        #kt_content {
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+        }
+        
+        #kt_content_container {
+            width: 100% !important;
+            max-width: 100% !important;
+            padding-left: 30px !important;
+            padding-right: 30px !important;
+        }
+        
+        .container-fluid {
+            width: 100% !important;
+            max-width: 100% !important;
+            padding-left: 30px !important;
+            padding-right: 30px !important;
+        }
+        
+        .container-xxl {
+            max-width: 100% !important;
+        }
+        
+        /* Garantir que o wrapper ocupe todo espaço disponível */
+        .wrapper {
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+        
+        /* Ajustar o content para ocupar todo espaço */
+        .content {
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+    </style>
+    
     <?= $head ?? '' ?>
     <?= $styles ?? '' ?>
 </head>
@@ -65,9 +110,9 @@
                 <!--end::Header-->
                 
                 <!--begin::Content-->
-                <div class="content d-flex flex-column flex-column-fluid" id="kt_content">
+                <div class="content d-flex flex-column flex-column-fluid" id="kt_content" style="width: 100%; max-width: 100%">
                     <!--begin::Container-->
-                    <div class="container-fluid" id="kt_content_container" style="max-width: 100%; width: 100%">
+                    <div class="container-fluid" id="kt_content_container" style="max-width: 100%; width: 100%; padding-left: 25px; padding-right: 25px">
                         <?= $content ?? '' ?>
                     </div>
                     <!--end::Container-->

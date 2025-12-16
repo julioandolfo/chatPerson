@@ -5,9 +5,9 @@ $title = 'Usuário - ' . htmlspecialchars($user['name'] ?? '');
 ob_start();
 ?>
 <!--begin::Layout-->
-<div class="d-flex flex-column flex-xl-row">
+<div class="d-flex flex-column flex-xl-row gap-5">
     <!--begin::Sidebar-->
-    <div class="flex-column flex-lg-row-auto w-100 w-xl-350px mb-10">
+    <div class="flex-column flex-lg-row-auto w-100 w-xl-350px mb-5 mb-xl-0">
         <!--begin::Card-->
         <div class="card mb-5 mb-xl-8">
             <div class="card-body pt-15">
@@ -94,9 +94,9 @@ ob_start();
     <!--end::Sidebar-->
 
     <!--begin::Content-->
-    <div class="flex-lg-row-fluid ms-xl-10">
+    <div class="flex-lg-row-fluid">
         <!--begin::Card - Roles-->
-        <div class="card mb-5">
+        <div class="card mb-5 mb-xl-8">
             <div class="card-header border-0 pt-5">
                 <h3 class="card-title align-items-start flex-column">
                     <span class="card-label fw-bold fs-3 mb-1">Roles</span>

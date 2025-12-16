@@ -625,6 +625,60 @@ window.editAgent = function(element) {
     }
 };
 
+// Definir outras funções globais ANTES do DOMContentLoaded
+window.quickAssignRole = function(link) {
+    const agentId = link.getAttribute("data-agent-id");
+    document.getElementById("quick_role_agent_user_id").value = agentId;
+    document.getElementById("quick_role_agent_select").value = "";
+    
+    const modal = new bootstrap.Modal(document.getElementById("kt_modal_quick_assign_role_agent"));
+    modal.show();
+};
+
+window.quickAssignDepartment = function(link) {
+    const agentId = link.getAttribute("data-agent-id");
+    document.getElementById("quick_dept_agent_user_id").value = agentId;
+    document.getElementById("quick_dept_agent_select").value = "";
+    
+    const modal = new bootstrap.Modal(document.getElementById("kt_modal_quick_assign_department_agent"));
+    modal.show();
+};
+
+window.quickChangeAvailability = function(link) {
+    const agentId = link.getAttribute("data-agent-id");
+    const currentAvailability = link.getAttribute("data-agent-availability") || "offline";
+    
+    document.getElementById("quick_avail_user_id").value = agentId;
+    document.getElementById("quick_avail_select").value = currentAvailability;
+    
+    const modal = new bootstrap.Modal(document.getElementById("kt_modal_quick_change_availability"));
+    modal.show();
+};
+
+window.deleteAgent = function(agentId, agentName) {
+    if (!confirm("Tem certeza que deseja deletar o agente \\"" + agentName + "\\"?\\n\\nEsta ação não pode ser desfeita.")) {
+        return;
+    }
+    
+    fetch("' . \App\Helpers\Url::to('/users') . '/" + agentId, {
+        method: "DELETE",
+        headers: {
+            "X-Requested-With": "XMLHttpRequest"
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert("Erro: " + (data.message || "Erro ao deletar agente"));
+        }
+    })
+    .catch(error => {
+        alert("Erro ao deletar agente");
+    });
+};
+
 document.addEventListener("DOMContentLoaded", function() {
     const table = document.querySelector("#kt_agents_table");
     const searchInput = document.querySelector("[data-kt-filter=\"search\"]");
@@ -750,16 +804,6 @@ document.addEventListener("DOMContentLoaded", function() {
             });
         });
     }
-    
-    // Função para atribuir role rapidamente
-    window.quickAssignRole = function(link) {
-        const agentId = link.getAttribute("data-agent-id");
-        document.getElementById("quick_role_agent_user_id").value = agentId;
-        document.getElementById("quick_role_agent_select").value = "";
-        
-        const modal = new bootstrap.Modal(document.getElementById("kt_modal_quick_assign_role_agent"));
-        modal.show();
-    };
     
     // Form de atribuição rápida de role
     const quickRoleForm = document.getElementById("kt_modal_quick_assign_role_agent_form");

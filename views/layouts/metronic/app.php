@@ -44,6 +44,7 @@
             justify-content: flex-start !important;
             width: 100% !important;
             max-width: 100% !important;
+            padding-left: var(--aside-width) !important; /* reserva espaço do menu */
         }
 
         /* Wrapper ocupa todo espaço e é deslocado à direita do aside */
@@ -52,7 +53,7 @@
             width: 100% !important;
             max-width: 100% !important;
             margin: 0 !important;
-            margin-left: var(--aside-width) !important;
+            margin-left: 0 !important;
             padding: 0 0 0 16px !important;
             box-sizing: border-box !important;
         }
@@ -85,8 +86,12 @@
 
         /* Quando o aside estiver minimizado */
         body.aside-minimize .wrapper {
-            margin-left: var(--aside-collapsed) !important;
+            margin-left: 0 !important;
             padding-left: 8px !important;
+        }
+
+        body.aside-minimize .page {
+            padding-left: var(--aside-collapsed) !important;
         }
 
         /* Responsivo: em mobile, não deslocar por aside */
@@ -100,6 +105,9 @@
                 width: 100% !important;
                 max-width: 100% !important;
                 margin-left: 0 !important;
+                padding-left: 0 !important;
+            }
+            .page {
                 padding-left: 0 !important;
             }
         }

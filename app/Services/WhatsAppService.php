@@ -582,12 +582,11 @@ class WhatsAppService
             ];
                 
                 // Reply: usar external_id da mensagem citada (se disponível)
+                // Quepasa espera o campo "inreply" no nível raiz do JSON
                 $quotedExternalId = $options['quoted_message_external_id'] ?? ($options['quoted_message_id'] ?? null);
                 if (!empty($quotedExternalId)) {
-                    // Tentativa com os campos padrões do WhatsApp Cloud (context.message_id)
-                    $payload['context'] = [
-                        'message_id' => $quotedExternalId
-                    ];
+                    $payload['inreply'] = $quotedExternalId;
+                    Logger::quepasa("sendMessage - Reply debug: quoted_external={$quotedExternalId}");
                 }
                 
                 // Incluir mídia se houver
@@ -1175,7 +1174,12 @@ class WhatsAppService
             }
             
             $message = $payload['text'] ?? $payload['message'] ?? $payload['caption'] ?? '';
-            $messageId = $payload['id'] ?? $payload['message_id'] ?? null;
+            // Capturar messageId de múltiplas fontes possíveis (payload direto ou dentro de data/message)
+            $messageId = $payload['id'] 
+                ?? $payload['message_id'] 
+                ?? ($payload['message']['id'] ?? null)
+                ?? ($payload['data']['id'] ?? null)
+                ?? null;
             
             // Processar timestamp (pode vir em formato ISO ou Unix timestamp)
             $timestamp = time();
@@ -2149,10 +2153,20 @@ class WhatsAppService
                 );
                 
                 // Gravar external_id (id do provedor) na mensagem recém-criada
-                if (!empty($payload['id']) && $messageId) {
+                // Usar o messageId extraído do payload (que pode vir de payload['id'], payload['message']['id'], etc)
+                $externalId = $payload['id'] 
+                    ?? ($payload['message']['id'] ?? null)
+                    ?? ($payload['data']['id'] ?? null)
+                    ?? $messageId; // Fallback para o messageId já extraído
+                
+                if (!empty($externalId) && $messageId) {
+                    Logger::quepasa("processWebhook - Salvando external_id: externalId={$externalId}, messageId={$messageId}");
                     \App\Models\Message::update($messageId, [
-                        'external_id' => $payload['id']
+                        'external_id' => $externalId
                     ]);
+                    Logger::quepasa("processWebhook - ✅ external_id salvo com sucesso");
+                } else {
+                    Logger::quepasa("processWebhook - ⚠️ Não foi possível salvar external_id: externalId=" . ($externalId ?? 'NULL') . ", messageId=" . ($messageId ?? 'NULL'));
                 }
                 
                 Logger::quepasa("processWebhook - ✅ Mensagem criada com sucesso: messageId={$messageId}");
@@ -2163,13 +2177,19 @@ class WhatsAppService
                 Logger::quepasa("Erro ao criar mensagem via ConversationService: " . $e->getMessage());
                 Logger::quepasa("processWebhook - Stack trace: " . $e->getTraceAsString());
                 // Fallback: criar mensagem diretamente se ConversationService falhar
+                // Capturar external_id do payload
+                $externalId = $payload['id'] 
+                    ?? ($payload['message']['id'] ?? null)
+                    ?? ($payload['data']['id'] ?? null)
+                    ?? null;
+                
                 $messageData = [
                     'conversation_id' => $conversation['id'],
                     'sender_type' => 'contact',
                     'sender_id' => $contact['id'],
                     'content' => $message ?: '',
                     'message_type' => !empty($attachments) ? ($attachments[0]['type'] ?? $messageType ?? 'text') : ($messageType ?? 'text'),
-                    'external_id' => $messageId,
+                    'external_id' => $externalId, // Usar external_id do payload, não messageId interno
                     'quoted_message_id' => $quotedMessageId ?? null,
                     'quoted_text' => $quotedMessageText ?? null,
                     'quoted_sender_name' => $quotedSenderName ?? null

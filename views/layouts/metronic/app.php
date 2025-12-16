@@ -24,8 +24,19 @@
     <link href="<?= \App\Helpers\Url::asset('css/custom/sidebar-toggle.css') ?>" rel="stylesheet" type="text/css" />
     
     <style>
-        /* Expandir o conteúdo em toda a área disponível (sem reserva para sidebar removida) */
-        /* Layout full width considerando o aside à esquerda */
+        :root {
+            --aside-width: 250px;
+            --aside-collapsed: 70px;
+        }
+
+        /* Fixar largura do aside desktop */
+        #kt_aside {
+            width: var(--aside-width) !important;
+            min-width: var(--aside-width) !important;
+            max-width: var(--aside-width) !important;
+        }
+
+        /* Layout base: página com aside + conteúdo */
         .page {
             display: flex !important;
             flex-direction: row !important;
@@ -35,16 +46,18 @@
             max-width: 100% !important;
         }
 
-        /* Wrapper ocupa todo espaço e desloca conteúdo para a direita do aside */
+        /* Wrapper ocupa todo espaço e é deslocado à direita do aside */
         .wrapper {
             flex: 1 1 auto !important;
             width: 100% !important;
             max-width: 100% !important;
             margin: 0 !important;
-            padding-left: 265px !important; /* largura aproximada do aside Metronic */
+            padding: 0 !important;
+            padding-left: var(--aside-width) !important;
             box-sizing: border-box !important;
         }
 
+        /* Conteúdo principal */
         .content {
             padding: 0 !important;
             width: 100% !important;
@@ -52,6 +65,7 @@
             flex: 1 1 auto !important;
         }
 
+        /* Container full width com respiro lateral */
         #kt_content_container,
         .container-fluid,
         .container-xxl {
@@ -59,14 +73,35 @@
             max-width: 100% !important;
             flex: 1 1 auto !important;
             margin: 0 !important;
-            padding-left: 24px !important;
-            padding-right: 24px !important;
+            padding-left: 20px !important;
+            padding-right: 20px !important;
             box-sizing: border-box !important;
         }
 
-        /* Garantir que o body não adicione gutters extras */
+        /* Gutters zero no body */
         body {
             --bs-gutter-x: 0 !important;
+        }
+
+        /* Quando o aside estiver minimizado */
+        body.aside-minimize .wrapper {
+            padding-left: var(--aside-collapsed) !important;
+            margin-left: 0 !important;
+        }
+
+        /* Responsivo: em mobile, não deslocar por aside */
+        @media (max-width: 991.98px) {
+            #kt_aside {
+                width: auto !important;
+                min-width: auto !important;
+                max-width: none !important;
+            }
+            .wrapper {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin-left: 0 !important;
+                padding-left: 0 !important;
+            }
         }
     </style>
     
@@ -114,7 +149,7 @@
                 <!--begin::Content-->
                 <div class="content d-flex flex-column flex-column-fluid" id="kt_content" style="width: 100%; max-width: 100%">
                     <!--begin::Container-->
-                    <div class="container-fluid" id="kt_content_container" style="max-width: 100%; width: 100%; padding-left: 25px; padding-right: 25px">
+                    <div class="container-fluid" id="kt_content_container">
                         <?= $content ?? '' ?>
                     </div>
                     <!--end::Container-->

@@ -25,9 +25,32 @@
     
     <style>
         /* Expandir o conteúdo em toda a área disponível (sem reserva para sidebar removida) */
-        .page,
+        /* Layout full width considerando a largura do sidebar esquerdo */
+        .page {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: stretch !important;
+            justify-content: flex-start !important;
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+
+        /* Sidebar esquerdo (Metronic Aside) costuma ter ~265px */
+        .page > .wrapper {
+            flex: 1 1 auto !important;
+            width: calc(100% - 265px) !important;
+            max-width: calc(100% - 265px) !important;
+            margin: 0 !important;
+        }
+
         .wrapper,
-        .content,
+        .content {
+            padding: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            flex: 1 1 auto !important;
+        }
+
         #kt_content_container,
         .container-fluid,
         .container-xxl {
@@ -35,20 +58,6 @@
             max-width: 100% !important;
             flex: 1 1 auto !important;
             margin: 0 !important;
-        }
-
-        .page {
-            align-items: stretch !important;
-            justify-content: flex-start !important;
-        }
-
-        .wrapper,
-        .content {
-            padding: 0 !important;
-        }
-
-        #kt_content_container,
-        .container-fluid {
             padding-left: 16px !important;
             padding-right: 16px !important;
         }

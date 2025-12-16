@@ -239,7 +239,7 @@ ob_start();
     flex-direction: row;
     height: calc(100vh - 110px); /* Header do Metronic */
     overflow: hidden;
-    margin: -20px -20px 0 -20px; /* Remove padding do container */
+    margin: 20px 20px 0 0; /* Margem superior e direita */
     position: relative;
     width: calc(100% + 40px); /* Compensa o margin negativo */
 }

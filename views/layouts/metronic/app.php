@@ -25,7 +25,7 @@
     
     <style>
         :root {
-            --aside-width: 250px;
+            --aside-width: 270px; /* largura efetiva do menu lateral */
             --aside-collapsed: 70px;
         }
 
@@ -52,8 +52,8 @@
             width: 100% !important;
             max-width: 100% !important;
             margin: 0 !important;
-            padding: 0 !important;
-            padding-left: var(--aside-width) !important;
+            margin-left: var(--aside-width) !important;
+            padding: 0 0 0 16px !important;
             box-sizing: border-box !important;
         }
 
@@ -85,8 +85,8 @@
 
         /* Quando o aside estiver minimizado */
         body.aside-minimize .wrapper {
-            padding-left: var(--aside-collapsed) !important;
-            margin-left: 0 !important;
+            margin-left: var(--aside-collapsed) !important;
+            padding-left: 8px !important;
         }
 
         /* Responsivo: em mobile, não deslocar por aside */

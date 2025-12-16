@@ -11,7 +11,7 @@ class Conversation extends Model
 {
     protected string $table = 'conversations';
     protected string $primaryKey = 'id';
-    protected array $fillable = ['contact_id', 'agent_id', 'department_id', 'channel', 'status', 'funnel_id', 'funnel_stage_id', 'whatsapp_account_id', 'pinned', 'pinned_at'];
+    protected array $fillable = ['contact_id', 'agent_id', 'department_id', 'channel', 'status', 'funnel_id', 'funnel_stage_id', 'whatsapp_account_id', 'pinned', 'pinned_at', 'is_spam', 'spam_marked_at', 'spam_marked_by'];
     protected array $hidden = [];
     protected bool $timestamps = true;
 
@@ -83,9 +83,17 @@ class Conversation extends Model
         $params = [];
         
         // Aplicar filtros
-        if (!empty($filters['status'])) {
-            $sql .= " AND c.status = ?";
+        // Filtro de spam (se status = 'spam', filtrar por is_spam = 1)
+        if (!empty($filters['is_spam'])) {
+            $sql .= " AND c.is_spam = 1";
+        } elseif (!empty($filters['status']) && $filters['status'] !== 'spam') {
+            // Se não é filtro de spam, aplicar filtro de status normal
+            // Mas excluir spam quando filtrar por outros status
+            $sql .= " AND c.status = ? AND (c.is_spam IS NULL OR c.is_spam = 0)";
             $params[] = $filters['status'];
+        } elseif (empty($filters['is_spam']) && empty($filters['status'])) {
+            // Por padrão, excluir spam da listagem normal
+            $sql .= " AND (c.is_spam IS NULL OR c.is_spam = 0)";
         }
         
         // Filtro por canal (suporta array para multi-select)

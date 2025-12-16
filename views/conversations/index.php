@@ -1636,6 +1636,7 @@ body.dark-mode .swal2-content {
                     <option value="open" <?= ($filters['status'] ?? 'open') === 'open' ? 'selected' : '' ?>>Abertas</option>
                     <option value="resolved" <?= ($filters['status'] ?? 'open') === 'resolved' ? 'selected' : '' ?>>Resolvidas</option>
                     <option value="closed" <?= ($filters['status'] ?? 'open') === 'closed' ? 'selected' : '' ?>>Fechadas</option>
+                    <option value="spam" <?= !empty($filters['is_spam']) ? 'selected' : '' ?>>🚫 Spam</option>
                     <option value="unanswered" <?= !empty($filters['unanswered']) ? 'selected' : '' ?>>🔴 Não respondidas</option>
                 </select>
                 
@@ -1780,6 +1781,9 @@ body.dark-mode .swal2-content {
                                             <span class="path2"></span>
                                         </i>
                                         <?php endif; ?>
+                                                        <?php if (!empty($conv['is_spam'])): ?>
+                                                            <span class="badge badge-sm badge-danger" title="Marcada como spam">🚫 SPAM</span>
+                                                        <?php endif; ?>
                                                         <?php
                                                         $nameRaw = $conv['contact_name'] ?? 'Sem nome';
                                                         $maxName = 22;
@@ -2584,19 +2588,39 @@ body.dark-mode .swal2-content {
                     <div class="mb-5">
                         <label class="form-label fw-semibold">Tipo de Mensagem:</label>
                         <select id="filterMessageType" class="form-select form-select-solid">
-                                        <option value="">Todos</option>
-                            <option value="note">Apenas Notas Internas</option>
-                                    </select>
-                                </div>
+                            <option value="">Todos</option>
+                            <option value="text">Texto</option>
+                            <option value="image">Imagem</option>
+                            <option value="video">Vídeo</option>
+                            <option value="audio">Áudio</option>
+                            <option value="document">Documento</option>
+                            <option value="location">Localização</option>
+                            <option value="note">Nota Interna</option>
+                        </select>
+                    </div>
                     
                     <div class="mb-5">
                         <label class="form-label fw-semibold">Remetente:</label>
                         <select id="filterSenderType" class="form-select form-select-solid">
-                                        <option value="">Todos</option>
+                            <option value="">Todos</option>
                             <option value="contact">Contato</option>
                             <option value="agent">Agente</option>
-                                    </select>
-                                </div>
+                            <option value="ai">Agente de IA</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-5" id="filterSenderIdContainer" style="display: none;">
+                        <label class="form-label fw-semibold">Agente Específico:</label>
+                        <select id="filterSenderId" class="form-select form-select-solid">
+                            <option value="">Todos os agentes</option>
+                            <?php 
+                            $agents = \App\Models\User::getAgents();
+                            foreach ($agents as $agent): 
+                            ?>
+                                <option value="<?= $agent['id'] ?>"><?= htmlspecialchars($agent['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                     
                     <div class="mb-5">
                         <label class="form-label fw-semibold">Data Inicial:</label>
@@ -4547,6 +4571,16 @@ function updateConversationSidebar(conversation, tags) {
         conversationStatusEl.innerHTML = `<span class="badge badge-light-${statusClass}">${statusText}</span>`;
     }
     
+    // Atualizar badge de SPAM
+    const spamBadgeEl = sidebar.querySelector('#sidebar-spam-badge');
+    if (spamBadgeEl) {
+        if (conversation.is_spam) {
+            spamBadgeEl.style.display = '';
+        } else {
+            spamBadgeEl.style.display = 'none';
+        }
+    }
+    
     // Carregar sentimento
     if (conversation.id) {
         loadConversationSentiment(conversation.id);
@@ -5476,9 +5510,11 @@ function applyFilters() {
     const params = new URLSearchParams();
     if (search) params.append('search', search);
     
-    // Tratar status especial "unanswered"
+    // Tratar status especial "unanswered" e "spam"
     if (status === 'unanswered') {
         params.append('unanswered', '1');
+    } else if (status === 'spam') {
+        params.append('status', 'spam');
     } else if (status) {
         params.append('status', status);
     }
@@ -5703,6 +5739,7 @@ function refreshConversationList(params = null) {
                             <div class="conversation-item-header">
                                 <div class="conversation-item-name d-flex align-items-center gap-2">
                                     ${pinned ? '<i class="ki-duotone ki-pin fs-7 text-warning" title="Fixada"><span class="path1"></span><span class="path2"></span></i>' : ''}
+                                    ${conv.is_spam ? '<span class="badge badge-sm badge-danger" title="Marcada como spam">🚫 SPAM</span>' : ''}
                                     ${escapeHtml(name)}
                                 </div>
                     <div class="conversation-item-time d-flex align-items-center gap-2">
@@ -5867,9 +5904,11 @@ function applyAdvancedFilters() {
     
     if (search) params.append('search', search);
     
-    // Tratar status especial "unanswered"
+    // Tratar status especial "unanswered" e "spam"
     if (status === 'unanswered') {
         params.append('unanswered', '1');
+    } else if (status === 'spam') {
+        params.append('status', 'spam');
     } else if (status) {
         params.append('status', status);
     }
@@ -6227,6 +6266,7 @@ let messageSearchFilters = {
     message_type: null,
     sender_type: null,
     sender_id: null,
+    ai_agent_id: null,
     date_from: null,
     date_to: null,
     has_attachments: null
@@ -6291,8 +6331,13 @@ function searchMessagesInConversation(event) {
         // Adicionar filtros ativos
         Object.keys(messageSearchFilters).forEach(key => {
             const value = messageSearchFilters[key];
-            if (value !== null && value !== '') {
-                params.append(key, value);
+            if (value !== null && value !== '' && value !== false) {
+                // Para booleanos, enviar apenas se true
+                if (typeof value === 'boolean' && value === true) {
+                    params.append(key, '1');
+                } else {
+                    params.append(key, value);
+                }
             }
         });
         
@@ -6710,19 +6755,54 @@ function showMessageSearchFilters() {
     document.getElementById('filterDateFrom').value = messageSearchFilters.date_from || '';
     document.getElementById('filterDateTo').value = messageSearchFilters.date_to || '';
     document.getElementById('filterHasAttachments').checked = messageSearchFilters.has_attachments === true;
+    document.getElementById('filterSenderId').value = messageSearchFilters.sender_id || '';
+    
+    // Mostrar/ocultar campo de agente específico baseado no tipo de remetente
+    updateSenderIdFilterVisibility();
+    
+    // Adicionar listener para atualizar visibilidade quando mudar tipo de remetente
+    const senderTypeSelect = document.getElementById('filterSenderType');
+    if (senderTypeSelect) {
+        senderTypeSelect.removeEventListener('change', updateSenderIdFilterVisibility);
+        senderTypeSelect.addEventListener('change', updateSenderIdFilterVisibility);
+    }
+}
+
+// Atualizar visibilidade do filtro de agente específico
+function updateSenderIdFilterVisibility() {
+    const senderType = document.getElementById('filterSenderType')?.value;
+    const senderIdContainer = document.getElementById('filterSenderIdContainer');
+    
+    if (senderType === 'agent' && senderIdContainer) {
+        senderIdContainer.style.display = 'block';
+    } else {
+        if (senderIdContainer) {
+            senderIdContainer.style.display = 'none';
+            document.getElementById('filterSenderId').value = '';
+        }
+    }
 }
 
 // Aplicar filtros de busca
 function applyMessageSearchFilters() {
     // Obter valores dos filtros
+    const senderType = document.getElementById('filterSenderType').value || null;
+    const senderId = document.getElementById('filterSenderId').value || null;
+    
     messageSearchFilters = {
         message_type: document.getElementById('filterMessageType').value || null,
-        sender_type: document.getElementById('filterSenderType').value || null,
-        sender_id: null, // Pode ser implementado depois com seleção de agente específico
+        sender_type: senderType,
+        sender_id: (senderType === 'agent' && senderId) ? parseInt(senderId) : null,
         date_from: document.getElementById('filterDateFrom').value || null,
         date_to: document.getElementById('filterDateTo').value || null,
         has_attachments: document.getElementById('filterHasAttachments').checked || null
     };
+    
+    // Se filtro de IA, ajustar sender_type
+    if (senderType === 'ai') {
+        messageSearchFilters.sender_type = 'agent';
+        messageSearchFilters.ai_agent_id = true; // Flag especial para filtrar por IA
+    }
     
     // Fechar modal
     bootstrap.Modal.getInstance(document.getElementById('kt_modal_message_search_filters')).hide();
@@ -6754,6 +6834,7 @@ function clearMessageSearchFilters() {
         message_type: null,
         sender_type: null,
         sender_id: null,
+        ai_agent_id: null,
         date_from: null,
         date_to: null,
         has_attachments: null
@@ -6765,6 +6846,13 @@ function clearMessageSearchFilters() {
     document.getElementById('filterDateFrom').value = '';
     document.getElementById('filterDateTo').value = '';
     document.getElementById('filterHasAttachments').checked = false;
+    document.getElementById('filterSenderId').value = '';
+    
+    // Ocultar campo de agente específico
+    const senderIdContainer = document.getElementById('filterSenderIdContainer');
+    if (senderIdContainer) {
+        senderIdContainer.style.display = 'none';
+    }
     
     // Atualizar indicador
     updateFiltersIndicator();

@@ -56,6 +56,7 @@ Router::post('/conversations/{id}/update-department', [ConversationController::c
 Router::post('/conversations/{id}/escalate', [ConversationController::class, 'escalate'], ['Authentication']);
 Router::post('/conversations/{id}/close', [ConversationController::class, 'close'], ['Authentication']);
 Router::post('/conversations/{id}/reopen', [ConversationController::class, 'reopen'], ['Authentication']);
+Router::post('/conversations/{id}/spam', [ConversationController::class, 'spam'], ['Authentication']);
 Router::post('/conversations/{id}/notes', [ConversationController::class, 'createNote'], ['Authentication']);
 Router::get('/conversations/{id}/notes', [ConversationController::class, 'getNotes'], ['Authentication']);
 Router::put('/conversations/{id}/notes/{noteId}', [ConversationController::class, 'updateNote'], ['Authentication']);

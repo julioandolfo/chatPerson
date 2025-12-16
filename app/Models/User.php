@@ -254,5 +254,19 @@ class User extends Model
 
         return \App\Helpers\Database::fetchAll($sql, $params);
     }
+    
+    /**
+     * Obter todos os agentes (para filtros e seleções)
+     */
+    public static function getAgents(): array
+    {
+        $sql = "SELECT u.id, u.name, u.email
+                FROM users u
+                WHERE u.status = 'active' 
+                  AND u.role IN ('agent', 'admin', 'supervisor', 'senior_agent', 'junior_agent')
+                ORDER BY u.name ASC";
+        
+        return \App\Helpers\Database::fetchAll($sql);
+    }
 }
 

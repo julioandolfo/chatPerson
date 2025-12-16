@@ -173,6 +173,7 @@
                     <div class="sidebar-info-item">
                         <span class="sidebar-info-label">Status:</span>
                         <span class="sidebar-info-value" data-field="status">-</span>
+                        <span class="badge badge-danger ms-2" id="sidebar-spam-badge" style="display: none;">🚫 SPAM</span>
                     </div>
                     
                     <!-- Sentimento -->
@@ -536,12 +537,29 @@ function reopenConversation(conversationId) {
 }
 
 function markAsSpam(conversationId) {
-    if (!confirm('Deseja realmente marcar esta conversa como spam? Esta ação não pode ser desfeita.')) {
+    if (!confirm('Deseja realmente marcar esta conversa como spam? Esta ação não pode ser desfeita e a conversa será fechada automaticamente.')) {
         return;
     }
     
-    // TODO: Implementar endpoint de spam
-    alert('Funcionalidade de spam em desenvolvimento');
+    fetch(`/conversations/${conversationId}/spam`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Recarregar a página para atualizar o estado
+            window.location.reload();
+        } else {
+            alert('Erro ao marcar como spam: ' + (data.message || 'Erro desconhecido'));
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao marcar como spam');
+    });
 }
 
 function addNote(conversationId) {

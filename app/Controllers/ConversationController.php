@@ -73,6 +73,7 @@ class ConversationController
             'whatsapp_account_ids' => isset($_GET['whatsapp_account_ids']) && is_array($_GET['whatsapp_account_ids']) ? array_map('intval', $_GET['whatsapp_account_ids']) : (!empty($_GET['whatsapp_account_id']) ? [(int)$_GET['whatsapp_account_id']] : null),
             'unanswered' => isset($_GET['unanswered']) && $_GET['unanswered'] === '1' ? true : null,
             'answered' => isset($_GET['answered']) && $_GET['answered'] === '1' ? true : null,
+            'is_spam' => isset($_GET['status']) && $_GET['status'] === 'spam' ? true : null, // Filtro de spam
             'date_from' => $_GET['date_from'] ?? null,
             'date_to' => $_GET['date_to'] ?? null,
             'pinned' => isset($_GET['pinned']) ? ($_GET['pinned'] === '1' ? true : false) : null,
@@ -977,6 +978,34 @@ class ConversationController
     }
     
     /**
+     * Marcar conversa como SPAM
+     */
+    public function spam(int $id): void
+    {
+        Permission::abortIfCannot('conversations.edit.own');
+        
+        try {
+            $conversation = \App\Models\Conversation::find($id);
+            if (!$conversation) {
+                Response::json(['success' => false, 'message' => 'Conversa não encontrada'], 404);
+                return;
+            }
+            
+            // Verificar se já está marcada como spam
+            if (!empty($conversation['is_spam'])) {
+                Response::json(['success' => false, 'message' => 'Conversa já está marcada como spam'], 400);
+                return;
+            }
+            
+            \App\Services\ConversationService::markAsSpam($id);
+            
+            Response::json(['success' => true, 'message' => 'Conversa marcada como spam']);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+    
+    /**
      * Marcar conversa como lida
      */
     public function markRead(int $id): void
@@ -1502,7 +1531,8 @@ class ConversationController
                 'sender_id' => isset($_GET['sender_id']) ? (int)$_GET['sender_id'] : null,
                 'date_from' => $_GET['date_from'] ?? null,
                 'date_to' => $_GET['date_to'] ?? null,
-                'has_attachments' => isset($_GET['has_attachments']) ? filter_var($_GET['has_attachments'], FILTER_VALIDATE_BOOLEAN) : null
+                'has_attachments' => isset($_GET['has_attachments']) ? filter_var($_GET['has_attachments'], FILTER_VALIDATE_BOOLEAN) : null,
+                'ai_agent_id' => isset($_GET['ai_agent_id']) ? filter_var($_GET['ai_agent_id'], FILTER_VALIDATE_BOOLEAN) : null
             ];
             
             // Remover filtros vazios

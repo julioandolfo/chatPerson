@@ -815,6 +815,53 @@ class ConversationService
     }
 
     /**
+     * Marcar conversa como SPAM
+     */
+    public static function markAsSpam(int $conversationId, ?int $userId = null): array
+    {
+        $conversation = Conversation::find($conversationId);
+        if (!$conversation) {
+            throw new \Exception('Conversa não encontrada');
+        }
+        
+        if ($userId === null) {
+            $userId = \App\Helpers\Auth::id();
+        }
+        
+        // Marcar como spam
+        Conversation::update($conversationId, [
+            'is_spam' => 1,
+            'spam_marked_at' => date('Y-m-d H:i:s'),
+            'spam_marked_by' => $userId,
+            'status' => 'closed' // Fechar automaticamente quando marcada como spam
+        ]);
+        
+        // Invalidar cache de conversas
+        self::invalidateCache($conversationId);
+        
+        // Obter conversa atualizada para notificar via WebSocket
+        $conversation = Conversation::findWithRelations($conversationId);
+        
+        // Notificar via WebSocket
+        try {
+            \App\Helpers\WebSocket::notifyConversationUpdated($conversationId, $conversation);
+        } catch (\Exception $e) {
+            error_log("Erro ao notificar WebSocket: " . $e->getMessage());
+        }
+        
+        // Log de atividade
+        try {
+            if (class_exists('\App\Services\ActivityService')) {
+                \App\Services\ActivityService::logConversationSpamMarked($conversationId, $userId);
+            }
+        } catch (\Exception $e) {
+            error_log("Erro ao logar atividade: " . $e->getMessage());
+        }
+        
+        return $conversation;
+    }
+
+    /**
      * Reabrir conversa
      */
     public static function reopen(int $conversationId): array

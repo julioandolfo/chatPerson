@@ -369,6 +369,11 @@ class Message extends Model
             $params[] = $filters['sender_id'];
         }
         
+        // Filtro por mensagens de IA (quando sender_type = 'agent' mas queremos apenas IA)
+        if (!empty($filters['ai_agent_id']) && $filters['ai_agent_id'] === true) {
+            $sql .= " AND m.ai_agent_id IS NOT NULL";
+        }
+        
         // Filtro por data (from)
         if (!empty($filters['date_from'])) {
             $sql .= " AND DATE(m.created_at) >= ?";

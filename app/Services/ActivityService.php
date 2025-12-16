@@ -88,6 +88,33 @@ class ActivityService
     }
 
     /**
+     * Log de atividade de marcação como spam
+     */
+    public static function logConversationSpamMarked(int $conversationId, ?int $userId = null): void
+    {
+        $conversation = \App\Models\Conversation::find($conversationId);
+        $contact = $conversation ? \App\Models\Contact::find($conversation['contact_id']) : null;
+        $user = $userId ? \App\Models\User::find($userId) : null;
+        
+        $description = $contact 
+            ? "Conversa marcada como spam: {$contact['name']}"
+            : "Conversa marcada como spam";
+        
+        Activity::log(
+            'conversation_spam_marked',
+            'conversation',
+            $conversationId,
+            $userId,
+            $description,
+            [
+                'contact_id' => $conversation['contact_id'] ?? null,
+                'contact_name' => $contact ? $contact['name'] : null,
+                'marked_by' => $user ? $user['name'] : null
+            ]
+        );
+    }
+
+    /**
      * Log de atividade de envio de mensagem
      */
     public static function logMessageSent(int $messageId, int $conversationId, string $senderType, ?int $senderId = null): void

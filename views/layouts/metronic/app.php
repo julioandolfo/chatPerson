@@ -24,64 +24,38 @@
     <link href="<?= \App\Helpers\Url::asset('css/custom/sidebar-toggle.css') ?>" rel="stylesheet" type="text/css" />
     
     <style>
-        /* Garantir que o conteúdo use 100% da largura sem sidebar direito */
-        #kt_wrapper {
-            width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 !important;
-        }
-        
-        #kt_content {
-            width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 !important;
-        }
-        
-        #kt_content_container {
-            width: 100% !important;
-            max-width: 100% !important;
-            padding-left: 30px !important;
-            padding-right: 30px !important;
-            flex: 1 1 auto !important;
-        }
-        
-        .container-fluid {
-            width: 100% !important;
-            max-width: 100% !important;
-            padding-left: 30px !important;
-            padding-right: 30px !important;
-            flex: 1 1 auto !important;
-        }
-        
+        /* Expandir o conteúdo em toda a área disponível (sem reserva para sidebar removida) */
+        .page,
+        .wrapper,
+        .content,
+        #kt_content_container,
+        .container-fluid,
         .container-xxl {
-            max-width: 100% !important;
-        }
-        
-        /* Garantir que o wrapper ocupe todo espaço disponível */
-        .wrapper {
             width: 100% !important;
             max-width: 100% !important;
             flex: 1 1 auto !important;
             margin: 0 !important;
         }
-        
-        /* Ajustar o content para ocupar todo espaço */
+
+        .page {
+            align-items: stretch !important;
+            justify-content: flex-start !important;
+        }
+
+        .wrapper,
         .content {
-            width: 100% !important;
-            max-width: 100% !important;
-            flex: 1 1 auto !important;
+            padding: 0 !important;
         }
 
-        /* Garantir que a página ocupe todo o espaço, sem reserva para sidebar inexistente */
-        .page {
-            width: 100% !important;
-            max-width: 100% !important;
-            flex: 1 1 auto !important;
+        #kt_content_container,
+        .container-fluid {
+            padding-left: 16px !important;
+            padding-right: 16px !important;
         }
 
-        .page {
-            width: 100% !important;
-            max-width: 100% !important;
+        /* Garantir que o body não adicione gutters extras */
+        body {
+            --bs-gutter-x: 0 !important;
         }
     </style>
     

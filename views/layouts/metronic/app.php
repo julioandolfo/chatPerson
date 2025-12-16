@@ -25,7 +25,7 @@
     
     <style>
         /* Expandir o conteúdo em toda a área disponível (sem reserva para sidebar removida) */
-        /* Layout full width considerando a largura do sidebar esquerdo */
+        /* Layout full width considerando o aside à esquerda */
         .page {
             display: flex !important;
             flex-direction: row !important;
@@ -35,15 +35,16 @@
             max-width: 100% !important;
         }
 
-        /* Sidebar esquerdo (Metronic Aside) costuma ter ~265px */
-        .page > .wrapper {
+        /* Wrapper ocupa todo espaço e desloca conteúdo para a direita do aside */
+        .wrapper {
             flex: 1 1 auto !important;
-            width: calc(100% - 265px) !important;
-            max-width: calc(100% - 265px) !important;
+            width: 100% !important;
+            max-width: 100% !important;
             margin: 0 !important;
+            padding-left: 265px !important; /* largura aproximada do aside Metronic */
+            box-sizing: border-box !important;
         }
 
-        .wrapper,
         .content {
             padding: 0 !important;
             width: 100% !important;
@@ -58,8 +59,9 @@
             max-width: 100% !important;
             flex: 1 1 auto !important;
             margin: 0 !important;
-            padding-left: 16px !important;
-            padding-right: 16px !important;
+            padding-left: 24px !important;
+            padding-right: 24px !important;
+            box-sizing: border-box !important;
         }
 
         /* Garantir que o body não adicione gutters extras */

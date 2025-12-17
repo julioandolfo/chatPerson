@@ -80,7 +80,7 @@ ob_start();
                                             <?php endif; ?>
                                         </div>
                                         <button type="button" class="btn btn-sm btn-icon btn-light-info" 
-                                                onclick="showStageMetrics(<?= $stage['id'] ?>, <?= json_encode($stage['name']) ?>)" 
+                                                onclick="showStageMetrics(<?= $stage['id'] ?>, <?= htmlspecialchars(json_encode($stage['name']), ENT_QUOTES, 'UTF-8') ?>)" 
                                                 title="Ver métricas">
                                             <i class="ki-duotone ki-chart-simple fs-2">
                                                 <span class="path1"></span>
@@ -99,7 +99,7 @@ ob_start();
                                             </button>
                                             <ul class="dropdown-menu">
                                                 <li>
-                                                    <a class="dropdown-item" href="#" onclick="editStage(<?= $stage['id'] ?>, <?= json_encode($stage['name']) ?>, <?= json_encode($stage['description'] ?? '') ?>, <?= json_encode($stage['color']) ?>); return false;">
+                                                    <a class="dropdown-item" href="#" onclick="editStage(<?= $stage['id'] ?>, <?= htmlspecialchars(json_encode($stage['name']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($stage['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($stage['color']), ENT_QUOTES, 'UTF-8') ?>); return false;">
                                                         <i class="ki-duotone ki-pencil fs-2 me-2">
                                                             <span class="path1"></span>
                                                             <span class="path2"></span>
@@ -108,7 +108,7 @@ ob_start();
                                                     </a>
                                                 </li>
                                                 <li>
-                                                    <a class="dropdown-item text-danger" href="#" onclick="deleteStage(<?= $stage['id'] ?>, <?= json_encode($stage['name']) ?>); return false;">
+                                                    <a class="dropdown-item text-danger" href="#" onclick="deleteStage(<?= $stage['id'] ?>, <?= htmlspecialchars(json_encode($stage['name']), ENT_QUOTES, 'UTF-8') ?>); return false;">
                                                         <i class="ki-duotone ki-trash fs-2 me-2">
                                                             <span class="path1"></span>
                                                             <span class="path2"></span>

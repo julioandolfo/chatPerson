@@ -148,10 +148,10 @@ ob_start();
                     </div>
                     <div class="col-lg-6">
                         <div class="fv-row mb-7">
-                            <label class="fw-semibold fs-6 mb-2">Período de Graça para Reabertura (minutos)</label>
+                            <label class="fw-semibold fs-6 mb-2">Período Mínimo para Reabertura (minutos)</label>
                             <input type="number" name="conversation_reopen_grace_period_minutes" class="form-control form-control-solid" 
-                                   value="<?= (int)($generalSettings['conversation_reopen_grace_period_minutes'] ?? 60) ?>" min="0" />
-                            <div class="form-text">Mensagens recebidas APÓS esse período reabrem a conversa e aplicam regras de nova conversa. Dentro do período, apenas reabrem sem aplicar regras.</div>
+                                   value="<?= (int)($generalSettings['conversation_reopen_grace_period_minutes'] ?? 10) ?>" min="0" />
+                            <div class="form-text"><strong>Conversas fechadas SÓ reabrem APÓS esse tempo.</strong> Mensagens recebidas ANTES desse período são salvas mas a conversa continua fechada (ideal para ignorar "Ok", "Obrigado"). Após esse período, cria nova conversa com todas as regras.</div>
                         </div>
                     </div>
                 </div>

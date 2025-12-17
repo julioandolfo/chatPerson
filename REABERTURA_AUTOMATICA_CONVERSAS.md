@@ -10,22 +10,22 @@ Sistema inteligente de reabertura de conversas fechadas/resolvidas baseado em **
 
 Quando uma conversa **fechada** ou **resolvida** recebe uma nova mensagem do cliente:
 
-### **Cenário 1: Dentro do Período de Graça** ⏱️
-- **Ação:** Apenas **reabre** a conversa (status = `open`)
-- **Regras:** **NÃO** aplica regras de nova conversa
-- **Atribuição:** Mantém o agente anterior
-- **Funil/Etapa:** Mantém funil e etapa anterior
-- **Uso:** Ideal para mensagens rápidas de confirmação (ex: "OK", "Obrigado")
+### **Cenário 1: Dentro do Período Mínimo** ⏱️ (< 10 min)
+- **Ação:** **NÃO reabre** a conversa (continua fechada)
+- **Mensagem:** É salva no banco de dados
+- **Conversa:** Continua com status `closed` ou `resolved`
+- **Notificação:** NÃO envia notificação aos agentes
+- **Uso:** Ignorar mensagens rápidas tipo "OK", "Obrigado", "Entendi" após fechamento
 
-### **Cenário 2: Após o Período de Graça** 🔄
-- **Ação:** Cria uma **NOVA** conversa
+### **Cenário 2: Após o Período Mínimo** 🔄 (>= 10 min)
+- **Ação:** **Reabre** como **NOVA** conversa
 - **Regras:** Aplica **TODAS** as regras de nova conversa:
   - ✅ Auto-atribuição (se configurado)
   - ✅ Funil/Etapa padrão da integração ou sistema
   - ✅ Automações de boas-vindas
   - ✅ Chatbot inicial (se configurado)
   - ✅ Distribuição por setor/departamento
-- **Uso:** Cliente voltou após muito tempo - tratado como novo atendimento
+- **Uso:** Cliente voltou após tempo suficiente - tratado como novo atendimento
 
 ---
 
@@ -33,15 +33,16 @@ Quando uma conversa **fechada** ou **resolvida** recebe uma nova mensagem do cli
 
 ### **Local:** `/settings` → Configurações Gerais
 
-**Campo:** `Período de Graça para Reabertura (minutos)`
+**Campo:** `Período Mínimo para Reabertura (minutos)`
 
 **Valores Sugeridos:**
-| Tempo | Uso | Exemplo |
-|-------|-----|---------|
-| `15` min | Suporte rápido | Cliente responde "Ok" após resolver |
-| `60` min | **Padrão recomendado** | Conversas comerciais |
-| `120` min | Atendimento longo | Pós-venda, implementações |
-| `1440` min | 24 horas | Para negócios que fecham à noite |
+| Tempo | Uso | Comportamento |
+|-------|-----|---------------|
+| `0` min | Sempre reabrir | Qualquer mensagem reabre imediatamente |
+| `5` min | Muito curto | Ignora confirmações rápidas |
+| `10` min | **Padrão recomendado** | Ignora "Ok", "Obrigado" dentro de 10 min |
+| `30` min | Médio | Cliente pode fazer perguntas de follow-up |
+| `60` min | Longo | Apenas conversas realmente novas reabrem |
 
 ---
 
@@ -96,21 +97,22 @@ Quando uma conversa **fechada** ou **resolvida** recebe uma nova mensagem do cli
 - Cliente: "Quero comprar um produto"
 - Agente: Atende, finaliza venda
 - Status: `closed`
-- Período de Graça: `60 minutos`
+- Período Mínimo para Reabertura: `10 minutos`
 
-### **Teste 1: Mensagem em 10 minutos** ⏱️
+### **Teste 1: Mensagem em 2 minutos** 🚫
 ```
 Cliente: "Ok, obrigado!"
-└─> Reabre conversa
-    └─> Mantém agente anterior
-    └─> Mantém funil/etapa
-    └─> NÃO dispara automações
+└─> 🚫 NÃO reabre conversa
+    └─> Mensagem é salva no banco
+    └─> Conversa continua fechada
+    └─> NÃO notifica agentes
+    └─> Ideal para confirmações rápidas
 ```
 
-### **Teste 2: Mensagem em 120 minutos** 🔄
+### **Teste 2: Mensagem em 15 minutos** 🔄
 ```
 Cliente: "Preciso de outro produto"
-└─> Cria NOVA conversa
+└─> 🔄 Cria NOVA conversa
     └─> Aplica auto-atribuição
     └─> Define funil/etapa padrão
     └─> Dispara chatbot de boas-vindas
@@ -149,21 +151,21 @@ Cliente: "Preciso de outro produto"
 
 ## 🧪 Como Testar
 
-### **Teste 1: Dentro do Período** ✅
+### **Teste 1: Dentro do Período Mínimo** 🚫
 1. Feche uma conversa manualmente
-2. Envie mensagem **dentro de 60 minutos**
+2. Envie mensagem **dentro de 10 minutos**
 3. Verificar:
-   - ✅ Conversa reaberta (status = `open`)
-   - ✅ Agente mantido
-   - ✅ Funil/etapa mantido
-   - ❌ Automações NÃO disparadas
+   - ✅ Mensagem salva no banco de dados
+   - ✅ Conversa continua fechada (status = `closed`)
+   - ❌ Conversa NÃO reabre
+   - ❌ Agentes NÃO são notificados
 
-### **Teste 2: Após o Período** ✅
+### **Teste 2: Após o Período Mínimo** ✅
 1. Feche uma conversa manualmente
 2. Altere `updated_at` no banco para simular tempo:
    ```sql
    UPDATE conversations 
-   SET updated_at = DATE_SUB(NOW(), INTERVAL 2 HOUR)
+   SET updated_at = DATE_SUB(NOW(), INTERVAL 15 MINUTE)
    WHERE id = 123;
    ```
 3. Envie mensagem

@@ -77,7 +77,7 @@ class SettingService
             'max_conversations_per_agent' => Setting::get('max_conversations_per_agent', 10),
             'auto_assign_conversations' => Setting::get('auto_assign_conversations', false),
             'conversation_timeout_minutes' => Setting::get('conversation_timeout_minutes', 30),
-            'conversation_reopen_grace_period_minutes' => Setting::get('conversation_reopen_grace_period_minutes', 60),
+            'conversation_reopen_grace_period_minutes' => Setting::get('conversation_reopen_grace_period_minutes', 10),
             'openai_api_key' => Setting::get('openai_api_key', ''),
             'chat_agent_name_enabled' => Setting::get('chat_agent_name_enabled', false),
         ];

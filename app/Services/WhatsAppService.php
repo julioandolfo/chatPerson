@@ -2041,33 +2041,46 @@ class WhatsAppService
             
             // Verificar se conversa está fechada/resolvida e se deve reabrir
             if ($conversation && in_array($conversation['status'], ['closed', 'resolved'])) {
-                Logger::quepasa("processWebhook - Conversa encontrada está fechada/resolvida. Verificando período de graça...");
+                Logger::quepasa("========================================");
+                Logger::quepasa("🔄 REABERTURA AUTOMÁTICA - INÍCIO");
+                Logger::quepasa("========================================");
+                Logger::quepasa("📋 Conversa ID: {$conversation['id']}");
+                Logger::quepasa("📊 Status atual: {$conversation['status']}");
+                Logger::quepasa("🕐 Updated_at: {$conversation['updated_at']}");
                 
-                // Obter período de graça das configurações (padrão: 60 minutos)
-                $gracePeriodMinutes = (int)\App\Models\Setting::get('conversation_reopen_grace_period_minutes', 60);
-                Logger::quepasa("processWebhook - Período de graça configurado: {$gracePeriodMinutes} minutos");
+                // Obter período de graça das configurações (padrão: 10 minutos)
+                // ATENÇÃO: Período de graça agora é o tempo MÍNIMO para reabrir
+                $gracePeriodMinutes = (int)\App\Models\Setting::get('conversation_reopen_grace_period_minutes', 10);
+                Logger::quepasa("⚙️  Período mínimo para reabertura: {$gracePeriodMinutes} minutos");
                 
                 // Calcular tempo desde última atualização
                 $updatedAt = strtotime($conversation['updated_at']);
                 $now = time();
                 $minutesSinceClosure = ($now - $updatedAt) / 60;
                 
-                Logger::quepasa("processWebhook - Tempo desde fechamento: " . round($minutesSinceClosure, 2) . " minutos");
+                Logger::quepasa("⏱️  Tempo desde fechamento: " . round($minutesSinceClosure, 2) . " minutos");
+                Logger::quepasa("🔢 Cálculo: {$minutesSinceClosure} >= {$gracePeriodMinutes} ?");
                 
-                if ($minutesSinceClosure > $gracePeriodMinutes) {
-                    // Passou do período de graça - tratar como NOVA conversa
-                    Logger::quepasa("processWebhook - Passou do período de graça. Criando NOVA conversa e aplicando regras...");
+                if ($minutesSinceClosure >= $gracePeriodMinutes) {
+                    // Passou do período mínimo - REABRIR como NOVA conversa
+                    Logger::quepasa("✅ SIM → Tempo suficiente passou");
+                    Logger::quepasa("🔄 Ação: REABRIR como NOVA conversa (aplicar regras completas)");
+                    Logger::quepasa("   - Auto-atribuição: SIM");
+                    Logger::quepasa("   - Funil/Etapa padrão: SIM");
+                    Logger::quepasa("   - Automações: SIM");
+                    Logger::quepasa("========================================");
                     $conversation = null; // Forçar criação de nova conversa
                     $shouldReopenAsNew = true;
                 } else {
-                    // Dentro do período de graça - apenas reabrir
-                    Logger::quepasa("processWebhook - Dentro do período de graça. Apenas reabrindo conversa...");
-                    \App\Models\Conversation::update($conversation['id'], [
-                        'status' => 'open'
-                    ]);
-                    // Recarregar conversa
-                    $conversation = \App\Models\Conversation::find($conversation['id']);
-                    Logger::quepasa("processWebhook - Conversa reaberta: ID={$conversation['id']}");
+                    // Dentro do período mínimo - NÃO reabrir (mensagem rápida tipo "ok")
+                    Logger::quepasa("❌ NÃO → Dentro do período mínimo");
+                    Logger::quepasa("🚫 Ação: NÃO reabrir conversa (ignorar reabertura)");
+                    Logger::quepasa("   - Conversa continua: {$conversation['status']}");
+                    Logger::quepasa("   - Mensagem será salva mas conversa NÃO reabre");
+                    Logger::quepasa("   - Ideal para: 'Ok', 'Obrigado', confirmações rápidas");
+                    Logger::quepasa("========================================");
+                    // NÃO fazer nada - conversa continua fechada
+                    // A mensagem será salva normalmente no processo abaixo
                 }
             }
             

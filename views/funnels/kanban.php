@@ -62,15 +62,17 @@ ob_start();
                     $stage = $stageData['stage'];
                     // Fallback de cor caso não esteja definida (dados antigos)
                     $stageColor = !empty($stage['color']) ? $stage['color'] : '#009ef7';
-                    // Opacidade suave para o header
-                    $stageColorSoft = $stageColor . '33'; // ~20% alpha em hex
+                    // Header com cor visível (alpha ~20%). Ex: #009ef7 + 33 => #009ef733
+                    $stageColorSoft = $stageColor . '33';
                     $conversations = $stageData['conversations'];
                 ?>
                     <div class="kanban-column flex-shrink-0" data-stage-id="<?= $stage['id'] ?>" style="min-width: 320px; max-width: 320px;">
                         <div class="card h-100">
                             <div class="card-header border-0" style="
-                                background-color: <?= htmlspecialchars($stageColorSoft) ?>;
-                                border-left: 4px solid <?= htmlspecialchars($stageColor) ?>;
+                                background-color: <?= htmlspecialchars($stageColorSoft) ?> !important;
+                                border-left: 5px solid <?= htmlspecialchars($stageColor) ?> !important;
+                                box-shadow: inset 0 1px 0 <?= htmlspecialchars($stageColorSoft) ?>;
+                                padding-left: 16px;
                             ">
                                 <div class="card-title d-flex align-items-center justify-content-between w-100">
                                     <div class="flex-grow-1">

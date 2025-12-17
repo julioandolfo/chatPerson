@@ -717,6 +717,17 @@ function showStageMetrics(stageId, stageName) {
                     confirmButtonText: 'Fechar',
                     customClass: {
                         popup: 'text-start'
+                    },
+                    heightAuto: false,
+                    didOpen: (el) => {
+                        // Ajustar altura e scroll interno
+                        el.style.maxHeight = '85vh';
+                        el.style.height = '85vh';
+                        const htmlContainer = el.querySelector('.swal2-html-container');
+                        if (htmlContainer) {
+                            htmlContainer.style.maxHeight = '72vh';
+                            htmlContainer.style.overflow = 'auto';
+                        }
                     }
                 });
             } else {
@@ -807,6 +818,17 @@ function showFunnelMetrics(funnelId) {
                     confirmButtonText: 'Fechar',
                     customClass: {
                         popup: 'text-start'
+                    },
+                    heightAuto: false,
+                    didOpen: (el) => {
+                        // Ajustar altura e scroll interno
+                        el.style.maxHeight = '85vh';
+                        el.style.height = '85vh';
+                        const htmlContainer = el.querySelector('.swal2-html-container');
+                        if (htmlContainer) {
+                            htmlContainer.style.maxHeight = '72vh';
+                            htmlContainer.style.overflow = 'auto';
+                        }
                     }
                 });
             } else {

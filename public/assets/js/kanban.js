@@ -545,8 +545,15 @@ document.addEventListener("DOMContentLoaded", function() {
                 
                 // Verificar se resposta é JSON
                 const contentType = response.headers.get("content-type");
+                console.log("Content-Type:", contentType);
+                
                 if (!contentType || !contentType.includes("application/json")) {
-                    throw new Error("Resposta não é JSON. Content-Type: " + contentType);
+                    // Retornar o HTML para debug
+                    return response.text().then(html => {
+                        console.error("❌ Resposta HTML recebida:");
+                        console.error(html);
+                        throw new Error("Resposta não é JSON. Content-Type: " + contentType + "\n\nVeja o console para detalhes do HTML retornado.");
+                    });
                 }
                 
                 return response.json();

@@ -2035,11 +2035,48 @@ class WhatsAppService
             // Criar ou buscar conversa
             Logger::quepasa("processWebhook - Buscando conversa existente: contact_id={$contact['id']}, channel=whatsapp, account_id={$account['id']}");
             $conversation = \App\Models\Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['id']);
-            Logger::quepasa("processWebhook - Resultado da busca: " . ($conversation ? "Encontrada (ID={$conversation['id']})" : "Não encontrada"));
+            Logger::quepasa("processWebhook - Resultado da busca: " . ($conversation ? "Encontrada (ID={$conversation['id']}, status={$conversation['status']})" : "Não encontrada"));
             $isNewConversation = false;
+            $shouldReopenAsNew = false;
+            
+            // Verificar se conversa está fechada/resolvida e se deve reabrir
+            if ($conversation && in_array($conversation['status'], ['closed', 'resolved'])) {
+                Logger::quepasa("processWebhook - Conversa encontrada está fechada/resolvida. Verificando período de graça...");
+                
+                // Obter período de graça das configurações (padrão: 60 minutos)
+                $gracePeriodMinutes = (int)\App\Models\Setting::get('conversation_reopen_grace_period_minutes', 60);
+                Logger::quepasa("processWebhook - Período de graça configurado: {$gracePeriodMinutes} minutos");
+                
+                // Calcular tempo desde última atualização
+                $updatedAt = strtotime($conversation['updated_at']);
+                $now = time();
+                $minutesSinceClosure = ($now - $updatedAt) / 60;
+                
+                Logger::quepasa("processWebhook - Tempo desde fechamento: " . round($minutesSinceClosure, 2) . " minutos");
+                
+                if ($minutesSinceClosure > $gracePeriodMinutes) {
+                    // Passou do período de graça - tratar como NOVA conversa
+                    Logger::quepasa("processWebhook - Passou do período de graça. Criando NOVA conversa e aplicando regras...");
+                    $conversation = null; // Forçar criação de nova conversa
+                    $shouldReopenAsNew = true;
+                } else {
+                    // Dentro do período de graça - apenas reabrir
+                    Logger::quepasa("processWebhook - Dentro do período de graça. Apenas reabrindo conversa...");
+                    \App\Models\Conversation::update($conversation['id'], [
+                        'status' => 'open'
+                    ]);
+                    // Recarregar conversa
+                    $conversation = \App\Models\Conversation::find($conversation['id']);
+                    Logger::quepasa("processWebhook - Conversa reaberta: ID={$conversation['id']}");
+                }
+            }
             
             if (!$conversation) {
-                Logger::quepasa("processWebhook - Conversa não encontrada, criando nova...");
+                $logMessage = $shouldReopenAsNew 
+                    ? "processWebhook - Criando NOVA conversa (reabertura após período de graça)..."
+                    : "processWebhook - Conversa não encontrada, criando nova...";
+                Logger::quepasa($logMessage);
+                
                 // Usar ConversationService para criar conversa (com todas as integrações)
                 try {
                     $conversation = \App\Services\ConversationService::create([

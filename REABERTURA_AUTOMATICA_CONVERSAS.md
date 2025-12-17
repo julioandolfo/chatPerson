@@ -1,0 +1,247 @@
+# Reabertura Automática de Conversas
+
+## 📋 Visão Geral
+
+Sistema inteligente de reabertura de conversas fechadas/resolvidas baseado em **Período de Graça** configurável.
+
+---
+
+## 🎯 Funcionalidade
+
+Quando uma conversa **fechada** ou **resolvida** recebe uma nova mensagem do cliente:
+
+### **Cenário 1: Dentro do Período de Graça** ⏱️
+- **Ação:** Apenas **reabre** a conversa (status = `open`)
+- **Regras:** **NÃO** aplica regras de nova conversa
+- **Atribuição:** Mantém o agente anterior
+- **Funil/Etapa:** Mantém funil e etapa anterior
+- **Uso:** Ideal para mensagens rápidas de confirmação (ex: "OK", "Obrigado")
+
+### **Cenário 2: Após o Período de Graça** 🔄
+- **Ação:** Cria uma **NOVA** conversa
+- **Regras:** Aplica **TODAS** as regras de nova conversa:
+  - ✅ Auto-atribuição (se configurado)
+  - ✅ Funil/Etapa padrão da integração ou sistema
+  - ✅ Automações de boas-vindas
+  - ✅ Chatbot inicial (se configurado)
+  - ✅ Distribuição por setor/departamento
+- **Uso:** Cliente voltou após muito tempo - tratado como novo atendimento
+
+---
+
+## ⚙️ Configuração
+
+### **Local:** `/settings` → Configurações Gerais
+
+**Campo:** `Período de Graça para Reabertura (minutos)`
+
+**Valores Sugeridos:**
+| Tempo | Uso | Exemplo |
+|-------|-----|---------|
+| `15` min | Suporte rápido | Cliente responde "Ok" após resolver |
+| `60` min | **Padrão recomendado** | Conversas comerciais |
+| `120` min | Atendimento longo | Pós-venda, implementações |
+| `1440` min | 24 horas | Para negócios que fecham à noite |
+
+---
+
+## 📐 Lógica de Funcionamento
+
+```
+┌──────────────────────────────────┐
+│ Mensagem recebida                │
+└──────────────┬───────────────────┘
+               │
+               ▼
+     ┌─────────────────┐
+     │ Buscar conversa │
+     └────────┬────────┘
+              │
+     ┌────────▼────────┐
+     │ Status: closed  │   ❌ Não → Processar normalmente
+     │   ou resolved?  │
+     └────────┬────────┘
+              │ ✅ Sim
+              ▼
+   ┌──────────────────────┐
+   │ Calcular tempo desde │
+   │    fechamento        │
+   └──────────┬───────────┘
+              │
+   ┌──────────▼───────────┐
+   │ Tempo > Período de   │
+   │    Graça?            │
+   └──────────┬───────────┘
+              │
+       ┌──────┴──────┐
+       │             │
+    ✅ Sim         ❌ Não
+       │             │
+       ▼             ▼
+ ┌─────────┐   ┌──────────┐
+ │ NOVA    │   │ Apenas   │
+ │ CONVERSA│   │ REABRIR  │
+ │         │   │          │
+ │ + Regras│   │ Sem      │
+ │ + Funil │   │ Regras   │
+ │ + Auto  │   │          │
+ └─────────┘   └──────────┘
+```
+
+---
+
+## 🔍 Exemplo Prático
+
+### **Situação:**
+- Cliente: "Quero comprar um produto"
+- Agente: Atende, finaliza venda
+- Status: `closed`
+- Período de Graça: `60 minutos`
+
+### **Teste 1: Mensagem em 10 minutos** ⏱️
+```
+Cliente: "Ok, obrigado!"
+└─> Reabre conversa
+    └─> Mantém agente anterior
+    └─> Mantém funil/etapa
+    └─> NÃO dispara automações
+```
+
+### **Teste 2: Mensagem em 120 minutos** 🔄
+```
+Cliente: "Preciso de outro produto"
+└─> Cria NOVA conversa
+    └─> Aplica auto-atribuição
+    └─> Define funil/etapa padrão
+    └─> Dispara chatbot de boas-vindas
+    └─> Aplica regras de nova conversa
+```
+
+---
+
+## 📂 Arquivos Modificados
+
+### 1. **Configuração**
+- `app/Services/SettingService.php`
+  - Adicionado: `conversation_reopen_grace_period_minutes` (padrão: 60)
+  
+- `views/settings/index.php`
+  - Campo de configuração na interface
+
+### 2. **Lógica de Reabertura**
+- `app/Services/WhatsAppService.php`
+  - Método: `processWebhook()`
+  - Linhas: ~2035-2070
+  - Verifica status da conversa
+  - Calcula tempo desde fechamento
+  - Decide se reabre ou cria nova
+
+### 3. **Logs**
+- `storage/logs/quepasa.log`
+  ```log
+  [INFO] processWebhook - Conversa encontrada está fechada/resolvida. Verificando período de graça...
+  [INFO] processWebhook - Período de graça configurado: 60 minutos
+  [INFO] processWebhook - Tempo desde fechamento: 125.5 minutos
+  [INFO] processWebhook - Passou do período de graça. Criando NOVA conversa e aplicando regras...
+  ```
+
+---
+
+## 🧪 Como Testar
+
+### **Teste 1: Dentro do Período** ✅
+1. Feche uma conversa manualmente
+2. Envie mensagem **dentro de 60 minutos**
+3. Verificar:
+   - ✅ Conversa reaberta (status = `open`)
+   - ✅ Agente mantido
+   - ✅ Funil/etapa mantido
+   - ❌ Automações NÃO disparadas
+
+### **Teste 2: Após o Período** ✅
+1. Feche uma conversa manualmente
+2. Altere `updated_at` no banco para simular tempo:
+   ```sql
+   UPDATE conversations 
+   SET updated_at = DATE_SUB(NOW(), INTERVAL 2 HOUR)
+   WHERE id = 123;
+   ```
+3. Envie mensagem
+4. Verificar:
+   - ✅ Nova conversa criada
+   - ✅ Auto-atribuição aplicada
+   - ✅ Funil/etapa padrão aplicado
+   - ✅ Automações disparadas
+
+---
+
+## 🎛️ Configurações Recomendadas por Tipo de Negócio
+
+| Tipo | Período Sugerido | Motivo |
+|------|------------------|--------|
+| **E-commerce** | 30-60 min | Cliente pode ter dúvidas rápidas |
+| **Suporte Técnico** | 60-120 min | Troubleshooting pode demorar |
+| **Vendas B2B** | 120-240 min | Negociações mais longas |
+| **Pós-venda** | 60-120 min | Follow-ups podem demorar |
+| **Atendimento 24/7** | 15-30 min | Respostas rápidas esperadas |
+
+---
+
+## 🔔 Notificações
+
+### **Reabertura Simples (Dentro do Período)**
+- WebSocket: `conversation_updated`
+- Notificação: "Conversa reaberta"
+
+### **Nova Conversa (Após Período)**
+- WebSocket: `new_conversation`
+- Notificação: "Nova conversa recebida"
+- Automações: Todas as configuradas para novas conversas
+
+---
+
+## 📊 Métricas Afetadas
+
+### **Dentro do Período:**
+- Contador de reaberturas
+- Tempo médio de resolução (continua contando)
+
+### **Após o Período:**
+- Nova conversa no contador
+- Novo ciclo de SLA
+- Nova oportunidade de conversão
+
+---
+
+## ⚠️ Observações Importantes
+
+1. **Período Zero (`0`)**: Sempre cria nova conversa (sem período de graça)
+2. **Conversas Abertas**: Lógica NÃO se aplica (apenas para `closed`/`resolved`)
+3. **Múltiplos Canais**: Funciona para todos os canais (WhatsApp, email, chat)
+4. **Histórico**: Conversas antigas são mantidas (não são apagadas)
+
+---
+
+## 🚀 Benefícios
+
+✅ **Cliente:** Resposta mais contextualizada (mantém histórico recente)  
+✅ **Agente:** Menos retrabalho em confirmações rápidas  
+✅ **Gestor:** Métricas mais precisas (separa nova conversa de reativação)  
+✅ **Sistema:** Automações aplicadas apenas quando relevante  
+
+---
+
+## 📝 Próximas Melhorias (Futuro)
+
+- [ ] Período de graça diferente por canal
+- [ ] Período de graça por setor/departamento
+- [ ] Dashboard de reaberturas vs. novas conversas
+- [ ] Regra de reabertura baseada em tags
+- [ ] Notificação customizada de reabertura
+
+---
+
+**Implementado em:** 17/12/2024  
+**Versão:** 1.0  
+**Status:** ✅ Produção
+

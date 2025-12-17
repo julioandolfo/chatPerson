@@ -143,9 +143,20 @@ ob_start();
                             <label class="fw-semibold fs-6 mb-2">Timeout de Conversa (minutos)</label>
                             <input type="number" name="conversation_timeout_minutes" class="form-control form-control-solid" 
                                    value="<?= (int)($generalSettings['conversation_timeout_minutes'] ?? 30) ?>" min="1" />
+                            <div class="form-text">Tempo de inatividade antes de considerar a conversa inativa</div>
                         </div>
                     </div>
                     <div class="col-lg-6">
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">Período de Graça para Reabertura (minutos)</label>
+                            <input type="number" name="conversation_reopen_grace_period_minutes" class="form-control form-control-solid" 
+                                   value="<?= (int)($generalSettings['conversation_reopen_grace_period_minutes'] ?? 60) ?>" min="0" />
+                            <div class="form-text">Mensagens recebidas APÓS esse período reabrem a conversa e aplicam regras de nova conversa. Dentro do período, apenas reabrem sem aplicar regras.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-lg-12">
                         <div class="fv-row mb-7">
                             <label class="fw-semibold fs-6 mb-2 d-flex align-items-center">
                                 <input type="checkbox" name="auto_assign_conversations" class="form-check-input me-2" 

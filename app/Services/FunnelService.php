@@ -111,18 +111,24 @@ class FunnelService
             throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));
         }
 
-        // Processar campos JSON
-        if (isset($data['blocked_stages']) && is_string($data['blocked_stages'])) {
-            $data['blocked_stages'] = json_decode($data['blocked_stages'], true);
-        }
-        if (isset($data['required_stages']) && is_string($data['required_stages'])) {
-            $data['required_stages'] = json_decode($data['required_stages'], true);
-        }
-        if (isset($data['required_tags']) && is_string($data['required_tags'])) {
-            $data['required_tags'] = json_decode($data['required_tags'], true);
-        }
-        if (isset($data['blocked_tags']) && is_string($data['blocked_tags'])) {
-            $data['blocked_tags'] = json_decode($data['blocked_tags'], true);
+        // Processar campos JSON: garantir string JSON válida ou null
+        $jsonFields = ['blocked_stages', 'required_stages', 'required_tags', 'blocked_tags'];
+        foreach ($jsonFields as $jsonField) {
+            if (!isset($data[$jsonField])) {
+                continue;
+            }
+            if (is_string($data[$jsonField])) {
+                $decoded = json_decode($data[$jsonField], true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    $data[$jsonField] = null;
+                } else {
+                    $data[$jsonField] = json_encode($decoded);
+                }
+            } elseif (is_array($data[$jsonField])) {
+                $data[$jsonField] = json_encode($data[$jsonField]);
+            } elseif ($data[$jsonField] === '' || $data[$jsonField] === null) {
+                $data[$jsonField] = null;
+            }
         }
 
         // Se não informar posição, colocar no final
@@ -188,18 +194,24 @@ class FunnelService
             throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));
         }
         
-        // Processar campos JSON
-        if (isset($data['blocked_stages']) && is_string($data['blocked_stages'])) {
-            $data['blocked_stages'] = json_decode($data['blocked_stages'], true);
-        }
-        if (isset($data['required_stages']) && is_string($data['required_stages'])) {
-            $data['required_stages'] = json_decode($data['required_stages'], true);
-        }
-        if (isset($data['required_tags']) && is_string($data['required_tags'])) {
-            $data['required_tags'] = json_decode($data['required_tags'], true);
-        }
-        if (isset($data['blocked_tags']) && is_string($data['blocked_tags'])) {
-            $data['blocked_tags'] = json_decode($data['blocked_tags'], true);
+        // Processar campos JSON: garantir string JSON válida ou null
+        $jsonFields = ['blocked_stages', 'required_stages', 'required_tags', 'blocked_tags'];
+        foreach ($jsonFields as $jsonField) {
+            if (!isset($data[$jsonField])) {
+                continue;
+            }
+            if (is_string($data[$jsonField])) {
+                $decoded = json_decode($data[$jsonField], true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    $data[$jsonField] = null;
+                } else {
+                    $data[$jsonField] = json_encode($decoded);
+                }
+            } elseif (is_array($data[$jsonField])) {
+                $data[$jsonField] = json_encode($data[$jsonField]);
+            } elseif ($data[$jsonField] === '' || $data[$jsonField] === null) {
+                $data[$jsonField] = null;
+            }
         }
 
         // Se for padrão, remover padrão dos outros estágios do mesmo funil

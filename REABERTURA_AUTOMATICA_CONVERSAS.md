@@ -138,7 +138,15 @@ Cliente: "Preciso de outro produto"
   - Calcula tempo desde fechamento
   - Decide se reabre ou cria nova
 
-### 3. **Logs**
+### 3. **Filtro no Polling**
+- `app/Controllers/RealtimeController.php`
+  - Método: `poll()`
+  - Linhas: ~247-265
+  - Filtra conversas com status `closed` ou `resolved`
+  - Impede que conversas fechadas apareçam na lista através do polling
+  - Resolve problema de conversas fechadas piscando na tela
+
+### 4. **Logs**
 - `storage/logs/quepasa.log`
   ```log
   [INFO] processWebhook - Conversa encontrada está fechada/resolvida. Verificando período de graça...

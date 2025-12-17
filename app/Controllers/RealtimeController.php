@@ -245,6 +245,20 @@ class RealtimeController
                         }
 
                         if ($shouldInclude) {
+                            // ✅ FILTRO: Apenas incluir conversas com status 'open' em new_conversations
+                            // Conversas fechadas/resolvidas com mensagens novas NÃO devem aparecer na lista
+                            $conversationStatus = $conv['status'] ?? 'open';
+                            
+                            // Se for nova conversa mas está fechada, NÃO incluir
+                            if ($isNewConversation && !in_array($conversationStatus, ['open'])) {
+                                continue; // Pular esta conversa
+                            }
+                            
+                            // Se for atualização mas está fechada, NÃO incluir
+                            if (!$isNewConversation && !in_array($conversationStatus, ['open'])) {
+                                continue; // Pular esta conversa
+                            }
+                            
                             // Verificar se já não está na lista de updates
                             $exists = false;
                             foreach ($updates['conversation_updates'] as $update) {
@@ -263,7 +277,7 @@ class RealtimeController
                             if (!$exists) {
                                 $conversationData = [
                                     'id' => $conv['id'],
-                                    'status' => $conv['status'] ?? 'open',
+                                    'status' => $conversationStatus,
                                     'unread_count' => $conv['unread_count'] ?? 0,
                                     'updated_at' => $conv['updated_at'],
                                     'created_at' => $conv['created_at'] ?? $conv['updated_at'],

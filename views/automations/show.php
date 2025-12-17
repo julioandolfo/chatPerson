@@ -227,19 +227,49 @@ ob_start();
                 <?php endif; ?>
             </div>
         </div>
-        <div class="card-toolbar">
-            <button type="button" class="btn btn-sm btn-light-info me-3" onclick="testAutomation()">
-                <i class="ki-duotone ki-play fs-2">
-                    <span class="path1"></span>
-                    <span class="path2"></span>
-                </i>
-                Testar Automação
-            </button>
-            <button type="button" class="btn btn-sm btn-light-primary me-3" data-bs-toggle="modal" data-bs-target="#kt_modal_edit_automation">
+        <div class="card-toolbar d-flex gap-2">
+            <div class="btn-group">
+                <button type="button" class="btn btn-sm btn-light-info" onclick="testAutomation()">
+                    <i class="ki-duotone ki-play fs-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Teste Rápido
+                </button>
+                <button type="button" class="btn btn-sm btn-light-info dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown">
+                    <span class="sr-only">Toggle Dropdown</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="#" onclick="testAutomation(); return false;">
+                        <i class="ki-duotone ki-flash-circle fs-2 me-2 text-info">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Teste Rápido
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="advancedTestAutomation(); return false;">
+                        <i class="ki-duotone ki-setting-2 fs-2 me-2 text-primary">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Teste Avançado
+                    </a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="#" onclick="validateAutomationConnections(); return false;">
+                        <i class="ki-duotone ki-check-circle fs-2 me-2 text-success">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Validar Automação
+                    </a></li>
+                </ul>
+            </div>
+            
+            <button type="button" class="btn btn-sm btn-light-primary" data-bs-toggle="modal" data-bs-target="#kt_modal_edit_automation">
                 <i class="ki-duotone ki-pencil fs-2"></i>
                 Editar Configuração
             </button>
-            <button type="button" class="btn btn-sm btn-light-primary" onclick="saveLayout()">
+            <button type="button" class="btn btn-sm btn-light-primary" onclick="if(validateAutomationConnections()){saveLayout();}">
                 <i class="ki-duotone ki-check fs-2"></i>
                 Salvar Layout
             </button>
@@ -1298,8 +1328,20 @@ function openNodeConfig(nodeId) {
                 <div class="fv-row mb-7">
                     <label class="required fw-semibold fs-6 mb-2">Agente</label>
                     <select name="agent_id" class="form-select form-select-solid" required>
+                        <option value="">Selecione um agente</option>
                         ${agentOptionsHtml}
                     </select>
+                    <div class="form-text">O agente será automaticamente atribuído à conversa</div>
+                </div>
+                
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2">Notificar Agente?</label>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="notify_agent" value="1" checked id="kt_notify_agent" />
+                        <label class="form-check-label" for="kt_notify_agent">
+                            Enviar notificação ao agente sobre a atribuição
+                        </label>
+                    </div>
                 </div>
             `;
             break;
@@ -1307,15 +1349,28 @@ function openNodeConfig(nodeId) {
             formContent = `
                 <div class="fv-row mb-7">
                     <label class="required fw-semibold fs-6 mb-2">Funil</label>
-                    <select name="funnel_id" id="kt_node_funnel_select" class="form-select form-select-solid" required>
+                    <select name="funnel_id" id="kt_node_funnel_select" class="form-select form-select-solid" required onchange="loadStagesForFunnel(this.value, 'kt_node_stage_select')">
+                        <option value="">Selecione um funil</option>
                         ${funnelOptionsHtml}
                     </select>
+                    <div class="form-text">Escolha o funil de destino</div>
                 </div>
                 <div class="fv-row mb-7">
                     <label class="required fw-semibold fs-6 mb-2">Estágio</label>
-                    <select name="stage_id" id="kt_node_stage_select" class="form-select form-select-solid" required>
-                        <option value="">Selecione um estágio</option>
+                    <select name="stage_id" id="kt_node_stage_select" class="form-select form-select-solid" required disabled>
+                        <option value="">Primeiro selecione um funil</option>
                     </select>
+                    <div class="form-text">A conversa será movida para este estágio automaticamente</div>
+                </div>
+                
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2">Validar Regras?</label>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="validate_rules" value="1" checked id="kt_validate_rules" />
+                        <label class="form-check-label" for="kt_validate_rules">
+                            Verificar regras de validação do estágio (limites, etc)
+                        </label>
+                    </div>
                 </div>
             `;
             break;
@@ -1323,23 +1378,67 @@ function openNodeConfig(nodeId) {
             formContent = `
                 <div class="fv-row mb-7">
                     <label class="required fw-semibold fs-6 mb-2">Campo</label>
-                    <select name="field" class="form-select form-select-solid" required>
-                        <option value="channel">Canal</option>
-                        <option value="status">Status</option>
-                        <option value="priority">Prioridade</option>
+                    <select name="field" id="kt_condition_field" class="form-select form-select-solid" required onchange="updateConditionOperators(this.value)">
+                        <option value="">Selecione um campo</option>
+                        <optgroup label="Conversa">
+                            <option value="channel">Canal</option>
+                            <option value="status">Status</option>
+                            <option value="priority">Prioridade</option>
+                            <option value="unread_count">Mensagens não lidas</option>
+                            <option value="created_days_ago">Dias desde criação</option>
+                        </optgroup>
+                        <optgroup label="Contato">
+                            <option value="contact.name">Nome do Contato</option>
+                            <option value="contact.phone">Telefone do Contato</option>
+                            <option value="contact.email">Email do Contato</option>
+                        </optgroup>
+                        <optgroup label="Agente">
+                            <option value="agent.id">ID do Agente</option>
+                            <option value="agent.name">Nome do Agente</option>
+                        </optgroup>
+                        <optgroup label="Tags">
+                            <option value="has_tag">Possui Tag</option>
+                        </optgroup>
                     </select>
+                    <div class="form-text">Campo que será avaliado na condição</div>
                 </div>
                 <div class="fv-row mb-7">
                     <label class="required fw-semibold fs-6 mb-2">Operador</label>
-                    <select name="operator" class="form-select form-select-solid" required>
-                        <option value="equals">Igual a</option>
-                        <option value="not_equals">Diferente de</option>
+                    <select name="operator" id="kt_condition_operator" class="form-select form-select-solid" required>
+                        <option value="">Selecione um operador</option>
+                        <option value="equals">Igual a (=)</option>
+                        <option value="not_equals">Diferente de (≠)</option>
                         <option value="contains">Contém</option>
+                        <option value="not_contains">Não contém</option>
+                        <option value="starts_with">Começa com</option>
+                        <option value="ends_with">Termina com</option>
+                        <option value="greater_than">Maior que (>)</option>
+                        <option value="less_than">Menor que (<)</option>
+                        <option value="greater_or_equal">Maior ou igual (≥)</option>
+                        <option value="less_or_equal">Menor ou igual (≤)</option>
+                        <option value="is_empty">Está vazio</option>
+                        <option value="is_not_empty">Não está vazio</option>
+                        <option value="in">Está em (lista)</option>
+                        <option value="not_in">Não está em (lista)</option>
                     </select>
+                    <div class="form-text">Como o valor será comparado</div>
                 </div>
-                <div class="fv-row mb-7">
+                <div class="fv-row mb-7" id="kt_condition_value_container">
                     <label class="required fw-semibold fs-6 mb-2">Valor</label>
-                    <input type="text" name="value" class="form-control form-control-solid" required />
+                    <input type="text" name="value" id="kt_condition_value" class="form-control form-control-solid" required placeholder="Digite o valor..." />
+                    <div class="form-text">Valor para comparação. Para listas, separe por vírgula</div>
+                </div>
+                
+                <div class="alert alert-primary d-flex align-items-center p-5 mb-7">
+                    <i class="ki-duotone ki-shield-tick fs-2x text-primary me-4">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div class="d-flex flex-column">
+                        <h4 class="mb-1 text-dark">Exemplo</h4>
+                        <span>Campo: <strong>Canal</strong> | Operador: <strong>Igual a</strong> | Valor: <strong>whatsapp</strong></span>
+                    </div>
                 </div>
             `;
             break;
@@ -1437,7 +1536,61 @@ function openNodeConfig(nodeId) {
             formContent = `
                 <div class="fv-row mb-7">
                     <label class="required fw-semibold fs-6 mb-2">Tag</label>
-                    <input type="text" name="tag" class="form-control form-control-solid" placeholder="Nome da tag" required />
+                    <input type="text" name="tag" id="kt_tag_name" class="form-control form-control-solid" placeholder="Nome da tag" required />
+                    <div class="form-text">Nome da tag que será adicionada à conversa</div>
+                </div>
+                
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2">Ação</label>
+                    <select name="tag_action" class="form-select form-select-solid">
+                        <option value="add">Adicionar Tag</option>
+                        <option value="remove">Remover Tag</option>
+                    </select>
+                    <div class="form-text">Adicionar ou remover a tag da conversa</div>
+                </div>
+                
+                <div class="alert alert-info d-flex align-items-center p-5">
+                    <i class="ki-duotone ki-tag fs-2x text-info me-4">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    <div class="d-flex flex-column">
+                        <h4 class="mb-1 text-dark">Tags</h4>
+                        <span>Use tags para categorizar e filtrar conversas facilmente</span>
+                    </div>
+                </div>
+            `;
+            break;
+        case "delay":
+            formContent = `
+                <div class="fv-row mb-7">
+                    <label class="required fw-semibold fs-6 mb-2">Tempo de Espera</label>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <input type="number" name="delay_value" class="form-control form-control-solid" placeholder="Quantidade" value="5" min="1" required />
+                        </div>
+                        <div class="col-md-6">
+                            <select name="delay_unit" class="form-select form-select-solid" required>
+                                <option value="seconds">Segundos</option>
+                                <option value="minutes" selected>Minutos</option>
+                                <option value="hours">Horas</option>
+                                <option value="days">Dias</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-text mt-2">A automação aguardará este tempo antes de continuar</div>
+                </div>
+                
+                <div class="alert alert-warning d-flex align-items-center p-5 mb-7">
+                    <i class="ki-duotone ki-information fs-2x text-warning me-4">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div class="d-flex flex-column">
+                        <h4 class="mb-1 text-dark">Atenção</h4>
+                        <span>Delays superiores a 60 segundos serão processados de forma assíncrona</span>
+                    </div>
                 </div>
             `;
             break;
@@ -2136,6 +2289,87 @@ function removeChatbotOption(button) {
 window.updateChatbotFields = updateChatbotFields;
 window.addChatbotOption = addChatbotOption;
 window.removeChatbotOption = removeChatbotOption;
+
+// Carregar estágios quando funil é selecionado
+function loadStagesForFunnel(funnelId, targetSelectId) {
+    const stageSelect = document.getElementById(targetSelectId);
+    if (!stageSelect) return;
+    
+    if (!funnelId) {
+        stageSelect.disabled = true;
+        stageSelect.innerHTML = '<option value="">Primeiro selecione um funil</option>';
+        return;
+    }
+    
+    stageSelect.disabled = false;
+    stageSelect.innerHTML = '<option value="">Carregando...</option>';
+    
+    fetch(`<?= \App\Helpers\Url::to('/funnels/') ?>${funnelId}/stages/json`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.stages) {
+                let options = '<option value="">Selecione um estágio</option>';
+                data.stages.forEach(stage => {
+                    options += `<option value="${stage.id}">${stage.name}</option>`;
+                });
+                stageSelect.innerHTML = options;
+            } else {
+                stageSelect.innerHTML = '<option value="">Erro ao carregar estágios</option>';
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            stageSelect.innerHTML = '<option value="">Erro ao carregar estágios</option>';
+        });
+}
+
+// Atualizar operadores de condição baseado no campo
+function updateConditionOperators(field) {
+    const operatorSelect = document.getElementById('kt_condition_operator');
+    const valueContainer = document.getElementById('kt_condition_value_container');
+    const valueInput = document.getElementById('kt_condition_value');
+    
+    if (!operatorSelect || !valueContainer || !valueInput) return;
+    
+    // Operadores numéricos para campos numéricos
+    const numericFields = ['unread_count', 'created_days_ago'];
+    const isNumeric = numericFields.includes(field);
+    
+    let operatorOptions = '<option value="">Selecione um operador</option>';
+    
+    if (isNumeric) {
+        operatorOptions += `
+            <option value="equals">Igual a (=)</option>
+            <option value="not_equals">Diferente de (≠)</option>
+            <option value="greater_than">Maior que (>)</option>
+            <option value="less_than">Menor que (<)</option>
+            <option value="greater_or_equal">Maior ou igual (≥)</option>
+            <option value="less_or_equal">Menor ou igual (≤)</option>
+        `;
+        valueInput.type = 'number';
+        valueInput.placeholder = 'Digite um número...';
+    } else {
+        operatorOptions += `
+            <option value="equals">Igual a (=)</option>
+            <option value="not_equals">Diferente de (≠)</option>
+            <option value="contains">Contém</option>
+            <option value="not_contains">Não contém</option>
+            <option value="starts_with">Começa com</option>
+            <option value="ends_with">Termina com</option>
+            <option value="is_empty">Está vazio</option>
+            <option value="is_not_empty">Não está vazio</option>
+            <option value="in">Está em (lista)</option>
+            <option value="not_in">Não está em (lista)</option>
+        `;
+        valueInput.type = 'text';
+        valueInput.placeholder = 'Digite o valor...';
+    }
+    
+    operatorSelect.innerHTML = operatorOptions;
+}
+
+window.loadStagesForFunnel = loadStagesForFunnel;
+window.updateConditionOperators = updateConditionOperators;
 </script>
 <?php
 $scripts = ob_get_clean() . <<<'JAVASCRIPT'
@@ -2196,12 +2430,19 @@ function previewMessageVariables() {
 
 // Adicionar listener para preview em tempo real
 document.addEventListener("DOMContentLoaded", function() {
-    // Usar event delegation para textarea de mensagem
+    // Usar event delegation para textarea de mensagem e chatbot
     document.addEventListener("input", function(e) {
-        if (e.target && e.target.id === "kt_node_message_textarea") {
+        if (e.target && (e.target.id === "kt_node_message_textarea" || e.target.name === "chatbot_message")) {
             previewMessageVariables();
         }
     });
+    
+    // Validação em tempo real de campos obrigatórios
+    document.addEventListener("blur", function(e) {
+        if (e.target && e.target.hasAttribute("required")) {
+            validateRequiredField(e.target);
+        }
+    }, true);
     
     // Adicionar botão de inserir variável ao clicar na tabela
     setTimeout(function() {
@@ -2416,8 +2657,283 @@ function previewVariables(message, conversationId) {
         });
 }
 
+// Validação visual de campos obrigatórios
+function validateRequiredField(field) {
+    if (!field) return true;
+    
+    const isValid = field.value.trim() !== '';
+    const feedbackId = field.id + '_feedback';
+    let feedback = document.getElementById(feedbackId);
+    
+    // Remover feedback existente
+    if (feedback) {
+        feedback.remove();
+    }
+    
+    // Remover classes anteriores
+    field.classList.remove('is-invalid', 'is-valid');
+    
+    if (!isValid) {
+        field.classList.add('is-invalid');
+        feedback = document.createElement('div');
+        feedback.id = feedbackId;
+        feedback.className = 'invalid-feedback';
+        feedback.textContent = 'Este campo é obrigatório';
+        field.parentNode.appendChild(feedback);
+        return false;
+    } else {
+        field.classList.add('is-valid');
+        return true;
+    }
+}
+
+// Validar formulário antes de salvar
+function validateAutomationForm() {
+    const requiredFields = document.querySelectorAll('#kt_node_config_form [required]');
+    let isValid = true;
+    
+    requiredFields.forEach(field => {
+        if (!validateRequiredField(field)) {
+            isValid = false;
+        }
+    });
+    
+    if (!isValid) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Campos Obrigatórios',
+            text: 'Por favor, preencha todos os campos obrigatórios antes de salvar.',
+            confirmButtonText: 'OK'
+        });
+    }
+    
+    return isValid;
+}
+
+// Validar se automação tem nós conectados
+function validateAutomationConnections() {
+    if (nodes.length === 0) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Automação Vazia',
+            text: 'Adicione pelo menos um nó à automação antes de ativá-la.',
+            confirmButtonText: 'OK'
+        });
+        return false;
+    }
+    
+    // Verificar se há nó trigger
+    const hasTrigger = nodes.some(node => node.node_type === 'trigger');
+    if (!hasTrigger) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Sem Gatilho',
+            text: 'Adicione um nó de gatilho (trigger) para iniciar a automação.',
+            confirmButtonText: 'OK'
+        });
+        return false;
+    }
+    
+    // Verificar nós desconectados (exceto trigger)
+    const disconnectedNodes = nodes.filter(node => {
+        if (node.node_type === 'trigger') return false;
+        
+        // Verificar se algum nó se conecta a este
+        const hasIncomingConnection = nodes.some(otherNode => {
+            const connections = otherNode.node_data?.connections || [];
+            return connections.some(conn => conn.target_node_id === node.id);
+        });
+        
+        return !hasIncomingConnection;
+    });
+    
+    if (disconnectedNodes.length > 0) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Nós Desconectados',
+            html: `Existem ${disconnectedNodes.length} nó(s) não conectado(s) na automação. <br><br>Conecte todos os nós ou remova os desnecessários.`,
+            confirmButtonText: 'OK'
+        });
+        return false;
+    }
+    
+    return true;
+}
+
+// Modo de teste avançado
+function advancedTestAutomation() {
+    if (!validateAutomationConnections()) {
+        return;
+    }
+    
+    const automationId = ' . (int)($automation['id'] ?? 0) . ';
+    
+    Swal.fire({
+        title: 'Modo de Teste Avançado',
+        html: `
+            <div class="text-start">
+                <p class="mb-4">Configure o teste da automação:</p>
+                <div class="fv-row mb-4">
+                    <label class="fw-semibold fs-6 mb-2">ID da Conversa (opcional)</label>
+                    <input type="number" id="test_conversation_id" class="swal2-input" placeholder="Deixe vazio para dados simulados" />
+                    <div class="form-text">Se fornecido, usa dados reais da conversa</div>
+                </div>
+                <div class="fv-row mb-4">
+                    <label class="fw-semibold fs-6 mb-2">Modo de Execução</label>
+                    <select id="test_mode" class="swal2-select">
+                        <option value="simulate">Simular (sem executar ações)</option>
+                        <option value="dry_run">Dry Run (valida mas não executa)</option>
+                        <option value="real">Execução Real (CUIDADO!)</option>
+                    </select>
+                </div>
+                <div class="fv-row">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="test_step_by_step" />
+                        <label class="form-check-label" for="test_step_by_step">
+                            Executar passo-a-passo
+                        </label>
+                    </div>
+                </div>
+            </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Iniciar Teste',
+        cancelButtonText: 'Cancelar',
+        preConfirm: () => {
+            const conversationId = document.getElementById('test_conversation_id').value;
+            const mode = document.getElementById('test_mode').value;
+            const stepByStep = document.getElementById('test_step_by_step').checked;
+            
+            return {
+                conversation_id: conversationId || null,
+                mode: mode,
+                step_by_step: stepByStep
+            };
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            executeAutomationTest(automationId, result.value);
+        }
+    });
+}
+
+// Executar teste da automação
+function executeAutomationTest(automationId, testConfig) {
+    Swal.fire({
+        title: 'Testando automação...',
+        html: '<div id="test_progress">Inicializando teste...</div>',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+    
+    const url = `<?= \App\Helpers\Url::to('/automations/') ?>${automationId}/test`;
+    const params = new URLSearchParams(testConfig);
+    
+    fetch(`${url}?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.test_result) {
+                displayTestResults(data.test_result);
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro no Teste',
+                    text: data.message || 'Não foi possível executar o teste',
+                    confirmButtonText: 'OK'
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Erro ao executar teste: ' + error.message,
+                confirmButtonText: 'OK'
+            });
+        });
+}
+
+// Exibir resultados do teste
+function displayTestResults(result) {
+    let html = `
+        <div class="text-start">
+            <h4 class="fw-bold mb-4">Resultado do Teste</h4>
+            <div class="mb-4">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge badge-light-primary fs-6">${result.steps?.length || 0} passo(s)</span>
+                    ${result.errors && result.errors.length > 0 ? `<span class="badge badge-light-danger fs-6">${result.errors.length} erro(s)</span>` : ''}
+                    ${result.simulated_actions && result.simulated_actions.length > 0 ? `<span class="badge badge-light-success fs-6">${result.simulated_actions.length} ação(ões)</span>` : ''}
+                </div>
+            </div>
+    `;
+    
+    if (result.errors && result.errors.length > 0) {
+        html += '<div class="alert alert-danger"><strong>Erros Encontrados:</strong><ul class="mb-0">';
+        result.errors.forEach(error => {
+            html += `<li>${error}</li>`;
+        });
+        html += '</ul></div>';
+    }
+    
+    if (result.steps && result.steps.length > 0) {
+        html += `
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
+                    <thead>
+                        <tr class="fw-bold text-muted bg-light">
+                            <th class="min-w-50px">#</th>
+                            <th class="min-w-150px">Tipo</th>
+                            <th class="min-w-200px">Detalhes</th>
+                            <th class="min-w-100px">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        result.steps.forEach((step, index) => {
+            const stepNum = index + 1;
+            const status = step.success ? '<span class="badge badge-light-success">✓ OK</span>' : '<span class="badge badge-light-danger">✗ Erro</span>';
+            let details = step.node_type || 'N/A';
+            
+            if (step.action_preview) {
+                details = JSON.stringify(step.action_preview, null, 2).substring(0, 100) + '...';
+            }
+            
+            html += `
+                <tr>
+                    <td class="fw-bold">${stepNum}</td>
+                    <td>${step.node_type || 'N/A'}</td>
+                    <td><pre class="mb-0 fs-8">${details}</pre></td>
+                    <td>${status}</td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table></div>';
+    }
+    
+    html += '</div>';
+    
+    Swal.fire({
+        html: html,
+        width: '900px',
+        confirmButtonText: 'Fechar',
+        customClass: {
+            popup: 'text-start'
+        }
+    });
+}
+
 // Tornar funções do segundo script acessíveis globalmente
 window.testAutomation = testAutomation;
+window.advancedTestAutomation = advancedTestAutomation;
+window.validateAutomationForm = validateAutomationForm;
+window.validateAutomationConnections = validateAutomationConnections;
+window.validateRequiredField = validateRequiredField;
 window.previewVariables = previewVariables;
 </script>
 JAVASCRIPT;

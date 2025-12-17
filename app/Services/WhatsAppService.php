@@ -59,7 +59,9 @@ class WhatsAppService
             'quepasa_user' => 'nullable|string|max:255',
             'quepasa_trackid' => 'nullable|string|max:255',
             'api_key' => 'nullable|string|max:255',
-            'instance_id' => 'nullable|string|max:255'
+            'instance_id' => 'nullable|string|max:255',
+            'default_funnel_id' => 'nullable|integer',
+            'default_stage_id' => 'nullable|integer'
         ]);
 
         if (!empty($errors)) {

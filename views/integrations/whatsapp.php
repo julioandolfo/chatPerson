@@ -73,6 +73,39 @@ ob_start();
                                         <span class="fw-semibold"><?= htmlspecialchars($account['instance_id']) ?></span>
                                     </div>
                                     <?php endif; ?>
+                                    <?php if (!empty($account['default_funnel_name'])): ?>
+                                    <div class="separator separator-dashed my-3"></div>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="ki-duotone ki-element-11 fs-5 text-primary me-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                            <span class="path4"></span>
+                                        </i>
+                                        <span class="text-muted fw-semibold fs-7 me-2">Funil Padrão:</span>
+                                        <span class="fw-bold fs-7"><?= htmlspecialchars($account['default_funnel_name']) ?></span>
+                                    </div>
+                                    <?php if (!empty($account['default_stage_name'])): ?>
+                                    <div class="d-flex align-items-center">
+                                        <i class="ki-duotone ki-abstract-26 fs-5 text-info me-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        <span class="text-muted fw-semibold fs-7 me-2">Etapa Padrão:</span>
+                                        <span class="fw-bold fs-7"><?= htmlspecialchars($account['default_stage_name']) ?></span>
+                                    </div>
+                                    <?php endif; ?>
+                                    <?php else: ?>
+                                    <div class="separator separator-dashed my-3"></div>
+                                    <div class="alert alert-warning d-flex align-items-center p-3">
+                                        <i class="ki-duotone ki-information fs-3 text-warning me-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        <span class="fs-8">Usando funil/etapa padrão do sistema</span>
+                                    </div>
+                                    <?php endif; ?>
                                 </div>
                                 <div class="d-flex gap-2">
                                     <?php if (\App\Helpers\Permission::can('whatsapp.view')): ?>
@@ -182,6 +215,42 @@ ob_start();
                                placeholder="meu-sistema" />
                         <div class="form-text">ID para rastreamento (X-QUEPASA-TRACKID). Deixe vazio para usar o nome da conta.</div>
                     </div>
+                    
+                    <div class="separator separator-dashed my-7"></div>
+                    <h4 class="fw-bold mb-5">Funil e Etapa Padrão</h4>
+                    <div class="alert alert-info d-flex align-items-center p-5 mb-7">
+                        <i class="ki-duotone ki-information fs-2x text-info me-4">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div class="d-flex flex-column">
+                            <span class="fs-7">Conversas criadas por esta conta entrarão automaticamente neste funil/etapa quando não houver automação específica.</span>
+                        </div>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Funil Padrão</label>
+                        <select name="default_funnel_id" id="kt_default_funnel_select" class="form-select form-select-solid" onchange="loadFunnelStages(this.value, 'kt_default_stage_select')">
+                            <option value="">Usar padrão do sistema</option>
+                            <?php if (!empty($funnels)): ?>
+                                <?php foreach ($funnels as $funnel): ?>
+                                    <option value="<?= $funnel['id'] ?>" <?= (!empty($default_funnel_id) && $default_funnel_id == $funnel['id']) ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($funnel['name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </select>
+                        <div class="form-text">Deixe vazio para usar o funil padrão do sistema</div>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Etapa Padrão</label>
+                        <select name="default_stage_id" id="kt_default_stage_select" class="form-select form-select-solid">
+                            <option value="">Selecione um funil primeiro</option>
+                        </select>
+                        <div class="form-text">Deixe vazio para usar a primeira etapa do funil</div>
+                    </div>
                 </div>
                 <div class="modal-footer flex-center">
                     <button type="reset" data-bs-dismiss="modal" class="btn btn-light me-3">Cancelar</button>
@@ -247,6 +316,45 @@ $scripts = '
 <script>
 let currentAccountId = null;
 let qrCodeStatusInterval = null;
+
+// Carregar etapas do funil
+function loadFunnelStages(funnelId, targetSelectId) {
+    const stageSelect = document.getElementById(targetSelectId);
+    
+    if (!funnelId) {
+        stageSelect.innerHTML = "<option value=\"\">Selecione um funil primeiro</option>";
+        return;
+    }
+    
+    // Loading
+    stageSelect.innerHTML = "<option value=\"\">Carregando etapas...</option>";
+    stageSelect.disabled = true;
+    
+    fetch("' . \App\Helpers\Url::to('/funnels') . '/" + funnelId + "/stages/json", {
+        headers: {
+            "X-Requested-With": "XMLHttpRequest"
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        stageSelect.disabled = false;
+        
+        if (data.success && data.stages && data.stages.length > 0) {
+            let html = "<option value=\"\">Usar primeira etapa do funil</option>";
+            data.stages.forEach(stage => {
+                html += `<option value="${stage.id}">${stage.name}</option>`;
+            });
+            stageSelect.innerHTML = html;
+        } else {
+            stageSelect.innerHTML = "<option value=\"\">Nenhuma etapa encontrada</option>";
+        }
+    })
+    .catch(error => {
+        console.error("Erro ao carregar etapas:", error);
+        stageSelect.disabled = false;
+        stageSelect.innerHTML = "<option value=\"\">Erro ao carregar etapas</option>";
+    });
+}
 
 document.addEventListener("DOMContentLoaded", function() {
     const form = document.getElementById("kt_modal_new_whatsapp_form");

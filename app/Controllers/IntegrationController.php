@@ -32,13 +32,33 @@ class IntegrationController
         Permission::abortIfCannot('whatsapp.view');
         
         try {
+            // Buscar contas WhatsApp com informações de funil/etapa
             $accounts = WhatsAppAccount::all();
+            
+            // Enriquecer com nomes de funil e etapa
+            foreach ($accounts as &$account) {
+                if (!empty($account['default_funnel_id'])) {
+                    $funnel = \App\Models\Funnel::find($account['default_funnel_id']);
+                    $account['default_funnel_name'] = $funnel['name'] ?? null;
+                }
+                
+                if (!empty($account['default_stage_id'])) {
+                    $stage = \App\Models\FunnelStage::find($account['default_stage_id']);
+                    $account['default_stage_name'] = $stage['name'] ?? null;
+                }
+            }
+            
+            // Buscar funis disponíveis
+            $funnels = \App\Models\Funnel::getAllActive();
+            
             Response::view('integrations/whatsapp', [
-                'whatsapp_accounts' => $accounts
+                'whatsapp_accounts' => $accounts,
+                'funnels' => $funnels
             ]);
         } catch (\Exception $e) {
             Response::view('integrations/whatsapp', [
                 'whatsapp_accounts' => [],
+                'funnels' => [],
                 'error' => $e->getMessage()
             ]);
         }

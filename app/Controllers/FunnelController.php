@@ -415,4 +415,28 @@ class FunnelController
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
+    
+    /**
+     * Obter etapas de um funil (JSON) para uso em selects dinâmicos
+     */
+    public function getStagesJson(int $id): void
+    {
+        Permission::abortIfCannot('funnels.view');
+        
+        try {
+            $stages = \App\Models\FunnelStage::where('funnel_id', '=', $id);
+            
+            // Ordenar por posição
+            usort($stages, function($a, $b) {
+                return ($a['position'] ?? 0) - ($b['position'] ?? 0);
+            });
+            
+            Response::json([
+                'success' => true,
+                'stages' => $stages
+            ]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
 }

@@ -132,7 +132,8 @@ Router::get('/funnels', [FunnelController::class, 'index'], ['Authentication']);
 Router::get('/funnels/kanban', [FunnelController::class, 'kanban'], ['Authentication']);
 Router::get('/funnels/{id}/kanban', [FunnelController::class, 'kanban'], ['Authentication']);
 Router::get('/funnels/{id}/stages', [FunnelController::class, 'getStages'], ['Authentication']);
-Router::get('/funnels/{id}/stages/{stageId}/json', [FunnelController::class, 'getStageJson'], ['Authentication']);
+Router::get('/funnels/{id}/stages/json', [FunnelController::class, 'getStagesJson'], ['Authentication']); // Todas as etapas em JSON
+Router::get('/funnels/{id}/stages/{stageId}/json', [FunnelController::class, 'getStageJson'], ['Authentication']); // Etapa específica em JSON
 Router::post('/funnels', [FunnelController::class, 'store'], ['Authentication']);
 Router::post('/funnels/{id}/stages', [FunnelController::class, 'createStage'], ['Authentication']);
 Router::post('/funnels/{id}/stages/{stageId}', [FunnelController::class, 'updateStage'], ['Authentication']);

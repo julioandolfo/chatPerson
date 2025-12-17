@@ -830,7 +830,7 @@ function showStageMetrics(stageId, stageName) {
                                             <div>
                                                 <div class="text-gray-500 fs-7">Conversas Atuais</div>
                                                 <div class="fw-bold fs-3">${m.current_count}</div>
-                                                ${m.max_conversations ? `<div class="text-muted fs-8">de ${m.max_conversations} máximo</div>` : \'\'}
+                                                ${m.max_conversations ? "<div class=\"text-muted fs-8\">de " + m.max_conversations + " máximo</div>" : \'\'}
                                             </div>
                                         </div>
                                         ${m.utilization_rate !== null ? `

@@ -18,21 +18,57 @@ function up_add_system_stages_to_funnels() {
     
     // 1. Adicionar campo is_system_stage na tabela funnel_stages
     echo "1. Adicionando campo is_system_stage...\n";
-    $sql = "ALTER TABLE funnel_stages 
-            ADD COLUMN IF NOT EXISTS is_system_stage TINYINT(1) DEFAULT 0 
-            COMMENT 'Etapa do sistema (não pode ser deletada/renomeada)' 
-            AFTER stage_order";
-    $db->exec($sql);
-    echo "   ✅ Campo is_system_stage adicionado!\n\n";
+    
+    // Verificar se coluna já existe
+    $sql = "SHOW COLUMNS FROM funnel_stages LIKE 'is_system_stage'";
+    $stmt = $db->query($sql);
+    $columnExists = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$columnExists) {
+        $sql = "ALTER TABLE funnel_stages 
+                ADD COLUMN is_system_stage TINYINT(1) DEFAULT 0 
+                COMMENT 'Etapa do sistema (não pode ser deletada/renomeada)'";
+        $db->exec($sql);
+        echo "   ✅ Campo is_system_stage adicionado!\n\n";
+    } else {
+        echo "   ℹ️  Campo is_system_stage já existe!\n\n";
+    }
+    
+    // 1.5. Adicionar campo stage_order (usado para ordenação fixa das etapas do sistema)
+    echo "1.5. Adicionando campo stage_order...\n";
+    
+    $sql = "SHOW COLUMNS FROM funnel_stages LIKE 'stage_order'";
+    $stmt = $db->query($sql);
+    $columnExists = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$columnExists) {
+        $sql = "ALTER TABLE funnel_stages 
+                ADD COLUMN stage_order INT DEFAULT 0 
+                COMMENT 'Ordem fixa (1=Entrada, 998=Fechadas, 999=Perdidas)'";
+        $db->exec($sql);
+        echo "   ✅ Campo stage_order adicionado!\n\n";
+    } else {
+        echo "   ℹ️  Campo stage_order já existe!\n\n";
+    }
     
     // 2. Adicionar campo system_stage_type para identificar tipo de etapa do sistema
     echo "2. Adicionando campo system_stage_type...\n";
-    $sql = "ALTER TABLE funnel_stages 
-            ADD COLUMN IF NOT EXISTS system_stage_type VARCHAR(50) NULL 
-            COMMENT 'Tipo da etapa do sistema: entrada, fechadas, perdidas' 
-            AFTER is_system_stage";
-    $db->exec($sql);
-    echo "   ✅ Campo system_stage_type adicionado!\n\n";
+    
+    // Verificar se coluna já existe
+    $sql = "SHOW COLUMNS FROM funnel_stages LIKE 'system_stage_type'";
+    $stmt = $db->query($sql);
+    $columnExists = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$columnExists) {
+        $sql = "ALTER TABLE funnel_stages 
+                ADD COLUMN system_stage_type VARCHAR(50) NULL 
+                COMMENT 'Tipo da etapa do sistema: entrada, fechadas, perdidas' 
+                AFTER is_system_stage";
+        $db->exec($sql);
+        echo "   ✅ Campo system_stage_type adicionado!\n\n";
+    } else {
+        echo "   ℹ️  Campo system_stage_type já existe!\n\n";
+    }
     
     // 3. Buscar todos os funis existentes
     echo "3. Buscando funis existentes...\n";
@@ -131,10 +167,20 @@ function up_add_system_stages_to_funnels() {
     
     // 5. Criar índice para system_stage_type
     echo "5. Criando índice para system_stage_type...\n";
-    $sql = "CREATE INDEX IF NOT EXISTS idx_funnel_stages_system_type 
-            ON funnel_stages(funnel_id, system_stage_type)";
-    $db->exec($sql);
-    echo "   ✅ Índice criado!\n\n";
+    
+    // Verificar se índice já existe
+    $sql = "SHOW INDEX FROM funnel_stages WHERE Key_name = 'idx_funnel_stages_system_type'";
+    $stmt = $db->query($sql);
+    $indexExists = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$indexExists) {
+        $sql = "CREATE INDEX idx_funnel_stages_system_type 
+                ON funnel_stages(funnel_id, system_stage_type)";
+        $db->exec($sql);
+        echo "   ✅ Índice criado!\n\n";
+    } else {
+        echo "   ℹ️  Índice já existe!\n\n";
+    }
     
     echo "=== Migration Concluída com Sucesso! ===\n";
 }
@@ -152,19 +198,61 @@ function down_add_system_stages_to_funnels() {
     
     // 2. Remover índice
     echo "2. Removendo índice...\n";
-    $sql = "DROP INDEX IF EXISTS idx_funnel_stages_system_type ON funnel_stages";
-    $db->exec($sql);
-    echo "   ✅ Índice removido!\n\n";
+    
+    // Verificar se índice existe
+    $sql = "SHOW INDEX FROM funnel_stages WHERE Key_name = 'idx_funnel_stages_system_type'";
+    $stmt = $db->query($sql);
+    $indexExists = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($indexExists) {
+        $sql = "DROP INDEX idx_funnel_stages_system_type ON funnel_stages";
+        $db->exec($sql);
+        echo "   ✅ Índice removido!\n\n";
+    } else {
+        echo "   ℹ️  Índice não existe!\n\n";
+    }
     
     // 3. Remover campos
     echo "3. Removendo campos...\n";
-    $sql = "ALTER TABLE funnel_stages DROP COLUMN IF EXISTS system_stage_type";
-    $db->exec($sql);
-    echo "   ✅ Campo system_stage_type removido!\n";
     
-    $sql = "ALTER TABLE funnel_stages DROP COLUMN IF EXISTS is_system_stage";
-    $db->exec($sql);
-    echo "   ✅ Campo is_system_stage removido!\n\n";
+    // Verificar e remover system_stage_type
+    $sql = "SHOW COLUMNS FROM funnel_stages LIKE 'system_stage_type'";
+    $stmt = $db->query($sql);
+    $columnExists = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($columnExists) {
+        $sql = "ALTER TABLE funnel_stages DROP COLUMN system_stage_type";
+        $db->exec($sql);
+        echo "   ✅ Campo system_stage_type removido!\n";
+    } else {
+        echo "   ℹ️  Campo system_stage_type não existe!\n";
+    }
+    
+    // Verificar e remover is_system_stage
+    $sql = "SHOW COLUMNS FROM funnel_stages LIKE 'is_system_stage'";
+    $stmt = $db->query($sql);
+    $columnExists = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($columnExists) {
+        $sql = "ALTER TABLE funnel_stages DROP COLUMN is_system_stage";
+        $db->exec($sql);
+        echo "   ✅ Campo is_system_stage removido!\n";
+    } else {
+        echo "   ℹ️  Campo is_system_stage não existe!\n";
+    }
+    
+    // Verificar e remover stage_order
+    $sql = "SHOW COLUMNS FROM funnel_stages LIKE 'stage_order'";
+    $stmt = $db->query($sql);
+    $columnExists = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($columnExists) {
+        $sql = "ALTER TABLE funnel_stages DROP COLUMN stage_order";
+        $db->exec($sql);
+        echo "   ✅ Campo stage_order removido!\n\n";
+    } else {
+        echo "   ℹ️  Campo stage_order não existe!\n\n";
+    }
     
     echo "=== Rollback Concluído! ===\n";
 }

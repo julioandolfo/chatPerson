@@ -4,7 +4,18 @@
  */
 
 // Variáveis globais (definidas via PHP no HTML)
-// window.KANBAN_CONFIG = { funnelId, moveConversationUrl, funnelBaseUrl, funnelsUrl }
+// window.KANBAN_CONFIG = { funnelId, moveConversationUrl, funnelBaseUrl, funnelsUrl, BASE_URL }
+
+// Toast global (fallback para evitar "toast is not defined")
+if (!window.toast && typeof Swal !== 'undefined') {
+    window.toast = Swal.mixin({
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 2000,
+        timerProgressBar: true
+    });
+}
 
 let draggedElement = null;
 
@@ -911,10 +922,12 @@ function quickAssignAgent(conversationId) {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        toast.fire({
-                            icon: 'success',
-                            title: 'Agente atribuído com sucesso!'
-                        });
+                        if (window.toast) {
+                            window.toast.fire({
+                                icon: 'success',
+                                title: 'Agente atribuído com sucesso!'
+                            });
+                        }
                         
                         // Recarregar página para atualizar card
                         setTimeout(() => location.reload(), 1000);
@@ -966,10 +979,12 @@ function quickResolve(conversationId) {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    toast.fire({
-                        icon: 'success',
-                        title: 'Conversa resolvida!'
-                    });
+                    if (window.toast) {
+                        window.toast.fire({
+                            icon: 'success',
+                            title: 'Conversa resolvida!'
+                        });
+                    }
                     
                     // Remover card do DOM com animação
                     const card = document.querySelector(`[data-conversation-id="${conversationId}"]`);

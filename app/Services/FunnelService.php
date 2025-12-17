@@ -77,6 +77,17 @@ class FunnelService
             throw new \InvalidArgumentException('Funil não encontrado');
         }
 
+        // Converter valores vazios para null ANTES da validação
+        if (isset($data['max_conversations']) && $data['max_conversations'] === '') {
+            $data['max_conversations'] = null;
+        }
+        if (isset($data['sla_hours']) && $data['sla_hours'] === '') {
+            $data['sla_hours'] = null;
+        }
+        if (isset($data['auto_assign_department_id']) && $data['auto_assign_department_id'] === '') {
+            $data['auto_assign_department_id'] = null;
+        }
+
         $errors = Validator::validate($data, [
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -113,17 +124,6 @@ class FunnelService
         if (isset($data['blocked_tags']) && is_string($data['blocked_tags'])) {
             $data['blocked_tags'] = json_decode($data['blocked_tags'], true);
         }
-        
-        // Converter valores vazios para null
-        if (isset($data['max_conversations']) && $data['max_conversations'] === '') {
-            $data['max_conversations'] = null;
-        }
-        if (isset($data['sla_hours']) && $data['sla_hours'] === '') {
-            $data['sla_hours'] = null;
-        }
-        if (isset($data['auto_assign_department_id']) && $data['auto_assign_department_id'] === '') {
-            $data['auto_assign_department_id'] = null;
-        }
 
         // Se não informar posição, colocar no final
         if (empty($data['position'])) {
@@ -154,6 +154,17 @@ class FunnelService
             throw new \InvalidArgumentException('Estágio não encontrado');
         }
 
+        // Converter valores vazios para null ANTES da validação
+        if (isset($data['max_conversations']) && $data['max_conversations'] === '') {
+            $data['max_conversations'] = null;
+        }
+        if (isset($data['sla_hours']) && $data['sla_hours'] === '') {
+            $data['sla_hours'] = null;
+        }
+        if (isset($data['auto_assign_department_id']) && $data['auto_assign_department_id'] === '') {
+            $data['auto_assign_department_id'] = null;
+        }
+
         $errors = Validator::validate($data, [
             'name' => 'nullable|string|max:255',
             'description' => 'nullable|string',
@@ -172,6 +183,10 @@ class FunnelService
             'auto_assign_method' => 'nullable|string|in:round-robin,by-load,by-specialty',
             'sla_hours' => 'nullable|integer|min:1'
         ]);
+
+        if (!empty($errors)) {
+            throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));
+        }
         
         // Processar campos JSON
         if (isset($data['blocked_stages']) && is_string($data['blocked_stages'])) {
@@ -185,21 +200,6 @@ class FunnelService
         }
         if (isset($data['blocked_tags']) && is_string($data['blocked_tags'])) {
             $data['blocked_tags'] = json_decode($data['blocked_tags'], true);
-        }
-        
-        // Converter valores vazios para null
-        if (isset($data['max_conversations']) && $data['max_conversations'] === '') {
-            $data['max_conversations'] = null;
-        }
-        if (isset($data['sla_hours']) && $data['sla_hours'] === '') {
-            $data['sla_hours'] = null;
-        }
-        if (isset($data['auto_assign_department_id']) && $data['auto_assign_department_id'] === '') {
-            $data['auto_assign_department_id'] = null;
-        }
-
-        if (!empty($errors)) {
-            throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));
         }
 
         // Se for padrão, remover padrão dos outros estágios do mesmo funil

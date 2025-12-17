@@ -39,12 +39,12 @@ ob_start();
                     <span class="path1"></span>
                     <span class="path2"></span>
                 </i>
-                <h3 class="text-gray-800 fw-bold mb-2">Nenhum estÃ¡gio encontrado</h3>
-                <div class="text-gray-500 fs-6 mb-7">Crie estÃ¡gios para este funil.</div>
+                <h3 class="text-gray-800 fw-bold mb-2">Nenhum estágio encontrado</h3>
+                <div class="text-gray-500 fs-6 mb-7">Crie estágios para este funil.</div>
                 <?php if (\App\Helpers\Permission::can('funnels.edit')): ?>
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#kt_modal_stage">
                     <i class="ki-duotone ki-plus fs-2"></i>
-                    Criar Primeiro EstÃ¡gio
+                    Criar Primeiro Estágio
                 </button>
                 <?php endif; ?>
             </div>
@@ -53,7 +53,7 @@ ob_start();
             <div class="d-flex justify-content-end mb-5">
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#kt_modal_stage">
                     <i class="ki-duotone ki-plus fs-2"></i>
-                    Novo EstÃ¡gio
+                    Novo Estágio
                 </button>
             </div>
             <?php endif; ?>
@@ -81,7 +81,7 @@ ob_start();
                                         </div>
                                         <button type="button" class="btn btn-sm btn-icon btn-light-info" 
                                                 onclick="showStageMetrics(<?= $stage['id'] ?>, <?= htmlspecialchars(json_encode($stage['name']), ENT_QUOTES, 'UTF-8') ?>)" 
-                                                title="Ver mÃ©tricas">
+                                                title="Ver métricas">
                                             <i class="ki-duotone ki-chart-simple fs-2">
                                                 <span class="path1"></span>
                                                 <span class="path2"></span>
@@ -153,7 +153,7 @@ ob_start();
                                             <?php endif; ?>
                                             <div class="d-flex align-items-center justify-content-between">
                                                 <?php if ($conv['unread_count'] > 0): ?>
-                                                    <span class="badge badge-light-danger"><?= $conv['unread_count'] ?> nÃ£o lidas</span>
+                                                    <span class="badge badge-light-danger"><?= $conv['unread_count'] ?> não lidas</span>
                                                 <?php endif; ?>
                                                 <span class="text-muted fs-7">
                                                     <?= $conv['last_message_at'] ? date('d/m H:i', strtotime($conv['last_message_at'])) : '' ?>
@@ -172,13 +172,13 @@ ob_start();
 </div>
 <!--end::Card-->
 
-<!--begin::Modal - Novo/Editar EstÃ¡gio-->
+<!--begin::Modal - Novo/Editar Estágio-->
 <?php if (\App\Helpers\Permission::can('funnels.edit')): ?>
 <div class="modal fade" id="kt_modal_stage" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered mw-900px">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="fw-bold" id="kt_modal_stage_title">Novo EstÃ¡gio</h2>
+                <h2 class="fw-bold" id="kt_modal_stage_title">Novo Estágio</h2>
                 <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
                     <i class="ki-duotone ki-cross fs-1">
                         <span class="path1"></span>
@@ -193,17 +193,17 @@ ob_start();
                     <ul class="nav nav-stretch nav-line-tabs nav-line-tabs-2x border-transparent fs-5 fw-bold mb-5">
                         <li class="nav-item mt-2">
                             <a class="nav-link text-active-primary ms-0 me-10 active" data-bs-toggle="tab" href="#kt_tab_stage_basic">
-                                BÃ¡sico
+                                Básico
                             </a>
                         </li>
                         <li class="nav-item mt-2">
                             <a class="nav-link text-active-primary ms-0 me-10" data-bs-toggle="tab" href="#kt_tab_stage_validation">
-                                ValidaÃ§Ãµes
+                                Validações
                             </a>
                         </li>
                         <li class="nav-item mt-2">
                             <a class="nav-link text-active-primary ms-0 me-10" data-bs-toggle="tab" href="#kt_tab_stage_auto">
-                                Auto-atribuiÃ§Ã£o
+                                Auto-atribuição
                             </a>
                         </li>
                     </ul>
@@ -211,15 +211,15 @@ ob_start();
                     
                     <!--begin::Tab Content-->
                     <div class="tab-content">
-                        <!--begin::Tab Pane - BÃ¡sico-->
+                        <!--begin::Tab Pane - Básico-->
                         <div class="tab-pane fade show active" id="kt_tab_stage_basic" role="tabpanel">
                             <div class="fv-row mb-7">
                                 <label class="required fw-semibold fs-6 mb-2">Nome</label>
-                                <input type="text" name="name" id="kt_stage_name" class="form-control form-control-solid" placeholder="Nome do estÃ¡gio" required />
+                                <input type="text" name="name" id="kt_stage_name" class="form-control form-control-solid" placeholder="Nome do estágio" required />
                             </div>
                             <div class="fv-row mb-7">
-                                <label class="fw-semibold fs-6 mb-2">DescriÃ§Ã£o</label>
-                                <textarea name="description" id="kt_stage_description" class="form-control form-control-solid" rows="3" placeholder="DescriÃ§Ã£o do estÃ¡gio"></textarea>
+                                <label class="fw-semibold fs-6 mb-2">Descrição</label>
+                                <textarea name="description" id="kt_stage_description" class="form-control form-control-solid" rows="3" placeholder="Descrição do estágio"></textarea>
                             </div>
                             <div class="fv-row mb-7">
                                 <label class="fw-semibold fs-6 mb-2">Cor</label>
@@ -229,30 +229,30 @@ ob_start();
                                 <div class="form-check form-check-custom form-check-solid">
                                     <input class="form-check-input" type="checkbox" name="is_default" value="1" id="kt_stage_default" />
                                     <label class="form-check-label" for="kt_stage_default">
-                                        EstÃ¡gio padrÃ£o (para novas conversas)
+                                        Estágio padrão (para novas conversas)
                                     </label>
                                 </div>
                             </div>
                             <div class="fv-row mb-7">
                                 <label class="fw-semibold fs-6 mb-2">Limite de Conversas</label>
                                 <input type="number" name="max_conversations" id="kt_stage_max_conversations" class="form-control form-control-solid" min="1" placeholder="Deixe vazio para ilimitado" />
-                                <div class="form-text">NÃºmero mÃ¡ximo de conversas simultÃ¢neas neste estÃ¡gio</div>
+                                <div class="form-text">Número máximo de conversas simultâneas neste estágio</div>
                             </div>
                             <div class="fv-row mb-7">
                                 <label class="fw-semibold fs-6 mb-2">SLA (horas)</label>
                                 <input type="number" name="sla_hours" id="kt_stage_sla_hours" class="form-control form-control-solid" min="1" placeholder="Deixe vazio para sem SLA" />
-                                <div class="form-text">Tempo mÃ¡ximo em horas que uma conversa pode ficar neste estÃ¡gio</div>
+                                <div class="form-text">Tempo máximo em horas que uma conversa pode ficar neste estágio</div>
                             </div>
                         </div>
-                        <!--end::Tab Pane - BÃ¡sico-->
+                        <!--end::Tab Pane - Básico-->
                         
-                        <!--begin::Tab Pane - ValidaÃ§Ãµes-->
+                        <!--begin::Tab Pane - Validações-->
                         <div class="tab-pane fade" id="kt_tab_stage_validation" role="tabpanel">
                             <div class="fv-row mb-7">
                                 <div class="form-check form-check-custom form-check-solid mb-5">
                                     <input class="form-check-input" type="checkbox" name="allow_move_back" value="1" id="kt_stage_allow_move_back" checked />
                                     <label class="form-check-label" for="kt_stage_allow_move_back">
-                                        Permitir mover conversas para estÃ¡gios anteriores
+                                        Permitir mover conversas para estágios anteriores
                                     </label>
                                 </div>
                             </div>
@@ -260,16 +260,16 @@ ob_start();
                                 <div class="form-check form-check-custom form-check-solid mb-5">
                                     <input class="form-check-input" type="checkbox" name="allow_skip_stages" value="1" id="kt_stage_allow_skip_stages" />
                                     <label class="form-check-label" for="kt_stage_allow_skip_stages">
-                                        Permitir pular estÃ¡gios intermediÃ¡rios
+                                        Permitir pular estágios intermediários
                                     </label>
-                                    <div class="form-text">Se desmarcado, conversas sÃ³ podem avanÃ§ar um estÃ¡gio por vez</div>
+                                    <div class="form-text">Se desmarcado, conversas só podem avançar um estágio por vez</div>
                                 </div>
                             </div>
                             <div class="fv-row mb-7">
-                                <label class="fw-semibold fs-6 mb-2">EstÃ¡gios Bloqueados</label>
-                                <select name="blocked_stages[]" id="kt_stage_blocked_stages" class="form-select form-select-solid" multiple data-kt-select2="true" data-placeholder="Selecione os estÃ¡gios bloqueados">
+                                <label class="fw-semibold fs-6 mb-2">Estágios Bloqueados</label>
+                                <select name="blocked_stages[]" id="kt_stage_blocked_stages" class="form-select form-select-solid" multiple data-kt-select2="true" data-placeholder="Selecione os estágios bloqueados">
                                     <?php
-                                    // Carregar todos os estÃ¡gios do funil atual
+                                    // Carregar todos os estágios do funil atual
                                     if (!empty($funnel['stages'])):
                                         foreach ($funnel['stages'] as $stage):
                                     ?>
@@ -279,11 +279,11 @@ ob_start();
                                     endif;
                                     ?>
                                 </select>
-                                <div class="form-text">Conversas destes estÃ¡gios nÃ£o podem ser movidas para este estÃ¡gio</div>
+                                <div class="form-text">Conversas destes estágios não podem ser movidas para este estágio</div>
                             </div>
                             <div class="fv-row mb-7">
-                                <label class="fw-semibold fs-6 mb-2">EstÃ¡gios ObrigatÃ³rios</label>
-                                <select name="required_stages[]" id="kt_stage_required_stages" class="form-select form-select-solid" multiple data-kt-select2="true" data-placeholder="Selecione os estÃ¡gios obrigatÃ³rios">
+                                <label class="fw-semibold fs-6 mb-2">Estágios Obrigatórios</label>
+                                <select name="required_stages[]" id="kt_stage_required_stages" class="form-select form-select-solid" multiple data-kt-select2="true" data-placeholder="Selecione os estágios obrigatórios">
                                     <?php
                                     if (!empty($funnel['stages'])):
                                         foreach ($funnel['stages'] as $stage):
@@ -294,11 +294,11 @@ ob_start();
                                     endif;
                                     ?>
                                 </select>
-                                <div class="form-text">Conversas devem passar por estes estÃ¡gios antes de entrar neste estÃ¡gio</div>
+                                <div class="form-text">Conversas devem passar por estes estágios antes de entrar neste estágio</div>
                             </div>
                             <div class="fv-row mb-7">
-                                <label class="fw-semibold fs-6 mb-2">Tags ObrigatÃ³rias</label>
-                                <select name="required_tags[]" id="kt_stage_required_tags" class="form-select form-select-solid" multiple data-kt-select2="true" data-placeholder="Selecione as tags obrigatÃ³rias">
+                                <label class="fw-semibold fs-6 mb-2">Tags Obrigatórias</label>
+                                <select name="required_tags[]" id="kt_stage_required_tags" class="form-select form-select-solid" multiple data-kt-select2="true" data-placeholder="Selecione as tags obrigatórias">
                                     <?php
                                     $allTags = \App\Models\Tag::all();
                                     foreach ($allTags as $tag):
@@ -306,7 +306,7 @@ ob_start();
                                         <option value="<?= $tag['id'] ?>"><?= htmlspecialchars($tag['name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
-                                <div class="form-text">Conversas devem ter estas tags para entrar neste estÃ¡gio</div>
+                                <div class="form-text">Conversas devem ter estas tags para entrar neste estágio</div>
                             </div>
                             <div class="fv-row mb-7">
                                 <label class="fw-semibold fs-6 mb-2">Tags Bloqueadas</label>
@@ -317,23 +317,23 @@ ob_start();
                                         <option value="<?= $tag['id'] ?>"><?= htmlspecialchars($tag['name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
-                                <div class="form-text">Conversas com estas tags nÃ£o podem entrar neste estÃ¡gio</div>
+                                <div class="form-text">Conversas com estas tags não podem entrar neste estágio</div>
                             </div>
                         </div>
-                        <!--end::Tab Pane - ValidaÃ§Ãµes-->
+                        <!--end::Tab Pane - Validações-->
                         
-                        <!--begin::Tab Pane - Auto-atribuiÃ§Ã£o-->
+                        <!--begin::Tab Pane - Auto-atribuição-->
                         <div class="tab-pane fade" id="kt_tab_stage_auto" role="tabpanel">
                             <div class="fv-row mb-7">
                                 <div class="form-check form-check-custom form-check-solid mb-5">
                                     <input class="form-check-input" type="checkbox" name="auto_assign" value="1" id="kt_stage_auto_assign" />
                                     <label class="form-check-label" for="kt_stage_auto_assign">
-                                        Auto-atribuir conversas ao entrar no estÃ¡gio
+                                        Auto-atribuir conversas ao entrar no estágio
                                     </label>
                                 </div>
                             </div>
                             <div class="fv-row mb-7" id="kt_auto_assign_fields" style="display: none;">
-                                <label class="fw-semibold fs-6 mb-2">Departamento para Auto-atribuiÃ§Ã£o</label>
+                                <label class="fw-semibold fs-6 mb-2">Departamento para Auto-atribuição</label>
                                 <select name="auto_assign_department_id" id="kt_stage_auto_assign_department" class="form-select form-select-solid">
                                     <option value="">Selecione um departamento</option>
                                     <?php
@@ -343,19 +343,19 @@ ob_start();
                                         <option value="<?= $dept['id'] ?>"><?= htmlspecialchars($dept['name']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
-                                <div class="form-text">Deixe vazio para atribuir a qualquer agente disponÃ­vel</div>
+                                <div class="form-text">Deixe vazio para atribuir a qualquer agente disponível</div>
                             </div>
                             <div class="fv-row mb-7" id="kt_auto_assign_method_field" style="display: none;">
-                                <label class="fw-semibold fs-6 mb-2">MÃ©todo de DistribuiÃ§Ã£o</label>
+                                <label class="fw-semibold fs-6 mb-2">Método de Distribuição</label>
                                 <select name="auto_assign_method" id="kt_stage_auto_assign_method" class="form-select form-select-solid">
-                                    <option value="round-robin">Round-Robin (DistribuiÃ§Ã£o igual)</option>
+                                    <option value="round-robin">Round-Robin (Distribuição igual)</option>
                                     <option value="by-load">Por Carga (Menos conversas)</option>
                                     <option value="by-specialty">Por Especialidade</option>
                                 </select>
-                                <div class="form-text">Como as conversas serÃ£o distribuÃ­das entre os agentes</div>
+                                <div class="form-text">Como as conversas serão distribuídas entre os agentes</div>
                             </div>
                         </div>
-                        <!--end::Tab Pane - Auto-atribuiÃ§Ã£o-->
+                        <!--end::Tab Pane - Auto-atribuição-->
                     </div>
                     <!--end::Tab Content-->
                 </div>
@@ -372,7 +372,7 @@ ob_start();
     </div>
 </div>
 <?php endif; ?>
-<!--end::Modal - Novo/Editar EstÃ¡gio-->
+<!--end::Modal - Novo/Editar Estágio-->
 
 <?php 
 $content = ob_get_clean(); 
@@ -415,9 +415,9 @@ $styles = '
 ';
 $funnelIdForJs = isset($currentFunnelId) ? intval($currentFunnelId) : 0;
 $scripts = '
-<!-- ConfiguraÃ§Ãµes do Kanban -->
+<!-- Configurações do Kanban -->
 <script>
-// ConfiguraÃ§Ãµes globais para o Kanban.js
+// Configurações globais para o Kanban.js
 window.KANBAN_CONFIG = {
     funnelId: ' . $funnelIdForJs . ',
     moveConversationUrl: "' . \App\Helpers\Url::to('/funnels/' . $funnelIdForJs . '/conversations/move') . '",

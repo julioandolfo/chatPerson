@@ -480,6 +480,15 @@ document.addEventListener("DOMContentLoaded", function() {
                 formData.delete("is_default");
             }
             
+            // Limpar campos numéricos vazios (para não causar erro de validação)
+            const numericFields = ['max_conversations', 'auto_assign_department_id', 'sla_hours'];
+            numericFields.forEach(field => {
+                const value = formData.get(field);
+                if (value === '' || value === null) {
+                    formData.delete(field);
+                }
+            });
+            
             // Processar arrays JSON
             const blockedStagesEl = document.getElementById("kt_stage_blocked_stages");
             const requiredStagesEl = document.getElementById("kt_stage_required_stages");

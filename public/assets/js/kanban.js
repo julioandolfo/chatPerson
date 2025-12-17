@@ -539,23 +539,28 @@ document.addEventListener("DOMContentLoaded", function() {
                 method: method,
                 body: formData
             })
-            .then(response => {
+            .then(async (response) => {
                 console.log("Response status:", response.status);
                 console.log("Response ok:", response.ok);
                 
-                // Verificar se resposta é JSON
                 const contentType = response.headers.get("content-type");
                 console.log("Content-Type:", contentType);
-                
+
+                // Se não for JSON, tentar ler o corpo como texto e exibir para debug
                 if (!contentType || !contentType.includes("application/json")) {
-                    // Retornar o HTML para debug
-                    return response.text().then(html => {
-                        console.error("❌ Resposta HTML recebida:");
-                        console.error(html);
-                        throw new Error("Resposta não é JSON. Content-Type: " + contentType + "\n\nVeja o console para detalhes do HTML retornado.");
-                    });
+                    const html = await response.text();
+                    console.error("❌ Resposta não JSON recebida (HTML/text):");
+                    console.error(html);
+
+                    const snippet = html.slice(0, 1200); // mostra no modal
+                    throw new Error(
+                        "Resposta não é JSON. Status: " + response.status +
+                        " | Content-Type: " + contentType +
+                        "\n\nPrévia da resposta:\n" + snippet
+                    );
                 }
                 
+                // OK, é JSON
                 return response.json();
             })
             .then(data => {
@@ -589,7 +594,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 Swal.fire({
                     icon: 'error',
                     title: 'Erro ao salvar estágio',
-                    html: '<p>' + error.message + '</p><small>Verifique o console para mais detalhes</small>',
+                    html: '<pre style="text-align:left; white-space:pre-wrap; max-height:300px; overflow:auto;">' + (error.message || '') + '</pre>',
                     confirmButtonText: 'OK'
                 });
             });

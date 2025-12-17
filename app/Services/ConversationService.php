@@ -10,6 +10,9 @@ use App\Models\Conversation;
 use App\Models\Contact;
 use App\Models\Message;
 use App\Models\User;
+use App\Models\WhatsAppAccount;
+use App\Models\Funnel;
+use App\Models\Setting;
 use App\Helpers\Validator;
 use App\Helpers\Logger;
 
@@ -52,6 +55,60 @@ class ConversationService
         $contact = Contact::find($data['contact_id']);
         if (!$contact) {
             throw new \Exception('Contato não encontrado');
+        }
+
+        // ------------------------------------------------------------------
+        // Resolver funil/etapa padrão (WhatsApp -> integração -> sistema)
+        // ------------------------------------------------------------------
+        $funnelId = $data['funnel_id'] ?? null;
+        $stageId = $data['stage_id'] ?? null;
+
+        // 1) Defaults da conta WhatsApp, se aplicável (prioridade da integração)
+        if (!empty($data['whatsapp_account_id'])) {
+            try {
+                $account = WhatsAppAccount::find((int)$data['whatsapp_account_id']);
+                if ($account && !empty($account['default_funnel_id'])) {
+                    $funnelId = (int)$account['default_funnel_id'];
+                    if (!empty($account['default_stage_id'])) {
+                        $stageId = (int)$account['default_stage_id'];
+                    }
+                }
+            } catch (\Exception $e) {
+                error_log("Conversas: erro ao aplicar defaults da conta WhatsApp: " . $e->getMessage());
+            }
+        }
+
+        // 2) Fallback: padrão do sistema
+        if (!$funnelId || !$stageId) {
+            try {
+                $defaultConfig = Setting::get('system_default_funnel_stage');
+                if (is_array($defaultConfig)) {
+                    $funnelId = $funnelId ?: ($defaultConfig['funnel_id'] ?? null);
+                    $stageId = $stageId ?: ($defaultConfig['stage_id'] ?? null);
+                }
+            } catch (\Exception $e) {
+                error_log("Conversas: erro ao obter padrão do sistema: " . $e->getMessage());
+            }
+        }
+
+        // 3) Se tem funil mas não etapa, pegar primeira etapa do funil
+        if ($funnelId && !$stageId) {
+            try {
+                $stages = Funnel::getStages((int)$funnelId);
+                if (!empty($stages)) {
+                    $stageId = (int)$stages[0]['id'];
+                }
+            } catch (\Exception $e) {
+                error_log("Conversas: erro ao obter primeira etapa do funil: " . $e->getMessage());
+            }
+        }
+
+        // Aplicar nos dados
+        if ($funnelId) {
+            $data['funnel_id'] = $funnelId;
+        }
+        if ($stageId) {
+            $data['stage_id'] = $stageId;
         }
 
         // Criar conversa

@@ -4631,6 +4631,28 @@ function updateConversationSidebar(conversation, tags) {
         }
     }
     
+    // Funil/Etapa
+    const funnelItem = sidebar.querySelector('#sidebar-funnel-item');
+    const funnelNameEl = sidebar.querySelector('[data-field="funnel_name"]');
+    if (funnelItem && funnelNameEl) {
+        if (conversation.funnel_name) {
+            funnelItem.style.display = 'flex';
+            funnelNameEl.textContent = conversation.funnel_name;
+        } else {
+            funnelItem.style.display = 'none';
+        }
+    }
+    const stageItem = sidebar.querySelector('#sidebar-stage-item');
+    const stageNameEl = sidebar.querySelector('[data-field="stage_name"]');
+    if (stageItem && stageNameEl) {
+        if (conversation.stage_name) {
+            stageItem.style.display = 'flex';
+            stageNameEl.textContent = conversation.stage_name;
+        } else {
+            stageItem.style.display = 'none';
+        }
+    }
+    
     // Atualizar setor
     const departmentEl = sidebar.querySelector('[data-field="department_name"]');
     const departmentItem = sidebar.querySelector('#sidebar-department-item');

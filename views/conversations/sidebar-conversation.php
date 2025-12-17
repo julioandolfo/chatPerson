@@ -192,6 +192,16 @@
                         <span class="sidebar-info-label">Canal:</span>
                         <span class="sidebar-info-value" data-field="channel">-</span>
                     </div>
+
+                    <div class="sidebar-info-item" id="sidebar-funnel-item" style="display: none;">
+                        <span class="sidebar-info-label">Funil:</span>
+                        <span class="sidebar-info-value" data-field="funnel_name">-</span>
+                    </div>
+                    
+                    <div class="sidebar-info-item" id="sidebar-stage-item" style="display: none;">
+                        <span class="sidebar-info-label">Etapa:</span>
+                        <span class="sidebar-info-value" data-field="stage_name">-</span>
+                    </div>
                     
                     <!-- Informações WhatsApp (mostrar apenas se canal for WhatsApp) -->
                     <div class="sidebar-info-item" id="sidebar-whatsapp-info" style="display: none;">

@@ -417,11 +417,15 @@ class Conversation extends Model
                        ct.name as contact_name, ct.phone as contact_phone, ct.email as contact_email, ct.avatar as contact_avatar,
                        u.name as agent_name, u.email as agent_email, u.avatar as agent_avatar,
                        wa.name as whatsapp_account_name, wa.phone_number as whatsapp_account_phone,
+                       f.name as funnel_name,
+                       fs.name as stage_name,
                        (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact' AND m.read_at IS NULL) as unread_count
                 FROM conversations c
                 LEFT JOIN contacts ct ON c.contact_id = ct.id
                 LEFT JOIN users u ON c.agent_id = u.id
                 LEFT JOIN whatsapp_accounts wa ON c.whatsapp_account_id = wa.id
+                LEFT JOIN funnels f ON c.funnel_id = f.id
+                LEFT JOIN funnel_stages fs ON c.funnel_stage_id = fs.id
                 WHERE c.id = ?";
         
         return Database::fetch($sql, [$id]);

@@ -721,7 +721,8 @@ window.KANBAN_CONFIG = {
     funnelId: ' . $funnelIdForJs . ',
     moveConversationUrl: "' . \App\Helpers\Url::to('/funnels/' . $funnelIdForJs . '/conversations/move') . '",
     funnelBaseUrl: "' . \App\Helpers\Url::to('/funnels/' . $funnelIdForJs) . '",
-    funnelsUrl: "' . \App\Helpers\Url::to('/funnels') . '"
+    funnelsUrl: "' . \App\Helpers\Url::to('/funnels') . '",
+    BASE_URL: "' . \App\Helpers\Url::to('') . '"
 };
 </script>
 <!-- Kanban JavaScript -->

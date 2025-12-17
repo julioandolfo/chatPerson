@@ -4126,6 +4126,7 @@ function updateConversationListPreview(conversationId, lastMessage) {
 function selectConversation(id) {
     // Atualizar conversa selecionada globalmente
     currentConversationId = parseInt(id);
+    window.currentConversationId = currentConversationId;
 
     // Marcar conversa como ativa na lista
     document.querySelectorAll('.conversation-item').forEach(item => {

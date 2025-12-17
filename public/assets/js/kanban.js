@@ -858,7 +858,7 @@ function showFunnelMetrics(funnelId) {
  */
 function quickAssignAgent(conversationId) {
     // Carregar lista de agentes disponíveis
-    fetch(window.KANBAN_CONFIG.BASE_URL + '/users?role=agent', {
+    fetch(window.KANBAN_CONFIG.BASE_URL + '/agents', {
         headers: {
             'X-Requested-With': 'XMLHttpRequest',
             'Accept': 'application/json'
@@ -866,11 +866,11 @@ function quickAssignAgent(conversationId) {
     })
     .then(response => response.json())
     .then(data => {
-        if (!data.success || !data.users) {
+        if (!data.success || !data.agents) {
             throw new Error('Erro ao carregar agentes');
         }
         
-        const agents = data.users;
+        const agents = data.agents;
         const agentOptions = agents.map(a => 
             `<option value="${a.id}">${a.name}${a.email ? ' - ' + a.email : ''}</option>`
         ).join('');

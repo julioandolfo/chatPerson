@@ -49,7 +49,7 @@ class IntegrationController
             }
             
             // Buscar funis disponíveis
-            $funnels = \App\Models\Funnel::getAllActive();
+            $funnels = \App\Models\Funnel::whereActive();
             
             Response::view('integrations/whatsapp', [
                 'whatsapp_accounts' => $accounts,

@@ -20,12 +20,12 @@ document.addEventListener("DOMContentLoaded", function() {
     kanbanItems.forEach(item => {
         item.addEventListener("dragstart", function(e) {
             draggedElement = this;
-            this.style.opacity = "0.5";
+            this.classList.add("dragging");
             e.dataTransfer.effectAllowed = "move";
         });
         
         item.addEventListener("dragend", function() {
-            this.style.opacity = "1";
+            this.classList.remove("dragging");
             draggedElement = null;
         });
     });
@@ -850,6 +850,163 @@ function showFunnelMetrics(funnelId) {
 }
 
 // ============================================================================
+// AÇÕES RÁPIDAS DOS CARDS
+// ============================================================================
+
+/**
+ * Atribuir agente rapidamente
+ */
+function quickAssignAgent(conversationId) {
+    // Carregar lista de agentes disponíveis
+    fetch(window.KANBAN_CONFIG.BASE_URL + '/users?role=agent', {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success || !data.users) {
+            throw new Error('Erro ao carregar agentes');
+        }
+        
+        const agents = data.users;
+        const agentOptions = agents.map(a => 
+            `<option value="${a.id}">${a.name}${a.email ? ' - ' + a.email : ''}</option>`
+        ).join('');
+        
+        Swal.fire({
+            title: 'Atribuir Agente',
+            html: `
+                <select id="swal-agent-select" class="form-select">
+                    <option value="">Selecione um agente...</option>
+                    ${agentOptions}
+                </select>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Atribuir',
+            cancelButtonText: 'Cancelar',
+            preConfirm: () => {
+                const agentId = document.getElementById('swal-agent-select').value;
+                if (!agentId) {
+                    Swal.showValidationMessage('Selecione um agente');
+                    return false;
+                }
+                return agentId;
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const agentId = result.value;
+                
+                const formData = new FormData();
+                formData.append('agent_id', agentId);
+                
+                fetch(window.KANBAN_CONFIG.BASE_URL + '/conversations/' + conversationId + '/assign', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        toast.fire({
+                            icon: 'success',
+                            title: 'Agente atribuído com sucesso!'
+                        });
+                        
+                        // Recarregar página para atualizar card
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        throw new Error(data.message || 'Erro ao atribuir agente');
+                    }
+                })
+                .catch(error => {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: error.message
+                    });
+                });
+            }
+        });
+    })
+    .catch(error => {
+        console.error('Erro ao carregar agentes:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro ao carregar agentes: ' + error.message
+        });
+    });
+}
+
+/**
+ * Resolver conversa rapidamente
+ */
+function quickResolve(conversationId) {
+    Swal.fire({
+        title: 'Resolver Conversa',
+        text: 'Deseja realmente marcar esta conversa como resolvida?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, resolver',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#50cd89'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch(window.KANBAN_CONFIG.BASE_URL + '/conversations/' + conversationId + '/close', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    toast.fire({
+                        icon: 'success',
+                        title: 'Conversa resolvida!'
+                    });
+                    
+                    // Remover card do DOM com animação
+                    const card = document.querySelector(`[data-conversation-id="${conversationId}"]`);
+                    if (card) {
+                        card.style.opacity = '0';
+                        card.style.transform = 'scale(0.8)';
+                        setTimeout(() => {
+                            card.remove();
+                            
+                            // Atualizar contador da coluna
+                            const column = card.closest('.kanban-column');
+                            if (column) {
+                                const stageId = column.dataset.stageId;
+                                const badge = column.querySelector(`#stage_count_${stageId}`);
+                                if (badge) {
+                                    const currentCount = parseInt(badge.textContent) || 0;
+                                    badge.textContent = Math.max(0, currentCount - 1);
+                                }
+                            }
+                        }, 300);
+                    }
+                } else {
+                    throw new Error(data.message || 'Erro ao resolver conversa');
+                }
+            })
+            .catch(error => {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: error.message
+                });
+            });
+        }
+    });
+}
+
+// ============================================================================
 // EXPORTAR FUNÇÕES GLOBAIS
 // ============================================================================
 
@@ -860,4 +1017,6 @@ window.deleteStage = deleteStage;
 window.toggleAutoAssignFields = toggleAutoAssignFields;
 window.showStageMetrics = showStageMetrics;
 window.showFunnelMetrics = showFunnelMetrics;
+window.quickAssignAgent = quickAssignAgent;
+window.quickResolve = quickResolve;
 

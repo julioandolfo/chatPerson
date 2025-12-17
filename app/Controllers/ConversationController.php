@@ -1006,6 +1006,45 @@ class ConversationController
     }
     
     /**
+     * Mover conversa para outra etapa
+     */
+    public function moveStage(int $id): void
+    {
+        Permission::abortIfCannot('conversations.edit.own');
+        
+        try {
+            $stageId = Request::post('stage_id');
+            
+            if (!$stageId) {
+                Response::json(['success' => false, 'message' => 'ID da etapa não fornecido'], 400);
+                return;
+            }
+            
+            // Verificar se conversa existe
+            $conversation = \App\Models\Conversation::find($id);
+            if (!$conversation) {
+                Response::json(['success' => false, 'message' => 'Conversa não encontrada'], 404);
+                return;
+            }
+            
+            // Verificar se etapa existe
+            $stage = \App\Models\FunnelStage::find($stageId);
+            if (!$stage) {
+                Response::json(['success' => false, 'message' => 'Etapa não encontrada'], 404);
+                return;
+            }
+            
+            // Usar o FunnelService para mover (já tem validações e logs)
+            $userId = \App\Helpers\Auth::id();
+            \App\Services\FunnelService::moveConversation($id, $stageId, $userId);
+            
+            Response::json(['success' => true, 'message' => 'Conversa movida com sucesso']);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+    
+    /**
      * Marcar conversa como lida
      */
     public function markRead(int $id): void

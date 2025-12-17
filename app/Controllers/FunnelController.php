@@ -18,8 +18,20 @@ class FunnelController
         
         try {
             $funnels = Funnel::all();
+            
+            // Se for requisição AJAX, retornar JSON
+            if (Request::isAjax()) {
+                Response::json(['success' => true, 'funnels' => $funnels]);
+                return;
+            }
+            
             Response::view('funnels/index', ['funnels' => $funnels]);
         } catch (\Exception $e) {
+            if (Request::isAjax()) {
+                Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+                return;
+            }
+            
             Response::view('funnels/index', [
                 'funnels' => [],
                 'error' => $e->getMessage()

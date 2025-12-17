@@ -134,6 +134,58 @@
                 
                 <div class="separator my-5"></div>
                 
+                <!-- Funil e Etapa -->
+                <div class="sidebar-section" id="sidebar-funnel-stage-section" style="display: none;">
+                    <div class="sidebar-section-title d-flex justify-content-between align-items-center">
+                        <span>🎯 Funil e Etapa</span>
+                        <button class="btn btn-sm btn-icon btn-light-primary p-0" id="sidebar-move-stage-btn" onclick="moveConversationStage()" title="Mover conversa">
+                            <i class="ki-duotone ki-arrows-circle fs-6">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                        </button>
+                    </div>
+                    
+                    <!-- Card com cor da etapa -->
+                    <div class="card border border-gray-300 mb-3" id="sidebar-funnel-card">
+                        <div class="card-body p-4" style="border-left: 5px solid #009ef7;">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="flex-grow-1">
+                                    <div class="fs-7 text-muted mb-1">Funil Atual</div>
+                                    <div class="fs-6 fw-bold text-gray-800" data-field="funnel_name">-</div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex align-items-center">
+                                <div class="flex-grow-1">
+                                    <div class="fs-7 text-muted mb-1">Etapa Atual</div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge badge-primary" id="sidebar-stage-badge" data-field="stage_name">-</span>
+                                        <span class="fs-8 text-muted" id="sidebar-stage-time">⏱️ -</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Histórico de movimentação (futuro) -->
+                    <!-- 
+                    <div class="alert alert-info d-flex align-items-start p-3 mb-0" style="font-size: 0.75rem;">
+                        <i class="ki-duotone ki-information-5 fs-6 me-2 mt-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div>
+                            <div class="fw-semibold mb-1">Última Movimentação</div>
+                            <div>Nova Entrada → Em Atendimento (há 2h)</div>
+                        </div>
+                    </div>
+                    -->
+                </div>
+                
+                <div class="separator my-5" id="sidebar-funnel-separator" style="display: none;"></div>
+                
                 <!-- Agentes do Contato -->
                 <div class="sidebar-section">
                     <div class="sidebar-section-title d-flex justify-content-between align-items-center">
@@ -193,16 +245,6 @@
                         <span class="sidebar-info-value" data-field="channel">-</span>
                     </div>
 
-                    <div class="sidebar-info-item" id="sidebar-funnel-item" style="display: none;">
-                        <span class="sidebar-info-label">Funil:</span>
-                        <span class="sidebar-info-value" data-field="funnel_name">-</span>
-                    </div>
-                    
-                    <div class="sidebar-info-item" id="sidebar-stage-item" style="display: none;">
-                        <span class="sidebar-info-label">Etapa:</span>
-                        <span class="sidebar-info-value" data-field="stage_name">-</span>
-                    </div>
-                    
                     <!-- Informações WhatsApp (mostrar apenas se canal for WhatsApp) -->
                     <div class="sidebar-info-item" id="sidebar-whatsapp-info" style="display: none;">
                         <span class="sidebar-info-label">Integração:</span>
@@ -662,5 +704,155 @@ function addNote(conversationId) {
 
 // Tornar função disponível globalmente
 window.addNote = addNote;
+
+// Função para mover conversa de funil/etapa
+function moveConversationStage() {
+    const conversationId = window.currentConversationId || 0;
+    if (!conversationId) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Atenção',
+            text: 'Selecione uma conversa primeiro'
+        });
+        return;
+    }
+    
+    // Carregar funis e etapas
+    fetch('<?= \App\Helpers\Url::to("/funnels") ?>', {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success || !data.funnels || data.funnels.length === 0) {
+            throw new Error('Nenhum funil disponível');
+        }
+        
+        const funnels = data.funnels;
+        const funnelOptions = funnels.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+        
+        Swal.fire({
+            title: 'Mover Conversa',
+            html: `
+                <div class="mb-4">
+                    <label class="form-label">Selecione o Funil:</label>
+                    <select id="swal-funnel-select" class="form-select">
+                        <option value="">Selecione...</option>
+                        ${funnelOptions}
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">Selecione a Etapa:</label>
+                    <select id="swal-stage-select" class="form-select" disabled>
+                        <option value="">Selecione um funil primeiro</option>
+                    </select>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Mover',
+            cancelButtonText: 'Cancelar',
+            didOpen: () => {
+                const funnelSelect = document.getElementById('swal-funnel-select');
+                const stageSelect = document.getElementById('swal-stage-select');
+                
+                funnelSelect.addEventListener('change', (e) => {
+                    const funnelId = e.target.value;
+                    if (!funnelId) {
+                        stageSelect.disabled = true;
+                        stageSelect.innerHTML = '<option value="">Selecione um funil primeiro</option>';
+                        return;
+                    }
+                    
+                    // Carregar etapas do funil
+                    fetch(`<?= \App\Helpers\Url::to("/funnels") ?>/${funnelId}/stages/json`, {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.stages) {
+                            const stageOptions = data.stages.map(s => 
+                                `<option value="${s.id}">${s.name}</option>`
+                            ).join('');
+                            stageSelect.innerHTML = `<option value="">Selecione...</option>${stageOptions}`;
+                            stageSelect.disabled = false;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro ao carregar etapas:', error);
+                        stageSelect.innerHTML = '<option value="">Erro ao carregar etapas</option>';
+                    });
+                });
+            },
+            preConfirm: () => {
+                const funnelId = document.getElementById('swal-funnel-select').value;
+                const stageId = document.getElementById('swal-stage-select').value;
+                
+                if (!funnelId || !stageId) {
+                    Swal.showValidationMessage('Selecione um funil e uma etapa');
+                    return false;
+                }
+                
+                return { funnelId, stageId };
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const { funnelId, stageId } = result.value;
+                
+                // Fazer requisição para mover conversa
+                const formData = new FormData();
+                formData.append('stage_id', stageId);
+                
+                fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/move-stage`, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sucesso!',
+                            text: 'Conversa movida com sucesso',
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+                        
+                        // Recarregar conversa
+                        if (typeof selectConversation === 'function') {
+                            selectConversation(conversationId);
+                        }
+                    } else {
+                        throw new Error(data.message || 'Erro ao mover conversa');
+                    }
+                })
+                .catch(error => {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: error.message
+                    });
+                });
+            }
+        });
+    })
+    .catch(error => {
+        console.error('Erro ao carregar funis:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro ao carregar funis: ' + error.message
+        });
+    });
+}
+
+window.moveConversationStage = moveConversationStage;
 </script>
 

@@ -4,6 +4,198 @@ $title = 'Kanban - Funis';
 
 ob_start();
 ?>
+
+<!-- CSS Personalizado para Kanban Melhorado -->
+<style>
+/* ============================================================================
+   ANIMAÇÕES E MELHORIAS VISUAIS DO KANBAN
+   ============================================================================ */
+
+/* Hover effect nos cards */
+.kanban-item.conversation-item {
+    transition: all 0.2s ease-in-out;
+    border-radius: 8px;
+}
+
+.kanban-item.conversation-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Efeito de drag */
+.kanban-item.conversation-item.dragging {
+    opacity: 0.5;
+    transform: rotate(2deg);
+    cursor: grabbing !important;
+}
+
+.kanban-item.conversation-item:active {
+    cursor: grabbing !important;
+}
+
+/* Animação ao mover */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.kanban-item.conversation-item.just-moved {
+    animation: slideIn 0.3s ease-out;
+    box-shadow: 0 0 0 3px rgba(0, 158, 247, 0.3);
+}
+
+/* Zona de drop ativa */
+.kanban-column-body.drop-zone-active {
+    background-color: rgba(0, 158, 247, 0.05);
+    border: 2px dashed #009ef7;
+    border-radius: 8px;
+}
+
+/* Badges e Tags */
+.kanban-item .badge {
+    font-weight: 500;
+    padding: 4px 8px;
+}
+
+/* Cards vazios */
+.kanban-items:empty::after {
+    content: "Arraste conversas para cá";
+    display: block;
+    text-align: center;
+    padding: 20px;
+    color: #b5b5c3;
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
+/* Avatar styles */
+.symbol img,
+.symbol .symbol-label {
+    object-fit: cover;
+}
+
+/* Dropdown do card */
+.kanban-item .dropdown-menu {
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e4e6ef;
+}
+
+/* Loading state */
+.kanban-item.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.kanban-item.loading::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #009ef7;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .kanban-column {
+        min-width: 280px !important;
+        max-width: 280px !important;
+    }
+    
+    .kanban-item.conversation-item {
+        font-size: 0.9rem;
+    }
+}
+
+/* Elevação suave */
+.hover-elevate-up {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-elevate-up:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* Estilo do grab cursor durante drag */
+.kanban-board {
+    user-select: none;
+}
+
+.kanban-item.conversation-item[draggable="true"] {
+    cursor: grab;
+}
+
+.kanban-item.conversation-item[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+/* Truncate text elegante */
+.text-truncate-2-lines {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+}
+
+/* Badge de SLA pulsando (quando vencido) */
+.badge.badge-light-danger.pulse {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* Smooth scroll no board */
+.kanban-board {
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e0 #f7fafc;
+}
+
+.kanban-board::-webkit-scrollbar {
+    height: 8px;
+}
+
+.kanban-board::-webkit-scrollbar-track {
+    background: #f7fafc;
+    border-radius: 4px;
+}
+
+.kanban-board::-webkit-scrollbar-thumb {
+    background: #cbd5e0;
+    border-radius: 4px;
+}
+
+.kanban-board::-webkit-scrollbar-thumb:hover {
+    background: #a0aec0;
+}
+</style>
+
 <!--begin::Card-->
 <div class="card">
     <div class="card-header border-0 pt-6">
@@ -133,43 +325,141 @@ ob_start();
                                 </div>
                             </div>
                             <div class="card-body p-5 kanban-column-body" style="min-height: 400px; max-height: calc(100vh - 300px); overflow-y: auto;">
-                                <div class="kanban-items d-flex flex-column gap-3">
-                                    <?php foreach ($conversations as $conv): ?>
-                                        <div class="kanban-item card p-5 cursor-move" 
+                                <div class="kanban-items d-flex flex-column gap-3" data-stage-id="<?= $stage['id'] ?>">
+                                    <?php foreach ($conversations as $conv): 
+                                        // Calcular indicadores
+                                        $slaClass = match($conv['sla_status'] ?? 'ok') {
+                                            'exceeded' => 'danger',
+                                            'warning' => 'warning',
+                                            default => 'success'
+                                        };
+                                        
+                                        $senderIsClient = ($conv['last_message_sender'] ?? 'contact') === 'contact';
+                                        $lastSenderName = $senderIsClient ? 'Cliente' : ($conv['last_agent_name'] ?? 'Agente');
+                                        $lastSenderIcon = $senderIsClient ? '💬' : '📤';
+                                        $lastSenderClass = $senderIsClient ? 'primary' : 'success';
+                                    ?>
+                                        <div class="kanban-item conversation-item card shadow-sm hover-elevate-up" 
                                              data-conversation-id="<?= $conv['id'] ?>"
                                              draggable="true"
-                                             onclick="window.location.href='<?= \App\Helpers\Url::to('/conversations/' . $conv['id']) ?>'">
-                                            <div class="d-flex align-items-center mb-3">
-                                                <div class="symbol symbol-35px me-3">
-                                                    <?php if (!empty($conv['contact_avatar'])): ?>
-                                                        <img src="<?= htmlspecialchars($conv['contact_avatar']) ?>" alt="<?= htmlspecialchars($conv['contact_name'] ?? '') ?>" />
-                                                    <?php else: ?>
-                                                        <div class="symbol-label fs-6 fw-semibold text-primary bg-light-primary">
-                                                            <?= mb_substr(htmlspecialchars($conv['contact_name'] ?? 'C'), 0, 1) ?>
+                                             style="border-left: 4px solid <?= htmlspecialchars($stageColor) ?>; cursor: grab; transition: all 0.2s;">
+                                             
+                                            <!-- Cabeçalho com Avatar e Ações -->
+                                            <div class="card-header border-0 px-5 py-3" style="min-height: auto;">
+                                                <div class="d-flex align-items-center w-100">
+                                                    <!-- Avatar Cliente -->
+                                                    <div class="symbol symbol-40px me-3">
+                                                        <?php if (!empty($conv['contact_avatar'])): ?>
+                                                            <img src="<?= htmlspecialchars($conv['contact_avatar']) ?>" alt="<?= htmlspecialchars($conv['contact_name'] ?? '') ?>" class="rounded" />
+                                                        <?php else: ?>
+                                                            <div class="symbol-label fs-5 fw-bold text-primary bg-light-primary rounded">
+                                                                <?= mb_substr(htmlspecialchars($conv['contact_name'] ?? 'C'), 0, 1) ?>
+                                                            </div>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                    
+                                                    <!-- Informações do Cliente -->
+                                                    <div class="flex-grow-1" onclick="window.location.href='<?= \App\Helpers\Url::to('/conversations?id=' . $conv['id']) ?>'" style="cursor: pointer;">
+                                                        <div class="fw-bold text-gray-800 fs-6"><?= htmlspecialchars($conv['contact_name'] ?? 'Sem nome') ?></div>
+                                                        <div class="text-muted fs-7"><?= htmlspecialchars($conv['contact_phone'] ?? '') ?></div>
+                                                    </div>
+                                                    
+                                                    <!-- Menu de Ações -->
+                                                    <div class="dropdown" onclick="event.stopPropagation();">
+                                                        <button class="btn btn-sm btn-icon btn-light btn-active-light-primary" type="button" data-bs-toggle="dropdown">
+                                                            <i class="ki-duotone ki-dots-vertical fs-3">
+                                                                <span class="path1"></span>
+                                                                <span class="path2"></span>
+                                                                <span class="path3"></span>
+                                                            </i>
+                                                        </button>
+                                                        <ul class="dropdown-menu dropdown-menu-end">
+                                                            <li><a class="dropdown-item" href="<?= \App\Helpers\Url::to('/conversations?id=' . $conv['id']) ?>"><i class="ki-duotone ki-eye fs-4 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>Ver Detalhes</a></li>
+                                                            <li><a class="dropdown-item" href="#" onclick="quickAssignAgent(<?= $conv['id'] ?>); return false;"><i class="ki-duotone ki-user-tick fs-4 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>Atribuir Agente</a></li>
+                                                            <li><a class="dropdown-item text-success" href="#" onclick="quickResolve(<?= $conv['id'] ?>); return false;"><i class="ki-duotone ki-check-circle fs-4 me-2"><span class="path1"></span><span class="path2"></span></i>Resolver</a></li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Corpo do Card -->
+                                            <div class="card-body px-5 py-3">
+                                                <!-- Preview da Última Mensagem -->
+                                                <?php if (!empty($conv['last_message'])): ?>
+                                                    <div class="mb-3">
+                                                        <p class="text-gray-700 fs-7 mb-1" style="line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                                            <?= htmlspecialchars(mb_substr($conv['last_message'], 0, 100)) ?>
+                                                        </p>
+                                                        <div class="d-flex align-items-center gap-2 mt-1">
+                                                            <span class="badge badge-light-<?= $lastSenderClass ?> fs-8"><?= $lastSenderIcon ?> <?= $lastSenderName ?></span>
+                                                            <span class="text-muted fs-8">
+                                                                <?= $conv['last_message_at'] ? date('d/m H:i', strtotime($conv['last_message_at'])) : '' ?>
+                                                            </span>
                                                         </div>
-                                                    <?php endif; ?>
-                                                </div>
-                                                <div class="flex-grow-1">
-                                                    <div class="fw-bold text-gray-800"><?= htmlspecialchars($conv['contact_name'] ?? 'Sem nome') ?></div>
-                                                    <div class="text-muted fs-7"><?= htmlspecialchars($conv['contact_phone'] ?? '') ?></div>
-                                                </div>
-                                            </div>
-                                            <?php if (!empty($conv['last_message'])): ?>
-                                                <p class="text-gray-600 fs-7 mb-2">
-                                                    <?= htmlspecialchars(mb_substr($conv['last_message'], 0, 80)) ?>
-                                                    <?= mb_strlen($conv['last_message']) > 80 ? '...' : '' ?>
-                                                </p>
-                                            <?php endif; ?>
-                                            <div class="d-flex align-items-center justify-content-between">
-                                                <?php if ($conv['unread_count'] > 0): ?>
-                                                    <span class="badge badge-light-danger"><?= $conv['unread_count'] ?> não lidas</span>
+                                                    </div>
                                                 <?php endif; ?>
-                                                <span class="text-muted fs-7">
-                                                    <?= $conv['last_message_at'] ? date('d/m H:i', strtotime($conv['last_message_at'])) : '' ?>
-                                                </span>
+                                                
+                                                <!-- Tags -->
+                                                <?php if (!empty($conv['tags'])): ?>
+                                                    <div class="d-flex flex-wrap gap-1 mb-3">
+                                                        <?php foreach (array_slice($conv['tags'], 0, 3) as $tag): ?>
+                                                            <span class="badge fs-8" style="background-color: <?= htmlspecialchars($tag['color']) ?>20; color: <?= htmlspecialchars($tag['color']) ?>; border: 1px solid <?= htmlspecialchars($tag['color']) ?>;">
+                                                                <?= htmlspecialchars($tag['name']) ?>
+                                                            </span>
+                                                        <?php endforeach; ?>
+                                                        <?php if (count($conv['tags']) > 3): ?>
+                                                            <span class="badge badge-light fs-8">+<?= count($conv['tags']) - 3 ?></span>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                <?php endif; ?>
+                                                
+                                                <!-- Footer com Metadados -->
+                                                <div class="d-flex align-items-center justify-content-between pt-2" style="border-top: 1px dashed #e4e6ef;">
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <!-- Avatar do Agente -->
+                                                        <?php if (!empty($conv['agent_name'])): ?>
+                                                            <div class="symbol symbol-20px" title="<?= htmlspecialchars($conv['agent_name']) ?>">
+                                                                <?php if (!empty($conv['agent_avatar'])): ?>
+                                                                    <img src="<?= htmlspecialchars($conv['agent_avatar']) ?>" alt="<?= htmlspecialchars($conv['agent_name']) ?>" class="rounded" />
+                                                                <?php else: ?>
+                                                                    <div class="symbol-label fs-8 fw-bold text-white bg-primary rounded">
+                                                                        <?= mb_substr(htmlspecialchars($conv['agent_name']), 0, 1) ?>
+                                                                    </div>
+                                                                <?php endif; ?>
+                                                            </div>
+                                                            <span class="text-muted fs-8"><?= htmlspecialchars($conv['agent_name']) ?></span>
+                                                        <?php else: ?>
+                                                            <span class="text-muted fs-8">Não atribuído</span>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                    
+                                                    <!-- Indicadores -->
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <!-- SLA -->
+                                                        <span class="badge badge-light-<?= $slaClass ?> fs-8" title="Tempo na etapa: <?= $conv['hours_in_stage'] ?? 0 ?>h">
+                                                            ⏱️ <?= $conv['hours_in_stage'] ?? 0 ?>h
+                                                        </span>
+                                                        
+                                                        <!-- Não Lidas -->
+                                                        <?php if (($conv['unread_count'] ?? 0) > 0): ?>
+                                                            <span class="badge badge-danger fs-8"><?= $conv['unread_count'] ?></span>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
                                             </div>
+                                            
                                         </div>
                                     <?php endforeach; ?>
+                                    
+                                    <?php if (empty($conversations)): ?>
+                                        <div class="text-center py-10">
+                                            <i class="ki-duotone ki-folder-down fs-3x text-gray-300 mb-3">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                            </i>
+                                            <p class="text-muted fs-7">Nenhuma conversa nesta etapa</p>
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>

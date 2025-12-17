@@ -60,6 +60,7 @@ Router::post('/conversations/{id}/reopen', [ConversationController::class, 'reop
 Router::post('/conversations/{id}/spam', [ConversationController::class, 'spam'], ['Authentication']);
 Router::post('/conversations/{id}/notes', [ConversationController::class, 'createNote'], ['Authentication']);
 Router::get('/conversations/{id}/notes', [ConversationController::class, 'getNotes'], ['Authentication']);
+Router::post('/conversations/{id}/move-stage', [ConversationController::class, 'moveStage'], ['Authentication']);
 Router::put('/conversations/{id}/notes/{noteId}', [ConversationController::class, 'updateNote'], ['Authentication']);
 Router::delete('/conversations/{id}/notes/{noteId}', [ConversationController::class, 'deleteNote'], ['Authentication']);
 Router::get('/conversations/{id}/timeline', [ConversationController::class, 'getTimeline'], ['Authentication']);

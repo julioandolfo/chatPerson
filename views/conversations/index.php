@@ -4631,25 +4631,70 @@ function updateConversationSidebar(conversation, tags) {
         }
     }
     
-    // Funil/Etapa
-    const funnelItem = sidebar.querySelector('#sidebar-funnel-item');
-    const funnelNameEl = sidebar.querySelector('[data-field="funnel_name"]');
-    if (funnelItem && funnelNameEl) {
-        if (conversation.funnel_name) {
-            funnelItem.style.display = 'flex';
-            funnelNameEl.textContent = conversation.funnel_name;
+    // Funil/Etapa - Card Destacado
+    const funnelSection = sidebar.querySelector('#sidebar-funnel-stage-section');
+    const funnelSeparator = sidebar.querySelector('#sidebar-funnel-separator');
+    const funnelCard = sidebar.querySelector('#sidebar-funnel-card');
+    
+    if (funnelSection && funnelCard) {
+        if (conversation.funnel_name || conversation.stage_name) {
+            // Mostrar seção
+            funnelSection.style.display = 'block';
+            funnelSeparator.style.display = 'block';
+            
+            // Atualizar nome do funil
+            const funnelNameEl = funnelCard.querySelector('[data-field="funnel_name"]');
+            if (funnelNameEl) {
+                funnelNameEl.textContent = conversation.funnel_name || '-';
+            }
+            
+            // Atualizar badge da etapa
+            const stageBadge = funnelCard.querySelector('#sidebar-stage-badge');
+            if (stageBadge) {
+                stageBadge.textContent = conversation.stage_name || '-';
+                
+                // Aplicar cor da etapa (se disponível)
+                if (conversation.stage_color) {
+                    stageBadge.style.backgroundColor = conversation.stage_color + '20';
+                    stageBadge.style.color = conversation.stage_color;
+                    stageBadge.style.borderColor = conversation.stage_color;
+                    
+                    // Aplicar cor no card
+                    const cardBody = funnelCard.querySelector('.card-body');
+                    if (cardBody) {
+                        cardBody.style.borderLeftColor = conversation.stage_color;
+                    }
+                } else {
+                    // Cor padrão
+                    stageBadge.className = 'badge badge-primary';
+                }
+            }
+            
+            // Atualizar tempo na etapa (futuro - por enquanto placeholder)
+            const stageTime = funnelCard.querySelector('#sidebar-stage-time');
+            if (stageTime && conversation.updated_at) {
+                const now = new Date();
+                const updatedAt = new Date(conversation.updated_at);
+                const diffMs = now - updatedAt;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffHours = Math.floor(diffMins / 60);
+                const diffDays = Math.floor(diffHours / 24);
+                
+                let timeText = '';
+                if (diffDays > 0) {
+                    timeText = `⏱️ ${diffDays}d nesta etapa`;
+                } else if (diffHours > 0) {
+                    timeText = `⏱️ ${diffHours}h nesta etapa`;
+                } else if (diffMins > 0) {
+                    timeText = `⏱️ ${diffMins}min nesta etapa`;
+                } else {
+                    timeText = `⏱️ Agora mesmo`;
+                }
+                stageTime.textContent = timeText;
+            }
         } else {
-            funnelItem.style.display = 'none';
-        }
-    }
-    const stageItem = sidebar.querySelector('#sidebar-stage-item');
-    const stageNameEl = sidebar.querySelector('[data-field="stage_name"]');
-    if (stageItem && stageNameEl) {
-        if (conversation.stage_name) {
-            stageItem.style.display = 'flex';
-            stageNameEl.textContent = conversation.stage_name;
-        } else {
-            stageItem.style.display = 'none';
+            funnelSection.style.display = 'none';
+            funnelSeparator.style.display = 'none';
         }
     }
     

@@ -37,8 +37,14 @@ class UserController
 
         try {
             $users = UserService::list($filters);
-            $roles = Role::all();
             
+            // Se for requisição AJAX, retornar JSON
+            if (Request::isAjax()) {
+                Response::json(['success' => true, 'users' => $users]);
+                return;
+            }
+            
+            $roles = Role::all();
             $departments = Department::all();
             
             Response::view('users/index', [

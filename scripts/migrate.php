@@ -50,11 +50,22 @@ foreach ($migrations as $migrationFile) {
     
     require $migrationFile;
     
-    // Extrair nome da função: remover número inicial, prefixo create_ e .php, adicionar prefixo up_
-    $functionName = preg_replace('/^\d+_/', '', $filename); // Remove número inicial (ex: 001_)
-    $functionName = preg_replace('/^create_/', '', $functionName); // Remove prefixo create_
-    $functionName = str_replace('.php', '', $functionName); // Remove extensão
-    $functionName = 'up_' . $functionName; // Adiciona prefixo up_
+    // Extrair nome da função: remover número inicial e .php, adicionar prefixo up_
+    $baseName = preg_replace('/^\d+_/', '', $filename); // Remove número inicial (ex: 001_)
+    $baseName = str_replace('.php', '', $baseName); // Remove extensão
+    
+    // Tentar primeiro COM create_ (novo padrão)
+    $functionName = 'up_' . $baseName;
+    
+    // Se não existir, tentar SEM create_ (padrão antigo)
+    if (!function_exists($functionName)) {
+        $baseNameWithoutCreate = preg_replace('/^create_/', '', $baseName);
+        $functionNameAlt = 'up_' . $baseNameWithoutCreate;
+        
+        if (function_exists($functionNameAlt)) {
+            $functionName = $functionNameAlt;
+        }
+    }
     
     // Debug: mostrar função procurada
     // echo "   Procurando função: {$functionName}\n";

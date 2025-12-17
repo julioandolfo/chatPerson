@@ -21,6 +21,116 @@ try {
     die("<h1>❌ Erro ao conectar</h1><p>" . htmlspecialchars($e->getMessage()) . "</p>");
 }
 
+// ============================================================================
+// PROCESSAR AÇÕES AJAX PRIMEIRO (antes de qualquer HTML)
+// ============================================================================
+if (isset($_GET['action']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    
+    try {
+        $action = $_GET['action'];
+        
+        if ($action === 'set_default') {
+            $funnelId = (int)$_GET['funnel_id'];
+            
+            // Desmarcar todos como padrão
+            $pdo->exec("UPDATE funnels SET is_default = 0");
+            
+            // Marcar o selecionado
+            $stmt = $pdo->prepare("UPDATE funnels SET is_default = 1 WHERE id = ?");
+            $stmt->execute([$funnelId]);
+            
+            echo json_encode(['success' => true, 'message' => 'Funil marcado como padrão!']);
+            
+        } elseif ($action === 'set_default_stage') {
+            $stageId = (int)$_GET['stage_id'];
+            
+            // Buscar funil da etapa
+            $stmt = $pdo->prepare("SELECT funnel_id FROM funnel_stages WHERE id = ?");
+            $stmt->execute([$stageId]);
+            $stage = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($stage) {
+                // Desmarcar todas etapas deste funil
+                $pdo->prepare("UPDATE funnel_stages SET is_default = 0 WHERE funnel_id = ?")->execute([$stage['funnel_id']]);
+                
+                // Marcar a selecionada
+                $pdo->prepare("UPDATE funnel_stages SET is_default = 1 WHERE id = ?")->execute([$stageId]);
+                
+                echo json_encode(['success' => true, 'message' => 'Etapa marcada como padrão!']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Etapa não encontrada']);
+            }
+            
+        } elseif ($action === 'create_default') {
+            // Desmarcar todos como padrão
+            $pdo->exec("UPDATE funnels SET is_default = 0");
+            
+            // Criar novo funil
+            $stmt = $pdo->prepare("
+                INSERT INTO funnels (name, description, status, is_default, color, created_at, updated_at) 
+                VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+            ");
+            $stmt->execute([
+                'Funil Entrada',
+                'Funil padrão do sistema. Todas as conversas sem configuração específica iniciam aqui.',
+                'active',
+                1,
+                '#3F4254'
+            ]);
+            
+            $funnelId = $pdo->lastInsertId();
+            
+            // Criar etapa padrão
+            $stmt = $pdo->prepare("
+                INSERT INTO funnel_stages (
+                    funnel_id, name, description, color, position, 
+                    is_default, allow_move_back, allow_skip_stages, 
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            ");
+            $stmt->execute([
+                $funnelId,
+                'Nova Entrada',
+                'Etapa padrão para novas conversas sem configuração específica.',
+                '#3F4254',
+                1,
+                1,
+                1,
+                1
+            ]);
+            
+            $stageId = $pdo->lastInsertId();
+            
+            // Salvar configuração
+            $config = json_encode(['funnel_id' => $funnelId, 'stage_id' => $stageId]);
+            $stmt = $pdo->prepare("
+                INSERT INTO settings (`key`, `value`, `type`, `group`, label, description, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+                ON DUPLICATE KEY UPDATE `value` = VALUES(`value`), updated_at = NOW()
+            ");
+            $stmt->execute([
+                'system_default_funnel_stage',
+                $config,
+                'json',
+                'system',
+                'Funil e Etapa Padrão do Sistema',
+                'Funil e etapa usados como padrão quando não há configuração específica'
+            ]);
+            
+            echo json_encode(['success' => true, 'message' => 'Funil "Funil Entrada" criado com sucesso!']);
+        }
+        
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+    
+    exit; // IMPORTANTE: Parar aqui para não gerar HTML
+}
+
+// ============================================================================
+// INTERFACE HTML (só é executado se não for ação AJAX)
+// ============================================================================
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -275,111 +385,3 @@ try {
     </script>
 </body>
 </html>
-
-<?php
-// Handler de ações AJAX
-if (isset($_GET['action']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    header('Content-Type: application/json');
-    
-    try {
-        $action = $_GET['action'];
-        
-        if ($action === 'set_default') {
-            $funnelId = (int)$_GET['funnel_id'];
-            
-            // Desmarcar todos como padrão
-            $pdo->exec("UPDATE funnels SET is_default = 0");
-            
-            // Marcar o selecionado
-            $stmt = $pdo->prepare("UPDATE funnels SET is_default = 1 WHERE id = ?");
-            $stmt->execute([$funnelId]);
-            
-            echo json_encode(['success' => true, 'message' => 'Funil marcado como padrão!']);
-            
-        } elseif ($action === 'set_default_stage') {
-            $stageId = (int)$_GET['stage_id'];
-            
-            // Buscar funil da etapa
-            $stmt = $pdo->prepare("SELECT funnel_id FROM funnel_stages WHERE id = ?");
-            $stmt->execute([$stageId]);
-            $stage = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($stage) {
-                // Desmarcar todas etapas deste funil
-                $pdo->prepare("UPDATE funnel_stages SET is_default = 0 WHERE funnel_id = ?")->execute([$stage['funnel_id']]);
-                
-                // Marcar a selecionada
-                $pdo->prepare("UPDATE funnel_stages SET is_default = 1 WHERE id = ?")->execute([$stageId]);
-                
-                echo json_encode(['success' => true, 'message' => 'Etapa marcada como padrão!']);
-            } else {
-                echo json_encode(['success' => false, 'message' => 'Etapa não encontrada']);
-            }
-            
-        } elseif ($action === 'create_default') {
-            // Desmarcar todos como padrão
-            $pdo->exec("UPDATE funnels SET is_default = 0");
-            
-            // Criar novo funil
-            $stmt = $pdo->prepare("
-                INSERT INTO funnels (name, description, status, is_default, color, created_at, updated_at) 
-                VALUES (?, ?, ?, ?, ?, NOW(), NOW())
-            ");
-            $stmt->execute([
-                'Funil Entrada',
-                'Funil padrão do sistema. Todas as conversas sem configuração específica iniciam aqui.',
-                'active',
-                1,
-                '#3F4254'
-            ]);
-            
-            $funnelId = $pdo->lastInsertId();
-            
-            // Criar etapa padrão
-            $stmt = $pdo->prepare("
-                INSERT INTO funnel_stages (
-                    funnel_id, name, description, color, position, 
-                    is_default, allow_move_back, allow_skip_stages, 
-                    created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-            ");
-            $stmt->execute([
-                $funnelId,
-                'Nova Entrada',
-                'Etapa padrão para novas conversas sem configuração específica.',
-                '#3F4254',
-                1,
-                1,
-                1,
-                1
-            ]);
-            
-            $stageId = $pdo->lastInsertId();
-            
-            // Salvar configuração
-            $config = json_encode(['funnel_id' => $funnelId, 'stage_id' => $stageId]);
-            $stmt = $pdo->prepare("
-                INSERT INTO settings (`key`, `value`, `type`, `group`, label, description, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
-                ON DUPLICATE KEY UPDATE `value` = VALUES(`value`), updated_at = NOW()
-            ");
-            $stmt->execute([
-                'system_default_funnel_stage',
-                $config,
-                'json',
-                'system',
-                'Funil e Etapa Padrão do Sistema',
-                'Funil e etapa usados como padrão quando não há configuração específica'
-            ]);
-            
-            echo json_encode(['success' => true, 'message' => 'Funil "Funil Entrada" criado com sucesso!']);
-        }
-        
-    } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-    }
-    
-    exit;
-}
-?>
-

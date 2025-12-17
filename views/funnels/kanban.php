@@ -60,11 +60,13 @@ ob_start();
             <div class="kanban-board d-flex gap-5 overflow-auto pb-5" id="kt_kanban_board">
                 <?php foreach ($kanbanData['stages'] as $stageData): 
                     $stage = $stageData['stage'];
+                    // Fallback de cor caso não esteja definida (dados antigos)
+                    $stageColor = !empty($stage['color']) ? $stage['color'] : '#009ef7';
                     $conversations = $stageData['conversations'];
                 ?>
                     <div class="kanban-column flex-shrink-0" data-stage-id="<?= $stage['id'] ?>" style="min-width: 320px; max-width: 320px;">
                         <div class="card h-100">
-                            <div class="card-header border-0" style="background-color: <?= htmlspecialchars($stage['color']) ?>20;">
+                            <div class="card-header border-0" style="background-color: <?= htmlspecialchars($stageColor) ?>20;">
                                 <div class="card-title d-flex align-items-center justify-content-between w-100">
                                     <div class="flex-grow-1">
                                         <h3 class="text-gray-800 fw-bold mb-0"><?= htmlspecialchars($stage['name']) ?></h3>

@@ -173,19 +173,30 @@ class FunnelController
         
         try {
             $data = Request::post();
+            
+            // DEBUG: Log dos dados recebidos
+            error_log("=== CREATE STAGE ===");
+            error_log("Funnel ID: " . $id);
+            error_log("Data recebida: " . json_encode($data));
+            
             $stageId = FunnelService::createStage($id, $data);
             
+            error_log("✅ Estágio criado com sucesso! ID: " . $stageId);
             Response::json([
                 'success' => true,
                 'message' => 'Estágio criado com sucesso!',
                 'id' => $stageId
             ]);
         } catch (\InvalidArgumentException $e) {
+            error_log("❌ InvalidArgumentException: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
             Response::json([
                 'success' => false,
                 'message' => $e->getMessage()
             ], 400);
         } catch (\Exception $e) {
+            error_log("❌ Exception: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
             Response::json([
                 'success' => false,
                 'message' => 'Erro ao criar estágio: ' . $e->getMessage()
@@ -263,23 +274,36 @@ class FunnelController
         
         try {
             $data = Request::post();
+            
+            // DEBUG: Log dos dados recebidos
+            error_log("=== UPDATE STAGE ===");
+            error_log("Funnel ID: " . $id);
+            error_log("Stage ID: " . $stageId);
+            error_log("Data recebida: " . json_encode($data));
+            
             if (FunnelService::updateStage($stageId, $data)) {
+                error_log("✅ Estágio atualizado com sucesso!");
                 Response::json([
                     'success' => true,
                     'message' => 'Estágio atualizado com sucesso!'
                 ]);
             } else {
+                error_log("❌ Falha ao atualizar estágio (retornou false)");
                 Response::json([
                     'success' => false,
                     'message' => 'Falha ao atualizar estágio.'
                 ], 500);
             }
         } catch (\InvalidArgumentException $e) {
+            error_log("❌ InvalidArgumentException: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
             Response::json([
                 'success' => false,
                 'message' => $e->getMessage()
             ], 400);
         } catch (\Exception $e) {
+            error_log("❌ Exception: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
             Response::json([
                 'success' => false,
                 'message' => 'Erro ao atualizar estágio: ' . $e->getMessage()

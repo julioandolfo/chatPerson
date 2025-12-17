@@ -526,27 +526,65 @@ document.addEventListener("DOMContentLoaded", function() {
                 formData.delete("auto_assign");
             }
             
+            // DEBUG: Log dos dados sendo enviados
+            console.log("=== SALVANDO ESTÁGIO ===");
+            console.log("URL:", url);
+            console.log("Método:", method);
+            console.log("FormData entries:");
+            for (let pair of formData.entries()) {
+                console.log(pair[0] + ': ' + pair[1]);
+            }
+            
             fetch(url, {
                 method: method,
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log("Response status:", response.status);
+                console.log("Response ok:", response.ok);
+                
+                // Verificar se resposta é JSON
+                const contentType = response.headers.get("content-type");
+                if (!contentType || !contentType.includes("application/json")) {
+                    throw new Error("Resposta não é JSON. Content-Type: " + contentType);
+                }
+                
+                return response.json();
+            })
             .then(data => {
+                console.log("Response data:", data);
+                
                 submitBtn.removeAttribute("data-kt-indicator");
                 submitBtn.disabled = false;
                 
                 if (data.success) {
+                    console.log("✅ Estágio salvo com sucesso!");
                     const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_stage"));
                     modal.hide();
                     location.reload();
                 } else {
-                    alert("Erro: " + (data.message || "Erro ao salvar estágio"));
+                    console.error("❌ Erro ao salvar:", data.message);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro ao salvar',
+                        text: data.message || "Erro ao salvar estágio",
+                        confirmButtonText: 'OK'
+                    });
                 }
             })
             .catch(error => {
+                console.error("❌ Erro catch:", error);
+                console.error("Erro stack:", error.stack);
+                
                 submitBtn.removeAttribute("data-kt-indicator");
                 submitBtn.disabled = false;
-                alert("Erro ao salvar estágio");
+                
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro ao salvar estágio',
+                    html: '<p>' + error.message + '</p><small>Verifique o console para mais detalhes</small>',
+                    confirmButtonText: 'OK'
+                });
             });
         });
         

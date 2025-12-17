@@ -922,7 +922,7 @@ function showStageMetrics(stageId, stageName) {
                 
                 Swal.fire({
                     html: html,
-                    width: \'800px\',
+                    width: \'1200px\',
                     showConfirmButton: true,
                     confirmButtonText: \'Fechar\',
                     customClass: {
@@ -1034,7 +1034,7 @@ function showFunnelMetrics(funnelId) {
                 
                 Swal.fire({
                     html: html,
-                    width: \'1000px\',
+                    width: \'1400px\',
                     showConfirmButton: true,
                     confirmButtonText: \'Fechar\',
                     customClass: {

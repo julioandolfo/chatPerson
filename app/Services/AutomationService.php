@@ -712,12 +712,87 @@ class AutomationService
      */
     private static function executeChatbot(array $nodeData, int $conversationId, ?int $executionId = null): void
     {
-        // TODO: Implementar lógica do chatbot completa
-        // Por enquanto apenas log
         try {
-            error_log("Chatbot executado para conversa {$conversationId}");
-            // Aqui seria integrado com sistema de chatbot/IA
+            $chatbotType = $nodeData['chatbot_type'] ?? 'simple';
+            $message = $nodeData['chatbot_message'] ?? '';
+            $timeout = (int)($nodeData['chatbot_timeout'] ?? 300);
+            $timeoutAction = $nodeData['chatbot_timeout_action'] ?? 'nothing';
+            
+            if (empty($message)) {
+                error_log("Chatbot sem mensagem configurada para conversa {$conversationId}");
+                return;
+            }
+            
+            // Processar variáveis na mensagem
+            $conversation = \App\Models\Conversation::find($conversationId);
+            if (!$conversation) {
+                throw new \Exception("Conversa não encontrada: {$conversationId}");
+            }
+            
+            $message = self::processVariables($message, $conversation);
+            
+            // Enviar mensagem inicial do chatbot
+            \App\Models\Message::create([
+                'conversation_id' => $conversationId,
+                'sender_id' => null, // Sistema
+                'sender_type' => 'system',
+                'message' => $message,
+                'type' => 'text',
+                'channel' => $conversation['channel'],
+                'direction' => 'outgoing',
+                'status' => 'sent'
+            ]);
+            
+            // Processar opções de menu (se tipo = menu)
+            if ($chatbotType === 'menu') {
+                $options = $nodeData['chatbot_options'] ?? [];
+                if (!empty($options) && is_array($options)) {
+                    $optionsText = "\n\n" . implode("\n", array_filter($options));
+                    
+                    \App\Models\Message::create([
+                        'conversation_id' => $conversationId,
+                        'sender_id' => null,
+                        'sender_type' => 'system',
+                        'message' => $optionsText,
+                        'type' => 'text',
+                        'channel' => $conversation['channel'],
+                        'direction' => 'outgoing',
+                        'status' => 'sent'
+                    ]);
+                }
+            }
+            
+            // Para chatbot condicional, salvar palavras-chave para monitorar
+            if ($chatbotType === 'conditional') {
+                $keywords = $nodeData['chatbot_keywords'] ?? '';
+                if (!empty($keywords)) {
+                    // Salvar keywords no metadata da conversa para monitoramento
+                    $metadata = json_decode($conversation['metadata'] ?? '{}', true);
+                    $metadata['chatbot_keywords'] = array_map('trim', explode(',', $keywords));
+                    $metadata['chatbot_timeout'] = time() + $timeout;
+                    $metadata['chatbot_timeout_action'] = $timeoutAction;
+                    
+                    \App\Models\Conversation::update($conversationId, [
+                        'metadata' => json_encode($metadata)
+                    ]);
+                }
+            }
+            
+            // Marcar conversa como aguardando resposta do chatbot
+            $currentMetadata = json_decode($conversation['metadata'] ?? '{}', true);
+            $currentMetadata['chatbot_active'] = true;
+            $currentMetadata['chatbot_type'] = $chatbotType;
+            $currentMetadata['chatbot_timeout_at'] = time() + $timeout;
+            $currentMetadata['chatbot_timeout_action'] = $timeoutAction;
+            
+            \App\Models\Conversation::update($conversationId, [
+                'metadata' => json_encode($currentMetadata)
+            ]);
+            
+            error_log("Chatbot ({$chatbotType}) executado para conversa {$conversationId}");
+            
         } catch (\Exception $e) {
+            error_log("Erro ao executar chatbot: " . $e->getMessage());
             if ($executionId) {
                 \App\Models\AutomationExecution::updateStatus($executionId, 'failed', "Erro no chatbot: " . $e->getMessage());
             }

@@ -1346,8 +1346,73 @@ function openNodeConfig(nodeId) {
         case "action_chatbot":
             formContent = `
                 <div class="fv-row mb-7">
-                    <label class="fw-semibold fs-6 mb-2">Configuração do Chatbot</label>
-                    <textarea name="chatbot_config" class="form-control form-control-solid" rows="5" placeholder="Configuração do chatbot (JSON)"></textarea>
+                    <label class="required fw-semibold fs-6 mb-2">Tipo de Chatbot</label>
+                    <select name="chatbot_type" id="kt_chatbot_type" class="form-select form-select-solid" required onchange="updateChatbotFields(this.value)">
+                        <option value="simple">Mensagem Simples</option>
+                        <option value="menu">Menu com Opções</option>
+                        <option value="conditional">Condicional (baseado em resposta)</option>
+                    </select>
+                    <div class="form-text">Escolha o tipo de interação do chatbot</div>
+                </div>
+                
+                <div class="fv-row mb-7">
+                    <label class="required fw-semibold fs-6 mb-2">Mensagem Inicial</label>
+                    <textarea name="chatbot_message" class="form-control form-control-solid" rows="3" placeholder="Olá {{contact.name}}! Como posso ajudar?" required></textarea>
+                    <div class="form-text">Use variáveis como {{contact.name}}, {{agent.name}}, etc.</div>
+                </div>
+                
+                <div id="kt_chatbot_options_container" style="display: none;">
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Opções do Menu</label>
+                        <div id="kt_chatbot_options_list">
+                            <div class="d-flex gap-2 mb-2 chatbot-option-item">
+                                <input type="text" name="chatbot_options[]" class="form-control form-control-solid" placeholder="Ex: 1 - Suporte Técnico" />
+                                <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeChatbotOption(this)">
+                                    <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-light-primary mt-2" onclick="addChatbotOption()">
+                            <i class="ki-duotone ki-plus fs-2"></i>
+                            Adicionar Opção
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="kt_chatbot_conditional_container" style="display: none;">
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Palavras-chave para Detectar</label>
+                        <input type="text" name="chatbot_keywords" class="form-control form-control-solid" placeholder="suporte, ajuda, problema (separado por vírgula)" />
+                        <div class="form-text">O chatbot responderá quando detectar estas palavras</div>
+                    </div>
+                </div>
+                
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2">Tempo de Espera (segundos)</label>
+                    <input type="number" name="chatbot_timeout" class="form-control form-control-solid" value="300" min="10" max="3600" />
+                    <div class="form-text">Tempo máximo para aguardar resposta do usuário</div>
+                </div>
+                
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2">Ação ao Timeout</label>
+                    <select name="chatbot_timeout_action" class="form-select form-select-solid">
+                        <option value="nothing">Nada</option>
+                        <option value="assign_agent">Atribuir a um Agente</option>
+                        <option value="send_message">Enviar Mensagem</option>
+                        <option value="close">Encerrar Conversa</option>
+                    </select>
+                </div>
+                
+                <div class="alert alert-info d-flex align-items-center p-5 mb-7">
+                    <i class="ki-duotone ki-information fs-2x text-info me-4">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div class="d-flex flex-column">
+                        <h4 class="mb-1 text-dark">Dica: Variáveis Disponíveis</h4>
+                        <span>{{contact.name}}, {{contact.phone}}, {{agent.name}}, {{date}}, {{time}}</span>
+                    </div>
                 </div>
             `;
             break;
@@ -2025,6 +2090,52 @@ window.deleteNode = deleteNode;
 window.saveLayout = saveLayout;
 window.refreshLogs = refreshLogs;
 window.removeConnection = removeConnection;
+
+// Funções para Chatbot Visual
+function updateChatbotFields(type) {
+    const optionsContainer = document.getElementById('kt_chatbot_options_container');
+    const conditionalContainer = document.getElementById('kt_chatbot_conditional_container');
+    
+    if (type === 'menu') {
+        optionsContainer.style.display = 'block';
+        conditionalContainer.style.display = 'none';
+    } else if (type === 'conditional') {
+        optionsContainer.style.display = 'none';
+        conditionalContainer.style.display = 'block';
+    } else {
+        optionsContainer.style.display = 'none';
+        conditionalContainer.style.display = 'none';
+    }
+}
+
+function addChatbotOption() {
+    const optionsList = document.getElementById('kt_chatbot_options_list');
+    const newOption = document.createElement('div');
+    newOption.className = 'd-flex gap-2 mb-2 chatbot-option-item';
+    newOption.innerHTML = `
+        <input type="text" name="chatbot_options[]" class="form-control form-control-solid" placeholder="Ex: 2 - Vendas" />
+        <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeChatbotOption(this)">
+            <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span></i>
+        </button>
+    `;
+    optionsList.appendChild(newOption);
+}
+
+function removeChatbotOption(button) {
+    const optionItem = button.closest('.chatbot-option-item');
+    const optionsList = document.getElementById('kt_chatbot_options_list');
+    
+    // Manter pelo menos uma opção
+    if (optionsList.children.length > 1) {
+        optionItem.remove();
+    } else {
+        alert('É necessário ter pelo menos uma opção no menu.');
+    }
+}
+
+window.updateChatbotFields = updateChatbotFields;
+window.addChatbotOption = addChatbotOption;
+window.removeChatbotOption = removeChatbotOption;
 </script>
 <?php
 $scripts = ob_get_clean() . <<<'JAVASCRIPT'

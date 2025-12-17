@@ -713,23 +713,21 @@ $styles = '
 </style>
 ';
 $funnelIdForJs = isset($currentFunnelId) ? intval($currentFunnelId) : 0;
-
-// Construir URL base completa (protocolo + domínio + basePath)
-$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
-$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-$basePath = \App\Helpers\Url::basePath();
-$fullBaseUrl = $protocol . $host . $basePath;
+$basePath = \App\Helpers\Url::basePath(); // ex: "" ou "/chat"
 
 $scripts = '
 <!-- Configurações do Kanban -->
 <script>
 // Configurações globais para o Kanban.js
+const __KANBAN_BASE_PATH = "' . $basePath . '";
+const __KANBAN_ORIGIN = window.location.origin || (window.location.protocol + "//" + window.location.host);
+
 window.KANBAN_CONFIG = {
     funnelId: ' . $funnelIdForJs . ',
     moveConversationUrl: "' . \App\Helpers\Url::to('/funnels/' . $funnelIdForJs . '/conversations/move') . '",
     funnelBaseUrl: "' . \App\Helpers\Url::to('/funnels/' . $funnelIdForJs) . '",
     funnelsUrl: "' . \App\Helpers\Url::to('/funnels') . '",
-    BASE_URL: "' . $fullBaseUrl . '"
+    BASE_URL: __KANBAN_ORIGIN + __KANBAN_BASE_PATH
 };
 console.log("KANBAN_CONFIG inicializado:", window.KANBAN_CONFIG);
 </script>

@@ -16,7 +16,7 @@ class FunnelStage extends Model
         'max_conversations', 'allow_move_back', 'allow_skip_stages',
         'blocked_stages', 'required_stages', 'required_tags', 'blocked_tags',
         'auto_assign', 'auto_assign_department_id', 'auto_assign_method',
-        'sla_hours', 'settings'
+        'sla_hours', 'settings', 'stage_order', 'is_system_stage', 'system_stage_type'
     ];
     protected bool $timestamps = true;
 
@@ -64,6 +64,47 @@ class FunnelStage extends Model
             'funnel_id' => $stage['funnel_id'],
             'funnel_stage_id' => $stageId
         ]);
+    }
+
+    /**
+     * Buscar etapa do sistema por tipo e funil
+     * @param int $funnelId ID do funil
+     * @param string $type Tipo: entrada, fechadas, perdidas
+     * @return array|null Etapa encontrada ou null
+     */
+    public static function getSystemStage(int $funnelId, string $type): ?array
+    {
+        $sql = "SELECT * FROM funnel_stages 
+                WHERE funnel_id = ? 
+                AND is_system_stage = 1 
+                AND system_stage_type = ? 
+                LIMIT 1";
+        return Database::fetch($sql, [$funnelId, $type]);
+    }
+
+    /**
+     * Buscar todas as etapas do sistema de um funil
+     * @param int $funnelId ID do funil
+     * @return array Array com as 3 etapas do sistema
+     */
+    public static function getSystemStages(int $funnelId): array
+    {
+        $sql = "SELECT * FROM funnel_stages 
+                WHERE funnel_id = ? 
+                AND is_system_stage = 1 
+                ORDER BY stage_order ASC";
+        return Database::fetchAll($sql, [$funnelId]);
+    }
+
+    /**
+     * Verificar se uma etapa é do sistema (não pode ser deletada/renomeada)
+     * @param int $stageId ID da etapa
+     * @return bool True se for etapa do sistema
+     */
+    public static function isSystemStage(int $stageId): bool
+    {
+        $stage = self::find($stageId);
+        return !empty($stage['is_system_stage']);
     }
 }
 

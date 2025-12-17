@@ -465,6 +465,80 @@ function showTransferConversationsModal(stageId, stageName, conversationCount) {
     });
 }
 
+/**
+ * Editar apenas a cor de uma etapa do sistema
+ */
+function editStageColorOnly(stageId, name, currentColor) {
+    Swal.fire({
+        title: 'Editar Cor da Etapa',
+        html: `
+            <div class="text-start mb-5">
+                <p class="text-muted"><strong>${name}</strong> é uma etapa obrigatória do sistema.</p>
+                <p class="text-muted fs-7">Apenas a cor pode ser alterada. Nome e descrição são fixos.</p>
+            </div>
+            <div class="fv-row">
+                <label class="fw-semibold fs-6 mb-2">Cor</label>
+                <input type="color" id="swal-stage-color" class="form-control form-control-solid" value="${currentColor}" />
+            </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Salvar Cor',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+            confirmButton: 'btn btn-primary',
+            cancelButton: 'btn btn-secondary'
+        },
+        preConfirm: () => {
+            const color = document.getElementById('swal-stage-color').value;
+            if (!color) {
+                Swal.showValidationMessage('Por favor, selecione uma cor');
+                return false;
+            }
+            return { color: color };
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const formData = new FormData();
+            formData.append('color', result.value.color);
+            
+            fetch(window.KANBAN_CONFIG.funnelBaseUrl + "/stages/" + stageId, {
+                method: "POST",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso!',
+                        text: 'Cor atualizada com sucesso!',
+                        timer: 2000
+                    }).then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: data.message || 'Erro ao atualizar cor'
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao atualizar cor:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: 'Erro ao atualizar cor da etapa'
+                });
+            });
+        }
+    });
+}
+
 // ============================================================================
 // FORMULÁRIO DE ESTÁGIO
 // ============================================================================
@@ -1028,6 +1102,7 @@ function quickResolve(conversationId) {
 window.moveConversation = moveConversation;
 window.changeFunnel = changeFunnel;
 window.editStage = editStage;
+window.editStageColorOnly = editStageColorOnly;
 window.deleteStage = deleteStage;
 window.toggleAutoAssignFields = toggleAutoAssignFields;
 window.showStageMetrics = showStageMetrics;

@@ -35,7 +35,53 @@ class FunnelService
         }
 
         $data['status'] = $data['status'] ?? 'active';
-        return Funnel::create($data);
+        $funnelId = Funnel::create($data);
+        
+        // ✅ CRIAR 3 ETAPAS OBRIGATÓRIAS DO SISTEMA
+        self::createSystemStages($funnelId);
+        
+        return $funnelId;
+    }
+
+    /**
+     * Criar as 3 etapas obrigatórias do sistema para um funil
+     * @param int $funnelId ID do funil
+     */
+    private static function createSystemStages(int $funnelId): void
+    {
+        // 1. Etapa "Entrada" (stage_order = 1)
+        FunnelStage::create([
+            'funnel_id' => $funnelId,
+            'name' => 'Entrada',
+            'description' => 'Etapa inicial do funil. Novas conversas e reaberturas entram aqui.',
+            'color' => '#3b82f6', // Azul
+            'stage_order' => 1,
+            'is_system_stage' => 1,
+            'system_stage_type' => 'entrada',
+            'is_default' => 1 // Primeira etapa é sempre padrão
+        ]);
+        
+        // 2. Etapa "Fechadas / Resolvidas" (stage_order = 998)
+        FunnelStage::create([
+            'funnel_id' => $funnelId,
+            'name' => 'Fechadas / Resolvidas',
+            'description' => 'Conversas fechadas ou resolvidas. Reabrem para "Entrada" após período de graça.',
+            'color' => '#22c55e', // Verde
+            'stage_order' => 998,
+            'is_system_stage' => 1,
+            'system_stage_type' => 'fechadas'
+        ]);
+        
+        // 3. Etapa "Perdidas" (stage_order = 999)
+        FunnelStage::create([
+            'funnel_id' => $funnelId,
+            'name' => 'Perdidas',
+            'description' => 'Conversas perdidas ou descartadas. Não reabrem automaticamente.',
+            'color' => '#ef4444', // Vermelho
+            'stage_order' => 999,
+            'is_system_stage' => 1,
+            'system_stage_type' => 'perdidas'
+        ]);
     }
 
     /**
@@ -158,6 +204,17 @@ class FunnelService
         $stage = FunnelStage::find($stageId);
         if (!$stage) {
             throw new \InvalidArgumentException('Estágio não encontrado');
+        }
+
+        // ✅ PROTEÇÃO: Etapas do sistema não podem ter nome/descrição alterados
+        if (!empty($stage['is_system_stage'])) {
+            // Apenas permitir alteração de cor em etapas do sistema
+            $allowedFields = ['color'];
+            $data = array_intersect_key($data, array_flip($allowedFields));
+            
+            if (empty($data)) {
+                throw new \InvalidArgumentException('Etapas do sistema só podem ter a cor alterada');
+            }
         }
 
         // Converter valores vazios para null ANTES da validação

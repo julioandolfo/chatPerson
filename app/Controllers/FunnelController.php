@@ -331,6 +331,15 @@ class FunnelController
         Permission::abortIfCannot('funnels.edit');
         
         try {
+            // ✅ PROTEÇÃO: Etapas do sistema não podem ser deletadas
+            if (\App\Models\FunnelStage::isSystemStage($stageId)) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Etapas do sistema (Entrada, Fechadas/Resolvidas, Perdidas) não podem ser deletadas.'
+                ], 403);
+                return;
+            }
+            
             $data = Request::post();
             $targetStageId = $data['target_stage_id'] ?? null;
             

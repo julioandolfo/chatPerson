@@ -91,15 +91,25 @@ class ConversationService
             }
         }
 
-        // 3) Se tem funil mas não etapa, pegar primeira etapa do funil
+        // 3) Se tem funil mas não etapa, pegar etapa "Entrada" do funil (sistema obrigatório)
         if ($funnelId && !$stageId) {
             try {
-                $stages = Funnel::getStages((int)$funnelId);
-                if (!empty($stages)) {
-                    $stageId = (int)$stages[0]['id'];
+                // ✅ Buscar etapa "Entrada" (sistema obrigatório)
+                $entradaStage = \App\Models\FunnelStage::getSystemStage((int)$funnelId, 'entrada');
+                
+                if ($entradaStage) {
+                    $stageId = (int)$entradaStage['id'];
+                    Logger::debug("Nova conversa: indo para etapa 'Entrada' do funil {$funnelId}", 'conversas.log');
+                } else {
+                    // Fallback: se não encontrar etapa "Entrada", pegar primeira etapa qualquer
+                    $stages = Funnel::getStages((int)$funnelId);
+                    if (!empty($stages)) {
+                        $stageId = (int)$stages[0]['id'];
+                        Logger::debug("Nova conversa: etapa 'Entrada' não encontrada, usando primeira etapa do funil", 'conversas.log');
+                    }
                 }
             } catch (\Exception $e) {
-                error_log("Conversas: erro ao obter primeira etapa do funil: " . $e->getMessage());
+                error_log("Conversas: erro ao obter etapa de entrada do funil: " . $e->getMessage());
             }
         }
 
@@ -824,10 +834,26 @@ class ConversationService
         $conversation = Conversation::find($conversationId);
         $agentId = $conversation['agent_id'] ?? null;
         
-        if (Conversation::update($conversationId, [
+        // ✅ MOVER PARA ETAPA "Fechadas / Resolvidas" do funil correspondente
+        $updateData = [
             'status' => 'closed',
             'resolved_at' => date('Y-m-d H:i:s')
-        ])) {
+        ];
+        
+        // Se conversa tem funil, mover para etapa "Fechadas / Resolvidas"
+        if (!empty($conversation['funnel_id'])) {
+            $fechadasStage = \App\Models\FunnelStage::getSystemStage(
+                $conversation['funnel_id'], 
+                'fechadas'
+            );
+            
+            if ($fechadasStage) {
+                $updateData['funnel_stage_id'] = $fechadasStage['id'];
+                error_log("ConversationService::close - Movendo conversa {$conversationId} para etapa 'Fechadas / Resolvidas' (ID: {$fechadasStage['id']})");
+            }
+        }
+        
+        if (Conversation::update($conversationId, $updateData)) {
             // Invalidar cache de conversas
             self::invalidateCache($conversationId);
             

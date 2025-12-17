@@ -268,7 +268,18 @@ ob_start();
                             ">
                                 <div class="card-title d-flex align-items-center justify-content-between w-100">
                                     <div class="flex-grow-1">
-                                        <h3 class="text-gray-800 fw-bold mb-0"><?= htmlspecialchars($stage['name']) ?></h3>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <h3 class="text-gray-800 fw-bold mb-0"><?= htmlspecialchars($stage['name']) ?></h3>
+                                            <?php if (!empty($stage['is_system_stage'])): ?>
+                                                <span class="badge badge-light-success badge-sm" title="Etapa obrigatória do sistema">
+                                                    <i class="ki-duotone ki-shield-tick fs-5">
+                                                        <span class="path1"></span>
+                                                        <span class="path2"></span>
+                                                    </i>
+                                                    Sistema
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
                                         <?php if (!empty($stage['description'])): ?>
                                             <span class="text-muted fs-7"><?= htmlspecialchars($stage['description']) ?></span>
                                         <?php endif; ?>
@@ -290,36 +301,51 @@ ob_start();
                                             </i>
                                         </button>
                                         <?php if (\App\Helpers\Permission::can('funnels.edit')): ?>
-                                        <div class="dropdown">
-                                            <button class="btn btn-sm btn-icon btn-active-color-primary" type="button" data-bs-toggle="dropdown">
-                                                <i class="ki-duotone ki-dots-vertical fs-2">
-                                                    <span class="path1"></span>
-                                                    <span class="path2"></span>
-                                                    <span class="path3"></span>
-                                                </i>
-                                            </button>
-                                            <ul class="dropdown-menu">
-                                                <li>
-                                                    <a class="dropdown-item" href="#" onclick="editStage(<?= $stage['id'] ?>, <?= htmlspecialchars(json_encode($stage['name']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($stage['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($stage['color']), ENT_QUOTES, 'UTF-8') ?>); return false;">
-                                                        <i class="ki-duotone ki-pencil fs-2 me-2">
-                                                            <span class="path1"></span>
-                                                            <span class="path2"></span>
-                                                        </i>
-                                                        Editar
-                                                    </a>
-                                                </li>
-                                                <li>
-                                                    <a class="dropdown-item text-danger" href="#" onclick="deleteStage(<?= $stage['id'] ?>, <?= htmlspecialchars(json_encode($stage['name']), ENT_QUOTES, 'UTF-8') ?>); return false;">
-                                                        <i class="ki-duotone ki-trash fs-2 me-2">
+                                            <?php if (!empty($stage['is_system_stage'])): ?>
+                                                <!-- Etapa do sistema: apenas editar cor -->
+                                                <button type="button" class="btn btn-sm btn-icon btn-light-primary" 
+                                                        onclick="editStageColorOnly(<?= $stage['id'] ?>, <?= htmlspecialchars(json_encode($stage['name']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($stage['color']), ENT_QUOTES, 'UTF-8') ?>)"
+                                                        title="Editar cor (etapa do sistema)">
+                                                    <i class="ki-duotone ki-color-swatch fs-2">
+                                                        <span class="path1"></span>
+                                                        <span class="path2"></span>
+                                                        <span class="path3"></span>
+                                                        <span class="path4"></span>
+                                                    </i>
+                                                </button>
+                                            <?php else: ?>
+                                                <!-- Etapa normal: editar e deletar -->
+                                                <div class="dropdown">
+                                                    <button class="btn btn-sm btn-icon btn-active-color-primary" type="button" data-bs-toggle="dropdown">
+                                                        <i class="ki-duotone ki-dots-vertical fs-2">
                                                             <span class="path1"></span>
                                                             <span class="path2"></span>
                                                             <span class="path3"></span>
                                                         </i>
-                                                        Deletar
-                                                    </a>
-                                                </li>
-                                            </ul>
-                                        </div>
+                                                    </button>
+                                                    <ul class="dropdown-menu">
+                                                        <li>
+                                                            <a class="dropdown-item" href="#" onclick="editStage(<?= $stage['id'] ?>, <?= htmlspecialchars(json_encode($stage['name']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($stage['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($stage['color']), ENT_QUOTES, 'UTF-8') ?>); return false;">
+                                                                <i class="ki-duotone ki-pencil fs-2 me-2">
+                                                                    <span class="path1"></span>
+                                                                    <span class="path2"></span>
+                                                                </i>
+                                                                Editar
+                                                            </a>
+                                                        </li>
+                                                        <li>
+                                                            <a class="dropdown-item text-danger" href="#" onclick="deleteStage(<?= $stage['id'] ?>, <?= htmlspecialchars(json_encode($stage['name']), ENT_QUOTES, 'UTF-8') ?>); return false;">
+                                                                <i class="ki-duotone ki-trash fs-2 me-2">
+                                                                    <span class="path1"></span>
+                                                                    <span class="path2"></span>
+                                                                    <span class="path3"></span>
+                                                                </i>
+                                                                Deletar
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
+                                            <?php endif; ?>
                                         <?php endif; ?>
                                     </div>
                                 </div>

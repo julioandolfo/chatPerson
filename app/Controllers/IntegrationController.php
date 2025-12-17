@@ -191,6 +191,52 @@ class IntegrationController
     }
 
     /**
+     * Atualizar configurações de funil/etapa da conta WhatsApp
+     */
+    public function updateWhatsAppAccountSettings(int $id): void
+    {
+        Permission::abortIfCannot('whatsapp.edit');
+        
+        try {
+            $data = Request::post();
+            
+            // Validar dados
+            $errors = \App\Helpers\Validator::validate($data, [
+                'default_funnel_id' => 'nullable|integer',
+                'default_stage_id' => 'nullable|integer'
+            ]);
+
+            if (!empty($errors)) {
+                throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));
+            }
+            
+            // Preparar dados (converter vazios em NULL)
+            $updateData = [
+                'default_funnel_id' => !empty($data['default_funnel_id']) ? (int)$data['default_funnel_id'] : null,
+                'default_stage_id' => !empty($data['default_stage_id']) ? (int)$data['default_stage_id'] : null
+            ];
+            
+            // Atualizar
+            WhatsAppAccount::update($id, $updateData);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Configurações atualizadas com sucesso!'
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao atualizar configurações: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
      * Atualizar conta WhatsApp
      */
     public function updateWhatsAppAccount(int $id): void

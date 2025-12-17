@@ -10214,7 +10214,7 @@ document.getElementById('assignForm')?.addEventListener('submit', function(e) {
                 // Recarregar conversa completa (inclui agentes do contato)
                 selectConversation(conversationId);
             } else {
-                window.location.reload();
+            window.location.reload();
             }
         } else {
             alert('Erro ao atribuir conversa: ' + (data.message || 'Erro desconhecido'));

@@ -180,6 +180,7 @@ Router::get('/users/{id}/performance', [UserController::class, 'getPerformanceSt
 Router::get('/integrations', [IntegrationController::class, 'index'], ['Authentication']);
 Router::get('/integrations/whatsapp', [IntegrationController::class, 'whatsapp'], ['Authentication']);
 Router::post('/integrations/whatsapp', [IntegrationController::class, 'createWhatsAppAccount'], ['Authentication']);
+Router::post('/integrations/whatsapp/{id}/settings', [IntegrationController::class, 'updateWhatsAppAccountSettings'], ['Authentication']); // Atualizar funil/etapa padrão
 Router::post('/integrations/whatsapp/{id}', [IntegrationController::class, 'updateWhatsAppAccount'], ['Authentication']);
 Router::delete('/integrations/whatsapp/{id}', [IntegrationController::class, 'deleteWhatsAppAccount'], ['Authentication']);
 Router::get('/integrations/whatsapp/{id}/qrcode', [IntegrationController::class, 'getQRCode'], ['Authentication']);

@@ -19,13 +19,13 @@ function up_create_default_funnel_and_stage() {
         if (!$existingFunnel) {
             // Criar Funil Padrão
             $stmt = $db->prepare("
-                INSERT INTO funnels (name, description, is_active, is_default, color, created_at, updated_at) 
+                INSERT INTO funnels (name, description, status, is_default, color, created_at, updated_at) 
                 VALUES (?, ?, ?, ?, ?, NOW(), NOW())
             ");
             $stmt->execute([
                 'Funil Entrada',
                 'Funil padrão do sistema. Todas as conversas sem configuração específica iniciam aqui.',
-                1, // is_active
+                'active', // status
                 1, // is_default
                 '#3F4254' // cor cinza escuro
             ]);

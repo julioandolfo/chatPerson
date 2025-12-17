@@ -462,7 +462,7 @@ class ConversationService
         
         // SEMPRE verificar e adicionar o agente à lista de agentes do contato (primeira atribuição ou reatribuição)
         // Isso garante que mesmo conversas antigas que já tinham agente atribuído terão o agente na lista do contato
-        try {
+            try {
             // Verificar se agente já está na lista de agentes do contato
             $existingAgents = \App\Models\ContactAgent::getByContact($conversation['contact_id']);
             $agentExists = false;
@@ -483,7 +483,7 @@ class ConversationService
                 \App\Models\ContactAgent::addAgent($conversation['contact_id'], $agentId, $isPrimary, 0);
                 error_log("ConversationService: Agente {$agentId} adicionado à lista de agentes do contato {$conversation['contact_id']} (primeira vez)" . ($isPrimary ? " e definido como principal" : ""));
             }
-        } catch (\Exception $e) {
+            } catch (\Exception $e) {
             error_log("Erro ao atualizar agente do contato: " . $e->getMessage());
             error_log("Trace: " . $e->getTraceAsString());
         }

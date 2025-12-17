@@ -9,7 +9,7 @@ class WhatsAppAccount extends Model
 {
     protected string $table = 'whatsapp_accounts';
     protected string $primaryKey = 'id';
-    protected array $fillable = ['name', 'phone_number', 'provider', 'api_url', 'api_key', 'instance_id', 'status', 'config', 'quepasa_user', 'quepasa_token', 'quepasa_trackid', 'quepasa_chatid'];
+    protected array $fillable = ['name', 'phone_number', 'provider', 'api_url', 'api_key', 'instance_id', 'status', 'config', 'quepasa_user', 'quepasa_token', 'quepasa_trackid', 'quepasa_chatid', 'default_funnel_id', 'default_stage_id'];
     protected bool $timestamps = true;
 
     /**

@@ -126,6 +126,14 @@ ob_start();
                                             <span class="path3"></span>
                                         </i>
                                     </button>
+                                    <button type="button" class="btn btn-light-success btn-sm" 
+                                            onclick="editAccountSettings(<?= $account['id'] ?>, <?= htmlspecialchars(json_encode($account['name']), ENT_QUOTES) ?>, <?= $account['default_funnel_id'] ?? 'null' ?>, <?= $account['default_stage_id'] ?? 'null' ?>)"
+                                            title="Configurar Funil/Etapa">
+                                        <i class="ki-duotone ki-setting-2 fs-4">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                    </button>
                                     <?php endif; ?>
                                     <?php if (\App\Helpers\Permission::can('whatsapp.edit')): ?>
                                     <?php if ($currentStatus === 'active'): ?>
@@ -310,6 +318,76 @@ ob_start();
 </div>
 <!--end::Modal - QR Code-->
 
+<!--begin::Modal - Editar Configurações da Conta-->
+<?php if (\App\Helpers\Permission::can('whatsapp.edit')): ?>
+<div class="modal fade" id="kt_modal_edit_account_settings" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-650px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Configurar Funil/Etapa Padrão</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <form id="kt_modal_edit_account_settings_form" class="form">
+                <input type="hidden" name="account_id" id="kt_edit_account_id">
+                <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                    <div class="mb-5">
+                        <h4 class="fw-bold" id="kt_edit_account_name"></h4>
+                    </div>
+                    
+                    <div class="alert alert-info d-flex align-items-center p-5 mb-7">
+                        <i class="ki-duotone ki-information fs-2x text-info me-4">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div class="d-flex flex-column">
+                            <span class="fs-7">Conversas criadas por esta conta entrarão automaticamente neste funil/etapa quando não houver automação específica.</span>
+                        </div>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Funil Padrão</label>
+                        <select name="default_funnel_id" id="kt_edit_default_funnel_select" class="form-select form-select-solid" onchange="loadFunnelStages(this.value, 'kt_edit_default_stage_select')">
+                            <option value="">Usar padrão do sistema</option>
+                            <?php if (!empty($funnels)): ?>
+                                <?php foreach ($funnels as $funnel): ?>
+                                    <option value="<?= $funnel['id'] ?>">
+                                        <?= htmlspecialchars($funnel['name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </select>
+                        <div class="form-text">Deixe vazio para usar o funil padrão do sistema</div>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Etapa Padrão</label>
+                        <select name="default_stage_id" id="kt_edit_default_stage_select" class="form-select form-select-solid">
+                            <option value="">Selecione um funil primeiro</option>
+                        </select>
+                        <div class="form-text">Deixe vazio para usar a primeira etapa do funil</div>
+                    </div>
+                </div>
+                <div class="modal-footer flex-center">
+                    <button type="reset" data-bs-dismiss="modal" class="btn btn-light me-3">Cancelar</button>
+                    <button type="submit" id="kt_modal_edit_account_settings_submit" class="btn btn-primary">
+                        <span class="indicator-label">Salvar</span>
+                        <span class="indicator-progress">Aguarde...
+                        <span class="spinner-border spinner-border-sm align-middle ms-2"></span></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+<!--end::Modal - Editar Configurações da Conta-->
+
 <?php 
 $content = ob_get_clean(); 
 $scripts = '
@@ -318,11 +396,12 @@ let currentAccountId = null;
 let qrCodeStatusInterval = null;
 
 // Carregar etapas do funil
-function loadFunnelStages(funnelId, targetSelectId) {
+function loadFunnelStages(funnelId, targetSelectId, callback) {
     const stageSelect = document.getElementById(targetSelectId);
     
     if (!funnelId) {
         stageSelect.innerHTML = "<option value=\"\">Selecione um funil primeiro</option>";
+        if (callback) callback();
         return;
     }
     
@@ -348,12 +427,46 @@ function loadFunnelStages(funnelId, targetSelectId) {
         } else {
             stageSelect.innerHTML = "<option value=\"\">Nenhuma etapa encontrada</option>";
         }
+        
+        if (callback) callback();
     })
     .catch(error => {
         console.error("Erro ao carregar etapas:", error);
         stageSelect.disabled = false;
         stageSelect.innerHTML = "<option value=\"\">Erro ao carregar etapas</option>";
+        if (callback) callback();
     });
+}
+
+// Abrir modal de edição de configurações
+function editAccountSettings(accountId, accountName, funnelId, stageId) {
+    document.getElementById("kt_edit_account_id").value = accountId;
+    document.getElementById("kt_edit_account_name").textContent = accountName;
+    
+    const funnelSelect = document.getElementById("kt_edit_default_funnel_select");
+    const stageSelect = document.getElementById("kt_edit_default_stage_select");
+    
+    // Resetar selects
+    stageSelect.innerHTML = "<option value=\"\">Selecione um funil primeiro</option>";
+    
+    // Selecionar funil atual
+    if (funnelId) {
+        funnelSelect.value = funnelId;
+        
+        // Carregar etapas do funil
+        loadFunnelStages(funnelId, "kt_edit_default_stage_select", function() {
+            // Após carregar, selecionar etapa atual
+            if (stageId) {
+                stageSelect.value = stageId;
+            }
+        });
+    } else {
+        funnelSelect.value = "";
+    }
+    
+    // Abrir modal
+    const modal = new bootstrap.Modal(document.getElementById("kt_modal_edit_account_settings"));
+    modal.show();
 }
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -392,6 +505,47 @@ document.addEventListener("DOMContentLoaded", function() {
                 submitBtn.removeAttribute("data-kt-indicator");
                 submitBtn.disabled = false;
                 alert("Erro ao criar conta");
+            });
+        });
+    }
+    
+    // Handler do formulário de edição de configurações
+    const editForm = document.getElementById("kt_modal_edit_account_settings_form");
+    if (editForm) {
+        editForm.addEventListener("submit", function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById("kt_modal_edit_account_settings_submit");
+            submitBtn.setAttribute("data-kt-indicator", "on");
+            submitBtn.disabled = true;
+            
+            const accountId = document.getElementById("kt_edit_account_id").value;
+            const formData = new FormData(editForm);
+            
+            fetch("' . \App\Helpers\Url::to('/integrations/whatsapp') . '/" + accountId + "/settings", {
+                method: "POST",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                submitBtn.removeAttribute("data-kt-indicator");
+                submitBtn.disabled = false;
+                
+                if (data.success) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_edit_account_settings"));
+                    modal.hide();
+                    location.reload();
+                } else {
+                    alert("Erro: " + (data.message || "Erro ao atualizar configurações"));
+                }
+            })
+            .catch(error => {
+                submitBtn.removeAttribute("data-kt-indicator");
+                submitBtn.disabled = false;
+                alert("Erro ao atualizar configurações");
             });
         });
     }

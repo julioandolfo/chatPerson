@@ -713,6 +713,13 @@ $styles = '
 </style>
 ';
 $funnelIdForJs = isset($currentFunnelId) ? intval($currentFunnelId) : 0;
+
+// Construir URL base completa (protocolo + domínio + basePath)
+$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+$basePath = \App\Helpers\Url::basePath();
+$fullBaseUrl = $protocol . $host . $basePath;
+
 $scripts = '
 <!-- Configurações do Kanban -->
 <script>
@@ -722,8 +729,9 @@ window.KANBAN_CONFIG = {
     moveConversationUrl: "' . \App\Helpers\Url::to('/funnels/' . $funnelIdForJs . '/conversations/move') . '",
     funnelBaseUrl: "' . \App\Helpers\Url::to('/funnels/' . $funnelIdForJs) . '",
     funnelsUrl: "' . \App\Helpers\Url::to('/funnels') . '",
-    BASE_URL: "' . \App\Helpers\Url::to('') . '"
+    BASE_URL: "' . $fullBaseUrl . '"
 };
+console.log("KANBAN_CONFIG inicializado:", window.KANBAN_CONFIG);
 </script>
 <!-- Kanban JavaScript -->
 <script src="' . \App\Helpers\Url::asset('js/kanban.js') . '"></script>';

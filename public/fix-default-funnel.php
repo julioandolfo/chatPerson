@@ -68,14 +68,15 @@ if (isset($_GET['action']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
             
             // Criar novo funil
             $stmt = $pdo->prepare("
-                INSERT INTO funnels (name, description, status, is_default, created_at, updated_at) 
-                VALUES (?, ?, ?, ?, NOW(), NOW())
+                INSERT INTO funnels (name, description, status, is_default, color, created_at, updated_at) 
+                VALUES (?, ?, ?, ?, ?, NOW(), NOW())
             ");
             $stmt->execute([
                 'Funil Entrada',
                 'Funil padrão do sistema. Todas as conversas sem configuração específica iniciam aqui.',
                 'active',
-                1
+                1,
+                '#3F4254'
             ]);
             
             $funnelId = $pdo->lastInsertId();

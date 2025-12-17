@@ -27,7 +27,7 @@ ob_start();
                     <span class="path2"></span>
                     <span class="path3"></span>
                 </i>
-                MÃ©tricas do Funil
+                Métricas do Funil
             </button>
             <?php endif; ?>
         </div>

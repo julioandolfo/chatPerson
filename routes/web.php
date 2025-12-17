@@ -135,6 +135,8 @@ Router::get('/funnels/{id}/stages', [FunnelController::class, 'getStages'], ['Au
 Router::get('/funnels/{id}/stages/json', [FunnelController::class, 'getStagesJson'], ['Authentication']); // Todas as etapas em JSON
 Router::get('/funnels/{id}/stages/{stageId}/json', [FunnelController::class, 'getStageJson'], ['Authentication']); // Etapa específica em JSON
 Router::post('/funnels', [FunnelController::class, 'store'], ['Authentication']);
+Router::post('/funnels/{id}', [FunnelController::class, 'update'], ['Authentication']); // Atualizar funil
+Router::delete('/funnels/{id}', [FunnelController::class, 'delete'], ['Authentication']); // Deletar funil
 Router::post('/funnels/{id}/stages', [FunnelController::class, 'createStage'], ['Authentication']);
 Router::post('/funnels/{id}/stages/{stageId}', [FunnelController::class, 'updateStage'], ['Authentication']);
 Router::delete('/funnels/{id}/stages/{stageId}', [FunnelController::class, 'deleteStage'], ['Authentication']);

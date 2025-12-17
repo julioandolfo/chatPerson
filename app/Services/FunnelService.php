@@ -944,5 +944,44 @@ class FunnelService
         $selectedAgent = $agents[0] ?? null;
         return $selectedAgent ? (int)$selectedAgent['id'] : null;
     }
+
+    /**
+     * Deletar funil
+     * 
+     * @param int $funnelId
+     * @throws \InvalidArgumentException
+     * @throws \Exception
+     * @return bool
+     */
+    public static function delete(int $funnelId): bool
+    {
+        $funnel = Funnel::find($funnelId);
+        if (!$funnel) {
+            throw new \InvalidArgumentException('Funil não encontrado');
+        }
+
+        // Não permitir deletar funil padrão
+        if ($funnel['is_default']) {
+            throw new \InvalidArgumentException('Não é possível deletar o funil padrão do sistema');
+        }
+
+        // Verificar se há conversas no funil
+        $conversationCount = \App\Helpers\Database::query(
+            "SELECT COUNT(*) as count FROM conversations c
+             INNER JOIN funnel_stages fs ON c.funnel_stage_id = fs.id
+             WHERE fs.funnel_id = ?",
+            [$funnelId]
+        )[0]['count'] ?? 0;
+
+        if ($conversationCount > 0) {
+            throw new \InvalidArgumentException(
+                "Este funil possui {$conversationCount} conversa(s) ativa(s). " .
+                "Mova ou finalize todas as conversas antes de deletar o funil."
+            );
+        }
+
+        // Deletar funil (cascade vai deletar as etapas automaticamente)
+        return Funnel::delete($funnelId);
+    }
 }
 

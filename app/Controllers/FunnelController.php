@@ -100,6 +100,71 @@ class FunnelController
     }
 
     /**
+     * Atualizar funil
+     */
+    public function update(int $id): void
+    {
+        Permission::abortIfCannot('funnels.edit');
+        
+        try {
+            $data = Request::post();
+            FunnelService::update($id, $data);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Funil atualizado com sucesso!'
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao atualizar funil: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Deletar funil
+     */
+    public function delete(int $id): void
+    {
+        Permission::abortIfCannot('funnels.delete');
+        
+        try {
+            // Verificar se é funil padrão
+            $funnel = Funnel::find($id);
+            if (!$funnel) {
+                throw new \Exception('Funil não encontrado');
+            }
+            
+            if ($funnel['is_default']) {
+                throw new \InvalidArgumentException('Não é possível deletar o funil padrão');
+            }
+            
+            FunnelService::delete($id);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Funil deletado com sucesso!'
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao deletar funil: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Criar estágio
      */
     public function createStage(int $id): void
@@ -230,16 +295,51 @@ class FunnelController
         Permission::abortIfCannot('funnels.edit');
         
         try {
+            $data = Request::post();
+            $targetStageId = $data['target_stage_id'] ?? null;
+            
             // Verificar se há conversas neste estágio
             $conversations = \App\Models\Funnel::getConversationsByStage($id, $stageId);
+            
             if (!empty($conversations)) {
-                throw new \Exception('Não é possível deletar estágio com conversas. Mova as conversas primeiro.');
+                // Se há conversas, precisa especificar para onde mover
+                if (!$targetStageId) {
+                    Response::json([
+                        'success' => false,
+                        'message' => 'Este estágio possui conversas. Especifique para qual estágio transferir.',
+                        'conversation_count' => count($conversations),
+                        'requires_transfer' => true
+                    ], 400);
+                    return;
+                }
+                
+                // Validar estágio de destino
+                $targetStage = \App\Models\FunnelStage::find($targetStageId);
+                if (!$targetStage) {
+                    throw new \InvalidArgumentException('Estágio de destino não encontrado');
+                }
+                
+                if ($targetStage['funnel_id'] != $id) {
+                    throw new \InvalidArgumentException('Estágio de destino deve pertencer ao mesmo funil');
+                }
+                
+                // Transferir todas as conversas para o estágio de destino
+                foreach ($conversations as $conversation) {
+                    FunnelService::moveConversation(
+                        $conversation['id'],
+                        $targetStageId,
+                        \App\Helpers\Auth::id(),
+                        false // skipValidation = false
+                    );
+                }
             }
             
+            // Deletar estágio
             if (\App\Models\FunnelStage::delete($stageId)) {
                 Response::json([
                     'success' => true,
-                    'message' => 'Estágio deletado com sucesso!'
+                    'message' => 'Estágio deletado com sucesso!' . 
+                                 (!empty($conversations) ? ' ' . count($conversations) . ' conversa(s) transferida(s).' : '')
                 ]);
             } else {
                 Response::json([
@@ -247,11 +347,16 @@ class FunnelController
                     'message' => 'Falha ao deletar estágio.'
                 ], 500);
             }
-        } catch (\Exception $e) {
+        } catch (\InvalidArgumentException $e) {
             Response::json([
                 'success' => false,
                 'message' => $e->getMessage()
             ], 400);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao deletar estágio: ' . $e->getMessage()
+            ], 500);
         }
     }
 

@@ -338,13 +338,11 @@ function toggleAutoAssignFields() {
 }
 
 function deleteStage(stageId, stageName) {
-    if (!confirm("Tem certeza que deseja deletar o estágio \"" + stageName + "\"?\n\nEsta ação não pode ser desfeita.")) {
-        return;
-    }
-    
+    // Primeiro tenta deletar para ver se há conversas
     fetch(window.KANBAN_CONFIG.funnelBaseUrl + "/stages/" + stageId, {
         method: "DELETE",
         headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
             "X-Requested-With": "XMLHttpRequest"
         }
     })
@@ -352,12 +350,107 @@ function deleteStage(stageId, stageName) {
     .then(data => {
         if (data.success) {
             location.reload();
+        } else if (data.requires_transfer) {
+            // Tem conversas - perguntar para onde transferir
+            showTransferConversationsModal(stageId, stageName, data.conversation_count);
         } else {
-            alert("Erro: " + (data.message || "Erro ao deletar estágio"));
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: data.message || "Erro ao deletar estágio"
+            });
         }
     })
     .catch(error => {
-        alert("Erro ao deletar estágio");
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro ao deletar estágio'
+        });
+    });
+}
+
+function showTransferConversationsModal(stageId, stageName, conversationCount) {
+    // Buscar outras etapas do funil
+    const columns = document.querySelectorAll('.kanban-column');
+    let stageOptions = '';
+    
+    columns.forEach(column => {
+        const colStageId = column.dataset.stageId;
+        const colStageName = column.querySelector('.fw-bold')?.textContent || '';
+        
+        if (colStageId != stageId) {
+            stageOptions += '<option value="' + colStageId + '">' + colStageName + '</option>';
+        }
+    });
+    
+    Swal.fire({
+        title: 'Transferir Conversas',
+        html: 
+            '<p class="mb-5">Este estágio possui <strong>' + conversationCount + ' conversa(s)</strong>.</p>' +
+            '<p class="mb-3">Para qual estágio deseja transferir antes de deletar?</p>' +
+            '<select id="swal-target-stage" class="form-select form-select-solid">' +
+                '<option value="">Selecione um estágio...</option>' +
+                stageOptions +
+            '</select>',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Transferir e Deletar',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+            confirmButton: 'btn btn-danger',
+            cancelButton: 'btn btn-secondary'
+        },
+        preConfirm: () => {
+            const targetStageId = document.getElementById('swal-target-stage').value;
+            if (!targetStageId) {
+                Swal.showValidationMessage('Selecione um estágio de destino');
+                return false;
+            }
+            return targetStageId;
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const targetStageId = result.value;
+            
+            // Deletar com transferência
+            fetch(window.KANBAN_CONFIG.funnelBaseUrl + "/stages/" + stageId, {
+                method: "DELETE",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: new URLSearchParams({
+                    target_stage_id: targetStageId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso!',
+                        text: data.message,
+                        timer: 2000
+                    }).then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: data.message || "Erro ao deletar estágio"
+                    });
+                }
+            })
+            .catch(error => {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: 'Erro ao deletar estágio'
+                });
+            });
+        }
     });
 }
 

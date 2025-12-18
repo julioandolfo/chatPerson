@@ -231,14 +231,36 @@ class AutomationController
      */
     public function saveLayout(int $id): void
     {
+        // Registrar shutdown handler para capturar erros fatais
+        register_shutdown_function(function() {
+            $error = error_get_last();
+            if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+                if (ob_get_level()) {
+                    ob_clean();
+                }
+                header('Content-Type: application/json');
+                http_response_code(500);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Erro fatal no servidor: ' . $error['message'],
+                    'file' => $error['file'] ?? '',
+                    'line' => $error['line'] ?? 0
+                ]);
+                exit;
+            }
+        });
+        
         // Suprimir warnings e notices que possam gerar HTML
-        error_reporting(E_ERROR | E_PARSE);
+        error_reporting(E_ALL);
         ini_set('display_errors', '0');
         
         // Limpar qualquer output buffer anterior
-        if (ob_get_level()) {
-            ob_clean();
+        while (ob_get_level() > 0) {
+            ob_end_clean();
         }
+        
+        // Iniciar novo buffer limpo
+        ob_start();
         
         Permission::abortIfCannot('automations.edit');
         
@@ -269,45 +291,55 @@ class AutomationController
             $tempIdToRealId = [];
             
             // Primeiro passo: criar/atualizar nós e criar mapeamento
-            foreach ($nodes as $nodeData) {
-                $tempId = $nodeData['id'] ?? null;
-                
-                // Verificar se tem ID e se existe no banco
-                $nodeId = null;
-                if (isset($nodeData['id'])) {
-                    if (is_numeric($nodeData['id'])) {
-                        $nodeId = (int)$nodeData['id'];
-                    } elseif (is_string($nodeData['id']) && is_numeric($nodeData['id'])) {
-                        $nodeId = (int)$nodeData['id'];
+            foreach ($nodes as $index => $nodeData) {
+                try {
+                    if (!is_array($nodeData)) {
+                        \App\Helpers\Logger::automation("saveLayout - ERRO: Nó {$index} não é array: " . gettype($nodeData));
+                        continue;
                     }
-                }
-                
-                if ($nodeId && in_array($nodeId, $oldNodeIds, true)) {
-                    // Atualizar nó existente
-                    \App\Helpers\Logger::automation("saveLayout - Atualizando nó existente: {$nodeId}");
-                    AutomationService::updateNode($nodeId, [
-                        'node_type' => $nodeData['node_type'],
-                        'node_data' => $nodeData['node_data'] ?? [],
-                        'position_x' => isset($nodeData['position_x']) ? (int)$nodeData['position_x'] : 0,
-                        'position_y' => isset($nodeData['position_y']) ? (int)$nodeData['position_y'] : 0
-                    ]);
-                    $sentNodeIds[] = $nodeId;
                     
-                    // Mapear ID temporário para ID real (se for temporário)
-                    if ($tempId && (is_string($tempId) && strpos($tempId, 'node_') === 0)) {
-                        $tempIdToRealId[$tempId] = $nodeId;
-                    }
-                } else {
-                    // Criar novo nó
-                    \App\Helpers\Logger::automation("saveLayout - Criando novo nó (ID recebido: " . ($nodeData['id'] ?? 'null') . ")");
-                    $newNodeId = AutomationService::createNode($id, $nodeData);
-                    \App\Helpers\Logger::automation("saveLayout - Novo nó criado com ID: {$newNodeId}");
-                    $sentNodeIds[] = $newNodeId;
+                    $tempId = $nodeData['id'] ?? null;
                     
-                    // Mapear ID temporário para ID real
-                    if ($tempId) {
-                        $tempIdToRealId[$tempId] = $newNodeId;
+                    // Verificar se tem ID e se existe no banco
+                    $nodeId = null;
+                    if (isset($nodeData['id'])) {
+                        if (is_numeric($nodeData['id'])) {
+                            $nodeId = (int)$nodeData['id'];
+                        } elseif (is_string($nodeData['id']) && is_numeric($nodeData['id'])) {
+                            $nodeId = (int)$nodeData['id'];
+                        }
                     }
+                    
+                    if ($nodeId && in_array($nodeId, $oldNodeIds, true)) {
+                        // Atualizar nó existente
+                        \App\Helpers\Logger::automation("saveLayout - Atualizando nó existente: {$nodeId}");
+                        AutomationService::updateNode($nodeId, [
+                            'node_type' => $nodeData['node_type'] ?? 'unknown',
+                            'node_data' => $nodeData['node_data'] ?? [],
+                            'position_x' => isset($nodeData['position_x']) ? (int)$nodeData['position_x'] : 0,
+                            'position_y' => isset($nodeData['position_y']) ? (int)$nodeData['position_y'] : 0
+                        ]);
+                        $sentNodeIds[] = $nodeId;
+                        
+                        // Mapear ID temporário para ID real (se for temporário)
+                        if ($tempId && (is_string($tempId) && strpos($tempId, 'node_') === 0)) {
+                            $tempIdToRealId[$tempId] = $nodeId;
+                        }
+                    } else {
+                        // Criar novo nó
+                        \App\Helpers\Logger::automation("saveLayout - Criando novo nó (ID recebido: " . ($nodeData['id'] ?? 'null') . ")");
+                        $newNodeId = AutomationService::createNode($id, $nodeData);
+                        \App\Helpers\Logger::automation("saveLayout - Novo nó criado com ID: {$newNodeId}");
+                        $sentNodeIds[] = $newNodeId;
+                        
+                        // Mapear ID temporário para ID real
+                        if ($tempId) {
+                            $tempIdToRealId[$tempId] = $newNodeId;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    \App\Helpers\Logger::automation("saveLayout - Erro ao processar nó {$index}: " . $e->getMessage());
+                    throw new \Exception("Erro ao processar nó {$index}: " . $e->getMessage());
                 }
             }
             
@@ -376,28 +408,40 @@ class AutomationController
             \App\Helpers\Logger::automation('saveLayout - Layout salvo com sucesso. Total de nós: ' . count($sentNodeIds));
             \App\Helpers\Logger::automation('saveLayout - IDs dos nós salvos: ' . json_encode($sentNodeIds));
             
-            Response::json([
+            // Limpar buffer antes de enviar resposta
+            if (ob_get_level()) {
+                ob_end_clean();
+            }
+            
+            // Enviar resposta JSON pura
+            header('Content-Type: application/json; charset=utf-8');
+            http_response_code(200);
+            echo json_encode([
                 'success' => true,
                 'message' => 'Layout salvo com sucesso!',
                 'nodes_count' => count($sentNodeIds)
-            ]);
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
         } catch (\Exception $e) {
             // Limpar qualquer output antes de enviar JSON
-            if (ob_get_level()) {
-                ob_clean();
+            while (ob_get_level() > 0) {
+                ob_end_clean();
             }
             
             \App\Helpers\Logger::automation('saveLayout - Erro: ' . $e->getMessage());
+            \App\Helpers\Logger::automation('saveLayout - Arquivo: ' . $e->getFile() . ' - Linha: ' . $e->getLine());
             \App\Helpers\Logger::automation('saveLayout - Stack trace: ' . $e->getTraceAsString());
             
             // Garantir que apenas JSON seja retornado
-            header('Content-Type: application/json');
+            header('Content-Type: application/json; charset=utf-8');
             http_response_code(400);
             echo json_encode([
                 'success' => false,
                 'message' => $e->getMessage(),
-                'error_type' => get_class($e)
-            ]);
+                'error_type' => get_class($e),
+                'file' => basename($e->getFile()),
+                'line' => $e->getLine()
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             exit;
         }
     }

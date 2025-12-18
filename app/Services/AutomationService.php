@@ -449,6 +449,9 @@ class AutomationService
             case 'action_assign_agent':
                 self::executeAssignAgent($nodeData, $conversationId, $executionId);
                 break;
+            case 'action_assign_advanced':
+                self::executeAssignAdvanced($nodeData, $conversationId, $executionId);
+                break;
             case 'action_move_stage':
                 self::executeMoveStage($nodeData, $conversationId, $executionId);
                 break;
@@ -571,6 +574,246 @@ class AutomationService
             }
             throw $e;
         }
+    }
+
+    /**
+     * Executar ação: atribuição avançada
+     */
+    private static function executeAssignAdvanced(array $nodeData, int $conversationId, ?int $executionId = null): void
+    {
+        try {
+            $conversation = Conversation::find($conversationId);
+            if (!$conversation) {
+                throw new \Exception('Conversa não encontrada');
+            }
+            
+            $assignmentType = $nodeData['assignment_type'] ?? 'auto';
+            $agentId = null;
+            \App\Helpers\Logger::automation("executeAssignAdvanced - Tipo: {$assignmentType}, Conversa: {$conversationId}");
+            
+            switch ($assignmentType) {
+                case 'specific_agent':
+                    $agentId = (int)($nodeData['agent_id'] ?? 0);
+                    $forceAssign = (bool)($nodeData['force_assign'] ?? false);
+                    
+                    \App\Helpers\Logger::automation("executeAssignAdvanced - Agente específico: {$agentId}, Forçar: " . ($forceAssign ? 'SIM' : 'NÃO'));
+                    
+                    if ($agentId) {
+                        \App\Services\ConversationService::assignToAgent($conversationId, $agentId, $forceAssign);
+                    }
+                    break;
+                    
+                case 'department':
+                    $departmentId = (int)($nodeData['department_id'] ?? 0);
+                    
+                    \App\Helpers\Logger::automation("executeAssignAdvanced - Setor específico: {$departmentId}");
+                    
+                    if ($departmentId) {
+                        $agentId = \App\Services\ConversationSettingsService::autoAssignConversation(
+                            $conversationId,
+                            $departmentId,
+                            $conversation['funnel_id'] ?? null,
+                            $conversation['funnel_stage_id'] ?? null
+                        );
+                    }
+                    break;
+                    
+                case 'custom_method':
+                    $method = $nodeData['distribution_method'] ?? 'round_robin';
+                    $filterDepartmentId = !empty($nodeData['filter_department_id']) ? (int)$nodeData['filter_department_id'] : null;
+                    $considerAvailability = (bool)($nodeData['consider_availability'] ?? true);
+                    $considerMaxConversations = (bool)($nodeData['consider_max_conversations'] ?? true);
+                    $allowAI = (bool)($nodeData['allow_ai_agents'] ?? false);
+                    
+                    \App\Helpers\Logger::automation("executeAssignAdvanced - Método personalizado: {$method}, Setor filtro: {$filterDepartmentId}");
+                    
+                    // Se método é por porcentagem, processar regras
+                    if ($method === 'percentage') {
+                        $percentageAgentIds = $nodeData['percentage_agent_ids'] ?? [];
+                        $percentageValues = $nodeData['percentage_values'] ?? [];
+                        
+                        if (!empty($percentageAgentIds) && !empty($percentageValues)) {
+                            $rules = [];
+                            foreach ($percentageAgentIds as $idx => $agId) {
+                                if (!empty($agId) && !empty($percentageValues[$idx])) {
+                                    $rules[] = [
+                                        'agent_id' => (int)$agId,
+                                        'percentage' => (int)$percentageValues[$idx]
+                                    ];
+                                }
+                            }
+                            
+                            \App\Helpers\Logger::automation("executeAssignAdvanced - Regras de %: " . json_encode($rules));
+                            
+                            // Selecionar agente baseado em porcentagem
+                            $agentId = self::selectAgentByPercentage($rules, $filterDepartmentId, $considerAvailability, $considerMaxConversations);
+                        }
+                    } else {
+                        // Usar método padrão (round-robin, by_load, etc)
+                        $agentId = self::selectAgentByMethod(
+                            $method,
+                            $filterDepartmentId,
+                            $conversation['funnel_id'] ?? null,
+                            $conversation['funnel_stage_id'] ?? null,
+                            $considerAvailability,
+                            $considerMaxConversations,
+                            $allowAI
+                        );
+                    }
+                    
+                    if ($agentId) {
+                        \App\Services\ConversationService::assignToAgent($conversationId, $agentId, false);
+                    }
+                    break;
+                    
+                case 'auto':
+                default:
+                    \App\Helpers\Logger::automation("executeAssignAdvanced - Automático (usa config global)");
+                    $agentId = \App\Services\ConversationSettingsService::autoAssignConversation(
+                        $conversationId,
+                        $conversation['department_id'] ?? null,
+                        $conversation['funnel_id'] ?? null,
+                        $conversation['funnel_stage_id'] ?? null
+                    );
+                    if ($agentId) {
+                        \App\Services\ConversationService::assignToAgent($conversationId, $agentId, false);
+                    }
+                    break;
+            }
+            
+            // Se não conseguiu atribuir, executar fallback
+            if (!$agentId) {
+                $fallbackAction = $nodeData['fallback_action'] ?? 'leave_unassigned';
+                
+                \App\Helpers\Logger::automation("executeAssignAdvanced - Fallback: {$fallbackAction}");
+                
+                switch ($fallbackAction) {
+                    case 'try_any_agent':
+                        // Tenta qualquer agente disponível sem filtros
+                        $agentId = \App\Services\ConversationSettingsService::assignRoundRobin(null, null, null, false);
+                        if ($agentId) {
+                            \App\Services\ConversationService::assignToAgent($conversationId, $agentId, false);
+                        }
+                        break;
+                        
+                    case 'assign_to_ai':
+                        // Atribuir a um agente de IA
+                        $aiAgents = \App\Models\User::where('is_ai_agent', '=', 1);
+                        if (!empty($aiAgents)) {
+                            \App\Services\ConversationService::assignToAgent($conversationId, $aiAgents[0]['id'], false);
+                            $agentId = $aiAgents[0]['id'];
+                        }
+                        break;
+                        
+                    case 'move_to_stage':
+                        $fallbackStageId = (int)($nodeData['fallback_stage_id'] ?? 0);
+                        if ($fallbackStageId) {
+                            \App\Services\FunnelService::moveConversationToStage($conversationId, $fallbackStageId);
+                        }
+                        break;
+                        
+                    case 'leave_unassigned':
+                    default:
+                        // Não faz nada, deixa sem atribuição
+                        break;
+                }
+            }
+            
+            if ($executionId) {
+                \App\Models\AutomationExecution::updateStatus(
+                    $executionId,
+                    'completed',
+                    $agentId ? "Atribuído ao agente ID: {$agentId}" : "Não foi possível atribuir"
+                );
+            }
+            
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::automation("executeAssignAdvanced - ERRO: " . $e->getMessage());
+            if ($executionId) {
+                \App\Models\AutomationExecution::updateStatus($executionId, 'failed', "Erro na atribuição: " . $e->getMessage());
+            }
+            throw $e;
+        }
+    }
+    
+    /**
+     * Selecionar agente por método
+     */
+    private static function selectAgentByMethod(string $method, ?int $departmentId, ?int $funnelId, ?int $stageId, bool $considerAvailability, bool $considerMaxConversations, bool $allowAI): ?int
+    {
+        \App\Helpers\Logger::automation("selectAgentByMethod - Método: {$method}, Setor: {$departmentId}");
+        
+        switch ($method) {
+            case 'round_robin':
+                return \App\Services\ConversationSettingsService::assignRoundRobin($departmentId, $funnelId, $stageId, $allowAI);
+            case 'by_load':
+                return \App\Services\ConversationSettingsService::assignByLoad($departmentId, $funnelId, $stageId, $allowAI);
+            case 'by_performance':
+                return \App\Services\ConversationSettingsService::assignByPerformance($departmentId, $funnelId, $stageId, $allowAI);
+            case 'by_specialty':
+                return \App\Services\ConversationSettingsService::assignBySpecialty($departmentId, $funnelId, $stageId, $allowAI);
+            default:
+                return \App\Services\ConversationSettingsService::assignRoundRobin($departmentId, $funnelId, $stageId, $allowAI);
+        }
+    }
+    
+    /**
+     * Selecionar agente por porcentagem
+     */
+    private static function selectAgentByPercentage(array $rules, ?int $departmentId, bool $considerAvailability, bool $considerMaxConversations): ?int
+    {
+        if (empty($rules)) {
+            return null;
+        }
+        
+        \App\Helpers\Logger::automation("selectAgentByPercentage - " . count($rules) . " regras");
+        
+        // Normalizar porcentagens
+        $total = array_sum(array_column($rules, 'percentage'));
+        if ($total == 0) {
+            return null;
+        }
+        
+        foreach ($rules as &$rule) {
+            $rule['normalized'] = ($rule['percentage'] / $total) * 100;
+        }
+        
+        // Selecionar aleatório baseado em peso
+        $rand = mt_rand(1, 100);
+        $cumulative = 0;
+        
+        foreach ($rules as $rule) {
+            $cumulative += $rule['normalized'];
+            if ($rand <= $cumulative) {
+                $agentId = $rule['agent_id'];
+                
+                // Verificar se agente está disponível
+                $agent = \App\Models\User::find($agentId);
+                if (!$agent || $agent['status'] !== 'active') {
+                    \App\Helpers\Logger::automation("selectAgentByPercentage - Agente {$agentId} não disponível, pulando");
+                    continue;
+                }
+                
+                // Verificar disponibilidade
+                if ($considerAvailability && $agent['availability_status'] !== 'online') {
+                    \App\Helpers\Logger::automation("selectAgentByPercentage - Agente {$agentId} offline, pulando");
+                    continue;
+                }
+                
+                // Verificar limites
+                if ($considerMaxConversations) {
+                    if (!\App\Services\ConversationSettingsService::canAssignToAgent($agentId, $departmentId, null, null)) {
+                        \App\Helpers\Logger::automation("selectAgentByPercentage - Agente {$agentId} no limite, pulando");
+                        continue;
+                    }
+                }
+                
+                \App\Helpers\Logger::automation("selectAgentByPercentage - Selecionado: {$agentId}");
+                return $agentId;
+            }
+        }
+        
+        return null;
     }
 
     /**
@@ -1435,6 +1678,44 @@ class AutomationService
                         'type' => 'assign_agent',
                         'agent_id' => $agentId,
                         'agent_name' => $agent ? $agent['name'] : 'Não especificado'
+                    ];
+                    break;
+                    
+                case 'action_assign_advanced':
+                    $assignmentType = $nodeData['assignment_type'] ?? 'auto';
+                    $previewText = 'Atribuição: ';
+                    
+                    switch ($assignmentType) {
+                        case 'specific_agent':
+                            $agentId = $nodeData['agent_id'] ?? null;
+                            $agent = $agentId ? \App\Models\User::find($agentId) : null;
+                            $previewText .= $agent ? $agent['name'] : 'Não especificado';
+                            break;
+                        case 'department':
+                            $deptId = $nodeData['department_id'] ?? null;
+                            $dept = $deptId ? \App\Models\Department::find($deptId) : null;
+                            $previewText .= 'Setor ' . ($dept ? $dept['name'] : 'Não especificado');
+                            break;
+                        case 'custom_method':
+                            $method = $nodeData['distribution_method'] ?? 'round_robin';
+                            $methodNames = [
+                                'round_robin' => 'Round-Robin',
+                                'by_load' => 'Por Carga',
+                                'by_performance' => 'Por Performance',
+                                'by_specialty' => 'Por Especialidade',
+                                'percentage' => 'Por Porcentagem'
+                            ];
+                            $previewText .= $methodNames[$method] ?? $method;
+                            break;
+                        case 'auto':
+                        default:
+                            $previewText .= 'Automática';
+                            break;
+                    }
+                    
+                    $step['action_preview'] = [
+                        'type' => 'assign_advanced',
+                        'preview_text' => $previewText
                     ];
                     break;
                     

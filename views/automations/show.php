@@ -403,6 +403,20 @@ ob_start();
                                 </div>
                             </div>
                             
+                            <!-- Ação - Atribuição Avançada -->
+                            <div class="automation-node-type" draggable="true" data-node-type="action" data-action-type="assign_advanced">
+                                <div class="d-flex align-items-center p-3 bg-light-primary rounded">
+                                    <i class="ki-duotone ki-user-tick fs-2x text-primary me-3">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold text-gray-800">Atribuição Avançada</div>
+                                        <div class="text-muted fs-7">Distribuição inteligente</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <!-- Ação - Mover Estágio -->
                             <div class="automation-node-type" draggable="true" data-node-type="action" data-action-type="move_stage">
                                 <div class="d-flex align-items-center p-3 bg-light-danger rounded">
@@ -843,6 +857,14 @@ if (!empty($funnels)) {
     }
 }
 
+$departments = \App\Models\Department::all();
+$departmentOptions = '<option value="">Selecione um setor</option>';
+if (!empty($departments)) {
+    foreach ($departments as $dept) {
+        $departmentOptions .= '<option value="' . htmlspecialchars($dept['id']) . '">' . htmlspecialchars($dept['name']) . '</option>';
+    }
+}
+
 ob_start();
 ?>
 <script>
@@ -879,6 +901,7 @@ const whatsappOptionsHtml = <?= json_encode($whatsappOptions, JSON_UNESCAPED_UNI
 const stageOptionsHtml = <?= json_encode($stageOptions, JSON_UNESCAPED_UNICODE) ?>;
 const agentOptionsHtml = <?= json_encode($agentOptions, JSON_UNESCAPED_UNICODE) ?>;
 const funnelOptionsHtml = <?= json_encode($funnelOptions, JSON_UNESCAPED_UNICODE) ?>;
+const departmentOptionsHtml = <?= json_encode($departmentOptions, JSON_UNESCAPED_UNICODE) ?>;
 
 document.addEventListener("DOMContentLoaded", function() {
     canvas = document.getElementById("kt_automation_canvas");
@@ -1446,6 +1469,154 @@ function openNodeConfig(nodeId) {
                         <label class="form-check-label" for="kt_notify_agent">
                             Enviar notificação ao agente sobre a atribuição
                         </label>
+                    </div>
+                </div>
+            `;
+            break;
+        case "action_assign_advanced":
+            formContent = `
+                <div class="fv-row mb-7">
+                    <label class="required fw-semibold fs-6 mb-2">Tipo de Atribuição</label>
+                    <select name="assignment_type" id="kt_assignment_type" class="form-select form-select-solid" required onchange="updateAssignmentFields(this.value)">
+                        <option value="auto">Automática (Usar método do sistema)</option>
+                        <option value="specific_agent">Agente Específico</option>
+                        <option value="department">Setor Específico</option>
+                        <option value="custom_method">Método Personalizado</option>
+                    </select>
+                    <div class="form-text">Escolha como a conversa será atribuída</div>
+                </div>
+
+                <!-- Container: Agente Específico -->
+                <div id="specific_agent_container" style="display: none;">
+                    <div class="fv-row mb-7">
+                        <label class="required fw-semibold fs-6 mb-2">Agente</label>
+                        <select name="agent_id" class="form-select form-select-solid">
+                            <option value="">Selecione um agente</option>
+                            ${agentOptionsHtml}
+                        </select>
+                    </div>
+                    <div class="fv-row mb-7">
+                        <label class="d-flex align-items-center">
+                            <input type="checkbox" name="force_assign" class="form-check-input me-2" />
+                            <span class="fw-semibold fs-6">Forçar atribuição (ignorar limites)</span>
+                        </label>
+                        <div class="form-text">Se habilitado, ignora limite máximo e status de disponibilidade</div>
+                    </div>
+                </div>
+
+                <!-- Container: Setor Específico -->
+                <div id="department_container" style="display: none;">
+                    <div class="fv-row mb-7">
+                        <label class="required fw-semibold fs-6 mb-2">Setor</label>
+                        <select name="department_id" class="form-select form-select-solid">
+                            <option value="">Selecione um setor</option>
+                            ${departmentOptionsHtml}
+                        </select>
+                        <div class="form-text">Atribui a um agente disponível do setor selecionado</div>
+                    </div>
+                </div>
+
+                <!-- Container: Método Personalizado -->
+                <div id="custom_method_container" style="display: none;">
+                    <div class="fv-row mb-7">
+                        <label class="required fw-semibold fs-6 mb-2">Método de Distribuição</label>
+                        <select name="distribution_method" id="kt_distribution_method" class="form-select form-select-solid" onchange="updatePercentageFields(this.value)">
+                            <option value="round_robin">Round-Robin (Distribuição igual)</option>
+                            <option value="by_load">Por Carga (Menor carga primeiro)</option>
+                            <option value="by_performance">Por Performance</option>
+                            <option value="by_specialty">Por Especialidade</option>
+                            <option value="percentage">Por Porcentagem</option>
+                        </select>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Filtrar por Setor</label>
+                        <select name="filter_department_id" class="form-select form-select-solid">
+                            <option value="">Todos os setores</option>
+                            ${departmentOptionsHtml}
+                        </select>
+                        <div class="form-text">Limita candidatos a agentes de um setor específico</div>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="d-flex align-items-center">
+                            <input type="checkbox" name="consider_availability" class="form-check-input me-2" checked />
+                            <span class="fw-semibold fs-6">Considerar status de disponibilidade</span>
+                        </label>
+                        <div class="form-text">Apenas agentes online/disponíveis</div>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="d-flex align-items-center">
+                            <input type="checkbox" name="consider_max_conversations" class="form-check-input me-2" checked />
+                            <span class="fw-semibold fs-6">Considerar limite máximo</span>
+                        </label>
+                        <div class="form-text">Respeita limite máximo de conversas do agente</div>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="d-flex align-items-center">
+                            <input type="checkbox" name="allow_ai_agents" class="form-check-input me-2" />
+                            <span class="fw-semibold fs-6">Permitir agentes de IA</span>
+                        </label>
+                        <div class="form-text">Inclui agentes de IA na seleção</div>
+                    </div>
+                    
+                    <!-- Container: Distribuição por Porcentagem -->
+                    <div id="percentage_container" style="display: none;">
+                        <div class="alert alert-info d-flex align-items-center p-5 mb-7">
+                            <i class="ki-duotone ki-information fs-2x text-info me-4">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            <div class="d-flex flex-column">
+                                <h4 class="mb-1 text-dark">Distribuição por Porcentagem</h4>
+                                <span>Defina a porcentagem de distribuição para cada agente. O total deve somar 100%.</span>
+                            </div>
+                        </div>
+                        
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">Regras de Distribuição</label>
+                            <div id="percentage_rules_list">
+                                <div class="d-flex gap-2 mb-2 percentage-rule-item">
+                                    <select name="percentage_agent_ids[]" class="form-select form-select-solid" style="flex: 1;">
+                                        <option value="">Selecione um agente</option>
+                                        ${agentOptionsHtml}
+                                    </select>
+                                    <input type="number" name="percentage_values[]" class="form-control form-control-solid" placeholder="%" min="1" max="100" style="width: 100px;" />
+                                    <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removePercentageRule(this)">
+                                        <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-light-primary mt-2" onclick="addPercentageRule()">
+                                <i class="ki-duotone ki-plus fs-2"></i>
+                                Adicionar Regra
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fallback -->
+                <div class="separator separator-dashed my-7"></div>
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2">Se não conseguir atribuir</label>
+                    <select name="fallback_action" id="kt_fallback_action" class="form-select form-select-solid" onchange="updateFallbackFields(this.value)">
+                        <option value="leave_unassigned">Deixar sem atribuição</option>
+                        <option value="try_any_agent">Tentar qualquer agente disponível</option>
+                        <option value="assign_to_ai">Atribuir a IA</option>
+                        <option value="move_to_stage">Mover para estágio específico</option>
+                    </select>
+                </div>
+
+                <div id="fallback_stage_container" style="display: none;">
+                    <div class="fv-row mb-7">
+                        <label class="required fw-semibold fs-6 mb-2">Estágio de Fallback</label>
+                        <select name="fallback_stage_id" class="form-select form-select-solid">
+                            <option value="">Selecione um estágio</option>
+                            ${stageOptionsHtml}
+                        </select>
                     </div>
                 </div>
             `;
@@ -2668,6 +2839,78 @@ function populateChatbotOptionTargets(optionsList) {
 window.updateChatbotFields = updateChatbotFields;
 window.addChatbotOption = addChatbotOption;
 window.removeChatbotOption = removeChatbotOption;
+
+// Funções para Atribuição Avançada
+function updateAssignmentFields(type) {
+    const specificAgentContainer = document.getElementById('specific_agent_container');
+    const departmentContainer = document.getElementById('department_container');
+    const customMethodContainer = document.getElementById('custom_method_container');
+    
+    // Ocultar todos
+    if (specificAgentContainer) specificAgentContainer.style.display = 'none';
+    if (departmentContainer) departmentContainer.style.display = 'none';
+    if (customMethodContainer) customMethodContainer.style.display = 'none';
+    
+    // Mostrar o relevante
+    if (type === 'specific_agent' && specificAgentContainer) {
+        specificAgentContainer.style.display = 'block';
+    } else if (type === 'department' && departmentContainer) {
+        departmentContainer.style.display = 'block';
+    } else if (type === 'custom_method' && customMethodContainer) {
+        customMethodContainer.style.display = 'block';
+    }
+}
+
+function updatePercentageFields(method) {
+    const percentageContainer = document.getElementById('percentage_container');
+    if (percentageContainer) {
+        percentageContainer.style.display = method === 'percentage' ? 'block' : 'none';
+    }
+}
+
+function updateFallbackFields(action) {
+    const fallbackStageContainer = document.getElementById('fallback_stage_container');
+    if (fallbackStageContainer) {
+        fallbackStageContainer.style.display = action === 'move_to_stage' ? 'block' : 'none';
+    }
+}
+
+function addPercentageRule() {
+    const list = document.getElementById('percentage_rules_list');
+    if (!list) return;
+    
+    const newRule = document.createElement('div');
+    newRule.className = 'd-flex gap-2 mb-2 percentage-rule-item';
+    newRule.innerHTML = `
+        <select name="percentage_agent_ids[]" class="form-select form-select-solid" style="flex: 1;">
+            <option value="">Selecione um agente</option>
+            ${agentOptionsHtml}
+        </select>
+        <input type="number" name="percentage_values[]" class="form-control form-control-solid" placeholder="%" min="1" max="100" style="width: 100px;" />
+        <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removePercentageRule(this)">
+            <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span></i>
+        </button>
+    `;
+    list.appendChild(newRule);
+}
+
+function removePercentageRule(button) {
+    const list = document.getElementById('percentage_rules_list');
+    if (!list) return;
+    
+    // Manter pelo menos uma regra
+    if (list.children.length > 1) {
+        button.closest('.percentage-rule-item').remove();
+    } else {
+        alert('É necessário ter pelo menos uma regra de porcentagem.');
+    }
+}
+
+window.updateAssignmentFields = updateAssignmentFields;
+window.updatePercentageFields = updatePercentageFields;
+window.updateFallbackFields = updateFallbackFields;
+window.addPercentageRule = addPercentageRule;
+window.removePercentageRule = removePercentageRule;
 
 // Carregar estágios quando funil é selecionado
 function loadStagesForFunnel(funnelId, targetSelectId) {

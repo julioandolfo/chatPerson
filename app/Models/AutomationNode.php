@@ -40,6 +40,11 @@ class AutomationNode extends Model
                 'icon' => 'ki-user',
                 'color' => '#7239ea'
             ],
+            'action_assign_advanced' => [
+                'label' => 'Atribuição Avançada',
+                'icon' => 'ki-user-tick',
+                'color' => '#9333ea'
+            ],
             'action_move_stage' => [
                 'label' => 'Mover para Estágio',
                 'icon' => 'ki-arrow-right',

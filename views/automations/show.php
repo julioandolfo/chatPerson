@@ -1005,7 +1005,7 @@ function addNode(nodeType, x, y) {
 }
 
 function renderNodes() {
-    nodes.forEach(node => {
+    nodes.forEach(function(node) {
         renderNode(node);
     });
 }
@@ -1620,6 +1620,68 @@ function openNodeConfig(nodeId) {
                 input.value = node.node_data[key] || "";
             }
         });
+        
+        // Tratamento especial para chatbot
+        if (node.node_type === 'action_chatbot') {
+            const chatbotType = node.node_data.chatbot_type || 'simple';
+            
+            // Mostrar/ocultar containers baseado no tipo
+            updateChatbotFields(chatbotType);
+            
+            // Preencher opções do menu (se existirem)
+            if (chatbotType === 'menu' && node.node_data.chatbot_options) {
+                const optionsList = document.getElementById('kt_chatbot_options_list');
+                if (optionsList) {
+                    optionsList.innerHTML = ''; // Limpar opções padrão
+                    
+                    const options = node.node_data.chatbot_options;
+                    if (Array.isArray(options)) {
+                        options.forEach(function(opt) {
+                            const optionItem = document.createElement('div');
+                            optionItem.className = 'd-flex gap-2 mb-2 chatbot-option-item';
+                            const optText = (typeof opt === 'object' ? opt.text : opt) || '';
+                            const optTarget = (typeof opt === 'object' ? opt.target_node_id : '') || '';
+                            
+                            optionItem.innerHTML = `
+                                <input type="text" name="chatbot_options[]" class="form-control form-control-solid" placeholder="Ex: 1 - Suporte" />
+                                <select name="chatbot_option_targets[]" class="form-select form-select-solid chatbot-option-target">
+                                    <option value="">Selecione o próximo nó</option>
+                                </select>
+                                <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeChatbotOption(this)">
+                                    <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span></i>
+                                </button>
+                            `;
+                            optionsList.appendChild(optionItem);
+                            
+                            // Preencher valor do input após adicionar ao DOM
+                            const textInput = optionItem.querySelector('input[name="chatbot_options[]"]');
+                            if (textInput) {
+                                textInput.value = optText;
+                            }
+                            
+                            // Preencher target se existir
+                            const targetSelect = optionItem.querySelector('.chatbot-option-target');
+                            if (targetSelect && opt.target_node_id) {
+                                targetSelect.setAttribute('data-selected', opt.target_node_id);
+                            }
+                        });
+                        
+                        // Popular selects de target
+                        populateChatbotOptionTargets(optionsList);
+                        
+                        // Aplicar valores selecionados
+                        options.forEach(function(opt, idx) {
+                            if (opt.target_node_id) {
+                                const targetSelect = optionsList.querySelectorAll('.chatbot-option-target')[idx];
+                                if (targetSelect) {
+                                    targetSelect.value = opt.target_node_id;
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+        }
     }
     
     // Carregar estágios quando funil for selecionado
@@ -1671,19 +1733,29 @@ function openNodeConfig(nodeId) {
 function deleteNode(nodeId) {
     if (!confirm("Tem certeza que deseja deletar este nó?")) return;
     
+    console.log('deleteNode - Deletando nó:', nodeId);
+    console.log('deleteNode - Array antes:', nodes.length, nodes);
+    
     // Remover conexões relacionadas
-    nodes.forEach(node => {
-        if (node.node_data.connections) {
-            node.node_data.connections = node.node_data.connections.filter(
-                conn => conn.target_node_id !== nodeId
-            );
+    nodes.forEach(function(node) {
+        if (node.node_data && node.node_data.connections) {
+            node.node_data.connections = node.node_data.connections.filter(function(conn) {
+                return conn.target_node_id !== nodeId;
+            });
         }
     });
     
-    nodes = nodes.filter(n => n.id !== nodeId);
+    nodes = nodes.filter(function(n) {
+        return n.id !== nodeId;
+    });
+    
     // Atualizar referência global
     window.nodes = nodes;
-    const nodeElement = document.getElementById(nodeId);
+    
+    console.log('deleteNode - Array depois:', nodes.length, nodes);
+    console.log('deleteNode - window.nodes atualizado:', window.nodes.length);
+    
+    const nodeElement = document.getElementById(String(nodeId));
     if (nodeElement) {
         nodeElement.remove();
     }
@@ -1865,10 +1937,10 @@ function renderConnections() {
     // Limpar conexões existentes
     connectionsSvg.innerHTML = '';
     
-    nodes.forEach(node => {
+    nodes.forEach(function(node) {
         if (!node.node_data.connections || !Array.isArray(node.node_data.connections)) return;
         
-        node.node_data.connections.forEach(connection => {
+        node.node_data.connections.forEach(function(connection) {
             const fromPos = getNodeHandlePosition(node.id, 'output');
             const toPos = getNodeHandlePosition(connection.target_node_id, 'input');
             
@@ -1935,6 +2007,7 @@ function saveLayout() {
     console.log('saveLayout - Tipo de nodes:', typeof nodes, Array.isArray(nodes));
     console.log('saveLayout - window.nodes existe?', typeof window.nodes);
     console.log('saveLayout - window.nodes.length:', window.nodes ? window.nodes.length : 'N/A');
+    console.log('saveLayout - IDs dos nós que serão enviados:', nodes.map(function(n) { return n.id; }));
     
     if (!Array.isArray(nodes)) {
         console.error('saveLayout - ERRO: nodes não é um array!', nodes);
@@ -1950,7 +2023,7 @@ function saveLayout() {
     }
     
     // Converter nós para formato do backend
-    const nodesData = nodes.map(node => {
+    const nodesData = nodes.map(function(node) {
         const nodeData = {
             node_type: node.node_type,
             node_data: node.node_data || {},
@@ -1960,7 +2033,7 @@ function saveLayout() {
         
         // SEMPRE incluir o ID (mesmo que temporário) para mapeamento de conexões
         if (node.id) {
-            nodeData.id = node.id; // Incluir ID temporário também
+            nodeData.id = node.id;
             // Guardar o id no próprio node_data para uso em runtime (chatbot)
             nodeData.node_data.node_id = node.id;
         }
@@ -2032,30 +2105,67 @@ document.addEventListener("DOMContentLoaded", function() {
             // Tratamento específico para chatbot menu: coletar opções + targets
             if (node.node_type === "action_chatbot") {
                 const chatbotType = nodeData.chatbot_type || 'simple';
+                console.log('Salvando configuração do chatbot, tipo:', chatbotType);
+                
                 if (chatbotType === 'menu') {
                     const optionInputs = Array.from(document.querySelectorAll('input[name="chatbot_options[]"]'));
                     const targetSelects = Array.from(document.querySelectorAll('select[name="chatbot_option_targets[]"]'));
                     const combined = [];
-                    optionInputs.forEach((inp, idx) => {
+                    
+                    console.log('Inputs de opções encontrados:', optionInputs.length);
+                    console.log('Selects de target encontrados:', targetSelects.length);
+                    
+                    optionInputs.forEach(function(inp, idx) {
                         const text = (inp.value || '').trim();
                         const target = targetSelects[idx] ? targetSelects[idx].value : '';
+                        console.log(`Opção ${idx}: text="${text}", target="${target}"`);
                         if (text) {
-                            combined.push({ text, target_node_id: target || null });
+                            combined.push({ text: text, target_node_id: target || null });
                         }
                     });
+                    
+                    console.log('Opções combinadas:', combined);
                     nodeData.chatbot_options = combined;
                 }
             }
             
+            console.log('node.node_data ANTES de merge:', node.node_data);
+            console.log('nodeData coletado do form:', nodeData);
+            
+            // Merge dos dados (preservar connections)
+            const oldConnections = node.node_data.connections || [];
             node.node_data = { ...node.node_data, ...nodeData };
+            node.node_data.connections = oldConnections; // Preservar conexões
+            
+            console.log('node.node_data DEPOIS de merge:', node.node_data);
+            
+            // Atualizar referência global
+            window.nodes = nodes;
             
             // Atualizar visualização
             const nodeElement = document.getElementById(nodeId);
             if (nodeElement) {
                 const config = nodeTypes[node.node_type] || {};
-                nodeElement.querySelector(".text-muted").textContent = 
-                    nodeData.label || nodeData.message || nodeData.name || config.label || "";
+                let displayText = nodeData.label || nodeData.message || nodeData.chatbot_message || nodeData.name || config.label || "";
+                
+                // Para chatbot, mostrar tipo e quantidade de opções
+                if (node.node_type === 'action_chatbot') {
+                    const type = nodeData.chatbot_type || 'simple';
+                    const typeLabels = { simple: 'Simples', menu: 'Menu', conditional: 'Condicional' };
+                    displayText = typeLabels[type] || type;
+                    
+                    if (type === 'menu' && nodeData.chatbot_options && Array.isArray(nodeData.chatbot_options)) {
+                        displayText += ` (${nodeData.chatbot_options.length} opções)`;
+                    }
+                }
+                
+                const textElement = nodeElement.querySelector(".text-muted");
+                if (textElement) {
+                    textElement.textContent = displayText;
+                }
             }
+            
+            console.log('Configuração salva. Fechando modal...');
             
             const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_node_config"));
             modal.hide();

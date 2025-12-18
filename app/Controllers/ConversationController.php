@@ -1094,11 +1094,13 @@ class ConversationController
             
             error_log("Conversa {$id}: Marcadas {$affected} mensagens como não lidas");
             
+            // Invalidar cache ANTES de recarregar
+            \App\Services\ConversationService::invalidateCache($id);
+            
             // Recarregar conversa para obter unread_count atualizado (calculado via subquery)
             $conversation = \App\Services\ConversationService::getConversation($id);
             
-            // Invalidar cache
-            \App\Services\ConversationService::invalidateCache($id);
+            error_log("Conversa {$id}: unread_count após marcar como não lida = " . ($conversation['unread_count'] ?? 0));
             
             // Notificar via WebSocket
             try {

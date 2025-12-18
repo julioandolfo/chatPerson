@@ -1934,6 +1934,12 @@ class WhatsAppService
                     Logger::quepasa("processWebhook - whatsapp_id final: '{$whatsappId}'");
                     
                     // Garantir que salvamos o número normalizado
+                    // ⚠️ Ignorar contatos do sistema (ex: mensagens automáticas do WhatsApp)
+                    if ($whatsappId === 'system' || $whatsappId === '0' || empty($whatsappId)) {
+                        Logger::quepasa("processWebhook - Ignorando contato do sistema: whatsapp_id={$whatsappId}");
+                        return;
+                    }
+                    
                     $normalizedPhone = \App\Models\Contact::normalizePhoneNumber($fromPhone);
                     
                     Logger::quepasa("processWebhook - Criando novo contato: name={$contactName}, phone={$normalizedPhone} (normalizado de {$fromPhone}), whatsapp_id={$whatsappId}");

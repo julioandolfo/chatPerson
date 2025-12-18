@@ -3982,17 +3982,33 @@ function applyConversationUpdate(conv) {
     // Garantir botão de fixar e classe pinned (preservar dropdown aberto)
             ensureActionsDropdown(conversationItem, pinned, conv.id, wasOpen);
 
-    const unreadCount = conv.unread_count || 0;
-    if (unreadCount > 0) {
-        if (badge) {
-            badge.textContent = unreadCount;
-        } else {
-            const badgeHtml = `<span class="conversation-item-badge">${unreadCount}</span>`;
-            const meta = conversationItem.querySelector('.conversation-item-meta');
-            if (meta) meta.insertAdjacentHTML('beforeend', badgeHtml);
+    // ⚠️ IMPORTANTE: Respeitar conversas marcadas manualmente como não lidas
+    const isManuallyMarkedAsUnread = window.manuallyMarkedAsUnread && window.manuallyMarkedAsUnread.has(conv.id);
+    const hasManualBadge = badge && badge.getAttribute('data-manual-unread') === 'true';
+    
+    console.log(`applyConversationUpdate: conv=${conv.id}, isManuallyMarked=${isManuallyMarkedAsUnread}, hasManualBadge=${hasManualBadge}, unread_count=${conv.unread_count}`);
+    
+    // Se foi marcada manualmente como não lida, não remover o badge
+    if (isManuallyMarkedAsUnread || hasManualBadge) {
+        console.log(`Preservando badge manual para conversa ${conv.id}`);
+        // Apenas atualizar o número se aumentou
+        if (badge && conv.unread_count > 0) {
+            badge.textContent = conv.unread_count;
         }
-    } else if (badge) {
-        badge.remove();
+    } else {
+        // Comportamento normal: atualizar badge baseado em unread_count
+        const unreadCount = conv.unread_count || 0;
+        if (unreadCount > 0) {
+            if (badge) {
+                badge.textContent = unreadCount;
+            } else {
+                const badgeHtml = `<span class="conversation-item-badge">${unreadCount}</span>`;
+                const meta = conversationItem.querySelector('.conversation-item-meta');
+                if (meta) meta.insertAdjacentHTML('beforeend', badgeHtml);
+            }
+        } else if (badge) {
+            badge.remove();
+        }
     }
     
     // Atualizar meta e resortear
@@ -4135,6 +4151,12 @@ function selectConversation(id) {
     const conversationItem = document.querySelector(`[data-conversation-id="${id}"]`);
     if (conversationItem) {
         conversationItem.classList.add('active');
+        
+        // Remover da lista de marcadas manualmente como não lidas
+        if (window.manuallyMarkedAsUnread && window.manuallyMarkedAsUnread.has(id)) {
+            window.manuallyMarkedAsUnread.delete(id);
+            console.log(`Conversa ${id} removida da lista de marcadas como não lidas`);
+        }
         
         // Remover badge de não lidas imediatamente (otimista - antes da resposta do servidor)
         const badge = conversationItem.querySelector('.conversation-item-badge');
@@ -6326,10 +6348,15 @@ function markConversationAsRead(conversationId) {
     });
 }
 
+// Armazenar conversas marcadas como não lidas manualmente
+window.manuallyMarkedAsUnread = window.manuallyMarkedAsUnread || new Set();
+
 // Marcar conversa como não lida
 function markConversationAsUnread(conversationId) {
     // Fechar o dropdown imediatamente
     closeAllDropdowns();
+    
+    console.log("Marcando conversa como não lida:", conversationId);
     
     fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/mark-unread`, {
         method: 'POST',
@@ -6340,16 +6367,32 @@ function markConversationAsUnread(conversationId) {
     })
     .then(response => response.json())
     .then(data => {
+        console.log("Resposta mark-unread:", data);
+        
         if (data.success) {
-            // Adicionar badge de não lido
+            // Adicionar à lista de conversas marcadas manualmente
+            window.manuallyMarkedAsUnread.add(conversationId);
+            console.log("Conversas marcadas como não lidas:", Array.from(window.manuallyMarkedAsUnread));
+            
+            // Forçar atualização do badge
             const conversationItem = document.querySelector(`[data-conversation-id="${conversationId}"]`);
             if (conversationItem) {
                 const meta = conversationItem.querySelector('.conversation-item-meta');
-                if (meta && !meta.querySelector('.conversation-item-badge')) {
+                if (meta) {
+                    // Remover badge existente
+                    const existingBadge = meta.querySelector('.conversation-item-badge');
+                    if (existingBadge) {
+                        existingBadge.remove();
+                    }
+                    
+                    // Adicionar novo badge
                     const badge = document.createElement('span');
                     badge.className = 'conversation-item-badge';
-                    badge.textContent = '1';
+                    badge.textContent = data.unread_count || '1';
+                    badge.setAttribute('data-manual-unread', 'true');
                     meta.appendChild(badge);
+                    
+                    console.log("Badge adicionado para conversa:", conversationId, "unread_count:", data.unread_count);
                 }
             }
             

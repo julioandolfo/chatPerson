@@ -265,7 +265,7 @@ ob_start();
                     </a>
                 </div>
             </div>
-            <div class="card-body py-3">
+            <div class="card-body py-3" style="max-height: 400px; overflow-y: auto;">
                 <div class="timeline">
                     <?php foreach ($recentConversations as $conversation): ?>
                         <div class="timeline-item">
@@ -528,6 +528,24 @@ ob_start();
                                     </span>
                                 </div>
                                 
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="text-muted fs-7">Tempo Médio de Resposta</span>
+                                    <span class="fw-bold text-gray-800">
+                                        <?php
+                                        $avgResponse = $agent['avg_response_minutes'] ?? 0;
+                                        if ($avgResponse > 0) {
+                                            if ($avgResponse < 60) {
+                                                echo number_format($avgResponse, 0) . ' min';
+                                            } else {
+                                                echo number_format($avgResponse / 60, 1) . 'h';
+                                            }
+                                        } else {
+                                            echo '-';
+                                        }
+                                        ?>
+                                    </span>
+                                </div>
+                                
                                 <div class="separator separator-dashed my-4"></div>
                                 
                                 <!-- SLA -->
@@ -683,7 +701,10 @@ function loadChartData(chartType, canvasId, configCallback) {
     if (groupBy) url.searchParams.append("group_by", groupBy);
     
     fetch(url)
-        .then(response => response.json())
+        .then(response => {
+            console.log("Chart response status:", response.status, "for", chartType);
+            return response.json();
+        })
         .then(data => {
             console.log("Chart data received:", chartType, data);
             
@@ -693,7 +714,12 @@ function loadChartData(chartType, canvasId, configCallback) {
                     console.warn("Sem dados para o gráfico:", chartType);
                     // Mostrar mensagem "Sem dados" no canvas
                     const canvas = document.getElementById(canvasId);
+                    if (!canvas) {
+                        console.error("Canvas não encontrado:", canvasId);
+                        return;
+                    }
                     const ctx = canvas.getContext("2d");
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
                     ctx.font = "16px Arial";
                     ctx.textAlign = "center";
                     ctx.fillStyle = "#999";
@@ -701,23 +727,50 @@ function loadChartData(chartType, canvasId, configCallback) {
                     return;
                 }
                 
-                const ctx = document.getElementById(canvasId).getContext("2d");
+                const canvas = document.getElementById(canvasId);
+                if (!canvas) {
+                    console.error("Canvas não encontrado:", canvasId);
+                    return;
+                }
+                const ctx = canvas.getContext("2d");
                 
                 // Destruir gráfico existente se houver
                 const chartVarName = canvasId.replace("kt_chart_", "");
-                if (window["chart" + chartVarName.charAt(0).toUpperCase() + chartVarName.slice(1)]) {
-                    window["chart" + chartVarName.charAt(0).toUpperCase() + chartVarName.slice(1)].destroy();
+                const chartInstanceName = "chart" + chartVarName.charAt(0).toUpperCase() + chartVarName.slice(1);
+                if (window[chartInstanceName]) {
+                    window[chartInstanceName].destroy();
                 }
                 
                 // Criar novo gráfico
                 const chart = new Chart(ctx, configCallback(data.data));
-                window["chart" + chartVarName.charAt(0).toUpperCase() + chartVarName.slice(1)] = chart;
+                window[chartInstanceName] = chart;
+                console.log("Gráfico criado com sucesso:", chartType);
             } else {
-                console.error("Erro nos dados do gráfico:", data);
+                console.error("Erro nos dados do gráfico:", chartType, data);
+                // Mostrar mensagem de erro no canvas
+                const canvas = document.getElementById(canvasId);
+                if (canvas) {
+                    const ctx = canvas.getContext("2d");
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.font = "16px Arial";
+                    ctx.textAlign = "center";
+                    ctx.fillStyle = "#f14c4c";
+                    ctx.fillText("Erro ao carregar dados", canvas.width / 2, canvas.height / 2);
+                }
             }
         })
         .catch(error => {
-            console.error("Erro ao carregar dados do gráfico:", error);
+            console.error("Erro ao carregar dados do gráfico:", chartType, error);
+            // Mostrar mensagem de erro no canvas
+            const canvas = document.getElementById(canvasId);
+            if (canvas) {
+                const ctx = canvas.getContext("2d");
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.font = "16px Arial";
+                ctx.textAlign = "center";
+                ctx.fillStyle = "#f14c4c";
+                ctx.fillText("Erro de conexão", canvas.width / 2, canvas.height / 2);
+            }
         });
 }
 

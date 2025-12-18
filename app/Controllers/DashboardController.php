@@ -42,8 +42,8 @@ class DashboardController
             // Métricas individuais de todos os agentes (para cards)
             $allAgentsMetrics = \App\Services\DashboardService::getAllAgentsMetrics($dateFrom, $dateTo);
             
-            // Conversas recentes
-            $recentConversations = \App\Services\DashboardService::getRecentConversations(10);
+            // Conversas recentes (apenas 5)
+            $recentConversations = \App\Services\DashboardService::getRecentConversations(5);
             
             // Atividade recente
             $recentActivity = \App\Services\DashboardService::getRecentActivity(10);
@@ -99,6 +99,8 @@ class DashboardController
         $dateTo = \App\Helpers\Request::get('date_to', date('Y-m-d H:i:s'));
         $groupBy = \App\Helpers\Request::get('group_by', 'day');
         
+        self::logDash("getChartData: type={$chartType}, dateFrom={$dateFrom}, dateTo={$dateTo}");
+        
         try {
             $data = [];
             
@@ -129,19 +131,23 @@ class DashboardController
                     break;
                     
                 default:
+                    self::logDash("getChartData: Tipo inválido - {$chartType}");
                     Response::json(['error' => 'Tipo de gráfico inválido'], 400);
                     return;
             }
+            
+            self::logDash("getChartData: {$chartType} retornou " . count($data) . " registros");
             
             Response::json([
                 'success' => true,
                 'data' => $data
             ]);
         } catch (\Exception $e) {
-            error_log("Erro ao obter dados de gráfico: " . $e->getMessage());
+            self::logDash("ERRO getChartData: {$chartType} - " . $e->getMessage());
             Response::json([
                 'success' => false,
-                'error' => 'Erro ao carregar dados do gráfico'
+                'error' => 'Erro ao carregar dados do gráfico',
+                'message' => $e->getMessage()
             ], 500);
         }
     }

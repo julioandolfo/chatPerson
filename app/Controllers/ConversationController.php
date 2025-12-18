@@ -1090,22 +1090,11 @@ class ConversationController
                     WHERE conversation_id = ? 
                     AND sender_type = 'contact'";
             
-            \App\Helpers\Database::execute($sql, [$id]);
+            $affected = \App\Helpers\Database::execute($sql, [$id]);
             
-            // Recalcular unread_count diretamente no banco
-            $sqlUpdate = "UPDATE conversations 
-                        SET unread_count = (
-                            SELECT COUNT(*) 
-                            FROM messages m 
-                            WHERE m.conversation_id = conversations.id 
-                            AND m.sender_type = 'contact' 
-                            AND m.read_at IS NULL
-                        )
-                        WHERE id = ?";
+            error_log("Conversa {$id}: Marcadas {$affected} mensagens como não lidas");
             
-            \App\Helpers\Database::execute($sqlUpdate, [$id]);
-            
-            // Recarregar conversa para obter unread_count atualizado
+            // Recarregar conversa para obter unread_count atualizado (calculado via subquery)
             $conversation = \App\Services\ConversationService::getConversation($id);
             
             // Invalidar cache

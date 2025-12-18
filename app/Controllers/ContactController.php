@@ -301,18 +301,25 @@ class ContactController
                 SELECT 
                     COUNT(*) AS total_conversations,
                     AVG(TIMESTAMPDIFF(SECOND, 
-                        created_at, 
-                        COALESCE(resolved_at, updated_at, NOW())
+                        c.created_at, 
+                        COALESCE(c.resolved_at, c.updated_at)
                     )) AS avg_duration_seconds,
+                    AVG(TIMESTAMPDIFF(MINUTE, 
+                        c.created_at, 
+                        COALESCE(c.resolved_at, c.updated_at)
+                    )) AS avg_duration_minutes,
                     AVG(TIMESTAMPDIFF(HOUR, 
-                        created_at, 
-                        COALESCE(resolved_at, updated_at, NOW())
+                        c.created_at, 
+                        COALESCE(c.resolved_at, c.updated_at)
                     )) AS avg_duration_hours
-                FROM conversations
-                WHERE contact_id = ? 
-                AND status IN ('closed', 'resolved')
-                AND (resolved_at IS NOT NULL OR updated_at IS NOT NULL)
+                FROM conversations c
+                WHERE c.contact_id = ? 
+                AND c.status IN ('closed', 'resolved')
+                AND (c.resolved_at IS NOT NULL OR c.updated_at IS NOT NULL)
             ", [$id]);
+            
+            // Log para debug
+            error_log("Histórico do contato {$id}: " . json_encode($stats));
 
             // Conversas anteriores (últimas 5 fechadas/resolvidas)
             $previous = \App\Helpers\Database::fetchAll("
@@ -328,14 +335,24 @@ class ContactController
                 LIMIT 5
             ", [$id]);
 
-            $avgSeconds = $stats['avg_duration_seconds'] !== null ? (int)round((float)$stats['avg_duration_seconds']) : null;
+            $totalConv = (int)($stats['total_conversations'] ?? 0);
+            $avgSeconds = $stats['avg_duration_seconds'] !== null && $stats['avg_duration_seconds'] > 0 
+                ? (int)round((float)$stats['avg_duration_seconds']) 
+                : null;
+            $avgMinutes = $stats['avg_duration_minutes'] !== null && $stats['avg_duration_minutes'] > 0 
+                ? round((float)$stats['avg_duration_minutes'], 1) 
+                : null;
+            $avgHours = $stats['avg_duration_hours'] !== null && $stats['avg_duration_hours'] > 0 
+                ? round((float)$stats['avg_duration_hours'], 2) 
+                : null;
             
             Response::json([
                 'success' => true,
                 'contact_id' => $id,
-                'total_conversations' => (int)($stats['total_conversations'] ?? 0),
+                'total_conversations' => $totalConv,
                 'avg_duration_seconds' => $avgSeconds,
-                'avg_duration_hours' => $stats['avg_duration_hours'] !== null ? round((float)$stats['avg_duration_hours'], 2) : null,
+                'avg_duration_minutes' => $avgMinutes,
+                'avg_duration_hours' => $avgHours,
                 // Não há CSAT armazenado atualmente; deixar null/--
                 'csat_score' => null,
                 'previous_conversations' => $previous ?: []

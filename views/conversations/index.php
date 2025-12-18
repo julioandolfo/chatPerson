@@ -5208,18 +5208,39 @@ function loadContactHistory(contactId) {
     })
     .then(r => r.json())
     .then(data => {
+        console.log('📊 Dados do histórico:', data);
+        
         if (!data.success) {
             if (listEl) listEl.innerHTML = `<div class="text-center py-5"><p class="text-muted fs-7">Erro ao carregar histórico</p></div>`;
+            if (countEl) countEl.textContent = '-';
+            if (avgEl) avgEl.textContent = '-';
+            if (csatEl) csatEl.textContent = '--';
             return;
         }
+        
         const total = data.total_conversations ?? 0;
         const avgSec = data.avg_duration_seconds;
-        const csat = data.csat_score; // ainda não implementado (fica null/--)
+        const avgMin = data.avg_duration_minutes;
+        const avgHours = data.avg_duration_hours;
+        const csat = data.csat_score;
         const previous = data.previous_conversations || [];
 
+        // Atualizar contador de conversas
         if (countEl) countEl.textContent = total;
-        if (avgEl) avgEl.textContent = avgSec !== null ? formatDuration(avgSec) : '-';
-        if (csatEl) csatEl.textContent = csat !== null ? csat : '--';
+        
+        // Atualizar tempo médio
+        if (avgEl) {
+            if (avgSec !== null && avgSec !== undefined && avgSec > 0) {
+                avgEl.textContent = formatDuration(avgSec);
+            } else if (total === 0) {
+                avgEl.textContent = 'Sem dados';
+            } else {
+                avgEl.textContent = '-';
+            }
+        }
+        
+        // Atualizar CSAT (ainda não implementado)
+        if (csatEl) csatEl.textContent = csat !== null && csat !== undefined ? csat : '--';
 
         if (!previous.length) {
             if (listEl) listEl.innerHTML = `<div class="text-center py-5"><p class="text-muted fs-7">Nenhuma conversa anterior</p></div>`;
@@ -5243,8 +5264,12 @@ function loadContactHistory(contactId) {
         });
         if (listEl) listEl.innerHTML = html;
     })
-    .catch(() => {
+    .catch(error => {
+        console.error('❌ Erro ao carregar histórico:', error);
         if (listEl) listEl.innerHTML = `<div class="text-center py-5"><p class="text-muted fs-7">Erro ao carregar histórico</p></div>`;
+        if (countEl) countEl.textContent = '-';
+        if (avgEl) avgEl.textContent = '-';
+        if (csatEl) csatEl.textContent = '--';
     });
 }
 

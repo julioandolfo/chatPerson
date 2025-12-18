@@ -153,8 +153,8 @@ foreach ($rolePermissions as $roleSlug => $permissions) {
             continue;
         }
         
-        // Verificar se já tem a permissão
-        $sql = "SELECT id FROM role_permissions WHERE role_id = ? AND permission_id = ?";
+        // Verificar se já tem a permissão (role_permissions não tem coluna 'id', apenas role_id e permission_id)
+        $sql = "SELECT role_id FROM role_permissions WHERE role_id = ? AND permission_id = ?";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([$role['id'], $permissionIds[$permSlug]]);
         $hasPermission = $stmt->fetch();

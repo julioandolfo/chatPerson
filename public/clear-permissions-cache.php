@@ -3,29 +3,59 @@
  * Script para limpar cache de permissões após correção
  */
 
-require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/../app/Services/PermissionService.php';
-require_once __DIR__ . '/../app/Services/ConversationService.php';
+echo "<!DOCTYPE html>";
+echo "<html><head>";
+echo "<meta charset='UTF-8'>";
+echo "<title>Limpeza de Cache de Permissões</title>";
+echo "<style>
+body { font-family: Arial, sans-serif; padding: 20px; max-width: 1200px; margin: 0 auto; }
+h1 { color: #333; }
+.success { color: #22c55e; }
+.error { color: #ef4444; }
+table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+th, td { padding: 12px; text-align: left; border: 1px solid #ddd; }
+th { background-color: #f5f5f5; font-weight: bold; }
+.btn { display: inline-block; padding: 10px 20px; background: #009ef7; color: white; text-decoration: none; border-radius: 4px; margin-top: 20px; }
+</style>";
+echo "</head><body>";
 
 echo "<h1>🧹 Limpeza de Cache de Permissões</h1>";
 echo "<p>Este script limpa o cache de permissões e conversas para aplicar as correções.</p>";
 
 echo "<hr>";
 
-// Limpar cache de permissões
-try {
-    \App\Services\PermissionService::clearAllCache();
-    echo "<p>✅ <strong>Cache de permissões limpo!</strong></p>";
-} catch (Exception $e) {
-    echo "<p>❌ Erro ao limpar cache de permissões: " . htmlspecialchars($e->getMessage()) . "</p>";
+// Limpar cache de permissões manualmente
+$cacheDir = __DIR__ . '/../storage/cache/permissions/';
+$count = 0;
+
+if (is_dir($cacheDir)) {
+    $files = glob($cacheDir . '*');
+    foreach ($files as $file) {
+        if (is_file($file)) {
+            @unlink($file);
+            $count++;
+        }
+    }
+    echo "<p class='success'>✅ <strong>Cache de permissões limpo!</strong> ($count arquivos removidos)</p>";
+} else {
+    echo "<p>ℹ️ Diretório de cache de permissões não existe ainda.</p>";
 }
 
-// Limpar cache de conversas
-try {
-    \App\Services\ConversationService::clearAllCache();
-    echo "<p>✅ <strong>Cache de conversas limpo!</strong></p>";
-} catch (Exception $e) {
-    echo "<p>❌ Erro ao limpar cache de conversas: " . htmlspecialchars($e->getMessage()) . "</p>";
+// Limpar cache de conversas manualmente
+$cacheDir2 = __DIR__ . '/../storage/cache/conversations/';
+$count2 = 0;
+
+if (is_dir($cacheDir2)) {
+    $files2 = glob($cacheDir2 . '*');
+    foreach ($files2 as $file) {
+        if (is_file($file)) {
+            @unlink($file);
+            $count2++;
+        }
+    }
+    echo "<p class='success'>✅ <strong>Cache de conversas limpo!</strong> ($count2 arquivos removidos)</p>";
+} else {
+    echo "<p>ℹ️ Diretório de cache de conversas não existe ainda.</p>";
 }
 
 echo "<hr>";
@@ -33,7 +63,24 @@ echo "<hr>";
 // Testar as correções
 echo "<h2>🧪 Testando Correções</h2>";
 
-$db = \App\Helpers\Database::getInstance();
+require_once __DIR__ . '/../config/database.php';
+
+// Conectar ao banco
+try {
+    $pdo = new PDO(
+        "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4",
+        DB_USER,
+        DB_PASS,
+        [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+        ]
+    );
+} catch (PDOException $e) {
+    echo "<p class='error'>❌ Erro ao conectar ao banco: " . htmlspecialchars($e->getMessage()) . "</p>";
+    echo "</body></html>";
+    exit;
+}
 
 // Buscar usuários de teste
 $sql = "SELECT u.id, u.name, u.email, r.name as role_name, r.level
@@ -43,7 +90,7 @@ $sql = "SELECT u.id, u.name, u.email, r.name as role_name, r.level
         ORDER BY r.level ASC, u.name ASC
         LIMIT 10";
 
-$users = $db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+$users = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 
 echo "<table border='1' style='border-collapse: collapse; width: 100%;'>";
 echo "<tr style='background: #f5f5f5;'>";
@@ -58,10 +105,23 @@ echo "<th style='padding: 8px;'>Pode ver próprias?</th>";
 echo "</tr>";
 
 foreach ($users as $user) {
-    $isSuperAdmin = \App\Services\PermissionService::isSuperAdmin($user['id']);
-    $isAdmin = \App\Services\PermissionService::isAdmin($user['id']);
-    $canViewAll = \App\Services\PermissionService::hasPermission($user['id'], 'conversations.view.all');
-    $canViewOwn = \App\Services\PermissionService::hasPermission($user['id'], 'conversations.view.own');
+    // Verificar manualmente baseado no level
+    $level = $user['level'] ?? 999;
+    $isSuperAdmin = ($level <= 0);
+    $isAdmin = ($level <= 1);
+    
+    // Verificar permissões no banco
+    $sqlPerm = "SELECT p.slug 
+                FROM permissions p
+                INNER JOIN role_permissions rp ON p.id = rp.permission_id
+                INNER JOIN user_roles ur ON rp.role_id = ur.role_id
+                WHERE ur.user_id = ? AND p.slug IN ('conversations.view.all', 'conversations.view.own')";
+    $stmtPerm = $pdo->prepare($sqlPerm);
+    $stmtPerm->execute([$user['id']]);
+    $permissions = $stmtPerm->fetchAll(PDO::FETCH_COLUMN);
+    
+    $canViewAll = in_array('conversations.view.all', $permissions) || $isSuperAdmin || $isAdmin;
+    $canViewOwn = in_array('conversations.view.own', $permissions);
     
     $bgColor = '';
     if ($isSuperAdmin) {
@@ -107,5 +167,7 @@ echo "<li>Verifique se ele vê APENAS suas próprias conversas</li>";
 echo "<li>Faça login como Admin para verificar se ainda vê tudo</li>";
 echo "</ol>";
 
-echo "<p><a href='/conversations' style='padding: 10px 20px; background: #009ef7; color: white; text-decoration: none; border-radius: 4px;'>Ir para Conversas</a></p>";
+echo "<p><a href='/conversations' class='btn'>Ir para Conversas</a></p>";
+
+echo "</body></html>";
 

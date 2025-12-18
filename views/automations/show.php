@@ -1789,26 +1789,34 @@ function openNodeConfig(nodeId) {
 function deleteNode(nodeId) {
     if (!confirm("Tem certeza que deseja deletar este nó?")) return;
     
-    console.log('deleteNode - Deletando nó:', nodeId);
+    console.log('deleteNode - Deletando nó:', nodeId, 'tipo:', typeof nodeId);
     console.log('deleteNode - Array antes:', nodes.length, nodes);
+    console.log('deleteNode - IDs no array:', nodes.map(function(n) { return n.id + ' (' + typeof n.id + ')'; }));
+    
+    // Normalizar nodeId para comparação
+    const nodeIdStr = String(nodeId);
+    const nodeIdNum = isNaN(nodeId) ? nodeId : Number(nodeId);
     
     // Remover conexões relacionadas
     nodes.forEach(function(node) {
         if (node.node_data && node.node_data.connections) {
             node.node_data.connections = node.node_data.connections.filter(function(conn) {
-                return conn.target_node_id !== nodeId;
+                const targetId = conn.target_node_id;
+                return targetId != nodeId && String(targetId) !== nodeIdStr && Number(targetId) !== nodeIdNum;
             });
         }
     });
     
+    // Filtrar o nó (comparação fraca para pegar string e number)
     nodes = nodes.filter(function(n) {
-        return n.id !== nodeId;
+        return n.id != nodeId && String(n.id) !== nodeIdStr && (isNaN(n.id) || Number(n.id) !== nodeIdNum);
     });
     
     // Atualizar referência global
     window.nodes = nodes;
     
     console.log('deleteNode - Array depois:', nodes.length, nodes);
+    console.log('deleteNode - IDs restantes:', nodes.map(function(n) { return n.id; }));
     console.log('deleteNode - window.nodes atualizado:', window.nodes.length);
     
     const nodeElement = document.getElementById(String(nodeId));

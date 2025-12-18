@@ -406,12 +406,22 @@ class AutomationController
             }
             
             // Deletar nós que não foram enviados (removidos pelo usuário)
+            \App\Helpers\Logger::automation('saveLayout - IDs antigos (banco): ' . json_encode($oldNodeIds));
+            \App\Helpers\Logger::automation('saveLayout - IDs recebidos (frontend): ' . json_encode($sentNodeIds));
+            
             $nodesToDelete = array_diff($oldNodeIds, $sentNodeIds);
+            \App\Helpers\Logger::automation('saveLayout - Diferença (a deletar): ' . json_encode($nodesToDelete));
+            \App\Helpers\Logger::automation('saveLayout - Quantidade a deletar: ' . count($nodesToDelete));
+            
             if (!empty($nodesToDelete)) {
-                \App\Helpers\Logger::automation('saveLayout - Deletando nós: ' . json_encode($nodesToDelete));
+                \App\Helpers\Logger::automation('saveLayout - DELETANDO nós: ' . json_encode(array_values($nodesToDelete)));
                 foreach ($nodesToDelete as $nodeIdToDelete) {
-                    AutomationNode::delete($nodeIdToDelete);
+                    \App\Helpers\Logger::automation('saveLayout - Deletando nó ID: ' . $nodeIdToDelete);
+                    $result = AutomationNode::delete($nodeIdToDelete);
+                    \App\Helpers\Logger::automation('saveLayout - Resultado da deleção: ' . ($result ? 'SUCESSO' : 'FALHOU'));
                 }
+            } else {
+                \App\Helpers\Logger::automation('saveLayout - Nenhum nó para deletar');
             }
             
             \App\Helpers\Logger::automation('saveLayout - Layout salvo com sucesso. Total de nós: ' . count($sentNodeIds));

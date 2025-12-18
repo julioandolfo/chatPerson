@@ -2,8 +2,8 @@
 <div id="kt_aside" class="aside py-9" data-kt-drawer="true" data-kt-drawer-name="aside" data-kt-drawer-activate="{default: true, lg: false}" data-kt-drawer-overlay="true" data-kt-drawer-width="{default:'200px', '300px': '250px'}" data-kt-drawer-direction="start" data-kt-drawer-toggle="#kt_aside_toggle">
     <!--begin::Brand-->
     <div class="aside-logo flex-column-auto px-9 mb-9" id="kt_aside_logo">
-        <div class="d-flex align-items-center justify-content-between w-100">
-            <a href="<?= \App\Helpers\Url::to('/dashboard') ?>" class="d-flex align-items-center flex-grow-1">
+        <div class="d-flex align-items-center justify-content-between w-100 sidebar-logo-container">
+            <a href="<?= \App\Helpers\Url::to('/dashboard') ?>" class="d-flex align-items-center flex-grow-1 sidebar-logo-link">
                 <?php
                 $appLogo = \App\Services\SettingService::get('app_logo', '');
                 $appName = \App\Services\SettingService::get('app_name', 'Sistema Multiatendimento');
@@ -20,7 +20,7 @@
                 <?php endif; ?>
             </a>
             <!--begin::Sidebar Toggle Button-->
-            <button class="btn btn-icon btn-sm btn-active-color-primary btn-color-gray-700 ms-2" id="kt_aside_toggle_sidebar" title="Recolher/Expandir Menu">
+            <button class="btn btn-icon btn-sm btn-active-color-primary btn-color-gray-700 ms-2 sidebar-toggle-btn" id="kt_aside_toggle_sidebar" title="Recolher/Expandir Menu">
                 <i class="ki-duotone ki-left fs-2">
                     <span class="path1"></span>
                     <span class="path2"></span>

@@ -18,18 +18,34 @@
     padding-left: 0.75rem !important;
     padding-right: 0.75rem !important;
     justify-content: center !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
 }
 
 #kt_aside.aside-minimize .aside-logo .logo-text {
     display: none !important;
 }
 
-#kt_aside.aside-minimize .aside-logo .d-flex {
+#kt_aside.aside-minimize .aside-logo .sidebar-logo-container {
+    flex-direction: column !important;
+    align-items: center !important;
     justify-content: center !important;
+    width: 100% !important;
+}
+
+#kt_aside.aside-minimize .aside-logo .sidebar-logo-link {
+    justify-content: center !important;
+    margin-bottom: 0.5rem !important;
+    width: 100% !important;
 }
 
 #kt_aside.aside-minimize #kt_aside_toggle_sidebar {
     margin-left: 0 !important;
+    margin-top: 0.5rem !important;
+    order: 2 !important;
+    position: relative !important;
+    z-index: 10 !important;
 }
 
 #kt_aside.aside-minimize .menu-title {
@@ -436,6 +452,22 @@ body.aside-minimize.right-sidebar-minimize .wrapper .container-fluid {
 /* Ajustar logo quando minimizado */
 .aside-minimize .aside-logo a {
     justify-content: center;
+}
+
+/* Garantir que quando não está minimizado, o botão fique ao lado da logo */
+#kt_aside:not(.aside-minimize) .aside-logo .sidebar-logo-container {
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+}
+
+#kt_aside:not(.aside-minimize) .aside-logo .sidebar-logo-link {
+    margin-bottom: 0 !important;
+}
+
+#kt_aside:not(.aside-minimize) #kt_aside_toggle_sidebar {
+    margin-top: 0 !important;
+    order: 0 !important;
 }
 
 /* Responsivo - em mobile sempre drawer */

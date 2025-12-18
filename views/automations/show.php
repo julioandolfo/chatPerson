@@ -374,7 +374,7 @@ ob_start();
             <!--end::Canvas Principal-->
             
             <!--begin::Paleta de Nós-->
-            <div class="automation-palette position-absolute top-0 end-0 m-5" style="z-index: 1000;">
+            <div class="automation-palette position-absolute end-0 m-5" style="z-index: 100; top: 80px;">
                 <div class="card shadow-lg">
                     <div class="card-header">
                         <h3 class="card-title">Componentes</h3>
@@ -1189,7 +1189,7 @@ function makeNodeDraggable(nodeId) {
 }
 
 function openNodeConfig(nodeId) {
-    const node = nodes.find(n => n.id === nodeId);
+    const node = nodes.find(n => String(n.id) === String(nodeId));
     if (!node) return;
     
     const config = nodeTypes[node.node_type] || {};
@@ -2869,6 +2869,14 @@ window.updateConditionOperators = updateConditionOperators;
 <?php
 $scripts = $scriptsPreload . ob_get_clean() . <<<'JAVASCRIPT'
 <script>
+// Fallback imediato para evitar ReferenceError antes dos scripts principais
+window.testAutomation = window.testAutomation || function() {
+    console.warn('testAutomation ainda não carregou. Aguarde o script principal.');
+};
+window.advancedTestAutomation = window.advancedTestAutomation || function() {
+    console.warn('advancedTestAutomation ainda não carregou. Aguarde o script principal.');
+};
+
 // ===== FUNÇÕES GLOBAIS (EXPORT NO TOPO) =====
 // Declarar funções como globais imediatamente
 window.testAutomation = null;

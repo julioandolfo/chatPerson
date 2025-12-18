@@ -243,10 +243,13 @@ class DashboardService
         $dateFrom = $dateFrom ?? date('Y-m-01');
         $dateTo = $dateTo ?? date('Y-m-d H:i:s');
         
+        // Contar TODAS as conversas do agente (não apenas as criadas no período)
         $sql = "SELECT COUNT(*) as total FROM conversations 
-                WHERE agent_id = ?
-                AND created_at >= ? AND created_at <= ?";
-        $result = \App\Helpers\Database::fetch($sql, [$userId, $dateFrom, $dateTo]);
+                WHERE agent_id = ?";
+        $result = \App\Helpers\Database::fetch($sql, [$userId]);
+        
+        error_log("DEBUG getMyConversations: userId=$userId, total=" . ($result['total'] ?? 0));
+        
         return (int)($result['total'] ?? 0);
     }
 
@@ -397,9 +400,12 @@ class DashboardService
     private static function getUnassignedConversations(): int
     {
         $sql = "SELECT COUNT(*) as total FROM conversations 
-                WHERE agent_id IS NULL 
+                WHERE (agent_id IS NULL OR agent_id = 0)
                 AND status IN ('open', 'pending')";
         $result = \App\Helpers\Database::fetch($sql);
+        
+        error_log("DEBUG getUnassignedConversations: total=" . ($result['total'] ?? 0));
+        
         return (int)($result['total'] ?? 0);
     }
     

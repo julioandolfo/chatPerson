@@ -655,16 +655,9 @@ ob_start();
 </div>
 <!--end::Row-->
 
-<!--begin::Row-->
-<div class="row gy-5 g-xl-10">
-    <!--begin::Col-->
-    <div class="col-xxl-6">
-        <!--begin::List Widget 5-->
-        <div class="card card-xl-stretch mb-xl-10">
-            <!--begin::Header-->
-            <div class="card-header align-items-center border-0 mt-4">
-                <h3 class="card-title align-items-start flex-column">
-                    <span class="fw-bold mb-2 text-gray-900">Ações Rápidas</span>
+<!-- Cards "Ações Rápidas" e "Funcionalidades" removidos -->
+
+<?php
                     <span class="text-muted fw-semibold fs-7">Acesso rápido às principais funcionalidades</span>
                 </h3>
                 <div class="card-toolbar">
@@ -943,11 +936,6 @@ ob_start();
             </div>
             <!--end::Body-->
         </div>
-        <!--end::List Widget 4-->
-    </div>
-    <!--end::Col-->
-</div>
-<!--end::Row-->
 
 <?php 
 $content = ob_get_clean(); 
@@ -977,7 +965,22 @@ function loadChartData(chartType, canvasId, configCallback) {
     fetch(url)
         .then(response => response.json())
         .then(data => {
+            console.log("Chart data received:", chartType, data);
+            
             if (data.success && data.data) {
+                // Verificar se há dados
+                if (!data.data || (Array.isArray(data.data) && data.data.length === 0)) {
+                    console.warn("Sem dados para o gráfico:", chartType);
+                    // Mostrar mensagem "Sem dados" no canvas
+                    const canvas = document.getElementById(canvasId);
+                    const ctx = canvas.getContext("2d");
+                    ctx.font = "16px Arial";
+                    ctx.textAlign = "center";
+                    ctx.fillStyle = "#999";
+                    ctx.fillText("Sem dados para exibir", canvas.width / 2, canvas.height / 2);
+                    return;
+                }
+                
                 const ctx = document.getElementById(canvasId).getContext("2d");
                 
                 // Destruir gráfico existente se houver
@@ -989,6 +992,8 @@ function loadChartData(chartType, canvasId, configCallback) {
                 // Criar novo gráfico
                 const chart = new Chart(ctx, configCallback(data.data));
                 window["chart" + chartVarName.charAt(0).toUpperCase() + chartVarName.slice(1)] = chart;
+            } else {
+                console.error("Erro nos dados do gráfico:", data);
             }
         })
         .catch(error => {

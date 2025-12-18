@@ -18,6 +18,15 @@ class UserService
      */
     public static function create(array $data): int
     {
+        // Converter valores vazios para null ANTES da validação
+        if (isset($data['max_conversations']) && $data['max_conversations'] === '') {
+            $data['max_conversations'] = null;
+        }
+        
+        // Definir valores padrão
+        $data['availability_status'] = $data['availability_status'] ?? 'offline';
+        $data['current_conversations'] = 0;
+        
         $errors = Validator::validate($data, [
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255',
@@ -27,15 +36,6 @@ class UserService
             'availability_status' => 'nullable|string|in:online,offline,away,busy',
             'max_conversations' => 'nullable|integer|min:1'
         ]);
-        
-        // Converter valores vazios para null
-        if (isset($data['max_conversations']) && $data['max_conversations'] === '') {
-            $data['max_conversations'] = null;
-        }
-        
-        // Definir valores padrão
-        $data['availability_status'] = $data['availability_status'] ?? 'offline';
-        $data['current_conversations'] = 0;
 
         if (!empty($errors)) {
             throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));
@@ -76,6 +76,14 @@ class UserService
             throw new \InvalidArgumentException('Usuário não encontrado');
         }
 
+        // Converter valores vazios para null ANTES da validação
+        if (isset($data['max_conversations']) && $data['max_conversations'] === '') {
+            $data['max_conversations'] = null;
+        }
+        if (isset($data['current_conversations']) && $data['current_conversations'] === '') {
+            $data['current_conversations'] = null;
+        }
+
         $errors = Validator::validate($data, [
             'name' => 'nullable|string|max:255',
             'email' => 'nullable|email|max:255',
@@ -87,11 +95,6 @@ class UserService
             'current_conversations' => 'nullable|integer|min:0',
             'avatar' => 'nullable|string|max:255'
         ]);
-        
-        // Converter valores vazios para null
-        if (isset($data['max_conversations']) && $data['max_conversations'] === '') {
-            $data['max_conversations'] = null;
-        }
 
         if (!empty($errors)) {
             throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));

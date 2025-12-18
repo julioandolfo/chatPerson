@@ -335,137 +335,8 @@ ob_start();
     </div>
     <div class="card-body pt-0">
         <!--begin::Editor de Fluxo-->
-        <div class="d-flex gap-5">
-            <!--begin::Painel Lateral - Tipos de Nós-->
-            <div class="flex-shrink-0" style="width: 280px;">
-                <div class="card">
-                    <div class="card-header border-0 pt-5">
-                        <h3 class="card-title align-items-start flex-column">
-                            <span class="card-label fw-bold fs-4 mb-1">Componentes</span>
-                            <span class="text-muted mt-1 fw-semibold fs-7">Arraste para o canvas</span>
-                        </h3>
-                    </div>
-                    <div class="card-body pt-0">
-                        <div class="d-flex flex-column gap-3">
-                            <!-- Trigger -->
-                            <div class="automation-node-type" draggable="true" data-node-type="trigger">
-                                <div class="d-flex align-items-center p-3 bg-light-primary rounded">
-                                    <i class="ki-duotone ki-play fs-2x text-primary me-3">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                    <div class="flex-grow-1">
-                                        <div class="fw-bold text-gray-800">Trigger</div>
-                                        <div class="text-muted fs-7">Inicia a automação</div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Condição -->
-                            <div class="automation-node-type" draggable="true" data-node-type="condition">
-                                <div class="d-flex align-items-center p-3 bg-light-info rounded">
-                                    <i class="ki-duotone ki-question fs-2x text-info me-3">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                    <div class="flex-grow-1">
-                                        <div class="fw-bold text-gray-800">Condição</div>
-                                        <div class="text-muted fs-7">Verifica regras</div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Ação - Mensagem -->
-                            <div class="automation-node-type" draggable="true" data-node-type="action" data-action-type="send_message">
-                                <div class="d-flex align-items-center p-3 bg-light-success rounded">
-                                    <i class="ki-duotone ki-message-text-2 fs-2x text-success me-3">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                    <div class="flex-grow-1">
-                                        <div class="fw-bold text-gray-800">Enviar Mensagem</div>
-                                        <div class="text-muted fs-7">Envia mensagem ao contato</div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Ação - Atribuir -->
-                            <div class="automation-node-type" draggable="true" data-node-type="action" data-action-type="assign_agent">
-                                <div class="d-flex align-items-center p-3 bg-light-warning rounded">
-                                    <i class="ki-duotone ki-user fs-2x text-warning me-3">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                    <div class="flex-grow-1">
-                                        <div class="fw-bold text-gray-800">Atribuir Agente</div>
-                                        <div class="text-muted fs-7">Atribui a um agente</div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Ação - Atribuição Avançada -->
-                            <div class="automation-node-type" draggable="true" data-node-type="action" data-action-type="assign_advanced">
-                                <div class="d-flex align-items-center p-3 bg-light-primary rounded">
-                                    <i class="ki-duotone ki-user-tick fs-2x text-primary me-3">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                    <div class="flex-grow-1">
-                                        <div class="fw-bold text-gray-800">Atribuição Avançada</div>
-                                        <div class="text-muted fs-7">Distribuição inteligente</div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Ação - Mover Estágio -->
-                            <div class="automation-node-type" draggable="true" data-node-type="action" data-action-type="move_stage">
-                                <div class="d-flex align-items-center p-3 bg-light-danger rounded">
-                                    <i class="ki-duotone ki-arrow-right fs-2x text-danger me-3">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                    <div class="flex-grow-1">
-                                        <div class="fw-bold text-gray-800">Mover Estágio</div>
-                                        <div class="text-muted fs-7">Move no funil</div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Ação - Adicionar Tag -->
-                            <div class="automation-node-type" draggable="true" data-node-type="action" data-action-type="add_tag">
-                                <div class="d-flex align-items-center p-3 bg-light-dark rounded">
-                                    <i class="ki-duotone ki-tag fs-2x text-dark me-3">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                    <div class="flex-grow-1">
-                                        <div class="fw-bold text-gray-800">Adicionar Tag</div>
-                                        <div class="text-muted fs-7">Adiciona uma tag</div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Delay -->
-                            <div class="automation-node-type" draggable="true" data-node-type="delay">
-                                <div class="d-flex align-items-center p-3 bg-light-secondary rounded">
-                                    <i class="ki-duotone ki-clock fs-2x text-secondary me-3">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                    <div class="flex-grow-1">
-                                        <div class="fw-bold text-gray-800">Delay</div>
-                                        <div class="text-muted fs-7">Aguarda tempo</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!--end::Painel Lateral-->
-            
+        <div>
             <!--begin::Canvas Principal-->
-            <div class="flex-grow-1">
                 <div class="automation-editor">
                     <div class="automation-canvas-toolbar">
                         <button type="button" class="btn btn-light" id="automation_zoom_out" title="Diminuir zoom">
@@ -499,6 +370,8 @@ ob_start();
                     </div>
                 </div>
             </div>
+            </div>
+            <!--end::Canvas Principal-->
             
             <!--begin::Paleta de Nós-->
             <div class="automation-palette position-absolute top-0 end-0 m-5" style="z-index: 1000;">
@@ -2996,6 +2869,17 @@ window.updateConditionOperators = updateConditionOperators;
 <?php
 $scripts = $scriptsPreload . ob_get_clean() . <<<'JAVASCRIPT'
 <script>
+// ===== FUNÇÕES GLOBAIS (EXPORT NO TOPO) =====
+// Declarar funções como globais imediatamente
+window.testAutomation = null;
+window.advancedTestAutomation = null;
+window.validateAutomationForm = null;
+window.validateAutomationConnections = null;
+window.validateRequiredField = null;
+window.previewVariables = null;
+window.showVariablesModal = null;
+window.previewMessageVariables = null;
+
 // Constante auxiliar para string vazia (evita problemas com aspas em strings PHP)
 const _EMPTY_STR = "";
 // Variáveis disponíveis para preview
@@ -3097,7 +2981,7 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
 // Testar automação
-function testAutomation() {
+window.testAutomation = function testAutomation() {
     const automationId = ' . (int)($automation['id'] ?? 0) . ';
     const conversationId = prompt('ID da conversa para teste (deixe vazio para usar dados simulados):');
     
@@ -3222,7 +3106,7 @@ function testAutomation() {
 }
 
 // Preview de variáveis (para usar em campos de mensagem)
-function previewVariables(message, conversationId) {
+window.previewVariables = function previewVariables(message, conversationId) {
     if (!message) {
         return;
     }
@@ -3280,7 +3164,7 @@ function previewVariables(message, conversationId) {
 }
 
 // Validação visual de campos obrigatórios
-function validateRequiredField(field) {
+window.validateRequiredField = function validateRequiredField(field) {
     if (!field) return true;
     
     const isValid = field.value.trim() !== '';
@@ -3310,7 +3194,7 @@ function validateRequiredField(field) {
 }
 
 // Validar formulário antes de salvar
-function validateAutomationForm() {
+window.validateAutomationForm = function validateAutomationForm() {
     const requiredFields = document.querySelectorAll('#kt_node_config_form [required]');
     let isValid = true;
     
@@ -3333,7 +3217,7 @@ function validateAutomationForm() {
 }
 
 // Validar se automação tem nós conectados
-function validateAutomationConnections() {
+window.validateAutomationConnections = function validateAutomationConnections() {
     if (nodes.length === 0) {
         Swal.fire({
             icon: 'warning',
@@ -3406,8 +3290,8 @@ function validateAutomationConnections() {
 }
 
 // Modo de teste avançado
-function advancedTestAutomation() {
-    if (!validateAutomationConnections()) {
+window.advancedTestAutomation = function advancedTestAutomation() {
+    if (!window.validateAutomationConnections()) {
         return;
     }
     
@@ -3573,15 +3457,17 @@ function displayTestResults(result) {
     });
 }
 
-// Tornar funções do segundo script acessíveis globalmente
-window.testAutomation = testAutomation;
-window.advancedTestAutomation = advancedTestAutomation;
-window.validateAutomationForm = validateAutomationForm;
-window.validateAutomationConnections = validateAutomationConnections;
-window.validateRequiredField = validateRequiredField;
-window.previewVariables = previewVariables;
-window.showVariablesModal = showVariablesModal;
-window.previewMessageVariables = previewMessageVariables;
+// ===== VERIFICAÇÃO FINAL: Funções globais =====
+// Todas as funções principais já são window.* em suas definições
+// Este bloco apenas confirma que estão disponíveis
+console.log('Funções globais de automação carregadas:', {
+    testAutomation: typeof window.testAutomation,
+    advancedTestAutomation: typeof window.advancedTestAutomation,
+    validateAutomationForm: typeof window.validateAutomationForm,
+    validateAutomationConnections: typeof window.validateAutomationConnections,
+    validateRequiredField: typeof window.validateRequiredField,
+    previewVariables: typeof window.previewVariables
+});
 </script>
 JAVASCRIPT;
 ?>

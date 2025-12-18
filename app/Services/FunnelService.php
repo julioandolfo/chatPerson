@@ -583,23 +583,30 @@ class FunnelService
         $createdMetrics = \App\Helpers\Database::fetch($sql, [$stage['funnel_id'], $dateFrom, $dateTo]);
         
         // Conversas que passaram pelo estágio no período
-        // Para tempo médio, calcular baseado em quando entrou na etapa (moved_at ou updated_at quando mudou de etapa)
+        // Tempo médio = tempo médio de resposta do agente às mensagens do cliente neste estágio
         $sql = "SELECT COUNT(DISTINCT c.id) as total,
                        COUNT(DISTINCT CASE WHEN c.status = 'resolved' THEN c.id END) as resolved,
                        COUNT(DISTINCT CASE WHEN c.status = 'closed' THEN c.id END) as closed,
-                       AVG(TIMESTAMPDIFF(HOUR, 
-                           COALESCE(c.moved_at, c.updated_at, c.created_at), 
-                           COALESCE(c.resolved_at, c.updated_at, NOW())
-                       )) as avg_time_hours,
-                       MIN(TIMESTAMPDIFF(HOUR, 
-                           COALESCE(c.moved_at, c.updated_at, c.created_at), 
-                           COALESCE(c.resolved_at, c.updated_at, NOW())
-                       )) as min_time_hours,
-                       MAX(TIMESTAMPDIFF(HOUR, 
-                           COALESCE(c.moved_at, c.updated_at, c.created_at), 
-                           COALESCE(c.resolved_at, c.updated_at, NOW())
-                       )) as max_time_hours
+                       AVG(response_times.avg_response_minutes) as avg_response_minutes
                 FROM conversations c
+                LEFT JOIN (
+                    SELECT 
+                        m1.conversation_id,
+                        AVG(TIMESTAMPDIFF(MINUTE, m1.created_at, m2.created_at)) as avg_response_minutes
+                    FROM messages m1
+                    INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
+                        AND m2.sender_type = 'agent'
+                        AND m2.created_at > m1.created_at
+                        AND m2.created_at = (
+                            SELECT MIN(m3.created_at)
+                            FROM messages m3
+                            WHERE m3.conversation_id = m1.conversation_id
+                            AND m3.sender_type = 'agent'
+                            AND m3.created_at > m1.created_at
+                        )
+                    WHERE m1.sender_type = 'contact'
+                    GROUP BY m1.conversation_id
+                ) response_times ON response_times.conversation_id = c.id
                 WHERE c.funnel_stage_id = ? 
                 AND (
                     (c.created_at >= ? AND c.created_at <= ?) OR
@@ -613,6 +620,15 @@ class FunnelService
             $dateFrom, $dateTo,
             $dateFrom, $dateTo
         ]);
+        
+        // Converter minutos para horas para manter compatibilidade
+        $avgTimeHours = isset($metrics['avg_response_minutes']) && $metrics['avg_response_minutes'] !== null
+            ? round((float)$metrics['avg_response_minutes'] / 60, 2)
+            : 0;
+        
+        $metrics['avg_time_hours'] = $avgTimeHours;
+        $metrics['min_time_hours'] = 0; // Não calculamos mais min/max
+        $metrics['max_time_hours'] = 0;
         
         // Conversas que entraram no estágio no período
         $sqlEntered = "SELECT COUNT(DISTINCT c.id) as entered
@@ -629,15 +645,33 @@ class FunnelService
             $dateTo
         ]);
         
-        // Métricas de agentes no período
+        // Métricas de agentes no período - tempo médio de resposta
         $sqlAgents = "SELECT 
                         c.agent_id,
                         u.name as agent_name,
                         COUNT(DISTINCT c.id) as conversations_count,
                         COUNT(DISTINCT CASE WHEN c.status = 'resolved' THEN c.id END) as resolved_count,
-                        AVG(TIMESTAMPDIFF(HOUR, c.created_at, COALESCE(c.resolved_at, c.updated_at))) as avg_time_hours
+                        AVG(response_times.avg_response_minutes) as avg_response_minutes
                       FROM conversations c
                       LEFT JOIN users u ON u.id = c.agent_id
+                      LEFT JOIN (
+                          SELECT 
+                              m1.conversation_id,
+                              AVG(TIMESTAMPDIFF(MINUTE, m1.created_at, m2.created_at)) as avg_response_minutes
+                          FROM messages m1
+                          INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
+                              AND m2.sender_type = 'agent'
+                              AND m2.created_at > m1.created_at
+                              AND m2.created_at = (
+                                  SELECT MIN(m3.created_at)
+                                  FROM messages m3
+                                  WHERE m3.conversation_id = m1.conversation_id
+                                  AND m3.sender_type = 'agent'
+                                  AND m3.created_at > m1.created_at
+                              )
+                          WHERE m1.sender_type = 'contact'
+                          GROUP BY m1.conversation_id
+                      ) response_times ON response_times.conversation_id = c.id
                       WHERE c.funnel_stage_id = ?
                       AND (c.created_at >= ? OR c.updated_at >= ?)
                       AND (c.created_at <= ? OR c.updated_at <= ?)
@@ -653,6 +687,16 @@ class FunnelService
             $dateTo,
             $dateTo
         ]);
+        
+        // Converter minutos para horas para os agentes
+        if (!empty($agentsMetrics)) {
+            foreach ($agentsMetrics as &$agentMetric) {
+                $agentMetric['avg_time_hours'] = isset($agentMetric['avg_response_minutes']) && $agentMetric['avg_response_minutes'] !== null
+                    ? round((float)$agentMetric['avg_response_minutes'] / 60, 2)
+                    : 0;
+            }
+            unset($agentMetric);
+        }
         
         // Taxa de conversão (se houver estágio seguinte)
         $nextStage = self::getNextStage($stage['funnel_id'], $stage['stage_order'] ?? 0);

@@ -295,64 +295,77 @@ class ContactController
                 return;
             }
 
-            // Conversas fechadas/resolvidas para métricas
-            // Calcular tempo médio baseado em quando foi resolvida/fechada
+            // Calcular métricas baseadas em TODAS as conversas do contato
+            // Tempo médio de resposta = tempo entre mensagem do cliente e resposta do agente
             $stats = \App\Helpers\Database::fetch("
                 SELECT 
-                    COUNT(*) AS total_conversations,
-                    AVG(TIMESTAMPDIFF(SECOND, 
-                        c.created_at, 
-                        COALESCE(c.resolved_at, c.updated_at)
-                    )) AS avg_duration_seconds,
-                    AVG(TIMESTAMPDIFF(MINUTE, 
-                        c.created_at, 
-                        COALESCE(c.resolved_at, c.updated_at)
-                    )) AS avg_duration_minutes,
-                    AVG(TIMESTAMPDIFF(HOUR, 
-                        c.created_at, 
-                        COALESCE(c.resolved_at, c.updated_at)
-                    )) AS avg_duration_hours
+                    COUNT(DISTINCT c.id) AS total_conversations,
+                    AVG(response_times.response_time_minutes) AS avg_response_time_minutes
                 FROM conversations c
-                WHERE c.contact_id = ? 
-                AND c.status IN ('closed', 'resolved')
-                AND (c.resolved_at IS NOT NULL OR c.updated_at IS NOT NULL)
+                LEFT JOIN (
+                    SELECT 
+                        m1.conversation_id,
+                        AVG(TIMESTAMPDIFF(MINUTE, m1.created_at, m2.created_at)) as response_time_minutes
+                    FROM messages m1
+                    INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
+                        AND m2.sender_type = 'agent'
+                        AND m2.created_at > m1.created_at
+                        AND m2.created_at = (
+                            SELECT MIN(m3.created_at)
+                            FROM messages m3
+                            WHERE m3.conversation_id = m1.conversation_id
+                            AND m3.sender_type = 'agent'
+                            AND m3.created_at > m1.created_at
+                        )
+                    WHERE m1.sender_type = 'contact'
+                    GROUP BY m1.conversation_id
+                ) response_times ON response_times.conversation_id = c.id
+                WHERE c.contact_id = ?
             ", [$id]);
             
             // Log para debug
             error_log("Histórico do contato {$id}: " . json_encode($stats));
 
-            // Conversas anteriores (últimas 5 fechadas/resolvidas)
+            // Conversas anteriores (últimas 5 conversas, priorizando fechadas/resolvidas)
             $previous = \App\Helpers\Database::fetchAll("
                 SELECT 
                     c.id,
                     c.status,
                     c.created_at,
                     c.updated_at,
-                    (SELECT content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) AS last_message
+                    (SELECT content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,
+                    (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) as message_count
                 FROM conversations c
-                WHERE c.contact_id = ? AND c.status IN ('closed', 'resolved')
-                ORDER BY c.updated_at DESC
+                WHERE c.contact_id = ?
+                ORDER BY 
+                    CASE 
+                        WHEN c.status IN ('closed', 'resolved') THEN 0
+                        WHEN c.status = 'open' THEN 1
+                        ELSE 2
+                    END,
+                    c.updated_at DESC
                 LIMIT 5
             ", [$id]);
 
             $totalConv = (int)($stats['total_conversations'] ?? 0);
-            $avgSeconds = $stats['avg_duration_seconds'] !== null && $stats['avg_duration_seconds'] > 0 
-                ? (int)round((float)$stats['avg_duration_seconds']) 
+            $avgResponseMinutes = $stats['avg_response_time_minutes'] !== null && $stats['avg_response_time_minutes'] > 0 
+                ? round((float)$stats['avg_response_time_minutes'], 1) 
                 : null;
-            $avgMinutes = $stats['avg_duration_minutes'] !== null && $stats['avg_duration_minutes'] > 0 
-                ? round((float)$stats['avg_duration_minutes'], 1) 
-                : null;
-            $avgHours = $stats['avg_duration_hours'] !== null && $stats['avg_duration_hours'] > 0 
-                ? round((float)$stats['avg_duration_hours'], 2) 
-                : null;
+            
+            // Converter para segundos para compatibilidade com o frontend
+            $avgResponseSeconds = $avgResponseMinutes !== null ? (int)($avgResponseMinutes * 60) : null;
             
             Response::json([
                 'success' => true,
                 'contact_id' => $id,
                 'total_conversations' => $totalConv,
-                'avg_duration_seconds' => $avgSeconds,
-                'avg_duration_minutes' => $avgMinutes,
-                'avg_duration_hours' => $avgHours,
+                'avg_response_time_seconds' => $avgResponseSeconds,
+                'avg_response_time_minutes' => $avgResponseMinutes,
+                'avg_response_time_hours' => $avgResponseMinutes !== null ? round($avgResponseMinutes / 60, 2) : null,
+                // Manter compatibilidade com código antigo
+                'avg_duration_seconds' => $avgResponseSeconds,
+                'avg_duration_minutes' => $avgResponseMinutes,
+                'avg_duration_hours' => $avgResponseMinutes !== null ? round($avgResponseMinutes / 60, 2) : null,
                 // Não há CSAT armazenado atualmente; deixar null/--
                 'csat_score' => null,
                 'previous_conversations' => $previous ?: []

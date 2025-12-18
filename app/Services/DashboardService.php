@@ -60,8 +60,11 @@ class DashboardService
             ? round(($closedConversations / $totalConversations) * 100, 2) 
             : 0;
         
-        // Tempo médio de primeira resposta (últimos 30 dias)
+        // Tempo médio de primeira resposta
         $avgFirstResponseTime = self::getAverageFirstResponseTime($dateFrom, $dateTo);
+        
+        // Tempo médio geral de resposta
+        $avgResponseTime = self::getAverageResponseTime($dateFrom, $dateTo);
         
         // Conversas sem atribuição
         $unassignedConversations = self::getUnassignedConversations();
@@ -91,6 +94,7 @@ class DashboardService
             'metrics' => [
                 'resolution_rate' => $resolutionRate,
                 'avg_first_response_time' => $avgFirstResponseTime,
+                'avg_response_time' => $avgResponseTime,
                 'avg_resolution_time' => $avgResolutionTime
             ],
             'period' => [
@@ -328,20 +332,63 @@ class DashboardService
         return $byChannel;
     }
 
+    /**
+     * Obter tempo médio de primeira resposta (em minutos)
+     * Calcula o tempo entre a primeira mensagem do cliente e a primeira resposta do agente
+     */
     private static function getAverageFirstResponseTime(string $dateFrom, string $dateTo): ?float
     {
-        $sql = "SELECT AVG(TIMESTAMPDIFF(MINUTE, c.created_at, m.created_at)) as avg_time
+        $sql = "SELECT AVG(TIMESTAMPDIFF(MINUTE, 
+                    (SELECT MIN(m1.created_at) 
+                     FROM messages m1 
+                     WHERE m1.conversation_id = c.id 
+                     AND m1.sender_type = 'contact'),
+                    (SELECT MIN(m2.created_at) 
+                     FROM messages m2 
+                     WHERE m2.conversation_id = c.id 
+                     AND m2.sender_type = 'agent')
+                )) as avg_time
                 FROM conversations c
-                INNER JOIN messages m ON m.conversation_id = c.id
-                WHERE m.sender_type = 'agent'
-                AND c.created_at >= ?
+                WHERE c.created_at >= ?
                 AND c.created_at <= ?
-                AND m.created_at = (
-                    SELECT MIN(m2.created_at) 
-                    FROM messages m2 
-                    WHERE m2.conversation_id = c.id 
-                    AND m2.sender_type = 'agent'
+                AND EXISTS (
+                    SELECT 1 FROM messages m3 
+                    WHERE m3.conversation_id = c.id 
+                    AND m3.sender_type = 'agent'
                 )";
+        
+        $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
+        return $result && $result['avg_time'] !== null ? round((float)$result['avg_time'], 2) : null;
+    }
+    
+    /**
+     * Obter tempo médio geral de resposta (em minutos)
+     * Calcula o tempo médio entre TODAS as mensagens do cliente e as respostas do agente
+     */
+    private static function getAverageResponseTime(string $dateFrom, string $dateTo): ?float
+    {
+        $sql = "SELECT AVG(response_time_minutes) as avg_time
+                FROM (
+                    SELECT 
+                        m1.conversation_id,
+                        AVG(TIMESTAMPDIFF(MINUTE, m1.created_at, m2.created_at)) as response_time_minutes
+                    FROM messages m1
+                    INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
+                        AND m2.sender_type = 'agent'
+                        AND m2.created_at > m1.created_at
+                        AND m2.created_at = (
+                            SELECT MIN(m3.created_at)
+                            FROM messages m3
+                            WHERE m3.conversation_id = m1.conversation_id
+                            AND m3.sender_type = 'agent'
+                            AND m3.created_at > m1.created_at
+                        )
+                    INNER JOIN conversations c ON c.id = m1.conversation_id
+                    WHERE m1.sender_type = 'contact'
+                    AND c.created_at >= ?
+                    AND c.created_at <= ?
+                    GROUP BY m1.conversation_id
+                ) as response_times";
         
         $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
         return $result && $result['avg_time'] !== null ? round((float)$result['avg_time'], 2) : null;
@@ -395,17 +442,23 @@ class DashboardService
                     COUNT(DISTINCT CASE WHEN c.status = 'resolved' THEN c.id END) as resolved_conversations,
                     COUNT(DISTINCT CASE WHEN c.status = 'closed' THEN c.id END) as closed_conversations,
                     AVG(TIMESTAMPDIFF(HOUR, c.created_at, COALESCE(c.resolved_at, c.updated_at))) as avg_resolution_hours,
-                    AVG(TIMESTAMPDIFF(MINUTE, c.created_at, 
-                        (SELECT MIN(m.created_at) FROM messages m 
-                         WHERE m.conversation_id = c.id AND m.sender_type = 'agent')
+                    AVG(TIMESTAMPDIFF(MINUTE, 
+                        (SELECT MIN(m1.created_at) FROM messages m1 
+                         WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact'),
+                        (SELECT MIN(m2.created_at) FROM messages m2 
+                         WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent')
                     )) as avg_first_response_minutes,
-                    COUNT(DISTINCT CASE WHEN TIMESTAMPDIFF(MINUTE, c.created_at, 
-                        (SELECT MIN(m.created_at) FROM messages m 
-                         WHERE m.conversation_id = c.id AND m.sender_type = 'agent')
+                    COUNT(DISTINCT CASE WHEN TIMESTAMPDIFF(MINUTE, 
+                        (SELECT MIN(m1.created_at) FROM messages m1 
+                         WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact'),
+                        (SELECT MIN(m2.created_at) FROM messages m2 
+                         WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent')
                     ) <= 5 THEN c.id END) as responded_5min,
-                    COUNT(DISTINCT CASE WHEN TIMESTAMPDIFF(MINUTE, c.created_at, 
-                        (SELECT MIN(m.created_at) FROM messages m 
-                         WHERE m.conversation_id = c.id AND m.sender_type = 'agent')
+                    COUNT(DISTINCT CASE WHEN TIMESTAMPDIFF(MINUTE, 
+                        (SELECT MIN(m1.created_at) FROM messages m1 
+                         WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact'),
+                        (SELECT MIN(m2.created_at) FROM messages m2 
+                         WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent')
                     ) <= 15 THEN c.id END) as responded_15min
                 FROM conversations c
                 WHERE c.agent_id = ?
@@ -604,19 +657,36 @@ class DashboardService
         
         $sql = "SELECT 
                     COUNT(*) as total_conversations,
-                    COUNT(CASE WHEN TIMESTAMPDIFF(MINUTE, c.created_at, m.created_at) <= 5 THEN 1 END) as responded_5min,
-                    COUNT(CASE WHEN TIMESTAMPDIFF(MINUTE, c.created_at, m.created_at) <= 15 THEN 1 END) as responded_15min,
-                    COUNT(CASE WHEN TIMESTAMPDIFF(MINUTE, c.created_at, m.created_at) <= 30 THEN 1 END) as responded_30min,
-                    AVG(TIMESTAMPDIFF(MINUTE, c.created_at, m.created_at)) as avg_response_time
+                    COUNT(CASE WHEN TIMESTAMPDIFF(MINUTE, 
+                        (SELECT MIN(m1.created_at) FROM messages m1 
+                         WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact'),
+                        (SELECT MIN(m2.created_at) FROM messages m2 
+                         WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent')
+                    ) <= 5 THEN 1 END) as responded_5min,
+                    COUNT(CASE WHEN TIMESTAMPDIFF(MINUTE, 
+                        (SELECT MIN(m1.created_at) FROM messages m1 
+                         WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact'),
+                        (SELECT MIN(m2.created_at) FROM messages m2 
+                         WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent')
+                    ) <= 15 THEN 1 END) as responded_15min,
+                    COUNT(CASE WHEN TIMESTAMPDIFF(MINUTE, 
+                        (SELECT MIN(m1.created_at) FROM messages m1 
+                         WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact'),
+                        (SELECT MIN(m2.created_at) FROM messages m2 
+                         WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent')
+                    ) <= 30 THEN 1 END) as responded_30min,
+                    AVG(TIMESTAMPDIFF(MINUTE, 
+                        (SELECT MIN(m1.created_at) FROM messages m1 
+                         WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact'),
+                        (SELECT MIN(m2.created_at) FROM messages m2 
+                         WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent')
+                    )) as avg_response_time
                 FROM conversations c
-                INNER JOIN messages m ON m.conversation_id = c.id
-                WHERE m.sender_type = 'agent'
-                AND c.created_at >= ? AND c.created_at <= ?
-                AND m.created_at = (
-                    SELECT MIN(m2.created_at) 
-                    FROM messages m2 
-                    WHERE m2.conversation_id = c.id 
-                    AND m2.sender_type = 'agent'
+                WHERE c.created_at >= ? AND c.created_at <= ?
+                AND EXISTS (
+                    SELECT 1 FROM messages m3 
+                    WHERE m3.conversation_id = c.id 
+                    AND m3.sender_type = 'agent'
                 )";
         
         $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);

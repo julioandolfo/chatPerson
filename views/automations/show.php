@@ -2506,7 +2506,7 @@ window.loadStagesForFunnel = loadStagesForFunnel;
 window.updateConditionOperators = updateConditionOperators;
 </script>
 <?php
-$scripts = ob_get_clean() . <<<'JAVASCRIPT'
+$scripts = $scriptsPreload . ob_get_clean() . <<<'JAVASCRIPT'
 <script>
 // Constante auxiliar para string vazia (evita problemas com aspas em strings PHP)
 const _EMPTY_STR = "";

@@ -112,6 +112,17 @@ $styles = <<<HTML
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
 }
 
+.automation-node .node-action-btn {
+    position: relative;
+    z-index: 150;
+    pointer-events: all;
+}
+
+.automation-node .chatbot-menu-options {
+    position: relative;
+    z-index: 50;
+}
+
 [data-bs-theme="dark"] .automation-node {
     background: #1e1e2d !important;
     color: #f1f1f2 !important;
@@ -155,17 +166,20 @@ $styles = <<<HTML
 }
 
 .connection-delete-btn {
-    opacity: 0.8;
-    transition: opacity 0.2s ease, transform 0.2s ease;
+    opacity: 0.9;
+    transition: opacity 0.2s ease;
 }
 
 .connection-delete-btn:hover {
     opacity: 1;
-    transform: scale(1.1);
 }
 
 .connection-group:hover .connection-delete-btn {
     opacity: 1;
+}
+
+.connection-delete-btn circle {
+    transition: fill 0.2s ease, stroke-width 0.2s ease;
 }
 
 [data-bs-theme="dark"] .connections-overlay line {
@@ -180,7 +194,7 @@ $styles = <<<HTML
     background: #009ef7;
     border: 2px solid white;
     cursor: crosshair;
-    z-index: 10;
+    z-index: 80;
     pointer-events: all;
     transition: transform 0.2s ease, background-color 0.2s ease;
 }
@@ -1086,14 +1100,14 @@ function renderNode(node) {
             <span class="fw-bold">${config.label || node.node_type}</span>
         </div>
         <div class="text-muted fs-7">${node.node_data.label || ""}</div>
-        <div class="mt-3 d-flex gap-2">
-            <button type="button" class="btn btn-sm btn-light-primary" onclick="openNodeConfig('${String(node.id || '')}')">
+        <div class="mt-3 d-flex gap-2" style="position: relative; z-index: 100;">
+            <button type="button" class="btn btn-sm btn-light-primary node-action-btn" onclick="openNodeConfig('${String(node.id || '')}')">
                 <i class="ki-duotone ki-pencil fs-5">
                     <span class="path1"></span>
                     <span class="path2"></span>
                 </i>
             </button>
-            <button type="button" class="btn btn-sm btn-light-danger" onclick="deleteNode('${String(node.id || '')}')">
+            <button type="button" class="btn btn-sm btn-light-danger node-action-btn" onclick="deleteNode('${String(node.id || '')}')">
                 <i class="ki-duotone ki-trash fs-5">
                     <span class="path1"></span>
                     <span class="path2"></span>
@@ -2115,14 +2129,14 @@ function renderConnections() {
                     }
                 });
                 
-                // Hover no botão
+                // Hover no botão (só mudar cor, não tamanho para evitar "saltos")
                 deleteBtn.addEventListener('mouseenter', function() {
-                    circle.setAttribute('r', '12');
                     circle.setAttribute('fill', '#d9214e');
+                    circle.setAttribute('stroke-width', '3');
                 });
                 deleteBtn.addEventListener('mouseleave', function() {
-                    circle.setAttribute('r', '10');
                     circle.setAttribute('fill', '#f1416c');
+                    circle.setAttribute('stroke-width', '2');
                 });
                 
                 // Destacar linha ao passar mouse

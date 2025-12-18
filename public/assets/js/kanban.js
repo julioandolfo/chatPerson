@@ -793,6 +793,56 @@ function showStageMetrics(stageId, stageName) {
                     html += '</div></div></div></div></div>';
                 }
                 
+                // Status atual detalhado
+                html += '<div class="row g-4 mt-2">';
+                html += '<div class="col-md-4"><div class="card card-flush"><div class="card-body text-center">';
+                html += '<div class="text-gray-500 fs-7 mb-1">Abertas</div>';
+                html += '<div class="fw-bold fs-2x text-primary">' + (m.current_open || 0) + '</div>';
+                html += '</div></div></div>';
+                
+                html += '<div class="col-md-4"><div class="card card-flush"><div class="card-body text-center">';
+                html += '<div class="text-gray-500 fs-7 mb-1">Resolvidas</div>';
+                html += '<div class="fw-bold fs-2x text-success">' + (m.current_resolved || 0) + '</div>';
+                html += '</div></div></div>';
+                
+                html += '<div class="col-md-4"><div class="card card-flush"><div class="card-body text-center">';
+                html += '<div class="text-gray-500 fs-7 mb-1">Não Atribuídas</div>';
+                html += '<div class="fw-bold fs-2x text-warning">' + (m.current_unassigned || 0) + '</div>';
+                html += '</div></div></div>';
+                html += '</div>';
+                
+                // Agentes atuais na etapa
+                if (m.agents_current && m.agents_current.length > 0) {
+                    html += '<h5 class="fw-bold mt-5 mb-3">👥 Agentes Atuais na Etapa</h5>';
+                    html += '<div class="table-responsive mb-4"><table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-2">';
+                    html += '<thead><tr class="fw-bold text-muted"><th>Agente</th><th>Conversas</th></tr></thead><tbody>';
+                    m.agents_current.forEach(agent => {
+                        html += '<tr>';
+                        html += '<td><span class="fw-bold">' + (agent.name || 'Desconhecido') + '</span></td>';
+                        html += '<td><span class="badge badge-light-primary">' + agent.count + '</span></td>';
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                }
+                
+                // Top agentes do período
+                if (m.agents_period && m.agents_period.length > 0) {
+                    html += '<h5 class="fw-bold mb-3">📊 Top Agentes do Período (30 dias)</h5>';
+                    html += '<div class="table-responsive"><table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-2">';
+                    html += '<thead><tr class="fw-bold text-muted">';
+                    html += '<th>Agente</th><th>Conversas</th><th>Resolvidas</th><th>Tempo Médio</th>';
+                    html += '</tr></thead><tbody>';
+                    m.agents_period.forEach(agent => {
+                        html += '<tr>';
+                        html += '<td><span class="fw-bold">' + (agent.agent_name || 'Desconhecido') + '</span></td>';
+                        html += '<td><span class="badge badge-light-primary">' + agent.conversations_count + '</span></td>';
+                        html += '<td><span class="badge badge-light-success">' + (agent.resolved_count || 0) + '</span></td>';
+                        html += '<td>' + (agent.avg_time_hours ? agent.avg_time_hours.toFixed(1) + 'h' : '-') + '</td>';
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                }
+                
                 html += '</div></div>';
                 
                 Swal.fire({
@@ -845,47 +895,142 @@ function showFunnelMetrics(funnelId) {
             if (data.success && data.metrics) {
                 const m = data.metrics;
                 let html = '<div class="mb-5"><h3 class="fw-bold mb-3">' + m.funnel_name + '</h3>';
+                
+                // Período
+                html += '<div class="text-gray-500 fs-7 mb-4">Período: ' + 
+                    new Date(m.period.from).toLocaleDateString('pt-BR') + ' até ' + 
+                    new Date(m.period.to).toLocaleDateString('pt-BR') + '</div>';
+                
+                // Cards de resumo - Período
+                html += '<h5 class="fw-bold mb-3">📊 Resumo do Período (30 dias)</h5>';
                 html += '<div class="row g-4 mb-5">';
                 
-                // Totais
-                html += '<div class="col-md-3"><div class="card card-flush"><div class="card-body text-center">';
-                html += '<div class="text-gray-500 fs-7 mb-2">Total de Conversas</div>';
-                html += '<div class="fw-bold fs-2x">' + m.totals.total_conversations + '</div>';
+                html += '<div class="col-md-3"><div class="card card-flush h-100"><div class="card-body text-center">';
+                html += '<div class="text-gray-500 fs-7 mb-2">Total Criadas</div>';
+                html += '<div class="fw-bold fs-2x">' + (m.totals.total_conversations || 0) + '</div>';
                 html += '</div></div></div>';
                 
-                html += '<div class="col-md-3"><div class="card card-flush"><div class="card-body text-center">';
+                html += '<div class="col-md-3"><div class="card card-flush h-100"><div class="card-body text-center">';
                 html += '<div class="text-gray-500 fs-7 mb-2">Abertas</div>';
-                html += '<div class="fw-bold fs-2x text-primary">' + m.totals.open_conversations + '</div>';
+                html += '<div class="fw-bold fs-2x text-primary">' + (m.totals.open_conversations || 0) + '</div>';
                 html += '</div></div></div>';
                 
-                html += '<div class="col-md-3"><div class="card card-flush"><div class="card-body text-center">';
+                html += '<div class="col-md-3"><div class="card card-flush h-100"><div class="card-body text-center">';
                 html += '<div class="text-gray-500 fs-7 mb-2">Resolvidas</div>';
-                html += '<div class="fw-bold fs-2x text-success">' + m.totals.resolved_conversations + '</div>';
+                html += '<div class="fw-bold fs-2x text-success">' + (m.totals.resolved_conversations || 0) + '</div>';
                 html += '</div></div></div>';
                 
-                html += '<div class="col-md-3"><div class="card card-flush"><div class="card-body text-center">';
+                html += '<div class="col-md-3"><div class="card card-flush h-100"><div class="card-body text-center">';
                 html += '<div class="text-gray-500 fs-7 mb-2">Taxa de Resolução</div>';
-                html += '<div class="fw-bold fs-2x text-info">' + m.totals.resolution_rate + '%</div>';
+                html += '<div class="fw-bold fs-2x text-info">' + (m.totals.resolution_rate || 0) + '%</div>';
                 html += '</div></div></div>';
                 
                 html += '</div>';
                 
-                // Tabela de estágios
-                html += '<h4 class="fw-bold mb-3">Métricas por Estágio</h4>';
+                // Cards de resumo - Atual
+                html += '<h5 class="fw-bold mb-3">📌 Estado Atual</h5>';
+                html += '<div class="row g-4 mb-5">';
+                
+                html += '<div class="col-md-3"><div class="card card-flush h-100"><div class="card-body text-center">';
+                html += '<div class="text-gray-500 fs-7 mb-2">Total Atual</div>';
+                html += '<div class="fw-bold fs-2x">' + (m.current?.total || 0) + '</div>';
+                html += '</div></div></div>';
+                
+                html += '<div class="col-md-3"><div class="card card-flush h-100"><div class="card-body text-center">';
+                html += '<div class="text-gray-500 fs-7 mb-2">Abertas</div>';
+                html += '<div class="fw-bold fs-2x text-primary">' + (m.current?.open || 0) + '</div>';
+                html += '</div></div></div>';
+                
+                html += '<div class="col-md-3"><div class="card card-flush h-100"><div class="card-body text-center">';
+                html += '<div class="text-gray-500 fs-7 mb-2">Resolvidas</div>';
+                html += '<div class="fw-bold fs-2x text-success">' + (m.current?.resolved || 0) + '</div>';
+                html += '</div></div></div>';
+                
+                html += '<div class="col-md-3"><div class="card card-flush h-100"><div class="card-body text-center">';
+                html += '<div class="text-gray-500 fs-7 mb-2">Não Atribuídas</div>';
+                html += '<div class="fw-bold fs-2x text-warning">' + (m.current?.unassigned || 0) + '</div>';
+                html += '</div></div></div>';
+                
+                html += '</div>';
+                
+                // Tempo médio de resolução
+                if (m.totals.avg_resolution_hours > 0) {
+                    html += '<div class="row g-4 mb-5">';
+                    html += '<div class="col-md-4"><div class="card card-flush"><div class="card-body text-center">';
+                    html += '<div class="text-gray-500 fs-7 mb-2">Tempo Médio</div>';
+                    html += '<div class="fw-bold fs-2x">' + m.totals.avg_resolution_hours + 'h</div>';
+                    html += '</div></div></div>';
+                    
+                    html += '<div class="col-md-4"><div class="card card-flush"><div class="card-body text-center">';
+                    html += '<div class="text-gray-500 fs-7 mb-2">Tempo Mínimo</div>';
+                    html += '<div class="fw-bold fs-2x text-success">' + (m.totals.min_resolution_hours || 0) + 'h</div>';
+                    html += '</div></div></div>';
+                    
+                    html += '<div class="col-md-4"><div class="card card-flush"><div class="card-body text-center">';
+                    html += '<div class="text-gray-500 fs-7 mb-2">Tempo Máximo</div>';
+                    html += '<div class="fw-bold fs-2x text-danger">' + (m.totals.max_resolution_hours || 0) + 'h</div>';
+                    html += '</div></div></div>';
+                    html += '</div>';
+                }
+                
+                // Top Agentes
+                if (m.top_agents && m.top_agents.length > 0) {
+                    html += '<h5 class="fw-bold mb-3">👥 Top Agentes do Período</h5>';
+                    html += '<div class="table-responsive mb-5"><table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">';
+                    html += '<thead><tr class="fw-bold text-muted">';
+                    html += '<th>Agente</th><th>Conversas</th><th>Resolvidas</th><th>Tempo Médio</th><th>Taxa Resolução</th>';
+                    html += '</tr></thead><tbody>';
+                    
+                    m.top_agents.forEach(agent => {
+                        const resolutionRate = agent.conversations_count > 0 
+                            ? ((agent.resolved_count / agent.conversations_count) * 100).toFixed(1)
+                            : 0;
+                        html += '<tr>';
+                        html += '<td><span class="fw-bold">' + (agent.agent_name || 'Desconhecido') + '</span></td>';
+                        html += '<td><span class="badge badge-light-primary">' + agent.conversations_count + '</span></td>';
+                        html += '<td><span class="badge badge-light-success">' + (agent.resolved_count || 0) + '</span></td>';
+                        html += '<td>' + (agent.avg_time_hours ? agent.avg_time_hours.toFixed(1) + 'h' : '-') + '</td>';
+                        html += '<td>' + resolutionRate + '%</td>';
+                        html += '</tr>';
+                    });
+                    
+                    html += '</tbody></table></div>';
+                }
+                
+                // Distribuição por etapa
+                if (m.distribution_by_stage && m.distribution_by_stage.length > 0) {
+                    html += '<h5 class="fw-bold mb-3">📊 Distribuição Atual por Etapa</h5>';
+                    html += '<div class="row g-3 mb-5">';
+                    m.distribution_by_stage.forEach(stage => {
+                        html += '<div class="col-md-3"><div class="card card-flush"><div class="card-body text-center">';
+                        html += '<div class="text-gray-500 fs-7 mb-1">' + stage.stage_name + '</div>';
+                        html += '<div class="fw-bold fs-3x">' + stage.count + '</div>';
+                        html += '</div></div></div>';
+                    });
+                    html += '</div>';
+                }
+                
+                // Tabela de estágios detalhada
+                html += '<h5 class="fw-bold mb-3">📈 Métricas Detalhadas por Estágio</h5>';
                 html += '<div class="table-responsive"><table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">';
                 html += '<thead><tr class="fw-bold text-muted">';
-                html += '<th>Estágio</th><th>Atual</th><th>Total (30d)</th><th>Tempo Médio</th><th>Taxa Conversão</th><th>Compliance SLA</th>';
+                html += '<th>Estágio</th><th>Atual</th><th>Total (30d)</th><th>Entradas</th><th>Tempo Médio</th><th>Taxa Conversão</th><th>Compliance SLA</th>';
                 html += '</tr></thead><tbody>';
                 
                 m.stages.forEach(stage => {
                     html += '<tr>';
                     html += '<td><span class="fw-bold">' + stage.stage_name + '</span></td>';
-                    html += '<td><span class="badge badge-light-primary">' + stage.current_count + '</span></td>';
-                    html += '<td>' + stage.total_in_period + '</td>';
-                    html += '<td>' + stage.avg_time_hours + 'h</td>';
-                    html += '<td>' + stage.conversion_rate + '%</td>';
+                    html += '<td><span class="badge badge-light-primary">' + (stage.current_count || 0) + '</span>';
+                    if (stage.current_unassigned > 0) {
+                        html += ' <span class="badge badge-light-warning" title="Não atribuídas">' + stage.current_unassigned + '</span>';
+                    }
+                    html += '</td>';
+                    html += '<td>' + (stage.total_in_period || 0) + '</td>';
+                    html += '<td>' + (stage.entered_in_period || 0) + '</td>';
+                    html += '<td>' + (stage.avg_time_hours || 0) + 'h</td>';
+                    html += '<td>' + (stage.conversion_rate || 0) + '%</td>';
                     
-                    if (stage.sla_compliance !== null) {
+                    if (stage.sla_compliance !== null && stage.sla_compliance !== undefined) {
                         const badgeClass = stage.sla_compliance >= 90 ? 'badge-light-success' : (stage.sla_compliance >= 70 ? 'badge-light-warning' : 'badge-light-danger');
                         html += '<td><span class="badge ' + badgeClass + '">' + stage.sla_compliance + '%</span></td>';
                     } else {
@@ -898,7 +1043,7 @@ function showFunnelMetrics(funnelId) {
                 
                 Swal.fire({
                     html: html,
-                    width: '1400px',
+                    width: '1600px',
                     showConfirmButton: true,
                     confirmButtonText: 'Fechar',
                     customClass: {
@@ -907,11 +1052,11 @@ function showFunnelMetrics(funnelId) {
                     heightAuto: false,
                     didOpen: (el) => {
                         // Ajustar altura e scroll interno
-                        el.style.maxHeight = '85vh';
-                        el.style.height = '85vh';
+                        el.style.maxHeight = '90vh';
+                        el.style.height = '90vh';
                         const htmlContainer = el.querySelector('.swal2-html-container');
                         if (htmlContainer) {
-                            htmlContainer.style.maxHeight = '72vh';
+                            htmlContainer.style.maxHeight = '78vh';
                             htmlContainer.style.overflow = 'auto';
                         }
                     }

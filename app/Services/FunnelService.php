@@ -527,23 +527,62 @@ class FunnelService
     }
     
     /**
-     * Obter métricas de um estágio
+     * Obter métricas de um estágio (com informações de agentes)
      */
     public static function getStageMetrics(int $stageId, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $dateFrom = $dateFrom ?? date('Y-m-d', strtotime('-30 days'));
-        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        $dateTo = $dateTo ?? date('Y-m-d H:i:s') . ' 23:59:59';
         
         $stage = FunnelStage::find($stageId);
         if (!$stage) {
             return [];
         }
         
-        // Conversas atuais no estágio
+        // Conversas atuais no estágio (sem filtro de data)
         $currentConversations = Funnel::getConversationsByStage($stage['funnel_id'], $stageId);
         $currentCount = count($currentConversations);
         
-        // Conversas que passaram pelo estágio no período
+        // Contar conversas atuais por status
+        $currentOpen = 0;
+        $currentResolved = 0;
+        $currentClosed = 0;
+        $currentUnassigned = 0;
+        $agentsInStage = [];
+        
+        foreach ($currentConversations as $conv) {
+            if ($conv['status'] === 'open') $currentOpen++;
+            elseif ($conv['status'] === 'resolved') $currentResolved++;
+            elseif ($conv['status'] === 'closed') $currentClosed++;
+            
+            if (empty($conv['agent_id'])) {
+                $currentUnassigned++;
+            } else {
+                $agentId = $conv['agent_id'];
+                if (!isset($agentsInStage[$agentId])) {
+                    $agentsInStage[$agentId] = [
+                        'id' => $agentId,
+                        'name' => $conv['agent_name'] ?? 'Desconhecido',
+                        'count' => 0
+                    ];
+                }
+                $agentsInStage[$agentId]['count']++;
+            }
+        }
+        
+        // Conversas criadas no período (independente de onde estão agora)
+        $sql = "SELECT COUNT(DISTINCT c.id) as total_created,
+                       COUNT(DISTINCT CASE WHEN c.status = 'open' THEN c.id END) as open_created,
+                       COUNT(DISTINCT CASE WHEN c.status = 'resolved' THEN c.id END) as resolved_created,
+                       COUNT(DISTINCT CASE WHEN c.status = 'closed' THEN c.id END) as closed_created
+                FROM conversations c
+                WHERE c.funnel_id = ?
+                AND DATE(c.created_at) >= ?
+                AND DATE(c.created_at) <= ?";
+        
+        $createdMetrics = \App\Helpers\Database::fetch($sql, [$stage['funnel_id'], $dateFrom, $dateTo]);
+        
+        // Conversas que passaram pelo estágio no período (usando activity_log ou updated_at)
         $sql = "SELECT COUNT(DISTINCT c.id) as total,
                        COUNT(DISTINCT CASE WHEN c.status = 'resolved' THEN c.id END) as resolved,
                        COUNT(DISTINCT CASE WHEN c.status = 'closed' THEN c.id END) as closed,
@@ -552,69 +591,117 @@ class FunnelService
                        MAX(TIMESTAMPDIFF(HOUR, c.created_at, COALESCE(c.resolved_at, c.updated_at))) as max_time_hours
                 FROM conversations c
                 WHERE c.funnel_stage_id = ? 
-                AND c.updated_at >= ? 
-                AND c.updated_at <= ?";
+                AND (c.created_at >= ? OR c.updated_at >= ?)
+                AND (c.created_at <= ? OR c.updated_at <= ?)";
         
-        $metrics = \App\Helpers\Database::fetch($sql, [$stageId, $dateFrom, $dateTo]);
+        $metrics = \App\Helpers\Database::fetch($sql, [
+            $stageId, 
+            $dateFrom, 
+            $dateFrom,
+            $dateTo, 
+            $dateTo
+        ]);
         
         // Conversas que entraram no estágio no período
         $sqlEntered = "SELECT COUNT(DISTINCT c.id) as entered
                        FROM conversations c
                        WHERE c.funnel_stage_id = ?
-                       AND DATE(c.updated_at) >= ?
-                       AND DATE(c.updated_at) <= ?";
+                       AND (c.created_at >= ? OR c.updated_at >= ?)
+                       AND (c.created_at <= ? OR c.updated_at <= ?)";
         
-        $entered = \App\Helpers\Database::fetch($sqlEntered, [$stageId, $dateFrom, $dateTo]);
+        $entered = \App\Helpers\Database::fetch($sqlEntered, [
+            $stageId, 
+            $dateFrom,
+            $dateFrom,
+            $dateTo,
+            $dateTo
+        ]);
+        
+        // Métricas de agentes no período
+        $sqlAgents = "SELECT 
+                        c.agent_id,
+                        u.name as agent_name,
+                        COUNT(DISTINCT c.id) as conversations_count,
+                        COUNT(DISTINCT CASE WHEN c.status = 'resolved' THEN c.id END) as resolved_count,
+                        AVG(TIMESTAMPDIFF(HOUR, c.created_at, COALESCE(c.resolved_at, c.updated_at))) as avg_time_hours
+                      FROM conversations c
+                      LEFT JOIN users u ON u.id = c.agent_id
+                      WHERE c.funnel_stage_id = ?
+                      AND (c.created_at >= ? OR c.updated_at >= ?)
+                      AND (c.created_at <= ? OR c.updated_at <= ?)
+                      AND c.agent_id IS NOT NULL
+                      GROUP BY c.agent_id, u.name
+                      ORDER BY conversations_count DESC
+                      LIMIT 10";
+        
+        $agentsMetrics = \App\Helpers\Database::fetchAll($sqlAgents, [
+            $stageId,
+            $dateFrom,
+            $dateFrom,
+            $dateTo,
+            $dateTo
+        ]);
         
         // Taxa de conversão (se houver estágio seguinte)
         $nextStage = self::getNextStage($stage['funnel_id'], $stage['stage_order'] ?? 0);
         $conversionRate = 0;
         if ($nextStage && ($metrics['total'] ?? 0) > 0) {
+            // Verificar conversas que saíram deste estágio e foram para o próximo
             $sqlConversion = "SELECT COUNT(DISTINCT c.id) as converted
                               FROM conversations c
                               WHERE c.funnel_stage_id = ?
-                              AND c.updated_at >= ?
-                              AND c.updated_at <= ?
                               AND EXISTS (
                                   SELECT 1 FROM conversations c2 
                                   WHERE c2.id = c.id 
                                   AND c2.funnel_stage_id = ?
-                              )";
+                                  AND c2.updated_at > c.updated_at
+                              )
+                              AND (c.created_at >= ? OR c.updated_at >= ?)
+                              AND (c.created_at <= ? OR c.updated_at <= ?)";
             $converted = \App\Helpers\Database::fetch($sqlConversion, [
-                $stageId, 
-                $dateFrom, 
-                $dateTo, 
-                $nextStage['id']
+                $stageId,
+                $nextStage['id'],
+                $dateFrom,
+                $dateFrom,
+                $dateTo,
+                $dateTo
             ]);
-            $conversionRate = ($converted['converted'] / $metrics['total']) * 100;
+            $conversionRate = ($converted['converted'] / max($metrics['total'], 1)) * 100;
         }
         
         return [
             'stage_id' => $stageId,
             'stage_name' => $stage['name'],
             'current_count' => $currentCount,
+            'current_open' => $currentOpen,
+            'current_resolved' => $currentResolved,
+            'current_closed' => $currentClosed,
+            'current_unassigned' => $currentUnassigned,
             'max_conversations' => $stage['max_conversations'] ?? null,
-            'utilization_rate' => $stage['max_conversations'] ? ($currentCount / $stage['max_conversations']) * 100 : null,
+            'utilization_rate' => $stage['max_conversations'] ? round(($currentCount / $stage['max_conversations']) * 100, 2) : null,
             'total_in_period' => (int)($metrics['total'] ?? 0),
             'entered_in_period' => (int)($entered['entered'] ?? 0),
             'resolved' => (int)($metrics['resolved'] ?? 0),
             'closed' => (int)($metrics['closed'] ?? 0),
+            'total_created_in_period' => (int)($createdMetrics['total_created'] ?? 0),
             'avg_time_hours' => round((float)($metrics['avg_time_hours'] ?? 0), 2),
             'min_time_hours' => round((float)($metrics['min_time_hours'] ?? 0), 2),
             'max_time_hours' => round((float)($metrics['max_time_hours'] ?? 0), 2),
             'conversion_rate' => round($conversionRate, 2),
             'sla_hours' => $stage['sla_hours'] ?? null,
-            'sla_compliance' => $stage['sla_hours'] ? self::calculateSLACompliance($stageId, $stage['sla_hours'], $dateFrom, $dateTo) : null
+            'sla_compliance' => $stage['sla_hours'] ? self::calculateSLACompliance($stageId, $stage['sla_hours'], $dateFrom, $dateTo) : null,
+            'agents_current' => array_values($agentsInStage),
+            'agents_period' => $agentsMetrics ?? []
         ];
     }
     
     /**
-     * Obter métricas do funil completo
+     * Obter métricas do funil completo (com informações de agentes)
      */
     public static function getFunnelMetrics(int $funnelId, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $dateFrom = $dateFrom ?? date('Y-m-d', strtotime('-30 days'));
-        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        $dateTo = $dateTo ?? date('Y-m-d H:i:s') . ' 23:59:59';
         
         $funnel = Funnel::find($funnelId);
         if (!$funnel) {
@@ -628,18 +715,74 @@ class FunnelService
             $stageMetrics[] = self::getStageMetrics($stage['id'], $dateFrom, $dateTo);
         }
         
-        // Métricas gerais do funil
+        // Métricas gerais do funil - Conversas criadas no período
         $sql = "SELECT COUNT(DISTINCT c.id) as total_conversations,
                        COUNT(DISTINCT CASE WHEN c.status = 'open' THEN c.id END) as open_conversations,
                        COUNT(DISTINCT CASE WHEN c.status = 'resolved' THEN c.id END) as resolved_conversations,
                        COUNT(DISTINCT CASE WHEN c.status = 'closed' THEN c.id END) as closed_conversations,
-                       AVG(TIMESTAMPDIFF(HOUR, c.created_at, COALESCE(c.resolved_at, c.updated_at))) as avg_resolution_hours
+                       AVG(TIMESTAMPDIFF(HOUR, c.created_at, COALESCE(c.resolved_at, c.updated_at))) as avg_resolution_hours,
+                       MIN(TIMESTAMPDIFF(HOUR, c.created_at, COALESCE(c.resolved_at, c.updated_at))) as min_resolution_hours,
+                       MAX(TIMESTAMPDIFF(HOUR, c.created_at, COALESCE(c.resolved_at, c.updated_at))) as max_resolution_hours
                 FROM conversations c
                 WHERE c.funnel_id = ?
-                AND c.updated_at >= ?
-                AND c.updated_at <= ?";
+                AND DATE(c.created_at) >= ?
+                AND DATE(c.created_at) <= ?";
         
         $funnelMetrics = \App\Helpers\Database::fetch($sql, [$funnelId, $dateFrom, $dateTo]);
+        
+        // Conversas atuais no funil (todas as etapas)
+        $sqlCurrent = "SELECT COUNT(DISTINCT c.id) as total_current,
+                              COUNT(DISTINCT CASE WHEN c.status = 'open' THEN c.id END) as open_current,
+                              COUNT(DISTINCT CASE WHEN c.status = 'resolved' THEN c.id END) as resolved_current,
+                              COUNT(DISTINCT CASE WHEN c.status = 'closed' THEN c.id END) as closed_current,
+                              COUNT(DISTINCT CASE WHEN c.agent_id IS NULL THEN c.id END) as unassigned_current
+                       FROM conversations c
+                       WHERE c.funnel_id = ?";
+        
+        $currentMetrics = \App\Helpers\Database::fetch($sqlCurrent, [$funnelId]);
+        
+        // Top agentes do funil no período
+        $sqlTopAgents = "SELECT 
+                            c.agent_id,
+                            u.name as agent_name,
+                            u.avatar as agent_avatar,
+                            COUNT(DISTINCT c.id) as conversations_count,
+                            COUNT(DISTINCT CASE WHEN c.status = 'resolved' THEN c.id END) as resolved_count,
+                            COUNT(DISTINCT CASE WHEN c.status = 'closed' THEN c.id END) as closed_count,
+                            AVG(TIMESTAMPDIFF(HOUR, c.created_at, COALESCE(c.resolved_at, c.updated_at))) as avg_time_hours
+                          FROM conversations c
+                          LEFT JOIN users u ON u.id = c.agent_id
+                          WHERE c.funnel_id = ?
+                          AND (c.created_at >= ? OR c.updated_at >= ?)
+                          AND (c.created_at <= ? OR c.updated_at <= ?)
+                          AND c.agent_id IS NOT NULL
+                          GROUP BY c.agent_id, u.name, u.avatar
+                          ORDER BY conversations_count DESC
+                          LIMIT 10";
+        
+        $topAgents = \App\Helpers\Database::fetchAll($sqlTopAgents, [
+            $funnelId,
+            $dateFrom,
+            $dateFrom,
+            $dateTo,
+            $dateTo
+        ]);
+        
+        // Distribuição por etapa atual
+        $sqlByStage = "SELECT 
+                         fs.name as stage_name,
+                         fs.id as stage_id,
+                         COUNT(DISTINCT c.id) as count
+                       FROM conversations c
+                       INNER JOIN funnel_stages fs ON fs.id = c.funnel_stage_id
+                       WHERE c.funnel_id = ?
+                       GROUP BY fs.id, fs.name
+                       ORDER BY fs.stage_order ASC";
+        
+        $byStage = \App\Helpers\Database::fetchAll($sqlByStage, [$funnelId]);
+        
+        $totalCreated = (int)($funnelMetrics['total_conversations'] ?? 0);
+        $resolvedCreated = (int)($funnelMetrics['resolved_conversations'] ?? 0);
         
         return [
             'funnel_id' => $funnelId,
@@ -650,15 +793,26 @@ class FunnelService
             ],
             'stages' => $stageMetrics,
             'totals' => [
-                'total_conversations' => (int)($funnelMetrics['total_conversations'] ?? 0),
+                'total_conversations' => $totalCreated,
                 'open_conversations' => (int)($funnelMetrics['open_conversations'] ?? 0),
-                'resolved_conversations' => (int)($funnelMetrics['resolved_conversations'] ?? 0),
+                'resolved_conversations' => $resolvedCreated,
                 'closed_conversations' => (int)($funnelMetrics['closed_conversations'] ?? 0),
                 'avg_resolution_hours' => round((float)($funnelMetrics['avg_resolution_hours'] ?? 0), 2),
-                'resolution_rate' => ($funnelMetrics['total_conversations'] ?? 0) > 0 
-                    ? round((($funnelMetrics['resolved_conversations'] ?? 0) / ($funnelMetrics['total_conversations'] ?? 1)) * 100, 2)
+                'min_resolution_hours' => round((float)($funnelMetrics['min_resolution_hours'] ?? 0), 2),
+                'max_resolution_hours' => round((float)($funnelMetrics['max_resolution_hours'] ?? 0), 2),
+                'resolution_rate' => $totalCreated > 0 
+                    ? round(($resolvedCreated / $totalCreated) * 100, 2)
                     : 0
-            ]
+            ],
+            'current' => [
+                'total' => (int)($currentMetrics['total_current'] ?? 0),
+                'open' => (int)($currentMetrics['open_current'] ?? 0),
+                'resolved' => (int)($currentMetrics['resolved_current'] ?? 0),
+                'closed' => (int)($currentMetrics['closed_current'] ?? 0),
+                'unassigned' => (int)($currentMetrics['unassigned_current'] ?? 0)
+            ],
+            'top_agents' => $topAgents ?? [],
+            'distribution_by_stage' => $byStage ?? []
         ];
     }
     

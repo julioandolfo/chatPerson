@@ -1466,6 +1466,9 @@ function openNodeConfig(nodeId) {
                         <div id="kt_chatbot_options_list">
                             <div class="d-flex gap-2 mb-2 chatbot-option-item">
                                 <input type="text" name="chatbot_options[]" class="form-control form-control-solid" placeholder="Ex: 1 - Suporte Técnico" />
+                                <select name="chatbot_option_targets[]" class="form-select form-select-solid chatbot-option-target">
+                                    <option value="">Selecione o próximo nó</option>
+                                </select>
                                 <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeChatbotOption(this)">
                                     <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span></i>
                                 </button>
@@ -1949,6 +1952,8 @@ function saveLayout() {
         // SEMPRE incluir o ID (mesmo que temporário) para mapeamento de conexões
         if (node.id) {
             nodeData.id = node.id; // Incluir ID temporário também
+            // Guardar o id no próprio node_data para uso em runtime (chatbot)
+            nodeData.node_data.node_id = node.id;
         }
         
         // Debug: verificar conexões
@@ -2013,6 +2018,23 @@ document.addEventListener("DOMContentLoaded", function() {
             for (let [key, value] of formData.entries()) {
                 if (key !== "node_id" && key !== "node_type") {
                     nodeData[key] = value;
+                }
+            }
+            // Tratamento específico para chatbot menu: coletar opções + targets
+            if (node.node_type === "action_chatbot") {
+                const chatbotType = nodeData.chatbot_type || 'simple';
+                if (chatbotType === 'menu') {
+                    const optionInputs = Array.from(document.querySelectorAll('input[name="chatbot_options[]"]'));
+                    const targetSelects = Array.from(document.querySelectorAll('select[name="chatbot_option_targets[]"]'));
+                    const combined = [];
+                    optionInputs.forEach((inp, idx) => {
+                        const text = (inp.value || '').trim();
+                        const target = targetSelects[idx] ? targetSelects[idx].value : '';
+                        if (text) {
+                            combined.push({ text, target_node_id: target || null });
+                        }
+                    });
+                    nodeData.chatbot_options = combined;
                 }
             }
             
@@ -2092,6 +2114,75 @@ document.addEventListener("DOMContentLoaded", function() {
         if (!editFunnelSelect.value) {
             loadEditStages(null);
         }
+    }
+
+    // Salvar configurações da automação (modal Editar)
+    const editAutomationForm = document.getElementById("kt_modal_edit_automation_form");
+    const editSubmitBtn = document.getElementById("kt_modal_edit_automation_submit");
+    if (editAutomationForm && editSubmitBtn) {
+        editAutomationForm.addEventListener("submit", function(e) {
+            e.preventDefault();
+
+            editSubmitBtn.setAttribute("data-kt-indicator", "on");
+            editSubmitBtn.disabled = true;
+
+            fetch(editAutomationForm.action, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Accept": "application/json"
+                },
+                body: new URLSearchParams(new FormData(editAutomationForm))
+            })
+            .then(res => res.json())
+            .then(data => {
+                editSubmitBtn.removeAttribute("data-kt-indicator");
+                editSubmitBtn.disabled = false;
+
+                if (data.success) {
+                    // Fechar modal e feedback
+                    const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_edit_automation"));
+                    if (modal) modal.hide();
+
+                    if (typeof Swal !== "undefined") {
+                        Swal.fire({
+                            icon: "success",
+                            title: "Automação atualizada!",
+                            text: data.message || "Alterações salvas com sucesso.",
+                            timer: 1800,
+                            showConfirmButton: false,
+                            toast: true,
+                            position: "top-end"
+                        });
+                    }
+
+                    // Atualizar nome/descrição na UI sem recarregar, se disponível
+                    const nameInput = editAutomationForm.querySelector("input[name='name']");
+                    if (nameInput) {
+                        const titleEl = document.getElementById("automation_title");
+                        if (titleEl) titleEl.textContent = nameInput.value;
+                    }
+                } else {
+                    const msg = data.message || "Erro ao salvar automação.";
+                    if (typeof Swal !== "undefined") {
+                        Swal.fire({ icon: "error", title: "Erro", text: msg });
+                    } else {
+                        alert(msg);
+                    }
+                }
+            })
+            .catch(error => {
+                editSubmitBtn.removeAttribute("data-kt-indicator");
+                editSubmitBtn.disabled = false;
+                console.error("Erro ao salvar automação:", error);
+                if (typeof Swal !== "undefined") {
+                    Swal.fire({ icon: "error", title: "Erro", text: "Falha ao salvar automação." });
+                } else {
+                    alert("Falha ao salvar automação.");
+                }
+            });
+        });
     }
     
     // Carregar logs ao iniciar
@@ -2248,10 +2339,12 @@ window.removeConnection = removeConnection;
 function updateChatbotFields(type) {
     const optionsContainer = document.getElementById('kt_chatbot_options_container');
     const conditionalContainer = document.getElementById('kt_chatbot_conditional_container');
+    const optionsList = document.getElementById('kt_chatbot_options_list');
     
     if (type === 'menu') {
         optionsContainer.style.display = 'block';
         conditionalContainer.style.display = 'none';
+        populateChatbotOptionTargets(optionsList);
     } else if (type === 'conditional') {
         optionsContainer.style.display = 'none';
         conditionalContainer.style.display = 'block';
@@ -2267,11 +2360,15 @@ function addChatbotOption() {
     newOption.className = 'd-flex gap-2 mb-2 chatbot-option-item';
     newOption.innerHTML = `
         <input type="text" name="chatbot_options[]" class="form-control form-control-solid" placeholder="Ex: 2 - Vendas" />
+        <select name="chatbot_option_targets[]" class="form-select form-select-solid chatbot-option-target">
+            <option value="">Selecione o próximo nó</option>
+        </select>
         <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeChatbotOption(this)">
             <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span></i>
         </button>
     `;
     optionsList.appendChild(newOption);
+    populateChatbotOptionTargets(optionsList);
 }
 
 function removeChatbotOption(button) {
@@ -2284,6 +2381,34 @@ function removeChatbotOption(button) {
     } else {
         alert('É necessário ter pelo menos uma opção no menu.');
     }
+}
+
+// Preencher selects de destino das opções do chatbot com nós existentes
+function populateChatbotOptionTargets(optionsList) {
+    if (!optionsList) return;
+    const selects = optionsList.querySelectorAll('.chatbot-option-target');
+    if (!selects || selects.length === 0) return;
+
+    // Montar opções com base nos nós existentes (exclui triggers)
+    const choices = [{ value: '', label: 'Selecione o próximo nó' }];
+    nodes.forEach(n => {
+        if (n.node_type === 'trigger') return;
+        choices.push({ value: n.id, label: `${n.node_data?.label || n.node_type || n.id}` });
+    });
+
+    selects.forEach(select => {
+        const prev = select.value;
+        select.innerHTML = '';
+        choices.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.value;
+            opt.textContent = c.label;
+            select.appendChild(opt);
+        });
+        if (prev) {
+            select.value = prev;
+        }
+    });
 }
 
 window.updateChatbotFields = updateChatbotFields;
@@ -2756,6 +2881,29 @@ function validateAutomationConnections() {
         });
         return false;
     }
+
+    // Validação extra: chatbot menu deve ter conexões para cada opção
+    const chatbotIssues = [];
+    nodes.forEach(node => {
+        if (node.node_type !== 'action_chatbot') return;
+        const type = node.node_data?.chatbot_type || 'simple';
+        if (type !== 'menu') return;
+        const options = (node.node_data?.chatbot_options || []).filter(o => (o || '').trim() !== '');
+        const connections = node.node_data?.connections || [];
+        if (options.length > 0 && connections.length < options.length) {
+            chatbotIssues.push(node.id || node.node_data?.label || 'Chatbot');
+        }
+    });
+
+    if (chatbotIssues.length > 0) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Chatbot incompleto',
+            html: `Os chatbots de menu precisam ter conexões para cada opção.<br><br>Corrija os nós: <strong>${chatbotIssues.join(', ')}</strong>`,
+            confirmButtonText: 'OK'
+        });
+        return false;
+    }
     
     return true;
 }
@@ -2935,6 +3083,8 @@ window.validateAutomationForm = validateAutomationForm;
 window.validateAutomationConnections = validateAutomationConnections;
 window.validateRequiredField = validateRequiredField;
 window.previewVariables = previewVariables;
+window.showVariablesModal = showVariablesModal;
+window.previewMessageVariables = previewMessageVariables;
 </script>
 JAVASCRIPT;
 ?>

@@ -173,6 +173,15 @@ class AutomationService
             return;
         }
 
+        // Se há um chatbot ativo aguardando resposta, tentar roteá-lo primeiro
+        $metadata = json_decode($conversation['metadata'] ?? '{}', true);
+        if (!empty($metadata['chatbot_active'])) {
+            $handled = self::handleChatbotResponse($conversation, $message);
+            if ($handled) {
+                return; // Já roteou para o próximo nó do chatbot, não disparar outras automações aqui
+            }
+        }
+
         // Buscar automações ativas para message_received
         $triggerData = [
             'channel' => $conversation['channel'] ?? null,
@@ -535,6 +544,33 @@ class AutomationService
     }
 
     /**
+     * Processar variáveis em mensagens (sobrecarga com dados já carregados)
+     */
+    private static function processVariables(string $message, array $conversation): string
+    {
+        $contact = \App\Models\Contact::find($conversation['contact_id']);
+        $agent = $conversation['agent_id'] ? \App\Models\User::find($conversation['agent_id']) : null;
+
+        $variables = [
+            '{{contact.name}}' => $contact ? ($contact['name'] ?? '') : '',
+            '{{contact.phone}}' => $contact ? ($contact['phone'] ?? '') : '',
+            '{{contact.email}}' => $contact ? ($contact['email'] ?? '') : '',
+            '{{agent.name}}' => $agent ? ($agent['name'] ?? '') : '',
+            '{{conversation.id}}' => $conversation['id'] ?? '',
+            '{{conversation.subject}}' => $conversation['subject'] ?? '',
+            '{{date}}' => date('d/m/Y'),
+            '{{time}}' => date('H:i'),
+            '{{datetime}}' => date('d/m/Y H:i'),
+        ];
+
+        foreach ($variables as $key => $value) {
+            $message = str_replace($key, $value, $message);
+        }
+
+        return $message;
+    }
+
+    /**
      * Executar ação: atribuir agente
      */
     private static function executeAssignAgent(array $nodeData, int $conversationId, ?int $executionId = null): void
@@ -717,6 +753,8 @@ class AutomationService
             $message = $nodeData['chatbot_message'] ?? '';
             $timeout = (int)($nodeData['chatbot_timeout'] ?? 300);
             $timeoutAction = $nodeData['chatbot_timeout_action'] ?? 'nothing';
+            $options = $nodeData['chatbot_options'] ?? [];
+            $connections = $nodeData['connections'] ?? [];
             
             if (empty($message)) {
                 error_log("Chatbot sem mensagem configurada para conversa {$conversationId}");
@@ -730,6 +768,18 @@ class AutomationService
             }
             
             $message = self::processVariables($message, $conversation);
+            
+            // Obter automation_id atual (para retomar o fluxo posteriormente)
+            $automationId = null;
+            if ($executionId) {
+                $execution = \App\Models\AutomationExecution::find($executionId);
+                if ($execution) {
+                    $automationId = (int)$execution['automation_id'];
+                }
+            }
+            if (!$automationId) {
+                $automationId = self::getCurrentAutomationId($conversationId);
+            }
             
             // Enviar mensagem inicial do chatbot
             \App\Models\Message::create([
@@ -745,20 +795,27 @@ class AutomationService
             
             // Processar opções de menu (se tipo = menu)
             if ($chatbotType === 'menu') {
-                $options = $nodeData['chatbot_options'] ?? [];
                 if (!empty($options) && is_array($options)) {
-                    $optionsText = "\n\n" . implode("\n", array_filter($options));
-                    
-                    \App\Models\Message::create([
-                        'conversation_id' => $conversationId,
-                        'sender_id' => null,
-                        'sender_type' => 'system',
-                        'message' => $optionsText,
-                        'type' => 'text',
-                        'channel' => $conversation['channel'],
-                        'direction' => 'outgoing',
-                        'status' => 'sent'
-                    ]);
+                    // opções podem ser [{text, target_node_id}] ou strings antigas
+                    $labels = array_map(function ($opt) {
+                        if (is_array($opt) && isset($opt['text'])) return $opt['text'];
+                        return $opt;
+                    }, $options);
+                    $labels = array_filter($labels);
+                    if (!empty($labels)) {
+                        $optionsText = "\n\n" . implode("\n", $labels);
+                        
+                        \App\Models\Message::create([
+                            'conversation_id' => $conversationId,
+                            'sender_id' => null,
+                            'sender_type' => 'system',
+                            'message' => $optionsText,
+                            'type' => 'text',
+                            'channel' => $conversation['channel'],
+                            'direction' => 'outgoing',
+                            'status' => 'sent'
+                        ]);
+                    }
                 }
             }
             
@@ -784,6 +841,25 @@ class AutomationService
             $currentMetadata['chatbot_type'] = $chatbotType;
             $currentMetadata['chatbot_timeout_at'] = time() + $timeout;
             $currentMetadata['chatbot_timeout_action'] = $timeoutAction;
+            // Normalizar opções para formato [{text, target_node_id}]
+            $normalizedOptions = [];
+            if (!empty($options) && is_array($options)) {
+                foreach ($options as $opt) {
+                    if (is_array($opt)) {
+                        $normalizedOptions[] = [
+                            'text' => $opt['text'] ?? '',
+                            'target_node_id' => $opt['target_node_id'] ?? null
+                        ];
+                    } else {
+                        $normalizedOptions[] = ['text' => $opt, 'target_node_id' => null];
+                    }
+                }
+            }
+            $currentMetadata['chatbot_options'] = $normalizedOptions;
+            // Se não houver target no item, manter compat com conexões em ordem
+            $currentMetadata['chatbot_next_nodes'] = array_values(array_map(fn($c) => $c['target_node_id'] ?? null, $connections));
+            $currentMetadata['chatbot_automation_id'] = $automationId;
+            $currentMetadata['chatbot_node_id'] = $nodeData['node_id'] ?? null;
             
             \App\Models\Conversation::update($conversationId, [
                 'metadata' => json_encode($currentMetadata)
@@ -798,6 +874,95 @@ class AutomationService
             }
             throw $e;
         }
+    }
+
+    /**
+     * Tratar resposta do usuário para continuar o fluxo do chatbot
+     */
+    private static function handleChatbotResponse(array $conversation, array $message): bool
+    {
+        $metadata = json_decode($conversation['metadata'] ?? '{}', true);
+        if (empty($metadata['chatbot_active'])) {
+            return false;
+        }
+
+        $text = trim(mb_strtolower($message['content'] ?? ''));
+        if ($text === '') {
+            return false;
+        }
+
+        $automationId = $metadata['chatbot_automation_id'] ?? null;
+        $options = $metadata['chatbot_options'] ?? [];
+        $nextNodes = $metadata['chatbot_next_nodes'] ?? [];
+
+        if (!$automationId || empty($options)) {
+            // Nada a fazer, limpar flag para evitar loop
+            $metadata['chatbot_active'] = false;
+            \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
+            return false;
+        }
+
+        // Encontrar opção correspondente
+        $matchedIndex = null;
+        foreach ($options as $idx => $optRaw) {
+            $optText = is_array($optRaw) ? ($optRaw['text'] ?? '') : $optRaw;
+            $optTarget = is_array($optRaw) ? ($optRaw['target_node_id'] ?? null) : null;
+            $opt = mb_strtolower(trim((string)$optText));
+            if ($opt === '') {
+                continue;
+            }
+
+            // Tentar casar por número inicial (ex.: "1 - Suporte")
+            if (preg_match('/^(\\d+)/', $opt, $m)) {
+                $num = $m[1];
+                if ($text === $num || str_starts_with($text, $num)) {
+                    $matchedIndex = $idx;
+                    break;
+                }
+            }
+
+            // Comparação direta do texto
+            if ($text === $opt) {
+                $matchedIndex = $idx;
+                break;
+            }
+        }
+
+        if ($matchedIndex === null) {
+            return false; // Nenhuma opção casou; manter chatbot ativo
+        }
+
+        // Priorizar target explícito na opção; fallback para lista de conexões em ordem
+        $optTarget = is_array($options[$matchedIndex]) ? ($options[$matchedIndex]['target_node_id'] ?? null) : null;
+        $targetNodeId = $optTarget ?: ($nextNodes[$matchedIndex] ?? null);
+        if (!$targetNodeId) {
+            return false;
+        }
+
+        // Carregar automação e nós
+        $automation = \App\Models\Automation::findWithNodes((int)$automationId);
+        if (!$automation || empty($automation['nodes'])) {
+            return false;
+        }
+
+        $nodes = $automation['nodes'];
+        $targetNode = self::findNodeById($targetNodeId, $nodes);
+        if (!$targetNode) {
+            return false;
+        }
+
+        // Limpar estado do chatbot antes de continuar
+        $metadata['chatbot_active'] = false;
+        $metadata['chatbot_options'] = [];
+        $metadata['chatbot_next_nodes'] = [];
+        $metadata['chatbot_automation_id'] = null;
+        $metadata['chatbot_node_id'] = null;
+        \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
+
+        // Continuar fluxo a partir do nó de destino
+        self::executeNode($targetNode, $conversation['id'], $nodes, null);
+
+        return true;
     }
 
     /**

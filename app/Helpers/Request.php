@@ -108,5 +108,15 @@ class Request
         return !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
                strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
     }
+
+    /**
+     * Obter dados JSON da requisição
+     * Retorna array vazio se não for JSON
+     */
+    public static function json(): array
+    {
+        $jsonData = self::getJsonBody();
+        return $jsonData ?? [];
+    }
 }
 

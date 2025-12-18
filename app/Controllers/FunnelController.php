@@ -595,9 +595,14 @@ class FunnelController
      */
     public function reorderStage(int $stageId): void
     {
-        Permission::abortIfCannot('funnels.edit');
+        // Desabilitar output de erros para garantir JSON puro
+        @ini_set('display_errors', '0');
+        error_reporting(0);
         
         try {
+            Permission::abortIfCannot('funnels.edit');
+            
+            // Obter dados JSON da requisição
             $data = Request::json();
             $direction = $data['direction'] ?? null;
             
@@ -613,7 +618,16 @@ class FunnelController
                 'message' => 'Ordem atualizada com sucesso'
             ]);
         } catch (\Exception $e) {
-            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+            // Log do erro para debug
+            error_log("Erro ao reordenar etapa $stageId: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
+            
+            Response::json([
+                'success' => false, 
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ], 500);
         }
     }
 }

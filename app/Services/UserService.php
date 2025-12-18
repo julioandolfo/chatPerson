@@ -54,6 +54,23 @@ class UserService
 
         $userId = User::create($data);
         
+        // Atribuir role ao usuário
+        $roleSlug = $data['role'];
+        try {
+            // Buscar ID da role pelo slug
+            $sql = "SELECT id FROM roles WHERE slug = ? LIMIT 1";
+            $role = \App\Helpers\Database::fetch($sql, [$roleSlug]);
+            
+            if ($role) {
+                // Atribuir role ao usuário
+                $sql = "INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)
+                        ON DUPLICATE KEY UPDATE role_id = VALUES(role_id)";
+                \App\Helpers\Database::execute($sql, [$userId, $role['id']]);
+            }
+        } catch (\Exception $e) {
+            error_log("Erro ao atribuir role: " . $e->getMessage());
+        }
+        
         // Log de atividade
         try {
             if (class_exists('\App\Services\ActivityService')) {

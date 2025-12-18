@@ -424,7 +424,7 @@ class PermissionService
     /**
      * Obter valor do cache
      */
-    private static function getCache(string $key): ?bool
+    private static function getCache(string $key)
     {
         if (!is_dir(self::$cacheDir)) {
             @mkdir(self::$cacheDir, 0755, true);

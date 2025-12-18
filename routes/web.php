@@ -179,6 +179,7 @@ Router::post('/users/{id}/departments/remove', [UserController::class, 'removeDe
 Router::post('/users/{id}/funnel-permissions', [UserController::class, 'assignFunnelPermission'], ['Authentication']);
 Router::post('/users/{id}/funnel-permissions/remove', [UserController::class, 'removeFunnelPermission'], ['Authentication']);
 Router::get('/users/{id}/performance', [UserController::class, 'getPerformanceStats'], ['Authentication']);
+Router::post('/users/update-availability', [UserController::class, 'updateAvailability'], ['Authentication']);
 
 // Rotas de Integrações
 Router::get('/integrations', [IntegrationController::class, 'index'], ['Authentication']);

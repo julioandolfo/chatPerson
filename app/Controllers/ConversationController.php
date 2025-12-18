@@ -1092,10 +1092,37 @@ class ConversationController
             
             \App\Helpers\Database::execute($sql, [$id]);
             
+            // Recalcular unread_count diretamente no banco
+            $sqlUpdate = "UPDATE conversations 
+                        SET unread_count = (
+                            SELECT COUNT(*) 
+                            FROM messages m 
+                            WHERE m.conversation_id = conversations.id 
+                            AND m.sender_type = 'contact' 
+                            AND m.read_at IS NULL
+                        )
+                        WHERE id = ?";
+            
+            \App\Helpers\Database::execute($sqlUpdate, [$id]);
+            
+            // Recarregar conversa para obter unread_count atualizado
+            $conversation = \App\Services\ConversationService::getConversation($id);
+            
             // Invalidar cache
             \App\Services\ConversationService::invalidateCache($id);
             
-            Response::json(['success' => true, 'message' => 'Conversa marcada como não lida']);
+            // Notificar via WebSocket
+            try {
+                \App\Helpers\WebSocket::notifyConversationUpdated($id, $conversation);
+            } catch (\Exception $e) {
+                error_log("Erro ao notificar WebSocket: " . $e->getMessage());
+            }
+            
+            Response::json([
+                'success' => true, 
+                'message' => 'Conversa marcada como não lida',
+                'unread_count' => $conversation['unread_count'] ?? 0
+            ]);
         } catch (\Exception $e) {
             Response::json(['success' => false, 'message' => $e->getMessage()], 400);
         }

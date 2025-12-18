@@ -135,9 +135,23 @@ ob_start();
                     </i>
                     <div>
                         <div class="fs-2x fw-bold text-gray-800">
-                            <?= $stats['metrics']['avg_first_response_time'] 
-                                ? \App\Services\AgentPerformanceService::formatTime($stats['metrics']['avg_first_response_time'])
-                                : '-' ?>
+                            <?php
+                            $avgFirstResponse = $stats['metrics']['avg_first_response_time'] ?? null;
+                            if ($avgFirstResponse !== null && $avgFirstResponse > 0) {
+                                if (class_exists('\App\Services\AgentPerformanceService')) {
+                                    echo \App\Services\AgentPerformanceService::formatTime($avgFirstResponse);
+                                } else {
+                                    // Fallback manual
+                                    if ($avgFirstResponse < 60) {
+                                        echo number_format($avgFirstResponse, 0) . ' min';
+                                    } else {
+                                        echo number_format($avgFirstResponse / 60, 1) . 'h';
+                                    }
+                                }
+                            } else {
+                                echo '-';
+                            }
+                            ?>
                         </div>
                         <div class="text-muted fs-6">Primeira resposta</div>
                     </div>
@@ -388,6 +402,156 @@ ob_start();
     </div>
     <!--end::Col-->
     <?php endif; ?>
+</div>
+<!--end::Row-->
+<?php endif; ?>
+
+<!--begin::Row - Cards Individuais de Agentes-->
+<?php if (!empty($allAgentsMetrics)): ?>
+<div class="row g-5 mb-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-3 mb-1">Métricas Individuais dos Agentes</span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">Desempenho detalhado de cada agente</span>
+                </h3>
+            </div>
+            <div class="card-body pt-3">
+                <div class="row g-4">
+                    <?php foreach ($allAgentsMetrics as $agent): ?>
+                    <div class="col-xl-4 col-lg-6">
+                        <div class="card border border-gray-300 h-100">
+                            <div class="card-body">
+                                <!-- Header do Card -->
+                                <div class="d-flex align-items-center mb-4">
+                                    <div class="symbol symbol-50px me-3">
+                                        <?php if (!empty($agent['agent_avatar'])): ?>
+                                            <img src="<?= htmlspecialchars($agent['agent_avatar']) ?>" alt="<?= htmlspecialchars($agent['agent_name']) ?>" class="symbol-label" />
+                                        <?php else: ?>
+                                            <div class="symbol-label fs-2 fw-semibold text-primary bg-light-primary">
+                                                <?= mb_substr(htmlspecialchars($agent['agent_name'] ?? 'A'), 0, 1) ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold fs-5 text-gray-800"><?= htmlspecialchars($agent['agent_name']) ?></div>
+                                        <div class="d-flex align-items-center mt-1">
+                                            <?php
+                                            $statusColors = [
+                                                'online' => 'success',
+                                                'busy' => 'warning',
+                                                'away' => 'info',
+                                                'offline' => 'gray-400'
+                                            ];
+                                            $statusLabels = [
+                                                'online' => 'Online',
+                                                'busy' => 'Ocupado',
+                                                'away' => 'Ausente',
+                                                'offline' => 'Offline'
+                                            ];
+                                            $status = $agent['availability_status'] ?? 'offline';
+                                            $color = $statusColors[$status] ?? 'gray-400';
+                                            $label = $statusLabels[$status] ?? 'Offline';
+                                            ?>
+                                            <span class="bullet bullet-dot bg-<?= $color ?> me-2"></span>
+                                            <span class="text-muted fs-7"><?= $label ?></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Métricas -->
+                                <div class="separator separator-dashed my-4"></div>
+                                
+                                <!-- Conversas -->
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="text-muted fs-7">Conversas Totais</span>
+                                    <span class="fw-bold fs-5 text-gray-800"><?= number_format($agent['total_conversations'] ?? 0) ?></span>
+                                </div>
+                                
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="text-muted fs-7">Em Aberto</span>
+                                    <span class="fw-bold text-warning"><?= number_format($agent['open_conversations'] ?? 0) ?></span>
+                                </div>
+                                
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="text-muted fs-7">Fechadas</span>
+                                    <span class="fw-bold text-success"><?= number_format($agent['closed_conversations'] ?? 0) ?></span>
+                                </div>
+                                
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="text-muted fs-7">Resolvidas</span>
+                                    <span class="fw-bold text-info"><?= number_format($agent['resolved_conversations'] ?? 0) ?></span>
+                                </div>
+                                
+                                <div class="separator separator-dashed my-4"></div>
+                                
+                                <!-- SLA e Tempos -->
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="text-muted fs-7">Taxa de Resolução</span>
+                                    <span class="badge badge-light-success"><?= number_format($agent['resolution_rate'] ?? 0, 1) ?>%</span>
+                                </div>
+                                
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="text-muted fs-7">Tempo Médio Resolução</span>
+                                    <span class="fw-bold text-gray-800">
+                                        <?php
+                                        $avgHours = $agent['avg_resolution_hours'] ?? 0;
+                                        if ($avgHours > 0) {
+                                            if ($avgHours < 1) {
+                                                echo number_format($avgHours * 60, 0) . ' min';
+                                            } else {
+                                                echo number_format($avgHours, 1) . 'h';
+                                            }
+                                        } else {
+                                            echo '-';
+                                        }
+                                        ?>
+                                    </span>
+                                </div>
+                                
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="text-muted fs-7">Tempo Médio 1ª Resposta</span>
+                                    <span class="fw-bold text-gray-800">
+                                        <?php
+                                        $avgFirst = $agent['avg_first_response_minutes'] ?? 0;
+                                        if ($avgFirst > 0) {
+                                            if ($avgFirst < 60) {
+                                                echo number_format($avgFirst, 0) . ' min';
+                                            } else {
+                                                echo number_format($avgFirst / 60, 1) . 'h';
+                                            }
+                                        } else {
+                                            echo '-';
+                                        }
+                                        ?>
+                                    </span>
+                                </div>
+                                
+                                <div class="separator separator-dashed my-4"></div>
+                                
+                                <!-- SLA -->
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="text-muted fs-7">SLA 5min</span>
+                                    <span class="badge badge-light-<?= ($agent['sla_5min_rate'] ?? 0) >= 80 ? 'success' : (($agent['sla_5min_rate'] ?? 0) >= 50 ? 'warning' : 'danger') ?>">
+                                        <?= number_format($agent['sla_5min_rate'] ?? 0, 1) ?>%
+                                    </span>
+                                </div>
+                                
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="text-muted fs-7">SLA 15min</span>
+                                    <span class="badge badge-light-<?= ($agent['sla_15min_rate'] ?? 0) >= 80 ? 'success' : (($agent['sla_15min_rate'] ?? 0) >= 50 ? 'warning' : 'danger') ?>">
+                                        <?= number_format($agent['sla_15min_rate'] ?? 0, 1) ?>%
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 <!--end::Row-->
 <?php endif; ?>

@@ -37,6 +37,9 @@ class DashboardController
             // Top agentes
             $topAgents = \App\Services\DashboardService::getTopAgents($dateFrom, $dateTo, 5);
             
+            // Métricas individuais de todos os agentes (para cards)
+            $allAgentsMetrics = \App\Services\DashboardService::getAllAgentsMetrics($dateFrom, $dateTo);
+            
             // Conversas recentes
             $recentConversations = \App\Services\DashboardService::getRecentConversations(10);
             
@@ -48,6 +51,7 @@ class DashboardController
                 'departmentStats' => $departmentStats,
                 'funnelStats' => $funnelStats,
                 'topAgents' => $topAgents,
+                'allAgentsMetrics' => $allAgentsMetrics,
                 'recentConversations' => $recentConversations,
                 'recentActivity' => $recentActivity,
                 'dateFrom' => $dateFrom,

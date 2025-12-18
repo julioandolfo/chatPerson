@@ -405,4 +405,41 @@ class UserController
             ], 500);
         }
     }
+    
+    /**
+     * Atualizar status de disponibilidade do usuário logado
+     */
+    public function updateAvailability(): void
+    {
+        $userId = \App\Helpers\Auth::id();
+        if (!$userId) {
+            Response::json(['success' => false, 'message' => 'Usuário não autenticado'], 401);
+            return;
+        }
+        
+        try {
+            $data = Request::json();
+            $status = $data['status'] ?? null;
+            
+            if (!$status || !in_array($status, ['online', 'offline', 'away', 'busy'])) {
+                Response::json(['success' => false, 'message' => 'Status inválido'], 400);
+                return;
+            }
+            
+            if (\App\Models\User::updateAvailabilityStatus($userId, $status)) {
+                Response::json([
+                    'success' => true,
+                    'message' => 'Status atualizado com sucesso',
+                    'status' => $status
+                ]);
+            } else {
+                Response::json(['success' => false, 'message' => 'Falha ao atualizar status'], 500);
+            }
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

@@ -582,24 +582,36 @@ class FunnelService
         
         $createdMetrics = \App\Helpers\Database::fetch($sql, [$stage['funnel_id'], $dateFrom, $dateTo]);
         
-        // Conversas que passaram pelo estágio no período (usando activity_log ou updated_at)
+        // Conversas que passaram pelo estágio no período
+        // Para tempo médio, calcular baseado em quando entrou na etapa (moved_at ou updated_at quando mudou de etapa)
         $sql = "SELECT COUNT(DISTINCT c.id) as total,
                        COUNT(DISTINCT CASE WHEN c.status = 'resolved' THEN c.id END) as resolved,
                        COUNT(DISTINCT CASE WHEN c.status = 'closed' THEN c.id END) as closed,
-                       AVG(TIMESTAMPDIFF(HOUR, c.created_at, COALESCE(c.resolved_at, c.updated_at))) as avg_time_hours,
-                       MIN(TIMESTAMPDIFF(HOUR, c.created_at, COALESCE(c.resolved_at, c.updated_at))) as min_time_hours,
-                       MAX(TIMESTAMPDIFF(HOUR, c.created_at, COALESCE(c.resolved_at, c.updated_at))) as max_time_hours
+                       AVG(TIMESTAMPDIFF(HOUR, 
+                           COALESCE(c.moved_at, c.updated_at, c.created_at), 
+                           COALESCE(c.resolved_at, c.updated_at, NOW())
+                       )) as avg_time_hours,
+                       MIN(TIMESTAMPDIFF(HOUR, 
+                           COALESCE(c.moved_at, c.updated_at, c.created_at), 
+                           COALESCE(c.resolved_at, c.updated_at, NOW())
+                       )) as min_time_hours,
+                       MAX(TIMESTAMPDIFF(HOUR, 
+                           COALESCE(c.moved_at, c.updated_at, c.created_at), 
+                           COALESCE(c.resolved_at, c.updated_at, NOW())
+                       )) as max_time_hours
                 FROM conversations c
                 WHERE c.funnel_stage_id = ? 
-                AND (c.created_at >= ? OR c.updated_at >= ?)
-                AND (c.created_at <= ? OR c.updated_at <= ?)";
+                AND (
+                    (c.created_at >= ? AND c.created_at <= ?) OR
+                    (c.updated_at >= ? AND c.updated_at <= ?) OR
+                    (c.moved_at >= ? AND c.moved_at <= ?)
+                )";
         
         $metrics = \App\Helpers\Database::fetch($sql, [
             $stageId, 
-            $dateFrom, 
-            $dateFrom,
-            $dateTo, 
-            $dateTo
+            $dateFrom, $dateTo,
+            $dateFrom, $dateTo,
+            $dateFrom, $dateTo
         ]);
         
         // Conversas que entraram no estágio no período

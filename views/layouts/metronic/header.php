@@ -169,6 +169,55 @@
                     <div class="separator my-2"></div>
                     <!--end::Menu separator-->
                     
+                    <!--begin::Menu item - Visibilidade-->
+                    <div class="menu-item px-5" data-kt-menu-trigger="hover" data-kt-menu-placement="left-start">
+                        <a href="#" class="menu-link px-5">
+                            <span class="menu-title">Status</span>
+                            <span class="menu-arrow"></span>
+                        </a>
+                        <!--begin::Menu sub-->
+                        <div class="menu-sub menu-sub-dropdown w-175px py-4">
+                            <div class="menu-item px-3">
+                                <a href="#" class="menu-link px-3" onclick="updateAvailabilityStatus('online'); return false;">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot bg-success"></span>
+                                    </span>
+                                    <span class="menu-title">Online</span>
+                                </a>
+                            </div>
+                            <div class="menu-item px-3">
+                                <a href="#" class="menu-link px-3" onclick="updateAvailabilityStatus('busy'); return false;">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot bg-warning"></span>
+                                    </span>
+                                    <span class="menu-title">Ocupado</span>
+                                </a>
+                            </div>
+                            <div class="menu-item px-3">
+                                <a href="#" class="menu-link px-3" onclick="updateAvailabilityStatus('away'); return false;">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot bg-info"></span>
+                                    </span>
+                                    <span class="menu-title">Ausente</span>
+                                </a>
+                            </div>
+                            <div class="menu-item px-3">
+                                <a href="#" class="menu-link px-3" onclick="updateAvailabilityStatus('offline'); return false;">
+                                    <span class="menu-bullet">
+                                        <span class="bullet bullet-dot bg-gray-400"></span>
+                                    </span>
+                                    <span class="menu-title">Offline</span>
+                                </a>
+                            </div>
+                        </div>
+                        <!--end::Menu sub-->
+                    </div>
+                    <!--end::Menu item-->
+                    
+                    <!--begin::Menu separator-->
+                    <div class="separator my-2"></div>
+                    <!--end::Menu separator-->
+                    
                     <!--begin::Menu item-->
                     <div class="menu-item px-5">
                         <a href="<?= \App\Helpers\Url::to('/logout') ?>" class="menu-link px-5">
@@ -186,4 +235,83 @@
     <!--end::Container-->
 </div>
 <!--end::Header-->
+
+<script>
+// Função para atualizar status de disponibilidade
+function updateAvailabilityStatus(status) {
+    fetch('<?= \App\Helpers\Url::to('/users/update-availability') ?>', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ status: status })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Usar toast se disponível, senão usar Swal
+            if (typeof toast !== 'undefined') {
+                toast.fire({
+                    icon: 'success',
+                    title: 'Status atualizado para: ' + getStatusLabel(status)
+                });
+            } else if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Status atualizado',
+                    text: 'Status atualizado para: ' + getStatusLabel(status),
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+            }
+            
+            // Atualizar visualmente o status no menu se necessário
+            updateStatusVisual(status);
+        } else {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: data.message || 'Erro ao atualizar status'
+                });
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao atualizar status:', error);
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Erro ao atualizar status'
+            });
+        }
+    });
+}
+
+function getStatusLabel(status) {
+    const labels = {
+        'online': 'Online',
+        'busy': 'Ocupado',
+        'away': 'Ausente',
+        'offline': 'Offline'
+    };
+    return labels[status] || status;
+}
+
+function updateStatusVisual(status) {
+    // Atualizar indicador visual se necessário
+    // Por enquanto, apenas fecha o menu
+    const menu = document.querySelector('[data-kt-menu="true"]');
+    if (menu) {
+        // Fechar menu após atualização
+        setTimeout(() => {
+            if (typeof KTMenu !== 'undefined') {
+                KTMenu.getInstance(menu)?.hide();
+            }
+        }, 500);
+    }
+}
+</script>
 

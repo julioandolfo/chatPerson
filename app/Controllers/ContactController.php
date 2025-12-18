@@ -296,12 +296,22 @@ class ContactController
             }
 
             // Conversas fechadas/resolvidas para métricas
+            // Calcular tempo médio baseado em quando foi resolvida/fechada
             $stats = \App\Helpers\Database::fetch("
                 SELECT 
                     COUNT(*) AS total_conversations,
-                    AVG(TIMESTAMPDIFF(SECOND, created_at, updated_at)) AS avg_duration_seconds
+                    AVG(TIMESTAMPDIFF(SECOND, 
+                        created_at, 
+                        COALESCE(resolved_at, updated_at, NOW())
+                    )) AS avg_duration_seconds,
+                    AVG(TIMESTAMPDIFF(HOUR, 
+                        created_at, 
+                        COALESCE(resolved_at, updated_at, NOW())
+                    )) AS avg_duration_hours
                 FROM conversations
-                WHERE contact_id = ? AND status IN ('closed', 'resolved')
+                WHERE contact_id = ? 
+                AND status IN ('closed', 'resolved')
+                AND (resolved_at IS NOT NULL OR updated_at IS NOT NULL)
             ", [$id]);
 
             // Conversas anteriores (últimas 5 fechadas/resolvidas)
@@ -318,11 +328,14 @@ class ContactController
                 LIMIT 5
             ", [$id]);
 
+            $avgSeconds = $stats['avg_duration_seconds'] !== null ? (int)round((float)$stats['avg_duration_seconds']) : null;
+            
             Response::json([
                 'success' => true,
                 'contact_id' => $id,
                 'total_conversations' => (int)($stats['total_conversations'] ?? 0),
-                'avg_duration_seconds' => $stats['avg_duration_seconds'] !== null ? (int)$stats['avg_duration_seconds'] : null,
+                'avg_duration_seconds' => $avgSeconds,
+                'avg_duration_hours' => $stats['avg_duration_hours'] !== null ? round((float)$stats['avg_duration_hours'], 2) : null,
                 // Não há CSAT armazenado atualmente; deixar null/--
                 'csat_score' => null,
                 'previous_conversations' => $previous ?: []

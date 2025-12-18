@@ -32,8 +32,11 @@ class DashboardService
         $closedConversations = self::getClosedConversations($dateFrom, $dateTo);
         
         // Conversas do usuário (se informado)
-        $myConversations = $userId ? self::getMyConversations($userId) : 0;
+        $myConversations = $userId ? self::getMyConversations($userId, $dateFrom, $dateTo) : 0;
         $myOpenConversations = $userId ? self::getMyOpenConversations($userId) : 0;
+        
+        // Tempo médio de resolução (período)
+        $avgResolutionTime = self::getAverageResolutionTime($dateFrom, $dateTo);
         
         // Total de agentes
         $totalAgents = self::getTotalAgents();
@@ -87,7 +90,8 @@ class DashboardService
             ],
             'metrics' => [
                 'resolution_rate' => $resolutionRate,
-                'avg_first_response_time' => $avgFirstResponseTime
+                'avg_first_response_time' => $avgFirstResponseTime,
+                'avg_resolution_time' => $avgResolutionTime
             ],
             'period' => [
                 'from' => $dateFrom,
@@ -230,11 +234,15 @@ class DashboardService
         return (int)($result['total'] ?? 0);
     }
 
-    private static function getMyConversations(int $userId): int
+    private static function getMyConversations(int $userId, ?string $dateFrom = null, ?string $dateTo = null): int
     {
+        $dateFrom = $dateFrom ?? date('Y-m-01');
+        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        
         $sql = "SELECT COUNT(*) as total FROM conversations 
-                WHERE agent_id = ?";
-        $result = \App\Helpers\Database::fetch($sql, [$userId]);
+                WHERE agent_id = ?
+                AND created_at >= ? AND created_at <= ?";
+        $result = \App\Helpers\Database::fetch($sql, [$userId, $dateFrom, $dateTo]);
         return (int)($result['total'] ?? 0);
     }
 
@@ -346,6 +354,122 @@ class DashboardService
                 AND status IN ('open', 'pending')";
         $result = \App\Helpers\Database::fetch($sql);
         return (int)($result['total'] ?? 0);
+    }
+    
+    /**
+     * Obter tempo médio de resolução (em horas)
+     */
+    private static function getAverageResolutionTime(?string $dateFrom = null, ?string $dateTo = null): ?float
+    {
+        $dateFrom = $dateFrom ?? date('Y-m-01');
+        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        
+        $sql = "SELECT AVG(TIMESTAMPDIFF(HOUR, c.created_at, COALESCE(c.resolved_at, c.updated_at))) as avg_time
+                FROM conversations c
+                WHERE c.status IN ('resolved', 'closed')
+                AND c.created_at >= ?
+                AND c.created_at <= ?
+                AND (c.resolved_at IS NOT NULL OR c.updated_at IS NOT NULL)";
+        
+        $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
+        return $result && $result['avg_time'] !== null ? round((float)$result['avg_time'], 2) : null;
+    }
+    
+    /**
+     * Obter métricas individuais de um agente
+     */
+    public static function getAgentMetrics(int $agentId, ?string $dateFrom = null, ?string $dateTo = null): array
+    {
+        $dateFrom = $dateFrom ?? date('Y-m-01');
+        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        
+        $agent = User::find($agentId);
+        if (!$agent) {
+            return [];
+        }
+        
+        // Conversas totais recebidas no período
+        $sql = "SELECT 
+                    COUNT(DISTINCT c.id) as total_conversations,
+                    COUNT(DISTINCT CASE WHEN c.status = 'open' THEN c.id END) as open_conversations,
+                    COUNT(DISTINCT CASE WHEN c.status = 'resolved' THEN c.id END) as resolved_conversations,
+                    COUNT(DISTINCT CASE WHEN c.status = 'closed' THEN c.id END) as closed_conversations,
+                    AVG(TIMESTAMPDIFF(HOUR, c.created_at, COALESCE(c.resolved_at, c.updated_at))) as avg_resolution_hours,
+                    AVG(TIMESTAMPDIFF(MINUTE, c.created_at, 
+                        (SELECT MIN(m.created_at) FROM messages m 
+                         WHERE m.conversation_id = c.id AND m.sender_type = 'agent')
+                    )) as avg_first_response_minutes,
+                    COUNT(DISTINCT CASE WHEN TIMESTAMPDIFF(MINUTE, c.created_at, 
+                        (SELECT MIN(m.created_at) FROM messages m 
+                         WHERE m.conversation_id = c.id AND m.sender_type = 'agent')
+                    ) <= 5 THEN c.id END) as responded_5min,
+                    COUNT(DISTINCT CASE WHEN TIMESTAMPDIFF(MINUTE, c.created_at, 
+                        (SELECT MIN(m.created_at) FROM messages m 
+                         WHERE m.conversation_id = c.id AND m.sender_type = 'agent')
+                    ) <= 15 THEN c.id END) as responded_15min
+                FROM conversations c
+                WHERE c.agent_id = ?
+                AND (c.created_at >= ? OR c.updated_at >= ?)
+                AND (c.created_at <= ? OR c.updated_at <= ?)";
+        
+        $metrics = \App\Helpers\Database::fetch($sql, [
+            $agentId,
+            $dateFrom, $dateFrom,
+            $dateTo, $dateTo
+        ]);
+        
+        // Conversas atuais abertas
+        $sqlCurrent = "SELECT COUNT(*) as total FROM conversations 
+                      WHERE agent_id = ? AND status IN ('open', 'pending')";
+        $current = \App\Helpers\Database::fetch($sqlCurrent, [$agentId]);
+        
+        $total = (int)($metrics['total_conversations'] ?? 0);
+        $resolved = (int)($metrics['resolved_conversations'] ?? 0);
+        $closed = (int)($metrics['closed_conversations'] ?? 0);
+        
+        return [
+            'agent_id' => $agentId,
+            'agent_name' => $agent['name'] ?? 'Desconhecido',
+            'agent_avatar' => $agent['avatar'] ?? null,
+            'availability_status' => $agent['availability_status'] ?? 'offline',
+            'total_conversations' => $total,
+            'open_conversations' => (int)($current['total'] ?? 0),
+            'resolved_conversations' => $resolved,
+            'closed_conversations' => $closed,
+            'avg_resolution_hours' => round((float)($metrics['avg_resolution_hours'] ?? 0), 2),
+            'avg_first_response_minutes' => round((float)($metrics['avg_first_response_minutes'] ?? 0), 2),
+            'sla_5min_rate' => $total > 0 ? round((($metrics['responded_5min'] ?? 0) / $total) * 100, 2) : 0,
+            'sla_15min_rate' => $total > 0 ? round((($metrics['responded_15min'] ?? 0) / $total) * 100, 2) : 0,
+            'resolution_rate' => $total > 0 ? round((($resolved + $closed) / $total) * 100, 2) : 0
+        ];
+    }
+    
+    /**
+     * Obter métricas de todos os agentes (para cards individuais)
+     */
+    public static function getAllAgentsMetrics(?string $dateFrom = null, ?string $dateTo = null): array
+    {
+        $dateFrom = $dateFrom ?? date('Y-m-01');
+        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        
+        // Buscar todos os agentes ativos
+        $sql = "SELECT id, name, email, avatar, availability_status 
+                FROM users 
+                WHERE role IN ('agent', 'admin', 'supervisor') 
+                AND status = 'active'
+                ORDER BY name ASC";
+        
+        $agents = \App\Helpers\Database::fetchAll($sql);
+        
+        $result = [];
+        foreach ($agents as $agent) {
+            $metrics = self::getAgentMetrics($agent['id'], $dateFrom, $dateTo);
+            if (!empty($metrics)) {
+                $result[] = $metrics;
+            }
+        }
+        
+        return $result;
     }
 
     /**

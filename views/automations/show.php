@@ -1138,6 +1138,16 @@ function renderNode(node) {
     });
 }
 
+// Re-renderizar nó (remove e renderiza novamente)
+function rerenderNode(node) {
+    const existing = document.getElementById(String(node.id));
+    if (existing) {
+        existing.remove();
+    }
+    renderNode(node);
+    renderConnections();
+}
+
 // Configurar drag de tipos de nós do painel lateral
 function setupNodeTypeDrag() {
     const nodeTypes = document.querySelectorAll(".automation-node-type");
@@ -1529,15 +1539,19 @@ function openNodeConfig(nodeId) {
                 <div id="kt_chatbot_options_container" style="display: none;">
                     <div class="fv-row mb-7">
                         <label class="fw-semibold fs-6 mb-2">Opções do Menu</label>
+                        <div class="form-text mb-2">Para cada opção, informe palavras-chave (separadas por vírgula) que também disparam essa opção.</div>
                         <div id="kt_chatbot_options_list">
-                            <div class="d-flex gap-2 mb-2 chatbot-option-item">
-                                <input type="text" name="chatbot_options[]" class="form-control form-control-solid" placeholder="Ex: 1 - Suporte Técnico" />
-                                <select name="chatbot_option_targets[]" class="form-select form-select-solid chatbot-option-target">
-                                    <option value="">Selecione o próximo nó</option>
-                                </select>
-                                <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeChatbotOption(this)">
-                                    <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span></i>
-                                </button>
+                            <div class="d-flex flex-column gap-2 mb-3 chatbot-option-item">
+                                <div class="d-flex gap-2">
+                                    <input type="text" name="chatbot_options[]" class="form-control form-control-solid" placeholder="Ex: 1 - Suporte Técnico" />
+                                    <select name="chatbot_option_targets[]" class="form-select form-select-solid chatbot-option-target">
+                                        <option value="">Selecione o próximo nó</option>
+                                    </select>
+                                    <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeChatbotOption(this)">
+                                        <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span></i>
+                                    </button>
+                                </div>
+                                <input type="text" name="chatbot_option_keywords[]" class="form-control form-control-solid" placeholder="Palavras-chave: 1, comercial, vendas" />
                             </div>
                         </div>
                         <button type="button" class="btn btn-sm btn-light-primary mt-2" onclick="addChatbotOption()">
@@ -1669,7 +1683,7 @@ function openNodeConfig(nodeId) {
     
     document.getElementById("kt_node_config_content").innerHTML = formContent;
     
-    // Preencher valores existentes
+            // Preencher valores existentes
     if (node.node_data) {
         Object.keys(node.node_data).forEach(key => {
             const input = document.querySelector(`[name="${key}"]`);
@@ -1695,18 +1709,22 @@ function openNodeConfig(nodeId) {
                     if (Array.isArray(options)) {
                         options.forEach(function(opt) {
                             const optionItem = document.createElement('div');
-                            optionItem.className = 'd-flex gap-2 mb-2 chatbot-option-item';
+                            optionItem.className = 'd-flex flex-column gap-2 mb-3 chatbot-option-item';
                             const optText = (typeof opt === 'object' ? opt.text : opt) || '';
                             const optTarget = (typeof opt === 'object' ? opt.target_node_id : '') || '';
+                            const optKeywords = (typeof opt === 'object' && Array.isArray(opt.keywords)) ? opt.keywords.join(', ') : ((typeof opt === 'object' && opt.keywords) ? opt.keywords : '');
                             
                             optionItem.innerHTML = `
-                                <input type="text" name="chatbot_options[]" class="form-control form-control-solid" placeholder="Ex: 1 - Suporte" />
-                                <select name="chatbot_option_targets[]" class="form-select form-select-solid chatbot-option-target">
-                                    <option value="">Selecione o próximo nó</option>
-                                </select>
-                                <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeChatbotOption(this)">
-                                    <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span></i>
-                                </button>
+                                <div class="d-flex gap-2">
+                                    <input type="text" name="chatbot_options[]" class="form-control form-control-solid" placeholder="Ex: 1 - Suporte" />
+                                    <select name="chatbot_option_targets[]" class="form-select form-select-solid chatbot-option-target">
+                                        <option value="">Selecione o próximo nó</option>
+                                    </select>
+                                    <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeChatbotOption(this)">
+                                        <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span></i>
+                                    </button>
+                                </div>
+                                <input type="text" name="chatbot_option_keywords[]" class="form-control form-control-solid" placeholder="Palavras-chave: 1, comercial, vendas" />
                             `;
                             optionsList.appendChild(optionItem);
                             
@@ -1714,6 +1732,11 @@ function openNodeConfig(nodeId) {
                             const textInput = optionItem.querySelector('input[name="chatbot_options[]"]');
                             if (textInput) {
                                 textInput.value = optText;
+                            }
+                            
+                            const keywordsInput = optionItem.querySelector('input[name="chatbot_option_keywords[]"]');
+                            if (keywordsInput) {
+                                keywordsInput.value = optKeywords;
                             }
                             
                             // Preencher target se existir
@@ -2192,6 +2215,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 if (chatbotType === 'menu') {
                     const optionInputs = Array.from(document.querySelectorAll('input[name="chatbot_options[]"]'));
                     const targetSelects = Array.from(document.querySelectorAll('select[name="chatbot_option_targets[]"]'));
+                    const keywordInputs = Array.from(document.querySelectorAll('input[name="chatbot_option_keywords[]"]'));
                     const combined = [];
                     
                     console.log('Inputs de opções encontrados:', optionInputs.length);
@@ -2200,9 +2224,11 @@ document.addEventListener("DOMContentLoaded", function() {
                     optionInputs.forEach(function(inp, idx) {
                         const text = (inp.value || '').trim();
                         const target = targetSelects[idx] ? targetSelects[idx].value : '';
-                        console.log(`Opção ${idx}: text="${text}", target="${target}"`);
+                        const keywordsRaw = keywordInputs[idx] ? keywordInputs[idx].value : '';
+                        const keywords = keywordsRaw.split(',').map(function(k){ return k.trim(); }).filter(function(k){ return k.length > 0; });
+                        console.log(`Opção ${idx}: text="${text}", target="${target}", keywords="${keywordsRaw}"`);
                         if (text) {
-                            combined.push({ text: text, target_node_id: target || null });
+                            combined.push({ text: text, target_node_id: target || null, keywords: keywords });
                         }
                     });
                     
@@ -2224,28 +2250,8 @@ document.addEventListener("DOMContentLoaded", function() {
             // Atualizar referência global
             window.nodes = nodes;
             
-            // Atualizar visualização
-            const nodeElement = document.getElementById(nodeId);
-            if (nodeElement) {
-                const config = nodeTypes[node.node_type] || {};
-                let displayText = nodeData.label || nodeData.message || nodeData.chatbot_message || nodeData.name || config.label || "";
-                
-                // Para chatbot, mostrar tipo e quantidade de opções
-                if (node.node_type === 'action_chatbot') {
-                    const type = nodeData.chatbot_type || 'simple';
-                    const typeLabels = { simple: 'Simples', menu: 'Menu', conditional: 'Condicional' };
-                    displayText = typeLabels[type] || type;
-                    
-                    if (type === 'menu' && nodeData.chatbot_options && Array.isArray(nodeData.chatbot_options)) {
-                        displayText += ` (${nodeData.chatbot_options.length} opções)`;
-                    }
-                }
-                
-                const textElement = nodeElement.querySelector(".text-muted");
-                if (textElement) {
-                    textElement.textContent = displayText;
-                }
-            }
+            // Re-render para refletir handles e dados atualizados
+            rerenderNode(node);
             
             console.log('Configuração salva. Fechando modal...');
             

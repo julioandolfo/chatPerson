@@ -3,7 +3,7 @@
  * Visualizador de Logs de Automação
  */
 
-$logFile = __DIR__ . '/../storage/logs/automation.log';
+$logFile = __DIR__ . '/../logs/automacao.log';
 
 // Criar arquivo se não existir
 if (!file_exists($logFile)) {
@@ -12,7 +12,7 @@ if (!file_exists($logFile)) {
         mkdir($dir, 0777, true);
     }
     touch($logFile);
-    chmod($logFile, 0666);
+    @chmod($logFile, 0666);
 }
 
 ?>

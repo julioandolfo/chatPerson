@@ -824,17 +824,18 @@ class AutomationService
             $currentMetadata['chatbot_type'] = $chatbotType;
             $currentMetadata['chatbot_timeout_at'] = time() + $timeout;
             $currentMetadata['chatbot_timeout_action'] = $timeoutAction;
-            // Normalizar opções para formato [{text, target_node_id}]
+            // Normalizar opções para formato [{text, target_node_id, keywords}]
             $normalizedOptions = [];
             if (!empty($options) && is_array($options)) {
                 foreach ($options as $opt) {
                     if (is_array($opt)) {
                         $normalizedOptions[] = [
                             'text' => $opt['text'] ?? '',
-                            'target_node_id' => $opt['target_node_id'] ?? null
+                            'target_node_id' => $opt['target_node_id'] ?? null,
+                            'keywords' => $opt['keywords'] ?? []
                         ];
                     } else {
-                        $normalizedOptions[] = ['text' => $opt, 'target_node_id' => null];
+                        $normalizedOptions[] = ['text' => $opt, 'target_node_id' => null, 'keywords' => []];
                     }
                 }
             }
@@ -890,6 +891,7 @@ class AutomationService
         foreach ($options as $idx => $optRaw) {
             $optText = is_array($optRaw) ? ($optRaw['text'] ?? '') : $optRaw;
             $optTarget = is_array($optRaw) ? ($optRaw['target_node_id'] ?? null) : null;
+            $optKeywords = is_array($optRaw) ? ($optRaw['keywords'] ?? []) : [];
             $opt = mb_strtolower(trim((string)$optText));
             if ($opt === '') {
                 continue;
@@ -908,6 +910,17 @@ class AutomationService
             if ($text === $opt) {
                 $matchedIndex = $idx;
                 break;
+            }
+
+            // Palavras-chave configuradas para a opção
+            if (!empty($optKeywords) && is_array($optKeywords)) {
+                foreach ($optKeywords as $kwRaw) {
+                    $kw = mb_strtolower(trim((string)$kwRaw));
+                    if ($kw !== '' && $text === $kw) {
+                        $matchedIndex = $idx;
+                        break 2;
+                    }
+                }
             }
         }
 

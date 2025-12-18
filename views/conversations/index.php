@@ -3917,7 +3917,9 @@ function ensureActionsDropdown(conversationItem, pinned, conversationId, preserv
 // Atualizar atributos de data (updated_at) e resortear a lista
 function updateConversationMeta(conversationItem, conv) {
     if (!conversationItem || !conv) return;
-    const updatedAt = conv.last_message_at || conv.updated_at || new Date().toISOString();
+    // Manter estabilidade da ordenação: priorizar last_message_at; se não houver, manter valor atual; por último usar updated_at
+    const currentUpdated = conversationItem.dataset.updatedAt || null;
+    const updatedAt = conv.last_message_at || currentUpdated || conv.updated_at || new Date().toISOString();
     conversationItem.dataset.updatedAt = updatedAt;
 }
 

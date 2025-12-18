@@ -1,0 +1,74 @@
+🚨 CORREÇÃO URGENTE - REORDENAÇÃO DO KANBAN
+================================================
+
+PROBLEMA ENCONTRADO:
+-------------------
+Seu Kanban tem 5 etapas com stage_order = 0 (duplicados)
+Isso impede que a reordenação funcione corretamente.
+
+SOLUÇÃO RÁPIDA (1 CLIQUE):
+--------------------------
+Acesse esta URL para aplicar a correção automaticamente:
+
+👉 https://chat.personizi.com.br/aplicar-correcao-agora.php
+
+OU
+
+Acesse esta URL para ver os detalhes e clicar em "Corrigir":
+
+👉 https://chat.personizi.com.br/fix-stage-order.php
+
+
+O QUE SERÁ CORRIGIDO:
+---------------------
+ANTES:
+  ID 1  - Novo                      = 0  ❌ (duplicado)
+  ID 2  - Em Andamento              = 0  ❌ (duplicado)
+  ID 3  - Aguardando                = 0  ❌ (duplicado)
+  ID 4  - Resolvido                 = 0  ❌ (duplicado)
+  ID 5  - Fechado                   = 0  ❌ (duplicado)
+  ID 8  - Entrada [Sistema]         = 1  ⚠️
+  ID 9  - Fechadas/Resolvidas [Sis] = 998
+  ID 10 - Perdidas [Sistema]        = 999
+
+DEPOIS:
+  ID 8  - Entrada [Sistema]         = 1  ✅
+  ID 1  - Novo                      = 2  ✅
+  ID 2  - Em Andamento              = 3  ✅
+  ID 3  - Aguardando                = 4  ✅
+  ID 4  - Resolvido                 = 5  ✅
+  ID 5  - Fechado                   = 6  ✅
+  ID 9  - Fechadas/Resolvidas [Sis] = 7  ✅
+  ID 10 - Perdidas [Sistema]        = 8  ✅
+
+
+APÓS CORRIGIR:
+--------------
+1. Limpe o cache: Ctrl + Shift + R
+2. Acesse: https://chat.personizi.com.br/funnels/kanban
+3. Teste as setas ← →
+4. Deve funcionar perfeitamente!
+
+
+ARQUIVOS CRIADOS (pode remover depois):
+---------------------------------------
+✅ public/aplicar-correcao-agora.php   - Correção automática (1 clique)
+✅ public/fix-stage-order.php          - Correção com detalhes
+✅ public/debug-reorder.php            - Debug avançado
+✅ public/LEIA-ISSO-URGENTE.txt        - Este arquivo
+✅ public/IMPORTANTE-LER-AGORA.html    - Explicação visual
+
+
+CÓDIGO JÁ CORRIGIDO:
+--------------------
+✅ app/Models/Funnel.php               - Agora usa stage_order
+✅ app/Services/FunnelService.php      - Agora usa stage_order
+✅ app/Helpers/Request.php             - Método json() criado
+✅ app/Controllers/FunnelController.php - Tratamento de erros melhorado
+
+
+TEMPO ESTIMADO: 30 segundos
+===========================
+
+Acesse: https://chat.personizi.com.br/aplicar-correcao-agora.php
+

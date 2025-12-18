@@ -179,6 +179,17 @@
     <div class="card">
         <h1>🔧 Corrigir Ordem das Etapas do Kanban</h1>
         <p>Este script verifica e corrige os valores de <code>stage_order</code> para todas as etapas.</p>
+        
+        <div style="background: #fff3cd; padding: 20px; border-radius: 8px; border-left: 4px solid #ffc107; margin-top: 20px;">
+            <h3 style="margin-top: 0; color: #997404;">⚠️ Problemas Detectados</h3>
+            <p>O script verifica:</p>
+            <ul>
+                <li><strong>Valores NULL:</strong> Etapas sem ordenação definida</li>
+                <li><strong>Valores ZERO (0):</strong> Problemático - múltiplas etapas com ordem 0</li>
+                <li><strong>Valores DUPLICADOS:</strong> Duas ou mais etapas com a mesma ordem no mesmo funil</li>
+            </ul>
+            <p><strong>Ao clicar em "Corrigir":</strong> O sistema reordenará todas as etapas automaticamente, colocando "Entrada" primeiro, etapas personalizadas no meio, e etapas do sistema por último.</p>
+        </div>
     </div>
 
     <div class="card">
@@ -198,6 +209,16 @@
             } else {
                 $currentFunnelId = null;
                 $problemsFound = 0;
+                $stagesByFunnel = [];
+                
+                // Agrupar etapas por funil para detectar duplicatas
+                foreach ($stages as $stage) {
+                    $fid = $stage['funnel_id'];
+                    if (!isset($stagesByFunnel[$fid])) {
+                        $stagesByFunnel[$fid] = [];
+                    }
+                    $stagesByFunnel[$fid][] = $stage;
+                }
                 
                 foreach ($stages as $stage) {
                     if ($currentFunnelId !== $stage['funnel_id']) {
@@ -212,11 +233,34 @@
                     }
                     
                     $orderValue = $stage['stage_order'] ?? 'NULL';
+                    
+                    // Verificar problemas
                     $isNull = ($stage['stage_order'] === null || $stage['stage_order'] === '');
-                    $statusClass = $isNull ? 'order-null' : 'order-ok';
-                    $statusText = $isNull ? '❌ Precisa corrigir' : '✅ OK';
+                    $isZero = ($stage['stage_order'] === 0 || $stage['stage_order'] === '0');
+                    
+                    // Contar quantas etapas do mesmo funil têm o mesmo stage_order
+                    $duplicateCount = 0;
+                    foreach ($stagesByFunnel[$stage['funnel_id']] as $s) {
+                        if ($s['stage_order'] == $stage['stage_order']) {
+                            $duplicateCount++;
+                        }
+                    }
+                    $hasDuplicate = ($duplicateCount > 1);
+                    
+                    $hasProblem = ($isNull || $isZero || $hasDuplicate);
+                    $statusClass = $hasProblem ? 'order-null' : 'order-ok';
                     
                     if ($isNull) {
+                        $statusText = '❌ NULL - Precisa corrigir';
+                    } elseif ($isZero) {
+                        $statusText = '❌ Zero - Precisa corrigir';
+                    } elseif ($hasDuplicate) {
+                        $statusText = '❌ Duplicado (' . $duplicateCount . 'x) - Precisa corrigir';
+                    } else {
+                        $statusText = '✅ OK';
+                    }
+                    
+                    if ($hasProblem) {
                         $problemsFound++;
                     }
                     
@@ -232,13 +276,20 @@
                 
                 if ($problemsFound > 0) {
                     echo '<div class="error">';
-                    echo '<strong>⚠️ Problemas encontrados: ' . $problemsFound . ' etapas sem stage_order</strong>';
+                    echo '<strong>⚠️ Problemas encontrados: ' . $problemsFound . ' etapas com problemas de ordenação</strong>';
+                    echo '<p>Problemas detectados:</p>';
+                    echo '<ul>';
+                    echo '<li>Valores NULL ou vazios</li>';
+                    echo '<li>Valores zero (0)</li>';
+                    echo '<li>Valores duplicados no mesmo funil</li>';
+                    echo '</ul>';
                     echo '<form method="POST" style="margin-top: 15px;">';
                     echo '<button type="submit" name="fix_all" class="btn btn-success">🔧 Corrigir Todas as Etapas</button>';
                     echo '</form>';
                     echo '</div>';
                 } else {
-                    echo '<div class="success">✅ Todas as etapas estão com stage_order definido!</div>';
+                    echo '<div class="success">✅ Todas as etapas estão com stage_order válido e único!</div>';
+                    echo '<p><a href="/funnels/kanban" class="btn btn-success">🚀 Ir para o Kanban</a></p>';
                 }
             }
         } catch (\Exception $e) {
@@ -251,10 +302,44 @@
         <h2>📝 O que este script faz?</h2>
         <ol>
             <li>Verifica todas as etapas no banco de dados</li>
-            <li>Identifica etapas sem <code>stage_order</code> definido (NULL)</li>
-            <li>Ao clicar em "Corrigir", define valores sequenciais (1, 2, 3...)</li>
-            <li>Mantém a ordem pela data de criação (ID crescente)</li>
+            <li>Identifica problemas: NULL, Zero (0), ou Duplicados</li>
+            <li>Ao clicar em "Corrigir", reordena seguindo esta prioridade:</li>
         </ol>
+        
+        <div style="background: #d1fae5; padding: 20px; border-radius: 8px; margin-top: 15px;">
+            <h3 style="margin-top: 0; color: #065f46;">✅ Ordem Correta Após Correção:</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #fff;">
+                        <th style="padding: 10px; border: 1px solid #ccc;">Ordem</th>
+                        <th style="padding: 10px; border: 1px solid #ccc;">Tipo</th>
+                        <th style="padding: 10px; border: 1px solid #ccc;">Nome</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #ccc; text-align: center;"><strong>1</strong></td>
+                        <td style="padding: 10px; border: 1px solid #ccc;">🛡️ Sistema</td>
+                        <td style="padding: 10px; border: 1px solid #ccc;"><strong>Entrada</strong></td>
+                    </tr>
+                    <tr style="background: #f8f9fa;">
+                        <td style="padding: 10px; border: 1px solid #ccc; text-align: center;"><strong>2, 3, 4...</strong></td>
+                        <td style="padding: 10px; border: 1px solid #ccc;">📝 Personalizadas</td>
+                        <td style="padding: 10px; border: 1px solid #ccc;">Novo, Em Andamento, Aguardando, etc.</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #ccc; text-align: center;"><strong>N-1</strong></td>
+                        <td style="padding: 10px; border: 1px solid #ccc;">🛡️ Sistema</td>
+                        <td style="padding: 10px; border: 1px solid #ccc;"><strong>Fechadas / Resolvidas</strong></td>
+                    </tr>
+                    <tr style="background: #f8f9fa;">
+                        <td style="padding: 10px; border: 1px solid #ccc; text-align: center;"><strong>N</strong></td>
+                        <td style="padding: 10px; border: 1px solid #ccc;">🛡️ Sistema</td>
+                        <td style="padding: 10px; border: 1px solid #ccc;"><strong>Perdidas</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <div class="card">

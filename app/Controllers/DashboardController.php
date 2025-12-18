@@ -26,9 +26,9 @@ class DashboardController
         
         try {
             // Estatísticas gerais
-            error_log("DEBUG Dashboard: Carregando stats para userId={$userId}, dateFrom={$dateFrom}, dateTo={$dateTo}");
+            self::logDash("Carregando stats para userId={$userId}, dateFrom={$dateFrom}, dateTo={$dateTo}");
             $generalStats = \App\Services\DashboardService::getGeneralStats($userId, $dateFrom, $dateTo);
-            error_log("DEBUG Dashboard: generalStats = " . json_encode($generalStats));
+            self::logDash("generalStats = " . json_encode($generalStats));
             
             // Estatísticas por setor
             $departmentStats = \App\Services\DashboardService::getDepartmentStats();
@@ -48,7 +48,7 @@ class DashboardController
             // Atividade recente
             $recentActivity = \App\Services\DashboardService::getRecentActivity(10);
             
-            error_log("DEBUG Dashboard: Passando dados para view");
+            self::logDash("Passando dados para view");
             Response::view('dashboard/index', [
                 'stats' => $generalStats,
                 'departmentStats' => $departmentStats,
@@ -61,8 +61,8 @@ class DashboardController
                 'dateTo' => $dateTo
             ]);
         } catch (\Exception $e) {
-            error_log("ERRO CRÍTICO ao carregar dashboard: " . $e->getMessage());
-            error_log("Stack trace: " . $e->getTraceAsString());
+            self::logDash("ERRO CRÍTICO: " . $e->getMessage());
+            self::logDash("Stack trace: " . $e->getTraceAsString());
             // Fallback para estatísticas básicas
             $stats = [
                 'conversations' => [
@@ -144,6 +144,23 @@ class DashboardController
                 'error' => 'Erro ao carregar dados do gráfico'
             ], 500);
         }
+    }
+
+    /**
+     * Log para arquivo logs/dash.log
+     */
+    private static function logDash(string $message): void
+    {
+        $logDir = __DIR__ . '/../../logs';
+        if (!is_dir($logDir)) {
+            mkdir($logDir, 0755, true);
+        }
+        
+        $logFile = $logDir . '/dash.log';
+        $timestamp = date('Y-m-d H:i:s');
+        $logMessage = "[{$timestamp}] {$message}\n";
+        
+        file_put_contents($logFile, $logMessage, FILE_APPEND);
     }
 
     /**

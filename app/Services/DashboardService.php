@@ -15,6 +15,23 @@ use App\Models\Message;
 class DashboardService
 {
     /**
+     * Log para arquivo logs/dash.log
+     */
+    private static function logDash(string $message): void
+    {
+        $logDir = __DIR__ . '/../../logs';
+        if (!is_dir($logDir)) {
+            mkdir($logDir, 0755, true);
+        }
+        
+        $logFile = $logDir . '/dash.log';
+        $timestamp = date('Y-m-d H:i:s');
+        $logMessage = "[{$timestamp}] [DashboardService] {$message}\n";
+        
+        file_put_contents($logFile, $logMessage, FILE_APPEND);
+    }
+
+    /**
      * Obter estatísticas gerais do dashboard
      */
     public static function getGeneralStats(?int $userId = null, ?string $dateFrom = null, ?string $dateTo = null): array
@@ -22,24 +39,24 @@ class DashboardService
         $dateFrom = $dateFrom ?? date('Y-m-01'); // Primeiro dia do mês
         $dateTo = $dateTo ?? date('Y-m-d H:i:s'); // Hoje
 
-        error_log("DEBUG getGeneralStats: userId={$userId}, dateFrom={$dateFrom}, dateTo={$dateTo}");
+        self::logDash("getGeneralStats: userId={$userId}, dateFrom={$dateFrom}, dateTo={$dateTo}");
 
         // Total de conversas
         $totalConversations = self::getTotalConversations($dateFrom, $dateTo);
-        error_log("DEBUG getGeneralStats: totalConversations={$totalConversations}");
+        self::logDash("totalConversations={$totalConversations}");
         
         // Conversas abertas
         $openConversations = self::getOpenConversations();
-        error_log("DEBUG getGeneralStats: openConversations={$openConversations}");
+        self::logDash("openConversations={$openConversations}");
         
         // Conversas fechadas
         $closedConversations = self::getClosedConversations($dateFrom, $dateTo);
-        error_log("DEBUG getGeneralStats: closedConversations={$closedConversations}");
+        self::logDash("closedConversations={$closedConversations}");
         
         // Conversas do usuário (se informado)
         $myConversations = $userId ? self::getMyConversations($userId, $dateFrom, $dateTo) : 0;
         $myOpenConversations = $userId ? self::getMyOpenConversations($userId) : 0;
-        error_log("DEBUG getGeneralStats: myConversations={$myConversations}, myOpenConversations={$myOpenConversations}");
+        self::logDash("myConversations={$myConversations}, myOpenConversations={$myOpenConversations}");
         
         // Tempo médio de resolução (período)
         $avgResolutionTime = self::getAverageResolutionTime($dateFrom, $dateTo);
@@ -74,8 +91,8 @@ class DashboardService
         
         // Conversas sem atribuição
         $unassignedConversations = self::getUnassignedConversations();
-        error_log("DEBUG getGeneralStats: unassignedConversations={$unassignedConversations}");
-        error_log("DEBUG getGeneralStats: avgFirstResponseTime={$avgFirstResponseTime}, avgResponseTime={$avgResponseTime}");
+        self::logDash("unassignedConversations={$unassignedConversations}");
+        self::logDash("avgFirstResponseTime={$avgFirstResponseTime}, avgResponseTime={$avgResponseTime}");
         
         return [
             'conversations' => [
@@ -256,7 +273,7 @@ class DashboardService
                 WHERE agent_id = ?";
         $result = \App\Helpers\Database::fetch($sql, [$userId]);
         
-        error_log("DEBUG getMyConversations: userId=$userId, total=" . ($result['total'] ?? 0));
+        self::logDash("getMyConversations: userId=$userId, total=" . ($result['total'] ?? 0));
         
         return (int)($result['total'] ?? 0);
     }
@@ -412,7 +429,7 @@ class DashboardService
                 AND status IN ('open', 'pending')";
         $result = \App\Helpers\Database::fetch($sql);
         
-        error_log("DEBUG getUnassignedConversations: total=" . ($result['total'] ?? 0));
+        self::logDash("getUnassignedConversations: total=" . ($result['total'] ?? 0));
         
         return (int)($result['total'] ?? 0);
     }

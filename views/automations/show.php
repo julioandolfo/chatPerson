@@ -2,6 +2,15 @@
 $layout = 'layouts.metronic.app';
 $title = 'Automação - ' . htmlspecialchars($automation['name'] ?? '');
 
+$scriptsPreload = <<<HTML
+<script>
+// Fallback para evitar ReferenceError caso scripts principais não carreguem
+if (typeof window.validateAutomationConnections === 'undefined') {
+    window.validateAutomationConnections = function() { return true; };
+}
+</script>
+HTML;
+
 $styles = <<<HTML
 <style>
 .automation-editor {

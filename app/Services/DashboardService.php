@@ -163,7 +163,6 @@ class DashboardService
                 FROM funnels f
                 LEFT JOIN conversations c ON f.id = c.funnel_id
                 LEFT JOIN funnel_stages fs ON f.id = fs.funnel_id
-                WHERE f.is_active = 1
                 GROUP BY f.id, f.name
                 ORDER BY conversations_count DESC
                 LIMIT 10";

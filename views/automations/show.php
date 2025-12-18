@@ -194,10 +194,31 @@ $styles = <<<HTML
     transform: translateX(-50%);
 }
 
+.node-connection-handle.output.chatbot-option-handle {
+    bottom: auto;
+    left: auto;
+    transform: translateY(-50%);
+}
+
 .node-connection-handle.input {
     top: -6px;
     left: 50%;
     transform: translateX(-50%);
+}
+
+.chatbot-menu-options {
+    border-top: 1px solid #e4e6ef;
+    padding-top: 8px;
+}
+
+.chatbot-option-row {
+    transition: background-color 0.2s ease;
+    border-radius: 4px;
+    padding-left: 8px;
+}
+
+.chatbot-option-row:hover {
+    background-color: rgba(0, 158, 247, 0.1);
 }
 
 [data-bs-theme="dark"] .node-connection-handle {
@@ -1034,7 +1055,15 @@ function renderNode(node) {
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     `;
     
-    nodeElement.innerHTML = `
+    // Determinar se é chatbot com menu
+    const isChatbotMenu = node.node_type === 'action_chatbot' && 
+                          node.node_data && 
+                          node.node_data.chatbot_type === 'menu' &&
+                          node.node_data.chatbot_options &&
+                          Array.isArray(node.node_data.chatbot_options);
+    
+    // HTML básico do nó
+    let innerHtml = `
         <div class="d-flex align-items-center gap-3 mb-2">
             <i class="ki-duotone ${config.icon || "ki-gear"} fs-2" style="color: ${config.color || "#009ef7"};">
                 <span class="path1"></span>
@@ -1058,22 +1087,50 @@ function renderNode(node) {
                 </i>
             </button>
         </div>
-        <div class="node-connection-handle output" data-node-id="${String(node.id || '')}" data-handle-type="output"></div>
         <div class="node-connection-handle input" data-node-id="${String(node.id || '')}" data-handle-type="input"></div>
     `;
+    
+    // Se é chatbot menu, adicionar handles múltiplos
+    if (isChatbotMenu) {
+        const options = node.node_data.chatbot_options;
+        innerHtml += '<div class="chatbot-menu-options" style="margin-top: 10px; font-size: 11px; color: #7e8299;">';
+        options.forEach(function(opt, idx) {
+            const optText = (typeof opt === 'object' ? opt.text : opt) || `Opção ${idx + 1}`;
+            innerHtml += `
+                <div class="chatbot-option-row" style="position: relative; padding: 4px 0; padding-right: 20px;">
+                    <span style="display: inline-block; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${optText}</span>
+                    <div class="node-connection-handle output chatbot-option-handle" 
+                         data-node-id="${String(node.id || '')}" 
+                         data-handle-type="output" 
+                         data-option-index="${idx}"
+                         style="right: -10px; top: 50%; transform: translateY(-50%); background: ${config.color || '#009ef7'};">
+                    </div>
+                </div>
+            `;
+        });
+        innerHtml += '</div>';
+    } else {
+        // Handle de saída normal para outros tipos
+        innerHtml += `<div class="node-connection-handle output" data-node-id="${String(node.id || '')}" data-handle-type="output"></div>`;
+    }
+    
+    nodeElement.innerHTML = innerHtml;
     
     canvas.appendChild(nodeElement);
     
     // Adicionar eventos aos handles de conexão
-    const outputHandle = nodeElement.querySelector('.node-connection-handle.output');
+    const outputHandles = nodeElement.querySelectorAll('.node-connection-handle.output');
     const inputHandle = nodeElement.querySelector('.node-connection-handle.input');
     
-    outputHandle.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
-        startConnection(node.id, 'output', e);
+    outputHandles.forEach(function(outputHandle) {
+        outputHandle.addEventListener('mousedown', function(e) {
+            e.stopPropagation();
+            const optionIndex = outputHandle.getAttribute('data-option-index');
+            startConnection(node.id, 'output', e, optionIndex);
+        });
     });
     
-    inputHandle.addEventListener('mouseup', (e) => {
+    inputHandle.addEventListener('mouseup', function(e) {
         e.stopPropagation();
         if (connectingFrom) {
             endConnection(node.id, 'input', e);
@@ -1771,13 +1828,22 @@ function updateSvgSize() {
     connectionsSvg.setAttribute('height', height);
 }
 
-function getNodeHandlePosition(nodeId, handleType) {
+function getNodeHandlePosition(nodeId, handleType, optionIndex) {
     if (!canvasViewport) return null;
     
-    const nodeElement = document.getElementById(nodeId);
+    const nodeElement = document.getElementById(String(nodeId));
     if (!nodeElement) return null;
     
-    const handle = nodeElement.querySelector(`.node-connection-handle.${handleType}`);
+    let handle;
+    
+    // Se for handle de opção de chatbot
+    if (handleType === 'output' && optionIndex !== undefined && optionIndex !== null) {
+        handle = nodeElement.querySelector(`.node-connection-handle.${handleType}[data-option-index="${optionIndex}"]`);
+    } else {
+        // Handle normal (primeiro encontrado)
+        handle = nodeElement.querySelector(`.node-connection-handle.${handleType}`);
+    }
+    
     if (!handle) return null;
     
     const viewportRect = canvasViewport.getBoundingClientRect();
@@ -1820,15 +1886,20 @@ function cancelConnection() {
     document.body.style.userSelect = '';
 }
 
-function startConnection(nodeId, handleType, e) {
+function startConnection(nodeId, handleType, e, optionIndex) {
     e.stopPropagation();
     e.preventDefault();
     
     // Cancelar conexão anterior se houver
     cancelConnection();
     
-    connectingFrom = { nodeId, handleType };
-    const pos = getNodeHandlePosition(nodeId, handleType);
+    connectingFrom = { 
+        nodeId: nodeId, 
+        handleType: handleType,
+        optionIndex: optionIndex !== undefined ? optionIndex : null
+    };
+    
+    const pos = getNodeHandlePosition(nodeId, handleType, optionIndex);
     if (!pos) {
         connectingFrom = null;
         return;
@@ -1913,16 +1984,26 @@ function endConnection(nodeId, handleType, e) {
         fromNode.node_data.connections = [];
     }
     
-    // Verificar se conexão já existe
-    const exists = fromNode.node_data.connections.some(
-        conn => conn.target_node_id === nodeId
-    );
+    // Verificar se conexão já existe (mesma origem, destino e opção)
+    const exists = fromNode.node_data.connections.some(function(conn) {
+        return conn.target_node_id === nodeId && 
+               conn.option_index === (connectingFrom.optionIndex !== null ? connectingFrom.optionIndex : undefined);
+    });
     
     if (!exists) {
-        fromNode.node_data.connections.push({
+        const newConnection = {
             target_node_id: nodeId,
             type: 'next'
-        });
+        };
+        
+        // Adicionar option_index se existir
+        if (connectingFrom.optionIndex !== null && connectingFrom.optionIndex !== undefined) {
+            newConnection.option_index = parseInt(connectingFrom.optionIndex);
+        }
+        
+        fromNode.node_data.connections.push(newConnection);
+        
+        console.log('Conexão criada:', newConnection);
         
         renderConnections();
     }
@@ -1941,7 +2022,8 @@ function renderConnections() {
         if (!node.node_data.connections || !Array.isArray(node.node_data.connections)) return;
         
         node.node_data.connections.forEach(function(connection) {
-            const fromPos = getNodeHandlePosition(node.id, 'output');
+            const optionIndex = connection.option_index !== undefined ? connection.option_index : null;
+            const fromPos = getNodeHandlePosition(node.id, 'output', optionIndex);
             const toPos = getNodeHandlePosition(connection.target_node_id, 'input');
             
             if (fromPos && toPos) {

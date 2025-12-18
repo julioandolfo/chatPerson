@@ -5,6 +5,16 @@
 
 $logFile = __DIR__ . '/../storage/logs/automation.log';
 
+// Criar arquivo se não existir
+if (!file_exists($logFile)) {
+    $dir = dirname($logFile);
+    if (!is_dir($dir)) {
+        mkdir($dir, 0777, true);
+    }
+    touch($logFile);
+    chmod($logFile, 0666);
+}
+
 ?>
 <!DOCTYPE html>
 <html>

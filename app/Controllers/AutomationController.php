@@ -262,19 +262,28 @@ class AutomationController
         // Iniciar novo buffer limpo
         ob_start();
         
+        \App\Helpers\Logger::automation('========================================');
+        \App\Helpers\Logger::automation('saveLayout - INÍCIO - Automation ID: ' . $id);
+        \App\Helpers\Logger::automation('saveLayout - Método: ' . $_SERVER['REQUEST_METHOD']);
+        \App\Helpers\Logger::automation('saveLayout - Content-Type: ' . ($_SERVER['CONTENT_TYPE'] ?? 'N/A'));
+        
         Permission::abortIfCannot('automations.edit');
         
         try {
             // Log do conteúdo bruto recebido
             $rawInput = file_get_contents('php://input');
-            \App\Helpers\Logger::automation('saveLayout - Raw input recebido: ' . substr($rawInput, 0, 500));
-            \App\Helpers\Logger::automation('saveLayout - Content-Type: ' . ($_SERVER['CONTENT_TYPE'] ?? 'N/A'));
+            \App\Helpers\Logger::automation('saveLayout - Tamanho do input: ' . strlen($rawInput) . ' bytes');
+            \App\Helpers\Logger::automation('saveLayout - Raw input (primeiros 1000 chars): ' . substr($rawInput, 0, 1000));
             
             $nodes = Request::post('nodes', []);
             
-            \App\Helpers\Logger::automation('saveLayout - Nós após Request::post: ' . json_encode($nodes));
+            \App\Helpers\Logger::automation('saveLayout - Quantidade de nós recebidos: ' . count($nodes));
             \App\Helpers\Logger::automation('saveLayout - Tipo de nodes: ' . gettype($nodes));
             \App\Helpers\Logger::automation('saveLayout - É array? ' . (is_array($nodes) ? 'SIM' : 'NÃO'));
+            
+            if (is_array($nodes) && count($nodes) > 0) {
+                \App\Helpers\Logger::automation('saveLayout - Primeiro nó: ' . json_encode($nodes[0]));
+            }
             
             if (!is_array($nodes)) {
                 throw new \InvalidArgumentException('Dados inválidos: nodes não é um array');

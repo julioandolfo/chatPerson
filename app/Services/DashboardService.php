@@ -510,6 +510,36 @@ class DashboardService
         $resolved = (int)($metrics['resolved_conversations'] ?? 0);
         $closed = (int)($metrics['closed_conversations'] ?? 0);
         
+        // Calcular tempo médio de resposta geral (todas as trocas de mensagens)
+        $sqlAvgResponse = "SELECT AVG(response_time_minutes) as avg_time
+                FROM (
+                    SELECT 
+                        m1.conversation_id,
+                        AVG(TIMESTAMPDIFF(MINUTE, m1.created_at, m2.created_at)) as response_time_minutes
+                    FROM messages m1
+                    INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
+                        AND m2.sender_type = 'agent'
+                        AND m2.created_at > m1.created_at
+                        AND m2.created_at = (
+                            SELECT MIN(m3.created_at)
+                            FROM messages m3
+                            WHERE m3.conversation_id = m1.conversation_id
+                            AND m3.sender_type = 'agent'
+                            AND m3.created_at > m1.created_at
+                        )
+                    INNER JOIN conversations c ON c.id = m1.conversation_id
+                    WHERE m1.sender_type = 'contact'
+                    AND c.agent_id = ?
+                    AND c.created_at >= ?
+                    AND c.created_at <= ?
+                    GROUP BY m1.conversation_id
+                ) as response_times";
+        
+        $avgResponseResult = \App\Helpers\Database::fetch($sqlAvgResponse, [$agentId, $dateFrom, $dateTo]);
+        $avgResponseMinutes = $avgResponseResult && $avgResponseResult['avg_time'] !== null 
+            ? round((float)$avgResponseResult['avg_time'], 2) 
+            : 0;
+        
         return [
             'agent_id' => $agentId,
             'agent_name' => $agent['name'] ?? 'Desconhecido',
@@ -521,6 +551,7 @@ class DashboardService
             'closed_conversations' => $closed,
             'avg_resolution_hours' => round((float)($metrics['avg_resolution_hours'] ?? 0), 2),
             'avg_first_response_minutes' => round((float)($metrics['avg_first_response_minutes'] ?? 0), 2),
+            'avg_response_minutes' => $avgResponseMinutes,
             'sla_5min_rate' => $total > 0 ? round((($metrics['responded_5min'] ?? 0) / $total) * 100, 2) : 0,
             'sla_15min_rate' => $total > 0 ? round((($metrics['responded_15min'] ?? 0) / $total) * 100, 2) : 0,
             'resolution_rate' => $total > 0 ? round((($resolved + $closed) / $total) * 100, 2) : 0
@@ -581,7 +612,13 @@ class DashboardService
                 GROUP BY period
                 ORDER BY period ASC";
         
-        return \App\Helpers\Database::fetchAll($sql, [$dateFormat, $dateFrom, $dateTo]);
+        self::logDash("getConversationsOverTime SQL: dateFrom={$dateFrom}, dateTo={$dateTo}, dateFormat={$dateFormat}");
+        
+        $result = \App\Helpers\Database::fetchAll($sql, [$dateFormat, $dateFrom, $dateTo]);
+        
+        self::logDash("getConversationsOverTime: " . count($result) . " registros retornados");
+        
+        return $result;
     }
 
     /**
@@ -602,7 +639,23 @@ class DashboardService
                 GROUP BY channel
                 ORDER BY count DESC";
         
-        return \App\Helpers\Database::fetchAll($sql, [$dateFrom, $dateTo]);
+        self::logDash("getConversationsByChannelChart SQL: dateFrom={$dateFrom}, dateTo={$dateTo}");
+        
+        // Testar sem filtro de data
+        $sqlTest = "SELECT COUNT(*) as total FROM conversations";
+        $testResult = \App\Helpers\Database::fetch($sqlTest);
+        self::logDash("Total de conversas sem filtro: " . ($testResult['total'] ?? 0));
+        
+        // Testar com filtro
+        $sqlTest2 = "SELECT COUNT(*) as total FROM conversations WHERE created_at >= ? AND created_at <= ?";
+        $testResult2 = \App\Helpers\Database::fetch($sqlTest2, [$dateFrom, $dateTo]);
+        self::logDash("Total de conversas COM filtro (created_at): " . ($testResult2['total'] ?? 0));
+        
+        $result = \App\Helpers\Database::fetchAll($sql, [$dateFrom, $dateTo]);
+        
+        self::logDash("getConversationsByChannelChart: " . count($result) . " canais retornados");
+        
+        return $result;
     }
 
     /**

@@ -297,7 +297,7 @@ ob_start();
                 </div>
                 <div class="modal-footer flex-center">
                     <button type="reset" data-bs-dismiss="modal" class="btn btn-light me-3">Cancelar</button>
-                    <button type="submit" id="kt_modal_new_user_submit" class="btn btn-primary">
+                    <button type="button" id="kt_modal_new_user_submit" class="btn btn-primary" onclick="document.getElementById('kt_modal_new_user_form').dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));">
                         <span class="indicator-label">Salvar</span>
                         <span class="indicator-progress">Aguarde...
                         <span class="spinner-border spinner-border-sm align-middle ms-2"></span></span>
@@ -497,12 +497,21 @@ document.addEventListener("DOMContentLoaded", function() {
     
     const form = document.getElementById("kt_modal_new_user_form");
     if (form) {
+        console.log('📝 Formulário de novo usuário encontrado, registrando handler AJAX');
+        
+        // Remover o onsubmit inline para usar o listener
+        form.onsubmit = null;
+        
         form.addEventListener("submit", function(e) {
             e.preventDefault();
+            e.stopPropagation();
+            console.log('✅ Submit interceptado, enviando via AJAX');
             
             const submitBtn = document.getElementById("kt_modal_new_user_submit");
             submitBtn.setAttribute("data-kt-indicator", "on");
             submitBtn.disabled = true;
+            
+            const formData = new FormData(form);
             
             fetch(form.action, {
                 method: "POST",
@@ -510,27 +519,68 @@ document.addEventListener("DOMContentLoaded", function() {
                     "Content-Type": "application/x-www-form-urlencoded",
                     "X-Requested-With": "XMLHttpRequest"
                 },
-                body: new URLSearchParams(new FormData(form))
+                body: new URLSearchParams(formData)
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log('📡 Resposta recebida:', response.status, response.statusText);
+                return response.json();
+            })
             .then(data => {
+                console.log('📊 Dados:', data);
                 submitBtn.removeAttribute("data-kt-indicator");
                 submitBtn.disabled = false;
                 
                 if (data.success) {
-                    const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_new_user"));
-                    modal.hide();
-                    location.reload();
+                    // Usar SweetAlert2 se disponível, senão usar toast
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sucesso!',
+                            text: data.message || 'Usuário criado com sucesso!',
+                            timer: 2000,
+                            showConfirmButton: false
+                        }).then(() => {
+                            const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_new_user"));
+                            if (modal) modal.hide();
+                            location.reload();
+                        });
+                    } else {
+                        alert(data.message || 'Usuário criado com sucesso!');
+                        const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_new_user"));
+                        if (modal) modal.hide();
+                        location.reload();
+                    }
                 } else {
-                    alert("Erro: " + (data.message || "Erro ao criar usuário"));
+                    // Mostrar erro de forma mais amigável
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro',
+                            text: data.message || 'Erro ao criar usuário'
+                        });
+                    } else {
+                        alert("Erro: " + (data.message || "Erro ao criar usuário"));
+                    }
                 }
             })
             .catch(error => {
+                console.error('❌ Erro:', error);
                 submitBtn.removeAttribute("data-kt-indicator");
                 submitBtn.disabled = false;
-                alert("Erro ao criar usuário");
+                
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: 'Erro ao criar usuário. Verifique o console para mais detalhes.'
+                    });
+                } else {
+                    alert("Erro ao criar usuário. Verifique o console para mais detalhes.");
+                }
             });
         });
+    } else {
+        console.error('❌ Formulário kt_modal_new_user_form não encontrado!');
     }
     
     // Função para editar usuário (aceita elemento button ou link)

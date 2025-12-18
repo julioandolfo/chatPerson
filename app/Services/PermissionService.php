@@ -167,7 +167,8 @@ class PermissionService
      */
     public static function isSuperAdmin(int $userId): bool
     {
-        return User::hasRole($userId, 'super-admin') || User::getMaxLevel($userId) >= 0;
+        // Level 0 = Super Admin (quanto menor o nível, maior o poder)
+        return User::hasRole($userId, 'super-admin') || User::getMaxLevel($userId) <= 0;
     }
 
     /**
@@ -175,7 +176,8 @@ class PermissionService
      */
     public static function isAdmin(int $userId): bool
     {
-        return User::hasRole($userId, 'admin') || User::getMaxLevel($userId) >= 1;
+        // Level 0-1 = Super Admin e Admin (quanto menor o nível, maior o poder)
+        return User::hasRole($userId, 'admin') || User::getMaxLevel($userId) <= 1;
     }
 
     /**

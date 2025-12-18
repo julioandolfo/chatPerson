@@ -127,7 +127,7 @@
 <body id="kt_body" class="header-fixed sidebar-enabled" style="--bs-gutter-x: 0">
     <!--begin::Theme mode setup on page load-->
     <script>
-        var defaultThemeMode = "light";
+        var defaultThemeMode = "dark";
         var themeMode;
         if (document.documentElement) {
             if (document.documentElement.hasAttribute("data-bs-theme-mode")) {

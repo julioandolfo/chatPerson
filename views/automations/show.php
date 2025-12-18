@@ -145,13 +145,27 @@ $styles = <<<HTML
     stroke: #009ef7;
     stroke-width: 2;
     pointer-events: stroke;
-    cursor: pointer;
+    cursor: default;
     transition: stroke-width 0.2s ease, opacity 0.2s ease;
 }
 
 .connections-overlay line.connection-line:hover {
     stroke-width: 3;
     opacity: 0.8;
+}
+
+.connection-delete-btn {
+    opacity: 0.8;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.connection-delete-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.connection-group:hover .connection-delete-btn {
+    opacity: 1;
 }
 
 [data-bs-theme="dark"] .connections-overlay line {
@@ -2034,6 +2048,11 @@ function renderConnections() {
             const toPos = getNodeHandlePosition(connection.target_node_id, 'input');
             
             if (fromPos && toPos) {
+                // Criar grupo para linha + botão de delete
+                const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                group.setAttribute('class', 'connection-group');
+                
+                // Criar a linha
                 const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                 line.setAttribute('x1', fromPos.x);
                 line.setAttribute('y1', fromPos.y);
@@ -2042,17 +2061,71 @@ function renderConnections() {
                 line.setAttribute('data-from', String(node.id || ''));
                 line.setAttribute('data-to', String(connection.target_node_id || ''));
                 line.setAttribute('class', 'connection-line');
-                line.setAttribute('title', 'Duplo clique para remover');
                 
-                // Remover com duplo clique
-                line.addEventListener('dblclick', (e) => {
+                // Calcular ponto médio
+                const midX = (fromPos.x + toPos.x) / 2;
+                const midY = (fromPos.y + toPos.y) / 2;
+                
+                // Criar botão de delete (círculo + ícone)
+                const deleteBtn = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                deleteBtn.setAttribute('class', 'connection-delete-btn');
+                deleteBtn.setAttribute('transform', 'translate(' + midX + ',' + midY + ')');
+                deleteBtn.style.cursor = 'pointer';
+                deleteBtn.setAttribute('data-from', String(node.id || ''));
+                deleteBtn.setAttribute('data-to', String(connection.target_node_id || ''));
+                
+                // Círculo de fundo
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('r', '10');
+                circle.setAttribute('fill', '#f1416c');
+                circle.setAttribute('stroke', '#ffffff');
+                circle.setAttribute('stroke-width', '2');
+                
+                // Ícone X (duas linhas cruzadas)
+                const xLine1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                xLine1.setAttribute('x1', '-4');
+                xLine1.setAttribute('y1', '-4');
+                xLine1.setAttribute('x2', '4');
+                xLine1.setAttribute('y2', '4');
+                xLine1.setAttribute('stroke', '#ffffff');
+                xLine1.setAttribute('stroke-width', '2');
+                xLine1.setAttribute('stroke-linecap', 'round');
+                
+                const xLine2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                xLine2.setAttribute('x1', '4');
+                xLine2.setAttribute('y1', '-4');
+                xLine2.setAttribute('x2', '-4');
+                xLine2.setAttribute('y2', '4');
+                xLine2.setAttribute('stroke', '#ffffff');
+                xLine2.setAttribute('stroke-width', '2');
+                xLine2.setAttribute('stroke-linecap', 'round');
+                
+                // Montar botão
+                deleteBtn.appendChild(circle);
+                deleteBtn.appendChild(xLine1);
+                deleteBtn.appendChild(xLine2);
+                
+                // Evento de clique no botão de delete
+                deleteBtn.addEventListener('click', function(e) {
                     e.stopPropagation();
+                    const fromId = this.getAttribute('data-from');
+                    const toId = this.getAttribute('data-to');
                     if (confirm('Deseja remover esta conexão?')) {
-                        removeConnection(node.id, connection.target_node_id);
+                        removeConnection(fromId, toId);
                     }
                 });
                 
-                // Destacar ao passar mouse
+                // Hover no botão
+                deleteBtn.addEventListener('mouseenter', function() {
+                    circle.setAttribute('r', '12');
+                    circle.setAttribute('fill', '#d9214e');
+                });
+                deleteBtn.addEventListener('mouseleave', function() {
+                    circle.setAttribute('r', '10');
+                    circle.setAttribute('fill', '#f1416c');
+                });
+                
+                // Destacar linha ao passar mouse
                 line.addEventListener('mouseenter', function() {
                     this.setAttribute('stroke-width', '3');
                     this.style.opacity = '0.8';
@@ -2062,7 +2135,10 @@ function renderConnections() {
                     this.style.opacity = '1';
                 });
                 
-                connectionsSvg.appendChild(line);
+                // Montar grupo e adicionar ao SVG
+                group.appendChild(line);
+                group.appendChild(deleteBtn);
+                connectionsSvg.appendChild(group);
             }
         });
     });

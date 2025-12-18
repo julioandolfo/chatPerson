@@ -72,6 +72,9 @@ class ConversationService
                     if (!empty($account['default_stage_id'])) {
                         $stageId = (int)$account['default_stage_id'];
                     }
+                    Logger::debug("ConversationService::create - Configuração da integração WhatsApp: Funil ID {$funnelId}, Etapa ID " . ($stageId ?? 'NULL'), 'conversas.log');
+                } else {
+                    Logger::debug("ConversationService::create - Integração WhatsApp sem configuração de funil/etapa", 'conversas.log');
                 }
             } catch (\Exception $e) {
                 error_log("Conversas: erro ao aplicar defaults da conta WhatsApp: " . $e->getMessage());
@@ -80,32 +83,37 @@ class ConversationService
 
         // 2) Fallback: padrão do sistema
         if (!$funnelId || !$stageId) {
+            Logger::debug("ConversationService::create - Aplicando fallback do sistema. Funil atual: " . ($funnelId ?? 'NULL') . ", Etapa atual: " . ($stageId ?? 'NULL'), 'conversas.log');
             try {
                 $defaultConfig = Setting::get('system_default_funnel_stage');
                 if (is_array($defaultConfig)) {
                     $funnelId = $funnelId ?: ($defaultConfig['funnel_id'] ?? null);
                     $stageId = $stageId ?: ($defaultConfig['stage_id'] ?? null);
+                    Logger::debug("ConversationService::create - Após fallback sistema: Funil ID " . ($funnelId ?? 'NULL') . ", Etapa ID " . ($stageId ?? 'NULL'), 'conversas.log');
                 }
             } catch (\Exception $e) {
                 error_log("Conversas: erro ao obter padrão do sistema: " . $e->getMessage());
             }
+        } else {
+            Logger::debug("ConversationService::create - Funil e etapa já definidos (integração ou outro). Funil ID {$funnelId}, Etapa ID {$stageId}", 'conversas.log');
         }
 
         // 3) Se tem funil mas não etapa, pegar etapa "Entrada" do funil (sistema obrigatório)
         if ($funnelId && !$stageId) {
+            Logger::debug("ConversationService::create - Tem funil mas não tem etapa. Buscando etapa 'Entrada' do funil {$funnelId}", 'conversas.log');
             try {
                 // ✅ Buscar etapa "Entrada" (sistema obrigatório)
                 $entradaStage = \App\Models\FunnelStage::getSystemStage((int)$funnelId, 'entrada');
                 
                 if ($entradaStage) {
                     $stageId = (int)$entradaStage['id'];
-                    Logger::debug("Nova conversa: indo para etapa 'Entrada' do funil {$funnelId}", 'conversas.log');
+                    Logger::debug("ConversationService::create - Etapa 'Entrada' encontrada: ID {$stageId}", 'conversas.log');
                 } else {
                     // Fallback: se não encontrar etapa "Entrada", pegar primeira etapa qualquer
                     $stages = Funnel::getStages((int)$funnelId);
                     if (!empty($stages)) {
                         $stageId = (int)$stages[0]['id'];
-                        Logger::debug("Nova conversa: etapa 'Entrada' não encontrada, usando primeira etapa do funil", 'conversas.log');
+                        Logger::debug("ConversationService::create - Etapa 'Entrada' não encontrada, usando primeira etapa do funil: ID {$stageId}", 'conversas.log');
                     }
                 }
             } catch (\Exception $e) {
@@ -120,6 +128,8 @@ class ConversationService
         if ($stageId) {
             $data['stage_id'] = $stageId;
         }
+        
+        Logger::debug("ConversationService::create - FINAL: Conversa será criada em Funil ID " . ($data['funnel_id'] ?? 'NULL') . ", Etapa ID " . ($data['stage_id'] ?? 'NULL'), 'conversas.log');
 
         // Criar conversa
         // Verificar se deve atribuir automaticamente

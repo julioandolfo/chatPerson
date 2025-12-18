@@ -938,8 +938,32 @@ class FunnelService
             $conversations = \App\Models\Funnel::getConversationsByStage($funnelId, $stage['id']);
             
             // Filtrar conversas por permissões do usuário
+            // Regra: Agentes veem apenas suas próprias conversas + conversas não atribuídas
             $filteredConversations = [];
+            $isAdmin = \App\Services\PermissionService::isAdmin($userId);
+            $isSuperAdmin = \App\Services\PermissionService::isSuperAdmin($userId);
+            $canViewAll = \App\Services\PermissionService::hasPermission($userId, 'conversations.view.all');
+            
             foreach ($conversations as $conv) {
+                // Admin/Super Admin veem tudo
+                if ($isAdmin || $isSuperAdmin || $canViewAll) {
+                    $filteredConversations[] = $conv;
+                    continue;
+                }
+                
+                // Conversas não atribuídas - todos podem ver
+                if (empty($conv['agent_id']) || $conv['agent_id'] === null) {
+                    $filteredConversations[] = $conv;
+                    continue;
+                }
+                
+                // Conversas próprias
+                if (isset($conv['agent_id']) && $conv['agent_id'] == $userId) {
+                    $filteredConversations[] = $conv;
+                    continue;
+                }
+                
+                // Verificar permissões normais (participante, setor, etc)
                 if (\App\Services\PermissionService::canViewConversation($userId, $conv)) {
                     $filteredConversations[] = $conv;
                 }

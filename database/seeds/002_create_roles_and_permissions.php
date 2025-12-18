@@ -37,6 +37,7 @@ function seed_roles_and_permissions() {
         // Conversas - Visualização
         ['name' => 'Ver próprias conversas', 'slug' => 'conversations.view.own', 'description' => 'Ver apenas conversas próprias', 'module' => 'conversations'],
         ['name' => 'Ver conversas atribuídas', 'slug' => 'conversations.view.assigned', 'description' => 'Ver conversas atribuídas', 'module' => 'conversations'],
+        ['name' => 'Ver conversas não atribuídas', 'slug' => 'conversations.view.unassigned', 'description' => 'Ver conversas sem atribuição (disponíveis para todos)', 'module' => 'conversations'],
         ['name' => 'Ver conversas do setor', 'slug' => 'conversations.view.department', 'description' => 'Ver conversas do setor', 'module' => 'conversations'],
         ['name' => 'Ver todas as conversas', 'slug' => 'conversations.view.all', 'description' => 'Ver todas as conversas', 'module' => 'conversations'],
         
@@ -97,6 +98,19 @@ function seed_roles_and_permissions() {
         ['name' => 'Editar agentes de IA', 'slug' => 'ai_agents.edit', 'description' => 'Editar agentes de IA', 'module' => 'ai_agents'],
         ['name' => 'Deletar agentes de IA', 'slug' => 'ai_agents.delete', 'description' => 'Deletar agentes de IA', 'module' => 'ai_agents'],
         
+        // Tags
+        ['name' => 'Ver tags', 'slug' => 'tags.view', 'description' => 'Ver tags', 'module' => 'tags'],
+        ['name' => 'Criar tags', 'slug' => 'tags.create', 'description' => 'Criar tags', 'module' => 'tags'],
+        ['name' => 'Editar tags', 'slug' => 'tags.edit', 'description' => 'Editar tags', 'module' => 'tags'],
+        ['name' => 'Deletar tags', 'slug' => 'tags.delete', 'description' => 'Deletar tags', 'module' => 'tags'],
+        ['name' => 'Atribuir tags a conversas', 'slug' => 'tags.assign', 'description' => 'Atribuir/remover tags em conversas', 'module' => 'tags'],
+        
+        // Templates de Mensagem
+        ['name' => 'Ver templates de mensagem', 'slug' => 'message_templates.view', 'description' => 'Ver templates de mensagem', 'module' => 'message_templates'],
+        ['name' => 'Criar templates de mensagem', 'slug' => 'message_templates.create', 'description' => 'Criar templates de mensagem', 'module' => 'message_templates'],
+        ['name' => 'Editar templates de mensagem', 'slug' => 'message_templates.edit', 'description' => 'Editar templates de mensagem', 'module' => 'message_templates'],
+        ['name' => 'Deletar templates de mensagem', 'slug' => 'message_templates.delete', 'description' => 'Deletar templates de mensagem', 'module' => 'message_templates'],
+        
         // Tools de IA
         ['name' => 'Ver tools de IA', 'slug' => 'ai_tools.view', 'description' => 'Ver tools de IA', 'module' => 'ai_tools'],
         
@@ -144,12 +158,18 @@ function seed_roles_and_permissions() {
     // Agente - permissões básicas
     $agentPermissions = [
         'conversations.view.own',
+        'conversations.view.unassigned',  // ✅ NOVO: Ver conversas não atribuídas
         'conversations.edit.own',
         'messages.send.own',
         'contacts.view',
         'contacts.create',
         'contacts.edit',
-        'ai_assistant.use', // Agentes podem usar o Assistente IA
+        'tags.view',           // ✅ Ver tags
+        'tags.assign',         // ✅ Atribuir tags a conversas
+        'message_templates.view', // ✅ Ver templates
+        'funnels.view',        // Ver funis
+        'automations.view',    // Ver automações
+        'ai_assistant.use',    // Agentes podem usar o Assistente IA
     ];
     foreach ($agentPermissions as $slug) {
         if (isset($permissionIds[$slug])) {

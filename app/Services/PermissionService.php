@@ -195,6 +195,19 @@ class PermissionService
             return true;
         }
 
+        // ✅ NOVA REGRA: Conversas NÃO ATRIBUÍDAS são visíveis para todos os agentes
+        // Isso permite que qualquer agente veja e responda conversas sem dono
+        if (empty($conversation['agent_id']) || $conversation['agent_id'] === null) {
+            // Verificar se tem permissão para ver conversas não atribuídas
+            if (self::hasPermission($userId, 'conversations.view.unassigned')) {
+                return true;
+            }
+            // Ou se tem permissão para ver próprias (agentes padrão)
+            if (self::hasPermission($userId, 'conversations.view.own')) {
+                return true;
+            }
+        }
+
         // Verificar se é participante da conversa
         if (isset($conversation['participants_data']) && !empty($conversation['participants_data'])) {
             $participants = explode('|||', $conversation['participants_data']);

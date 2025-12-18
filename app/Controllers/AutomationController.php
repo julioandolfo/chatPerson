@@ -231,6 +231,15 @@ class AutomationController
      */
     public function saveLayout(int $id): void
     {
+        // Suprimir warnings e notices que possam gerar HTML
+        error_reporting(E_ERROR | E_PARSE);
+        ini_set('display_errors', '0');
+        
+        // Limpar qualquer output buffer anterior
+        if (ob_get_level()) {
+            ob_clean();
+        }
+        
         Permission::abortIfCannot('automations.edit');
         
         try {
@@ -373,12 +382,23 @@ class AutomationController
                 'nodes_count' => count($sentNodeIds)
             ]);
         } catch (\Exception $e) {
+            // Limpar qualquer output antes de enviar JSON
+            if (ob_get_level()) {
+                ob_clean();
+            }
+            
             \App\Helpers\Logger::automation('saveLayout - Erro: ' . $e->getMessage());
             \App\Helpers\Logger::automation('saveLayout - Stack trace: ' . $e->getTraceAsString());
-            Response::json([
+            
+            // Garantir que apenas JSON seja retornado
+            header('Content-Type: application/json');
+            http_response_code(400);
+            echo json_encode([
                 'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
+                'message' => $e->getMessage(),
+                'error_type' => get_class($e)
+            ]);
+            exit;
         }
     }
 

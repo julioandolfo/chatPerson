@@ -2400,15 +2400,18 @@ function populateChatbotOptionTargets(optionsList) {
 
     // Montar opções com base nos nós existentes (exclui triggers)
     const choices = [{ value: '', label: 'Selecione o próximo nó' }];
-    nodes.forEach(n => {
-        if (n.node_type === 'trigger') return;
-        choices.push({ value: n.id, label: `${n.node_data?.label || n.node_type || n.id}` });
-    });
+    if (typeof nodes !== 'undefined' && Array.isArray(nodes)) {
+        nodes.forEach(function(n) {
+            if (n.node_type === 'trigger') return;
+            const nodeLabel = (n.node_data && n.node_data.label) || n.node_type || String(n.id);
+            choices.push({ value: n.id, label: nodeLabel });
+        });
+    }
 
-    selects.forEach(select => {
+    selects.forEach(function(select) {
         const prev = select.value;
         select.innerHTML = '';
-        choices.forEach(c => {
+        choices.forEach(function(c) {
             const opt = document.createElement('option');
             opt.value = c.value;
             opt.textContent = c.label;

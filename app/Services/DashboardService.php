@@ -37,7 +37,12 @@ class DashboardService
     public static function getGeneralStats(?int $userId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $dateFrom = $dateFrom ?? date('Y-m-01'); // Primeiro dia do mês
-        $dateTo = $dateTo ?? date('Y-m-d H:i:s'); // Hoje
+        $dateTo = $dateTo ?? date('Y-m-d') . ' 23:59:59'; // Hoje até 23:59:59
+        
+        // Garantir que dateTo inclui o dia inteiro
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
 
         self::logDash("getGeneralStats: userId={$userId}, dateFrom={$dateFrom}, dateTo={$dateTo}");
 
@@ -176,7 +181,12 @@ class DashboardService
     public static function getTopAgents(?string $dateFrom = null, ?string $dateTo = null, int $limit = 10): array
     {
         $dateFrom = $dateFrom ?? date('Y-m-01');
-        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        $dateTo = $dateTo ?? date('Y-m-d') . ' 23:59:59';
+        
+        // Garantir que dateTo inclui o dia inteiro
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
 
         return \App\Services\AgentPerformanceService::getAgentsRanking($dateFrom, $dateTo, $limit);
     }
@@ -439,7 +449,12 @@ class DashboardService
     private static function getAverageResolutionTime(?string $dateFrom = null, ?string $dateTo = null): ?float
     {
         $dateFrom = $dateFrom ?? date('Y-m-01');
-        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        $dateTo = $dateTo ?? date('Y-m-d') . ' 23:59:59';
+        
+        // Garantir que dateTo inclui o dia inteiro
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
         
         $sql = "SELECT AVG(TIMESTAMPDIFF(HOUR, c.created_at, COALESCE(c.resolved_at, c.updated_at))) as avg_time
                 FROM conversations c
@@ -458,7 +473,12 @@ class DashboardService
     public static function getAgentMetrics(int $agentId, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $dateFrom = $dateFrom ?? date('Y-m-01');
-        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        $dateTo = $dateTo ?? date('Y-m-d') . ' 23:59:59';
+        
+        // Garantir que dateTo inclui o dia inteiro
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
         
         $agent = User::find($agentId);
         if (!$agent) {
@@ -564,7 +584,12 @@ class DashboardService
     public static function getAllAgentsMetrics(?string $dateFrom = null, ?string $dateTo = null): array
     {
         $dateFrom = $dateFrom ?? date('Y-m-01');
-        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        $dateTo = $dateTo ?? date('Y-m-d') . ' 23:59:59';
+        
+        // Garantir que dateTo inclui o dia inteiro
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
         
         // Buscar todos os agentes ativos
         $sql = "SELECT id, name, email, avatar, availability_status 
@@ -592,7 +617,12 @@ class DashboardService
     public static function getConversationsOverTime(?string $dateFrom = null, ?string $dateTo = null, string $groupBy = 'day'): array
     {
         $dateFrom = $dateFrom ?? date('Y-m-01');
-        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        $dateTo = $dateTo ?? date('Y-m-d') . ' 23:59:59';
+        
+        // Garantir que dateTo inclui o dia inteiro
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
         
         $dateFormat = match($groupBy) {
             'hour' => '%Y-%m-%d %H:00:00',
@@ -627,7 +657,12 @@ class DashboardService
     public static function getConversationsByChannelChart(?string $dateFrom = null, ?string $dateTo = null): array
     {
         $dateFrom = $dateFrom ?? date('Y-m-01');
-        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        $dateTo = $dateTo ?? date('Y-m-d') . ' 23:59:59';
+        
+        // Garantir que dateTo inclui o dia inteiro
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
         
         $sql = "SELECT 
                     COALESCE(channel, 'N/A') as channel,
@@ -664,7 +699,12 @@ class DashboardService
     public static function getConversationsByStatusChart(?string $dateFrom = null, ?string $dateTo = null): array
     {
         $dateFrom = $dateFrom ?? date('Y-m-01');
-        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        $dateTo = $dateTo ?? date('Y-m-d') . ' 23:59:59';
+        
+        // Garantir que dateTo inclui o dia inteiro
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
         
         $sql = "SELECT 
                     status,
@@ -683,7 +723,12 @@ class DashboardService
     public static function getAgentsPerformanceChart(?string $dateFrom = null, ?string $dateTo = null, int $limit = 10): array
     {
         $dateFrom = $dateFrom ?? date('Y-m-01');
-        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        $dateTo = $dateTo ?? date('Y-m-d') . ' 23:59:59';
+        
+        // Garantir que dateTo inclui o dia inteiro
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
         
         $agents = self::getTopAgents($dateFrom, $dateTo, $limit);
         
@@ -707,7 +752,12 @@ class DashboardService
     public static function getMessagesOverTime(?string $dateFrom = null, ?string $dateTo = null, string $groupBy = 'day'): array
     {
         $dateFrom = $dateFrom ?? date('Y-m-01');
-        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        $dateTo = $dateTo ?? date('Y-m-d') . ' 23:59:59';
+        
+        // Garantir que dateTo inclui o dia inteiro
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
         
         $dateFormat = match($groupBy) {
             'hour' => '%Y-%m-%d %H:00:00',
@@ -736,7 +786,12 @@ class DashboardService
     public static function getSLAMetrics(?string $dateFrom = null, ?string $dateTo = null): array
     {
         $dateFrom = $dateFrom ?? date('Y-m-01');
-        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        $dateTo = $dateTo ?? date('Y-m-d') . ' 23:59:59';
+        
+        // Garantir que dateTo inclui o dia inteiro
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
         
         $sql = "SELECT 
                     COUNT(*) as total_conversations,

@@ -22,7 +22,12 @@ class DashboardController
         
         $userId = \App\Helpers\Auth::id();
         $dateFrom = \App\Helpers\Request::get('date_from', date('Y-m-01'));
-        $dateTo = \App\Helpers\Request::get('date_to', date('Y-m-d H:i:s'));
+        $dateTo = \App\Helpers\Request::get('date_to', date('Y-m-d'));
+        
+        // Garantir que dateTo inclui o dia inteiro (até 23:59:59)
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
         
         try {
             // Estatísticas gerais
@@ -96,8 +101,13 @@ class DashboardController
     {
         $chartType = \App\Helpers\Request::get('type', 'conversations_over_time');
         $dateFrom = \App\Helpers\Request::get('date_from', date('Y-m-01'));
-        $dateTo = \App\Helpers\Request::get('date_to', date('Y-m-d H:i:s'));
+        $dateTo = \App\Helpers\Request::get('date_to', date('Y-m-d'));
         $groupBy = \App\Helpers\Request::get('group_by', 'day');
+        
+        // Garantir que dateTo inclui o dia inteiro (até 23:59:59)
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
         
         self::logDash("getChartData: type={$chartType}, dateFrom={$dateFrom}, dateTo={$dateTo}");
         

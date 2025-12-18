@@ -603,7 +603,10 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById("edit_user_max_conversations").value = userMaxConversations;
         
         const form = document.getElementById("kt_modal_edit_user_form");
-        form.action = "' . \App\Helpers\Url::to('/users') . '/" + userId;
+        const baseUrl = window.location.origin;
+        form.action = baseUrl + "/users/" + userId;
+        
+        console.log("Editando usuário:", userId, "URL:", form.action);
         
         const modal = new bootstrap.Modal(document.getElementById("kt_modal_edit_user"));
         modal.show();
@@ -626,6 +629,9 @@ document.addEventListener("DOMContentLoaded", function() {
                 formData.delete("password");
             }
             
+            console.log("Enviando atualização para:", editForm.action);
+            console.log("FormData:", Object.fromEntries(formData));
+            
             fetch(editForm.action, {
                 method: "POST",
                 headers: {
@@ -633,23 +639,47 @@ document.addEventListener("DOMContentLoaded", function() {
                 },
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log("Response status:", response.status);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
             .then(data => {
+                console.log("Response data:", data);
                 submitBtn.removeAttribute("data-kt-indicator");
                 submitBtn.disabled = false;
                 
                 if (data.success) {
-                    const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_edit_user"));
-                    modal.hide();
-                    location.reload();
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso!',
+                        text: data.message || 'Usuário atualizado com sucesso!',
+                        timer: 2000,
+                        showConfirmButton: false
+                    }).then(() => {
+                        const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_edit_user"));
+                        modal.hide();
+                        location.reload();
+                    });
                 } else {
-                    alert("Erro: " + (data.message || "Erro ao atualizar usuário"));
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro!',
+                        text: data.message || 'Erro ao atualizar usuário'
+                    });
                 }
             })
             .catch(error => {
+                console.error("Erro ao atualizar usuário:", error);
                 submitBtn.removeAttribute("data-kt-indicator");
                 submitBtn.disabled = false;
-                alert("Erro ao atualizar usuário");
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro!',
+                    text: error.message || 'Erro ao atualizar usuário'
+                });
             });
         });
     }

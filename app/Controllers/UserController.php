@@ -146,10 +146,13 @@ class UserController
      */
     public function update(int $id): void
     {
+        error_log("UserController::update chamado para userId={$id}");
+        
         Permission::abortIfCannot('users.edit');
         
         try {
             $data = Request::post();
+            error_log("UserController::update data=" . json_encode($data));
             
             // Processar upload de avatar se houver
             if (!empty($_FILES['avatar_file']) && $_FILES['avatar_file']['error'] === UPLOAD_ERR_OK) {

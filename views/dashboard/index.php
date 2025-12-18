@@ -98,7 +98,7 @@ ob_start();
 <!--begin::Row - Métricas Adicionais-->
 <div class="row g-5 mb-5">
     <!--begin::Col-->
-    <div class="col-xl-4">
+    <div class="col-xl-3">
         <div class="card h-100">
             <div class="card-header border-0 pt-5">
                 <h3 class="card-title fw-bold">Minhas Conversas</h3>
@@ -122,10 +122,10 @@ ob_start();
     <!--end::Col-->
     
     <!--begin::Col-->
-    <div class="col-xl-4">
+    <div class="col-xl-3">
         <div class="card h-100">
             <div class="card-header border-0 pt-5">
-                <h3 class="card-title fw-bold">Tempo Médio de Resposta</h3>
+                <h3 class="card-title fw-bold">Tempo 1ª Resposta</h3>
             </div>
             <div class="card-body pt-3">
                 <div class="d-flex align-items-center">
@@ -153,7 +153,7 @@ ob_start();
                             }
                             ?>
                         </div>
-                        <div class="text-muted fs-6">Primeira resposta</div>
+                        <div class="text-muted fs-6">Média primeira resposta</div>
                     </div>
                 </div>
             </div>
@@ -162,7 +162,48 @@ ob_start();
     <!--end::Col-->
     
     <!--begin::Col-->
-    <div class="col-xl-4">
+    <div class="col-xl-3">
+        <div class="card h-100">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title fw-bold">Tempo de Resposta</h3>
+            </div>
+            <div class="card-body pt-3">
+                <div class="d-flex align-items-center">
+                    <i class="ki-duotone ki-message-text fs-3x text-info me-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div>
+                        <div class="fs-2x fw-bold text-gray-800">
+                            <?php
+                            $avgResponse = $stats['metrics']['avg_response_time'] ?? null;
+                            if ($avgResponse !== null && $avgResponse > 0) {
+                                if (class_exists('\App\Services\AgentPerformanceService')) {
+                                    echo \App\Services\AgentPerformanceService::formatTime($avgResponse);
+                                } else {
+                                    // Fallback manual
+                                    if ($avgResponse < 60) {
+                                        echo number_format($avgResponse, 0) . ' min';
+                                    } else {
+                                        echo number_format($avgResponse / 60, 1) . 'h';
+                                    }
+                                }
+                            } else {
+                                echo '-';
+                            }
+                            ?>
+                        </div>
+                        <div class="text-muted fs-6">Média geral de resposta</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!--end::Col-->
+    
+    <!--begin::Col-->
+    <div class="col-xl-3">
         <div class="card h-100">
             <div class="card-header border-0 pt-5">
                 <h3 class="card-title fw-bold">Conversas sem Atribuição</h3>

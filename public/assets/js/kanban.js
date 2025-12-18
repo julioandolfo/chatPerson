@@ -1101,7 +1101,8 @@ function quickResolve(conversationId) {
 
 async function reorderStage(stageId, direction) {
     try {
-        const response = await fetch(`${BASE_URL}/funnels/stages/${stageId}/reorder`, {
+        const baseUrl = window.KANBAN_CONFIG?.BASE_URL || window.location.origin;
+        const response = await fetch(`${baseUrl}/funnels/stages/${stageId}/reorder`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

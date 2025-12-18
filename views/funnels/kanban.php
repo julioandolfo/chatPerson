@@ -262,80 +262,101 @@ ob_start();
                 ?>
                     <div class="kanban-column flex-shrink-0" data-stage-id="<?= $stage['id'] ?>" style="min-width: 320px; max-width: 320px;">
                         <div class="card h-100">
-                            <div class="card-header border-0" style="
-                                background-color: <?= htmlspecialchars($stageColorSoft) ?> !important;
-                                border-left: 5px solid <?= htmlspecialchars($stageColor) ?> !important;
-                                box-shadow: inset 0 1px 0 <?= htmlspecialchars($stageColorSoft) ?>;
-                                padding-left: 16px;
+                            <div class="card-header border-0 py-4 px-5" style="
+                                background: linear-gradient(135deg, <?= htmlspecialchars($stageColorSoft) ?> 0%, <?= htmlspecialchars($stageColorSoft . '80') ?> 100%);
+                                border-left: 4px solid <?= htmlspecialchars($stageColor) ?>;
+                                border-bottom: 1px solid <?= htmlspecialchars($stageColor) ?>33;
                             ">
-                                <div class="card-title d-flex align-items-center justify-content-between w-100">
-                                    <div class="flex-grow-1">
-                                        <div class="d-flex align-items-center gap-2">
-                                            <h3 class="text-gray-800 fw-bold mb-0"><?= htmlspecialchars($stage['name']) ?></h3>
-                                            <?php if (!empty($stage['is_system_stage'])): ?>
-                                                <span class="badge badge-light-success badge-sm" title="Etapa obrigatória do sistema">
-                                                    <i class="ki-duotone ki-shield-tick fs-5">
+                                <!-- Linha 1: Nome + Badge Sistema + Contador -->
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <div class="d-flex align-items-center gap-2 flex-grow-1" 
+                                         <?php if (!empty($stage['description'])): ?>
+                                         title="<?= htmlspecialchars($stage['description']) ?>"
+                                         <?php endif; ?>>
+                                        <h3 class="text-gray-900 fw-bold mb-0 fs-5" style="line-height: 1.2;">
+                                            <?= htmlspecialchars($stage['name']) ?>
+                                        </h3>
+                                        <?php if (!empty($stage['is_system_stage'])): ?>
+                                            <span class="badge badge-success badge-sm fs-8 px-2 py-1" 
+                                                  style="font-weight: 500;" 
+                                                  title="Etapa obrigatória do sistema">
+                                                <i class="ki-duotone ki-shield-tick fs-6 me-1">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                                Sistema
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-1">
+                                        <span class="badge badge-primary fs-6 px-2" id="stage_count_<?= $stage['id'] ?>">
+                                            <?= count($conversations) ?>
+                                        </span>
+                                        <?php if (!empty($stage['max_conversations'])): ?>
+                                            <span class="text-muted fs-7 fw-semibold">/ <?= $stage['max_conversations'] ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                
+                                <!-- Linha 2: Botões de Ação -->
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <!-- Botões de Reordenação -->
+                                    <?php if (\App\Helpers\Permission::can('funnels.edit')): ?>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <?php if ($stageIndex > 0): ?>
+                                                <button type="button" 
+                                                        class="btn btn-sm btn-icon btn-color-gray-500 btn-active-color-primary" 
+                                                        onclick="reorderStage(<?= $stage['id'] ?>, 'up')"
+                                                        title="Mover para esquerda"
+                                                        style="width: 28px; height: 28px;">
+                                                    <i class="ki-duotone ki-arrow-left fs-4">
                                                         <span class="path1"></span>
                                                         <span class="path2"></span>
                                                     </i>
-                                                    Sistema
-                                                </span>
+                                                </button>
+                                            <?php else: ?>
+                                                <div style="width: 28px;"></div>
+                                            <?php endif; ?>
+                                            <?php if ($stageIndex < count($stagesData) - 1): ?>
+                                                <button type="button" 
+                                                        class="btn btn-sm btn-icon btn-color-gray-500 btn-active-color-primary" 
+                                                        onclick="reorderStage(<?= $stage['id'] ?>, 'down')"
+                                                        title="Mover para direita"
+                                                        style="width: 28px; height: 28px;">
+                                                    <i class="ki-duotone ki-arrow-right fs-4">
+                                                        <span class="path1"></span>
+                                                        <span class="path2"></span>
+                                                    </i>
+                                                </button>
                                             <?php endif; ?>
                                         </div>
-                                        <?php if (!empty($stage['description'])): ?>
-                                            <span class="text-muted fs-7"><?= htmlspecialchars($stage['description']) ?></span>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <div class="d-flex align-items-center gap-1">
-                                            <span class="badge badge-light-primary" id="stage_count_<?= $stage['id'] ?>"><?= count($conversations) ?></span>
-                                            <?php if (!empty($stage['max_conversations'])): ?>
-                                                <span class="badge badge-light-warning">/ <?= $stage['max_conversations'] ?></span>
-                                            <?php endif; ?>
-                                        </div>
-                                        
-                                        <?php if (\App\Helpers\Permission::can('funnels.edit')): ?>
-                                            <!-- Botões de Reordenação -->
-                                            <div class="btn-group btn-group-sm">
-                                                <?php if ($stageIndex > 0): ?>
-                                                    <button type="button" class="btn btn-sm btn-icon btn-light-secondary" 
-                                                            onclick="reorderStage(<?= $stage['id'] ?>, 'up')"
-                                                            title="Mover para esquerda">
-                                                        <i class="ki-duotone ki-arrow-left fs-3">
-                                                            <span class="path1"></span>
-                                                            <span class="path2"></span>
-                                                        </i>
-                                                    </button>
-                                                <?php endif; ?>
-                                                <?php if ($stageIndex < count($stagesData) - 1): ?>
-                                                    <button type="button" class="btn btn-sm btn-icon btn-light-secondary" 
-                                                            onclick="reorderStage(<?= $stage['id'] ?>, 'down')"
-                                                            title="Mover para direita">
-                                                        <i class="ki-duotone ki-arrow-right fs-3">
-                                                            <span class="path1"></span>
-                                                            <span class="path2"></span>
-                                                        </i>
-                                                    </button>
-                                                <?php endif; ?>
-                                            </div>
-                                        <?php endif; ?>
-                                        
-                                        <button type="button" class="btn btn-sm btn-icon btn-light-info" 
+                                    <?php else: ?>
+                                        <div></div>
+                                    <?php endif; ?>
+                                    
+                                    <!-- Botões de Métricas e Edição -->
+                                    <div class="d-flex align-items-center gap-1">
+                                        <button type="button" 
+                                                class="btn btn-sm btn-icon btn-color-gray-500 btn-active-color-info" 
                                                 onclick="showStageMetrics(<?= $stage['id'] ?>, <?= htmlspecialchars(json_encode($stage['name']), ENT_QUOTES, 'UTF-8') ?>)" 
-                                                title="Ver métricas">
-                                            <i class="ki-duotone ki-chart-simple fs-2">
+                                                title="Ver métricas"
+                                                style="width: 28px; height: 28px;">
+                                            <i class="ki-duotone ki-chart-simple fs-4">
                                                 <span class="path1"></span>
                                                 <span class="path2"></span>
                                                 <span class="path3"></span>
                                             </i>
                                         </button>
+                                        
                                         <?php if (\App\Helpers\Permission::can('funnels.edit')): ?>
                                             <?php if (!empty($stage['is_system_stage'])): ?>
                                                 <!-- Etapa do sistema: apenas editar cor -->
-                                                <button type="button" class="btn btn-sm btn-icon btn-light-primary" 
+                                                <button type="button" 
+                                                        class="btn btn-sm btn-icon btn-color-gray-500 btn-active-color-primary" 
                                                         onclick="editStageColorOnly(<?= $stage['id'] ?>, <?= htmlspecialchars(json_encode($stage['name']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($stage['color']), ENT_QUOTES, 'UTF-8') ?>)"
-                                                        title="Editar cor (etapa do sistema)">
-                                                    <i class="ki-duotone ki-color-swatch fs-2">
+                                                        title="Editar cor"
+                                                        style="width: 28px; height: 28px;">
+                                                    <i class="ki-duotone ki-color-swatch fs-4">
                                                         <span class="path1"></span>
                                                         <span class="path2"></span>
                                                         <span class="path3"></span>
@@ -343,28 +364,31 @@ ob_start();
                                                     </i>
                                                 </button>
                                             <?php else: ?>
-                                                <!-- Etapa normal: editar e deletar -->
+                                                <!-- Etapa normal: dropdown com editar e deletar -->
                                                 <div class="dropdown">
-                                                    <button class="btn btn-sm btn-icon btn-active-color-primary" type="button" data-bs-toggle="dropdown">
-                                                        <i class="ki-duotone ki-dots-vertical fs-2">
+                                                    <button class="btn btn-sm btn-icon btn-color-gray-500 btn-active-color-primary" 
+                                                            type="button" 
+                                                            data-bs-toggle="dropdown"
+                                                            style="width: 28px; height: 28px;">
+                                                        <i class="ki-duotone ki-setting-2 fs-4">
                                                             <span class="path1"></span>
                                                             <span class="path2"></span>
-                                                            <span class="path3"></span>
                                                         </i>
                                                     </button>
-                                                    <ul class="dropdown-menu">
+                                                    <ul class="dropdown-menu dropdown-menu-end">
                                                         <li>
                                                             <a class="dropdown-item" href="#" onclick="editStage(<?= $stage['id'] ?>, <?= htmlspecialchars(json_encode($stage['name']), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($stage['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($stage['color']), ENT_QUOTES, 'UTF-8') ?>); return false;">
-                                                                <i class="ki-duotone ki-pencil fs-2 me-2">
+                                                                <i class="ki-duotone ki-pencil fs-4 me-2">
                                                                     <span class="path1"></span>
                                                                     <span class="path2"></span>
                                                                 </i>
                                                                 Editar
                                                             </a>
                                                         </li>
+                                                        <li><hr class="dropdown-divider"></li>
                                                         <li>
                                                             <a class="dropdown-item text-danger" href="#" onclick="deleteStage(<?= $stage['id'] ?>, <?= htmlspecialchars(json_encode($stage['name']), ENT_QUOTES, 'UTF-8') ?>); return false;">
-                                                                <i class="ki-duotone ki-trash fs-2 me-2">
+                                                                <i class="ki-duotone ki-trash fs-4 me-2">
                                                                     <span class="path1"></span>
                                                                     <span class="path2"></span>
                                                                     <span class="path3"></span>
@@ -787,7 +811,47 @@ window.KANBAN_CONFIG = {
 console.log("KANBAN_CONFIG inicializado:", window.KANBAN_CONFIG);
 </script>
 <!-- Kanban JavaScript -->
-<script src="' . \App\Helpers\Url::asset('js/kanban.js') . '"></script>';
+<script src="' . \App\Helpers\Url::asset('js/kanban.js') . '?v=' . time() . '"></script>
+<script>
+// Função fallback caso o arquivo JS ainda não tenha carregado (cache)
+if (typeof window.reorderStage === "undefined") {
+    console.warn("Função reorderStage não encontrada, definindo fallback...");
+    window.reorderStage = async function(stageId, direction) {
+        try {
+            const BASE_URL = window.KANBAN_CONFIG?.BASE_URL || window.location.origin;
+            const response = await fetch(`${BASE_URL}/funnels/stages/${stageId}/reorder`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ direction })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                Swal.fire({
+                    icon: "success",
+                    title: "Ordem atualizada!",
+                    text: "A etapa foi movida com sucesso.",
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                setTimeout(() => location.reload(), 500);
+            } else {
+                throw new Error(result.message || "Erro ao reordenar etapa");
+            }
+        } catch (error) {
+            console.error("Erro ao reordenar etapa:", error);
+            Swal.fire({
+                icon: "error",
+                title: "Erro",
+                text: error.message || "Não foi possível reordenar a etapa"
+            });
+        }
+    };
+}
+</script>';
 ?>
 
 <?php include __DIR__ . '/../layouts/metronic/app.php'; ?>

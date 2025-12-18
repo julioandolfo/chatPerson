@@ -1146,6 +1146,7 @@ function rerenderNode(node) {
     }
     renderNode(node);
     renderConnections();
+    makeNodeDraggable(String(node.id));
 }
 
 // Configurar drag de tipos de nós do painel lateral
@@ -1539,14 +1540,11 @@ function openNodeConfig(nodeId) {
                 <div id="kt_chatbot_options_container" style="display: none;">
                     <div class="fv-row mb-7">
                         <label class="fw-semibold fs-6 mb-2">Opções do Menu</label>
-                        <div class="form-text mb-2">Para cada opção, informe palavras-chave (separadas por vírgula) que também disparam essa opção.</div>
+                        <div class="form-text mb-2">Para cada opção, informe palavras-chave (separadas por vírgula) que também disparam essa opção. (Conexões agora são feitas pelas bolinhas no diagrama.)</div>
                         <div id="kt_chatbot_options_list">
                             <div class="d-flex flex-column gap-2 mb-3 chatbot-option-item">
                                 <div class="d-flex gap-2">
                                     <input type="text" name="chatbot_options[]" class="form-control form-control-solid" placeholder="Ex: 1 - Suporte Técnico" />
-                                    <select name="chatbot_option_targets[]" class="form-select form-select-solid chatbot-option-target">
-                                        <option value="">Selecione o próximo nó</option>
-                                    </select>
                                     <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeChatbotOption(this)">
                                         <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span></i>
                                     </button>
@@ -1711,15 +1709,11 @@ function openNodeConfig(nodeId) {
                             const optionItem = document.createElement('div');
                             optionItem.className = 'd-flex flex-column gap-2 mb-3 chatbot-option-item';
                             const optText = (typeof opt === 'object' ? opt.text : opt) || '';
-                            const optTarget = (typeof opt === 'object' ? opt.target_node_id : '') || '';
                             const optKeywords = (typeof opt === 'object' && Array.isArray(opt.keywords)) ? opt.keywords.join(', ') : ((typeof opt === 'object' && opt.keywords) ? opt.keywords : '');
                             
                             optionItem.innerHTML = `
                                 <div class="d-flex gap-2">
                                     <input type="text" name="chatbot_options[]" class="form-control form-control-solid" placeholder="Ex: 1 - Suporte" />
-                                    <select name="chatbot_option_targets[]" class="form-select form-select-solid chatbot-option-target">
-                                        <option value="">Selecione o próximo nó</option>
-                                    </select>
                                     <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeChatbotOption(this)">
                                         <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span></i>
                                     </button>
@@ -1728,7 +1722,6 @@ function openNodeConfig(nodeId) {
                             `;
                             optionsList.appendChild(optionItem);
                             
-                            // Preencher valor do input após adicionar ao DOM
                             const textInput = optionItem.querySelector('input[name="chatbot_options[]"]');
                             if (textInput) {
                                 textInput.value = optText;
@@ -1738,26 +1731,9 @@ function openNodeConfig(nodeId) {
                             if (keywordsInput) {
                                 keywordsInput.value = optKeywords;
                             }
-                            
-                            // Preencher target se existir
-                            const targetSelect = optionItem.querySelector('.chatbot-option-target');
-                            if (targetSelect && opt.target_node_id) {
-                                targetSelect.setAttribute('data-selected', opt.target_node_id);
-                            }
                         });
                         
-                        // Popular selects de target
-                        populateChatbotOptionTargets(optionsList);
-                        
-                        // Aplicar valores selecionados
-                        options.forEach(function(opt, idx) {
-                            if (opt.target_node_id) {
-                                const targetSelect = optionsList.querySelectorAll('.chatbot-option-target')[idx];
-                                if (targetSelect) {
-                                    targetSelect.value = opt.target_node_id;
-                                }
-                            }
-                        });
+                        // Conexões são feitas pelos handles; sem selects de target
                     }
                 }
             }
@@ -2214,21 +2190,18 @@ document.addEventListener("DOMContentLoaded", function() {
                 
                 if (chatbotType === 'menu') {
                     const optionInputs = Array.from(document.querySelectorAll('input[name="chatbot_options[]"]'));
-                    const targetSelects = Array.from(document.querySelectorAll('select[name="chatbot_option_targets[]"]'));
                     const keywordInputs = Array.from(document.querySelectorAll('input[name="chatbot_option_keywords[]"]'));
                     const combined = [];
                     
                     console.log('Inputs de opções encontrados:', optionInputs.length);
-                    console.log('Selects de target encontrados:', targetSelects.length);
                     
                     optionInputs.forEach(function(inp, idx) {
                         const text = (inp.value || '').trim();
-                        const target = targetSelects[idx] ? targetSelects[idx].value : '';
                         const keywordsRaw = keywordInputs[idx] ? keywordInputs[idx].value : '';
                         const keywords = keywordsRaw.split(',').map(function(k){ return k.trim(); }).filter(function(k){ return k.length > 0; });
-                        console.log(`Opção ${idx}: text="${text}", target="${target}", keywords="${keywordsRaw}"`);
+                        console.log(`Opção ${idx}: text="${text}", keywords="${keywordsRaw}"`);
                         if (text) {
-                            combined.push({ text: text, target_node_id: target || null, keywords: keywords });
+                            combined.push({ text: text, target_node_id: null, keywords: keywords });
                         }
                     });
                     
@@ -2250,8 +2223,9 @@ document.addEventListener("DOMContentLoaded", function() {
             // Atualizar referência global
             window.nodes = nodes;
             
-            // Re-render para refletir handles e dados atualizados
-            rerenderNode(node);
+    // Re-render para refletir handles e dados atualizados
+    rerenderNode(node);
+    makeNodeDraggable(String(node.id));
             
             console.log('Configuração salva. Fechando modal...');
             
@@ -2551,7 +2525,7 @@ function updateChatbotFields(type) {
     if (type === 'menu') {
         optionsContainer.style.display = 'block';
         conditionalContainer.style.display = 'none';
-        populateChatbotOptionTargets(optionsList);
+        // conexões são pelos handles; nada para popular aqui
     } else if (type === 'conditional') {
         optionsContainer.style.display = 'none';
         conditionalContainer.style.display = 'block';
@@ -2564,18 +2538,17 @@ function updateChatbotFields(type) {
 function addChatbotOption() {
     const optionsList = document.getElementById('kt_chatbot_options_list');
     const newOption = document.createElement('div');
-    newOption.className = 'd-flex gap-2 mb-2 chatbot-option-item';
+    newOption.className = 'd-flex flex-column gap-2 mb-3 chatbot-option-item';
     newOption.innerHTML = `
-        <input type="text" name="chatbot_options[]" class="form-control form-control-solid" placeholder="Ex: 2 - Vendas" />
-        <select name="chatbot_option_targets[]" class="form-select form-select-solid chatbot-option-target">
-            <option value="">Selecione o próximo nó</option>
-        </select>
-        <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeChatbotOption(this)">
-            <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span></i>
-        </button>
+        <div class="d-flex gap-2">
+            <input type="text" name="chatbot_options[]" class="form-control form-control-solid" placeholder="Ex: 2 - Vendas" />
+            <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeChatbotOption(this)">
+                <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span></i>
+            </button>
+        </div>
+        <input type="text" name="chatbot_option_keywords[]" class="form-control form-control-solid" placeholder="Palavras-chave: 2, vendas, comercial" />
     `;
     optionsList.appendChild(newOption);
-    populateChatbotOptionTargets(optionsList);
 }
 
 function removeChatbotOption(button) {
@@ -2590,35 +2563,8 @@ function removeChatbotOption(button) {
     }
 }
 
-// Preencher selects de destino das opções do chatbot com nós existentes
 function populateChatbotOptionTargets(optionsList) {
-    if (!optionsList) return;
-    const selects = optionsList.querySelectorAll('.chatbot-option-target');
-    if (!selects || selects.length === 0) return;
-
-    // Montar opções com base nos nós existentes (exclui triggers)
-    const choices = [{ value: '', label: 'Selecione o próximo nó' }];
-    if (typeof nodes !== 'undefined' && Array.isArray(nodes)) {
-        nodes.forEach(function(n) {
-            if (n.node_type === 'trigger') return;
-            const nodeLabel = (n.node_data && n.node_data.label) || n.node_type || String(n.id);
-            choices.push({ value: n.id, label: nodeLabel });
-        });
-    }
-
-    selects.forEach(function(select) {
-        const prev = select.value;
-        select.innerHTML = '';
-        choices.forEach(function(c) {
-            const opt = document.createElement('option');
-            opt.value = c.value;
-            opt.textContent = c.label;
-            select.appendChild(opt);
-        });
-        if (prev) {
-            select.value = prev;
-        }
-    });
+    // Conexões agora são feitas pelos handles no nó do chatbot (sem selects)
 }
 
 window.updateChatbotFields = updateChatbotFields;

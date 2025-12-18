@@ -511,11 +511,21 @@ class AutomationService
 
     /**
      * Processar variáveis em mensagens
+     * @param string $message Mensagem com variáveis
+     * @param int|array $conversationOrId ID da conversa ou array da conversa já carregado
+     * @return string Mensagem com variáveis substituídas
      */
-    private static function processVariables(string $message, int $conversationId): string
+    private static function processVariables(string $message, $conversationOrId): string
     {
-        $conversation = Conversation::find($conversationId);
-        if (!$conversation) {
+        // Se recebeu int, buscar conversa; se array, usar diretamente
+        if (is_int($conversationOrId)) {
+            $conversation = Conversation::find($conversationOrId);
+            if (!$conversation) {
+                return $message;
+            }
+        } elseif (is_array($conversationOrId)) {
+            $conversation = $conversationOrId;
+        } else {
             return $message;
         }
 
@@ -528,34 +538,6 @@ class AutomationService
             '{{contact.phone}}' => $contact ? ($contact['phone'] ?? '') : '',
             '{{contact.email}}' => $contact ? ($contact['email'] ?? '') : '',
             '{{agent.name}}' => $agent ? ($agent['name'] ?? '') : '',
-            '{{conversation.id}}' => $conversation['id'],
-            '{{conversation.subject}}' => $conversation['subject'] ?? '',
-            '{{date}}' => date('d/m/Y'),
-            '{{time}}' => date('H:i'),
-            '{{datetime}}' => date('d/m/Y H:i'),
-        ];
-
-        // Substituir variáveis
-        foreach ($variables as $key => $value) {
-            $message = str_replace($key, $value, $message);
-        }
-
-        return $message;
-    }
-
-    /**
-     * Processar variáveis em mensagens (sobrecarga com dados já carregados)
-     */
-    private static function processVariables(string $message, array $conversation): string
-    {
-        $contact = \App\Models\Contact::find($conversation['contact_id']);
-        $agent = $conversation['agent_id'] ? \App\Models\User::find($conversation['agent_id']) : null;
-
-        $variables = [
-            '{{contact.name}}' => $contact ? ($contact['name'] ?? '') : '',
-            '{{contact.phone}}' => $contact ? ($contact['phone'] ?? '') : '',
-            '{{contact.email}}' => $contact ? ($contact['email'] ?? '') : '',
-            '{{agent.name}}' => $agent ? ($agent['name'] ?? '') : '',
             '{{conversation.id}}' => $conversation['id'] ?? '',
             '{{conversation.subject}}' => $conversation['subject'] ?? '',
             '{{date}}' => date('d/m/Y'),
@@ -563,6 +545,7 @@ class AutomationService
             '{{datetime}}' => date('d/m/Y H:i'),
         ];
 
+        // Substituir variáveis
         foreach ($variables as $key => $value) {
             $message = str_replace($key, $value, $message);
         }

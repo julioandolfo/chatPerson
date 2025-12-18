@@ -37,7 +37,7 @@ class Funnel extends Model
     {
         $sql = "SELECT * FROM funnel_stages 
                 WHERE funnel_id = ? 
-                ORDER BY position ASC, id ASC";
+                ORDER BY stage_order ASC, id ASC";
         return Database::fetchAll($sql, [$funnelId]);
     }
 

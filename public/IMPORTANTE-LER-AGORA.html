@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚨 PROBLEMA CRÍTICO ENCONTRADO!</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+        }
+        .card {
+            background: white;
+            color: #212529;
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #dc3545;
+            margin-top: 0;
+            font-size: 2.5em;
+            text-align: center;
+        }
+        .critical {
+            background: #dc3545;
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+        .problem {
+            background: #fff5f5;
+            border-left: 6px solid #dc3545;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .solution {
+            background: #d1fae5;
+            border-left: 6px solid #22c55e;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .code {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 15px 0;
+            overflow-x: auto;
+        }
+        .btn {
+            display: inline-block;
+            padding: 20px 40px;
+            background: #22c55e;
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            margin: 10px;
+            font-weight: 600;
+            font-size: 1.3em;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4);
+        }
+        .btn:hover {
+            background: #16a34a;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(34, 197, 94, 0.6);
+        }
+        .step {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #3182ce;
+        }
+        .step h3 {
+            margin-top: 0;
+            color: #3182ce;
+        }
+        ul {
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="critical">
+        🚨 PROBLEMA CRÍTICO ENCONTRADO NA REORDENAÇÃO!
+    </div>
+
+    <div class="card">
+        <h1>O Problema Real</h1>
+        
+        <div class="problem">
+            <h2>🐛 Duas Colunas Diferentes!</h2>
+            <p><strong>O sistema estava usando DUAS colunas diferentes para ordenação:</strong></p>
+            <ol>
+                <li><strong>Kanban (exibição):</strong> Ordenava por <code>position</code></li>
+                <li><strong>Reordenação (lógica):</strong> Alterava <code>stage_order</code></li>
+            </ol>
+            
+            <p>Por isso você via:</p>
+            <ul>
+                <li>❌ Reordenação dizia "sucesso" mas nada mudava</li>
+                <li>❌ Valores de <code>stage_order</code> mudavam no banco</li>
+                <li>❌ Mas o Kanban continuava mostrando na ordem de <code>position</code></li>
+            </ul>
+            
+            <div class="code">
+<span style="color: #dc3545;">// ❌ ERRADO - Funnel.php (linha 40)</span>
+ORDER BY position ASC
+
+<span style="color: #dc3545;">// ❌ ERRADO - Reordenação alterava stage_order</span>
+UPDATE funnel_stages SET stage_order = ?
+            </div>
+        </div>
+        
+        <div class="solution">
+            <h2>✅ Correção Aplicada</h2>
+            <p><strong>Agora TODO o sistema usa APENAS <code>stage_order</code>:</strong></p>
+            
+            <h3>Arquivos Corrigidos:</h3>
+            <ol>
+                <li><code>app/Models/Funnel.php</code> → getStages() agora usa <code>stage_order</code></li>
+                <li><code>app/Services/FunnelService.php</code> → getNextStage() agora usa <code>stage_order</code></li>
+                <li><code>app/Services/FunnelService.php</code> → Chamadas corrigidas</li>
+            </ol>
+            
+            <div class="code">
+<span style="color: #22c55e;">// ✅ CORRETO - Agora todos usam stage_order</span>
+ORDER BY stage_order ASC
+
+<span style="color: #22c55e;">// ✅ Reordenação e exibição usam a mesma coluna!</span>
+UPDATE funnel_stages SET stage_order = ?
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h1>O Que Você Precisa Fazer AGORA</h1>
+        
+        <div class="step">
+            <h3>Passo 1: Corrigir Valores no Banco</h3>
+            <p>Suas etapas têm valores incorretos:</p>
+            <ul>
+                <li>Etapas 1-5: todas com <code>stage_order = 0</code> ❌</li>
+                <li>Etapa 8: <code>stage_order = 1</code></li>
+                <li>Etapa 9: <code>stage_order = 998</code></li>
+            </ul>
+            <p><strong>Execute o script de correção:</strong></p>
+            <p style="text-align: center;">
+                <a href="/fix-stage-order.php" class="btn">
+                    🔧 CORRIGIR VALORES AGORA
+                </a>
+            </p>
+            <p><strong>O que ele fará:</strong></p>
+            <ul>
+                <li>✅ Reordenar etapas na ordem correta</li>
+                <li>✅ "Entrada" será a primeira (ordem 1)</li>
+                <li>✅ Suas etapas personalizadas no meio (ordem 2, 3, 4...)</li>
+                <li>✅ "Fechadas/Resolvidas" e "Perdidas" por último</li>
+            </ul>
+        </div>
+        
+        <div class="step">
+            <h3>Passo 2: Limpar Cache</h3>
+            <p>Essencial para carregar o código corrigido:</p>
+            <ul>
+                <li><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd> (Windows/Linux)</li>
+                <li><kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd> (Mac)</li>
+            </ul>
+        </div>
+        
+        <div class="step">
+            <h3>Passo 3: Testar no Kanban</h3>
+            <ol>
+                <li>Acesse o Kanban</li>
+                <li>Clique nas setas ← →</li>
+                <li>✅ AGORA deve funcionar corretamente!</li>
+            </ol>
+            <p style="text-align: center;">
+                <a href="/funnels/kanban" class="btn">
+                    🚀 IR PARA O KANBAN
+                </a>
+            </p>
+        </div>
+    </div>
+
+    <div class="card">
+        <h1>Por Que Isso Aconteceu?</h1>
+        
+        <p>O sistema tinha dois campos de ordenação legados:</p>
+        <ul>
+            <li><code>position</code> - Campo antigo, usado originalmente</li>
+            <li><code>stage_order</code> - Campo novo, adicionado depois</li>
+        </ul>
+        
+        <p>Quando a funcionalidade de reordenação foi implementada:</p>
+        <ul>
+            <li>✅ Foi criada usando <code>stage_order</code> (correto)</li>
+            <li>❌ Mas o Kanban continuou usando <code>position</code> (errado)</li>
+        </ul>
+        
+        <p><strong>Resultado:</strong> Duas partes do código falando "línguas diferentes"!</p>
+    </div>
+
+    <div class="card" style="background: #d1fae5;">
+        <h1 style="color: #065f46;">✅ Agora Está Correto!</h1>
+        
+        <p style="font-size: 1.2em; text-align: center;">
+            <strong>Todo o sistema agora usa APENAS <code>stage_order</code></strong>
+        </p>
+        
+        <p style="text-align: center; margin-top: 30px;">
+            <a href="/fix-stage-order.php" class="btn">
+                1️⃣ CORRIGIR BANCO DE DADOS
+            </a>
+            <br>
+            <a href="/funnels/kanban" class="btn" style="margin-top: 20px;">
+                2️⃣ TESTAR NO KANBAN
+            </a>
+        </p>
+    </div>
+
+    <div style="text-align: center; padding: 20px; background: rgba(255,255,255,0.1); border-radius: 8px; margin-top: 30px;">
+        <p><strong>⏱️ Tempo estimado:</strong> 2 minutos</p>
+        <p><strong>📝 Remova após corrigir:</strong> <code>public/IMPORTANTE-LER-AGORA.html</code></p>
+    </div>
+</body>
+</html>
+

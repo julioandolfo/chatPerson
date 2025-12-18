@@ -124,11 +124,25 @@
             $totalUpdated = 0;
             
             foreach ($funnelIds as $funnelId) {
-                // Buscar etapas do funil ordenadas por ID
-                $sql = "SELECT id, name, stage_order FROM funnel_stages WHERE funnel_id = ? ORDER BY id ASC";
+                // Buscar etapas do funil com ordenação especial para etapas do sistema
+                $sql = "SELECT id, name, is_system_stage, system_stage_type, stage_order 
+                        FROM funnel_stages 
+                        WHERE funnel_id = ? 
+                        ORDER BY 
+                            CASE 
+                                WHEN system_stage_type = 'entrada' THEN 1
+                                WHEN system_stage_type IS NULL THEN 2
+                                WHEN system_stage_type = 'fechadas_resolvidas' THEN 3
+                                WHEN system_stage_type = 'perdidas' THEN 4
+                                ELSE 5
+                            END,
+                            id ASC";
                 $stmt = $db->prepare($sql);
                 $stmt->execute([$funnelId]);
                 $stages = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                echo '<h3>Funil ID: ' . $funnelId . '</h3>';
+                echo '<ul>';
                 
                 // Atualizar stage_order para cada etapa
                 foreach ($stages as $index => $stage) {
@@ -138,14 +152,20 @@
                     $stmt = $db->prepare($sql);
                     $stmt->execute([$newOrder, $stage['id']]);
                     
+                    $isSystem = !empty($stage['is_system_stage']) ? ' [SISTEMA]' : '';
+                    $oldOrder = $stage['stage_order'] ?? 'NULL';
+                    echo '<li>Etapa "' . htmlspecialchars($stage['name']) . '"' . $isSystem . ': ' . $oldOrder . ' → <strong>' . $newOrder . '</strong></li>';
+                    
                     $totalUpdated++;
                 }
+                
+                echo '</ul>';
             }
             
             $db->commit();
             
             echo '<div class="success">✅ Sucesso! Total de etapas atualizadas: ' . $totalUpdated . '</div>';
-            echo '<p><a href="?" class="btn btn-success">🔄 Ver Resultado</a></p>';
+            echo '<p><a href="?" class="btn btn-success">🔄 Ver Resultado</a> <a href="/funnels/kanban" class="btn btn-success">🚀 Ir para Kanban</a></p>';
             
         } catch (\Exception $e) {
             $db->rollBack();

@@ -567,7 +567,7 @@ class FunnelService
         $entered = \App\Helpers\Database::fetch($sqlEntered, [$stageId, $dateFrom, $dateTo]);
         
         // Taxa de conversão (se houver estágio seguinte)
-        $nextStage = self::getNextStage($stage['funnel_id'], $stage['position']);
+        $nextStage = self::getNextStage($stage['funnel_id'], $stage['stage_order'] ?? 0);
         $conversionRate = 0;
         if ($nextStage && ($metrics['total'] ?? 0) > 0) {
             $sqlConversion = "SELECT COUNT(DISTINCT c.id) as converted
@@ -665,13 +665,13 @@ class FunnelService
     /**
      * Obter próximo estágio
      */
-    private static function getNextStage(int $funnelId, int $currentPosition): ?array
+    private static function getNextStage(int $funnelId, int $currentStageOrder): ?array
     {
         $sql = "SELECT * FROM funnel_stages 
-                WHERE funnel_id = ? AND position > ?
-                ORDER BY position ASC 
+                WHERE funnel_id = ? AND stage_order > ?
+                ORDER BY stage_order ASC 
                 LIMIT 1";
-        return \App\Helpers\Database::fetch($sql, [$funnelId, $currentPosition]);
+        return \App\Helpers\Database::fetch($sql, [$funnelId, $currentStageOrder]);
     }
     
     /**

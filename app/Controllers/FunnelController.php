@@ -589,4 +589,31 @@ class FunnelController
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
+    
+    /**
+     * Reordenar etapa (mover para cima/baixo)
+     */
+    public function reorderStage(int $stageId): void
+    {
+        Permission::abortIfCannot('funnels.edit');
+        
+        try {
+            $data = Request::json();
+            $direction = $data['direction'] ?? null;
+            
+            if (!in_array($direction, ['up', 'down'])) {
+                Response::json(['success' => false, 'message' => 'Direção inválida'], 400);
+                return;
+            }
+            
+            FunnelService::reorderStage($stageId, $direction);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Ordem atualizada com sucesso'
+            ]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
 }

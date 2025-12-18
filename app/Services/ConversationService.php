@@ -69,10 +69,27 @@ class ConversationService
                 $account = WhatsAppAccount::find((int)$data['whatsapp_account_id']);
                 if ($account && !empty($account['default_funnel_id'])) {
                     $funnelId = (int)$account['default_funnel_id'];
+                    
+                    // Se tem etapa específica configurada, usar ela
                     if (!empty($account['default_stage_id'])) {
                         $stageId = (int)$account['default_stage_id'];
+                        Logger::debug("ConversationService::create - Integração: Funil ID {$funnelId}, Etapa específica ID {$stageId}", 'conversas.log');
+                    } else {
+                        // Se não tem etapa específica, buscar etapa "Entrada" do funil (sistema obrigatório)
+                        Logger::debug("ConversationService::create - Integração: Funil ID {$funnelId}, sem etapa específica. Buscando 'Entrada'...", 'conversas.log');
+                        $entradaStage = \App\Models\FunnelStage::getSystemStage($funnelId, 'entrada');
+                        if ($entradaStage) {
+                            $stageId = (int)$entradaStage['id'];
+                            Logger::debug("ConversationService::create - Integração: Usando etapa 'Entrada' ID {$stageId}", 'conversas.log');
+                        } else {
+                            // Fallback: primeira etapa do funil
+                            $stages = Funnel::getStages($funnelId);
+                            if (!empty($stages)) {
+                                $stageId = (int)$stages[0]['id'];
+                                Logger::debug("ConversationService::create - Integração: 'Entrada' não encontrada, usando primeira etapa ID {$stageId}", 'conversas.log');
+                            }
+                        }
                     }
-                    Logger::debug("ConversationService::create - Configuração da integração WhatsApp: Funil ID {$funnelId}, Etapa ID " . ($stageId ?? 'NULL'), 'conversas.log');
                 } else {
                     Logger::debug("ConversationService::create - Integração WhatsApp sem configuração de funil/etapa", 'conversas.log');
                 }

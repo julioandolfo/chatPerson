@@ -1052,5 +1052,86 @@ class FunnelService
         // Deletar funil (cascade vai deletar as etapas automaticamente)
         return Funnel::delete($funnelId);
     }
+    
+    /**
+     * Reordenar etapa (mover para cima/baixo)
+     * 
+     * @param int $stageId ID da etapa
+     * @param string $direction 'up' ou 'down'
+     * @return bool
+     * @throws \InvalidArgumentException
+     */
+    public static function reorderStage(int $stageId, string $direction): bool
+    {
+        $db = \App\Helpers\Database::getInstance();
+        
+        // Buscar etapa atual
+        $currentStage = \App\Models\FunnelStage::find($stageId);
+        if (!$currentStage) {
+            throw new \InvalidArgumentException('Etapa não encontrada');
+        }
+        
+        $funnelId = $currentStage['funnel_id'];
+        $currentOrder = $currentStage['stage_order'] ?? 0;
+        
+        // Buscar todas as etapas do funil ordenadas
+        $allStages = \App\Models\FunnelStage::where('funnel_id', '=', $funnelId);
+        usort($allStages, function($a, $b) {
+            return ($a['stage_order'] ?? 0) - ($b['stage_order'] ?? 0);
+        });
+        
+        // Encontrar índice da etapa atual
+        $currentIndex = null;
+        foreach ($allStages as $idx => $stage) {
+            if ($stage['id'] == $stageId) {
+                $currentIndex = $idx;
+                break;
+            }
+        }
+        
+        if ($currentIndex === null) {
+            throw new \InvalidArgumentException('Etapa não encontrada no funil');
+        }
+        
+        // Determinar etapa para trocar
+        $swapIndex = null;
+        if ($direction === 'up' && $currentIndex > 0) {
+            $swapIndex = $currentIndex - 1;
+        } elseif ($direction === 'down' && $currentIndex < count($allStages) - 1) {
+            $swapIndex = $currentIndex + 1;
+        } else {
+            // Já está na primeira ou última posição
+            return true;
+        }
+        
+        $swapStage = $allStages[$swapIndex];
+        
+        // Trocar os valores de stage_order
+        $tempOrder = $currentStage['stage_order'];
+        $newCurrentOrder = $swapStage['stage_order'];
+        $newSwapOrder = $tempOrder;
+        
+        // Atualizar no banco usando transação
+        try {
+            $db->beginTransaction();
+            
+            // Atualizar etapa atual
+            $sql = "UPDATE funnel_stages SET stage_order = ? WHERE id = ?";
+            $db->prepare($sql)->execute([$newCurrentOrder, $stageId]);
+            
+            // Atualizar etapa trocada
+            $sql = "UPDATE funnel_stages SET stage_order = ? WHERE id = ?";
+            $db->prepare($sql)->execute([$newSwapOrder, $swapStage['id']]);
+            
+            $db->commit();
+            
+            Logger::info("Etapa {$stageId} reordenada: {$direction}", 'funnels.log');
+            
+            return true;
+        } catch (\Exception $e) {
+            $db->rollBack();
+            throw new \Exception('Erro ao reordenar etapa: ' . $e->getMessage());
+        }
+    }
 }
 

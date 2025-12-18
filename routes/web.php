@@ -141,6 +141,7 @@ Router::delete('/funnels/{id}', [FunnelController::class, 'delete'], ['Authentic
 Router::post('/funnels/{id}/stages', [FunnelController::class, 'createStage'], ['Authentication']);
 Router::post('/funnels/{id}/stages/{stageId}', [FunnelController::class, 'updateStage'], ['Authentication']);
 Router::delete('/funnels/{id}/stages/{stageId}', [FunnelController::class, 'deleteStage'], ['Authentication']);
+Router::post('/funnels/stages/{stageId}/reorder', [FunnelController::class, 'reorderStage'], ['Authentication']);
 Router::post('/funnels/{id}/conversations/move', [FunnelController::class, 'moveConversation'], ['Authentication']);
 Router::post('/funnels/{id}/stages/reorder', [FunnelController::class, 'reorderStages'], ['Authentication']);
 Router::get('/funnels/{id}/metrics', [FunnelController::class, 'getFunnelMetrics'], ['Authentication']);

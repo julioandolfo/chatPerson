@@ -250,7 +250,9 @@ ob_start();
             </div>
             <?php endif; ?>
             <div class="kanban-board d-flex gap-5 overflow-auto pb-5" id="kt_kanban_board">
-                <?php foreach ($kanbanData['stages'] as $stageData): 
+                <?php 
+                $stagesData = $kanbanData['stages'];
+                foreach ($stagesData as $stageIndex => $stageData): 
                     $stage = $stageData['stage'];
                     // Fallback de cor caso não esteja definida (dados antigos)
                     $stageColor = !empty($stage['color']) ? $stage['color'] : '#009ef7';
@@ -291,6 +293,33 @@ ob_start();
                                                 <span class="badge badge-light-warning">/ <?= $stage['max_conversations'] ?></span>
                                             <?php endif; ?>
                                         </div>
+                                        
+                                        <?php if (\App\Helpers\Permission::can('funnels.edit')): ?>
+                                            <!-- Botões de Reordenação -->
+                                            <div class="btn-group btn-group-sm">
+                                                <?php if ($stageIndex > 0): ?>
+                                                    <button type="button" class="btn btn-sm btn-icon btn-light-secondary" 
+                                                            onclick="reorderStage(<?= $stage['id'] ?>, 'up')"
+                                                            title="Mover para esquerda">
+                                                        <i class="ki-duotone ki-arrow-left fs-3">
+                                                            <span class="path1"></span>
+                                                            <span class="path2"></span>
+                                                        </i>
+                                                    </button>
+                                                <?php endif; ?>
+                                                <?php if ($stageIndex < count($stagesData) - 1): ?>
+                                                    <button type="button" class="btn btn-sm btn-icon btn-light-secondary" 
+                                                            onclick="reorderStage(<?= $stage['id'] ?>, 'down')"
+                                                            title="Mover para direita">
+                                                        <i class="ki-duotone ki-arrow-right fs-3">
+                                                            <span class="path1"></span>
+                                                            <span class="path2"></span>
+                                                        </i>
+                                                    </button>
+                                                <?php endif; ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        
                                         <button type="button" class="btn btn-sm btn-icon btn-light-info" 
                                                 onclick="showStageMetrics(<?= $stage['id'] ?>, <?= htmlspecialchars(json_encode($stage['name']), ENT_QUOTES, 'UTF-8') ?>)" 
                                                 title="Ver métricas">

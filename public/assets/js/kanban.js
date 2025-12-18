@@ -1096,6 +1096,44 @@ function quickResolve(conversationId) {
 }
 
 // ============================================================================
+// REORDENAR ETAPA
+// ============================================================================
+
+async function reorderStage(stageId, direction) {
+    try {
+        const response = await fetch(`${BASE_URL}/funnels/stages/${stageId}/reorder`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ direction })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            toast.fire({
+                icon: 'success',
+                title: 'Ordem atualizada!',
+                text: 'A etapa foi movida com sucesso.'
+            });
+            
+            // Recarregar página para atualizar ordem
+            setTimeout(() => location.reload(), 500);
+        } else {
+            throw new Error(result.message || 'Erro ao reordenar etapa');
+        }
+    } catch (error) {
+        console.error('Erro ao reordenar etapa:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: error.message || 'Não foi possível reordenar a etapa'
+        });
+    }
+}
+
+// ============================================================================
 // EXPORTAR FUNÇÕES GLOBAIS
 // ============================================================================
 
@@ -1109,4 +1147,5 @@ window.showStageMetrics = showStageMetrics;
 window.showFunnelMetrics = showFunnelMetrics;
 window.quickAssignAgent = quickAssignAgent;
 window.quickResolve = quickResolve;
+window.reorderStage = reorderStage;
 

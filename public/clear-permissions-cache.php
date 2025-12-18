@@ -63,19 +63,19 @@ echo "<hr>";
 // Testar as correções
 echo "<h2>🧪 Testando Correções</h2>";
 
-require_once __DIR__ . '/../config/database.php';
+// Carregar configuração do banco
+$dbConfig = require __DIR__ . '/../config/database.php';
 
 // Conectar ao banco
 try {
     $pdo = new PDO(
-        "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4",
-        DB_USER,
-        DB_PASS,
-        [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
-        ]
+        "mysql:host=" . $dbConfig['host'] . ";dbname=" . $dbConfig['database'] . ";charset=" . $dbConfig['charset'],
+        $dbConfig['username'],
+        $dbConfig['password'],
+        $dbConfig['options']
     );
+    
+    echo "<p class='success'>✅ Conectado ao banco de dados com sucesso!</p>";
 } catch (PDOException $e) {
     echo "<p class='error'>❌ Erro ao conectar ao banco: " . htmlspecialchars($e->getMessage()) . "</p>";
     echo "</body></html>";

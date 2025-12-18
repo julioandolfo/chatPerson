@@ -22,18 +22,24 @@ class DashboardService
         $dateFrom = $dateFrom ?? date('Y-m-01'); // Primeiro dia do mês
         $dateTo = $dateTo ?? date('Y-m-d H:i:s'); // Hoje
 
+        error_log("DEBUG getGeneralStats: userId={$userId}, dateFrom={$dateFrom}, dateTo={$dateTo}");
+
         // Total de conversas
         $totalConversations = self::getTotalConversations($dateFrom, $dateTo);
+        error_log("DEBUG getGeneralStats: totalConversations={$totalConversations}");
         
         // Conversas abertas
         $openConversations = self::getOpenConversations();
+        error_log("DEBUG getGeneralStats: openConversations={$openConversations}");
         
         // Conversas fechadas
         $closedConversations = self::getClosedConversations($dateFrom, $dateTo);
+        error_log("DEBUG getGeneralStats: closedConversations={$closedConversations}");
         
         // Conversas do usuário (se informado)
         $myConversations = $userId ? self::getMyConversations($userId, $dateFrom, $dateTo) : 0;
         $myOpenConversations = $userId ? self::getMyOpenConversations($userId) : 0;
+        error_log("DEBUG getGeneralStats: myConversations={$myConversations}, myOpenConversations={$myOpenConversations}");
         
         // Tempo médio de resolução (período)
         $avgResolutionTime = self::getAverageResolutionTime($dateFrom, $dateTo);
@@ -68,6 +74,8 @@ class DashboardService
         
         // Conversas sem atribuição
         $unassignedConversations = self::getUnassignedConversations();
+        error_log("DEBUG getGeneralStats: unassignedConversations={$unassignedConversations}");
+        error_log("DEBUG getGeneralStats: avgFirstResponseTime={$avgFirstResponseTime}, avgResponseTime={$avgResponseTime}");
         
         return [
             'conversations' => [

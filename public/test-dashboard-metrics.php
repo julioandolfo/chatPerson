@@ -213,7 +213,7 @@ echo "</div>";
 
 if ($avgFirstResponse !== null) {
     $hours = floor($avgFirstResponse / 60);
-    $minutes = $avgFirstResponse % 60;
+    $minutes = (int)($avgFirstResponse % 60);
     echo "<div class='metric {$status}'>";
     echo "<span>Formato Legível</span>";
     echo "<span class='value'>";

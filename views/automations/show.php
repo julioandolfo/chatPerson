@@ -1485,13 +1485,22 @@ function openNodeConfig(nodeId) {
             
             // Preencher select de fallback node com nós disponíveis (após renderizar)
             setTimeout(() => {
+                console.log('Timeout executado - populando fallback e intents');
+                console.log('ai_fallback_node_id:', node.node_data.ai_fallback_node_id);
+                console.log('ai_intents:', node.node_data.ai_intents);
+                
                 if (typeof populateAIFallbackNodes === 'function') {
                     populateAIFallbackNodes(node.node_data.ai_fallback_node_id);
+                } else {
+                    console.error('populateAIFallbackNodes não disponível');
                 }
+                
                 if (typeof populateAIIntents === 'function') {
                     populateAIIntents(node.node_data.ai_intents || []);
+                } else {
+                    console.error('populateAIIntents não disponível');
                 }
-            }, 100);
+            }, 200); // Aumentado de 100 para 200ms
             
             break;
         case "action_assign_advanced":
@@ -2635,14 +2644,23 @@ document.addEventListener("DOMContentLoaded", function() {
             
             // Tratamento específico para AI Agent: coletar intents
             if (node.node_type === "action_assign_ai_agent") {
-                const branchingEnabled = nodeData.ai_branching_enabled === '1' || nodeData.ai_branching_enabled === true;
-                console.log('Salvando configuração do AI Agent, branching:', branchingEnabled);
+                // Checkbox retorna 'on' quando marcado, ou undefined quando desmarcado
+                const branchingEnabled = nodeData.ai_branching_enabled === 'on' || 
+                                        nodeData.ai_branching_enabled === '1' || 
+                                        nodeData.ai_branching_enabled === true;
+                
+                console.log('Salvando configuração do AI Agent');
+                console.log('  ai_branching_enabled raw:', nodeData.ai_branching_enabled);
+                console.log('  branchingEnabled processado:', branchingEnabled);
+                
+                // Converter para boolean para salvar corretamente
+                nodeData.ai_branching_enabled = branchingEnabled;
                 
                 if (branchingEnabled) {
                     const intentInputs = document.querySelectorAll('.ai-intent-item');
                     const intents = [];
                     
-                    console.log('Intent items encontrados:', intentInputs.length);
+                    console.log('  Intent items encontrados:', intentInputs.length);
                     
                     intentInputs.forEach((item, idx) => {
                         const intentName = item.querySelector(`input[name="ai_intents[${idx}][intent]"]`)?.value?.trim();
@@ -2652,7 +2670,11 @@ document.addEventListener("DOMContentLoaded", function() {
                         
                         const keywords = keywordsRaw.split(',').map(k => k.trim()).filter(k => k.length > 0);
                         
-                        console.log(`Intent ${idx}: name="${intentName}", desc="${description}", target="${targetNodeId}"`);
+                        console.log(`  Intent ${idx}:`);
+                        console.log(`    - name: "${intentName}"`);
+                        console.log(`    - desc: "${description}"`);
+                        console.log(`    - keywords: [${keywords.join(', ')}]`);
+                        console.log(`    - target: "${targetNodeId}"`);
                         
                         if (intentName && targetNodeId) {
                             intents.push({
@@ -2661,11 +2683,17 @@ document.addEventListener("DOMContentLoaded", function() {
                                 keywords: keywords,
                                 target_node_id: targetNodeId
                             });
+                        } else {
+                            console.warn(`  Intent ${idx} ignorado - faltando nome ou target`);
                         }
                     });
                     
-                    console.log('Intents coletados:', intents);
+                    console.log('  Total de intents válidos coletados:', intents.length);
+                    console.log('  Intents:', intents);
                     nodeData.ai_intents = intents;
+                } else {
+                    console.log('  Ramificação desabilitada, limpando intents');
+                    nodeData.ai_intents = [];
                 }
             }
             
@@ -3282,86 +3310,134 @@ window.renumberAIIntents = function() {
 window.populateAIFallbackNodes = function(selectedNodeId) {
     selectedNodeId = selectedNodeId || '';
     const select = document.getElementById('kt_ai_fallback_node_id');
-    if (!select) return;
+    if (!select) {
+        console.warn('populateAIFallbackNodes: select kt_ai_fallback_node_id não encontrado');
+        return;
+    }
     
     // Limpar opções existentes (exceto a primeira)
     while (select.options.length > 1) {
         select.remove(1);
     }
     
-    // Adicionar nós disponíveis
-    const nodes = window.currentAutomation?.nodes || [];
+    // Adicionar nós disponíveis - usar window.nodes
+    const nodes = window.nodes || [];
+    console.log('populateAIFallbackNodes: Total de nós disponíveis:', nodes.length);
+    
+    let addedCount = 0;
     nodes.forEach(node => {
         if (node.node_type !== 'trigger' && node.node_type !== 'action_assign_ai_agent') {
             const label = node.node_data?.label || node.node_type;
             const option = new Option(label, node.id);
             select.add(option);
+            addedCount++;
             
             if (node.id == selectedNodeId) {
                 option.selected = true;
             }
         }
     });
+    
+    console.log('populateAIFallbackNodes: Nós adicionados ao select:', addedCount);
 };
 
 // Preencher select de nós disponíveis para target de intent
 window.populateAIIntentTargetNodes = function(intentIndex) {
     const select = document.querySelector(`select[name="ai_intents[${intentIndex}][target_node_id]"]`);
-    if (!select) return;
+    if (!select) {
+        console.warn('populateAIIntentTargetNodes: select não encontrado para intent index:', intentIndex);
+        return;
+    }
     
-    // Adicionar nós disponíveis
-    const nodes = window.currentAutomation?.nodes || [];
+    // Adicionar nós disponíveis - usar window.nodes
+    const nodes = window.nodes || [];
+    console.log('populateAIIntentTargetNodes: Total de nós disponíveis:', nodes.length);
+    
+    let addedCount = 0;
     nodes.forEach(node => {
         if (node.node_type !== 'trigger' && node.node_type !== 'action_assign_ai_agent') {
             const label = node.node_data?.label || node.node_type;
             const option = new Option(label, node.id);
             select.add(option);
+            addedCount++;
         }
     });
+    
+    console.log('populateAIIntentTargetNodes: Nós adicionados ao select:', addedCount);
 };
 
 // Popular intents existentes ao carregar nó
 window.populateAIIntents = function(intents) {
+    console.log('populateAIIntents chamado com:', intents);
+    
     intents = intents || [];
     const list = document.getElementById('ai_intents_list');
-    if (!list) return;
     
-    // Limpar lista
-    list.innerHTML = '';
-    
-    // Se não há intents, não adicionar nada (usuário pode adicionar manualmente)
-    if (!intents || intents.length === 0) {
+    if (!list) {
+        console.error('populateAIIntents: elemento ai_intents_list não encontrado!');
         return;
     }
     
+    // Limpar lista
+    list.innerHTML = '';
+    console.log('Lista limpa');
+    
+    // Se não há intents, não adicionar nada (usuário pode adicionar manualmente)
+    if (!intents || intents.length === 0) {
+        console.log('Nenhum intent para carregar');
+        return;
+    }
+    
+    console.log(`Carregando ${intents.length} intent(s)`);
+    
     // Adicionar cada intent
     intents.forEach((intent, index) => {
+        console.log(`Adicionando intent ${index}:`, intent);
+        
         if (typeof addAIIntent === 'function') {
             addAIIntent();
+        } else {
+            console.error('addAIIntent não está disponível');
+            return;
         }
         
-        // Preencher valores
+        // Preencher valores - aumentar timeout para garantir que o DOM foi atualizado
         setTimeout(() => {
             const item = list.children[index];
-            if (item) {
-                const intentInput = item.querySelector(`input[name="ai_intents[${index}][intent]"]`);
-                const descInput = item.querySelector(`input[name="ai_intents[${index}][description]"]`);
-                const keywordsInput = item.querySelector(`input[name="ai_intents[${index}][keywords]"]`);
-                const targetSelect = item.querySelector(`select[name="ai_intents[${index}][target_node_id]"]`);
-                
-                if (intentInput) intentInput.value = intent.intent || '';
-                if (descInput) descInput.value = intent.description || '';
-                if (keywordsInput) {
-                    // Keywords pode ser array ou string
-                    const keywords = Array.isArray(intent.keywords) ? intent.keywords.join(', ') : (intent.keywords || '');
-                    keywordsInput.value = keywords;
-                }
-                if (targetSelect && intent.target_node_id) {
-                    targetSelect.value = intent.target_node_id;
-                }
+            if (!item) {
+                console.error(`Item ${index} não encontrado no DOM`);
+                return;
             }
-        }, 50);
+            
+            console.log(`Preenchendo valores do intent ${index}`);
+            
+            const intentInput = item.querySelector(`input[name="ai_intents[${index}][intent]"]`);
+            const descInput = item.querySelector(`input[name="ai_intents[${index}][description]"]`);
+            const keywordsInput = item.querySelector(`input[name="ai_intents[${index}][keywords]"]`);
+            const targetSelect = item.querySelector(`select[name="ai_intents[${index}][target_node_id]"]`);
+            
+            if (intentInput) {
+                intentInput.value = intent.intent || '';
+                console.log(`  - Intent name: ${intent.intent}`);
+            }
+            if (descInput) {
+                descInput.value = intent.description || '';
+                console.log(`  - Description: ${intent.description}`);
+            }
+            if (keywordsInput) {
+                // Keywords pode ser array ou string
+                const keywords = Array.isArray(intent.keywords) ? intent.keywords.join(', ') : (intent.keywords || '');
+                keywordsInput.value = keywords;
+                console.log(`  - Keywords: ${keywords}`);
+            }
+            if (targetSelect && intent.target_node_id) {
+                targetSelect.value = intent.target_node_id;
+                console.log(`  - Target node: ${intent.target_node_id}`);
+            }
+        }, 100); // Aumentado de 50 para 100ms
     });
+    
+    console.log('populateAIIntents concluído');
 };
 
 </script>

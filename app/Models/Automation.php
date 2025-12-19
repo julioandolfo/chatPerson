@@ -75,8 +75,8 @@ class Automation extends Model
      */
     public static function getActiveByTrigger(string $triggerType, array $triggerData = [], ?int $funnelId = null, ?int $stageId = null): array
     {
-        \App\Helpers\Logger::debug("=== Automation::getActiveByTrigger INÍCIO ===", 'automacao.log');
-        \App\Helpers\Logger::debug("Parâmetros: triggerType={$triggerType}, funnelId={$funnelId}, stageId={$stageId}, triggerData=" . json_encode($triggerData), 'automacao.log');
+        \App\Helpers\Logger::automation("=== Automation::getActiveByTrigger INÍCIO ===");
+        \App\Helpers\Logger::automation("Parâmetros: triggerType={$triggerType}, funnelId={$funnelId}, stageId={$stageId}, triggerData=" . json_encode($triggerData));
         
         $sql = "SELECT a.*, f.name as funnel_name, fs.name as stage_name
                 FROM automations a
@@ -98,22 +98,22 @@ class Automation extends Model
             $params[] = $stageId;
         }
         
-        \App\Helpers\Logger::debug("SQL: {$sql}", 'automacao.log');
-        \App\Helpers\Logger::debug("Params: " . json_encode($params), 'automacao.log');
+        \App\Helpers\Logger::automation("SQL: {$sql}");
+        \App\Helpers\Logger::automation("Params: " . json_encode($params));
         
         $automations = Database::fetchAll($sql, $params);
         
-        \App\Helpers\Logger::debug("Automações encontradas no banco: " . count($automations), 'automacao.log');
+        \App\Helpers\Logger::automation("Automações encontradas no banco: " . count($automations));
         
         if (!empty($automations)) {
             foreach ($automations as $idx => $auto) {
-                \App\Helpers\Logger::debug("  [{$idx}] ID: {$auto['id']}, Nome: {$auto['name']}, Funil: {$auto['funnel_id']}, Estágio: {$auto['stage_id']}, Trigger Config: {$auto['trigger_config']}", 'automacao.log');
+                \App\Helpers\Logger::automation("  [{$idx}] ID: {$auto['id']}, Nome: {$auto['name']}, Funil: {$auto['funnel_id']}, Estágio: {$auto['stage_id']}, Trigger Config: {$auto['trigger_config']}");
             }
         }
         
         // Filtrar por trigger_config se fornecido
         if (!empty($triggerData)) {
-            \App\Helpers\Logger::debug("Aplicando filtro de trigger_config...", 'automacao.log');
+            \App\Helpers\Logger::automation("Aplicando filtro de trigger_config...");
             $filtered = [];
             foreach ($automations as $automation) {
                 // Evitar warning de json_decode com null/empty e tratar erro de decode
@@ -124,23 +124,23 @@ class Automation extends Model
                     $config = json_decode($configRaw, true);
                     if (json_last_error() !== JSON_ERROR_NONE) {
                         error_log('Automation::getActiveByTrigger - JSON inválido em trigger_config: ' . json_last_error_msg());
-                        \App\Helpers\Logger::debug("JSON inválido em trigger_config para automação ID {$automation['id']}: " . json_last_error_msg(), 'automacao.log');
+                        \App\Helpers\Logger::automation("JSON inválido em trigger_config para automação ID {$automation['id']}: " . json_last_error_msg());
                         $config = [];
                     }
                 }
 
                 $matches = self::matchesTriggerConfig($config, $triggerData);
-                \App\Helpers\Logger::debug("  Automação ID {$automation['id']}: Config=" . json_encode($config) . ", Matches=" . ($matches ? 'SIM' : 'NÃO'), 'automacao.log');
+                \App\Helpers\Logger::automation("  Automação ID {$automation['id']}: Config=" . json_encode($config) . ", Matches=" . ($matches ? 'SIM' : 'NÃO'));
                 
                 if ($matches) {
                     $filtered[] = $automation;
                 }
             }
-            \App\Helpers\Logger::debug("Após filtro trigger_config: " . count($filtered) . " automações", 'automacao.log');
+            \App\Helpers\Logger::automation("Após filtro trigger_config: " . count($filtered) . " automações");
             return $filtered;
         }
         
-        \App\Helpers\Logger::debug("=== Automation::getActiveByTrigger FIM === Retornando " . count($automations) . " automações", 'automacao.log');
+        \App\Helpers\Logger::automation("=== Automation::getActiveByTrigger FIM === Retornando " . count($automations) . " automações");
         return $automations;
     }
 

@@ -40,7 +40,12 @@ if (file_exists($logFile)) {
 
 // Testar Logger::debug
 echo "<p>Escrevendo com Logger::debug...</p>";
-\App\Helpers\Logger::debug("TESTE 1: Escrita direta via Logger::debug", 'automacao.log');
+\App\Helpers\Logger::debug("TESTE 1A: Escrita direta via Logger::debug", 'automacao.log');
+echo "<p class='success'>✅ Comando executado sem erro</p>";
+
+// Testar Logger::automation
+echo "<p>Escrevendo com Logger::automation...</p>";
+\App\Helpers\Logger::automation("TESTE 1B: Escrita direta via Logger::automation");
 echo "<p class='success'>✅ Comando executado sem erro</p>";
 
 // Testar escrita direta

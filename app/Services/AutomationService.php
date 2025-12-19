@@ -136,15 +136,15 @@ class AutomationService
      */
     public static function executeForNewConversation(int $conversationId): void
     {
-        \App\Helpers\Logger::debug("=== executeForNewConversation INÍCIO === conversationId: {$conversationId}", 'automacao.log');
+        \App\Helpers\Logger::automation("=== executeForNewConversation INÍCIO === conversationId: {$conversationId}");
         
         $conversation = Conversation::find($conversationId);
         if (!$conversation) {
-            \App\Helpers\Logger::debug("ERRO: Conversa não encontrada! conversationId: {$conversationId}", 'automacao.log');
+            \App\Helpers\Logger::automation("ERRO: Conversa não encontrada! conversationId: {$conversationId}");
             return;
         }
         
-        \App\Helpers\Logger::debug("Conversa encontrada: " . json_encode($conversation), 'automacao.log');
+        \App\Helpers\Logger::automation("Conversa encontrada: " . json_encode($conversation));
 
         // Buscar automações ativas para new_conversation
         $triggerData = [
@@ -156,27 +156,27 @@ class AutomationService
         $funnelId = $conversation['funnel_id'] ?? null;
         $stageId = $conversation['funnel_stage_id'] ?? null;
 
-        \App\Helpers\Logger::debug("Buscando automações com: triggerData=" . json_encode($triggerData) . ", funnelId={$funnelId}, stageId={$stageId}", 'automacao.log');
+        \App\Helpers\Logger::automation("Buscando automações com: triggerData=" . json_encode($triggerData) . ", funnelId={$funnelId}, stageId={$stageId}");
 
         $automations = Automation::getActiveByTrigger('new_conversation', $triggerData, $funnelId, $stageId);
 
-        \App\Helpers\Logger::debug("Automações encontradas: " . count($automations), 'automacao.log');
+        \App\Helpers\Logger::automation("Automações encontradas: " . count($automations));
         
         if (!empty($automations)) {
-            \App\Helpers\Logger::debug("Lista de automações: " . json_encode($automations), 'automacao.log');
+            \App\Helpers\Logger::automation("Lista de automações: " . json_encode($automations));
         }
 
         foreach ($automations as $automation) {
-            \App\Helpers\Logger::debug("Executando automação ID: {$automation['id']}, Nome: {$automation['name']}", 'automacao.log');
+            \App\Helpers\Logger::automation("Executando automação ID: {$automation['id']}, Nome: {$automation['name']}");
             try {
                 self::executeAutomation($automation['id'], $conversationId);
-                \App\Helpers\Logger::debug("Automação ID: {$automation['id']} executada com SUCESSO", 'automacao.log');
+                \App\Helpers\Logger::automation("Automação ID: {$automation['id']} executada com SUCESSO");
             } catch (\Exception $e) {
-                \App\Helpers\Logger::debug("ERRO ao executar automação ID: {$automation['id']} - " . $e->getMessage(), 'automacao.log');
+                \App\Helpers\Logger::automation("ERRO ao executar automação ID: {$automation['id']} - " . $e->getMessage());
             }
         }
         
-        \App\Helpers\Logger::debug("=== executeForNewConversation FIM ===", 'automacao.log');
+        \App\Helpers\Logger::automation("=== executeForNewConversation FIM ===");
     }
 
     /**

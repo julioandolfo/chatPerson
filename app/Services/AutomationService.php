@@ -1079,17 +1079,56 @@ class AutomationService
                 $automationId = self::getCurrentAutomationId($conversationId);
             }
             
-            // Enviar mensagem inicial do chatbot
-            \App\Helpers\Logger::automation("    Enviando mensagem do chatbot...");
-            $messageId = \App\Models\Message::create([
-                'conversation_id' => $conversationId,
-                'sender_id' => null, // Sistema
-                'sender_type' => 'system',
-                'content' => $message,
-                'message_type' => 'text',
-                'channel' => $conversation['channel'] ?? 'whatsapp'
-            ]);
-            \App\Helpers\Logger::automation("    ✅ Mensagem enviada: ID {$messageId}");
+            // Enviar mensagem inicial do chatbot VIA WHATSAPP
+            \App\Helpers\Logger::automation("    Enviando mensagem do chatbot via WhatsApp...");
+            
+            try {
+                // Buscar dados do contato
+                $contact = \App\Models\Contact::find($conversation['contact_id']);
+                if (!$contact) {
+                    throw new \Exception("Contato não encontrado: {$conversation['contact_id']}");
+                }
+                
+                $whatsappAccountId = $conversation['whatsapp_account_id'];
+                if (!$whatsappAccountId) {
+                    throw new \Exception("Conversa sem conta WhatsApp vinculada");
+                }
+                
+                // Enviar via API do WhatsApp
+                \App\Helpers\Logger::automation("    Enviando via WhatsApp para: {$contact['phone']}");
+                $response = \App\Services\WhatsAppService::sendMessage(
+                    $whatsappAccountId,
+                    $contact['phone'],
+                    $message
+                );
+                
+                \App\Helpers\Logger::automation("    ✅ Mensagem enviada via WhatsApp! Response: " . json_encode($response));
+                
+                // Salvar mensagem no banco (já foi enviada)
+                $messageId = \App\Models\Message::create([
+                    'conversation_id' => $conversationId,
+                    'sender_id' => null, // Sistema
+                    'sender_type' => 'agent', // Marcar como 'agent' para aparecer como mensagem da empresa
+                    'content' => $message,
+                    'message_type' => 'text',
+                    'channel' => 'whatsapp'
+                ]);
+                
+                \App\Helpers\Logger::automation("    ✅ Mensagem salva no banco: ID {$messageId}");
+                
+            } catch (\Exception $e) {
+                \App\Helpers\Logger::automation("    ❌ ERRO ao enviar via WhatsApp: " . $e->getMessage());
+                // Se falhar o envio, ainda salvar no banco para registro
+                $messageId = \App\Models\Message::create([
+                    'conversation_id' => $conversationId,
+                    'sender_id' => null,
+                    'sender_type' => 'system',
+                    'content' => $message . "\n\n[ERRO: Não foi possível enviar via WhatsApp]",
+                    'message_type' => 'text',
+                    'channel' => 'whatsapp'
+                ]);
+                throw $e; // Re-lançar erro para marcar automação como failed
+            }
             
             // Processar opções de menu (se tipo = menu)
             if ($chatbotType === 'menu') {
@@ -1101,16 +1140,32 @@ class AutomationService
                     }, $options);
                     $labels = array_filter($labels);
                     if (!empty($labels)) {
-                        $optionsText = "\n\n" . implode("\n", $labels);
+                        $optionsText = implode("\n", $labels);
                         
-                        \App\Models\Message::create([
-                            'conversation_id' => $conversationId,
-                            'sender_id' => null,
-                            'sender_type' => 'system',
-                            'content' => $optionsText,
-                            'message_type' => 'text',
-                            'channel' => $conversation['channel'] ?? 'whatsapp'
-                        ]);
+                        try {
+                            // Enviar opções via WhatsApp
+                            \App\Helpers\Logger::automation("    Enviando opções do menu via WhatsApp...");
+                            $response = \App\Services\WhatsAppService::sendMessage(
+                                $whatsappAccountId,
+                                $contact['phone'],
+                                $optionsText
+                            );
+                            
+                            \App\Helpers\Logger::automation("    ✅ Opções enviadas via WhatsApp!");
+                            
+                            // Salvar no banco
+                            \App\Models\Message::create([
+                                'conversation_id' => $conversationId,
+                                'sender_id' => null,
+                                'sender_type' => 'agent',
+                                'content' => $optionsText,
+                                'message_type' => 'text',
+                                'channel' => 'whatsapp'
+                            ]);
+                        } catch (\Exception $e) {
+                            \App\Helpers\Logger::automation("    ⚠️ Erro ao enviar opções: " . $e->getMessage());
+                            // Continuar mesmo se falhar (já enviou a mensagem principal)
+                        }
                     }
                 }
             }

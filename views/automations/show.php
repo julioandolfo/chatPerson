@@ -2258,14 +2258,37 @@ function renderConnections() {
 }
 
 function removeConnection(fromNodeId, toNodeId) {
-    const node = nodes.find(n => n.id === fromNodeId);
-    if (!node || !node.node_data.connections) return;
+    console.log('removeConnection chamado:', { fromNodeId, toNodeId, type_from: typeof fromNodeId, type_to: typeof toNodeId });
     
+    // Converter para string para garantir comparação consistente
+    const fromIdStr = String(fromNodeId);
+    const toIdStr = String(toNodeId);
+    
+    const node = nodes.find(n => String(n.id) === fromIdStr);
+    console.log('Nó encontrado:', node);
+    
+    if (!node || !node.node_data.connections) {
+        console.log('Nó não encontrado ou sem conexões');
+        return;
+    }
+    
+    const oldConnectionsCount = node.node_data.connections.length;
     node.node_data.connections = node.node_data.connections.filter(
-        conn => conn.target_node_id !== toNodeId
+        conn => String(conn.target_node_id) !== toIdStr
     );
     
+    const newConnectionsCount = node.node_data.connections.length;
+    console.log('Conexões removidas:', oldConnectionsCount - newConnectionsCount);
+    console.log('Conexões restantes:', node.node_data.connections);
+    
+    // Atualizar visualmente
     renderConnections();
+    
+    // Salvar automaticamente no servidor
+    if (oldConnectionsCount > newConnectionsCount) {
+        console.log('Salvando alteração no servidor...');
+        saveLayout();
+    }
 }
 
 function saveLayout() {

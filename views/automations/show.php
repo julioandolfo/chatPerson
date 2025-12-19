@@ -9,12 +9,16 @@ if (typeof window.validateAutomationConnections === 'undefined') {
     window.validateAutomationConnections = function() { return true; };
 }
 // Garantir que botões de teste não quebrem antes do script principal carregar
-if (typeof window.testAutomation === 'undefined') {
-    window.testAutomation = function() { console.warn('testAutomation ainda não carregou.'); };
-}
-if (typeof window.advancedTestAutomation === 'undefined') {
-    window.advancedTestAutomation = function() { console.warn('advancedTestAutomation ainda não carregou.'); };
-}
+if (typeof window.__realTestAutomation === 'undefined') window.__realTestAutomation = null;
+if (typeof window.__realAdvancedTestAutomation === 'undefined') window.__realAdvancedTestAutomation = null;
+window.testAutomation = function() {
+    if (typeof window.__realTestAutomation === 'function') return window.__realTestAutomation();
+    console.warn('testAutomation ainda não carregou. Aguarde...');
+};
+window.advancedTestAutomation = function() {
+    if (typeof window.__realAdvancedTestAutomation === 'function') return window.__realAdvancedTestAutomation();
+    console.warn('advancedTestAutomation ainda não carregou. Aguarde...');
+};
 </script>
 HTML;
 
@@ -3414,7 +3418,9 @@ window.advancedTestAutomation = function advancedTestAutomation() {
                 conversation_id: conversationId || null,
                 mode: mode,
                 step_by_step: stepByStep
-            };
+};
+window.__realAdvancedTestAutomation = window.advancedTestAutomation;
+window.__realTestAutomation = window.testAutomation;
         }
     }).then((result) => {
         if (result.isConfirmed) {

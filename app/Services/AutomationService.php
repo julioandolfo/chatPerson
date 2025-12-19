@@ -184,23 +184,41 @@ class AutomationService
      */
     public static function executeForMessageReceived(int $messageId): void
     {
+        \App\Helpers\Logger::automation("=== executeForMessageReceived INÍCIO ===");
+        \App\Helpers\Logger::automation("Message ID: {$messageId}");
+        
         $message = \App\Models\Message::find($messageId);
         if (!$message || $message['sender_type'] === 'agent') {
+            \App\Helpers\Logger::automation("Mensagem não encontrada ou é de agente. Abortando.");
             return; // Não executar para mensagens de agentes
         }
 
+        \App\Helpers\Logger::automation("Mensagem encontrada: sender_type={$message['sender_type']}, content='{$message['content']}'");
+
         $conversation = Conversation::find($message['conversation_id']);
         if (!$conversation) {
+            \App\Helpers\Logger::automation("Conversa não encontrada. Abortando.");
             return;
         }
 
+        \App\Helpers\Logger::automation("Conversa ID: {$conversation['id']}");
+        \App\Helpers\Logger::automation("Metadata bruto: " . ($conversation['metadata'] ?? 'null'));
+
         // Se há um chatbot ativo aguardando resposta, tentar roteá-lo primeiro
         $metadata = json_decode($conversation['metadata'] ?? '{}', true);
+        \App\Helpers\Logger::automation("Metadata decodificado: " . json_encode($metadata));
+        \App\Helpers\Logger::automation("chatbot_active? " . (isset($metadata['chatbot_active']) ? ($metadata['chatbot_active'] ? 'TRUE' : 'FALSE') : 'NÃO EXISTE'));
+        
         if (!empty($metadata['chatbot_active'])) {
+            \App\Helpers\Logger::automation("🤖 Chatbot ATIVO detectado! Chamando handleChatbotResponse...");
             $handled = self::handleChatbotResponse($conversation, $message);
             if ($handled) {
+                \App\Helpers\Logger::automation("✅ Chatbot tratou a mensagem. Não disparar outras automações.");
                 return; // Já roteou para o próximo nó do chatbot, não disparar outras automações aqui
             }
+            \App\Helpers\Logger::automation("⚠️ handleChatbotResponse retornou false. Continuando com automações normais...");
+        } else {
+            \App\Helpers\Logger::automation("Chatbot NÃO está ativo. Buscando automações normais...");
         }
 
         // Buscar automações ativas para message_received
@@ -1222,10 +1240,16 @@ class AutomationService
             $currentMetadata['chatbot_invalid_attempts'] = 0; // Resetar contador
             
             \App\Helpers\Logger::automation("    Salvando estado do chatbot no metadata...");
+            \App\Helpers\Logger::automation("    Metadata a ser salvo: " . json_encode($currentMetadata));
             \App\Models\Conversation::update($conversationId, [
                 'metadata' => json_encode($currentMetadata)
             ]);
             \App\Helpers\Logger::automation("    ✅ Estado salvo! Chatbot aguardando resposta do contato.");
+            
+            // Verificar se realmente salvou
+            $conversationCheck = \App\Models\Conversation::find($conversationId);
+            $metadataCheck = json_decode($conversationCheck['metadata'] ?? '{}', true);
+            \App\Helpers\Logger::automation("    🔍 Verificação pós-salvamento: chatbot_active = " . ($metadataCheck['chatbot_active'] ? 'TRUE' : 'FALSE'));
             
             error_log("Chatbot ({$chatbotType}) executado para conversa {$conversationId}");
             

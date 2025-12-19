@@ -1715,7 +1715,7 @@ function openNodeConfig(nodeId) {
                 
                 <div class="fv-row mb-7">
                     <label class="fw-semibold fs-6 mb-2">⚠️ Nó de Fallback (Tentativas Excedidas)</label>
-                    <select name="chatbot_fallback_node_id" class="form-select form-select-solid">
+                    <select name="chatbot_fallback_node_id" id="kt_chatbot_fallback_node_id" class="form-select form-select-solid">
                         <option value="">Nenhum (enviar mensagem padrão)</option>
                         <!-- Será preenchido dinamicamente com os nós disponíveis -->
                     </select>
@@ -1819,6 +1819,29 @@ function openNodeConfig(nodeId) {
     }
     
     document.getElementById("kt_node_config_content").innerHTML = formContent;
+    
+    // Popular select de nó fallback para chatbot
+    if (node.node_type === 'action_chatbot') {
+        const fallbackSelect = document.getElementById('kt_chatbot_fallback_node_id');
+        if (fallbackSelect) {
+            // Limpar opções existentes (manter apenas a primeira)
+            while (fallbackSelect.options.length > 1) {
+                fallbackSelect.remove(1);
+            }
+            
+            // Adicionar todos os nós disponíveis (exceto o atual)
+            nodes.forEach(n => {
+                if (String(n.id) !== String(nodeId)) {
+                    const nodeConfig = nodeTypes[n.node_type] || {};
+                    const nodeLabel = n.node_data?.label || nodeConfig.label || n.node_type;
+                    const option = document.createElement('option');
+                    option.value = String(n.id);
+                    option.textContent = `${nodeLabel} (ID: ${n.id})`;
+                    fallbackSelect.appendChild(option);
+                }
+            });
+        }
+    }
     
     // Preencher valores existentes
     if (node.node_data) {

@@ -259,13 +259,13 @@ class ConversationService
         
         // Executar automações para nova conversa
         try {
-            Logger::debug("ConversationService::create - Tentando executar automações para conversa ID: {$id}, funnel_id: {$conversationData['funnel_id']}, stage_id: {$conversationData['funnel_stage_id']}", 'conversas.log');
+            \App\Helpers\Logger::debug("ConversationService::create - Tentando executar automações para conversa ID: {$id}, funnel_id: {$conversationData['funnel_id']}, stage_id: {$conversationData['funnel_stage_id']}", 'conversas.log');
             \App\Services\AutomationService::executeForNewConversation($id);
-            Logger::debug("ConversationService::create - Automações executadas com sucesso para conversa ID: {$id}", 'conversas.log');
+            \App\Helpers\Logger::debug("ConversationService::create - Automações executadas com sucesso para conversa ID: {$id}", 'conversas.log');
         } catch (\Exception $e) {
             // Log erro mas não interromper criação da conversa
             error_log("Erro ao executar automações: " . $e->getMessage());
-            Logger::debug("ConversationService::create - ERRO ao executar automações: " . $e->getMessage(), 'conversas.log');
+            \App\Helpers\Logger::debug("ConversationService::create - ERRO ao executar automações: " . $e->getMessage(), 'conversas.log');
         }
         
         return $conversation;

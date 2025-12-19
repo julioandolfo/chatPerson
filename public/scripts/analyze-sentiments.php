@@ -1,7 +1,8 @@
 <?php
 /**
  * Script para análise periódica de sentimento
- * Executar via cron: */5 * * * * cd /var/www/html && php public/scripts/analyze-sentiments.php >> logs/sentiment-analysis.log 2>&1
+ * Executar via cron a cada 5 minutos:
+ * cd /var/www/html && php public/scripts/analyze-sentiments.php >> logs/sentiment-analysis.log 2>&1
  */
 
 require_once __DIR__ . '/../../vendor/autoload.php';

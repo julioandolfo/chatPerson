@@ -400,36 +400,53 @@ class AutomationService
      */
     public static function executeAutomation(int $automationId, int $conversationId, bool $logExecution = true): void
     {
+        \App\Helpers\Logger::automation("=== executeAutomation INÍCIO === automationId: {$automationId}, conversationId: {$conversationId}");
+        
         $automation = Automation::findWithNodes($automationId);
-        if (!$automation || empty($automation['nodes'])) {
+        if (!$automation) {
+            \App\Helpers\Logger::automation("ERRO: Automação não encontrada! automationId: {$automationId}");
             return;
         }
+        
+        if (empty($automation['nodes'])) {
+            \App\Helpers\Logger::automation("ERRO: Automação sem nós! automationId: {$automationId}");
+            return;
+        }
+        
+        \App\Helpers\Logger::automation("Automação carregada com " . count($automation['nodes']) . " nós");
 
         // Criar log de execução
         $executionId = null;
         if ($logExecution) {
             try {
+                \App\Helpers\Logger::automation("Criando log de execução no banco...");
                 $executionId = \App\Models\AutomationExecution::createLog(
                     $automationId,
                     $conversationId,
                     'running'
                 );
+                \App\Helpers\Logger::automation("Log de execução criado: ID {$executionId}");
             } catch (\Exception $e) {
                 error_log("Erro ao criar log de execução: " . $e->getMessage());
+                \App\Helpers\Logger::automation("ERRO ao criar log de execução: " . $e->getMessage());
             }
         }
 
         try {
             // Encontrar nó inicial (trigger)
+            \App\Helpers\Logger::automation("Procurando nó trigger...");
             $startNode = null;
             foreach ($automation['nodes'] as $node) {
+                \App\Helpers\Logger::automation("  Nó ID {$node['id']}, Tipo: {$node['node_type']}");
                 if ($node['node_type'] === 'trigger') {
                     $startNode = $node;
+                    \App\Helpers\Logger::automation("  ✅ Nó trigger encontrado: ID {$node['id']}");
                     break;
                 }
             }
 
             if (!$startNode) {
+                \App\Helpers\Logger::automation("ERRO: Nó inicial (trigger) não encontrado!");
                 if ($executionId) {
                     \App\Models\AutomationExecution::updateStatus($executionId, 'failed', 'Nó inicial não encontrado');
                 }
@@ -437,18 +454,25 @@ class AutomationService
             }
 
             // Executar fluxo começando do nó inicial
+            \App\Helpers\Logger::automation("Iniciando execução do nó trigger ID: {$startNode['id']}");
             self::executeNode($startNode, $conversationId, $automation['nodes'], $executionId);
             
+            \App\Helpers\Logger::automation("Execução do fluxo completada!");
             if ($executionId) {
                 \App\Models\AutomationExecution::updateStatus($executionId, 'completed');
+                \App\Helpers\Logger::automation("Status atualizado para 'completed'");
             }
         } catch (\Exception $e) {
+            \App\Helpers\Logger::automation("ERRO FATAL: " . $e->getMessage());
+            \App\Helpers\Logger::automation("Stack trace: " . $e->getTraceAsString());
             if ($executionId) {
                 \App\Models\AutomationExecution::updateStatus($executionId, 'failed', $e->getMessage());
             }
             error_log("Erro ao executar automação {$automationId}: " . $e->getMessage());
             throw $e;
         }
+        
+        \App\Helpers\Logger::automation("=== executeAutomation FIM ===");
     }
 
     /**
@@ -456,48 +480,70 @@ class AutomationService
      */
     private static function executeNode(array $node, int $conversationId, array $allNodes, ?int $executionId = null): void
     {
+        \App\Helpers\Logger::automation("  → executeNode: ID {$node['id']}, Tipo: {$node['node_type']}");
+        
         $nodeData = $node['node_data'] ?? [];
         
         // Atualizar log com nó atual
         if ($executionId) {
             \App\Models\AutomationExecution::updateStatus($executionId, 'running', null, $node['id']);
+            \App\Helpers\Logger::automation("  Status atualizado para nó ID: {$node['id']}");
         }
         
         switch ($node['node_type']) {
             case 'action_send_message':
+                \App\Helpers\Logger::automation("  Executando: enviar mensagem");
                 self::executeSendMessage($nodeData, $conversationId, $executionId);
                 break;
             case 'action_assign_agent':
+                \App\Helpers\Logger::automation("  Executando: atribuir agente");
                 self::executeAssignAgent($nodeData, $conversationId, $executionId);
                 break;
             case 'action_assign_advanced':
+                \App\Helpers\Logger::automation("  Executando: atribuição avançada");
                 self::executeAssignAdvanced($nodeData, $conversationId, $executionId);
                 break;
             case 'action_move_stage':
+                \App\Helpers\Logger::automation("  Executando: mover etapa");
                 self::executeMoveStage($nodeData, $conversationId, $executionId);
                 break;
             case 'action_set_tag':
+                \App\Helpers\Logger::automation("  Executando: definir tag");
                 self::executeSetTag($nodeData, $conversationId, $executionId);
                 break;
             case 'action_chatbot':
+                \App\Helpers\Logger::automation("  Executando: chatbot");
                 self::executeChatbot($nodeData, $conversationId, $executionId);
                 break;
             case 'condition':
+                \App\Helpers\Logger::automation("  Executando: condição");
                 self::executeCondition($nodeData, $conversationId, $allNodes, $executionId);
                 return; // Condição já processa os próximos nós
             case 'delay':
+                \App\Helpers\Logger::automation("  Executando: delay");
                 self::executeDelay($nodeData, $conversationId, $allNodes, $executionId);
                 return; // Delay precisa aguardar
+            case 'trigger':
+                \App\Helpers\Logger::automation("  Nó trigger - pulando execução");
+                break;
+            default:
+                \App\Helpers\Logger::automation("  AVISO: Tipo de nó desconhecido: {$node['node_type']}");
         }
 
         // Seguir para próximos nós conectados
         if (!empty($nodeData['connections'])) {
+            \App\Helpers\Logger::automation("  Nó tem " . count($nodeData['connections']) . " conexão(ões)");
             foreach ($nodeData['connections'] as $connection) {
+                \App\Helpers\Logger::automation("    → Seguindo para nó: {$connection['target_node_id']}");
                 $nextNode = self::findNodeById($connection['target_node_id'], $allNodes);
                 if ($nextNode) {
                     self::executeNode($nextNode, $conversationId, $allNodes, $executionId);
+                } else {
+                    \App\Helpers\Logger::automation("    ERRO: Nó {$connection['target_node_id']} não encontrado!");
                 }
             }
+        } else {
+            \App\Helpers\Logger::automation("  Nó não tem conexões - fim do fluxo");
         }
     }
 

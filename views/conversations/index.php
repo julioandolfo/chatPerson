@@ -5418,11 +5418,399 @@ function manageContactAgents(contactId) {
         return;
     }
     
-    // TODO: Implementar modal de gerenciamento de agentes do contato
-    // Por enquanto, mostrar alert
-    alert('Funcionalidade de gerenciamento de agentes do contato em desenvolvimento.\n\nEm breve você poderá:\n- Adicionar novos agentes ao contato\n- Remover agentes\n- Definir agente principal\n- Configurar prioridades');
+    // Definir ID do contato no modal
+    document.getElementById('contactAgentsModalContactId').value = contactId;
     
-    console.log('Gerenciar agentes do contato:', contactId);
+    // Limpar seleção de agente
+    document.getElementById('addContactAgentSelect').value = '';
+    document.getElementById('addAsPrimaryAgent').checked = false;
+    
+    // Restaurar todas as opções do select antes de carregar
+    const select = document.getElementById('addContactAgentSelect');
+    if (select) {
+        Array.from(select.options).forEach(option => {
+            option.style.display = '';
+            option.disabled = false;
+        });
+    }
+    
+    // Carregar agentes do contato
+    loadContactAgentsInModal(contactId);
+    
+    // Abrir modal
+    const modal = new bootstrap.Modal(document.getElementById('kt_modal_contact_agents'));
+    modal.show();
+}
+
+/**
+ * Carregar agentes do contato no modal
+ */
+function loadContactAgentsInModal(contactId) {
+    const agentsListEl = document.getElementById('contactAgentsList');
+    if (!agentsListEl) return;
+    
+    agentsListEl.innerHTML = '<div class="text-muted fs-7 text-center py-3">Carregando...</div>';
+    
+    fetch(`<?= \App\Helpers\Url::to('/contacts') ?>/${contactId}/agents`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success || !data.agents) {
+            agentsListEl.innerHTML = '<div class="text-muted fs-7 text-center py-3">Nenhum agente atribuído</div>';
+            updateAgentSelect([]);
+            return;
+        }
+        
+        const agents = data.agents || [];
+        
+        if (agents.length === 0) {
+            agentsListEl.innerHTML = '<div class="text-muted fs-7 text-center py-3">Nenhum agente atribuído</div>';
+            updateAgentSelect([]);
+            return;
+        }
+        
+        // Renderizar lista de agentes com ações
+        renderContactAgentsList(agents, contactId);
+        
+        // Atualizar select removendo agentes já adicionados
+        const agentIds = agents.map(a => a.agent_id || a.id);
+        updateAgentSelect(agentIds);
+    })
+    .catch(error => {
+        console.error('Erro ao carregar agentes do contato:', error);
+        agentsListEl.innerHTML = '<div class="text-danger fs-7 text-center py-3">Erro ao carregar agentes</div>';
+    });
+}
+
+/**
+ * Atualizar select de agentes, ocultando os que já estão na lista
+ */
+function updateAgentSelect(excludedAgentIds) {
+    const select = document.getElementById('addContactAgentSelect');
+    if (!select) return;
+    
+    // Percorrer todas as opções e mostrar/ocultar conforme necessário
+    Array.from(select.options).forEach(option => {
+        if (option.value === '') {
+            // Manter opção vazia sempre visível
+            return;
+        }
+        
+        const isExcluded = excludedAgentIds.includes(parseInt(option.value));
+        
+        if (isExcluded) {
+            // Ocultar opção (mas não remover, para poder restaurar depois)
+            option.style.display = 'none';
+            option.disabled = true;
+        } else {
+            // Mostrar opção
+            option.style.display = '';
+            option.disabled = false;
+        }
+    });
+    
+    // Se a opção selecionada foi ocultada, limpar seleção
+    if (select.value && excludedAgentIds.includes(parseInt(select.value))) {
+        select.value = '';
+    }
+}
+
+/**
+ * Renderizar lista de agentes no modal
+ */
+function renderContactAgentsList(agents, contactId) {
+    const agentsListEl = document.getElementById('contactAgentsList');
+    if (!agentsListEl) return;
+    
+    let html = '';
+    
+    agents.forEach(agent => {
+        const isPrimary = agent.is_primary == 1 || agent.is_primary === true;
+        const agentName = agent.agent_name || agent.name || 'Agente';
+        const agentEmail = agent.agent_email || agent.email || '';
+        const initials = getInitials(agentName);
+        const priority = agent.priority || 0;
+        const agentId = agent.agent_id || agent.id;
+        
+        html += `
+            <div class="d-flex align-items-center gap-3 p-3 border rounded mb-2" style="background: var(--bs-gray-50);" data-agent-id="${agentId}">
+                <div class="symbol symbol-40px symbol-circle">
+                    <div class="symbol-label bg-light-primary text-primary fw-bold">
+                        ${initials}
+                    </div>
+                </div>
+                <div class="flex-grow-1">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="fw-semibold">${escapeHtml(agentName)}</span>
+                        ${isPrimary ? '<span class="badge badge-primary">Principal</span>' : ''}
+                    </div>
+                    ${agentEmail ? `<div class="text-muted fs-7">${escapeHtml(agentEmail)}</div>` : ''}
+                    <div class="mt-2">
+                        <label class="form-label fs-7 mb-1">Prioridade:</label>
+                        <input type="number" 
+                               class="form-control form-control-sm d-inline-block" 
+                               style="width: 80px;" 
+                               value="${priority}" 
+                               min="0" 
+                               max="100"
+                               onchange="updateContactAgentPriority(${contactId}, ${agentId}, this.value)">
+                    </div>
+                </div>
+                <div class="d-flex flex-column gap-2">
+                    ${!isPrimary ? `
+                        <button class="btn btn-sm btn-light-primary" 
+                                onclick="setContactPrimaryAgent(${contactId}, ${agentId})"
+                                title="Definir como principal">
+                            <i class="ki-duotone ki-star fs-6">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                        </button>
+                    ` : `
+                        <button class="btn btn-sm btn-light-success" disabled title="Agente principal">
+                            <i class="ki-duotone ki-check fs-6">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                        </button>
+                    `}
+                    <button class="btn btn-sm btn-light-danger" 
+                            onclick="removeContactAgent(${contactId}, ${agentId}, '${escapeHtml(agentName)}')"
+                            title="Remover agente">
+                        <i class="ki-duotone ki-trash fs-6">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    
+    agentsListEl.innerHTML = html;
+}
+
+/**
+ * Mostrar toast/notificação de sucesso ou erro
+ */
+function showToast(type, message) {
+    if (typeof Swal !== 'undefined') {
+        Swal.fire({
+            icon: type === 'success' ? 'success' : 'error',
+            title: type === 'success' ? 'Sucesso!' : 'Erro',
+            text: message,
+            timer: type === 'success' ? 2000 : 3000,
+            showConfirmButton: false,
+            toast: true,
+            position: 'top-end'
+        });
+    } else {
+        alert(message);
+    }
+}
+
+/**
+ * Adicionar agente ao contato a partir do modal
+ */
+function addContactAgentFromModal() {
+    const contactId = document.getElementById('contactAgentsModalContactId').value;
+    const agentId = document.getElementById('addContactAgentSelect').value;
+    const isPrimary = document.getElementById('addAsPrimaryAgent').checked;
+    
+    if (!contactId) {
+        alert('Erro: ID do contato não encontrado');
+        return;
+    }
+    
+    if (!agentId) {
+        alert('Por favor, selecione um agente');
+        return;
+    }
+    
+    // Verificar se agente já está na lista
+    const agentsListEl = document.getElementById('contactAgentsList');
+    if (agentsListEl) {
+        const existingAgents = agentsListEl.querySelectorAll('[data-agent-id]');
+        for (let el of existingAgents) {
+            if (el.getAttribute('data-agent-id') == agentId) {
+                showToast('error', 'Este agente já está na lista');
+                return;
+            }
+        }
+    }
+    
+    // Desabilitar botão durante requisição
+    const addBtn = event.target.closest('button');
+    const originalText = addBtn.innerHTML;
+    addBtn.disabled = true;
+    addBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Adicionando...';
+    
+    const formData = new FormData();
+    formData.append('agent_id', agentId);
+    formData.append('is_primary', isPrimary ? '1' : '0');
+    formData.append('priority', '0');
+    
+    fetch(`<?= \App\Helpers\Url::to('/contacts') ?>/${contactId}/agents`, {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        },
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            // Limpar formulário
+            document.getElementById('addContactAgentSelect').value = '';
+            document.getElementById('addAsPrimaryAgent').checked = false;
+            
+            // Recarregar lista (isso também atualizará o select)
+            loadContactAgentsInModal(contactId);
+            
+            // Recarregar na sidebar também
+            loadContactAgents(contactId);
+            
+            // Mostrar mensagem de sucesso
+            showToast('success', 'Agente adicionado com sucesso!');
+        } else {
+            alert('Erro: ' + (data.message || 'Erro ao adicionar agente'));
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao adicionar agente:', error);
+        alert('Erro ao adicionar agente');
+    })
+    .finally(() => {
+        addBtn.disabled = false;
+        addBtn.innerHTML = originalText;
+    });
+}
+
+/**
+ * Remover agente do contato
+ */
+function removeContactAgent(contactId, agentId, agentName) {
+    if (!confirm(`Tem certeza que deseja remover o agente "${agentName}" deste contato?`)) {
+        return;
+    }
+    
+    fetch(`<?= \App\Helpers\Url::to('/contacts') ?>/${contactId}/agents/${agentId}`, {
+        method: 'DELETE',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            // Recarregar lista no modal
+            loadContactAgentsInModal(contactId);
+            
+            // Recarregar na sidebar também
+            loadContactAgents(contactId);
+            
+            // Mostrar mensagem de sucesso
+            showToast('success', 'Agente removido com sucesso!');
+        } else {
+            alert('Erro: ' + (data.message || 'Erro ao remover agente'));
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao remover agente:', error);
+        alert('Erro ao remover agente');
+    });
+}
+
+/**
+ * Definir agente principal
+ */
+function setContactPrimaryAgent(contactId, agentId) {
+    const formData = new FormData();
+    formData.append('agent_id', agentId);
+    
+    fetch(`<?= \App\Helpers\Url::to('/contacts') ?>/${contactId}/agents/set-primary`, {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        },
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            // Recarregar lista no modal
+            loadContactAgentsInModal(contactId);
+            
+            // Recarregar na sidebar também
+            loadContactAgents(contactId);
+            
+            // Mostrar mensagem de sucesso
+            showToast('success', 'Agente principal definido com sucesso!');
+        } else {
+            alert('Erro: ' + (data.message || 'Erro ao definir agente principal'));
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao definir agente principal:', error);
+        alert('Erro ao definir agente principal');
+    });
+}
+
+/**
+ * Atualizar prioridade do agente
+ */
+function updateContactAgentPriority(contactId, agentId, priority) {
+    const priorityValue = parseInt(priority) || 0;
+    
+    // Validar range
+    if (priorityValue < 0 || priorityValue > 100) {
+        alert('Prioridade deve estar entre 0 e 100');
+        // Recarregar para restaurar valor anterior
+        loadContactAgentsInModal(contactId);
+        return;
+    }
+    
+    // Atualizar via API (usando método store que atualiza se já existe)
+    const formData = new FormData();
+    formData.append('agent_id', agentId);
+    formData.append('priority', priorityValue);
+    
+    fetch(`<?= \App\Helpers\Url::to('/contacts') ?>/${contactId}/agents`, {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        },
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            // Recarregar lista para atualizar ordem
+            loadContactAgentsInModal(contactId);
+            
+            // Mostrar mensagem de sucesso
+            showToast('success', 'Prioridade atualizada!');
+        } else {
+            alert('Erro: ' + (data.message || 'Erro ao atualizar prioridade'));
+            // Recarregar para restaurar valor anterior
+            loadContactAgentsInModal(contactId);
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao atualizar prioridade:', error);
+        alert('Erro ao atualizar prioridade');
+        // Recarregar para restaurar valor anterior
+        loadContactAgentsInModal(contactId);
+    });
 }
 
 

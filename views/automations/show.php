@@ -2718,6 +2718,26 @@ document.addEventListener("DOMContentLoaded", function() {
                     console.log('  Total de intents válidos coletados:', intents.length);
                     console.log('  Intents:', intents);
                     nodeData.ai_intents = intents;
+
+                    // ✅ Criar conexões automaticamente para cada intent com target definido
+                    if (!node.node_data.connections) {
+                        node.node_data.connections = [];
+                    }
+                    intents.forEach((intent, idx) => {
+                        if (!intent.target_node_id) return;
+                        const exists = node.node_data.connections.some(conn =>
+                            String(conn.target_node_id) === String(intent.target_node_id) &&
+                            conn.option_index === idx
+                        );
+                        if (!exists) {
+                            node.node_data.connections.push({
+                                target_node_id: intent.target_node_id,
+                                type: 'next',
+                                option_index: idx
+                            });
+                        }
+                    });
+                    console.log('  Conexões auto-criadas para intents:', node.node_data.connections);
                 } else {
                     console.log('  Ramificação desabilitada, limpando intents');
                     nodeData.ai_intents = [];

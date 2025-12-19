@@ -1195,4 +1195,87 @@ class OpenAIService
         
         return round($promptCost + $completionCost, 4);
     }
+
+    /**
+     * Classificar intenção de forma semântica usando OpenAI
+     */
+    public static function classifyIntent(string $text, array $intents, float $minConfidence = 0.35): ?array
+    {
+        if (empty($intents)) {
+            return null;
+        }
+
+        $apiKey = self::getApiKey();
+        if (empty($apiKey)) {
+            error_log('OpenAIService::classifyIntent - API Key não configurada');
+            return null;
+        }
+
+        // Preparar intents (nome + descrição)
+        $intentList = array_map(function ($intent) {
+            return [
+                'intent' => $intent['intent'] ?? '',
+                'description' => $intent['description'] ?? ''
+            ];
+        }, $intents);
+
+        $messages = [
+            [
+                'role' => 'system',
+                'content' => 'Você é um classificador de intenções. Dado um texto do cliente, escolha o intent mais adequado da lista fornecida e retorne um JSON { "intent": "...", "confidence": 0-1 }. Se não tiver segurança, devolva intent vazio.'
+            ],
+            [
+                'role' => 'user',
+                'content' =>
+                    "Texto do cliente: \"{$text}\"\n\n" .
+                    "Intents disponíveis:\n" . json_encode($intentList, JSON_UNESCAPED_UNICODE)
+            ]
+        ];
+
+        $payload = [
+            'model' => 'gpt-4o-mini',
+            'messages' => $messages,
+            'temperature' => 0.1,
+            'max_tokens' => 200,
+            'response_format' => ['type' => 'json_object']
+        ];
+
+        try {
+            $response = self::makeRequest($apiKey, $payload);
+            $assistantMessage = $response['choices'][0]['message'] ?? null;
+            $content = $assistantMessage['content'] ?? null;
+            if (!$content) {
+                return null;
+            }
+            $json = json_decode($content, true);
+            if (!$json || empty($json['intent'])) {
+                return null;
+            }
+            $confidence = isset($json['confidence']) ? (float)$json['confidence'] : 0.0;
+            if ($confidence < $minConfidence) {
+                return null;
+            }
+
+            // Encontrar intent correspondente pelo slug/nome
+            foreach ($intents as $intent) {
+                $name = $intent['intent'] ?? '';
+                if ($name && strcasecmp($name, $json['intent']) === 0) {
+                    return $intent;
+                }
+            }
+
+            // Se não achou match exato, tentar match parcial
+            foreach ($intents as $intent) {
+                $name = $intent['intent'] ?? '';
+                if ($name && stripos($name, $json['intent']) !== false) {
+                    return $intent;
+                }
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            error_log('OpenAIService::classifyIntent - erro: ' . $e->getMessage());
+            return null;
+        }
+    }
 }

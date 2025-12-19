@@ -1531,8 +1531,18 @@ class AutomationService
             return self::escalateFromAI($conversation['id'], $metadata);
         }
         
-        // Analisar a resposta da IA para identificar intent
+        // Analisar a resposta da IA para identificar intent (primeiro por keywords, depois por IA semântica)
         $detectedIntent = self::detectAIIntent($aiMessage['content'] ?? '', $metadata['ai_intents'] ?? []);
+
+        // Fallback: detecção semântica via OpenAI (usando descrição do intent)
+        if (!$detectedIntent && !empty($metadata['ai_intents'])) {
+            $minConfidence = isset($metadata['ai_intent_confidence']) ? (float)$metadata['ai_intent_confidence'] : 0.35;
+            $semanticEnabled = $metadata['ai_intent_semantic_enabled'] ?? true; // habilitado por padrão
+            if ($semanticEnabled) {
+                \App\Helpers\Logger::automation("Nenhum match por keywords. Tentando detecção semântica via OpenAI (min confidence {$minConfidence})");
+                $detectedIntent = self::detectAIIntentSemantic($aiMessage['content'] ?? '', $metadata['ai_intents'] ?? [], $minConfidence);
+            }
+        }
         
         if ($detectedIntent) {
             \App\Helpers\Logger::automation("Intent detectado: {$detectedIntent['intent']}");
@@ -1644,6 +1654,31 @@ class AutomationService
         
         \App\Helpers\Logger::automation("Nenhum intent matched");
         return null;
+    }
+
+    /**
+     * Detectar intent de forma semântica via OpenAI (usando descrição do intent)
+     */
+    private static function detectAIIntentSemantic(string $aiResponse, array $intents, float $minConfidence = 0.35): ?array
+    {
+        \App\Helpers\Logger::automation("Detectando intent (semântico). Intents: " . count($intents) . ", minConfidence: {$minConfidence}");
+
+        if (empty($intents)) {
+            return null;
+        }
+
+        try {
+            $result = \App\Services\OpenAIService::classifyIntent($aiResponse, $intents, $minConfidence);
+            if ($result) {
+                \App\Helpers\Logger::automation("Intent semântico detectado: " . ($result['intent'] ?? '[sem nome]'));
+                return $result;
+            }
+            \App\Helpers\Logger::automation("Intent semântico não encontrado ou confiança abaixo do mínimo");
+            return null;
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::automation("Erro ao detectar intent semântico: " . $e->getMessage());
+            return null;
+        }
     }
 
     /**

@@ -2359,16 +2359,36 @@ document.addEventListener("DOMContentLoaded", function() {
             e.preventDefault();
             
             const nodeId = document.getElementById("kt_node_id").value;
-            const node = nodes.find(n => n.id === nodeId);
+            const node = nodes.find(n => String(n.id) === String(nodeId));
             if (!node) return;
             
             const formData = new FormData(nodeConfigForm);
             const nodeData = {};
+            // Suporte a campos array (name="field[]") e checkboxes
             for (let [key, value] of formData.entries()) {
-                if (key !== "node_id" && key !== "node_type") {
+                if (key === "node_id" || key === "node_type") continue;
+                
+                // Arrays: campos com [] no nome
+                if (key.endsWith("[]")) {
+                    const baseKey = key.slice(0, -2);
+                    if (!nodeData[baseKey]) nodeData[baseKey] = [];
+                    nodeData[baseKey].push(value);
+                } else {
                     nodeData[key] = value;
                 }
             }
+            // Checkboxes que não aparecem no FormData quando desmarcados
+            const checkboxKeys = [
+                'consider_availability',
+                'consider_max_conversations',
+                'allow_ai_agents',
+                'force_assign'
+            ];
+            checkboxKeys.forEach(k => {
+                if (!formData.has(k)) {
+                    nodeData[k] = '0';
+                }
+            });
             // Tratamento específico para chatbot menu: coletar opções + targets
             if (node.node_type === "action_chatbot") {
                 const chatbotType = nodeData.chatbot_type || 'simple';

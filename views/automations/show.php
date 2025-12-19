@@ -1053,6 +1053,29 @@ function renderNode(node) {
             `;
         });
         innerHtml += '</div>';
+    } else if (node.node_type === 'action_assign_ai_agent' && 
+               node.node_data.ai_branching_enabled && 
+               node.node_data.ai_intents && 
+               Array.isArray(node.node_data.ai_intents) &&
+               node.node_data.ai_intents.length > 0) {
+        // Se é AI Agent com ramificação, adicionar handles múltiplos para cada intent
+        const intents = node.node_data.ai_intents;
+        innerHtml += '<div class="ai-intents-visual" style="margin-top: 10px; font-size: 11px; color: #7e8299;">';
+        intents.forEach(function(intent, idx) {
+            const intentLabel = intent.description || intent.intent || `Intent ${idx + 1}`;
+            innerHtml += `
+                <div class="ai-intent-row" style="position: relative; padding: 4px 0; padding-right: 20px;">
+                    <span style="display: inline-block; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${intentLabel}">🎯 ${intentLabel}</span>
+                    <div class="node-connection-handle output ai-intent-handle" 
+                         data-node-id="${String(node.id || '')}" 
+                         data-handle-type="output" 
+                         data-intent-index="${idx}"
+                         style="right: -10px; top: 50%; transform: translateY(-50%); background: #6366f1;">
+                    </div>
+                </div>
+            `;
+        });
+        innerHtml += '</div>';
     } else {
         // Handle de saída normal para outros tipos
         innerHtml += `<div class="node-connection-handle output" data-node-id="${String(node.id || '')}" data-handle-type="output"></div>`;
@@ -1404,7 +1427,68 @@ function openNodeConfig(nodeId) {
                     </label>
                     <div class="form-text">Se habilitado, só adiciona a IA se a conversa não tiver um agente humano atribuído</div>
                 </div>
+                
+                <div class="separator my-7"></div>
+                
+                <div class="fv-row mb-7">
+                    <label class="d-flex align-items-center">
+                        <input type="checkbox" name="ai_branching_enabled" id="kt_ai_branching_enabled" class="form-check-input me-2" onchange="toggleAIBranchingContainer()" ${node.node_data.ai_branching_enabled ? 'checked' : ''} />
+                        <span class="fw-semibold fs-6">Habilitar ramificação baseada em intent</span>
+                    </label>
+                    <div class="form-text">Permite que a IA roteie a conversa para diferentes nós baseado no entendimento da resposta</div>
+                </div>
+                
+                <div id="ai_branching_container" style="display: ${node.node_data.ai_branching_enabled ? 'block' : 'none'};">
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">
+                            <i class="ki-duotone ki-route fs-2 me-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Intents / Condições de Ramificação
+                        </label>
+                        <div class="form-text mb-3">Configure os intents que a IA pode detectar e para qual nó cada um deve direcionar</div>
+                        
+                        <div id="ai_intents_list" class="mb-3">
+                            <!-- Items serão adicionados dinamicamente via JavaScript -->
+                        </div>
+                        
+                        <button type="button" class="btn btn-sm btn-light-primary" onclick="addAIIntent()">
+                            <i class="ki-duotone ki-plus fs-2"></i>
+                            Adicionar Intent
+                        </button>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Máximo de Interações</label>
+                        <input type="number" name="ai_max_interactions" id="kt_ai_max_interactions" class="form-control form-control-solid" value="${node.node_data.ai_max_interactions || 5}" min="1" max="100" />
+                        <div class="form-text">Número máximo de mensagens da IA antes de escalar para um agente humano</div>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="d-flex align-items-center">
+                            <input type="checkbox" name="ai_escalate_on_stuck" id="kt_ai_escalate_on_stuck" class="form-check-input me-2" ${node.node_data.ai_escalate_on_stuck !== false ? 'checked' : ''} />
+                            <span class="fw-semibold fs-6">Escalar automaticamente se ficar preso</span>
+                        </label>
+                        <div class="form-text">Se a IA não conseguir resolver após o máximo de interações, escalará para um agente humano</div>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Nó de Fallback (Opcional)</label>
+                        <select name="ai_fallback_node_id" id="kt_ai_fallback_node_id" class="form-select form-select-solid">
+                            <option value="">Nenhum (apenas escalar para humano)</option>
+                        </select>
+                        <div class="form-text">Nó a ser executado quando escalar para humano (ex: enviar mensagem de transição)</div>
+                    </div>
+                </div>
             `;
+            
+            // Preencher select de fallback node com nós disponíveis (após renderizar)
+            setTimeout(() => {
+                populateAIFallbackNodes(node.node_data.ai_fallback_node_id);
+                populateAIIntents(node.node_data.ai_intents || []);
+            }, 100);
+            
             break;
         case "action_assign_advanced":
             const assignType = node.node_data.assignment_type || 'auto';
@@ -2542,6 +2626,42 @@ document.addEventListener("DOMContentLoaded", function() {
                     
                     console.log('Opções combinadas:', combined);
                     nodeData.chatbot_options = combined;
+                }
+            }
+            
+            // Tratamento específico para AI Agent: coletar intents
+            if (node.node_type === "action_assign_ai_agent") {
+                const branchingEnabled = nodeData.ai_branching_enabled === '1' || nodeData.ai_branching_enabled === true;
+                console.log('Salvando configuração do AI Agent, branching:', branchingEnabled);
+                
+                if (branchingEnabled) {
+                    const intentInputs = document.querySelectorAll('.ai-intent-item');
+                    const intents = [];
+                    
+                    console.log('Intent items encontrados:', intentInputs.length);
+                    
+                    intentInputs.forEach((item, idx) => {
+                        const intentName = item.querySelector(`input[name="ai_intents[${idx}][intent]"]`)?.value?.trim();
+                        const description = item.querySelector(`input[name="ai_intents[${idx}][description]"]`)?.value?.trim();
+                        const keywordsRaw = item.querySelector(`input[name="ai_intents[${idx}][keywords]"]`)?.value || '';
+                        const targetNodeId = item.querySelector(`select[name="ai_intents[${idx}][target_node_id]"]`)?.value;
+                        
+                        const keywords = keywordsRaw.split(',').map(k => k.trim()).filter(k => k.length > 0);
+                        
+                        console.log(`Intent ${idx}: name="${intentName}", desc="${description}", target="${targetNodeId}"`);
+                        
+                        if (intentName && targetNodeId) {
+                            intents.push({
+                                intent: intentName,
+                                description: description || intentName,
+                                keywords: keywords,
+                                target_node_id: targetNodeId
+                            });
+                        }
+                    });
+                    
+                    console.log('Intents coletados:', intents);
+                    nodeData.ai_intents = intents;
                 }
             }
             
@@ -3724,8 +3844,188 @@ console.log('Funções globais de automação carregadas:', {
     validateRequiredField: typeof window.validateRequiredField,
     previewVariables: typeof window.previewVariables
 });
+
+// ============================================
+// FUNÇÕES PARA RAMIFICAÇÃO DE IA
+// ============================================
+
+// Toggle do container de ramificação
+window.toggleAIBranchingContainer = function() {
+    const checkbox = document.getElementById('kt_ai_branching_enabled');
+    const container = document.getElementById('ai_branching_container');
+    
+    if (checkbox && container) {
+        container.style.display = checkbox.checked ? 'block' : 'none';
+    }
+};
+
+// Adicionar novo intent
+window.addAIIntent = function addAIIntent() {
+    const list = document.getElementById('ai_intents_list');
+    if (!list) return;
+    
+    const index = list.children.length;
+    const intentHtml = `
+        <div class="card card-bordered mb-3 ai-intent-item" data-intent-index="${index}">
+            <div class="card-body p-5">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="mb-0">Intent #${index + 1}</h5>
+                    <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeAIIntent(this)">
+                        <i class="ki-duotone ki-trash fs-2"></i>
+                    </button>
+                </div>
+                
+                <div class="fv-row mb-4">
+                    <label class="fw-semibold fs-7 mb-2">Nome do Intent</label>
+                    <input type="text" name="ai_intents[${index}][intent]" class="form-control form-control-sm form-control-solid" placeholder="Ex: purchase_inquiry, support_request" />
+                    <div class="form-text">Identificador único do intent (sem espaços)</div>
+                </div>
+                
+                <div class="fv-row mb-4">
+                    <label class="fw-semibold fs-7 mb-2">Descrição</label>
+                    <input type="text" name="ai_intents[${index}][description]" class="form-control form-control-sm form-control-solid" placeholder="Ex: Cliente perguntando sobre compra" />
+                    <div class="form-text">Descrição legível do que este intent representa</div>
+                </div>
+                
+                <div class="fv-row mb-4">
+                    <label class="fw-semibold fs-7 mb-2">Palavras-chave (separadas por vírgula)</label>
+                    <input type="text" name="ai_intents[${index}][keywords]" class="form-control form-control-sm form-control-solid" placeholder="Ex: comprar, produto, preço" />
+                    <div class="form-text">Palavras que indicam este intent na resposta da IA</div>
+                </div>
+                
+                <div class="fv-row">
+                    <label class="fw-semibold fs-7 mb-2">Nó de Destino</label>
+                    <select name="ai_intents[${index}][target_node_id]" class="form-select form-select-sm form-select-solid ai-intent-target-select">
+                        <option value="">Selecione um nó...</option>
+                    </select>
+                    <div class="form-text">Nó que será executado quando este intent for detectado</div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    list.insertAdjacentHTML('beforeend', intentHtml);
+    
+    // Preencher select de nós disponíveis
+    populateAIIntentTargetNodes(index);
+};
+
+// Remover intent
+window.removeAIIntent = function removeAIIntent(button) {
+    const item = button.closest('.ai-intent-item');
+    if (item) {
+        item.remove();
+        // Renumerar intents restantes
+        renumberAIIntents();
+    }
+};
+
+// Renumerar intents após remoção
+function renumberAIIntents() {
+    const items = document.querySelectorAll('.ai-intent-item');
+    items.forEach((item, index) => {
+        item.setAttribute('data-intent-index', index);
+        item.querySelector('h5').textContent = `Intent #${index + 1}`;
+        
+        // Atualizar names dos inputs
+        item.querySelectorAll('input, select').forEach(input => {
+            const name = input.getAttribute('name');
+            if (name && name.startsWith('ai_intents[')) {
+                const newName = name.replace(/ai_intents\[\d+\]/, `ai_intents[${index}]`);
+                input.setAttribute('name', newName);
+            }
+        });
+    });
+}
+
+// Preencher select de nós disponíveis para fallback
+window.populateAIFallbackNodes = function populateAIFallbackNodes(selectedNodeId) {
+    selectedNodeId = selectedNodeId || '';
+    const select = document.getElementById('kt_ai_fallback_node_id');
+    if (!select) return;
+    
+    // Limpar opções existentes (exceto a primeira)
+    while (select.options.length > 1) {
+        select.remove(1);
+    }
+    
+    // Adicionar nós disponíveis
+    const nodes = window.currentAutomation?.nodes || [];
+    nodes.forEach(node => {
+        if (node.node_type !== 'trigger' && node.node_type !== 'action_assign_ai_agent') {
+            const label = node.node_data?.label || node.node_type;
+            const option = new Option(label, node.id);
+            select.add(option);
+            
+            if (node.id == selectedNodeId) {
+                option.selected = true;
+            }
+        }
+    });
+};
+
+// Preencher select de nós disponíveis para target de intent
+window.populateAIIntentTargetNodes = function populateAIIntentTargetNodes(intentIndex) {
+    const select = document.querySelector(`select[name="ai_intents[${intentIndex}][target_node_id]"]`);
+    if (!select) return;
+    
+    // Adicionar nós disponíveis
+    const nodes = window.currentAutomation?.nodes || [];
+    nodes.forEach(node => {
+        if (node.node_type !== 'trigger' && node.node_type !== 'action_assign_ai_agent') {
+            const label = node.node_data?.label || node.node_type;
+            const option = new Option(label, node.id);
+            select.add(option);
+        }
+    });
+};
+
+// Popular intents existentes ao carregar nó
+window.populateAIIntents = function populateAIIntents(intents) {
+    intents = intents || [];
+    const list = document.getElementById('ai_intents_list');
+    if (!list) return;
+    
+    // Limpar lista
+    list.innerHTML = '';
+    
+    // Se não há intents, não adicionar nada (usuário pode adicionar manualmente)
+    if (!intents || intents.length === 0) {
+        return;
+    }
+    
+    // Adicionar cada intent
+    intents.forEach((intent, index) => {
+        addAIIntent();
+        
+        // Preencher valores
+        setTimeout(() => {
+            const item = list.children[index];
+            if (item) {
+                const intentInput = item.querySelector(`input[name="ai_intents[${index}][intent]"]`);
+                const descInput = item.querySelector(`input[name="ai_intents[${index}][description]"]`);
+                const keywordsInput = item.querySelector(`input[name="ai_intents[${index}][keywords]"]`);
+                const targetSelect = item.querySelector(`select[name="ai_intents[${index}][target_node_id]"]`);
+                
+                if (intentInput) intentInput.value = intent.intent || '';
+                if (descInput) descInput.value = intent.description || '';
+                if (keywordsInput) {
+                    // Keywords pode ser array ou string
+                    const keywords = Array.isArray(intent.keywords) ? intent.keywords.join(', ') : (intent.keywords || '');
+                    keywordsInput.value = keywords;
+                }
+                if (targetSelect && intent.target_node_id) {
+                    targetSelect.value = intent.target_node_id;
+                }
+            }
+        }, 50);
+    });
+};
+
 </script>
 JAVASCRIPT;
+
+echo $scripts;
 ?>
 
 <?php include __DIR__ . '/../layouts/metronic/app.php'; ?>

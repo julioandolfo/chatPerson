@@ -209,6 +209,25 @@ class AutomationService
         \App\Helpers\Logger::automation("Metadata decodificado: " . json_encode($metadata));
         \App\Helpers\Logger::automation("chatbot_active? " . (isset($metadata['chatbot_active']) ? ($metadata['chatbot_active'] ? 'TRUE' : 'FALSE') : 'NÃO EXISTE'));
         
+        // Verificar se ramificação de IA está ativa (prioridade)
+        if (!empty($metadata['ai_branching_active'])) {
+            \App\Helpers\Logger::automation("🤖 Ramificação de IA ATIVA detectada!");
+            
+            // Verificar se a mensagem foi enviada pela IA
+            if ($message['sender_type'] === 'agent' && !empty($message['ai_agent_id'])) {
+                \App\Helpers\Logger::automation("Mensagem da IA detectada, analisando intent...");
+                $handled = self::handleAIBranchingResponse($conversation, $message);
+                
+                if ($handled) {
+                    \App\Helpers\Logger::automation("✅ Ramificação tratou a mensagem. Roteou para nó específico.");
+                    return;
+                }
+                \App\Helpers\Logger::automation("⚠️ handleAIBranchingResponse retornou false. Continuando...");
+            } else {
+                \App\Helpers\Logger::automation("Mensagem não é da IA. Sender: {$message['sender_type']}, AI Agent ID: " . ($message['ai_agent_id'] ?? 'null'));
+            }
+        }
+        
         if (!empty($metadata['chatbot_active'])) {
             \App\Helpers\Logger::automation("🤖 Chatbot ATIVO detectado! Chamando handleChatbotResponse...");
             $handled = self::handleChatbotResponse($conversation, $message);
@@ -1483,6 +1502,227 @@ class AutomationService
         \App\Helpers\Logger::automation("=== handleChatbotResponse FIM (true) ===");
 
         return true;
+    }
+
+    /**
+     * Tratar resposta da IA e rotear para nó baseado em intent
+     */
+    private static function handleAIBranchingResponse(array $conversation, array $aiMessage): bool
+    {
+        \App\Helpers\Logger::automation("=== handleAIBranchingResponse INÍCIO ===");
+        \App\Helpers\Logger::automation("Conversa ID: {$conversation['id']}, Mensagem da IA: '" . substr($aiMessage['content'] ?? '', 0, 100) . "'");
+        
+        $metadata = json_decode($conversation['metadata'] ?? '{}', true);
+        
+        if (empty($metadata['ai_branching_active'])) {
+            \App\Helpers\Logger::automation("Ramificação de IA não está ativa. Retornando false.");
+            return false;
+        }
+        
+        // Incrementar contador de interações
+        $interactionCount = (int)($metadata['ai_interaction_count'] ?? 0) + 1;
+        $maxInteractions = (int)($metadata['ai_max_interactions'] ?? 5);
+        
+        \App\Helpers\Logger::automation("Interação {$interactionCount}/{$maxInteractions}");
+        
+        // Verificar se atingiu máximo de interações
+        if ($interactionCount >= $maxInteractions) {
+            \App\Helpers\Logger::automation("Máximo de interações atingido. Escalando para humano...");
+            return self::escalateFromAI($conversation['id'], $metadata);
+        }
+        
+        // Analisar a resposta da IA para identificar intent
+        $detectedIntent = self::detectAIIntent($aiMessage['content'] ?? '', $metadata['ai_intents'] ?? []);
+        
+        if ($detectedIntent) {
+            \App\Helpers\Logger::automation("Intent detectado: {$detectedIntent['intent']}");
+            
+            // Buscar nó de destino para este intent
+            $targetNodeId = $detectedIntent['target_node_id'] ?? null;
+            
+            if ($targetNodeId) {
+                \App\Helpers\Logger::automation("Executando nó de destino: {$targetNodeId}");
+                
+                // Limpar metadata de ramificação
+                $metadata['ai_branching_active'] = false;
+                $metadata['ai_interaction_count'] = 0;
+                \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
+                
+                // Buscar automação e nó de destino
+                $automationId = $metadata['ai_branching_automation_id'];
+                $automation = \App\Models\Automation::find($automationId);
+                
+                if ($automation) {
+                    $nodes = $automation['nodes'] ?? [];
+                    $targetNode = array_values(array_filter($nodes, fn($n) => $n['id'] == $targetNodeId))[0] ?? null;
+                    
+                    if ($targetNode) {
+                        \App\Helpers\Logger::automation("Nó de destino encontrado. Executando...");
+                        // Executar nó de destino
+                        self::executeNode($targetNode, $conversation['id'], $nodes, null);
+                        
+                        \App\Helpers\Logger::automation("=== handleAIBranchingResponse FIM (true - intent executado) ===");
+                        return true;
+                    } else {
+                        \App\Helpers\Logger::automation("ERRO: Nó de destino não encontrado com ID {$targetNodeId}");
+                    }
+                } else {
+                    \App\Helpers\Logger::automation("ERRO: Automação não encontrada com ID {$automationId}");
+                }
+            } else {
+                \App\Helpers\Logger::automation("AVISO: Intent detectado mas sem target_node_id configurado");
+            }
+        } else {
+            \App\Helpers\Logger::automation("Nenhum intent detectado na resposta da IA");
+        }
+        
+        // Não detectou intent ou não conseguiu executar, atualizar contador e continuar com IA
+        $metadata['ai_interaction_count'] = $interactionCount;
+        \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
+        
+        \App\Helpers\Logger::automation("=== handleAIBranchingResponse FIM (false - continua com IA) ===");
+        return false; // Continua com IA normal
+    }
+
+    /**
+     * Detectar intent baseado na resposta da IA
+     */
+    private static function detectAIIntent(string $aiResponse, array $intents): ?array
+    {
+        \App\Helpers\Logger::automation("Detectando intent. Total de intents configurados: " . count($intents));
+        
+        if (empty($intents)) {
+            return null;
+        }
+        
+        $aiResponseLower = mb_strtolower($aiResponse);
+        
+        // Método 1: Por palavras-chave (busca por múltiplas palavras)
+        $matchScores = [];
+        
+        foreach ($intents as $index => $intent) {
+            $keywords = $intent['keywords'] ?? [];
+            $intentName = $intent['intent'] ?? "intent_{$index}";
+            
+            if (empty($keywords)) {
+                continue;
+            }
+            
+            $matchCount = 0;
+            $matchedKeywords = [];
+            
+            foreach ($keywords as $keyword) {
+                $keywordLower = mb_strtolower(trim($keyword));
+                
+                if (!empty($keywordLower) && stripos($aiResponseLower, $keywordLower) !== false) {
+                    $matchCount++;
+                    $matchedKeywords[] = $keyword;
+                }
+            }
+            
+            if ($matchCount > 0) {
+                $matchScores[] = [
+                    'intent' => $intent,
+                    'score' => $matchCount,
+                    'matched_keywords' => $matchedKeywords
+                ];
+                
+                \App\Helpers\Logger::automation("Intent '{$intentName}' matched {$matchCount} keyword(s): " . implode(', ', $matchedKeywords));
+            }
+        }
+        
+        // Se encontrou matches, retornar o com maior score
+        if (!empty($matchScores)) {
+            // Ordenar por score (descendente)
+            usort($matchScores, fn($a, $b) => $b['score'] - $a['score']);
+            
+            $bestMatch = $matchScores[0];
+            \App\Helpers\Logger::automation("Melhor match: {$bestMatch['intent']['intent']} com score {$bestMatch['score']}");
+            
+            return $bestMatch['intent'];
+        }
+        
+        \App\Helpers\Logger::automation("Nenhum intent matched");
+        return null;
+    }
+
+    /**
+     * Escalar de IA para agente humano
+     */
+    private static function escalateFromAI(int $conversationId, array $metadata): bool
+    {
+        \App\Helpers\Logger::automation("Escalando conversa {$conversationId} de IA para humano");
+        
+        try {
+            $conversation = \App\Models\Conversation::find($conversationId);
+            if (!$conversation) {
+                \App\Helpers\Logger::automation("ERRO: Conversa não encontrada");
+                return false;
+            }
+            
+            // Marcar AIConversation como escalada
+            $aiConversation = \App\Models\AIConversation::getByConversationId($conversationId);
+            if ($aiConversation && $aiConversation['status'] === 'active') {
+                \App\Models\AIConversation::updateStatus($aiConversation['id'], 'escalated');
+                \App\Helpers\Logger::automation("AIConversation marcada como 'escalated'");
+            }
+            
+            // Tentar atribuir a agente humano
+            $agentId = \App\Services\ConversationSettingsService::autoAssignConversation(
+                $conversationId,
+                $conversation['department_id'] ?? null,
+                $conversation['funnel_id'] ?? null,
+                $conversation['funnel_stage_id'] ?? null
+            );
+            
+            if ($agentId && $agentId > 0) {
+                \App\Services\ConversationService::assignToAgent($conversationId, $agentId, false);
+                \App\Helpers\Logger::automation("Conversa atribuída ao agente humano ID: {$agentId}");
+            } else {
+                \App\Helpers\Logger::automation("Não foi possível atribuir a agente humano (nenhum disponível)");
+            }
+            
+            // Enviar mensagem de sistema
+            \App\Services\ConversationService::sendMessage(
+                $conversationId,
+                "🤖 → 👤 Esta conversa foi escalada para um agente humano devido ao limite de interações da IA.",
+                'system',
+                null,
+                [],
+                'system'
+            );
+            
+            // Executar nó de fallback se configurado
+            $fallbackNodeId = $metadata['ai_fallback_node_id'] ?? null;
+            if ($fallbackNodeId) {
+                \App\Helpers\Logger::automation("Executando nó de fallback: {$fallbackNodeId}");
+                
+                $automationId = $metadata['ai_branching_automation_id'];
+                $automation = \App\Models\Automation::find($automationId);
+                
+                if ($automation) {
+                    $nodes = $automation['nodes'] ?? [];
+                    $fallbackNode = array_values(array_filter($nodes, fn($n) => $n['id'] == $fallbackNodeId))[0] ?? null;
+                    
+                    if ($fallbackNode) {
+                        self::executeNode($fallbackNode, $conversationId, $nodes, null);
+                        \App\Helpers\Logger::automation("Nó de fallback executado com sucesso");
+                    }
+                }
+            }
+            
+            // Limpar metadata
+            $metadata['ai_branching_active'] = false;
+            $metadata['ai_interaction_count'] = 0;
+            \App\Models\Conversation::update($conversationId, ['metadata' => json_encode($metadata)]);
+            
+            \App\Helpers\Logger::automation("Escalação completa. Metadata limpo.");
+            return true;
+            
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::automation("ERRO ao escalar: " . $e->getMessage());
+            return false;
+        }
     }
 
     /**

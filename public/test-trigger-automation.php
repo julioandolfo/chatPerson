@@ -4,7 +4,7 @@
  * Simula uma nova conversa e monitora os logs
  */
 
-require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../app/Helpers/autoload.php';
 
 header('Content-Type: text/html; charset=UTF-8');
 

@@ -1235,6 +1235,19 @@ function openNodeConfig(nodeId) {
     const node = nodes.find(n => String(n.id) === String(nodeId));
     if (!node) return;
     
+    console.log('=== openNodeConfig chamado ===');
+    console.log('Node ID:', nodeId);
+    console.log('Node Type:', node.node_type);
+    console.log('Node Data completo:', JSON.parse(JSON.stringify(node.node_data)));
+    
+    if (node.node_type === 'action_assign_ai_agent') {
+        console.log('AI Agent - Dados ao abrir:');
+        console.log('  ai_branching_enabled:', node.node_data.ai_branching_enabled);
+        console.log('  ai_intents:', node.node_data.ai_intents);
+        console.log('  ai_max_interactions:', node.node_data.ai_max_interactions);
+        console.log('  ai_fallback_node_id:', node.node_data.ai_fallback_node_id);
+    }
+    
     const config = nodeTypes[node.node_type] || {};
     document.getElementById("kt_modal_node_config_title").textContent = "Configurar: " + config.label;
     document.getElementById("kt_node_id").value = nodeId;
@@ -2707,6 +2720,15 @@ document.addEventListener("DOMContentLoaded", function() {
             
             console.log('node.node_data DEPOIS de merge:', node.node_data);
             
+            // Log específico para AI Agent
+            if (node.node_type === "action_assign_ai_agent") {
+                console.log('AI Agent - Verificação final:');
+                console.log('  ai_branching_enabled:', node.node_data.ai_branching_enabled);
+                console.log('  ai_intents:', node.node_data.ai_intents);
+                console.log('  ai_max_interactions:', node.node_data.ai_max_interactions);
+                console.log('  ai_fallback_node_id:', node.node_data.ai_fallback_node_id);
+            }
+            
             // Atualizar referência global
             window.nodes = nodes;
             
@@ -3328,7 +3350,9 @@ window.populateAIFallbackNodes = function(selectedNodeId) {
     nodes.forEach(node => {
         if (node.node_type !== 'trigger' && node.node_type !== 'action_assign_ai_agent') {
             const label = node.node_data?.label || node.node_type;
-            const option = new Option(label, node.id);
+            // Adicionar ID do nó no label para facilitar identificação
+            const labelWithId = `${label} (ID: ${node.id})`;
+            const option = new Option(labelWithId, node.id);
             select.add(option);
             addedCount++;
             
@@ -3357,7 +3381,9 @@ window.populateAIIntentTargetNodes = function(intentIndex) {
     nodes.forEach(node => {
         if (node.node_type !== 'trigger' && node.node_type !== 'action_assign_ai_agent') {
             const label = node.node_data?.label || node.node_type;
-            const option = new Option(label, node.id);
+            // Adicionar ID do nó no label para facilitar identificação
+            const labelWithId = `${label} (ID: ${node.id})`;
+            const option = new Option(labelWithId, node.id);
             select.add(option);
             addedCount++;
         }

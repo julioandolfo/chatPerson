@@ -35,7 +35,7 @@ $db = \App\Helpers\Database::getInstance();
 echo '<h2>1️⃣ Integrações WhatsApp Configuradas</h2>';
 
 $integrations = $db->query("
-    SELECT id, name, phone_number, default_funnel_id, default_stage_id, is_active
+    SELECT id, name, phone_number, default_funnel_id, default_stage_id, status
     FROM whatsapp_accounts
     ORDER BY id
 ");
@@ -59,7 +59,7 @@ if (empty($integrations)) {
             $stageName = $stage ? $stage['name'] : '<span class="error">Estágio não encontrado!</span>';
         }
         
-        $activeStatus = $int['is_active'] ? '<span class="success">✅ Sim</span>' : '<span class="error">❌ Não</span>';
+        $activeStatus = $int['status'] === 'active' ? '<span class="success">✅ Ativa</span>' : '<span class="error">❌ ' . htmlspecialchars($int['status']) . '</span>';
         
         echo "<tr>
             <td>{$int['id']}</td>

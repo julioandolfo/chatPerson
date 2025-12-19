@@ -136,10 +136,15 @@ class AutomationService
      */
     public static function executeForNewConversation(int $conversationId): void
     {
+        Logger::debug("=== executeForNewConversation INÍCIO === conversationId: {$conversationId}", 'automacao.log');
+        
         $conversation = Conversation::find($conversationId);
         if (!$conversation) {
+            Logger::debug("ERRO: Conversa não encontrada! conversationId: {$conversationId}", 'automacao.log');
             return;
         }
+        
+        Logger::debug("Conversa encontrada: " . json_encode($conversation), 'automacao.log');
 
         // Buscar automações ativas para new_conversation
         $triggerData = [
@@ -151,11 +156,27 @@ class AutomationService
         $funnelId = $conversation['funnel_id'] ?? null;
         $stageId = $conversation['funnel_stage_id'] ?? null;
 
+        Logger::debug("Buscando automações com: triggerData=" . json_encode($triggerData) . ", funnelId={$funnelId}, stageId={$stageId}", 'automacao.log');
+
         $automations = Automation::getActiveByTrigger('new_conversation', $triggerData, $funnelId, $stageId);
 
-        foreach ($automations as $automation) {
-            self::executeAutomation($automation['id'], $conversationId);
+        Logger::debug("Automações encontradas: " . count($automations), 'automacao.log');
+        
+        if (!empty($automations)) {
+            Logger::debug("Lista de automações: " . json_encode($automations), 'automacao.log');
         }
+
+        foreach ($automations as $automation) {
+            Logger::debug("Executando automação ID: {$automation['id']}, Nome: {$automation['name']}", 'automacao.log');
+            try {
+                self::executeAutomation($automation['id'], $conversationId);
+                Logger::debug("Automação ID: {$automation['id']} executada com SUCESSO", 'automacao.log');
+            } catch (\Exception $e) {
+                Logger::debug("ERRO ao executar automação ID: {$automation['id']} - " . $e->getMessage(), 'automacao.log');
+            }
+        }
+        
+        Logger::debug("=== executeForNewConversation FIM ===", 'automacao.log');
     }
 
     /**

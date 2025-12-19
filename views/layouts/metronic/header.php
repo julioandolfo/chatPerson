@@ -247,7 +247,17 @@ function updateAvailabilityStatus(status) {
         },
         body: JSON.stringify({ status: status })
     })
-    .then(response => response.json())
+    .then(async response => {
+        // Verificar se a resposta é realmente JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            // Se não for JSON, tentar ler como texto para debug
+            const text = await response.text();
+            console.error('Resposta não é JSON:', text.substring(0, 200));
+            throw new Error('Resposta do servidor não é JSON válido');
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             // Usar toast se disponível, senão usar Swal
@@ -284,7 +294,7 @@ function updateAvailabilityStatus(status) {
             Swal.fire({
                 icon: 'error',
                 title: 'Erro',
-                text: 'Erro ao atualizar status'
+                text: 'Erro ao atualizar status. Verifique o console para mais detalhes.'
             });
         }
     });

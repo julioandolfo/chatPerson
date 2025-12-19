@@ -12,14 +12,35 @@ class Response
      */
     public static function json(array $data, int $statusCode = 200): void
     {
+        // Desabilitar display de erros para evitar HTML no JSON
+        $oldDisplayErrors = ini_get('display_errors');
+        ini_set('display_errors', '0');
+        
         // Limpar qualquer output buffer antes de enviar JSON
         while (ob_get_level() > 0) {
             ob_end_clean();
         }
         
+        // Garantir que não há nenhum output anterior
+        if (ob_get_level() === 0) {
+            ob_start();
+        }
+        
         http_response_code($statusCode);
         header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-cache, must-revalidate');
+        header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
+        
+        // Limpar buffer novamente antes de enviar
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
         echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        
+        // Restaurar display_errors antes de sair
+        ini_set('display_errors', $oldDisplayErrors);
+        
         exit;
     }
 

@@ -414,13 +414,22 @@ class UserController
      */
     public function updateAvailability(): void
     {
-        $userId = \App\Helpers\Auth::id();
-        if (!$userId) {
-            Response::json(['success' => false, 'message' => 'Usuário não autenticado'], 401);
-            return;
+        // Desabilitar display de erros para evitar HTML no JSON
+        $oldDisplayErrors = ini_get('display_errors');
+        ini_set('display_errors', '0');
+        
+        // Limpar qualquer output buffer anterior
+        while (ob_get_level() > 0) {
+            ob_end_clean();
         }
         
         try {
+            $userId = \App\Helpers\Auth::id();
+            if (!$userId) {
+                Response::json(['success' => false, 'message' => 'Usuário não autenticado'], 401);
+                return;
+            }
+            
             $data = Request::json();
             $status = $data['status'] ?? null;
             
@@ -439,10 +448,20 @@ class UserController
                 Response::json(['success' => false, 'message' => 'Falha ao atualizar status'], 500);
             }
         } catch (\Exception $e) {
+            error_log('UserController::updateAvailability - Erro: ' . $e->getMessage());
             Response::json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => 'Erro ao atualizar status: ' . $e->getMessage()
             ], 500);
+        } catch (\Throwable $e) {
+            error_log('UserController::updateAvailability - Erro fatal: ' . $e->getMessage());
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao atualizar status'
+            ], 500);
+        } finally {
+            // Restaurar configuração original
+            ini_set('display_errors', $oldDisplayErrors);
         }
     }
 }

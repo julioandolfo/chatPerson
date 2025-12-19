@@ -514,7 +514,9 @@ class AutomationService
             case 'action_chatbot':
                 \App\Helpers\Logger::automation("  Executando: chatbot");
                 self::executeChatbot($nodeData, $conversationId, $executionId);
-                break;
+                \App\Helpers\Logger::automation("  ⏸️ Chatbot executado - PAUSANDO execução. Aguardando resposta do usuário.");
+                \App\Helpers\Logger::automation("  Próximos nós serão executados após resposta do usuário via handleChatbotResponse()");
+                return; // ✅ CHATBOT PAUSA AQUI - não continuar para próximos nós!
             case 'condition':
                 \App\Helpers\Logger::automation("  Executando: condição");
                 self::executeCondition($nodeData, $conversationId, $allNodes, $executionId);

@@ -275,18 +275,18 @@ class AgentPerformanceService
         }
         
         if ($minutes < 60) {
-            return round($minutes) . ' min';
+            return (int)round($minutes) . ' min';
         }
         
-        $hours = floor($minutes / 60);
-        $mins = round($minutes % 60);
+        $hours = (int)floor($minutes / 60);
+        $mins = (int)round($minutes % 60);
         
         if ($hours < 24) {
             return $hours . 'h ' . $mins . 'min';
         }
         
-        $days = floor($hours / 24);
-        $hours = $hours % 24;
+        $days = (int)floor($hours / 24);
+        $hours = (int)($hours % 24);
         
         return $days . 'd ' . $hours . 'h';
     }

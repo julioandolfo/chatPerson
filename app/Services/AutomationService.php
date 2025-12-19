@@ -1867,6 +1867,44 @@ class AutomationService
                     ];
                     break;
                     
+                case 'action_chatbot':
+                    $chatbotType = $nodeData['chatbot_type'] ?? 'simple';
+                    $message = $nodeData['chatbot_message'] ?? '';
+                    $options = $nodeData['chatbot_options'] ?? [];
+                    $timeout = $nodeData['chatbot_timeout'] ?? 300;
+                    
+                    $preview = self::previewVariables($message, $conversationId);
+                    
+                    $optionsPreview = [];
+                    if ($chatbotType === 'menu' && !empty($options)) {
+                        foreach ($options as $idx => $opt) {
+                            $optText = is_array($opt) ? ($opt['text'] ?? '') : $opt;
+                            if (!empty($optText)) {
+                                $optionsPreview[] = $optText;
+                            }
+                        }
+                    }
+                    
+                    $step['action_preview'] = [
+                        'type' => 'chatbot',
+                        'chatbot_type' => $chatbotType,
+                        'message' => $preview['processed'],
+                        'options' => $optionsPreview,
+                        'timeout' => $timeout,
+                        'wait_for_response' => true,
+                        'note' => '⏸️ Aguardando resposta do usuário (execução pausada)'
+                    ];
+                    
+                    $step['status'] = 'waiting';
+                    
+                    // Adicionar aviso especial
+                    $testData['warnings'][] = [
+                        'node_id' => $node['id'],
+                        'node_type' => 'action_chatbot',
+                        'message' => 'Chatbot detectado: Em execução real, aguardaria resposta do usuário antes de continuar.'
+                    ];
+                    break;
+                    
                 case 'condition':
                     $conditionResult = self::testCondition($nodeData, $conversationId);
                     $step['condition_result'] = $conditionResult;
@@ -1895,7 +1933,37 @@ class AutomationService
         
         $testData['steps'][] = $step;
         
-        // Seguir para próximos nós
+        // Chatbot pausa a execução - não continuar para próximos nós no teste
+        if ($node['node_type'] === 'action_chatbot') {
+            // Adicionar informação sobre os próximos nós possíveis
+            if (!empty($nodeData['connections'])) {
+                $nextNodesInfo = [];
+                foreach ($nodeData['connections'] as $connection) {
+                    $nextNode = self::findNodeById($connection['target_node_id'], $allNodes);
+                    if ($nextNode) {
+                        $nextNodesInfo[] = [
+                            'node_id' => $nextNode['id'],
+                            'node_type' => $nextNode['node_type'],
+                            'node_name' => $nextNode['node_data']['name'] ?? $nextNode['node_type']
+                        ];
+                    }
+                }
+                
+                if (!empty($nextNodesInfo)) {
+                    $testData['warnings'][] = [
+                        'node_id' => $node['id'],
+                        'node_type' => 'action_chatbot',
+                        'message' => 'Próximos nós conectados (serão executados após resposta): ' . 
+                                     implode(', ', array_map(function($n) { return $n['node_name']; }, $nextNodesInfo))
+                    ];
+                }
+            }
+            
+            // NÃO continuar para próximos nós - chatbot pausa aqui
+            return;
+        }
+        
+        // Seguir para próximos nós (exceto se for chatbot - já retornou acima)
         if (!empty($nodeData['connections'])) {
             foreach ($nodeData['connections'] as $connection) {
                 $nextNode = self::findNodeById($connection['target_node_id'], $allNodes);

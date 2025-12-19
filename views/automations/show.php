@@ -3501,15 +3501,27 @@ function displayTestResults(result) {
                 <div class="d-flex align-items-center gap-2 mb-2">
                     <span class="badge badge-light-primary fs-6">${result.steps?.length || 0} passo(s)</span>
                     ${result.errors && result.errors.length > 0 ? `<span class="badge badge-light-danger fs-6">${result.errors.length} erro(s)</span>` : ''}
+                    ${result.warnings && result.warnings.length > 0 ? `<span class="badge badge-light-warning fs-6">${result.warnings.length} aviso(s)</span>` : ''}
                     ${result.simulated_actions && result.simulated_actions.length > 0 ? `<span class="badge badge-light-success fs-6">${result.simulated_actions.length} ação(ões)</span>` : ''}
                 </div>
             </div>
     `;
     
+    // Exibir avisos (warnings) - especialmente sobre chatbots
+    if (result.warnings && result.warnings.length > 0) {
+        html += '<div class="alert alert-warning d-flex align-items-center"><i class="ki-duotone ki-information fs-2tx text-warning me-4"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i><div><strong>Avisos Importantes:</strong><ul class="mb-0 mt-2">';
+        result.warnings.forEach(warning => {
+            const message = warning.message || warning;
+            html += `<li>${message}</li>`;
+        });
+        html += '</ul></div></div>';
+    }
+    
     if (result.errors && result.errors.length > 0) {
         html += '<div class="alert alert-danger"><strong>Erros Encontrados:</strong><ul class="mb-0">';
         result.errors.forEach(error => {
-            html += `<li>${error}</li>`;
+            const message = error.message || error;
+            html += `<li>${message}</li>`;
         });
         html += '</ul></div>';
     }
@@ -3522,7 +3534,7 @@ function displayTestResults(result) {
                         <tr class="fw-bold text-muted bg-light">
                             <th class="min-w-50px">#</th>
                             <th class="min-w-150px">Tipo</th>
-                            <th class="min-w-200px">Detalhes</th>
+                            <th class="min-w-300px">Detalhes</th>
                             <th class="min-w-100px">Status</th>
                         </tr>
                     </thead>
@@ -3531,19 +3543,62 @@ function displayTestResults(result) {
         
         result.steps.forEach((step, index) => {
             const stepNum = index + 1;
-            const status = step.success ? '<span class="badge badge-light-success">✓ OK</span>' : '<span class="badge badge-light-danger">✗ Erro</span>';
-            let details = step.node_type || 'N/A';
             
+            // Determinar status visual
+            let statusBadge = '';
+            if (step.status === 'waiting') {
+                statusBadge = '<span class="badge badge-light-warning">⏸️ Aguardando</span>';
+            } else if (step.status === 'error') {
+                statusBadge = '<span class="badge badge-light-danger">✗ Erro</span>';
+            } else if (step.status === 'simulated') {
+                statusBadge = '<span class="badge badge-light-success">✓ Simulado</span>';
+            } else {
+                statusBadge = step.success ? '<span class="badge badge-light-success">✓ OK</span>' : '<span class="badge badge-light-danger">✗ Erro</span>';
+            }
+            
+            // Formatar detalhes
+            let details = '';
             if (step.action_preview) {
-                details = JSON.stringify(step.action_preview, null, 2).substring(0, 100) + '...';
+                const preview = step.action_preview;
+                
+                if (preview.type === 'chatbot') {
+                    // Formato especial para chatbot
+                    details = `<strong>Tipo:</strong> ${preview.chatbot_type}<br>
+                               <strong>Mensagem:</strong> ${preview.message.substring(0, 100)}${preview.message.length > 100 ? '...' : ''}<br>`;
+                    
+                    if (preview.options && preview.options.length > 0) {
+                        details += `<strong>Opções:</strong> ${preview.options.length} opção(ões)<br>`;
+                        details += `<ul class="mb-0 mt-1">`;
+                        preview.options.forEach(opt => {
+                            details += `<li class="fs-8">${opt}</li>`;
+                        });
+                        details += `</ul>`;
+                    }
+                    
+                    if (preview.note) {
+                        details += `<div class="mt-2 p-2 bg-light-warning rounded"><small>${preview.note}</small></div>`;
+                    }
+                } else if (preview.type === 'send_message') {
+                    details = `<strong>Mensagem:</strong><br>${preview.message.substring(0, 150)}${preview.message.length > 150 ? '...' : ''}`;
+                } else {
+                    // Outros tipos - JSON formatado
+                    details = `<pre class="mb-0 fs-8" style="max-height: 100px; overflow-y: auto;">${JSON.stringify(preview, null, 2)}</pre>`;
+                }
+            } else if (step.condition_result) {
+                details = `<strong>Resultado:</strong> ${step.condition_result.result ? '✓ Verdadeiro' : '✗ Falso'}<br>
+                          <small>${step.condition_result.reason || ''}</small>`;
+            } else if (step.error) {
+                details = `<span class="text-danger">${step.error}</span>`;
+            } else {
+                details = step.node_name || step.node_type || 'N/A';
             }
             
             html += `
                 <tr>
                     <td class="fw-bold">${stepNum}</td>
-                    <td>${step.node_type || 'N/A'}</td>
-                    <td><pre class="mb-0 fs-8">${details}</pre></td>
-                    <td>${status}</td>
+                    <td><span class="badge badge-light-primary">${step.node_type || 'N/A'}</span></td>
+                    <td>${details}</td>
+                    <td>${statusBadge}</td>
                 </tr>
             `;
         });
@@ -3555,7 +3610,7 @@ function displayTestResults(result) {
     
     Swal.fire({
         html: html,
-        width: '900px',
+        width: '1000px',
         confirmButtonText: 'Fechar',
         customClass: {
             popup: 'text-start'

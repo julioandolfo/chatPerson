@@ -1786,7 +1786,7 @@ function openNodeConfig(nodeId) {
     
     document.getElementById("kt_node_config_content").innerHTML = formContent;
     
-            // Preencher valores existentes
+    // Preencher valores existentes
     if (node.node_data) {
         Object.keys(node.node_data).forEach(key => {
             const input = document.querySelector(`[name="${key}"]`);
@@ -1794,6 +1794,17 @@ function openNodeConfig(nodeId) {
                 input.value = node.node_data[key] || "";
             }
         });
+        // Tratamento para Atribuição Avançada: garantir exibição dos blocos certos ao abrir
+        if (node.node_type === 'action_assign_advanced') {
+            const assignSelect = document.getElementById('kt_assignment_type');
+            const methodSelect = document.getElementById('kt_distribution_method');
+            if (assignSelect) {
+                updateAssignmentFields(assignSelect.value || 'auto');
+            }
+            if (methodSelect) {
+                updatePercentageFields(methodSelect.value || 'round_robin');
+            }
+        }
         
         // Tratamento especial para chatbot
         if (node.node_type === 'action_chatbot') {

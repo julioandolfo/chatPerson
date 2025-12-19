@@ -2106,14 +2106,14 @@ body.dark-mode .swal2-content {
                     </div>
                 </div>
                 <div class="ai-active-banner-actions">
-                    <button class="btn btn-sm btn-light-primary" onclick="showAIHistoryModal(<?= $selectedConversation['id'] ?? 0 ?>)">
+                    <button class="btn btn-sm btn-light-primary" onclick="if(typeof showAIHistory === 'function') showAIHistory(); else console.error('showAIHistory não está disponível');">
                         <i class="ki-duotone ki-eye fs-6">
                             <span class="path1"></span>
                             <span class="path2"></span>
                         </i>
                         Ver Histórico
                     </button>
-                    <button class="btn btn-sm btn-icon btn-light-danger" onclick="removeAIAgentFromConversation(<?= $selectedConversation['id'] ?? 0 ?>)" title="Remover IA">
+                    <button class="btn btn-sm btn-icon btn-light-danger" onclick="if(typeof removeAIAgent === 'function') removeAIAgent(); else console.error('removeAIAgent não está disponível');" title="Remover IA">
                         <i class="ki-duotone ki-cross fs-6">
                             <span class="path1"></span>
                             <span class="path2"></span>
@@ -14499,10 +14499,10 @@ function updateAIActiveBanner(status, conversationId) {
         const removeBtn = banner.querySelector('.ai-active-banner-actions button:last-child');
         
         if (historyBtn) {
-            historyBtn.setAttribute('onclick', `showAIHistoryModal(${conversationId})`);
+            historyBtn.setAttribute('onclick', 'if(typeof showAIHistory === \'function\') showAIHistory(); else console.error(\'showAIHistory não está disponível\');');
         }
         if (removeBtn) {
-            removeBtn.setAttribute('onclick', `removeAIAgentFromConversation(${conversationId})`);
+            removeBtn.setAttribute('onclick', 'if(typeof removeAIAgent === \'function\') removeAIAgent(); else console.error(\'removeAIAgent não está disponível\');');
         }
         
         // Mostrar banner

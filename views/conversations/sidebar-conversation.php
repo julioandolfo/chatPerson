@@ -907,7 +907,17 @@ window.moveConversationStage = moveConversationStage;
  * Carregar status da IA na conversa
  */
 function loadAIAgentStatus(conversationId) {
-    if (!conversationId) return;
+    if (!conversationId) {
+        console.warn('loadAIAgentStatus: conversationId não fornecido');
+        updateAIAgentSidebar({ has_ai: false });
+        return;
+    }
+    
+    // Mostrar estado de carregamento
+    const statusDiv = document.getElementById('sidebar-ai-status');
+    if (statusDiv) {
+        statusDiv.innerHTML = '<div class="text-muted fs-7">Carregando...</div>';
+    }
     
     fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/ai-status`, {
         headers: {
@@ -915,21 +925,32 @@ function loadAIAgentStatus(conversationId) {
             'Accept': 'application/json'
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             updateAIAgentSidebar(data.data);
-            updateAIActiveBanner(data.data, conversationId);
+            if (typeof updateAIActiveBanner === 'function') {
+                updateAIActiveBanner(data.data, conversationId);
+            }
         } else {
             console.error('Erro ao carregar status da IA:', data.message);
             updateAIAgentSidebar({ has_ai: false });
-            updateAIActiveBanner({ has_ai: false }, conversationId);
+            if (typeof updateAIActiveBanner === 'function') {
+                updateAIActiveBanner({ has_ai: false }, conversationId);
+            }
         }
     })
     .catch(error => {
         console.error('Erro ao carregar status da IA:', error);
         updateAIAgentSidebar({ has_ai: false });
-        updateAIActiveBanner({ has_ai: false }, conversationId);
+        if (typeof updateAIActiveBanner === 'function') {
+            updateAIActiveBanner({ has_ai: false }, conversationId);
+        }
     });
 }
 
@@ -942,7 +963,10 @@ function updateAIAgentSidebar(status) {
     const actionsDiv = document.getElementById('sidebar-ai-actions');
     const addSection = document.getElementById('sidebar-ai-add-section');
     
-    if (!section || !statusDiv) return;
+    if (!section || !statusDiv) {
+        console.warn('updateAIAgentSidebar: Elementos do sidebar não encontrados');
+        return;
+    }
     
     if (status.has_ai && status.ai_agent) {
         // Tem IA ativa

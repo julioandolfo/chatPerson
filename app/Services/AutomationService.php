@@ -521,6 +521,10 @@ class AutomationService
                 \App\Helpers\Logger::automation("  Executando: atribuição avançada");
                 self::executeAssignAdvanced($nodeData, $conversationId, $executionId);
                 break;
+            case 'action_assign_ai_agent':
+                \App\Helpers\Logger::automation("  Executando: atribuir agente de IA");
+                self::executeAssignAIAgent($nodeData, $conversationId, $executionId);
+                break;
             case 'action_move_stage':
                 \App\Helpers\Logger::automation("  Executando: mover etapa");
                 self::executeMoveStage($nodeData, $conversationId, $executionId);

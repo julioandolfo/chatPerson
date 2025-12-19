@@ -749,6 +749,14 @@ if (!empty($departments)) {
     }
 }
 
+$aiAgents = \App\Models\AIAgent::getAvailableAgents();
+$aiAgentOptions = '<option value="">Automático (primeiro disponível)</option>';
+if (!empty($aiAgents)) {
+    foreach ($aiAgents as $aiAgent) {
+        $aiAgentOptions .= '<option value="' . htmlspecialchars($aiAgent['id']) . '">' . htmlspecialchars($aiAgent['name'] . ' (' . $aiAgent['agent_type'] . ')') . '</option>';
+    }
+}
+
 ob_start();
 ?>
 <script>
@@ -786,6 +794,7 @@ const stageOptionsHtml = <?= json_encode($stageOptions, JSON_UNESCAPED_UNICODE) 
 const agentOptionsHtml = <?= json_encode($agentOptions, JSON_UNESCAPED_UNICODE) ?>;
 const funnelOptionsHtml = <?= json_encode($funnelOptions, JSON_UNESCAPED_UNICODE) ?>;
 const departmentOptionsHtml = <?= json_encode($departmentOptions, JSON_UNESCAPED_UNICODE) ?>;
+const aiAgentOptionsHtml = <?= json_encode($aiAgentOptions, JSON_UNESCAPED_UNICODE) ?>;
 
 document.addEventListener("DOMContentLoaded", function() {
     canvas = document.getElementById("kt_automation_canvas");
@@ -1354,6 +1363,46 @@ function openNodeConfig(nodeId) {
                             Enviar notificação ao agente sobre a atribuição
                         </label>
                     </div>
+                </div>
+            `;
+            break;
+        case "action_assign_ai_agent":
+            const aiAgentId = node.node_data.ai_agent_id || '';
+            const processImmediately = node.node_data.process_immediately ?? false;
+            const assumeConversation = node.node_data.assume_conversation ?? false;
+            const onlyIfUnassigned = node.node_data.only_if_unassigned ?? false;
+            
+            formContent = `
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2">Agente de IA</label>
+                    <select name="ai_agent_id" class="form-select form-select-solid">
+                        ${aiAgentOptionsHtml}
+                    </select>
+                    <div class="form-text">Selecione um agente de IA específico ou deixe "Automático" para usar o primeiro disponível</div>
+                </div>
+                
+                <div class="fv-row mb-7">
+                    <label class="d-flex align-items-center">
+                        <input type="checkbox" name="process_immediately" class="form-check-input me-2" ${processImmediately ? 'checked' : ''} />
+                        <span class="fw-semibold fs-6">Processar mensagens imediatamente</span>
+                    </label>
+                    <div class="form-text">Se habilitado, a IA processará a última mensagem do contato assim que for adicionada</div>
+                </div>
+                
+                <div class="fv-row mb-7">
+                    <label class="d-flex align-items-center">
+                        <input type="checkbox" name="assume_conversation" class="form-check-input me-2" ${assumeConversation ? 'checked' : ''} />
+                        <span class="fw-semibold fs-6">Assumir conversa (remover agente humano)</span>
+                    </label>
+                    <div class="form-text">Se habilitado, remove o agente humano da conversa para a IA assumir completamente</div>
+                </div>
+                
+                <div class="fv-row mb-7">
+                    <label class="d-flex align-items-center">
+                        <input type="checkbox" name="only_if_unassigned" class="form-check-input me-2" ${onlyIfUnassigned ? 'checked' : ''} />
+                        <span class="fw-semibold fs-6">Apenas se não tiver agente atribuído</span>
+                    </label>
+                    <div class="form-text">Se habilitado, só adiciona a IA se a conversa não tiver um agente humano atribuído</div>
                 </div>
             `;
             break;

@@ -45,6 +45,11 @@ class AutomationNode extends Model
                 'icon' => 'ki-user-tick',
                 'color' => '#9333ea'
             ],
+            'action_assign_ai_agent' => [
+                'label' => 'Atribuir Agente de IA',
+                'icon' => 'ki-robot',
+                'color' => '#6366f1'
+            ],
             'action_move_stage' => [
                 'label' => 'Mover para Estágio',
                 'icon' => 'ki-arrow-right',

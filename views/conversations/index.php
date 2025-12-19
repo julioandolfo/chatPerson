@@ -818,12 +818,84 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     z-index: 10;
 }
 
+/* Banner de IA Ativa */
+.ai-active-banner {
+    padding: 12px 20px;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+    border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+    flex-shrink: 0;
+    animation: slideDown 0.3s ease-out;
+}
+
+.ai-active-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.ai-active-banner-icon {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    border-radius: 50%;
+    color: white;
+}
+
+.ai-active-banner-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.ai-active-banner-title {
+    display: flex;
+    align-items: center;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--bs-text-dark);
+    margin-bottom: 2px;
+}
+
+.ai-active-banner-subtitle {
+    font-size: 12px;
+    color: var(--bs-text-gray-700);
+    display: flex;
+    align-items: center;
+}
+
+.ai-active-banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Dark mode para banner de IA */
+[data-theme="dark"] .ai-active-banner {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
+    border-bottom-color: rgba(99, 102, 241, 0.3);
+}
+
 /* Badge de mensagem de IA */
 .ai-message-badge {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 4px 8px;
+    gap: 6px;
+    padding: 4px 10px;
     background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
     border: 1px solid rgba(99, 102, 241, 0.2);
     border-radius: 12px;
@@ -833,13 +905,53 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     font-weight: 500;
 }
 
+.ai-message-badge .ai-avatar-mini {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    font-size: 9px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.ai-message-badge .ai-avatar-mini img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
 .ai-message-badge i {
     color: #6366f1;
+    font-size: 12px;
 }
 
 .ai-badge-text {
     font-size: 11px;
     font-weight: 500;
+}
+
+/* Avatar do agente de IA nas mensagens */
+.chat-message.outgoing .message-avatar.ai-agent-avatar {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 12px;
+}
+
+.chat-message.outgoing .message-avatar.ai-agent-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
 }
 
 /* Estilo especial para mensagens de IA */
@@ -1972,6 +2084,45 @@ body.dark-mode .swal2-content {
             </div>
         </div>
         
+        <!-- Banner de IA Ativa (aparece quando IA está ativa) -->
+        <div id="aiActiveBanner" class="ai-active-banner d-none" style="display: none !important;">
+            <div class="ai-active-banner-content">
+                <div class="ai-active-banner-icon">
+                    <i class="ki-duotone ki-robot fs-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                        <span class="path4"></span>
+                    </i>
+                </div>
+                <div class="ai-active-banner-info">
+                    <div class="ai-active-banner-title">
+                        <span class="ai-agent-name">Agente de IA Ativo</span>
+                        <span class="badge badge-sm badge-light-success ms-2">Ativo</span>
+                    </div>
+                    <div class="ai-active-banner-subtitle">
+                        <span class="ai-agent-type"></span>
+                        <span class="ai-messages-count ms-2"></span>
+                    </div>
+                </div>
+                <div class="ai-active-banner-actions">
+                    <button class="btn btn-sm btn-light-primary" onclick="showAIHistoryModal(<?= $selectedConversation['id'] ?? 0 ?>)">
+                        <i class="ki-duotone ki-eye fs-6">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Ver Histórico
+                    </button>
+                    <button class="btn btn-sm btn-icon btn-light-danger" onclick="removeAIAgentFromConversation(<?= $selectedConversation['id'] ?? 0 ?>)" title="Remover IA">
+                        <i class="ki-duotone ki-cross fs-6">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
         <!-- Mensagens (sempre presente) -->
         <div class="chat-messages" id="chatMessages">
             <?php if (!empty($selectedConversation)): ?>
@@ -2039,6 +2190,16 @@ body.dark-mode .swal2-content {
                         
                                             <?php else: ?>
                             <!-- Mensagem normal -->
+                            <?php
+                            // Verificar se é mensagem de IA
+                            $isAIMessage = !empty($msg['ai_agent_id']);
+                            $aiAgentName = $msg['ai_agent_name'] ?? 'Assistente IA';
+                            $aiAgentInitials = '';
+                            if ($isAIMessage && $aiAgentName) {
+                                $parts = explode(' ', $aiAgentName);
+                                $aiAgentInitials = strtoupper(substr($parts[0], 0, 1) . (isset($parts[1]) ? substr($parts[1], 0, 1) : ''));
+                            }
+                            ?>
                             <div class="chat-message <?= $msgDirection === 'incoming' ? 'incoming' : 'outgoing' ?>" data-message-id="<?= $msg['id'] ?? '' ?>" data-timestamp="<?= strtotime($msgCreatedAt) * 1000 ?>">
                                 <?php if ($msgDirection === 'incoming'): ?>
                                     <?php if (!empty($selectedConversation['contact_avatar'])): ?>
@@ -2046,6 +2207,11 @@ body.dark-mode .swal2-content {
                                     <?php else: ?>
                                         <div class="message-avatar"><?= $initials ?></div>
                                     <?php endif; ?>
+                                <?php elseif ($isAIMessage && $msgDirection === 'outgoing'): ?>
+                                    <!-- Avatar do agente de IA -->
+                                    <div class="message-avatar ai-agent-avatar" title="<?= htmlspecialchars($aiAgentName) ?>">
+                                        <?= $aiAgentInitials ?: '🤖' ?>
+                                    </div>
                                 <?php endif; ?>
                                 <div class="message-content">
                                     <div class="message-actions">
@@ -2063,10 +2229,6 @@ body.dark-mode .swal2-content {
                                         </button>
                                     </div>
                                             <?php
-                                    // Verificar se é mensagem de IA
-                                    $isAIMessage = !empty($msg['ai_agent_id']);
-                                    $aiAgentName = $msg['ai_agent_name'] ?? 'Assistente IA';
-                                    
                                     // Verificar se é uma mensagem citada/reply
                                     $isQuoted = strpos($msgContent, '↩️') === 0;
                                     
@@ -2094,6 +2256,9 @@ body.dark-mode .swal2-content {
                                     ?>
                                     <?php if ($isAIMessage && $msgDirection === 'outgoing'): ?>
                                         <div class="ai-message-badge" title="Mensagem enviada por <?= htmlspecialchars($aiAgentName) ?>">
+                                            <div class="ai-avatar-mini">
+                                                <?= $aiAgentInitials ?: '🤖' ?>
+                                            </div>
                                             <i class="ki-duotone ki-robot fs-7">
                                                 <span class="path1"></span>
                                                 <span class="path2"></span>
@@ -4262,6 +4427,11 @@ function selectConversation(id) {
             // Atualizar sidebar
             updateConversationSidebar(data.conversation, data.tags || []);
             
+            // Carregar status da IA e atualizar banner
+            if (typeof loadAIAgentStatus === 'function') {
+                loadAIAgentStatus(id);
+            }
+            
             // Atualizar timeline quando conversa é selecionada
             updateConversationTimeline(data.conversation.id);
             
@@ -4903,6 +5073,11 @@ function updateConversationSidebar(conversation, tags) {
     if (addNoteBtn && conversation.id) {
         addNoteBtn.setAttribute('onclick', `addNote(${conversation.id})`);
         addNoteBtn.style.display = '';
+    }
+    
+    // Carregar status da IA na conversa
+    if (conversation.id && typeof loadAIAgentStatus === 'function') {
+        loadAIAgentStatus(conversation.id);
     }
     
     // Atualizar timeline
@@ -7661,6 +7836,13 @@ function addMessageToChat(message) {
         const isAIMessage = message.ai_agent_id !== null && message.ai_agent_id !== undefined;
         const aiAgentName = message.ai_agent_name || 'Assistente IA';
         
+        // Obter iniciais do agente de IA
+        let aiAgentInitials = '';
+        if (isAIMessage && aiAgentName) {
+            const parts = aiAgentName.split(' ');
+            aiAgentInitials = (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
+        }
+        
         let avatarHtml = '';
         if (isIncoming) {
             if (currentContactAvatar) {
@@ -7669,6 +7851,9 @@ function addMessageToChat(message) {
                 const initials = getInitials(message.sender_name || 'NN');
                 avatarHtml = `<div class="message-avatar">${initials}</div>`;
             }
+        } else if (isAIMessage) {
+            // Avatar do agente de IA para mensagens de IA
+            avatarHtml = `<div class="message-avatar ai-agent-avatar" title="${escapeHtml(aiAgentName)}">${aiAgentInitials || '🤖'}</div>`;
         }
         
         // Badge de IA se for mensagem de agente de IA
@@ -7676,6 +7861,7 @@ function addMessageToChat(message) {
         if (isAIMessage && !isIncoming) {
             aiBadgeHtml = `
                 <div class="ai-message-badge" title="Mensagem enviada por ${escapeHtml(aiAgentName)}">
+                    <div class="ai-avatar-mini">${aiAgentInitials || '🤖'}</div>
                     <i class="ki-duotone ki-robot fs-7">
                         <span class="path1"></span>
                         <span class="path2"></span>
@@ -14279,6 +14465,54 @@ if (editContactForm) {
             submitBtn.innerHTML = originalText;
         });
     });
+}
+
+/**
+ * Atualizar banner de IA ativa no topo do chat
+ */
+function updateAIActiveBanner(status, conversationId) {
+    const banner = document.getElementById('aiActiveBanner');
+    if (!banner) return;
+    
+    if (status.has_ai && status.ai_agent) {
+        const aiAgent = status.ai_agent;
+        const aiConv = status.ai_conversation;
+        
+        // Obter iniciais do agente
+        const parts = aiAgent.name.split(' ');
+        const initials = (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
+        
+        // Atualizar conteúdo do banner
+        const nameEl = banner.querySelector('.ai-agent-name');
+        const typeEl = banner.querySelector('.ai-agent-type');
+        const countEl = banner.querySelector('.ai-messages-count');
+        
+        if (nameEl) nameEl.textContent = aiAgent.name;
+        if (typeEl) typeEl.textContent = aiAgent.type || 'GENERAL';
+        if (countEl) {
+            const count = status.messages_count || 0;
+            countEl.textContent = `${count} ${count === 1 ? 'mensagem' : 'mensagens'}`;
+        }
+        
+        // Atualizar onclick dos botões
+        const historyBtn = banner.querySelector('.ai-active-banner-actions button:first-child');
+        const removeBtn = banner.querySelector('.ai-active-banner-actions button:last-child');
+        
+        if (historyBtn) {
+            historyBtn.setAttribute('onclick', `showAIHistoryModal(${conversationId})`);
+        }
+        if (removeBtn) {
+            removeBtn.setAttribute('onclick', `removeAIAgentFromConversation(${conversationId})`);
+        }
+        
+        // Mostrar banner
+        banner.classList.remove('d-none');
+        banner.style.display = '';
+    } else {
+        // Ocultar banner
+        banner.classList.add('d-none');
+        banner.style.display = 'none';
+    }
 }
 </script>
 

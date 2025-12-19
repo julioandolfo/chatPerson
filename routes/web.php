@@ -280,6 +280,13 @@ Router::post('/conversations/{id}/tags', [TagController::class, 'addToConversati
 Router::post('/conversations/{id}/tags/remove', [TagController::class, 'removeFromConversation'], ['Authentication']);
 Router::get('/conversations/{id}/tags', [TagController::class, 'getByConversation'], ['Authentication']);
 
+// Rotas de Agentes de IA em Conversas
+Router::get('/conversations/{id}/ai-status', [ConversationController::class, 'getAIStatus'], ['Authentication']);
+Router::get('/conversations/{id}/ai-messages', [ConversationController::class, 'getAIMessages'], ['Authentication']);
+Router::post('/conversations/{id}/ai-agents', [ConversationController::class, 'addAIAgent'], ['Authentication']);
+Router::delete('/conversations/{id}/ai-agents', [ConversationController::class, 'removeAIAgent'], ['Authentication']);
+Router::get('/ai-agents/available', [ConversationController::class, 'getAvailableAIAgents'], ['Authentication']);
+
 // Rotas de Notificações
 Router::get('/notifications', [NotificationController::class, 'index'], ['Authentication']);
 Router::get('/notifications/unread', [NotificationController::class, 'getUnread'], ['Authentication']);

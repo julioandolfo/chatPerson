@@ -1858,6 +1858,160 @@ class ConversationController
     }
 
     /**
+     * Obter status da IA na conversa
+     */
+    public function getAIStatus(int $id): void
+    {
+        $config = $this->prepareJsonResponse();
+        
+        try {
+            Permission::abortIfCannot('conversations.view.own');
+            
+            $status = \App\Services\ConversationAIService::getAIStatus($id);
+            
+            ob_end_clean();
+            Response::json([
+                'success' => true,
+                'data' => $status
+            ]);
+        } catch (\Exception $e) {
+            ob_end_clean();
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        } finally {
+            $this->restoreAfterJsonResponse($config);
+        }
+    }
+
+    /**
+     * Obter mensagens da IA na conversa
+     */
+    public function getAIMessages(int $id): void
+    {
+        $config = $this->prepareJsonResponse();
+        
+        try {
+            Permission::abortIfCannot('conversations.view.own');
+            
+            $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 50;
+            $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
+            
+            $messages = \App\Services\ConversationAIService::getAIMessages($id, $limit, $offset);
+            
+            ob_end_clean();
+            Response::json([
+                'success' => true,
+                'data' => $messages
+            ]);
+        } catch (\Exception $e) {
+            ob_end_clean();
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        } finally {
+            $this->restoreAfterJsonResponse($config);
+        }
+    }
+
+    /**
+     * Adicionar agente de IA à conversa
+     */
+    public function addAIAgent(int $id): void
+    {
+        $config = $this->prepareJsonResponse();
+        
+        try {
+            Permission::abortIfCannot('conversations.edit.own');
+            
+            $data = json_decode(file_get_contents('php://input'), true);
+            if (!$data) {
+                $data = $_POST;
+            }
+            
+            $result = \App\Services\ConversationAIService::addAIAgent($id, $data);
+            
+            ob_end_clean();
+            Response::json([
+                'success' => true,
+                'message' => $result['message'],
+                'data' => $result
+            ]);
+        } catch (\Exception $e) {
+            ob_end_clean();
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        } finally {
+            $this->restoreAfterJsonResponse($config);
+        }
+    }
+
+    /**
+     * Remover agente de IA da conversa
+     */
+    public function removeAIAgent(int $id): void
+    {
+        $config = $this->prepareJsonResponse();
+        
+        try {
+            Permission::abortIfCannot('conversations.edit.own');
+            
+            $data = json_decode(file_get_contents('php://input'), true);
+            if (!$data) {
+                $data = $_POST;
+            }
+            
+            $result = \App\Services\ConversationAIService::removeAIAgent($id, $data);
+            
+            ob_end_clean();
+            Response::json([
+                'success' => true,
+                'message' => $result['message']
+            ]);
+        } catch (\Exception $e) {
+            ob_end_clean();
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        } finally {
+            $this->restoreAfterJsonResponse($config);
+        }
+    }
+
+    /**
+     * Listar agentes de IA disponíveis
+     */
+    public function getAvailableAIAgents(): void
+    {
+        $config = $this->prepareJsonResponse();
+        
+        try {
+            Permission::abortIfCannot('conversations.view.own');
+            
+            $agents = \App\Services\ConversationAIService::getAvailableAgents();
+            
+            ob_end_clean();
+            Response::json([
+                'success' => true,
+                'data' => $agents
+            ]);
+        } catch (\Exception $e) {
+            ob_end_clean();
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        } finally {
+            $this->restoreAfterJsonResponse($config);
+        }
+    }
+
+    /**
      * Remover participante de uma conversa
      */
     public function removeParticipant(int $id, int $userId): void

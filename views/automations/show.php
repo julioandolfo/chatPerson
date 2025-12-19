@@ -1,4 +1,4 @@
-só<?php
+<?php
 $layout = 'layouts.metronic.app';
 $title = 'Automação - ' . htmlspecialchars($automation['name'] ?? '');
 

@@ -1041,6 +1041,8 @@ class AutomationService
      */
     private static function executeChatbot(array $nodeData, int $conversationId, ?int $executionId = null): void
     {
+        \App\Helpers\Logger::automation("    → executeChatbot: conversationId={$conversationId}");
+        
         try {
             $chatbotType = $nodeData['chatbot_type'] ?? 'simple';
             $message = $nodeData['chatbot_message'] ?? '';
@@ -1049,7 +1051,10 @@ class AutomationService
             $options = $nodeData['chatbot_options'] ?? [];
             $connections = $nodeData['connections'] ?? [];
             
+            \App\Helpers\Logger::automation("    Tipo: {$chatbotType}, Mensagem: " . substr($message, 0, 50) . "..., Opções: " . count($options));
+            
             if (empty($message)) {
+                \App\Helpers\Logger::automation("    ERRO: Chatbot sem mensagem configurada!");
                 error_log("Chatbot sem mensagem configurada para conversa {$conversationId}");
                 return;
             }
@@ -1075,16 +1080,16 @@ class AutomationService
             }
             
             // Enviar mensagem inicial do chatbot
-            \App\Models\Message::create([
+            \App\Helpers\Logger::automation("    Enviando mensagem do chatbot...");
+            $messageId = \App\Models\Message::create([
                 'conversation_id' => $conversationId,
                 'sender_id' => null, // Sistema
                 'sender_type' => 'system',
-                'message' => $message,
-                'type' => 'text',
-                'channel' => $conversation['channel'],
-                'direction' => 'outgoing',
-                'status' => 'sent'
+                'content' => $message,
+                'message_type' => 'text',
+                'channel' => $conversation['channel'] ?? 'whatsapp'
             ]);
+            \App\Helpers\Logger::automation("    ✅ Mensagem enviada: ID {$messageId}");
             
             // Processar opções de menu (se tipo = menu)
             if ($chatbotType === 'menu') {
@@ -1102,11 +1107,9 @@ class AutomationService
                             'conversation_id' => $conversationId,
                             'sender_id' => null,
                             'sender_type' => 'system',
-                            'message' => $optionsText,
-                            'type' => 'text',
-                            'channel' => $conversation['channel'],
-                            'direction' => 'outgoing',
-                            'status' => 'sent'
+                            'content' => $optionsText,
+                            'message_type' => 'text',
+                            'channel' => $conversation['channel'] ?? 'whatsapp'
                         ]);
                     }
                 }
@@ -1155,13 +1158,16 @@ class AutomationService
             $currentMetadata['chatbot_automation_id'] = $automationId;
             $currentMetadata['chatbot_node_id'] = $nodeData['node_id'] ?? null;
             
+            \App\Helpers\Logger::automation("    Salvando estado do chatbot no metadata...");
             \App\Models\Conversation::update($conversationId, [
                 'metadata' => json_encode($currentMetadata)
             ]);
+            \App\Helpers\Logger::automation("    ✅ Estado salvo! Chatbot aguardando resposta do contato.");
             
             error_log("Chatbot ({$chatbotType}) executado para conversa {$conversationId}");
             
         } catch (\Exception $e) {
+            \App\Helpers\Logger::automation("    ❌ ERRO no chatbot: " . $e->getMessage());
             error_log("Erro ao executar chatbot: " . $e->getMessage());
             if ($executionId) {
                 \App\Models\AutomationExecution::updateStatus($executionId, 'failed', "Erro no chatbot: " . $e->getMessage());

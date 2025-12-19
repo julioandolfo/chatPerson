@@ -1347,14 +1347,56 @@ function openNodeConfig(nodeId) {
             `;
             break;
         case "action_assign_advanced":
+            const assignType = node.node_data.assignment_type || 'auto';
+            const distributionMethod = node.node_data.distribution_method || 'round_robin';
+            const filterDepartmentId = node.node_data.filter_department_id || '';
+            const considerAvailability = node.node_data.consider_availability ?? true;
+            const considerMax = node.node_data.consider_max_conversations ?? true;
+            const allowAI = node.node_data.allow_ai_agents ?? false;
+            const percentageAgentIds = node.node_data.percentage_agent_ids || [];
+            const percentageValues = node.node_data.percentage_values || [];
+
+            // Montar itens de porcentagem existentes
+            let percentageItemsHtml = '';
+            if (Array.isArray(percentageAgentIds) && Array.isArray(percentageValues) && percentageAgentIds.length) {
+                percentageAgentIds.forEach((agId, idx) => {
+                    const val = percentageValues[idx] ?? '';
+                    percentageItemsHtml += `
+                        <div class="d-flex gap-2 mb-2 percentage-rule-item">
+                            <select name="percentage_agent_ids[]" class="form-select form-select-solid" style="flex: 1;">
+                                <option value="">Selecione um agente</option>
+                                ${agentOptionsHtml}
+                            </select>
+                            <input type="number" name="percentage_values[]" class="form-control form-control-solid" placeholder="%" min="1" max="100" style="width: 100px;" value="${val}"/>
+                            <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removePercentageRule(this)">
+                                <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span></i>
+                            </button>
+                        </div>
+                    `;
+                });
+            } else {
+                percentageItemsHtml = `
+                    <div class="d-flex gap-2 mb-2 percentage-rule-item">
+                        <select name="percentage_agent_ids[]" class="form-select form-select-solid" style="flex: 1;">
+                            <option value="">Selecione um agente</option>
+                            ${agentOptionsHtml}
+                        </select>
+                        <input type="number" name="percentage_values[]" class="form-control form-control-solid" placeholder="%" min="1" max="100" style="width: 100px;" />
+                        <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removePercentageRule(this)">
+                            <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span></i>
+                        </button>
+                    </div>
+                `;
+            }
+
             formContent = `
                 <div class="fv-row mb-7">
                     <label class="required fw-semibold fs-6 mb-2">Tipo de Atribuição</label>
                     <select name="assignment_type" id="kt_assignment_type" class="form-select form-select-solid" required onchange="updateAssignmentFields(this.value)">
-                        <option value="auto">Automática (Usar método do sistema)</option>
-                        <option value="specific_agent">Agente Específico</option>
-                        <option value="department">Setor Específico</option>
-                        <option value="custom_method">Método Personalizado</option>
+                        <option value="auto" ${assignType === 'auto' ? 'selected' : ''}>Automática (Usar método do sistema)</option>
+                        <option value="specific_agent" ${assignType === 'specific_agent' ? 'selected' : ''}>Agente Específico</option>
+                        <option value="department" ${assignType === 'department' ? 'selected' : ''}>Setor Específico</option>
+                        <option value="custom_method" ${assignType === 'custom_method' ? 'selected' : ''}>Método Personalizado</option>
                     </select>
                     <div class="form-text">Escolha como a conversa será atribuída</div>
                 </div>
@@ -1394,11 +1436,11 @@ function openNodeConfig(nodeId) {
                     <div class="fv-row mb-7">
                         <label class="required fw-semibold fs-6 mb-2">Método de Distribuição</label>
                         <select name="distribution_method" id="kt_distribution_method" class="form-select form-select-solid" onchange="updatePercentageFields(this.value)">
-                            <option value="round_robin">Round-Robin (Distribuição igual)</option>
-                            <option value="by_load">Por Carga (Menor carga primeiro)</option>
-                            <option value="by_performance">Por Performance</option>
-                            <option value="by_specialty">Por Especialidade</option>
-                            <option value="percentage">Por Porcentagem</option>
+                            <option value="round_robin" ${distributionMethod === 'round_robin' ? 'selected' : ''}>Round-Robin (Distribuição igual)</option>
+                            <option value="by_load" ${distributionMethod === 'by_load' ? 'selected' : ''}>Por Carga (Menor carga primeiro)</option>
+                            <option value="by_performance" ${distributionMethod === 'by_performance' ? 'selected' : ''}>Por Performance</option>
+                            <option value="by_specialty" ${distributionMethod === 'by_specialty' ? 'selected' : ''}>Por Especialidade</option>
+                            <option value="percentage" ${distributionMethod === 'percentage' ? 'selected' : ''}>Por Porcentagem</option>
                         </select>
                     </div>
                     
@@ -1413,7 +1455,7 @@ function openNodeConfig(nodeId) {
                     
                     <div class="fv-row mb-7">
                         <label class="d-flex align-items-center">
-                            <input type="checkbox" name="consider_availability" class="form-check-input me-2" checked />
+                            <input type="checkbox" name="consider_availability" class="form-check-input me-2" ${considerAvailability ? 'checked' : ''} />
                             <span class="fw-semibold fs-6">Considerar status de disponibilidade</span>
                         </label>
                         <div class="form-text">Apenas agentes online/disponíveis</div>
@@ -1421,7 +1463,7 @@ function openNodeConfig(nodeId) {
                     
                     <div class="fv-row mb-7">
                         <label class="d-flex align-items-center">
-                            <input type="checkbox" name="consider_max_conversations" class="form-check-input me-2" checked />
+                            <input type="checkbox" name="consider_max_conversations" class="form-check-input me-2" ${considerMax ? 'checked' : ''} />
                             <span class="fw-semibold fs-6">Considerar limite máximo</span>
                         </label>
                         <div class="form-text">Respeita limite máximo de conversas do agente</div>
@@ -1429,7 +1471,7 @@ function openNodeConfig(nodeId) {
                     
                     <div class="fv-row mb-7">
                         <label class="d-flex align-items-center">
-                            <input type="checkbox" name="allow_ai_agents" class="form-check-input me-2" />
+                            <input type="checkbox" name="allow_ai_agents" class="form-check-input me-2" ${allowAI ? 'checked' : ''} />
                             <span class="fw-semibold fs-6">Permitir agentes de IA</span>
                         </label>
                         <div class="form-text">Inclui agentes de IA na seleção</div>
@@ -1452,16 +1494,7 @@ function openNodeConfig(nodeId) {
                         <div class="fv-row mb-7">
                             <label class="fw-semibold fs-6 mb-2">Regras de Distribuição</label>
                             <div id="percentage_rules_list">
-                                <div class="d-flex gap-2 mb-2 percentage-rule-item">
-                                    <select name="percentage_agent_ids[]" class="form-select form-select-solid" style="flex: 1;">
-                                        <option value="">Selecione um agente</option>
-                                        ${agentOptionsHtml}
-                                    </select>
-                                    <input type="number" name="percentage_values[]" class="form-control form-control-solid" placeholder="%" min="1" max="100" style="width: 100px;" />
-                                    <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removePercentageRule(this)">
-                                        <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span></i>
-                                    </button>
-                                </div>
+                                ${percentageItemsHtml}
                             </div>
                             <button type="button" class="btn btn-sm btn-light-primary mt-2" onclick="addPercentageRule()">
                                 <i class="ki-duotone ki-plus fs-2"></i>
@@ -2659,59 +2692,57 @@ window.refreshLogs = refreshLogs;
 window.removeConnection = removeConnection;
 
 // Funções para Chatbot Visual
-function updateChatbotFields(type) {
+window.updateChatbotFields = function updateChatbotFields(type) {
     const optionsContainer = document.getElementById('kt_chatbot_options_container');
     const conditionalContainer = document.getElementById('kt_chatbot_conditional_container');
     const optionsList = document.getElementById('kt_chatbot_options_list');
     
-    if (type === 'menu') {
-        optionsContainer.style.display = 'block';
-        conditionalContainer.style.display = 'none';
-        // conexões são pelos handles; nada para popular aqui
-    } else if (type === 'conditional') {
-        optionsContainer.style.display = 'none';
-        conditionalContainer.style.display = 'block';
-    } else {
-        optionsContainer.style.display = 'none';
-        conditionalContainer.style.display = 'none';
-    }
-}
+    if (optionsContainer) optionsContainer.style.display = 'none';
+    if (conditionalContainer) conditionalContainer.style.display = 'none';
 
-function addChatbotOption() {
+    if (type === 'menu') {
+        if (optionsContainer) optionsContainer.style.display = 'block';
+        if (optionsList && optionsList.children.length === 0) {
+            // garantir pelo menos uma opção
+            addChatbotOption();
+        }
+    } else if (type === 'conditional') {
+        if (conditionalContainer) conditionalContainer.style.display = 'block';
+    }
+};
+
+window.addChatbotOption = function addChatbotOption(option = {}) {
     const optionsList = document.getElementById('kt_chatbot_options_list');
+    if (!optionsList) return;
     const newOption = document.createElement('div');
     newOption.className = 'd-flex flex-column gap-2 mb-3 chatbot-option-item';
     newOption.innerHTML = `
         <div class="d-flex gap-2">
-            <input type="text" name="chatbot_options[]" class="form-control form-control-solid" placeholder="Ex: 2 - Vendas" />
+            <input type="text" name="chatbot_options[]" class="form-control form-control-solid" placeholder="Ex: 2 - Vendas" value="${option.text || option || ''}" />
             <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeChatbotOption(this)">
                 <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span></i>
             </button>
         </div>
-        <input type="text" name="chatbot_option_keywords[]" class="form-control form-control-solid" placeholder="Palavras-chave: 2, vendas, comercial" />
+        <input type="text" name="chatbot_option_keywords[]" class="form-control form-control-solid" placeholder="Palavras-chave: 2, vendas, comercial" value="${(option.keywords || []).join(', ')}" />
     `;
     optionsList.appendChild(newOption);
-}
+};
 
-function removeChatbotOption(button) {
+window.removeChatbotOption = function removeChatbotOption(button) {
     const optionItem = button.closest('.chatbot-option-item');
     const optionsList = document.getElementById('kt_chatbot_options_list');
-    
+    if (!optionsList || !optionItem) return;
     // Manter pelo menos uma opção
     if (optionsList.children.length > 1) {
         optionItem.remove();
     } else {
         alert('É necessário ter pelo menos uma opção no menu.');
     }
-}
+};
 
-function populateChatbotOptionTargets(optionsList) {
+window.populateChatbotOptionTargets = function populateChatbotOptionTargets() {
     // Conexões agora são feitas pelos handles no nó do chatbot (sem selects)
-}
-
-window.updateChatbotFields = updateChatbotFields;
-window.addChatbotOption = addChatbotOption;
-window.removeChatbotOption = removeChatbotOption;
+};
 
 // Funções para Atribuição Avançada
 function updateAssignmentFields(type) {

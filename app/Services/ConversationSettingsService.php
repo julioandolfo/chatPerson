@@ -342,7 +342,7 @@ class ConversationSettingsService
     /**
      * Distribuição Round-Robin
      */
-    private static function assignRoundRobin(?int $departmentId = null, ?int $funnelId = null, ?int $stageId = null, bool $includeAI = false): ?int
+    public static function assignRoundRobin(?int $departmentId = null, ?int $funnelId = null, ?int $stageId = null, bool $includeAI = false): ?int
     {
         $agents = self::getAvailableAgents($departmentId, $funnelId, $stageId, $includeAI);
         
@@ -373,7 +373,7 @@ class ConversationSettingsService
     /**
      * Distribuição por carga (menor carga primeiro)
      */
-    private static function assignByLoad(?int $departmentId = null, ?int $funnelId = null, ?int $stageId = null, bool $includeAI = false): ?int
+    public static function assignByLoad(?int $departmentId = null, ?int $funnelId = null, ?int $stageId = null, bool $includeAI = false): ?int
     {
         $agents = self::getAvailableAgents($departmentId, $funnelId, $stageId, $includeAI);
         
@@ -404,7 +404,7 @@ class ConversationSettingsService
     /**
      * Distribuição por especialidade (simplificado - pode ser expandido)
      */
-    private static function assignBySpecialty(?int $departmentId = null, ?int $funnelId = null, ?int $stageId = null, bool $includeAI = false): ?int
+    public static function assignBySpecialty(?int $departmentId = null, ?int $funnelId = null, ?int $stageId = null, bool $includeAI = false): ?int
     {
         // Por enquanto, usar round-robin dentro do setor
         return self::assignRoundRobin($departmentId, $funnelId, $stageId, $includeAI);
@@ -413,7 +413,7 @@ class ConversationSettingsService
     /**
      * Distribuição por performance (melhor performance primeiro)
      */
-    private static function assignByPerformance(?int $departmentId = null, ?int $funnelId = null, ?int $stageId = null, bool $includeAI = false): ?int
+    public static function assignByPerformance(?int $departmentId = null, ?int $funnelId = null, ?int $stageId = null, bool $includeAI = false): ?int
     {
         $agents = self::getAvailableAgents($departmentId, $funnelId, $stageId, $includeAI);
         
@@ -454,7 +454,7 @@ class ConversationSettingsService
     /**
      * Distribuição por porcentagem
      */
-    private static function assignByPercentage(?int $departmentId = null, ?int $funnelId = null, ?int $stageId = null, bool $includeAI = false): ?int
+    public static function assignByPercentage(?int $departmentId = null, ?int $funnelId = null, ?int $stageId = null, bool $includeAI = false): ?int
     {
         $settings = self::getSettings();
         

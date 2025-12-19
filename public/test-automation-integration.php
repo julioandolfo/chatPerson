@@ -27,18 +27,16 @@ echo '<style>
     th { background-color: #f2f2f2; }
 </style>';
 
-$db = \App\Helpers\Database::getInstance();
-
 // ========================================
 // 1. VERIFICAR INTEGRAÇÕES WHATSAPP
 // ========================================
 echo '<h2>1️⃣ Integrações WhatsApp Configuradas</h2>';
 
-$integrations = $db->query("
+$integrations = \App\Helpers\Database::fetchAll("
     SELECT id, name, phone_number, default_funnel_id, default_stage_id, status
     FROM whatsapp_accounts
     ORDER BY id
-");
+", []);
 
 if (empty($integrations)) {
     echo '<p class="error">❌ Nenhuma integração WhatsApp encontrada!</p>';
@@ -50,13 +48,13 @@ if (empty($integrations)) {
         $stageName = '-';
         
         if ($int['default_funnel_id']) {
-            $funnel = $db->fetch("SELECT name FROM funnels WHERE id = ?", [$int['default_funnel_id']]);
-            $funnelName = $funnel ? $funnel['name'] : '<span class="error">Funil não encontrado!</span>';
+            $funnel = \App\Helpers\Database::fetch("SELECT name FROM funnels WHERE id = ?", [$int['default_funnel_id']]);
+            $funnelName = $funnel ? htmlspecialchars($funnel['name']) : '<span class="error">Funil não encontrado!</span>';
         }
         
         if ($int['default_stage_id']) {
-            $stage = $db->fetch("SELECT name FROM funnel_stages WHERE id = ?", [$int['default_stage_id']]);
-            $stageName = $stage ? $stage['name'] : '<span class="error">Estágio não encontrado!</span>';
+            $stage = \App\Helpers\Database::fetch("SELECT name FROM funnel_stages WHERE id = ?", [$int['default_stage_id']]);
+            $stageName = $stage ? htmlspecialchars($stage['name']) : '<span class="error">Estágio não encontrado!</span>';
         }
         
         $activeStatus = $int['status'] === 'active' ? '<span class="success">✅ Ativa</span>' : '<span class="error">❌ ' . htmlspecialchars($int['status']) . '</span>';
@@ -78,7 +76,7 @@ if (empty($integrations)) {
 // ========================================
 echo '<h2>2️⃣ Automações Ativas</h2>';
 
-$automations = $db->query("
+$automations = \App\Helpers\Database::fetchAll("
     SELECT a.id, a.name, a.trigger_type, a.funnel_id, a.stage_id, a.status, a.is_active,
            f.name as funnel_name, fs.name as stage_name
     FROM automations a
@@ -86,7 +84,7 @@ $automations = $db->query("
     LEFT JOIN funnel_stages fs ON a.stage_id = fs.id
     WHERE a.is_active = TRUE
     ORDER BY a.id
-");
+", []);
 
 if (empty($automations)) {
     echo '<p class="warning">⚠️ Nenhuma automação ativa encontrada!</p>';
@@ -115,7 +113,7 @@ if (empty($automations)) {
 // ========================================
 echo '<h2>3️⃣ Últimas 10 Conversas Criadas</h2>';
 
-$conversations = $db->query("
+$conversations = \App\Helpers\Database::fetchAll("
     SELECT c.id, c.contact_id, c.channel, c.funnel_id, c.funnel_stage_id, 
            c.whatsapp_account_id, c.created_at,
            co.name as contact_name, co.phone as contact_phone,
@@ -126,7 +124,7 @@ $conversations = $db->query("
     LEFT JOIN funnel_stages fs ON c.funnel_stage_id = fs.id
     ORDER BY c.id DESC
     LIMIT 10
-");
+", []);
 
 if (empty($conversations)) {
     echo '<p class="warning">⚠️ Nenhuma conversa encontrada!</p>';
@@ -156,7 +154,7 @@ if (empty($conversations)) {
 // ========================================
 echo '<h2>4️⃣ Últimas 10 Execuções de Automações</h2>';
 
-$executions = $db->query("
+$executions = \App\Helpers\Database::fetchAll("
     SELECT ae.id, ae.automation_id, ae.conversation_id, ae.status, ae.error_message, ae.created_at,
            a.name as automation_name,
            c.id as conv_id, co.name as contact_name
@@ -166,7 +164,7 @@ $executions = $db->query("
     LEFT JOIN contacts co ON c.contact_id = co.id
     ORDER BY ae.id DESC
     LIMIT 10
-");
+", []);
 
 if (empty($executions)) {
     echo '<p class="warning">⚠️ Nenhuma execução de automação registrada!</p>';
@@ -207,11 +205,11 @@ foreach ($integrations as $int) {
 }
 
 // Verificar se há conversas sem funil/estágio
-$conversationsWithoutFunnel = $db->fetch("
+$conversationsWithoutFunnel = \App\Helpers\Database::fetch("
     SELECT COUNT(*) as total
     FROM conversations
     WHERE funnel_id IS NULL OR funnel_stage_id IS NULL
-");
+", []);
 
 if ($conversationsWithoutFunnel['total'] > 0) {
     $issues[] = "Existem {$conversationsWithoutFunnel['total']} conversas sem funil/estágio";

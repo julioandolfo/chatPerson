@@ -8,6 +8,13 @@ $scriptsPreload = <<<HTML
 if (typeof window.validateAutomationConnections === 'undefined') {
     window.validateAutomationConnections = function() { return true; };
 }
+// Garantir que botões de teste não quebrem antes do script principal carregar
+if (typeof window.testAutomation === 'undefined') {
+    window.testAutomation = function() { console.warn('testAutomation ainda não carregou.'); };
+}
+if (typeof window.advancedTestAutomation === 'undefined') {
+    window.advancedTestAutomation = function() { console.warn('advancedTestAutomation ainda não carregou.'); };
+}
 </script>
 HTML;
 

@@ -47,6 +47,10 @@ class Database
                 self::$config['password'],
                 self::$config['options']
             );
+            
+            // Configurar timezone do MySQL para America/Sao_Paulo (GMT-3)
+            self::$instance->exec("SET time_zone = '-03:00'");
+            
         } catch (PDOException $e) {
             error_log('Database connection error: ' . $e->getMessage());
             throw new \RuntimeException('Erro ao conectar ao banco de dados');

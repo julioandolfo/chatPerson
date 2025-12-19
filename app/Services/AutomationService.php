@@ -1215,6 +1215,12 @@ class AutomationService
             $currentMetadata['chatbot_automation_id'] = $automationId;
             $currentMetadata['chatbot_node_id'] = $nodeData['node_id'] ?? null;
             
+            // Configurações de validação e feedback
+            $currentMetadata['chatbot_max_attempts'] = (int)($nodeData['chatbot_max_attempts'] ?? 3);
+            $currentMetadata['chatbot_invalid_feedback'] = $nodeData['chatbot_invalid_feedback'] ?? 'Opção inválida. Por favor, escolha uma das opções disponíveis.';
+            $currentMetadata['chatbot_fallback_node_id'] = $nodeData['chatbot_fallback_node_id'] ?? null;
+            $currentMetadata['chatbot_invalid_attempts'] = 0; // Resetar contador
+            
             \App\Helpers\Logger::automation("    Salvando estado do chatbot no metadata...");
             \App\Models\Conversation::update($conversationId, [
                 'metadata' => json_encode($currentMetadata)
@@ -1238,26 +1244,44 @@ class AutomationService
      */
     private static function handleChatbotResponse(array $conversation, array $message): bool
     {
+        \App\Helpers\Logger::automation("=== handleChatbotResponse INÍCIO ===");
+        \App\Helpers\Logger::automation("Conversa ID: {$conversation['id']}, Mensagem: '{$message['content']}'");
+        
         $metadata = json_decode($conversation['metadata'] ?? '{}', true);
+        \App\Helpers\Logger::automation("chatbot_active: " . ($metadata['chatbot_active'] ?? 'false'));
+        
         if (empty($metadata['chatbot_active'])) {
+            \App\Helpers\Logger::automation("Chatbot não está ativo. Retornando false.");
             return false;
         }
 
         $text = trim(mb_strtolower($message['content'] ?? ''));
+        \App\Helpers\Logger::automation("Texto processado: '{$text}'");
+        
         if ($text === '') {
+            \App\Helpers\Logger::automation("Texto vazio. Retornando false.");
             return false;
         }
 
         $automationId = $metadata['chatbot_automation_id'] ?? null;
         $options = $metadata['chatbot_options'] ?? [];
         $nextNodes = $metadata['chatbot_next_nodes'] ?? [];
+        
+        \App\Helpers\Logger::automation("Automation ID: {$automationId}");
+        \App\Helpers\Logger::automation("Opções: " . json_encode($options));
+        \App\Helpers\Logger::automation("Next Nodes: " . json_encode($nextNodes));
 
         if (!$automationId || empty($options)) {
+            \App\Helpers\Logger::automation("Sem automationId ou opções. Limpando flag.");
             // Nada a fazer, limpar flag para evitar loop
             $metadata['chatbot_active'] = false;
             \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
             return false;
         }
+
+        // Contador de tentativas inválidas
+        $invalidAttempts = (int)($metadata['chatbot_invalid_attempts'] ?? 0);
+        $maxAttempts = (int)($metadata['chatbot_max_attempts'] ?? 3);
 
         // Encontrar opção correspondente
         $matchedIndex = null;
@@ -1266,14 +1290,20 @@ class AutomationService
             $optTarget = is_array($optRaw) ? ($optRaw['target_node_id'] ?? null) : null;
             $optKeywords = is_array($optRaw) ? ($optRaw['keywords'] ?? []) : [];
             $opt = mb_strtolower(trim((string)$optText));
+            
+            \App\Helpers\Logger::automation("  Testando opção [{$idx}]: '{$optText}' (normalizado: '{$opt}')");
+            
             if ($opt === '') {
+                \App\Helpers\Logger::automation("    Opção vazia, pulando");
                 continue;
             }
 
             // Tentar casar por número inicial (ex.: "1 - Suporte")
             if (preg_match('/^(\\d+)/', $opt, $m)) {
                 $num = $m[1];
+                \App\Helpers\Logger::automation("    Número extraído: '{$num}', comparando com '{$text}'");
                 if ($text === $num || str_starts_with($text, $num)) {
+                    \App\Helpers\Logger::automation("    ✅ MATCH por número!");
                     $matchedIndex = $idx;
                     break;
                 }
@@ -1281,6 +1311,7 @@ class AutomationService
 
             // Comparação direta do texto
             if ($text === $opt) {
+                \App\Helpers\Logger::automation("    ✅ MATCH direto!");
                 $matchedIndex = $idx;
                 break;
             }
@@ -1289,7 +1320,9 @@ class AutomationService
             if (!empty($optKeywords) && is_array($optKeywords)) {
                 foreach ($optKeywords as $kwRaw) {
                     $kw = mb_strtolower(trim((string)$kwRaw));
+                    \App\Helpers\Logger::automation("    Testando keyword: '{$kw}'");
                     if ($kw !== '' && $text === $kw) {
+                        \App\Helpers\Logger::automation("    ✅ MATCH por keyword!");
                         $matchedIndex = $idx;
                         break 2;
                     }
@@ -1298,27 +1331,112 @@ class AutomationService
         }
 
         if ($matchedIndex === null) {
-            return false; // Nenhuma opção casou; manter chatbot ativo
+            \App\Helpers\Logger::automation("❌ Nenhuma opção correspondeu!");
+            
+            // Incrementar contador de tentativas inválidas
+            $invalidAttempts++;
+            $metadata['chatbot_invalid_attempts'] = $invalidAttempts;
+            
+            \App\Helpers\Logger::automation("Tentativa inválida #{$invalidAttempts} de {$maxAttempts}");
+            
+            // Verificar se excedeu tentativas
+            if ($invalidAttempts >= $maxAttempts) {
+                \App\Helpers\Logger::automation("🚨 Máximo de tentativas excedido!");
+                
+                // Verificar se há nó fallback configurado
+                $fallbackNodeId = $metadata['chatbot_fallback_node_id'] ?? null;
+                
+                if ($fallbackNodeId) {
+                    \App\Helpers\Logger::automation("Executando nó fallback: {$fallbackNodeId}");
+                    
+                    // Carregar automação e executar nó fallback
+                    $automation = \App\Models\Automation::findWithNodes((int)$automationId);
+                    if ($automation && !empty($automation['nodes'])) {
+                        $fallbackNode = self::findNodeById($fallbackNodeId, $automation['nodes']);
+                        if ($fallbackNode) {
+                            // Limpar estado do chatbot
+                            $metadata['chatbot_active'] = false;
+                            $metadata['chatbot_options'] = [];
+                            $metadata['chatbot_next_nodes'] = [];
+                            $metadata['chatbot_automation_id'] = null;
+                            $metadata['chatbot_node_id'] = null;
+                            $metadata['chatbot_invalid_attempts'] = 0;
+                            \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
+                            
+                            // Executar nó fallback
+                            self::executeNode($fallbackNode, $conversation['id'], $automation['nodes'], null);
+                            return true;
+                        }
+                    }
+                }
+                
+                // Se não tem fallback, limpar e enviar mensagem padrão
+                $metadata['chatbot_active'] = false;
+                $metadata['chatbot_invalid_attempts'] = 0;
+                \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
+                
+                // Enviar mensagem de erro final
+                try {
+                    \App\Services\ConversationService::sendMessage(
+                        $conversation['id'],
+                        "Desculpe, não consegui entender suas respostas. Por favor, aguarde que um atendente entrará em contato.",
+                        'agent',
+                        null
+                    );
+                } catch (\Exception $e) {
+                    \App\Helpers\Logger::automation("Erro ao enviar mensagem de erro: " . $e->getMessage());
+                }
+                
+                return false;
+            }
+            
+            // Ainda tem tentativas, salvar contador e enviar feedback
+            \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
+            
+            // Enviar mensagem de feedback
+            $feedbackMessage = $metadata['chatbot_invalid_feedback'] ?? "Opção inválida. Por favor, escolha uma das opções disponíveis.";
+            try {
+                \App\Services\ConversationService::sendMessage(
+                    $conversation['id'],
+                    $feedbackMessage,
+                    'agent',
+                    null
+                );
+            } catch (\Exception $e) {
+                \App\Helpers\Logger::automation("Erro ao enviar feedback: " . $e->getMessage());
+            }
+            
+            return false; // Manter chatbot ativo para próxima tentativa
         }
+
+        \App\Helpers\Logger::automation("✅ Opção encontrada: índice {$matchedIndex}");
 
         // Priorizar target explícito na opção; fallback para lista de conexões em ordem
         $optTarget = is_array($options[$matchedIndex]) ? ($options[$matchedIndex]['target_node_id'] ?? null) : null;
         $targetNodeId = $optTarget ?: ($nextNodes[$matchedIndex] ?? null);
+        
+        \App\Helpers\Logger::automation("Target Node ID: {$targetNodeId}");
+        
         if (!$targetNodeId) {
+            \App\Helpers\Logger::automation("❌ Sem target node ID. Retornando false.");
             return false;
         }
 
         // Carregar automação e nós
         $automation = \App\Models\Automation::findWithNodes((int)$automationId);
         if (!$automation || empty($automation['nodes'])) {
+            \App\Helpers\Logger::automation("❌ Automação não encontrada ou sem nós.");
             return false;
         }
 
         $nodes = $automation['nodes'];
         $targetNode = self::findNodeById($targetNodeId, $nodes);
         if (!$targetNode) {
+            \App\Helpers\Logger::automation("❌ Target node não encontrado.");
             return false;
         }
+        
+        \App\Helpers\Logger::automation("✅ Target node encontrado: " . json_encode($targetNode));
 
         // Limpar estado do chatbot antes de continuar
         $metadata['chatbot_active'] = false;
@@ -1326,10 +1444,15 @@ class AutomationService
         $metadata['chatbot_next_nodes'] = [];
         $metadata['chatbot_automation_id'] = null;
         $metadata['chatbot_node_id'] = null;
+        $metadata['chatbot_invalid_attempts'] = 0;
         \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
+        
+        \App\Helpers\Logger::automation("Estado do chatbot limpo. Executando target node...");
 
         // Continuar fluxo a partir do nó de destino
         self::executeNode($targetNode, $conversation['id'], $nodes, null);
+        
+        \App\Helpers\Logger::automation("=== handleChatbotResponse FIM (true) ===");
 
         return true;
     }

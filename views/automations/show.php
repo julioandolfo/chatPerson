@@ -1,4 +1,4 @@
-<?php
+só<?php
 $layout = 'layouts.metronic.app';
 $title = 'Automação - ' . htmlspecialchars($automation['name'] ?? '');
 
@@ -1697,6 +1697,29 @@ function openNodeConfig(nodeId) {
                         <option value="send_message">Enviar Mensagem</option>
                         <option value="close">Encerrar Conversa</option>
                     </select>
+                </div>
+                
+                <div class="separator my-5"></div>
+                
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2">🔁 Máximo de Tentativas Inválidas</label>
+                    <input type="number" name="chatbot_max_attempts" class="form-control form-control-solid" value="3" min="1" max="10" />
+                    <div class="form-text">Número de vezes que o usuário pode responder com opção inválida antes de desistir</div>
+                </div>
+                
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2">💬 Mensagem de Feedback (Resposta Inválida)</label>
+                    <textarea name="chatbot_invalid_feedback" class="form-control form-control-solid" rows="2" placeholder="Opção inválida. Por favor, escolha uma das opções disponíveis.">Opção inválida. Por favor, escolha uma das opções disponíveis.</textarea>
+                    <div class="form-text">Mensagem enviada quando o usuário responde algo que não está nas opções</div>
+                </div>
+                
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2">⚠️ Nó de Fallback (Tentativas Excedidas)</label>
+                    <select name="chatbot_fallback_node_id" class="form-select form-select-solid">
+                        <option value="">Nenhum (enviar mensagem padrão)</option>
+                        <!-- Será preenchido dinamicamente com os nós disponíveis -->
+                    </select>
+                    <div class="form-text">Nó a ser executado quando o usuário exceder o máximo de tentativas inválidas</div>
                 </div>
                 
                 <div class="alert alert-info d-flex align-items-center p-5 mb-7">

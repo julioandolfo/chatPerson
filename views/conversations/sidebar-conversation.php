@@ -907,6 +907,8 @@ window.moveConversationStage = moveConversationStage;
  * Carregar status da IA na conversa
  */
 function loadAIAgentStatus(conversationId) {
+    console.log('loadAIAgentStatus chamado com conversationId:', conversationId);
+    
     if (!conversationId) {
         console.warn('loadAIAgentStatus: conversationId não fornecido');
         updateAIAgentSidebar({ has_ai: false });
@@ -917,21 +919,28 @@ function loadAIAgentStatus(conversationId) {
     const statusDiv = document.getElementById('sidebar-ai-status');
     if (statusDiv) {
         statusDiv.innerHTML = '<div class="text-muted fs-7">Carregando...</div>';
+    } else {
+        console.error('Elemento sidebar-ai-status não encontrado!');
     }
     
-    fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/ai-status`, {
+    const url = `<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/ai-status`;
+    console.log('Fazendo requisição para:', url);
+    
+    fetch(url, {
         headers: {
             'X-Requested-With': 'XMLHttpRequest',
             'Accept': 'application/json'
         }
     })
     .then(response => {
+        console.log('Resposta recebida:', response.status, response.statusText);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         return response.json();
     })
     .then(data => {
+        console.log('Dados recebidos:', data);
         if (data.success) {
             updateAIAgentSidebar(data.data);
             if (typeof updateAIActiveBanner === 'function') {

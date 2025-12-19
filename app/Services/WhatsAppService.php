@@ -1637,11 +1637,21 @@ class WhatsAppService
                 if (!$conversation) {
                     Logger::quepasa("processWebhook - Conversa não encontrada, criando nova para mensagem enviada...");
                     try {
-                        $conversation = \App\Services\ConversationService::create([
+                        $conversationData = [
                             'contact_id' => $contact['id'],
                             'channel' => 'whatsapp',
                             'whatsapp_account_id' => $account['id']
-                        ]);
+                        ];
+                        
+                        // Adicionar funil e estágio padrão da integração, se configurados
+                        if (!empty($account['default_funnel_id'])) {
+                            $conversationData['funnel_id'] = $account['default_funnel_id'];
+                        }
+                        if (!empty($account['default_stage_id'])) {
+                            $conversationData['stage_id'] = $account['default_stage_id'];
+                        }
+                        
+                        $conversation = \App\Services\ConversationService::create($conversationData);
                     } catch (\Exception $e) {
                         Logger::quepasa("Erro ao criar conversa via ConversationService: " . $e->getMessage());
                         $conversationId = \App\Models\Conversation::create([
@@ -2098,11 +2108,23 @@ class WhatsAppService
                 
                 // Usar ConversationService para criar conversa (com todas as integrações)
                 try {
-                    $conversation = \App\Services\ConversationService::create([
+                    $conversationData = [
                         'contact_id' => $contact['id'],
                         'channel' => 'whatsapp',
                         'whatsapp_account_id' => $account['id']
-                    ]);
+                    ];
+                    
+                    // Adicionar funil e estágio padrão da integração, se configurados
+                    if (!empty($account['default_funnel_id'])) {
+                        $conversationData['funnel_id'] = $account['default_funnel_id'];
+                        Logger::quepasa("processWebhook - Usando funil padrão da integração: {$account['default_funnel_id']}");
+                    }
+                    if (!empty($account['default_stage_id'])) {
+                        $conversationData['stage_id'] = $account['default_stage_id'];
+                        Logger::quepasa("processWebhook - Usando estágio padrão da integração: {$account['default_stage_id']}");
+                    }
+                    
+                    $conversation = \App\Services\ConversationService::create($conversationData);
                     $isNewConversation = true;
                     Logger::quepasa("processWebhook - Conversa criada via ConversationService: ID={$conversation['id']}");
                 } catch (\Exception $e) {

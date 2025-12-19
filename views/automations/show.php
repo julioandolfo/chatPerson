@@ -1478,6 +1478,20 @@ function openNodeConfig(nodeId) {
                         <input type="number" name="ai_max_interactions" id="kt_ai_max_interactions" class="form-control form-control-solid" value="${node.node_data.ai_max_interactions || 5}" min="1" max="100" />
                         <div class="form-text">Número máximo de mensagens da IA antes de escalar para um agente humano</div>
                     </div>
+
+                    <div class="fv-row mb-7">
+                        <label class="d-flex align-items-center">
+                            <input type="checkbox" name="ai_intent_semantic_enabled" id="kt_ai_intent_semantic_enabled" class="form-check-input me-2" ${node.node_data.ai_intent_semantic_enabled !== false ? 'checked' : ''} />
+                            <span class="fw-semibold fs-6">Usar interpretação IA (semântica) para intents</span>
+                        </label>
+                        <div class="form-text">Permite que a IA escolha o intent pela descrição (sem depender apenas de palavras-chave)</div>
+                    </div>
+
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Confiança mínima da interpretação IA</label>
+                        <input type="number" step="0.05" name="ai_intent_confidence" id="kt_ai_intent_confidence" class="form-control form-control-solid" value="${node.node_data.ai_intent_confidence ?? 0.35}" min="0.1" max="1" />
+                        <div class="form-text">Valores mais altos exigem maior certeza para escolher um intent. Padrão: 0.35</div>
+                    </div>
                     
                     <div class="fv-row mb-7">
                         <label class="d-flex align-items-center">
@@ -2662,10 +2676,16 @@ document.addEventListener("DOMContentLoaded", function() {
                 const branchingEnabled = nodeData.ai_branching_enabled === 'on' || 
                                         nodeData.ai_branching_enabled === '1' || 
                                         nodeData.ai_branching_enabled === true;
+
+                // Configurações de interpretação semântica
+                nodeData.ai_intent_semantic_enabled = formData.has('ai_intent_semantic_enabled');
+                nodeData.ai_intent_confidence = parseFloat(formData.get('ai_intent_confidence') || '0.35');
                 
                 console.log('Salvando configuração do AI Agent');
                 console.log('  ai_branching_enabled raw:', nodeData.ai_branching_enabled);
                 console.log('  branchingEnabled processado:', branchingEnabled);
+                console.log('  ai_intent_semantic_enabled:', nodeData.ai_intent_semantic_enabled);
+                console.log('  ai_intent_confidence:', nodeData.ai_intent_confidence);
                 
                 // Converter para boolean para salvar corretamente
                 nodeData.ai_branching_enabled = branchingEnabled;

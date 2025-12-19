@@ -7970,7 +7970,7 @@ function addMessageToChat(message) {
             }
             
             quotedHtml = `
-                <div class="quoted-message" onclick="console.log('Quoted message clicado (JS), ID:', ${quotedMessageId || 'null'}); ${quotedMessageId ? `scrollToMessage(${quotedMessageId})` : 'console.log(\'Sem ID para scroll\')'}" title="${quotedMessageId ? 'Clique para ver a mensagem original' : 'Mensagem original não disponível'}" data-quoted-id="${quotedMessageId || ''}">
+                <div class="quoted-message" onclick="console.log('Quoted message clicado (JS), ID:', ${quotedMessageId || 'null'}); ${quotedMessageId ? ('scrollToMessage(' + quotedMessageId + ')') : 'console.log(\\'Sem ID para scroll\\')'}" title="${quotedMessageId ? 'Clique para ver a mensagem original' : 'Mensagem original não disponível'}" data-quoted-id="${quotedMessageId || ''}">
                     <div class="quoted-message-header">${escapeHtml(quotedSender)}</div>
                     <div class="quoted-message-content">${escapeHtml(quotedText.length > 60 ? quotedText.substring(0, 60) + '...' : quotedText)}</div>
                 </div>

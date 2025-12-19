@@ -760,7 +760,8 @@ if (!empty($aiAgents)) {
 ob_start();
 ?>
 <script>
-let nodes = <?= $nodesJson ?>;
+// Usar var para evitar erro de redeclaração caso o script seja injetado mais de uma vez
+var nodes = <?= $nodesJson ?>;
 // Garantir que nodes seja acessível globalmente
 window.nodes = nodes;
 let nodeTypes = <?= $nodeTypesJson ?>;
@@ -2689,17 +2690,30 @@ document.addEventListener("DOMContentLoaded", function() {
                         console.log(`    - keywords: [${keywords.join(', ')}]`);
                         console.log(`    - target: "${targetNodeId}"`);
                         
-                        if (intentName && targetNodeId) {
-                            intents.push({
-                                intent: intentName,
-                                description: description || intentName,
-                                keywords: keywords,
-                                target_node_id: targetNodeId
-                            });
-                        } else {
+                        // Validar: nome e target obrigatórios
+                        if (!intentName || !targetNodeId) {
                             console.warn(`  Intent ${idx} ignorado - faltando nome ou target`);
+                            return; // pula para próximo
                         }
+                        
+                        intents.push({
+                            intent: intentName,
+                            description: description || intentName,
+                            keywords: keywords,
+                            target_node_id: targetNodeId
+                        });
                     });
+                    
+                    // Se havia intents no formulário mas nenhum válido, bloquear salvamento
+                    if (intentInputs.length > 0 && intents.length === 0) {
+                        console.error('Nenhum intent válido encontrado. Verifique nome e nó de destino.');
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Configure os intents',
+                            text: 'Cada intent precisa de Nome e Nó de Destino.',
+                        });
+                        return; // não prosseguir com o merge/salvar
+                    }
                     
                     console.log('  Total de intents válidos coletados:', intents.length);
                     console.log('  Intents:', intents);

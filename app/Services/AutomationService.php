@@ -1186,6 +1186,16 @@ class AutomationService
                 
                 \App\Helpers\Logger::automation("    ✅ Mensagem enviada via WhatsApp! Response: " . json_encode($response));
                 
+                // Extrair external_id da resposta (se disponível) para evitar duplicatas quando webhook retornar
+                $externalId = null;
+                if (isset($response['id'])) {
+                    $externalId = $response['id'];
+                } elseif (isset($response['message_id'])) {
+                    $externalId = $response['message_id'];
+                } elseif (isset($response['data']['id'])) {
+                    $externalId = $response['data']['id'];
+                }
+                
                 // Salvar mensagem no banco (já foi enviada)
                 $messageId = \App\Models\Message::create([
                     'conversation_id' => $conversationId,
@@ -1193,10 +1203,12 @@ class AutomationService
                     'sender_type' => 'agent', // Marcar como 'agent' para aparecer como mensagem da empresa
                     'content' => $message,
                     'message_type' => 'text',
-                    'channel' => 'whatsapp'
+                    'channel' => 'whatsapp',
+                    'external_id' => $externalId, // Salvar ID externo para evitar duplicatas
+                    'metadata' => json_encode(['chatbot_message' => true, 'sent_at' => time()]) // Marcar como mensagem do chatbot
                 ]);
                 
-                \App\Helpers\Logger::automation("    ✅ Mensagem salva no banco: ID {$messageId}");
+                \App\Helpers\Logger::automation("    ✅ Mensagem salva no banco: ID {$messageId}, external_id={$externalId}");
                 
             } catch (\Exception $e) {
                 \App\Helpers\Logger::automation("    ❌ ERRO ao enviar via WhatsApp: " . $e->getMessage());

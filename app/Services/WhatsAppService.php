@@ -1118,6 +1118,8 @@ class WhatsAppService
             $isMessageFromConnectedNumber = false;
             $connectedNumberNormalized = self::normalizePhoneNumber($account['phone_number']);
             
+            Logger::quepasa("processWebhook - 🔍 VERIFICANDO SE É MENSAGEM ENVIADA: connectedNumber={$connectedNumberNormalized}, chatid={$chatid}");
+            
             // Comparar chatid/wid com número da conta conectada
             // O chatid pode ter formato: "553591970289:87@s.whatsapp.net"
             // Precisamos extrair apenas o número antes dos dois pontos
@@ -1125,6 +1127,8 @@ class WhatsAppService
                 $chatidClean = str_replace('@s.whatsapp.net', '', $chatid);
                 $chatidNumber = explode(':', $chatidClean)[0];
                 $chatidNumberNormalized = self::normalizePhoneNumber($chatidNumber);
+                
+                Logger::quepasa("processWebhook - Comparando: chatidNormalized={$chatidNumberNormalized} vs connectedNormalized={$connectedNumberNormalized}");
                 
                 // Comparar números normalizados
                 // Se correspondem exatamente OU se os primeiros 10-11 dígitos correspondem, é o mesmo número
@@ -1149,9 +1153,25 @@ class WhatsAppService
             // Verificar também campo fromme/frominternal se existir no payload
             if (!$isMessageFromConnectedNumber) {
                 $fromme = $payload['fromme'] ?? $payload['from_internal'] ?? $payload['frominternal'] ?? false;
-                if ($fromme === true || $fromme === 'true' || $fromme === 1) {
+                if ($fromme === true || $fromme === 'true' || $fromme === 1 || $fromme === '1') {
                     $isMessageFromConnectedNumber = true;
                     Logger::quepasa("processWebhook - Mensagem ENVIADA detectada via campo fromme/frominternal");
+                }
+            }
+            
+            // Verificar também se o participante/sender é o próprio bot
+            if (!$isMessageFromConnectedNumber && isset($payload['participant'])) {
+                $participant = $payload['participant'];
+                $participantPhone = null;
+                if (is_array($participant) && isset($participant['phone'])) {
+                    $participantPhone = self::normalizePhoneNumber($participant['phone']);
+                } elseif (is_string($participant)) {
+                    $participantPhone = self::normalizePhoneNumber($participant);
+                }
+                
+                if ($participantPhone && $participantPhone === $connectedNumberNormalized) {
+                    $isMessageFromConnectedNumber = true;
+                    Logger::quepasa("processWebhook - Mensagem ENVIADA detectada via campo participant");
                 }
             }
             
@@ -1534,7 +1554,8 @@ class WhatsAppService
                 $message = $payload['caption'];
             }
 
-            Logger::quepasa("processWebhook - Processando mensagem: fromPhone={$fromPhone}, message={$message}, messageId={$messageId}, isGroup=" . ($isGroup ? 'true' : 'false') . ", isMessageFromConnectedNumber=" . ($isMessageFromConnectedNumber ? 'true' : 'false'));
+            Logger::quepasa("processWebhook - Processando mensagem: fromPhone={$fromPhone}, message=" . substr($message, 0, 100) . ", messageId={$messageId}, isGroup=" . ($isGroup ? 'true' : 'false') . ", isMessageFromConnectedNumber=" . ($isMessageFromConnectedNumber ? 'true' : 'false'));
+            Logger::quepasa("processWebhook - Campos de detecção: chatid={$chatid}, from={$from}, fromme=" . ($payload['fromme'] ?? 'null') . ", participant=" . ($payload['participant'] ?? 'null'));
             
             if (!$fromPhone || (empty($message) && !$mediaUrl && empty($location))) {
                 Logger::error("WhatsApp webhook: dados incompletos (fromPhone: " . ($fromPhone ?? 'NULL') . ", message: " . ($message ?? 'NULL') . ", mediaUrl: " . ($mediaUrl ?? 'NULL') . ")");
@@ -2217,6 +2238,24 @@ class WhatsAppService
                 Logger::quepasa("processWebhook - Sem texto, usando caractere invisível. Attachments: " . count($attachments));
             }
 
+            // Extrair external_id do payload antes de criar mensagem
+            $externalId = $payload['id'] 
+                ?? ($payload['message']['id'] ?? null)
+                ?? ($payload['data']['id'] ?? null)
+                ?? null;
+            
+            // Verificar se mensagem já existe (evitar duplicatas)
+            if ($externalId) {
+                Logger::quepasa("processWebhook - Verificando se mensagem já existe: external_id={$externalId}");
+                $existingMessage = \App\Models\Message::findByExternalId($externalId);
+                if ($existingMessage) {
+                    Logger::quepasa("processWebhook - ⚠️ Mensagem já existe no banco (ID: {$existingMessage['id']}). Ignorando webhook duplicado.");
+                    return; // Ignorar mensagem duplicada
+                }
+            } else {
+                Logger::quepasa("processWebhook - ⚠️ Webhook sem external_id. Não é possível verificar duplicatas.");
+            }
+            
             // Criar mensagem usando ConversationService (com todas as integrações)
             Logger::quepasa("processWebhook - Preparando criação de mensagem: conversationId={$conversation['id']}, contactId={$contact['id']}, message='" . substr($message, 0, 50) . "', attachmentsCount=" . count($attachments));
             
@@ -2231,13 +2270,6 @@ class WhatsAppService
                     null,              // messageType
                     $quotedMessageId   // quoted_message_id
                 );
-                
-                // Gravar external_id (id do provedor) na mensagem recém-criada
-                // Usar o messageId extraído do payload (que pode vir de payload['id'], payload['message']['id'], etc)
-                $externalId = $payload['id'] 
-                    ?? ($payload['message']['id'] ?? null)
-                    ?? ($payload['data']['id'] ?? null)
-                    ?? $messageId; // Fallback para o messageId já extraído
                 
                 if (!empty($externalId) && $messageId) {
                     Logger::quepasa("processWebhook - Salvando external_id: externalId={$externalId}, messageId={$messageId}");

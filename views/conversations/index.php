@@ -7969,8 +7969,15 @@ function addMessageToChat(message) {
                 quotedMessageId = null;
             }
             
+            // Criar onclick handler para quoted message
+            const quotedOnclick = quotedMessageId 
+                ? "scrollToMessage(" + quotedMessageId + ")" 
+                : "console.log('Sem ID para scroll')";
+            const quotedTitle = quotedMessageId ? 'Clique para ver a mensagem original' : 'Mensagem original não disponível';
+            const quotedDataId = quotedMessageId || '';
+            
             quotedHtml = `
-                <div class="quoted-message" onclick="console.log('Quoted message clicado (JS), ID:', ${quotedMessageId || 'null'}); ${quotedMessageId ? ('scrollToMessage(' + quotedMessageId + ')') : 'console.log(\\'Sem ID para scroll\\')'}" title="${quotedMessageId ? 'Clique para ver a mensagem original' : 'Mensagem original não disponível'}" data-quoted-id="${quotedMessageId || ''}">
+                <div class="quoted-message" onclick="${quotedOnclick}" title="${quotedTitle}" data-quoted-id="${quotedDataId}">
                     <div class="quoted-message-header">${escapeHtml(quotedSender)}</div>
                     <div class="quoted-message-content">${escapeHtml(quotedText.length > 60 ? quotedText.substring(0, 60) + '...' : quotedText)}</div>
                 </div>
@@ -7978,15 +7985,19 @@ function addMessageToChat(message) {
         }
         
         // Adicionar botões de ação
+        const msgId = message.id || 0;
+        const senderName = (message.sender_name || 'Remetente').replace(/'/g, "\\'");
+        const msgContent = ((message.content || '').substring(0, 100)).replace(/'/g, "\\'");
+        
         const replyBtn = `
             <div class="message-actions">
-                <button class="message-actions-btn" onclick="replyToMessage(${message.id || 0}, '${escapeHtml(message.sender_name || 'Remetente')}', '${escapeHtml((message.content || '').substring(0, 100))}')" title="Responder">
+                <button class="message-actions-btn" onclick="replyToMessage(${msgId}, '${senderName}', '${msgContent}')" title="Responder">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="9 10 4 15 9 20"></polyline>
                         <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
                     </svg>
                 </button>
-                <button class="message-actions-btn" onclick="forwardMessage(${message.id || 0})" title="Encaminhar">
+                <button class="message-actions-btn" onclick="forwardMessage(${msgId})" title="Encaminhar">
                     <i class="ki-duotone ki-arrow-right fs-6">
                         <span class="path1"></span>
                         <span class="path2"></span>
@@ -10472,89 +10483,94 @@ function renderVariables(variables) {
     
     // Variáveis de agente
     if (variables.agent) {
-        html += `
-            <div class="col-12 mt-5">
-                <h5 class="fw-bold mb-3">
-                    <i class="ki-duotone ki-profile-user fs-4 text-success me-2">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                    </i>
-                    Agente
-                </h5>
-            </div>
-        `;
+        html += ''
+            + '<div class="col-12 mt-5">'
+            + '  <h5 class="fw-bold mb-3">'
+            + '    <i class="ki-duotone ki-profile-user fs-4 text-success me-2">'
+            + '      <span class="path1"></span>'
+            + '      <span class="path2"></span>'
+            + '    </i>'
+            + '    Agente'
+            + '  </h5>'
+            + '</div>';
+        
         Object.keys(variables.agent).forEach(key => {
             const varName = `{{agent.${key}}}`;
-            html += `
-                <div class="col-md-6">
-                    <div class="card card-flush shadow-sm hover-shadow-lg cursor-pointer" onclick="insertVariable('${varName}')">
-                        <div class="card-body p-4">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <div class="fw-semibold text-gray-800">${escapeHtml(varName)}</div>
-                                    <div class="text-muted fs-7">${escapeHtml(variables.agent[key])}</div>
-                                </div>
-                                <i class="ki-duotone ki-copy fs-4 text-success">
-                                    <span class="path1"></span>
-                                    <span class="path2"></span>
-                                </i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
+            const label = escapeHtml(varName);
+            const desc = escapeHtml(variables.agent[key]);
+            html += ''
+                + '<div class="col-md-6">'
+                + '  <div class="card card-flush shadow-sm hover-shadow-lg cursor-pointer" onclick="insertVariable(\''
+                + varName.replace(/'/g, "\\'")
+                + '\')">'
+                + '    <div class="card-body p-4">'
+                + '      <div class="d-flex justify-content-between align-items-center">'
+                + '        <div>'
+                + '          <div class="fw-semibold text-gray-800">' + label + '</div>'
+                + '          <div class="text-muted fs-7">' + desc + '</div>'
+                + '        </div>'
+                + '        <i class="ki-duotone ki-copy fs-4 text-success">'
+                + '          <span class="path1"></span>'
+                + '          <span class="path2"></span>'
+                + '        </i>'
+                + '      </div>'
+                + '    </div>'
+                + '  </div>'
+                + '</div>';
         });
     }
     
     // Variáveis de conversa
     if (variables.conversation) {
-        html += `
-            <div class="col-12 mt-5">
-                <h5 class="fw-bold mb-3">
-                    <i class="ki-duotone ki-message-text fs-4 text-info me-2">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                        <span class="path3"></span>
-                    </i>
-                    Conversa
-                </h5>
-            </div>
-        `;
+        html += ''
+            + '<div class="col-12 mt-5">'
+            + '  <h5 class="fw-bold mb-3">'
+            + '    <i class="ki-duotone ki-message-text fs-4 text-info me-2">'
+            + '      <span class="path1"></span>'
+            + '      <span class="path2"></span>'
+            + '      <span class="path3"></span>'
+            + '    </i>'
+            + '    Conversa'
+            + '  </h5>'
+            + '</div>';
+        
         Object.keys(variables.conversation).forEach(key => {
             const varName = `{{conversation.${key}}}`;
-            html += `
-                <div class="col-md-6">
-                    <div class="card card-flush shadow-sm hover-shadow-lg cursor-pointer" onclick="insertVariable('${varName}')">
-                        <div class="card-body p-4">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <div class="fw-semibold text-gray-800">${escapeHtml(varName)}</div>
-                                    <div class="text-muted fs-7">${escapeHtml(variables.conversation[key])}</div>
-                                </div>
-                                <i class="ki-duotone ki-copy fs-4 text-info">
-                                    <span class="path1"></span>
-                                    <span class="path2"></span>
-                                </i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
+            const label = escapeHtml(varName);
+            const desc = escapeHtml(variables.conversation[key]);
+            html += ''
+                + '<div class="col-md-6">'
+                + '  <div class="card card-flush shadow-sm hover-shadow-lg cursor-pointer" onclick="insertVariable(\''
+                + varName.replace(/'/g, "\\'")
+                + '\')">'
+                + '    <div class="card-body p-4">'
+                + '      <div class="d-flex justify-content-between align-items-center">'
+                + '        <div>'
+                + '          <div class="fw-semibold text-gray-800">' + label + '</div>'
+                + '          <div class="text-muted fs-7">' + desc + '</div>'
+                + '        </div>'
+                + '        <i class="ki-duotone ki-copy fs-4 text-info">'
+                + '          <span class="path1"></span>'
+                + '          <span class="path2"></span>'
+                + '        </i>'
+                + '      </div>'
+                + '    </div>'
+                + '  </div>'
+                + '</div>';
         });
     }
     
     // Variáveis de data/hora
-    html += `
-        <div class="col-12 mt-5">
-            <h5 class="fw-bold mb-3">
-                <i class="ki-duotone ki-time fs-4 text-warning me-2">
-                    <span class="path1"></span>
-                    <span class="path2"></span>
-                </i>
-                Data e Hora
-            </h5>
-        </div>
-    `;
+    html += ''
+        + '<div class="col-12 mt-5">'
+        + '  <h5 class="fw-bold mb-3">'
+        + '    <i class="ki-duotone ki-time fs-4 text-warning me-2">'
+        + '      <span class="path1"></span>'
+        + '      <span class="path2"></span>'
+        + '    </i>'
+        + '    Data e Hora'
+        + '  </h5>'
+        + '</div>';
     
     const dateVariables = {
         'date': 'Data atual (dd/mm/yyyy)',
@@ -10564,24 +10580,27 @@ function renderVariables(variables) {
     
     Object.keys(dateVariables).forEach(key => {
         const varName = `{{${key}}}`;
-        html += `
-            <div class="col-md-4">
-                <div class="card card-flush shadow-sm hover-shadow-lg cursor-pointer" onclick="insertVariable('${varName}')">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <div class="fw-semibold text-gray-800">${escapeHtml(varName)}</div>
-                                <div class="text-muted fs-7">${escapeHtml(dateVariables[key])}</div>
-                            </div>
-                            <i class="ki-duotone ki-copy fs-4 text-warning">
-                                <span class="path1"></span>
-                                <span class="path2"></span>
-                            </i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
+        const label = escapeHtml(varName);
+        const desc = escapeHtml(dateVariables[key]);
+        html += ''
+            + '<div class="col-md-4">'
+            + '  <div class="card card-flush shadow-sm hover-shadow-lg cursor-pointer" onclick="insertVariable(\''
+            + varName.replace(/'/g, "\\'")
+            + '\')">'
+            + '    <div class="card-body p-4">'
+            + '      <div class="d-flex justify-content-between align-items-center">'
+            + '        <div>'
+            + '          <div class="fw-semibold text-gray-800">' + label + '</div>'
+            + '          <div class="text-muted fs-7">' + desc + '</div>'
+            + '        </div>'
+            + '        <i class="ki-duotone ki-copy fs-4 text-warning">'
+            + '          <span class="path1"></span>'
+            + '          <span class="path2"></span>'
+            + '        </i>'
+            + '      </div>'
+            + '    </div>'
+            + '  </div>'
+            + '</div>';
     });
     
     variablesList.innerHTML = html;

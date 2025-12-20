@@ -19,12 +19,17 @@ class ConversationAIService
      */
     public static function getAIStatus(int $conversationId): array
     {
+        error_log("ConversationAIService::getAIStatus - Iniciando para conversationId: {$conversationId}");
+        
         $conversation = Conversation::find($conversationId);
         if (!$conversation) {
+            error_log("ConversationAIService::getAIStatus - Conversa não encontrada: {$conversationId}");
             throw new \Exception('Conversa não encontrada');
         }
 
+        error_log("ConversationAIService::getAIStatus - Conversa encontrada, buscando AIConversation...");
         $aiConversation = AIConversation::getByConversationId($conversationId);
+        error_log("ConversationAIService::getAIStatus - AIConversation: " . ($aiConversation ? json_encode($aiConversation) : 'null'));
         
         if (!$aiConversation || $aiConversation['status'] !== 'active') {
             return [

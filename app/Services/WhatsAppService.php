@@ -2145,9 +2145,10 @@ class WhatsAppService
                         Logger::quepasa("processWebhook - Usando estágio padrão da integração: {$account['default_stage_id']}");
                     }
                     
-                    $conversation = \App\Services\ConversationService::create($conversationData);
+                    // Criar conversa mas NÃO executar automações ainda (executar depois de salvar mensagem)
+                    $conversation = \App\Services\ConversationService::create($conversationData, false);
                     $isNewConversation = true;
-                    Logger::quepasa("processWebhook - Conversa criada via ConversationService: ID={$conversation['id']}");
+                    Logger::quepasa("processWebhook - Conversa criada via ConversationService: ID={$conversation['id']} (automações serão executadas após salvar mensagem)");
                 } catch (\Exception $e) {
                     Logger::quepasa("Erro ao criar conversa via ConversationService: " . $e->getMessage());
                     Logger::quepasa("Stack trace: " . $e->getTraceAsString());
@@ -2286,8 +2287,16 @@ class WhatsAppService
                 
                 Logger::quepasa("processWebhook - ✅ Mensagem criada com sucesso: messageId={$messageId}");
                 
-                // Se mensagem foi criada com sucesso, automações já foram executadas pelo ConversationService
-                // Não precisa chamar AutomationService novamente
+                // Se foi uma nova conversa, executar automações AGORA (após mensagem estar salva)
+                if ($isNewConversation) {
+                    try {
+                        Logger::quepasa("processWebhook - Executando automações para nova conversa (após salvar mensagem)...");
+                        \App\Services\AutomationService::executeForNewConversation($conversation['id']);
+                        Logger::quepasa("processWebhook - ✅ Automações executadas com sucesso");
+                    } catch (\Exception $e) {
+                        Logger::quepasa("processWebhook - ⚠️ Erro ao executar automações: " . $e->getMessage());
+                    }
+                }
             } catch (\Exception $e) {
                 Logger::quepasa("Erro ao criar mensagem via ConversationService: " . $e->getMessage());
                 Logger::quepasa("processWebhook - Stack trace: " . $e->getTraceAsString());

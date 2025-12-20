@@ -30,8 +30,11 @@ class ConversationService
     
     /**
      * Criar nova conversa
+     * 
+     * @param array $data Dados da conversa
+     * @param bool $executeAutomationsNow Se FALSE, não executa automações imediatamente (permite executar depois)
      */
-    public static function create(array $data): array
+    public static function create(array $data, bool $executeAutomationsNow = true): array
     {
         // Validar dados
         $errors = Validator::validate($data, [
@@ -257,15 +260,19 @@ class ConversationService
             error_log("Erro ao notificar WebSocket: " . $e->getMessage());
         }
         
-        // Executar automações para nova conversa
-        try {
-            \App\Helpers\Logger::automation("ConversationService::create - Tentando executar automações para conversa ID: {$id}, funnel_id: {$conversationData['funnel_id']}, stage_id: {$conversationData['funnel_stage_id']}");
-            \App\Services\AutomationService::executeForNewConversation($id);
-            \App\Helpers\Logger::automation("ConversationService::create - Automações executadas com sucesso para conversa ID: {$id}");
-        } catch (\Exception $e) {
-            // Log erro mas não interromper criação da conversa
-            error_log("Erro ao executar automações: " . $e->getMessage());
-            \App\Helpers\Logger::automation("ConversationService::create - ERRO ao executar automações: " . $e->getMessage());
+        // Executar automações para nova conversa (se solicitado)
+        if ($executeAutomationsNow) {
+            try {
+                \App\Helpers\Logger::automation("ConversationService::create - Tentando executar automações para conversa ID: {$id}, funnel_id: {$conversationData['funnel_id']}, stage_id: {$conversationData['funnel_stage_id']}");
+                \App\Services\AutomationService::executeForNewConversation($id);
+                \App\Helpers\Logger::automation("ConversationService::create - Automações executadas com sucesso para conversa ID: {$id}");
+            } catch (\Exception $e) {
+                // Log erro mas não interromper criação da conversa
+                error_log("Erro ao executar automações: " . $e->getMessage());
+                \App\Helpers\Logger::automation("ConversationService::create - ERRO ao executar automações: " . $e->getMessage());
+            }
+        } else {
+            \App\Helpers\Logger::automation("ConversationService::create - Execução de automações ADIADA (será executada pelo chamador)");
         }
         
         return $conversation;

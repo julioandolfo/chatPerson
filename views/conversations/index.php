@@ -11384,7 +11384,8 @@ function loadParticipantsForConversation(conversationIdParam = null) {
             if (select) {
                 select.innerHTML = '<option value="">Selecione um usuário...</option>';
                 data.agents.forEach(user => {
-                    select.innerHTML += `<option value="${user.id}">${escapeHtml(user.name || user.email || 'Usuário')} ${user.email ? `(${escapeHtml(user.email)})` : ''}</option>`;
+                    const emailLabel = user.email ? ' (' + escapeHtml(user.email) + ')' : '';
+                    select.innerHTML += `<option value="${user.id}">${escapeHtml(user.name || user.email || 'Usuário')}${emailLabel}</option>`;
                 });
             }
         })

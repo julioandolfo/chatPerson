@@ -229,13 +229,43 @@ class AutomationService
         }
         
         if (!empty($metadata['chatbot_active'])) {
-            \App\Helpers\Logger::automation("🤖 Chatbot ATIVO detectado! Chamando handleChatbotResponse...");
-            $handled = self::handleChatbotResponse($conversation, $message);
-            if ($handled) {
-                \App\Helpers\Logger::automation("✅ Chatbot tratou a mensagem. Não disparar outras automações.");
-                return; // Já roteou para o próximo nó do chatbot, não disparar outras automações aqui
+            \App\Helpers\Logger::automation("🤖 Chatbot ATIVO detectado!");
+            
+            // Verificar se esta é a primeira mensagem do contato (que pode ter disparado new_conversation)
+            // Se o chatbot foi ativado há menos de 10 segundos, pode ser que esta mensagem tenha CRIADO a conversa
+            // e o chatbot ainda não enviou a mensagem inicial
+            $isFirstContactMessage = false;
+            $conversationCreatedAt = strtotime($conversation['created_at']);
+            $messageCreatedAt = strtotime($message['created_at']);
+            $timeDiff = abs($messageCreatedAt - $conversationCreatedAt);
+            
+            if ($timeDiff <= 5) { // Se mensagem foi criada dentro de 5s da conversa
+                // Contar mensagens do contato antes desta
+                $result = \App\Helpers\Database::query(
+                    "SELECT COUNT(*) as count FROM messages 
+                     WHERE conversation_id = ? 
+                     AND sender_type = 'contact' 
+                     AND id < ?",
+                    [$conversation['id'], $messageId]
+                );
+                
+                $contactMessagesBefore = isset($result[0]['count']) ? (int)$result[0]['count'] : 0;
+                $isFirstContactMessage = $contactMessagesBefore == 0;
+                \App\Helpers\Logger::automation("Verificação primeira mensagem: timeDiff={$timeDiff}s, isFirst={$isFirstContactMessage}, contactMessagesBefore={$contactMessagesBefore}");
             }
-            \App\Helpers\Logger::automation("⚠️ handleChatbotResponse retornou false. Continuando com automações normais...");
+            
+            if ($isFirstContactMessage) {
+                \App\Helpers\Logger::automation("⚠️ Esta é a PRIMEIRA mensagem do contato (que criou a conversa). Chatbot ainda não enviou mensagem inicial. Ignorando processamento pelo chatbot.");
+                // Não processar pelo chatbot, deixar automações normais tratarem
+            } else {
+                \App\Helpers\Logger::automation("Chamando handleChatbotResponse...");
+                $handled = self::handleChatbotResponse($conversation, $message);
+                if ($handled) {
+                    \App\Helpers\Logger::automation("✅ Chatbot tratou a mensagem. Não disparar outras automações.");
+                    return; // Já roteou para o próximo nó do chatbot, não disparar outras automações aqui
+                }
+                \App\Helpers\Logger::automation("⚠️ handleChatbotResponse retornou false. Continuando com automações normais...");
+            }
         } else {
             \App\Helpers\Logger::automation("Chatbot NÃO está ativo. Buscando automações normais...");
         }
@@ -1500,11 +1530,12 @@ class AutomationService
                     'agent',
                     null
                 );
+                \App\Helpers\Logger::automation("✅ Mensagem de feedback enviada. Aguardando nova tentativa.");
             } catch (\Exception $e) {
                 \App\Helpers\Logger::automation("Erro ao enviar feedback: " . $e->getMessage());
             }
             
-            return false; // Manter chatbot ativo para próxima tentativa
+            return true; // Chatbot tratou a mensagem (inválida), não disparar outras automações
         }
 
         \App\Helpers\Logger::automation("✅ Opção encontrada: índice {$matchedIndex}");

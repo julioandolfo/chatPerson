@@ -984,6 +984,8 @@ class AutomationService
             return;
         }
 
+        \App\Helpers\Logger::automation("executeDelay INÍCIO: delaySeconds={$delaySeconds}, conversationId={$conversationId}");
+
         // Obter automation_id da execução ou do contexto
         $automationId = null;
         if ($executionId) {
@@ -1000,22 +1002,28 @@ class AutomationService
         
         if (!$automationId) {
             error_log("Não foi possível obter automation_id para delay na conversa {$conversationId}");
+            \App\Helpers\Logger::automation("executeDelay ERRO: não obteve automation_id para conversa {$conversationId}");
             return;
         }
 
         // Para delays pequenos (< 60s), usar sleep
         // Para delays maiores, usar fila de jobs
         if ($delaySeconds <= 60) {
+            \App\Helpers\Logger::automation("executeDelay: modo síncrono (sleep) para {$delaySeconds}s, automationId={$automationId}");
             sleep($delaySeconds);
             
             // Após sleep, continuar execução normalmente
             if (!empty($nodeData['connections'])) {
+                \App\Helpers\Logger::automation("executeDelay: retomando após sleep, conexões=" . count($nodeData['connections']));
                 foreach ($nodeData['connections'] as $connection) {
+                    \App\Helpers\Logger::automation("executeDelay: seguindo para nó {$connection['target_node_id']} após sleep");
                     $nextNode = self::findNodeById($connection['target_node_id'], $allNodes);
                     if ($nextNode) {
                         self::executeNode($nextNode, $conversationId, $allNodes, $executionId);
                     }
                 }
+            } else {
+                \App\Helpers\Logger::automation("executeDelay: nenhuma conexão encontrada após sleep");
             }
         } else {
             // Agendar delay para execução posterior
@@ -1030,6 +1038,7 @@ class AutomationService
             }
             
             try {
+                \App\Helpers\Logger::automation("executeDelay: agendando delay de {$delaySeconds}s (async) para conversa {$conversationId}, automation {$automationId}, node {$nodeId}, próximos nós: " . json_encode($nextNodes));
                 \App\Services\AutomationDelayService::scheduleDelay(
                     $automationId,
                     $conversationId,
@@ -1040,20 +1049,31 @@ class AutomationService
                     $executionId
                 );
                 
+                // Importante: não seguir para próximos nós nem marcar completed; aguardar cron retomar
+                if ($executionId) {
+                    \App\Models\AutomationExecution::updateStatus($executionId, 'waiting', "Delay agendado por {$delaySeconds}s");
+                }
+
                 error_log("Delay de {$delaySeconds}s agendado para conversa {$conversationId} (executará em " . date('Y-m-d H:i:s', time() + $delaySeconds) . ")");
+                return; // Pausar aqui; retomará pelo cron
             } catch (\Exception $e) {
                 error_log("Erro ao agendar delay: " . $e->getMessage());
+                \App\Helpers\Logger::automation("executeDelay: erro ao agendar delay: " . $e->getMessage());
                 // Em caso de erro, tentar executar imediatamente (fallback)
                 if (!empty($nodeData['connections'])) {
                     foreach ($nodeData['connections'] as $connection) {
+                        \App\Helpers\Logger::automation("executeDelay fallback: seguindo para nó {$connection['target_node_id']} após erro no agendamento");
                         $nextNode = self::findNodeById($connection['target_node_id'], $allNodes);
                         if ($nextNode) {
                             self::executeNode($nextNode, $conversationId, $allNodes, $executionId);
                         }
                     }
+                } else {
+                    \App\Helpers\Logger::automation("executeDelay fallback: nenhuma conexão para seguir após erro no agendamento");
                 }
             }
         }
+        \App\Helpers\Logger::automation("executeDelay FIM");
     }
 
     /**

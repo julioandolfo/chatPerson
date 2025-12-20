@@ -10433,37 +10433,40 @@ function renderVariables(variables) {
     
     // Variáveis de contato
     if (variables.contact) {
-        html += `
-            <div class="col-12">
-                <h5 class="fw-bold mb-3">
-                    <i class="ki-duotone ki-user fs-4 text-primary me-2">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                    </i>
-                    Contato
-                </h5>
-            </div>
-        `;
+        html += ''
+            + '<div class="col-12">'
+            + '  <h5 class="fw-bold mb-3">'
+            + '    <i class="ki-duotone ki-user fs-4 text-primary me-2">'
+            + '      <span class="path1"></span>'
+            + '      <span class="path2"></span>'
+            + '    </i>'
+            + '    Contato'
+            + '  </h5>'
+            + '</div>';
+
         Object.keys(variables.contact).forEach(key => {
             const varName = `{{contact.${key}}}`;
-            html += `
-                <div class="col-md-6">
-                    <div class="card card-flush shadow-sm hover-shadow-lg cursor-pointer" onclick="insertVariable('${varName}')">
-                        <div class="card-body p-4">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <div class="fw-semibold text-gray-800">${escapeHtml(varName)}</div>
-                                    <div class="text-muted fs-7">${escapeHtml(variables.contact[key])}</div>
-                                </div>
-                                <i class="ki-duotone ki-copy fs-4 text-primary">
-                                    <span class="path1"></span>
-                                    <span class="path2"></span>
-                                </i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
+            const label = escapeHtml(varName);
+            const desc = escapeHtml(variables.contact[key]);
+            html += ''
+                + '<div class="col-md-6">'
+                + '  <div class="card card-flush shadow-sm hover-shadow-lg cursor-pointer" onclick="insertVariable(\''
+                + varName.replace(/'/g, "\\'")
+                + '\')">'
+                + '    <div class="card-body p-4">'
+                + '      <div class="d-flex justify-content-between align-items-center">'
+                + '        <div>'
+                + '          <div class="fw-semibold text-gray-800">' + label + '</div>'
+                + '          <div class="text-muted fs-7">' + desc + '</div>'
+                + '        </div>'
+                + '        <i class="ki-duotone ki-copy fs-4 text-primary">'
+                + '          <span class="path1"></span>'
+                + '          <span class="path2"></span>'
+                + '        </i>'
+                + '      </div>'
+                + '    </div>'
+                + '  </div>'
+                + '</div>';
         });
     }
     

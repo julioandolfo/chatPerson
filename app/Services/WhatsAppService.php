@@ -2257,10 +2257,11 @@ class WhatsAppService
             }
             
             // Criar mensagem usando ConversationService (com todas as integrações)
-            Logger::quepasa("processWebhook - Preparando criação de mensagem: conversationId={$conversation['id']}, contactId={$contact['id']}, message='" . substr($message, 0, 50) . "', attachmentsCount=" . count($attachments));
+            Logger::quepasa("processWebhook - Preparando criação de mensagem: conversationId={$conversation['id']}, contactId={$contact['id']}, message='" . substr($message, 0, 50) . "', attachmentsCount=" . count($attachments) . ", timestamp=" . date('Y-m-d H:i:s', $timestamp));
             
             try {
                 // Passar quoted_message_id para registrar reply corretamente
+                // E passar timestamp original do WhatsApp para preservar ordem correta
                 $messageId = \App\Services\ConversationService::sendMessage(
                     $conversation['id'],
                     $message ?: '',
@@ -2268,7 +2269,9 @@ class WhatsAppService
                     $contact['id'],
                     $attachments,
                     null,              // messageType
-                    $quotedMessageId   // quoted_message_id
+                    $quotedMessageId,  // quoted_message_id
+                    null,              // aiAgentId
+                    $timestamp         // timestamp original da mensagem do WhatsApp
                 );
                 
                 if (!empty($externalId) && $messageId) {

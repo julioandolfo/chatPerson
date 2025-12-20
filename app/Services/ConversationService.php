@@ -1081,7 +1081,7 @@ class ConversationService
     /**
      * Enviar mensagem na conversa
      */
-    public static function sendMessage(int $conversationId, string $content, string $senderType = 'agent', ?int $senderId = null, array $attachments = [], ?string $messageType = null, ?int $quotedMessageId = null, ?int $aiAgentId = null): ?int
+    public static function sendMessage(int $conversationId, string $content, string $senderType = 'agent', ?int $senderId = null, array $attachments = [], ?string $messageType = null, ?int $quotedMessageId = null, ?int $aiAgentId = null, ?int $messageTimestamp = null): ?int
     {
         if ($senderId === null && $aiAgentId === null) {
             $senderId = \App\Helpers\Auth::id();
@@ -1126,6 +1126,11 @@ class ConversationService
             'message_type' => $messageType,
             'status' => 'sent'
         ];
+        
+        // Se foi fornecido timestamp customizado (ex: do WhatsApp), usar ele para created_at
+        if ($messageTimestamp !== null) {
+            $messageData['created_at'] = date('Y-m-d H:i:s', $messageTimestamp);
+        }
         
         // Adicionar ai_agent_id se fornecido
         if ($aiAgentId !== null) {

@@ -52,10 +52,14 @@ abstract class Model
         // Filtrar apenas campos fillable
         $data = array_intersect_key($data, array_flip($instance->fillable));
         
-        // Adicionar timestamps
+        // Adicionar timestamps (somente se não foram fornecidos)
         if ($instance->timestamps) {
-            $data['created_at'] = date('Y-m-d H:i:s');
-            $data['updated_at'] = date('Y-m-d H:i:s');
+            if (!isset($data['created_at'])) {
+                $data['created_at'] = date('Y-m-d H:i:s');
+            }
+            if (!isset($data['updated_at'])) {
+                $data['updated_at'] = date('Y-m-d H:i:s');
+            }
         }
 
         $fields = array_keys($data);

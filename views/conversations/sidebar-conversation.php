@@ -967,13 +967,22 @@ function loadAIAgentStatus(conversationId) {
  * Atualizar sidebar com status da IA
  */
 function updateAIAgentSidebar(status) {
+    console.log('updateAIAgentSidebar chamado com status:', status);
+    
     const section = document.getElementById('sidebar-ai-agent-section');
     const statusDiv = document.getElementById('sidebar-ai-status');
     const actionsDiv = document.getElementById('sidebar-ai-actions');
     const addSection = document.getElementById('sidebar-ai-add-section');
     
-    if (!section || !statusDiv) {
-        console.warn('updateAIAgentSidebar: Elementos do sidebar não encontrados');
+    console.log('Elementos encontrados:', {
+        section: !!section,
+        statusDiv: !!statusDiv,
+        actionsDiv: !!actionsDiv,
+        addSection: !!addSection
+    });
+    
+    if (!statusDiv) {
+        console.error('updateAIAgentSidebar: statusDiv não encontrado!');
         return;
     }
     
@@ -1021,10 +1030,11 @@ function updateAIAgentSidebar(status) {
             </div>
         `;
         
-        actionsDiv.style.display = 'block';
-        addSection.style.display = 'none';
+        if (actionsDiv) actionsDiv.style.display = 'block';
+        if (addSection) addSection.style.display = 'none';
     } else {
         // Não tem IA
+        console.log('Atualizando sidebar: Sem IA ativa');
         statusDiv.innerHTML = `
             <div class="d-flex align-items-center mb-2">
                 <span class="badge badge-secondary me-2">⚪ Inativo</span>
@@ -1034,8 +1044,9 @@ function updateAIAgentSidebar(status) {
             </div>
         `;
         
-        actionsDiv.style.display = 'none';
-        addSection.style.display = 'block';
+        if (actionsDiv) actionsDiv.style.display = 'none';
+        if (addSection) addSection.style.display = 'block';
+        console.log('Sidebar atualizado: Sem IA - HTML inserido');
     }
     
     // Atualizar banner de IA ativa (se a função existir)

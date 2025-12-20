@@ -4428,8 +4428,15 @@ function selectConversation(id) {
             updateConversationSidebar(data.conversation, data.tags || []);
             
             // Carregar status da IA e atualizar banner
+            console.log('🔍 [selectConversation] Tentando carregar status da IA...', {
+                id: id,
+                loadAIAgentStatusExists: typeof loadAIAgentStatus
+            });
             if (typeof loadAIAgentStatus === 'function') {
+                console.log('✅ [selectConversation] Chamando loadAIAgentStatus para id:', id);
                 loadAIAgentStatus(id);
+            } else {
+                console.warn('❌ [selectConversation] loadAIAgentStatus não está disponível');
             }
             
             // Atualizar timeline quando conversa é selecionada
@@ -5076,8 +5083,15 @@ function updateConversationSidebar(conversation, tags) {
     }
     
     // Carregar status da IA na conversa
+    console.log('🔍 Tentando carregar status da IA...', {
+        conversationId: conversation.id,
+        loadAIAgentStatusExists: typeof loadAIAgentStatus
+    });
     if (conversation.id && typeof loadAIAgentStatus === 'function') {
+        console.log('✅ Chamando loadAIAgentStatus para conversation.id:', conversation.id);
         loadAIAgentStatus(conversation.id);
+    } else {
+        console.warn('❌ loadAIAgentStatus não está disponível ou conversation.id está vazio');
     }
     
     // Atualizar timeline

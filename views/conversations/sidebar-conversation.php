@@ -482,6 +482,8 @@
 </div>
 
 <script>
+console.log('📋 sidebar-conversation.php carregado');
+
 // Funções de ação do sidebar
 function editContact(contactId) {
     const contactIdValue = contactId || window.currentConversation?.contact_id || 0;
@@ -962,6 +964,7 @@ function loadAIAgentStatus(conversationId) {
         }
     });
 }
+console.log('✅ loadAIAgentStatus definida:', typeof loadAIAgentStatus);
 
 /**
  * Atualizar sidebar com status da IA

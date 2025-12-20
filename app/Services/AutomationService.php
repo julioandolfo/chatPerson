@@ -232,15 +232,17 @@ class AutomationService
             \App\Helpers\Logger::automation("🤖 Chatbot ATIVO detectado!");
             
             // Verificar se esta é a primeira mensagem do contato (que pode ter disparado new_conversation)
-            // Se o chatbot foi ativado há menos de 10 segundos, pode ser que esta mensagem tenha CRIADO a conversa
-            // e o chatbot ainda não enviou a mensagem inicial
+            // Se o chatbot foi ativado recentemente, pode ser que esta mensagem tenha CRIADO a conversa
+            // e o chatbot ainda não enviou a mensagem inicial (considerar delay + processamento)
             $isFirstContactMessage = false;
             $conversationCreatedAt = strtotime($conversation['created_at']);
             $messageCreatedAt = strtotime($message['created_at']);
             $timeDiff = abs($messageCreatedAt - $conversationCreatedAt);
             
-            if ($timeDiff <= 5) { // Se mensagem foi criada dentro de 5s da conversa
-                // Contar mensagens do contato antes desta
+            \App\Helpers\Logger::automation("Verificando se é primeira mensagem: conversationCreatedAt={$conversation['created_at']}, messageCreatedAt={$message['created_at']}, timeDiff={$timeDiff}s");
+            
+            if ($timeDiff <= 15) { // Se mensagem foi criada dentro de 15s da conversa (cobre delay + processamento)
+                // Contar mensagens do contato antes desta (por ID, não por timestamp)
                 $result = \App\Helpers\Database::query(
                     "SELECT COUNT(*) as count FROM messages 
                      WHERE conversation_id = ? 
@@ -250,8 +252,47 @@ class AutomationService
                 );
                 
                 $contactMessagesBefore = isset($result[0]['count']) ? (int)$result[0]['count'] : 0;
-                $isFirstContactMessage = $contactMessagesBefore == 0;
-                \App\Helpers\Logger::automation("Verificação primeira mensagem: timeDiff={$timeDiff}s, isFirst={$isFirstContactMessage}, contactMessagesBefore={$contactMessagesBefore}");
+                
+                // Também contar mensagens do bot/agente (usar ID para evitar race condition)
+                // Conta mensagens do bot com ID menor (que foram inseridas antes)
+                $botMessagesResult = \App\Helpers\Database::query(
+                    "SELECT COUNT(*) as count FROM messages 
+                     WHERE conversation_id = ? 
+                     AND sender_type = 'agent' 
+                     AND id < ?",
+                    [$conversation['id'], $messageId]
+                );
+                
+                $botMessagesBefore = isset($botMessagesResult[0]['count']) ? (int)$botMessagesResult[0]['count'] : 0;
+                
+                // Debug: listar IDs das mensagens do bot para entender a ordem
+                if ($botMessagesBefore == 0) {
+                    $allBotMessages = \App\Helpers\Database::query(
+                        "SELECT id, created_at, LEFT(content, 30) as content_preview 
+                         FROM messages 
+                         WHERE conversation_id = ? 
+                         AND sender_type = 'agent' 
+                         ORDER BY id",
+                        [$conversation['id']]
+                    );
+                    \App\Helpers\Logger::automation("DEBUG: Não há mensagens do bot antes. Todas mensagens agent na conversa: " . json_encode($allBotMessages));
+                }
+                
+                \App\Helpers\Logger::automation("Verificação primeira mensagem: messageId={$messageId}, conversationId={$conversation['id']}, timeDiff={$timeDiff}s, contactMessagesBefore={$contactMessagesBefore}, botMessagesBefore={$botMessagesBefore}");
+                
+                // É primeira mensagem SE:
+                // 1. Não há mensagens do contato antes desta E
+                // 2. Não há mensagens do bot com ID menor (bot ainda não inseriu sua mensagem no banco quando esta foi criada)
+                //
+                // Explicação: Se a mensagem do contato foi a que CRIOU a conversa, ela dispara new_conversation
+                // que executa o chatbot. O chatbot insere sua mensagem no banco ANTES desta mensagem ser salva.
+                // Então se não há mensagens do bot com ID menor, significa que esta mensagem foi salva DEPOIS
+                // do chatbot ser executado, mas é a mensagem que DISPAROU o chatbot, não uma resposta.
+                $isFirstContactMessage = ($contactMessagesBefore == 0 && $botMessagesBefore == 0);
+                
+                \App\Helpers\Logger::automation("→ Conclusão: isFirstContactMessage={$isFirstContactMessage}");
+            } else {
+                \App\Helpers\Logger::automation("TimeDiff {$timeDiff}s > 15s - não verificar se é primeira mensagem");
             }
             
             if ($isFirstContactMessage) {

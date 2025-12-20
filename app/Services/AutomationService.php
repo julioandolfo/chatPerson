@@ -979,8 +979,27 @@ class AutomationService
      */
     private static function executeDelay(array $nodeData, int $conversationId, array $allNodes, ?int $executionId = null): void
     {
-        $delaySeconds = $nodeData['delay_seconds'] ?? 0;
+        // Compatibilidade: alguns nós usam delay_value + delay_unit em vez de delay_seconds
+        $delaySeconds = $nodeData['delay_seconds'] ?? null;
+        if ($delaySeconds === null) {
+            $delayValue = (int)($nodeData['delay_value'] ?? 0);
+            $delayUnit = $nodeData['delay_unit'] ?? 'seconds';
+            switch ($delayUnit) {
+                case 'minutes':
+                    $delaySeconds = $delayValue * 60;
+                    break;
+                case 'hours':
+                    $delaySeconds = $delayValue * 3600;
+                    break;
+                case 'seconds':
+                default:
+                    $delaySeconds = $delayValue;
+                    break;
+            }
+        }
+
         if ($delaySeconds <= 0) {
+            \App\Helpers\Logger::automation("executeDelay: delaySeconds calculado <= 0 (valor recebido: {$delaySeconds}). Abortando.");
             return;
         }
 

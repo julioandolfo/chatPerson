@@ -1297,12 +1297,14 @@ class OpenAIService
     public static function classifyIntent(string $text, array $intents, float $minConfidence = 0.35, string $context = ''): ?array
     {
         if (empty($intents)) {
+            self::logIntentDebug("classify_intent_skip no_intents text='" . $text . "'");
             return null;
         }
 
         $apiKey = self::getApiKey();
         if (empty($apiKey)) {
             error_log('OpenAIService::classifyIntent - API Key não configurada');
+            self::logIntentDebug("classify_intent_error api_key_missing");
             return null;
         }
 
@@ -1335,6 +1337,8 @@ class OpenAIService
             'max_tokens' => 200,
             'response_format' => ['type' => 'json_object']
         ];
+
+        self::logIntentDebug("classify_intent_request model=" . ($payload['model'] ?? '') . " minConf={$minConfidence} text='" . $text . "' context_snip='" . substr($context, 0, 300) . "'");
 
         try {
             $response = self::makeRequest($apiKey, $payload);

@@ -1807,6 +1807,14 @@ class AutomationService
         self::logIntent("=== handleAIBranchingResponse === conv:{$conversation['id']} sender:{$senderType} msg:'" . ($message['content'] ?? '') . "'");
         
         $metadata = json_decode($conversation['metadata'] ?? '{}', true);
+        self::logIntent("metadata ai_active=" . (!empty($metadata['ai_branching_active']) ? '1' : '0') .
+            " intents=" . count($metadata['ai_intents'] ?? []) .
+            " fallback=" . ($metadata['ai_fallback_node_id'] ?? 'null') .
+            " semantic=" . (($metadata['ai_intent_semantic_enabled'] ?? true) ? 'on' : 'off') .
+            " minConf=" . ($metadata['ai_intent_confidence'] ?? '0.35') .
+            " ai_interaction_count=" . ($metadata['ai_interaction_count'] ?? '0') .
+            " ai_max_interactions=" . ($metadata['ai_max_interactions'] ?? '5')
+        );
         
         if (empty($metadata['ai_branching_active'])) {
             \App\Helpers\Logger::automation("Ramificação de IA não está ativa. Retornando false.");
@@ -2012,6 +2020,7 @@ class AutomationService
     private static function detectAIIntent(string $aiResponse, array $intents): ?array
     {
         \App\Helpers\Logger::automation("Detectando intent. Total de intents configurados: " . count($intents));
+        self::logIntent("keyword_call intents=" . count($intents) . " text='" . $aiResponse . "'");
         
         if (empty($intents)) {
             return null;
@@ -2050,6 +2059,7 @@ class AutomationService
                 ];
                 
                 \App\Helpers\Logger::automation("Intent '{$intentName}' matched {$matchCount} keyword(s): " . implode(', ', $matchedKeywords));
+                self::logIntent("keyword_match intent={$intentName} score={$matchCount} kws=" . implode('|', $matchedKeywords));
             }
         }
         
@@ -2060,6 +2070,7 @@ class AutomationService
             
             $bestMatch = $matchScores[0];
             \App\Helpers\Logger::automation("Melhor match: {$bestMatch['intent']['intent']} com score {$bestMatch['score']}");
+            self::logIntent("keyword_best intent={$bestMatch['intent']['intent']} score={$bestMatch['score']}");
             
             return $bestMatch['intent'];
         }

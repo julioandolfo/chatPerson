@@ -282,34 +282,53 @@ class FunnelService
     /**
      * Mover conversa para estágio (com validações)
      */
-    public static function moveConversation(int $conversationId, int $stageId, ?int $userId = null): bool
+    public static function moveConversation(int $conversationId, int $stageId, ?int $userId = null, bool $bypassPermissions = false): bool
     {
+        \App\Helpers\Logger::automation("FunnelService::moveConversation - INÍCIO");
+        \App\Helpers\Logger::automation("  conversationId: {$conversationId}, stageId: {$stageId}, userId: " . ($userId ?? 'NULL') . ", bypassPermissions: " . ($bypassPermissions ? 'TRUE' : 'FALSE'));
+        
         if ($userId === null) {
             $userId = \App\Helpers\Auth::id();
+            \App\Helpers\Logger::automation("  userId após Auth::id(): " . ($userId ?? 'NULL'));
         }
         
         $conversation = Conversation::find($conversationId);
         if (!$conversation) {
+            \App\Helpers\Logger::automation("  ❌ Conversa não encontrada!");
             throw new \InvalidArgumentException('Conversa não encontrada');
         }
+        \App\Helpers\Logger::automation("  ✅ Conversa encontrada: ID {$conversationId}");
 
         $stage = FunnelStage::find($stageId);
         if (!$stage) {
+            \App\Helpers\Logger::automation("  ❌ Estágio não encontrado!");
             throw new \InvalidArgumentException('Estágio não encontrado');
         }
+        \App\Helpers\Logger::automation("  ✅ Estágio encontrado: {$stage['name']} (Funil: {$stage['funnel_id']})");
 
-        // Verificar permissões
-        if (!\App\Services\PermissionService::canEditConversation($userId, $conversation)) {
-            throw new \Exception('Você não tem permissão para editar esta conversa');
-        }
+        // Verificar permissões (apenas se não for bypass - usado em automações)
+        if (!$bypassPermissions) {
+            \App\Helpers\Logger::automation("  Verificando permissões...");
+            if (!\App\Services\PermissionService::canEditConversation($userId, $conversation)) {
+                \App\Helpers\Logger::automation("  ❌ Sem permissão para editar conversa!");
+                throw new \Exception('Você não tem permissão para editar esta conversa');
+            }
 
-        // Verificar se usuário pode mover para este estágio
-        if (!\App\Models\AgentFunnelPermission::canMoveToStage($userId, $stageId)) {
-            throw new \Exception('Você não tem permissão para mover conversas para este estágio');
+            // Verificar se usuário pode mover para este estágio
+            if (!\App\Models\AgentFunnelPermission::canMoveToStage($userId, $stageId)) {
+                \App\Helpers\Logger::automation("  ❌ Sem permissão para mover para este estágio!");
+                throw new \Exception('Você não tem permissão para mover conversas para este estágio');
+            }
+            \App\Helpers\Logger::automation("  ✅ Permissões OK");
+        } else {
+            \App\Helpers\Logger::automation("  ⚠️  Bypass de permissões ativado (automação)");
         }
 
         $oldStageId = $conversation['funnel_stage_id'] ?? null;
         $oldFunnelId = $conversation['funnel_id'] ?? null;
+        
+        \App\Helpers\Logger::automation("  Conversa atual - Funil: {$oldFunnelId}, Estágio: {$oldStageId}");
+        \App\Helpers\Logger::automation("  Novo destino - Funil: {$stage['funnel_id']}, Estágio: {$stageId}");
         
         // Validações de movimentação
         if ($oldStageId) {
@@ -325,11 +344,24 @@ class FunnelService
         // TODO: Verificar limite configurado no estágio
         
         // Mover conversa
-        if (Conversation::update($conversationId, [
+        \App\Helpers\Logger::automation("  Executando UPDATE no banco de dados...");
+        $updateData = [
             'funnel_id' => $stage['funnel_id'],
             'funnel_stage_id' => $stageId,
             'moved_at' => date('Y-m-d H:i:s')
-        ])) {
+        ];
+        \App\Helpers\Logger::automation("  Dados para UPDATE: " . json_encode($updateData));
+        
+        try {
+            $updateResult = Conversation::update($conversationId, $updateData);
+            \App\Helpers\Logger::automation("  Resultado do UPDATE: " . ($updateResult ? 'TRUE' : 'FALSE'));
+        } catch (\Exception $updateEx) {
+            \App\Helpers\Logger::automation("  ❌ EXCEÇÃO durante UPDATE: " . $updateEx->getMessage());
+            throw $updateEx;
+        }
+        
+        if ($updateResult) {
+            \App\Helpers\Logger::automation("  ✅ UPDATE bem-sucedido!");
             // Executar automações para movimentação
             try {
                 \App\Services\AutomationService::executeForConversationMoved(
@@ -357,9 +389,12 @@ class FunnelService
                 error_log("Erro ao logar atividade: " . $e->getMessage());
             }
             
+            \App\Helpers\Logger::automation("FunnelService::moveConversation - FIM (Sucesso)");
             return true;
         }
         
+        \App\Helpers\Logger::automation("  ❌ UPDATE retornou FALSE! Conversa NÃO foi movida.");
+        \App\Helpers\Logger::automation("FunnelService::moveConversation - FIM (Falha)");
         return false;
     }
 

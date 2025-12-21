@@ -1125,13 +1125,21 @@ class AutomationService
             
             \App\Helpers\Logger::automation("  Conversa atual - Funil: {$conversation['funnel_id']}, Estágio: {$conversation['funnel_stage_id']}");
             
-            // Mover conversa
+            // Mover conversa (com bypass de permissões pois é automação)
             \App\Helpers\Logger::automation("  Movendo conversa {$conversationId} para estágio {$stageId}...");
-            \App\Services\FunnelService::moveConversation($conversationId, $stageId);
             
-            \App\Helpers\Logger::automation("  ✅ Conversa movida com sucesso!");
+            try {
+                $result = \App\Services\FunnelService::moveConversation($conversationId, $stageId, null, true);
+                \App\Helpers\Logger::automation("  ✅ Conversa movida com sucesso! Resultado: " . ($result ? 'TRUE' : 'FALSE'));
+            } catch (\Exception $moveException) {
+                \App\Helpers\Logger::automation("  ❌ EXCEÇÃO ao chamar moveConversation: " . $moveException->getMessage());
+                \App\Helpers\Logger::automation("  Stack trace: " . $moveException->getTraceAsString());
+                throw $moveException;
+            }
+            
         } catch (\Exception $e) {
-            \App\Helpers\Logger::automation("  ❌ ERRO ao mover conversa: " . $e->getMessage());
+            \App\Helpers\Logger::automation("  ❌ ERRO GERAL ao executar mover conversa: " . $e->getMessage());
+            \App\Helpers\Logger::automation("  Linha: " . $e->getLine() . ", Arquivo: " . $e->getFile());
             if ($executionId) {
                 \App\Models\AutomationExecution::updateStatus($executionId, 'failed', "Erro ao mover estágio: " . $e->getMessage());
             }

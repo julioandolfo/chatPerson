@@ -105,7 +105,14 @@ abstract class Model
         $sql = "UPDATE `{$instance->table}` SET " . implode(', ', $fields) . 
                " WHERE `{$instance->primaryKey}` = ?";
 
-        return Database::execute($sql, $values) > 0;
+        // Log temporário para debug
+        \App\Helpers\Logger::automation("  Model::update - SQL: {$sql}");
+        \App\Helpers\Logger::automation("  Model::update - Values: " . json_encode($values));
+        
+        $affectedRows = Database::execute($sql, $values);
+        \App\Helpers\Logger::automation("  Model::update - Linhas afetadas: {$affectedRows}");
+        
+        return $affectedRows > 0;
     }
 
     /**

@@ -3817,7 +3817,6 @@ window.populateAIIntents = function(intents) {
                 targetSelect.value = intent.target_node_id;
                 console.log(`  - Target node: ${intent.target_node_id}`);
             }
-            const exitMessageInput = item.querySelector(`textarea[name="ai_intents[${index}][exit_message]"]`);
             if (exitMessageInput) {
                 exitMessageInput.value = intent.exit_message || '';
                 console.log(`  - Exit message: ${intent.exit_message}`);

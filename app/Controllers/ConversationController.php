@@ -1991,9 +1991,19 @@ class ConversationController
         $config = $this->prepareJsonResponse();
         
         try {
-            Permission::abortIfCannot('conversations.view.own');
+            \App\Helpers\Logger::api('Requisição recebida em getAvailableAIAgents', [
+                'user_id' => \App\Helpers\Auth::id()
+            ]);
+            
+            // Qualquer usuário logado pode ver agentes disponíveis
+            // Permission::abortIfCannot('conversations.view.own');
             
             $agents = \App\Services\ConversationAIService::getAvailableAgents();
+            
+            \App\Helpers\Logger::api('Agentes disponíveis encontrados', [
+                'count' => count($agents),
+                'agents' => $agents
+            ]);
             
             ob_end_clean();
             Response::json([
@@ -2001,6 +2011,13 @@ class ConversationController
                 'data' => $agents
             ]);
         } catch (\Exception $e) {
+            \App\Helpers\Logger::error('Erro ao buscar agentes disponíveis', [
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             ob_end_clean();
             Response::json([
                 'success' => false,

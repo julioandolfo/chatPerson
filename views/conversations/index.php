@@ -3952,19 +3952,31 @@ window.showAddAIAgentModal = function() {
     }
     
     // Carregar agentes disponíveis
-    fetch(`<?= \App\Helpers\Url::to('/ai-agents/available') ?>`, {
+    const url = `<?= \App\Helpers\Url::to('/ai-agents/available') ?>`;
+    console.log('🔍 Carregando agentes de IA de:', url);
+    
+    fetch(url, {
         headers: {
             'X-Requested-With': 'XMLHttpRequest',
             'Accept': 'application/json'
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('📥 Resposta recebida:', response.status, response.statusText);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
     .then(data => {
+        console.log('📊 Dados recebidos:', data);
+        
         if (!data.success || !data.data || data.data.length === 0) {
+            console.warn('⚠️ Nenhum agente disponível:', data);
             Swal.fire({
                 icon: 'warning',
                 title: 'Atenção',
-                text: 'Nenhum agente de IA disponível'
+                text: data.message || 'Nenhum agente de IA disponível'
             });
             return;
         }
@@ -4038,11 +4050,15 @@ window.showAddAIAgentModal = function() {
         });
     })
     .catch(error => {
-        console.error('Erro ao carregar agentes:', error);
+        console.error('❌ Erro ao carregar agentes:', error);
+        console.error('Detalhes do erro:', {
+            message: error.message,
+            stack: error.stack
+        });
         Swal.fire({
             icon: 'error',
             title: 'Erro',
-            text: 'Erro ao carregar agentes de IA disponíveis'
+            text: `Erro ao carregar agentes de IA: ${error.message}`
         });
     });
 };

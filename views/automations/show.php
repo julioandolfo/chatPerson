@@ -272,6 +272,8 @@ $styles = <<<HTML
 .chatbot-menu-options {
     border-top: 1px solid #e4e6ef;
     padding-top: 8px;
+    font-size: 11px;
+    color: #7e8299;
 }
 
 .chatbot-option-row {
@@ -311,8 +313,17 @@ $styles = <<<HTML
     box-shadow: 0 2px 4px rgba(99, 102, 241, 0.5);
 }
 
+.ai-intents-visual {
+    border-top: 1px solid #e4e6ef;
+    padding-top: 8px;
+    font-size: 11px;
+    color: #7e8299;
+}
+
 .ai-intent-row {
     transition: background-color 0.2s ease;
+    border-radius: 4px;
+    padding-left: 8px;
 }
 
 .ai-intent-row:hover {
@@ -321,10 +332,6 @@ $styles = <<<HTML
 
 .ai-intent-row:hover .node-connection-handle.ai-intent-handle {
     transform: translateY(-50%) scale(1.2);
-}
-
-.ai-intents-visual {
-    border-top-color: #e4e6ef;
 }
 
 [data-bs-theme="dark"] .ai-intents-visual {
@@ -1125,7 +1132,7 @@ function renderNode(node) {
     // Se é chatbot menu, adicionar handles múltiplos
     if (isChatbotMenu) {
         const options = node.node_data.chatbot_options;
-        innerHtml += '<div class="chatbot-menu-options" style="margin-top: 10px; font-size: 11px; color: #7e8299;">';
+        innerHtml += '<div class="chatbot-menu-options" style="margin-top: 10px;">';
         options.forEach(function(opt, idx) {
             const optText = (typeof opt === 'object' ? opt.text : opt) || `Opção ${idx + 1}`;
             innerHtml += `
@@ -1150,18 +1157,18 @@ function renderNode(node) {
         console.log('🎯 Renderizando AI Agent com intents:', node.id, 'Total:', intents.length);
         console.log('   Intents:', intents);
         
-        innerHtml += '<div class="ai-intents-visual" style="margin-top: 10px; border-top: 1px solid #e4e6ef; padding-top: 8px;">';
+        innerHtml += '<div class="ai-intents-visual" style="margin-top: 10px;">';
         intents.forEach(function(intent, idx) {
             const intentLabel = intent.description || intent.intent || `Intent ${idx + 1}`;
             console.log(`   -> Intent ${idx}: ${intentLabel}`);
             innerHtml += `
-                <div class="ai-intent-row" style="position: relative; padding: 6px 8px; padding-right: 24px; margin: 0 -15px; min-height: 28px; display: flex; align-items: center;">
-                    <span style="font-size: 11px; color: #7e8299; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${intentLabel}">🎯 ${intentLabel}</span>
+                <div class="ai-intent-row" style="position: relative; padding: 4px 0; padding-right: 20px;">
+                    <span style="display: inline-block; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${intentLabel}">🎯 ${intentLabel}</span>
                     <div class="node-connection-handle output ai-intent-handle" 
                          data-node-id="${String(node.id || '')}" 
                          data-handle-type="output" 
                          data-intent-index="${idx}"
-                         style="position: absolute; right: -6px; top: 50%; transform: translateY(-50%); width: 12px; height: 12px; border-radius: 50%; background: #6366f1; border: 2px solid white; cursor: crosshair; z-index: 80; pointer-events: all;">
+                         style="right: -10px; top: 50%; transform: translateY(-50%); background: #6366f1;">
                     </div>
                 </div>
             `;
@@ -1827,7 +1834,7 @@ function openNodeConfig(nodeId) {
             formContent = `
                 <div class="fv-row mb-7">
                     <label class="required fw-semibold fs-6 mb-2">Funil</label>
-                    <select name="funnel_id" id="kt_node_funnel_select" class="form-select form-select-solid" required onchange="loadStagesForFunnel(this.value, 'kt_node_stage_select')">
+                    <select name="funnel_id" id="kt_node_funnel_select" class="form-select form-select-solid" required>
                         <option value="">Selecione um funil</option>
                         ${funnelOptionsHtml}
                     </select>
@@ -2207,15 +2214,29 @@ function openNodeConfig(nodeId) {
         }
     }
     
-    // Carregar estágios quando funil for selecionado
-    const funnelSelect = document.getElementById("kt_node_funnel_select");
-    const stageSelect = document.getElementById("kt_node_stage_select");
-    if (funnelSelect && stageSelect) {
-        funnelSelect.addEventListener("change", function() {
-            const funnelId = this.value;
-            stageSelect.innerHTML = '<option value="">Selecione um estágio</option>';
+    // Carregar estágios quando funil for selecionado (action_move_stage)
+    setTimeout(() => {
+        const funnelSelect = document.getElementById("kt_node_funnel_select");
+        const stageSelect = document.getElementById("kt_node_stage_select");
+        
+        if (funnelSelect && stageSelect) {
+            console.log('🔄 Configurando listener para action_move_stage');
+            console.log('   node.node_data.funnel_id:', node.node_data.funnel_id);
+            console.log('   node.node_data.stage_id:', node.node_data.stage_id);
             
-            if (funnelId) {
+            // Função para carregar estágios
+            const loadStages = (funnelId, selectedStageId = null) => {
+                console.log('📋 loadStages chamado:', { funnelId, selectedStageId });
+                
+                if (!funnelId) {
+                    stageSelect.innerHTML = '<option value="">Primeiro selecione um funil</option>';
+                    stageSelect.disabled = true;
+                    return;
+                }
+                
+                stageSelect.innerHTML = '<option value="">Carregando...</option>';
+                stageSelect.disabled = true;
+                
                 fetch(funnelsBaseUrl + "/" + funnelId + "/stages")
                     .then(response => {
                         if (!response.ok) {
@@ -2224,30 +2245,65 @@ function openNodeConfig(nodeId) {
                         return response.json();
                     })
                     .then(data => {
-                        if (data.success && data.stages) {
-                            data.stages.forEach(stage => {
+                        console.log('✅ Estágios carregados:', data);
+                        console.log('   Total de estágios recebidos:', data.stages?.length || 0);
+                        
+                        // Limpar completamente antes de adicionar
+                        stageSelect.innerHTML = '';
+                        
+                        // Adicionar opção padrão
+                        const defaultOption = document.createElement("option");
+                        defaultOption.value = "";
+                        defaultOption.textContent = "Selecione um estágio";
+                        stageSelect.appendChild(defaultOption);
+                        
+                        if (data.success && data.stages && data.stages.length > 0) {
+                            console.log('   Adicionando opções ao select...');
+                            data.stages.forEach((stage, idx) => {
+                                console.log(`   [${idx}] ID: ${stage.id}, Nome: ${stage.name}`);
                                 const option = document.createElement("option");
                                 option.value = stage.id;
                                 option.textContent = stage.name;
                                 stageSelect.appendChild(option);
                             });
                             
-                            // Selecionar estágio atual se houver
-                            const currentStageId = node.node_data.stage_id || automationStageId;
-                            if (currentStageId) {
-                                stageSelect.value = currentStageId;
+                            console.log('   Total de options no select:', stageSelect.options.length);
+                            
+                            stageSelect.disabled = false;
+                            
+                            // Pré-selecionar estágio se fornecido
+                            if (selectedStageId) {
+                                console.log('🎯 Pré-selecionando estágio:', selectedStageId);
+                                setTimeout(() => {
+                                    stageSelect.value = selectedStageId;
+                                    console.log('   Valor selecionado:', stageSelect.value);
+                                }, 50);
                             }
                         } else {
-                            console.error("Erro ao carregar estágios:", data.message || "Resposta inválida");
+                            console.error("Nenhum estágio encontrado");
+                            stageSelect.innerHTML = '<option value="">Nenhum estágio disponível</option>';
                         }
                     })
                     .catch(error => {
                         console.error("Erro ao carregar estágios:", error);
                         stageSelect.innerHTML = '<option value="">Erro ao carregar estágios</option>';
+                        stageSelect.disabled = false;
                     });
+            };
+            
+            // Adicionar listener para mudanças futuras
+            funnelSelect.addEventListener("change", function() {
+                loadStages(this.value);
+            });
+            
+            // Pré-selecionar funil e carregar estágios se já configurado
+            if (node.node_data.funnel_id) {
+                console.log('🔧 Pré-configurando funil:', node.node_data.funnel_id);
+                funnelSelect.value = node.node_data.funnel_id;
+                loadStages(node.node_data.funnel_id, node.node_data.stage_id);
             }
-        });
-    }
+        }
+    }, 150); // Aumentado timeout para garantir que o DOM está pronto
     
     console.log('✅ Abrindo modal de configuração...');
     const modalElement = document.getElementById("kt_modal_node_config");

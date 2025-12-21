@@ -2899,11 +2899,11 @@ class AutomationService
         if ($seconds < 60) {
             return "{$seconds} segundo(s)";
         } elseif ($seconds < 3600) {
-            $minutes = floor($seconds / 60);
+            $minutes = intval(floor($seconds / 60));
             return "{$minutes} minuto(s)";
         } else {
-            $hours = floor($seconds / 3600);
-            $minutes = floor(($seconds % 3600) / 60);
+            $hours = intval(floor($seconds / 3600));
+            $minutes = intval(floor(($seconds % 3600) / 60));
             if ($minutes > 0) {
                 return "{$hours} hora(s) e {$minutes} minuto(s)";
             }

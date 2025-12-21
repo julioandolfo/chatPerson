@@ -2390,6 +2390,12 @@ body.dark-mode .swal2-content {
                             <span class="path4"></span>
                         </i>
                     </button>
+                    <button class="btn btn-sm btn-icon btn-light-success" title="Ver mensagens agendadas" onclick="showScheduledMessagesModal()">
+                        <i class="ki-duotone ki-calendar fs-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                    </button>
                     <button class="btn btn-sm btn-icon btn-light-primary" title="Emoji" onclick="toggleEmoji()">
                         <i class="ki-duotone ki-emoji-happy fs-3">
                             <span class="path1"></span>
@@ -3435,6 +3441,53 @@ body.dark-mode .swal2-content {
                         <button type="submit" class="btn btn-primary">Agendar</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Ver Mensagens Agendadas -->
+<div class="modal fade" id="kt_modal_scheduled_messages" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-800px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Mensagens Agendadas</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <!-- Filtros -->
+                <div class="mb-5">
+                    <div class="btn-group" role="group">
+                        <input type="radio" class="btn-check" name="scheduled_status_filter" id="filter_all" value="" checked>
+                        <label class="btn btn-sm btn-outline btn-outline-dashed btn-active-light-primary" for="filter_all">Todas</label>
+                        
+                        <input type="radio" class="btn-check" name="scheduled_status_filter" id="filter_pending" value="pending">
+                        <label class="btn btn-sm btn-outline btn-outline-dashed btn-active-light-warning" for="filter_pending">Pendentes</label>
+                        
+                        <input type="radio" class="btn-check" name="scheduled_status_filter" id="filter_sent" value="sent">
+                        <label class="btn btn-sm btn-outline btn-outline-dashed btn-active-light-success" for="filter_sent">Enviadas</label>
+                        
+                        <input type="radio" class="btn-check" name="scheduled_status_filter" id="filter_cancelled" value="cancelled">
+                        <label class="btn btn-sm btn-outline btn-outline-dashed btn-active-light-danger" for="filter_cancelled">Canceladas</label>
+                        
+                        <input type="radio" class="btn-check" name="scheduled_status_filter" id="filter_failed" value="failed">
+                        <label class="btn btn-sm btn-outline btn-outline-dashed btn-active-light-dark" for="filter_failed">Falhadas</label>
+                    </div>
+                </div>
+                
+                <!-- Lista de mensagens -->
+                <div id="scheduledMessagesList" style="max-height: 500px; overflow-y: auto;">
+                    <div class="text-center py-10">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -14598,6 +14651,220 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('Erro ao agendar mensagem: ' + error.message);
             }
         });
+    }
+    
+    // Mostrar modal de mensagens agendadas
+    window.showScheduledMessagesModal = function() {
+        const conversationId = window.currentConversationId;
+        if (!conversationId) {
+            alert('Nenhuma conversa selecionada');
+            return;
+        }
+        
+        const modal = new bootstrap.Modal(document.getElementById('kt_modal_scheduled_messages'));
+        modal.show();
+        
+        // Carregar mensagens
+        loadScheduledMessages();
+        
+        // Configurar filtros
+        const filterInputs = document.querySelectorAll('input[name="scheduled_status_filter"]');
+        filterInputs.forEach(input => {
+            input.addEventListener('change', function() {
+                loadScheduledMessages(this.value);
+            });
+        });
+    };
+    
+    // Carregar mensagens agendadas
+    async function loadScheduledMessages(status = '') {
+        const conversationId = window.currentConversationId;
+        if (!conversationId) return;
+        
+        const listContainer = document.getElementById('scheduledMessagesList');
+        listContainer.innerHTML = '<div class="text-center py-10"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Carregando...</span></div></div>';
+        
+        try {
+            const url = `<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/scheduled-messages${status ? '?status=' + status : ''}`;
+            const response = await fetch(url, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                const messages = data.messages || [];
+                
+                if (messages.length === 0) {
+                    listContainer.innerHTML = `
+                        <div class="text-center py-10">
+                            <i class="ki-duotone ki-calendar fs-3x text-muted mb-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <h5 class="text-muted">Nenhuma mensagem agendada</h5>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let html = '';
+                messages.forEach(msg => {
+                    const scheduledDate = new Date(msg.scheduled_at);
+                    const formattedDate = scheduledDate.toLocaleString('pt-BR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    
+                    let statusBadge = '';
+                    let statusClass = '';
+                    let actionButtons = '';
+                    
+                    switch(msg.status) {
+                        case 'pending':
+                            statusBadge = '<span class="badge badge-light-warning">Pendente</span>';
+                            statusClass = 'border-warning';
+                            actionButtons = `<button class="btn btn-sm btn-light-danger" onclick="cancelScheduledMessage(${msg.id})">Cancelar</button>`;
+                            break;
+                        case 'sent':
+                            statusBadge = '<span class="badge badge-light-success">Enviada</span>';
+                            statusClass = 'border-success';
+                            break;
+                        case 'cancelled':
+                            statusBadge = '<span class="badge badge-light-danger">Cancelada</span>';
+                            statusClass = 'border-danger';
+                            break;
+                        case 'failed':
+                            statusBadge = '<span class="badge badge-light-dark">Falhou</span>';
+                            statusClass = 'border-dark';
+                            break;
+                    }
+                    
+                    const content = msg.content || '';
+                    const truncatedContent = content.length > 100 ? content.substring(0, 100) + '...' : content;
+                    
+                    html += `
+                        <div class="card mb-3 ${statusClass}" style="border-left: 4px solid;">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <div>
+                                        <span class="fw-bold text-gray-800 fs-6">
+                                            <i class="ki-duotone ki-calendar fs-5 me-1">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                            </i>
+                                            ${formattedDate}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        ${statusBadge}
+                                    </div>
+                                </div>
+                                <div class="text-gray-700 mb-3">${escapeHtml(truncatedContent)}</div>
+                                ${msg.error_message ? `<div class="alert alert-danger mb-3 py-2">${escapeHtml(msg.error_message)}</div>` : ''}
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">
+                                        ${msg.cancel_if_resolved ? '<i class="ki-duotone ki-check-circle fs-6 text-info me-1"><span class="path1"></span><span class="path2"></span></i>Cancelar se resolvida ' : ''}
+                                        ${msg.cancel_if_responded ? '<i class="ki-duotone ki-message-text fs-6 text-info me-1"><span class="path1"></span><span class="path2"></span></i>Cancelar se respondida' : ''}
+                                    </small>
+                                    <div>
+                                        ${actionButtons}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                listContainer.innerHTML = html;
+            } else {
+                listContainer.innerHTML = `
+                    <div class="alert alert-danger">
+                        ${data.message || 'Erro ao carregar mensagens'}
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Erro:', error);
+            listContainer.innerHTML = `
+                <div class="alert alert-danger">
+                    Erro ao carregar mensagens: ${error.message}
+                </div>
+            `;
+        }
+    }
+    
+    // Cancelar mensagem agendada
+    window.cancelScheduledMessage = async function(messageId) {
+        const conversationId = window.currentConversationId;
+        if (!conversationId) return;
+        
+        const result = await Swal.fire({
+            title: 'Confirmar cancelamento',
+            text: 'Deseja cancelar esta mensagem agendada?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Sim, cancelar',
+            cancelButtonText: 'Não',
+            customClass: {
+                confirmButton: 'btn btn-danger',
+                cancelButton: 'btn btn-light'
+            }
+        });
+        
+        if (!result.isConfirmed) return;
+        
+        try {
+            const response = await fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/scheduled-messages/${messageId}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso!',
+                    text: 'Mensagem cancelada com sucesso',
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 3000
+                });
+                
+                // Recarregar lista
+                const activeFilter = document.querySelector('input[name="scheduled_status_filter"]:checked');
+                loadScheduledMessages(activeFilter ? activeFilter.value : '');
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: data.message || 'Erro ao cancelar mensagem'
+                });
+            }
+        } catch (error) {
+            console.error('Erro:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Erro ao cancelar mensagem: ' + error.message
+            });
+        }
+    };
+    
+    // Função auxiliar para escapar HTML
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
     
     // Máscara de telefone brasileiro (DDD + número)

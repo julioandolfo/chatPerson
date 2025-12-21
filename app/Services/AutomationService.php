@@ -217,19 +217,15 @@ class AutomationService
         if (!empty($metadata['ai_branching_active'])) {
             \App\Helpers\Logger::automation("🤖 Ramificação de IA ATIVA detectada!");
             
-            // Verificar se a mensagem foi enviada pela IA
-            if ($message['sender_type'] === 'agent' && !empty($message['ai_agent_id'])) {
-                \App\Helpers\Logger::automation("Mensagem da IA detectada, analisando intent...");
-                $handled = self::handleAIBranchingResponse($conversation, $message);
-                
-                if ($handled) {
-                    \App\Helpers\Logger::automation("✅ Ramificação tratou a mensagem. Roteou para nó específico.");
-                    return;
-                }
-                \App\Helpers\Logger::automation("⚠️ handleAIBranchingResponse retornou false. Continuando...");
-            } else {
-                \App\Helpers\Logger::automation("Mensagem não é da IA. Sender: {$message['sender_type']}, AI Agent ID: " . ($message['ai_agent_id'] ?? 'null'));
+            // Antes tratávamos apenas mensagens da IA; agora também tratamos a resposta do contato
+            \App\Helpers\Logger::automation("Analisando intent na mensagem recebida (sender_type={$message['sender_type']})...");
+            $handled = self::handleAIBranchingResponse($conversation, $message);
+            
+            if ($handled) {
+                \App\Helpers\Logger::automation("✅ Ramificação tratou a mensagem. Roteou para nó específico.");
+                return;
             }
+            \App\Helpers\Logger::automation("⚠️ handleAIBranchingResponse retornou false. Continuando...");
         }
         
         if (!empty($metadata['chatbot_active'])) {

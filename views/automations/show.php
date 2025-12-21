@@ -1093,7 +1093,8 @@ function renderNode(node) {
     outputHandles.forEach(function(outputHandle) {
         outputHandle.addEventListener('mousedown', function(e) {
             e.stopPropagation();
-            const optionIndex = outputHandle.getAttribute('data-option-index');
+            // Suportar tanto option-index (chatbot) quanto intent-index (AI agent)
+            const optionIndex = outputHandle.getAttribute('data-option-index') || outputHandle.getAttribute('data-intent-index');
             startConnection(node.id, 'output', e, optionIndex);
         });
     });
@@ -2226,9 +2227,11 @@ function getNodeHandlePosition(nodeId, handleType, optionIndex) {
     
     let handle;
     
-    // Se for handle de opção de chatbot
+    // Se for handle de opção (chatbot ou AI intent)
     if (handleType === 'output' && optionIndex !== undefined && optionIndex !== null) {
-        handle = nodeElement.querySelector(`.node-connection-handle.${handleType}[data-option-index="${optionIndex}"]`);
+        // Tentar primeiro com data-option-index (chatbot), depois data-intent-index (AI agent)
+        handle = nodeElement.querySelector(`.node-connection-handle.${handleType}[data-option-index="${optionIndex}"]`) ||
+                 nodeElement.querySelector(`.node-connection-handle.${handleType}[data-intent-index="${optionIndex}"]`);
     } else {
         // Handle normal (primeiro encontrado)
         handle = nodeElement.querySelector(`.node-connection-handle.${handleType}`);
@@ -2888,10 +2891,12 @@ document.addEventListener("DOMContentLoaded", function() {
             console.log('node.node_data ANTES de merge:', node.node_data);
             console.log('nodeData coletado do form:', nodeData);
             
-            // Merge dos dados (preservar connections)
-            const oldConnections = node.node_data.connections || [];
+            // Merge dos dados (preservar connections que já foram atualizadas acima)
+            // NÃO sobrescrever connections aqui, pois elas já foram atualizadas para AI intents
+            const connectionsToPreserve = node.node_data.connections || [];
             node.node_data = { ...node.node_data, ...nodeData };
-            node.node_data.connections = oldConnections; // Preservar conexões
+            // Manter as conexões já atualizadas (não sobrescrever com as antigas)
+            node.node_data.connections = connectionsToPreserve;
             
             console.log('node.node_data DEPOIS de merge:', node.node_data);
             

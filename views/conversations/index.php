@@ -3792,6 +3792,157 @@ function showNewConversationModal() {
 window.showNewConversationModal = showNewConversationModal;
 
 // ============================================
+// FUNÇÕES DE IA - DEFINIR IMEDIATAMENTE
+// ============================================
+
+/**
+ * Carregar status da IA na conversa
+ */
+window.loadAIAgentStatus = function(conversationId) {
+    console.log('loadAIAgentStatus chamado com conversationId:', conversationId);
+    
+    if (!conversationId) {
+        console.warn('loadAIAgentStatus: conversationId não fornecido');
+        if (typeof window.updateAIAgentSidebar === 'function') {
+            window.updateAIAgentSidebar({ has_ai: false });
+        }
+        return;
+    }
+    
+    // Mostrar estado de carregamento
+    const statusDiv = document.getElementById('sidebar-ai-status');
+    if (statusDiv) {
+        statusDiv.innerHTML = '<div class="text-muted fs-7">Carregando...</div>';
+    }
+    
+    const url = `<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/ai-status`;
+    console.log('Fazendo requisição para:', url);
+    
+    fetch(url, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => {
+        console.log('Resposta recebida:', response.status, response.statusText);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Dados recebidos:', data);
+        if (data.success) {
+            if (typeof window.updateAIAgentSidebar === 'function') {
+                window.updateAIAgentSidebar(data.data);
+            }
+            if (typeof window.updateAIActiveBanner === 'function') {
+                window.updateAIActiveBanner(data.data, conversationId);
+            }
+        } else {
+            console.error('Erro ao carregar status da IA:', data.message);
+            if (typeof window.updateAIAgentSidebar === 'function') {
+                window.updateAIAgentSidebar({ has_ai: false });
+            }
+            if (typeof window.updateAIActiveBanner === 'function') {
+                window.updateAIActiveBanner({ has_ai: false }, conversationId);
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao carregar status da IA:', error);
+        if (typeof window.updateAIAgentSidebar === 'function') {
+            window.updateAIAgentSidebar({ has_ai: false });
+        }
+        if (typeof window.updateAIActiveBanner === 'function') {
+            window.updateAIActiveBanner({ has_ai: false }, conversationId);
+        }
+    });
+};
+
+/**
+ * Atualizar sidebar com status da IA
+ */
+window.updateAIAgentSidebar = function(status) {
+    console.log('updateAIAgentSidebar chamado com status:', status);
+    
+    const section = document.getElementById('sidebar-ai-agent-section');
+    console.log('Elemento sidebar-ai-agent-section encontrado:', !!section);
+    
+    if (!section) {
+        console.error('Elemento sidebar-ai-agent-section não encontrado!');
+        return;
+    }
+    
+    const statusDiv = document.getElementById('sidebar-ai-status');
+    const actionsDiv = document.getElementById('sidebar-ai-actions');
+    const addSection = document.getElementById('sidebar-add-ai-agent');
+    
+    console.log('Elementos encontrados:', {
+        statusDiv: !!statusDiv,
+        actionsDiv: !!actionsDiv,
+        addSection: !!addSection,
+        hasAI: status.has_ai
+    });
+    
+    if (status.has_ai && status.ai_agent) {
+        // Tem IA ativa
+        const agent = status.ai_agent;
+        const stats = status.ai_conversation || {};
+        
+        if (statusDiv) {
+            statusDiv.innerHTML = `
+                <div class="d-flex align-items-center mb-2">
+                    <div class="symbol symbol-35px symbol-circle me-3">
+                        <div class="symbol-label bg-light-primary">
+                            <i class="ki-duotone ki-abstract-26 fs-2 text-primary">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1">
+                        <a href="#" class="text-dark fw-bold text-hover-primary fs-6">${agent.name || 'IA'}</a>
+                        <span class="text-muted fw-semibold d-block fs-7">${agent.model || 'gpt-4'}</span>
+                    </div>
+                </div>
+                
+                ${stats.messages_count ? `
+                <div class="mb-2">
+                    <span class="text-gray-600 fs-7">Mensagens: </span>
+                    <span class="badge badge-light-info fs-7">${stats.messages_count || 0}</span>
+                </div>
+                ` : ''}
+            `;
+        }
+        
+        if (actionsDiv) actionsDiv.style.display = '';
+        if (addSection) addSection.style.display = 'none';
+        console.log('Sidebar atualizado: IA ativa');
+    } else {
+        // Sem IA ativa
+        if (statusDiv) {
+            statusDiv.innerHTML = '<div class="text-muted fs-7">Nenhum agente de IA ativo nesta conversa</div>';
+        }
+        if (actionsDiv) actionsDiv.style.display = 'none';
+        if (addSection) addSection.style.display = 'block';
+        console.log('Sidebar atualizado: Sem IA - HTML inserido');
+    }
+    
+    // Atualizar banner de IA ativa (se a função existir)
+    if (typeof window.updateAIActiveBanner === 'function') {
+        const conversationId = window.currentConversationId || 0;
+        window.updateAIActiveBanner(status, conversationId);
+    }
+};
+
+console.log('✅ Funções de IA definidas no escopo global:', {
+    loadAIAgentStatus: typeof window.loadAIAgentStatus,
+    updateAIAgentSidebar: typeof window.updateAIAgentSidebar
+});
+
+// ============================================
 // VARIÁVEIS E OUTRAS FUNÇÕES
 // ============================================
 

@@ -1090,19 +1090,55 @@ class AutomationService
      */
     private static function executeMoveStage(array $nodeData, int $conversationId, ?int $executionId = null): void
     {
+        \App\Helpers\Logger::automation("executeMoveStage - INÍCIO");
+        \App\Helpers\Logger::automation("  nodeData recebido: " . json_encode($nodeData));
+        
         $stageId = $nodeData['stage_id'] ?? null;
+        $funnelId = $nodeData['funnel_id'] ?? null;
+        $validateRules = $nodeData['validate_rules'] ?? true;
+        
+        \App\Helpers\Logger::automation("  stage_id: " . ($stageId ?: 'NULL'));
+        \App\Helpers\Logger::automation("  funnel_id: " . ($funnelId ?: 'NULL'));
+        \App\Helpers\Logger::automation("  validate_rules: " . ($validateRules ? 'SIM' : 'NÃO'));
+        
         if (!$stageId) {
+            \App\Helpers\Logger::automation("  ❌ ERRO: stage_id não fornecido!");
             return;
         }
 
         try {
+            // Buscar informações do estágio
+            $stage = \App\Models\FunnelStage::find($stageId);
+            if (!$stage) {
+                \App\Helpers\Logger::automation("  ❌ ERRO: Estágio ID {$stageId} não encontrado!");
+                throw new \Exception("Estágio não encontrado");
+            }
+            
+            \App\Helpers\Logger::automation("  Estágio encontrado: {$stage['name']} (Funil ID: {$stage['funnel_id']})");
+            
+            // Buscar conversa atual
+            $conversation = \App\Models\Conversation::find($conversationId);
+            if (!$conversation) {
+                \App\Helpers\Logger::automation("  ❌ ERRO: Conversa ID {$conversationId} não encontrada!");
+                throw new \Exception("Conversa não encontrada");
+            }
+            
+            \App\Helpers\Logger::automation("  Conversa atual - Funil: {$conversation['funnel_id']}, Estágio: {$conversation['funnel_stage_id']}");
+            
+            // Mover conversa
+            \App\Helpers\Logger::automation("  Movendo conversa {$conversationId} para estágio {$stageId}...");
             \App\Services\FunnelService::moveConversation($conversationId, $stageId);
+            
+            \App\Helpers\Logger::automation("  ✅ Conversa movida com sucesso!");
         } catch (\Exception $e) {
+            \App\Helpers\Logger::automation("  ❌ ERRO ao mover conversa: " . $e->getMessage());
             if ($executionId) {
                 \App\Models\AutomationExecution::updateStatus($executionId, 'failed', "Erro ao mover estágio: " . $e->getMessage());
             }
             throw $e;
         }
+        
+        \App\Helpers\Logger::automation("executeMoveStage - FIM");
     }
 
     /**

@@ -2887,6 +2887,14 @@ document.addEventListener("DOMContentLoaded", function() {
                     nodeData[key] = value;
                 }
             }
+            
+            // Log específico para action_move_stage
+            if (node.node_type === "action_move_stage") {
+                console.log('🔀 action_move_stage - Dados coletados:');
+                console.log('  funnel_id:', nodeData.funnel_id);
+                console.log('  stage_id:', nodeData.stage_id);
+                console.log('  validate_rules:', nodeData.validate_rules);
+            }
             // Checkboxes que não aparecem no FormData quando desmarcados
             const checkboxKeys = [
                 'consider_availability',

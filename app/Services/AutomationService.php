@@ -1804,6 +1804,14 @@ class AutomationService
             if ($targetNodeId) {
                 \App\Helpers\Logger::automation("Executando nó de destino: {$targetNodeId}");
                 
+                // ✅ PRIMEIRO: Remover a IA IMEDIATAMENTE para evitar que ela responda
+                try {
+                    \App\Services\ConversationAIService::removeAIAgent($conversation['id']);
+                    \App\Helpers\Logger::automation("✅ IA removida IMEDIATAMENTE para evitar resposta.");
+                } catch (\Exception $e) {
+                    \App\Helpers\Logger::automation("Falha ao remover IA: " . $e->getMessage());
+                }
+                
                 // Limpar metadata de ramificação
                 $metadata['ai_branching_active'] = false;
                 $metadata['ai_interaction_count'] = 0;
@@ -1819,18 +1827,10 @@ class AutomationService
                             'agent',
                             null
                         );
-                        \App\Helpers\Logger::automation("Mensagem de saída do intent enviada antes do próximo nó.");
+                        \App\Helpers\Logger::automation("📤 Mensagem de saída do intent enviada.");
                     } catch (\Exception $e) {
                         \App\Helpers\Logger::automation("Falha ao enviar mensagem de saída do intent: " . $e->getMessage());
                     }
-                }
-
-                // Remover a IA da conversa após identificar a intenção (handoff)
-                try {
-                    \App\Services\ConversationAIService::removeAIAgent($conversation['id']);
-                    \App\Helpers\Logger::automation("IA removida da conversa após roteamento por intent.");
-                } catch (\Exception $e) {
-                    \App\Helpers\Logger::automation("Falha ao remover IA após roteamento: " . $e->getMessage());
                 }
                 
                 // Buscar automação e nó de destino

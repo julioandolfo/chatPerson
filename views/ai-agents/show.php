@@ -375,6 +375,7 @@ foreach ($allTools as $tool) {
                             <div class="fv-row mb-7">
                                 <label class="fw-semibold fs-6 mb-2">Modelo</label>
                                 <select name="model" id="edit_agent_model" class="form-select form-select-solid">
+                                    <option value="gpt-4o" <?= ($agent['model'] ?? '') === 'gpt-4o' ? 'selected' : '' ?>>GPT-4o</option>
                                     <option value="gpt-4" <?= ($agent['model'] ?? 'gpt-4') === 'gpt-4' ? 'selected' : '' ?>>GPT-4</option>
                                     <option value="gpt-4-turbo" <?= ($agent['model'] ?? '') === 'gpt-4-turbo' ? 'selected' : '' ?>>GPT-4 Turbo</option>
                                     <option value="gpt-3.5-turbo" <?= ($agent['model'] ?? '') === 'gpt-3.5-turbo' ? 'selected' : '' ?>>GPT-3.5 Turbo</option>

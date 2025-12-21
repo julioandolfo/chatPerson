@@ -37,14 +37,36 @@ class Validator
                         break;
 
                     case 'min':
-                        if (!empty($value) && strlen($value) < (int)$ruleValue) {
-                            $errors[$field][] = "O campo {$field} deve ter no mínimo {$ruleValue} caracteres";
+                        // Verificar se é numérico ou string
+                        if (!empty($value)) {
+                            if (is_numeric($value)) {
+                                // Validação numérica
+                                if ((float)$value < (float)$ruleValue) {
+                                    $errors[$field][] = "O campo {$field} deve ser no mínimo {$ruleValue}";
+                                }
+                            } else {
+                                // Validação de string
+                                if (strlen($value) < (int)$ruleValue) {
+                                    $errors[$field][] = "O campo {$field} deve ter no mínimo {$ruleValue} caracteres";
+                                }
+                            }
                         }
                         break;
 
                     case 'max':
-                        if (!empty($value) && strlen($value) > (int)$ruleValue) {
-                            $errors[$field][] = "O campo {$field} deve ter no máximo {$ruleValue} caracteres";
+                        // Verificar se é numérico ou string
+                        if (!empty($value)) {
+                            if (is_numeric($value)) {
+                                // Validação numérica
+                                if ((float)$value > (float)$ruleValue) {
+                                    $errors[$field][] = "O campo {$field} deve ser no máximo {$ruleValue}";
+                                }
+                            } else {
+                                // Validação de string
+                                if (strlen($value) > (int)$ruleValue) {
+                                    $errors[$field][] = "O campo {$field} deve ter no máximo {$ruleValue} caracteres";
+                                }
+                            }
                         }
                         break;
 
@@ -55,8 +77,10 @@ class Validator
                         break;
 
                     case 'integer':
-                        if (!empty($value) && !is_numeric($value) || (int)$value != $value) {
-                            $errors[$field][] = "O campo {$field} deve ser um número inteiro";
+                        if (!empty($value)) {
+                            if (!is_numeric($value) || (int)$value != $value) {
+                                $errors[$field][] = "O campo {$field} deve ser um número inteiro";
+                            }
                         }
                         break;
                 }

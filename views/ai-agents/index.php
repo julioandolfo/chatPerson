@@ -152,6 +152,7 @@ ob_start();
                             <div class="fv-row mb-7">
                                 <label class="fw-semibold fs-6 mb-2">Modelo</label>
                                 <select name="model" class="form-select form-select-solid">
+                                    <option value="gpt-4o">GPT-4o</option>
                                     <option value="gpt-4">GPT-4</option>
                                     <option value="gpt-4-turbo">GPT-4 Turbo</option>
                                     <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
@@ -280,6 +281,7 @@ ob_start();
                             <div class="fv-row mb-7">
                                 <label class="fw-semibold fs-6 mb-2">Modelo</label>
                                 <select name="model" id="edit_model" class="form-select form-select-solid">
+                                    <option value="gpt-4o">GPT-4o</option>
                                     <option value="gpt-4">GPT-4</option>
                                     <option value="gpt-4-turbo">GPT-4 Turbo</option>
                                     <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>

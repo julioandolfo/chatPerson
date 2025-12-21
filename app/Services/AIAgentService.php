@@ -17,6 +17,25 @@ class AIAgentService
      */
     public static function create(array $data): int
     {
+        // Converter valores antes da validação
+        // Converter max_conversations vazio para null ANTES da validação
+        if (isset($data['max_conversations']) && ($data['max_conversations'] === '' || $data['max_conversations'] === null)) {
+            $data['max_conversations'] = null;
+        } elseif (isset($data['max_conversations']) && $data['max_conversations'] !== null) {
+            // Converter para int se tiver valor
+            $data['max_conversations'] = (int)$data['max_conversations'];
+        }
+        
+        // Converter temperature para float se presente
+        if (isset($data['temperature']) && $data['temperature'] !== '' && $data['temperature'] !== null) {
+            $data['temperature'] = (float)$data['temperature'];
+        }
+        
+        // Converter max_tokens para int se presente
+        if (isset($data['max_tokens']) && $data['max_tokens'] !== '' && $data['max_tokens'] !== null) {
+            $data['max_tokens'] = (int)$data['max_tokens'];
+        }
+
         $errors = Validator::validate($data, [
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -40,11 +59,6 @@ class AIAgentService
         $data['enabled'] = isset($data['enabled']) ? (bool)$data['enabled'] : true;
         $data['current_conversations'] = 0;
 
-        // Converter max_conversations vazio para null
-        if (isset($data['max_conversations']) && $data['max_conversations'] === '') {
-            $data['max_conversations'] = null;
-        }
-
         // Serializar settings se for array
         if (isset($data['settings']) && is_array($data['settings'])) {
             $data['settings'] = json_encode($data['settings'], JSON_UNESCAPED_UNICODE);
@@ -63,6 +77,25 @@ class AIAgentService
             throw new \Exception('Agente de IA não encontrado');
         }
 
+        // Converter valores antes da validação
+        // Converter max_conversations vazio para null ANTES da validação
+        if (isset($data['max_conversations']) && ($data['max_conversations'] === '' || $data['max_conversations'] === null)) {
+            $data['max_conversations'] = null;
+        } elseif (isset($data['max_conversations']) && $data['max_conversations'] !== null) {
+            // Converter para int se tiver valor
+            $data['max_conversations'] = (int)$data['max_conversations'];
+        }
+        
+        // Converter temperature para float se presente
+        if (isset($data['temperature']) && $data['temperature'] !== '' && $data['temperature'] !== null) {
+            $data['temperature'] = (float)$data['temperature'];
+        }
+        
+        // Converter max_tokens para int se presente
+        if (isset($data['max_tokens']) && $data['max_tokens'] !== '' && $data['max_tokens'] !== null) {
+            $data['max_tokens'] = (int)$data['max_tokens'];
+        }
+
         $errors = Validator::validate($data, [
             'name' => 'nullable|string|max:255',
             'description' => 'nullable|string',
@@ -77,11 +110,6 @@ class AIAgentService
 
         if (!empty($errors)) {
             throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));
-        }
-
-        // Converter max_conversations vazio para null
-        if (isset($data['max_conversations']) && $data['max_conversations'] === '') {
-            $data['max_conversations'] = null;
         }
 
         // Converter enabled para boolean se presente

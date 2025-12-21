@@ -3966,7 +3966,17 @@ window.showAddAIAgentModal = function() {
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        return response.json();
+        // Capturar o texto primeiro para ver se é HTML
+        return response.text().then(text => {
+            console.log('📄 Conteúdo da resposta (primeiros 500 chars):', text.substring(0, 500));
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                console.error('❌ Erro ao fazer parse do JSON:', e);
+                console.error('📄 Conteúdo completo:', text);
+                throw new Error('Resposta não é um JSON válido. Verifique o console para mais detalhes.');
+            }
+        });
     })
     .then(data => {
         console.log('📊 Dados recebidos:', data);

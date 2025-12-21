@@ -1988,7 +1988,15 @@ class ConversationController
      */
     public function getAvailableAIAgents(): void
     {
-        $config = $this->prepareJsonResponse();
+        // Mostrar erros temporariamente para debug
+        ini_set('display_errors', '1');
+        error_reporting(E_ALL);
+        
+        // Limpar qualquer output anterior
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        ob_start();
         
         try {
             \App\Helpers\Logger::api('Requisição recebida em getAvailableAIAgents', [
@@ -2006,10 +2014,12 @@ class ConversationController
             ]);
             
             ob_end_clean();
-            Response::json([
+            header('Content-Type: application/json');
+            echo json_encode([
                 'success' => true,
                 'data' => $agents
             ]);
+            exit;
         } catch (\Exception $e) {
             \App\Helpers\Logger::error('Erro ao buscar agentes disponíveis', [
                 'error' => $e->getMessage(),
@@ -2019,12 +2029,15 @@ class ConversationController
             ]);
             
             ob_end_clean();
-            Response::json([
+            header('Content-Type: application/json');
+            http_response_code(500);
+            echo json_encode([
                 'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        } finally {
-            $this->restoreAfterJsonResponse($config);
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
+            exit;
         }
     }
 

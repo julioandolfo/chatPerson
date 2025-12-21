@@ -1056,11 +1056,10 @@ function renderNode(node) {
         });
         innerHtml += '</div>';
     } else if (node.node_type === 'action_assign_ai_agent' && 
-               node.node_data.ai_branching_enabled && 
                node.node_data.ai_intents && 
                Array.isArray(node.node_data.ai_intents) &&
                node.node_data.ai_intents.length > 0) {
-        // Se é AI Agent com ramificação, adicionar handles múltiplos para cada intent
+        // Se é AI Agent e há intents configurados, renderizar handles (mesmo que o flag esteja off, para evitar sumir quando o checkbox não foi salvo corretamente)
         const intents = node.node_data.ai_intents;
         innerHtml += '<div class="ai-intents-visual" style="margin-top: 10px; font-size: 11px; color: #7e8299; padding-right: 6px;">';
         intents.forEach(function(intent, idx) {

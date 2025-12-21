@@ -26,7 +26,7 @@ class AutomationService
         $errors = Validator::validate($data, [
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'trigger_type' => 'required|string|in:new_conversation,message_received,conversation_updated,conversation_moved,conversation_resolved,time_based,contact_created,contact_updated,agent_activity,webhook',
+            'trigger_type' => 'required|string|in:new_conversation,message_received,conversation_updated,conversation_moved,conversation_resolved,no_customer_response,no_agent_response,time_based,contact_created,contact_updated,agent_activity,webhook',
             'trigger_config' => 'nullable|array',
             'funnel_id' => 'nullable|integer',
             'stage_id' => 'nullable|integer',
@@ -1157,12 +1157,15 @@ class AutomationService
     }
 
     /**
-     * Executar ação: adicionar tag
+     * Executar ação: adicionar ou remover tag
      */
     private static function executeSetTag(array $nodeData, int $conversationId, ?int $executionId = null): void
     {
         $tagId = $nodeData['tag_id'] ?? null;
+        $tagAction = $nodeData['tag_action'] ?? 'add';
+        
         if (!$tagId) {
+            \App\Helpers\Logger::automation("  ⚠️ Tag ID não informado, pulando ação");
             return;
         }
 
@@ -1170,15 +1173,27 @@ class AutomationService
             // Verificar se tag existe
             $tag = \App\Models\Tag::find($tagId);
             if (!$tag) {
-                throw new \Exception("Tag não encontrada");
+                throw new \Exception("Tag ID {$tagId} não encontrada");
             }
 
-            // Adicionar tag à conversa
-            $sql = "INSERT IGNORE INTO conversation_tags (conversation_id, tag_id) VALUES (?, ?)";
-            \App\Helpers\Database::execute($sql, [$conversationId, $tagId]);
+            \App\Helpers\Logger::automation("  Tag: {$tag['name']} (ID: {$tagId}), Ação: {$tagAction}");
+            
+            // Executar ação (add ou remove)
+            if ($tagAction === 'remove') {
+                // Remover tag da conversa
+                $sql = "DELETE FROM conversation_tags WHERE conversation_id = ? AND tag_id = ?";
+                \App\Helpers\Database::execute($sql, [$conversationId, $tagId]);
+                \App\Helpers\Logger::automation("  ✅ Tag '{$tag['name']}' removida da conversa {$conversationId}");
+            } else {
+                // Adicionar tag à conversa (padrão)
+                $sql = "INSERT IGNORE INTO conversation_tags (conversation_id, tag_id) VALUES (?, ?)";
+                \App\Helpers\Database::execute($sql, [$conversationId, $tagId]);
+                \App\Helpers\Logger::automation("  ✅ Tag '{$tag['name']}' adicionada à conversa {$conversationId}");
+            }
         } catch (\Exception $e) {
+            \App\Helpers\Logger::automation("  ❌ Erro ao processar tag: " . $e->getMessage());
             if ($executionId) {
-                \App\Models\AutomationExecution::updateStatus($executionId, 'failed', "Erro ao adicionar tag: " . $e->getMessage());
+                \App\Models\AutomationExecution::updateStatus($executionId, 'failed', "Erro ao processar tag: " . $e->getMessage());
             }
             throw $e;
         }

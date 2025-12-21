@@ -595,11 +595,19 @@ class ConversationService
         // Invalidar cache de conversas
         self::invalidateCache($conversationId);
         
-        // Atualizar contagem de conversas dos agentes
-        if ($oldAgentId && $oldAgentId != $agentId) {
-            User::updateConversationsCount($oldAgentId);
+        // Atualizar contagem de conversas dos agentes APENAS se o agente mudou
+        if ($oldAgentId != $agentId) {
+            // Decrementar contador do agente anterior (se houver)
+            if ($oldAgentId) {
+                User::updateConversationsCount($oldAgentId);
+            }
+            // Incrementar contador do novo agente
+            User::updateConversationsCount($agentId);
+            
+            Logger::debug("Contadores atualizados: antigo agente {$oldAgentId} → novo agente {$agentId}", 'conversas.log');
+        } else {
+            Logger::debug("Agente não mudou (já era {$agentId}), contadores não foram alterados", 'conversas.log');
         }
-        User::updateConversationsCount($agentId);
         
         // Obter conversa atualizada para notificar via WebSocket
         $conversation = Conversation::findWithRelations($conversationId);
@@ -791,8 +799,14 @@ class ConversationService
         // Invalidar cache
         self::invalidateCache($conversationId);
         
-        // Atualizar contagem de conversas
-        User::updateConversationsCount($agentId);
+        // Atualizar contagem de conversas APENAS se o agente mudou
+        if ($oldAgentId != $agentId) {
+            if ($oldAgentId) {
+                User::updateConversationsCount($oldAgentId);
+            }
+            User::updateConversationsCount($agentId);
+            Logger::debug("Escalação: contadores atualizados (antigo: {$oldAgentId} → novo: {$agentId})", 'conversas.log');
+        }
         
         // Obter conversa atualizada
         $conversation = Conversation::findWithRelations($conversationId);
@@ -1037,7 +1051,7 @@ class ConversationService
             // Invalidar cache de conversas
             self::invalidateCache($conversationId);
             
-            // Atualizar contagem de conversas do agente
+            // Atualizar contagem de conversas do agente APENAS se mudou
             $finalAgentId = $shouldAssignToContactAgent && $contactAgentId ? $contactAgentId : $oldAgentId;
             if ($finalAgentId && $finalAgentId != $oldAgentId) {
                 // Se mudou de agente, atualizar contagem de ambos
@@ -1045,8 +1059,7 @@ class ConversationService
                     User::updateConversationsCount($oldAgentId);
                 }
                 User::updateConversationsCount($finalAgentId);
-            } elseif ($finalAgentId) {
-                User::updateConversationsCount($finalAgentId);
+                Logger::debug("Reabertura: contadores atualizados (antigo: {$oldAgentId} → novo: {$finalAgentId})", 'conversas.log');
             }
             
             // Obter conversa atualizada para notificar via WebSocket

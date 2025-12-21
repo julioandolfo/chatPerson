@@ -1,0 +1,144 @@
+╔════════════════════════════════════════════════════════════════╗
+║   COMO ATIVAR O SCHEDULER DE AUTOMAÇÕES NO WINDOWS (LARAGON)  ║
+╚════════════════════════════════════════════════════════════════╝
+
+📋 PRÉ-REQUISITOS:
+✅ Laragon rodando
+✅ MySQL ativo
+✅ Banco de dados "chat" existente
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧪 PASSO 1: TESTAR MANUALMENTE (IMPORTANTE!)
+
+1. Abrir PowerShell ou CMD
+2. Executar:
+   cd C:\laragon\www\chat
+   php public\automation-scheduler.php
+
+3. Verificar saída:
+   ✅ Deve mostrar: "Scheduler executado com sucesso!"
+   ❌ Se der erro de banco de dados: Iniciar Laragon/MySQL
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚙️ PASSO 2: CONFIGURAR AGENDADOR DE TAREFAS
+
+1. Pressionar Win + R
+2. Digitar: taskschd.msc
+3. Pressionar Enter
+
+4. Clicar em: "Criar Tarefa..."
+
+5. ABA "GERAL":
+   Nome: Chat Automation Scheduler
+   Descrição: Executa automações baseadas em tempo
+   ☑️ Executar estando o usuário conectado ou não
+   ☑️ Executar com privilégios mais altos
+
+6. ABA "GATILHOS":
+   - Clicar "Novo..."
+   - Iniciar a tarefa: Em um agendamento
+   - Configurações: Diariamente
+   - Hora de início: 00:00:00
+   - ☑️ Repetir tarefa a cada: 1 minuto
+   - por tempo de: Indefinidamente
+   - ☑️ Habilitado
+   - Clicar "OK"
+
+7. ABA "AÇÕES":
+   - Clicar "Novo..."
+   - Ação: Iniciar um programa
+   
+   ⚠️ AJUSTE A VERSÃO DO PHP CONFORME SEU LARAGON:
+   
+   Programa/script:
+   C:\laragon\bin\php\php-8.1.10-Win32-vs16-x64\php.exe
+   
+   Adicionar argumentos:
+   public\automation-scheduler.php
+   
+   Iniciar em:
+   C:\laragon\www\chat
+   
+   - Clicar "OK"
+
+8. ABA "CONDIÇÕES":
+   - ☐ DESMARCAR: "Iniciar apenas se conectado à alimentação CA"
+   - ☐ DESMARCAR: "Parar se passar a bateria"
+
+9. ABA "CONFIGURAÇÕES":
+   - ☑️ Permitir execução sob demanda
+   - ☑️ Executar assim que possível após perder agendamento
+   - Se falhar, reiniciar a cada: 1 minuto
+
+10. Clicar "OK" e salvar
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ PASSO 3: VERIFICAR SE ESTÁ FUNCIONANDO
+
+1. No Agendador de Tarefas:
+   - Localizar "Chat Automation Scheduler"
+   - Clicar com botão direito → "Executar"
+   - Aba "Histórico" → Verificar execução
+
+2. Verificar Logs:
+   - Abrir: C:\laragon\www\chat\storage\logs\
+   - Verificar arquivo: automation-2025-12-21.log
+   - Deve ter registros do scheduler
+
+3. Aguardar 1 minuto e verificar novamente
+   - Deve ter nova execução no histórico
+   - Deve ter novo registro no log
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 PASSO 4: CRIAR AUTOMAÇÃO DE TESTE
+
+1. Acessar: http://localhost/automations
+2. Clicar "Nova Automação"
+3. Configurar:
+   - Nome: Teste Scheduler 1 minuto
+   - Gatilho: Tempo sem Resposta do Cliente
+   - Tempo: 1 minuto
+   - Status: Ativa
+4. Adicionar nó: Enviar Mensagem
+   - Conteúdo: "Teste automático!"
+5. Salvar
+
+6. Criar conversa e enviar mensagem como agente
+7. Aguardar 1 minuto
+8. Verificar se mensagem foi enviada automaticamente
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ PROBLEMAS COMUNS:
+
+1. ERRO: "Nenhuma conexão pôde ser feita"
+   → SOLUÇÃO: Iniciar Laragon e MySQL
+
+2. TAREFA NÃO EXECUTA:
+   → Verificar caminho do PHP (pode ser diferente)
+   → Ver em: C:\laragon\bin\php\ (sua versão)
+
+3. AUTOMAÇÃO NÃO DISPARA:
+   → Verificar se está Ativa
+   → Verificar logs em storage\logs\
+   → Verificar histórico no Agendador de Tarefas
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 DOCUMENTAÇÃO COMPLETA:
+
+- GUIA_CONFIGURACAO_SCHEDULER.md - Guia detalhado
+- IMPLEMENTACAO_COMPLETA_GATILHOS.md - Detalhes técnicos
+- RESUMO_EXECUTIVO_GATILHOS.md - Resumo executivo
+- NOVOS_GATILHOS_AUTOMACAO.md - Casos de uso
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ PRONTO! O scheduler está configurado e rodando a cada 1 minuto!
+
+Suas automações com "Tempo sem Resposta" agora funcionam automaticamente! 🎉
+

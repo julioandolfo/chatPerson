@@ -1536,6 +1536,90 @@ function openNodeConfig(nodeId) {
                         <div class="form-text">Headers que devem estar presentes no webhook (opcional)</div>
                     </div>
                 `;
+            } else if (triggerType === "no_customer_response") {
+                formContent += `
+                    <div class="fv-row mb-7">
+                        <label class="required fw-semibold fs-6 mb-2">Tempo sem Resposta</label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <input type="number" name="wait_time_value" class="form-control form-control-solid" placeholder="Quantidade" value="30" min="1" required />
+                            </div>
+                            <div class="col-md-6">
+                                <select name="wait_time_unit" class="form-select form-select-solid" required>
+                                    <option value="minutes">Minutos</option>
+                                    <option value="hours">Horas</option>
+                                    <option value="days">Dias</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-text mt-2">A automação será executada se o cliente não responder dentro deste prazo</div>
+                    </div>
+                    <div class="fv-row mb-7">
+                        <div class="form-check form-check-custom form-check-solid">
+                            <input class="form-check-input" type="checkbox" name="only_open_conversations" value="1" id="kt_only_open" checked />
+                            <label class="form-check-label" for="kt_only_open">
+                                Apenas conversas abertas
+                            </label>
+                        </div>
+                        <div class="form-text">Marque para executar apenas em conversas com status "open" ou "pending"</div>
+                    </div>
+                    <div class="alert alert-info d-flex align-items-center p-5 mt-5">
+                        <i class="ki-duotone ki-information-5 fs-2x text-info me-4">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div class="d-flex flex-column">
+                            <h4 class="mb-1 text-dark">Como Funciona</h4>
+                            <span>Esta automação verifica periodicamente conversas onde a última mensagem foi enviada pelo agente e o cliente não respondeu no tempo especificado.</span>
+                        </div>
+                    </div>
+                `;
+            } else if (triggerType === "no_agent_response") {
+                formContent += `
+                    <div class="fv-row mb-7">
+                        <label class="required fw-semibold fs-6 mb-2">Tempo sem Resposta</label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <input type="number" name="wait_time_value" class="form-control form-control-solid" placeholder="Quantidade" value="15" min="1" required />
+                            </div>
+                            <div class="col-md-6">
+                                <select name="wait_time_unit" class="form-select form-select-solid" required>
+                                    <option value="minutes" selected>Minutos</option>
+                                    <option value="hours">Horas</option>
+                                    <option value="days">Dias</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-text mt-2">A automação será executada se o agente não responder dentro deste prazo</div>
+                    </div>
+                    <div class="fv-row mb-7">
+                        <div class="form-check form-check-custom form-check-solid mb-3">
+                            <input class="form-check-input" type="checkbox" name="only_assigned" value="1" id="kt_only_assigned" checked />
+                            <label class="form-check-label" for="kt_only_assigned">
+                                Apenas conversas atribuídas
+                            </label>
+                        </div>
+                        <div class="form-check form-check-custom form-check-solid">
+                            <input class="form-check-input" type="checkbox" name="only_open_conversations" value="1" id="kt_only_open_agent" checked />
+                            <label class="form-check-label" for="kt_only_open_agent">
+                                Apenas conversas abertas
+                            </label>
+                        </div>
+                        <div class="form-text mt-2">Configure quais conversas devem ser verificadas</div>
+                    </div>
+                    <div class="alert alert-warning d-flex align-items-center p-5 mt-5">
+                        <i class="ki-duotone ki-information-5 fs-2x text-warning me-4">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div class="d-flex flex-column">
+                            <h4 class="mb-1 text-dark">Como Funciona</h4>
+                            <span>Esta automação verifica periodicamente conversas onde a última mensagem foi enviada pelo cliente e o agente não respondeu no tempo especificado. Útil para notificar supervisores ou escalar conversas.</span>
+                        </div>
+                    </div>
+                `;
             }
             break;
         case "action_send_message":
@@ -2117,13 +2201,15 @@ function openNodeConfig(nodeId) {
             formContent = `
                 <div class="fv-row mb-7">
                     <label class="required fw-semibold fs-6 mb-2">Tag</label>
-                    <input type="text" name="tag" id="kt_tag_name" class="form-control form-control-solid" placeholder="Nome da tag" required />
-                    <div class="form-text">Nome da tag que será adicionada à conversa</div>
+                    <select name="tag_id" id="kt_tag_id" class="form-select form-select-solid" data-control="select2" data-placeholder="Selecione uma tag" required>
+                        <option value="">Selecione uma tag...</option>
+                    </select>
+                    <div class="form-text">Selecione a tag que será adicionada/removida da conversa</div>
                 </div>
                 
                 <div class="fv-row mb-7">
                     <label class="fw-semibold fs-6 mb-2">Ação</label>
-                    <select name="tag_action" class="form-select form-select-solid">
+                    <select name="tag_action" id="kt_tag_action" class="form-select form-select-solid">
                         <option value="add">Adicionar Tag</option>
                         <option value="remove">Remover Tag</option>
                     </select>
@@ -2141,6 +2227,82 @@ function openNodeConfig(nodeId) {
                     </div>
                 </div>
             `;
+            
+            // Carregar tags do sistema via AJAX após o modal abrir
+            setTimeout(() => {
+                const tagSelect = document.getElementById('kt_tag_id');
+                const tagActionSelect = document.getElementById('kt_tag_action');
+                
+                if (tagSelect) {
+                    // Buscar tag_id salva (se editando nó existente)
+                    const savedTagId = currentNodeRefForModal?.node_data?.tag_id || null;
+                    const savedTagAction = currentNodeRefForModal?.node_data?.tag_action || 'add';
+                    
+                    console.log('🏷️ Carregando tags... Tag salva:', savedTagId, 'Ação:', savedTagAction);
+                    
+                    fetch('<?= \App\Helpers\Url::to('/tags/all') ?>', {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.tags) {
+                            console.log('✅ Tags carregadas:', data.tags.length);
+                            
+                            // Adicionar opções ao select
+                            data.tags.forEach(tag => {
+                                const option = document.createElement('option');
+                                option.value = tag.id;
+                                option.textContent = tag.name;
+                                if (tag.color) {
+                                    option.setAttribute('data-color', tag.color);
+                                }
+                                tagSelect.appendChild(option);
+                            });
+                            
+                            // Inicializar select2
+                            $(tagSelect).select2({
+                                dropdownParent: $('#kt_modal_node'),
+                                templateResult: function(tag) {
+                                    if (!tag.element) return tag.text;
+                                    const color = tag.element.getAttribute('data-color');
+                                    if (color) {
+                                        return $('<span><span class="badge" style="background-color: ' + color + '20; color: ' + color + '; border: 1px solid ' + color + ';">' + tag.text + '</span></span>');
+                                    }
+                                    return tag.text;
+                                },
+                                templateSelection: function(tag) {
+                                    if (!tag.element) return tag.text;
+                                    const color = tag.element.getAttribute('data-color');
+                                    if (color) {
+                                        return $('<span class="badge" style="background-color: ' + color + '20; color: ' + color + '; border: 1px solid ' + color + ';">' + tag.text + '</span>');
+                                    }
+                                    return tag.text;
+                                }
+                            });
+                            
+                            // Selecionar tag salva (se houver)
+                            if (savedTagId) {
+                                $(tagSelect).val(savedTagId).trigger('change');
+                                console.log('🏷️ Tag salva selecionada:', savedTagId);
+                            }
+                            
+                            // Selecionar ação salva
+                            if (tagActionSelect && savedTagAction) {
+                                tagActionSelect.value = savedTagAction;
+                                console.log('🏷️ Ação salva selecionada:', savedTagAction);
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro ao carregar tags:', error);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Erro',
+                            text: 'Não foi possível carregar as tags. Verifique sua conexão.'
+                        });
+                    });
+                }
+            }, 100);
             break;
         case "delay":
             formContent = `

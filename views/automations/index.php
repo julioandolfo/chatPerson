@@ -61,6 +61,8 @@ ob_start();
                                         'conversation_updated' => 'Conversa Atualizada',
                                         'conversation_moved' => 'Conversa Movida',
                                         'conversation_resolved' => 'Conversa Resolvida',
+                                        'no_customer_response' => 'Sem Resposta Cliente',
+                                        'no_agent_response' => 'Sem Resposta Agente',
                                         'time_based' => 'Baseado em Tempo',
                                         'contact_created' => 'Contato Criado',
                                         'contact_updated' => 'Contato Atualizado',
@@ -163,6 +165,8 @@ ob_start();
                             <option value="conversation_updated">Conversa Atualizada</option>
                             <option value="conversation_moved">Conversa Movida no Funil</option>
                             <option value="conversation_resolved">Conversa Resolvida</option>
+                            <option value="no_customer_response">Tempo sem Resposta do Cliente</option>
+                            <option value="no_agent_response">Tempo sem Resposta do Agente</option>
                             <option value="time_based">Baseado em Tempo (Agendado)</option>
                             <option value="contact_created">Contato Criado</option>
                             <option value="contact_updated">Contato Atualizado</option>
@@ -275,7 +279,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const funnelStageContainer = document.getElementById("kt_funnel_stage_container");
     
     if (triggerTypeSelect && funnelStageContainer) {
-        const triggersWithFunnel = ["new_conversation", "conversation_moved", "conversation_updated", "conversation_resolved"];
+        const triggersWithFunnel = ["new_conversation", "conversation_moved", "conversation_updated", "conversation_resolved", "no_customer_response", "no_agent_response"];
         
         triggerTypeSelect.addEventListener("change", function() {
             if (triggersWithFunnel.includes(this.value)) {

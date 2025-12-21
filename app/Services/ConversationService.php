@@ -1332,6 +1332,16 @@ class ConversationService
             error_log("Erro ao logar atividade: " . $e->getMessage());
         }
 
+        // Se é primeira mensagem do agente, atualizar first_response_at
+        if ($senderType === 'agent' || $senderType === 'ai_agent') {
+            $conv = Conversation::find($conversationId);
+            if ($conv && empty($conv['first_response_at'])) {
+                Conversation::update($conversationId, [
+                    'first_response_at' => date('Y-m-d H:i:s')
+                ]);
+            }
+        }
+        
         // Atualizar updated_at da conversa
         Conversation::update($conversationId, []);
         

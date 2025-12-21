@@ -4751,6 +4751,9 @@ function applyConversationUpdate(conv) {
             const badge = conversationItem.querySelector('.conversation-item-badge');
             const avatarContainer = conversationItem.querySelector('.symbol-label');
             const pinned = conv.pinned === 1 || conv.pinned === true;
+            const firstResponseAt = conv.first_response_at_calc || conv.first_response_at || '';
+            const lastContactAt = conv.last_contact_message_at || '';
+            const lastAgentAt = conv.last_agent_message_at || '';
 
             if (preview && conv.last_message) {
                 const maxChars = 37;
@@ -4776,6 +4779,15 @@ function applyConversationUpdate(conv) {
 
     // Garantir botão de fixar e classe pinned (preservar dropdown aberto)
             ensureActionsDropdown(conversationItem, pinned, conv.id, wasOpen);
+
+    // Atualizar data attributes para SLA/tempos
+    conversationItem.dataset.status = conv.status || 'open';
+    conversationItem.dataset.createdAt = conv.created_at || conversationItem.dataset.createdAt || '';
+    conversationItem.dataset.firstResponseAt = firstResponseAt;
+    conversationItem.dataset.lastMessageAt = conv.last_message_at || conv.updated_at || conversationItem.dataset.lastMessageAt || '';
+    conversationItem.dataset.lastContactMessageAt = lastContactAt;
+    conversationItem.dataset.lastAgentMessageAt = lastAgentAt;
+    conversationItem.dataset.agentId = conv.agent_id || conversationItem.dataset.agentId || '';
 
     // ⚠️ IMPORTANTE: Respeitar conversas marcadas manualmente como não lidas
     const isManuallyMarkedAsUnread = window.manuallyMarkedAsUnread && window.manuallyMarkedAsUnread.has(conv.id);
@@ -7156,9 +7168,23 @@ function refreshConversationList(params = null) {
         ? `<div class="symbol-label"><img src="${escapeHtml(conv.contact_avatar)}" alt="${escapeHtml(name)}" class="h-45px w-45px rounded" style="object-fit: cover;"></div>`
         : `<div class="symbol-label bg-light-primary text-primary fw-bold">${initials}</div>`;
 
+            const firstResponseAt = conv.first_response_at_calc || conv.first_response_at || '';
+            const lastContactAt = conv.last_contact_message_at || '';
+            const lastAgentAt = conv.last_agent_message_at || '';
+            const createdAt = conv.created_at || '';
+            const lastMessageAt = conv.last_message_at || conv.updated_at || '';
+
             html += `
                 <div class="conversation-item ${isActive ? 'active' : ''} ${pinned ? 'pinned' : ''}" 
                      data-conversation-id="${conv.id}"
+                     data-status="${escapeHtml(conv.status || 'open')}"
+                     data-created-at="${escapeHtml(createdAt)}"
+                     data-first-response-at="${escapeHtml(firstResponseAt)}"
+                     data-last-message-at="${escapeHtml(lastMessageAt)}"
+                     data-last-contact-message-at="${escapeHtml(lastContactAt)}"
+                     data-last-agent-message-at="${escapeHtml(lastAgentAt)}"
+                     data-agent-id="${escapeHtml(conv.agent_id || '')}"
+                     data-updated-at="${lastMessageAt || new Date().toISOString()}"
                      data-onclick="selectConversation">
                     <div class="d-flex gap-3 w-100">
                         <!-- Checkbox para seleção em massa -->
@@ -12870,6 +12896,13 @@ function addConversationToList(conv) {
         });
     }
     
+    // Calcular campos de SLA / datas
+    const firstResponseAt = conv.first_response_at_calc || conv.first_response_at || '';
+    const lastContactAt = conv.last_contact_message_at || '';
+    const lastAgentAt = conv.last_agent_message_at || '';
+    const createdAt = conv.created_at || '';
+    const lastMessageAt = conv.last_message_at || conv.updated_at || '';
+
     // Criar HTML do item
     const avatarHtml = conv.contact_avatar
         ? `<div class="symbol-label"><img src="${escapeHtml(conv.contact_avatar)}" alt="${escapeHtml(name)}" class="h-45px w-45px rounded" style="object-fit: cover;"></div>`
@@ -12878,7 +12911,14 @@ function addConversationToList(conv) {
     const conversationHtml = `
         <div class="conversation-item ${isActive ? 'active' : ''} ${pinned ? 'pinned' : ''}" 
              data-conversation-id="${conv.id}"
-             data-updated-at="${conv.last_message_at || conv.updated_at || new Date().toISOString()}"
+             data-status="${escapeHtml(conv.status || 'open')}"
+             data-created-at="${escapeHtml(createdAt)}"
+             data-first-response-at="${escapeHtml(firstResponseAt)}"
+             data-last-message-at="${escapeHtml(lastMessageAt)}"
+             data-last-contact-message-at="${escapeHtml(lastContactAt)}"
+             data-last-agent-message-at="${escapeHtml(lastAgentAt)}"
+             data-agent-id="${escapeHtml(conv.agent_id || '')}"
+             data-updated-at="${lastMessageAt || new Date().toISOString()}"
              data-onclick="selectConversation">
             <div class="d-flex gap-3 w-100">
                 <!-- Checkbox para seleção em massa -->

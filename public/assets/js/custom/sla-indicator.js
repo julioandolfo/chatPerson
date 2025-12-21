@@ -179,20 +179,28 @@ const SLAIndicator = {
         
         // viewBox será do tamanho exato do avatar
         const viewBoxSize = size;
-        const center = viewBoxSize / 2;
-        // Radius considerando a stroke-width (3px) para não cortar
-        const radius = (viewBoxSize - 4) / 2;
-        const circumference = 2 * Math.PI * radius;
+        const stroke = size >= 50 ? 3.5 : size >= 45 ? 3 : 2.5;
+        const inset = stroke / 2;
+        const rectSize = viewBoxSize - stroke;
+        const rx = Math.max(8, Math.round(size * 0.22)); // cantos arredondados para seguir o avatar
+        const perimeter = 2 * (rectSize * 2 + 0); // 2*(w+h)
+        const dashArray = 2 * (rectSize + rectSize);
         
         return `
             <svg class="sla-progress-ring" width="${viewBoxSize}" height="${viewBoxSize}" viewBox="0 0 ${viewBoxSize} ${viewBoxSize}">
-                <circle class="sla-ring-bg" cx="${center}" cy="${center}" r="${radius}"></circle>
-                <circle class="sla-ring-progress" 
-                        cx="${center}" 
-                        cy="${center}" 
-                        r="${radius}"
-                        stroke-dasharray="${circumference}"
-                        stroke-dashoffset="${circumference}"></circle>
+                <rect class="sla-ring-bg"
+                      x="${inset}" y="${inset}"
+                      width="${rectSize}" height="${rectSize}"
+                      rx="${rx}" ry="${rx}">
+                </rect>
+                <rect class="sla-ring-progress"
+                      x="${inset}" y="${inset}"
+                      width="${rectSize}" height="${rectSize}"
+                      rx="${rx}" ry="${rx}"
+                      stroke-dasharray="${dashArray}"
+                      stroke-dashoffset="${dashArray}"
+                      stroke-width="${stroke}">
+                </rect>
             </svg>
         `;
     },

@@ -25,7 +25,8 @@
     overflow: visible;
 }
 
-.sla-progress-ring circle {
+.sla-progress-ring circle,
+.sla-progress-ring rect {
     fill: none;
     stroke-width: 3;
     transition: stroke-dashoffset 0.3s ease, stroke 0.3s ease;
@@ -139,7 +140,8 @@
     height: 100%;
 }
 
-.symbol-35px .sla-progress-ring circle {
+.symbol-35px .sla-progress-ring circle,
+.symbol-35px .sla-progress-ring rect {
     stroke-width: 2.5;
 }
 
@@ -150,7 +152,8 @@
     height: 100%;
 }
 
-.symbol-45px .sla-progress-ring circle {
+.symbol-45px .sla-progress-ring circle,
+.symbol-45px .sla-progress-ring rect {
     stroke-width: 3;
 }
 
@@ -161,7 +164,8 @@
     height: 100%;
 }
 
-.symbol-50px .sla-progress-ring circle {
+.symbol-50px .sla-progress-ring circle,
+.symbol-50px .sla-progress-ring rect {
     stroke-width: 3.5;
 }
 
@@ -189,7 +193,7 @@
 .conversation-item .symbol.symbol-sla img {
     width: 45px;
     height: 45px;
-    border-radius: 12px;
+    border-radius: 12px; /* mantém cantos arredondados, não círculo */
     display: block;
     overflow: hidden;
 }

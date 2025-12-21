@@ -182,19 +182,32 @@ $styles = <<<HTML
     overflow: visible;
 }
 
+.connections-overlay path.connection-line {
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+[data-bs-theme="dark"] .connections-overlay path.connection-line {
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.4));
+}
+
+.connections-overlay path,
 .connections-overlay line {
     pointer-events: stroke;
     cursor: pointer;
 }
 
+.connections-overlay path.connection-line,
 .connections-overlay line.connection-line {
     stroke: #009ef7;
     stroke-width: 2;
     pointer-events: stroke;
     cursor: default;
     transition: stroke-width 0.2s ease, opacity 0.2s ease;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
+.connections-overlay path.connection-line:hover,
 .connections-overlay line.connection-line:hover {
     stroke-width: 3;
     opacity: 0.8;
@@ -217,26 +230,29 @@ $styles = <<<HTML
     transition: fill 0.2s ease, stroke-width 0.2s ease;
 }
 
+[data-bs-theme="dark"] .connections-overlay path,
 [data-bs-theme="dark"] .connections-overlay line {
     stroke: #50cd89;
 }
 
 .node-connection-handle {
     position: absolute;
-    width: 12px;
-    height: 12px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
     background: #009ef7;
-    border: 2px solid white;
+    border: 3px solid white;
     cursor: crosshair;
     z-index: 80;
     pointer-events: all;
-    transition: transform 0.2s ease, background-color 0.2s ease;
+    transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 .node-connection-handle:hover {
-    transform: scale(1.3);
+    transform: scale(1.4);
     background: #50cd89;
+    box-shadow: 0 3px 10px rgba(80, 205, 137, 0.4);
 }
 
 .automation-canvas-tip {
@@ -261,6 +277,14 @@ $styles = <<<HTML
     bottom: auto;
     left: auto;
     transform: translateY(-50%);
+    background: #009ef7 !important;
+    width: 14px;
+    height: 14px;
+}
+
+.node-connection-handle.output.chatbot-option-handle:hover {
+    background: #50cd89 !important;
+    transform: translateY(-50%) scale(1.5);
 }
 
 .node-connection-handle.input {
@@ -277,40 +301,53 @@ $styles = <<<HTML
 }
 
 .chatbot-option-row {
-    transition: background-color 0.2s ease;
-    border-radius: 4px;
-    padding-left: 8px;
+    transition: background-color 0.2s ease, border-left 0.2s ease;
+    border-radius: 6px;
+    padding: 6px 8px;
+    margin: 3px 0;
+    border-left: 3px solid transparent;
+    position: relative;
 }
 
 .chatbot-option-row:hover {
     background-color: rgba(0, 158, 247, 0.1);
+    border-left-color: #009ef7;
+}
+
+[data-bs-theme="dark"] .chatbot-option-row:hover {
+    background-color: rgba(0, 158, 247, 0.15);
+    border-left-color: #0dcaf0;
 }
 
 [data-bs-theme="dark"] .node-connection-handle {
     background: #50cd89;
     border-color: #1e1e2d;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 [data-bs-theme="dark"] .node-connection-handle:hover {
     background: #009ef7;
+    box-shadow: 0 3px 12px rgba(0, 158, 247, 0.5);
 }
 
 .node-connection-handle.ai-intent-handle {
     background: #6366f1 !important;
-    border: 2px solid white;
-    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
+    border: 3px solid white;
+    width: 14px;
+    height: 14px;
+    box-shadow: 0 2px 6px rgba(99, 102, 241, 0.4);
     transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .node-connection-handle.ai-intent-handle:hover {
     background: #4f46e5 !important;
-    transform: translateY(-50%) scale(1.4);
-    box-shadow: 0 3px 8px rgba(99, 102, 241, 0.5);
+    transform: translateY(-50%) scale(1.5);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.6);
 }
 
 [data-bs-theme="dark"] .node-connection-handle.ai-intent-handle {
     border-color: #1e1e2d;
-    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.5);
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.6);
 }
 
 .ai-intents-visual {
@@ -320,18 +357,40 @@ $styles = <<<HTML
     color: #7e8299;
 }
 
+.ai-intent-label,
+.chatbot-option-label {
+    display: inline-block;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    font-weight: 500;
+    color: #3f4254;
+    line-height: 1.5;
+}
+
+[data-bs-theme="dark"] .ai-intent-label,
+[data-bs-theme="dark"] .chatbot-option-label {
+    color: #92929f;
+}
+
 .ai-intent-row {
-    transition: background-color 0.2s ease;
-    border-radius: 4px;
-    padding-left: 8px;
+    transition: background-color 0.2s ease, border-left 0.2s ease;
+    border-radius: 6px;
+    padding: 6px 8px;
+    margin: 3px 0;
+    border-left: 3px solid transparent;
+    position: relative;
 }
 
 .ai-intent-row:hover {
     background-color: rgba(99, 102, 241, 0.08);
+    border-left-color: #6366f1;
 }
 
 .ai-intent-row:hover .node-connection-handle.ai-intent-handle {
-    transform: translateY(-50%) scale(1.2);
+    transform: translateY(-50%) scale(1.3);
 }
 
 [data-bs-theme="dark"] .ai-intents-visual {
@@ -340,11 +399,21 @@ $styles = <<<HTML
 
 [data-bs-theme="dark"] .ai-intent-row:hover {
     background-color: rgba(99, 102, 241, 0.15);
+    border-left-color: #818cf8;
 }
 
 .connecting-line {
     stroke-dasharray: 5,5;
     opacity: 0.7;
+    fill: none;
+    stroke-linecap: round;
+    animation: dash 0.5s linear infinite;
+}
+
+@keyframes dash {
+    to {
+        stroke-dashoffset: -10;
+    }
 }
 </style>
 HTML;
@@ -1136,13 +1205,13 @@ function renderNode(node) {
         options.forEach(function(opt, idx) {
             const optText = (typeof opt === 'object' ? opt.text : opt) || `Opção ${idx + 1}`;
             innerHtml += `
-                <div class="chatbot-option-row" style="position: relative; padding: 4px 0; padding-right: 20px;">
-                    <span style="display: inline-block; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${optText}</span>
+                <div class="chatbot-option-row">
+                    <span class="chatbot-option-label" style="display: inline-block; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${optText}</span>
                     <div class="node-connection-handle output chatbot-option-handle" 
                          data-node-id="${String(node.id || '')}" 
                          data-handle-type="output" 
                          data-option-index="${idx}"
-                         style="right: -10px; top: 50%; transform: translateY(-50%); background: ${config.color || '#009ef7'};">
+                         style="position: absolute; right: -11px; top: 50%; transform: translateY(-50%);">
                     </div>
                 </div>
             `;
@@ -1162,13 +1231,13 @@ function renderNode(node) {
             const intentLabel = intent.description || intent.intent || `Intent ${idx + 1}`;
             console.log(`   -> Intent ${idx}: ${intentLabel}`);
             innerHtml += `
-                <div class="ai-intent-row" style="position: relative; padding: 4px 0; padding-right: 20px;">
-                    <span style="display: inline-block; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${intentLabel}">🎯 ${intentLabel}</span>
+                <div class="ai-intent-row">
+                    <span class="ai-intent-label" title="${intentLabel}">🎯 ${intentLabel}</span>
                     <div class="node-connection-handle output ai-intent-handle" 
                          data-node-id="${String(node.id || '')}" 
                          data-handle-type="output" 
                          data-intent-index="${idx}"
-                         style="right: -10px; top: 50%; transform: translateY(-50%); background: #6366f1;">
+                         style="position: absolute; right: -11px; top: 50%; transform: translateY(-50%);">
                     </div>
                 </div>
             `;
@@ -2448,26 +2517,40 @@ function startConnection(nodeId, handleType, e, optionIndex) {
     document.body.style.cursor = 'crosshair';
     document.body.style.userSelect = 'none';
     
-    // Criar linha temporária
-    connectingLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    connectingLine.setAttribute('x1', pos.x);
-    connectingLine.setAttribute('y1', pos.y);
-    connectingLine.setAttribute('x2', pos.x);
-    connectingLine.setAttribute('y2', pos.y);
+    // Criar path temporário para curva Bézier
+    connectingLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    connectingLine.setAttribute('d', `M ${pos.x} ${pos.y} L ${pos.x} ${pos.y}`);
     connectingLine.setAttribute('class', 'connecting-line');
     connectingLine.setAttribute('stroke', '#009ef7');
     connectingLine.setAttribute('stroke-width', '2');
+    connectingLine.setAttribute('fill', 'none');
     connectionsSvg.appendChild(connectingLine);
     
-    // Atualizar linha ao mover mouse
+    // Armazenar posição inicial
+    connectingLine._startX = pos.x;
+    connectingLine._startY = pos.y;
+    
+    // Atualizar linha ao mover mouse (com curva Bézier)
     updateLineHandler = (e) => {
         if (!canvasViewport) return;
         const viewportRect = canvasViewport.getBoundingClientRect();
         const x = (e.clientX - viewportRect.left - canvasTranslate.x) / canvasScale;
         const y = (e.clientY - viewportRect.top - canvasTranslate.y) / canvasScale;
         if (connectingLine) {
-            connectingLine.setAttribute('x2', x);
-            connectingLine.setAttribute('y2', y);
+            const startX = connectingLine._startX;
+            const startY = connectingLine._startY;
+            
+            // Calcular pontos de controle
+            const dx = x - startX;
+            const offsetX = Math.min(Math.abs(dx) * 0.5, 100);
+            const cp1x = startX + offsetX;
+            const cp1y = startY;
+            const cp2x = x - offsetX;
+            const cp2y = y;
+            
+            // Atualizar path com curva Bézier
+            const pathData = `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x} ${y}`;
+            connectingLine.setAttribute('d', pathData);
         }
     };
     
@@ -2570,19 +2653,38 @@ function renderConnections() {
                 const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
                 group.setAttribute('class', 'connection-group');
                 
-                // Criar a linha
-                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                line.setAttribute('x1', fromPos.x);
-                line.setAttribute('y1', fromPos.y);
-                line.setAttribute('x2', toPos.x);
-                line.setAttribute('y2', toPos.y);
-                line.setAttribute('data-from', String(node.id || ''));
-                line.setAttribute('data-to', String(connection.target_node_id || ''));
-                line.setAttribute('class', 'connection-line');
+                // Calcular pontos de controle para curva Bézier
+                const dx = toPos.x - fromPos.x;
+                const dy = toPos.y - fromPos.y;
                 
-                // Calcular ponto médio
-                const midX = (fromPos.x + toPos.x) / 2;
-                const midY = (fromPos.y + toPos.y) / 2;
+                // Distância entre os pontos
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // Offset dos pontos de controle (proporcional à distância)
+                const offsetX = Math.min(Math.abs(dx) * 0.5, 100);
+                const offsetY = Math.abs(dy) * 0.3;
+                
+                // Pontos de controle para curva suave
+                const cp1x = fromPos.x + offsetX;
+                const cp1y = fromPos.y;
+                const cp2x = toPos.x - offsetX;
+                const cp2y = toPos.y;
+                
+                // Criar path com curva Bézier cúbica
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                const pathData = `M ${fromPos.x} ${fromPos.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${toPos.x} ${toPos.y}`;
+                path.setAttribute('d', pathData);
+                path.setAttribute('data-from', String(node.id || ''));
+                path.setAttribute('data-to', String(connection.target_node_id || ''));
+                path.setAttribute('class', 'connection-line');
+                path.setAttribute('fill', 'none');
+                path.setAttribute('stroke', '#009ef7');
+                path.setAttribute('stroke-width', '2');
+                
+                // Calcular ponto médio na curva (aproximação usando t=0.5)
+                const t = 0.5;
+                const midX = Math.pow(1-t, 3) * fromPos.x + 3 * Math.pow(1-t, 2) * t * cp1x + 3 * (1-t) * Math.pow(t, 2) * cp2x + Math.pow(t, 3) * toPos.x;
+                const midY = Math.pow(1-t, 3) * fromPos.y + 3 * Math.pow(1-t, 2) * t * cp1y + 3 * (1-t) * Math.pow(t, 2) * cp2y + Math.pow(t, 3) * toPos.y;
                 
                 // Criar botão de delete (círculo + ícone)
                 const deleteBtn = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -2644,17 +2746,17 @@ function renderConnections() {
                 });
                 
                 // Destacar linha ao passar mouse
-                line.addEventListener('mouseenter', function() {
+                path.addEventListener('mouseenter', function() {
                     this.setAttribute('stroke-width', '3');
                     this.style.opacity = '0.8';
                 });
-                line.addEventListener('mouseleave', function() {
+                path.addEventListener('mouseleave', function() {
                     this.setAttribute('stroke-width', '2');
                     this.style.opacity = '1';
                 });
                 
                 // Montar grupo e adicionar ao SVG
-                group.appendChild(line);
+                group.appendChild(path);
                 group.appendChild(deleteBtn);
                 connectionsSvg.appendChild(group);
             }

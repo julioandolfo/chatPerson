@@ -47,7 +47,10 @@ Router::get('/dashboard/chart-data', [DashboardController::class, 'getChartData'
 Router::get('/dashboard/export', [DashboardController::class, 'exportReport'], ['Authentication']);
 Router::get('/conversations', [ConversationController::class, 'index'], ['Authentication']);
 Router::post('/conversations', [ConversationController::class, 'store'], ['Authentication']);
+// Rotas específicas DEVEM vir ANTES das rotas com parâmetros dinâmicos
 Router::post('/conversations/new', [ConversationController::class, 'newConversation'], ['Authentication']);
+Router::get('/conversations/for-forwarding', [ConversationController::class, 'listForForwarding'], ['Authentication']);
+// Rotas com parâmetros dinâmicos {id}
 Router::get('/conversations/{id}', [ConversationController::class, 'show'], ['Authentication']);
 Router::delete('/conversations/{id}', [ConversationController::class, 'destroy'], ['Authentication']);
 // Rota alternativa para exibir conversa na lista (usado no layout Chatwoot)
@@ -65,6 +68,8 @@ Router::put('/conversations/{id}/notes/{noteId}', [ConversationController::class
 Router::delete('/conversations/{id}/notes/{noteId}', [ConversationController::class, 'deleteNote'], ['Authentication']);
 Router::get('/conversations/{id}/timeline', [ConversationController::class, 'getTimeline'], ['Authentication']);
 Router::get('/conversations/{id}/sentiment', [ConversationController::class, 'getSentiment'], ['Authentication']);
+Router::post('/conversations/{id}/messages', [ConversationController::class, 'sendMessage'], ['Authentication']);
+Router::post('/conversations/{id}/forward', [ConversationController::class, 'forwardMessage'], ['Authentication']);
 
 // Analytics
 Router::get('/analytics', [AnalyticsController::class, 'index'], ['Authentication']);
@@ -77,10 +82,6 @@ Router::get('/analytics/funnel/data', [AnalyticsController::class, 'getFunnelDat
 Router::get('/analytics/automations/data', [AnalyticsController::class, 'getAutomationsData'], ['Authentication']);
 Router::get('/analytics/ai/data', [AnalyticsController::class, 'getAIData'], ['Authentication']);
 Router::get('/analytics/comparison', [AnalyticsController::class, 'getTimeComparison'], ['Authentication']);
-// Rotas de tags movidas para após as rotas de tags (linhas 192-199)
-Router::post('/conversations/{id}/messages', [ConversationController::class, 'sendMessage'], ['Authentication']);
-Router::get('/conversations/for-forwarding', [ConversationController::class, 'listForForwarding'], ['Authentication']);
-Router::post('/conversations/{id}/forward', [ConversationController::class, 'forwardMessage'], ['Authentication']);
 Router::post('/conversations/{id}/pin', [ConversationController::class, 'pin'], ['Authentication']);
 Router::post('/conversations/{id}/unpin', [ConversationController::class, 'unpin'], ['Authentication']);
 Router::get('/conversations/{id}/search-messages', [ConversationController::class, 'searchMessages'], ['Authentication']);
@@ -149,17 +150,19 @@ Router::get('/funnels/{id}/stages/metrics', [FunnelController::class, 'getStageM
 
 // Rotas de Automações
 Router::get('/automations', [AutomationController::class, 'index'], ['Authentication']);
-Router::get('/automations/{id}', [AutomationController::class, 'show'], ['Authentication']);
 Router::post('/automations', [AutomationController::class, 'store'], ['Authentication']);
+// Rotas específicas DEVEM vir ANTES das rotas com parâmetros dinâmicos
+Router::get('/automations/variables', [AutomationController::class, 'getVariables'], ['Authentication']);
+Router::post('/automations/preview-variables', [AutomationController::class, 'previewVariables'], ['Authentication']);
+// Rotas com parâmetros dinâmicos {id}
+Router::get('/automations/{id}', [AutomationController::class, 'show'], ['Authentication']);
 Router::post('/automations/{id}', [AutomationController::class, 'update'], ['Authentication']);
 Router::post('/automations/{id}/nodes', [AutomationController::class, 'createNode'], ['Authentication']);
 Router::post('/automations/{id}/nodes/{nodeId}', [AutomationController::class, 'updateNode'], ['Authentication']);
 Router::delete('/automations/{id}/nodes/{nodeId}', [AutomationController::class, 'deleteNode'], ['Authentication']);
 Router::post('/automations/{id}/layout', [AutomationController::class, 'saveLayout'], ['Authentication']);
 Router::get('/automations/{id}/logs', [AutomationController::class, 'getLogs'], ['Authentication']);
-Router::get('/automations/variables', [AutomationController::class, 'getVariables'], ['Authentication']);
 Router::get('/automations/{id}/test', [AutomationController::class, 'test'], ['Authentication']);
-Router::post('/automations/preview-variables', [AutomationController::class, 'previewVariables'], ['Authentication']);
 
 // Rotas de Agentes
 Router::get('/agents', [AgentController::class, 'index'], ['Authentication']);
@@ -300,14 +303,16 @@ Router::delete('/notifications/{id}', [NotificationController::class, 'destroy']
 // Rotas de Templates de Mensagens
 Router::get('/message-templates', [MessageTemplateController::class, 'index'], ['Authentication']);
 Router::post('/message-templates', [MessageTemplateController::class, 'store'], ['Authentication']);
-Router::post('/message-templates/{id}', [MessageTemplateController::class, 'update'], ['Authentication']);
-Router::delete('/message-templates/{id}', [MessageTemplateController::class, 'destroy'], ['Authentication']);
+// Rotas específicas DEVEM vir ANTES das rotas com parâmetros dinâmicos
 Router::get('/message-templates/available', [MessageTemplateController::class, 'getAvailable'], ['Authentication']);
 Router::get('/message-templates/personal', [MessageTemplateController::class, 'getPersonal'], ['Authentication']);
+Router::get('/message-templates/variables', [MessageTemplateController::class, 'getVariables'], ['Authentication']);
+// Rotas com parâmetros dinâmicos {id}
 Router::get('/message-templates/{id}', [MessageTemplateController::class, 'show'], ['Authentication']);
+Router::post('/message-templates/{id}', [MessageTemplateController::class, 'update'], ['Authentication']);
+Router::delete('/message-templates/{id}', [MessageTemplateController::class, 'destroy'], ['Authentication']);
 Router::post('/message-templates/{id}/preview', [MessageTemplateController::class, 'preview'], ['Authentication']);
 Router::post('/message-templates/{id}/process', [MessageTemplateController::class, 'process'], ['Authentication']);
-Router::get('/message-templates/variables', [MessageTemplateController::class, 'getVariables'], ['Authentication']);
 
 // Rotas de Anexos
 Router::get('/attachments/{path}', [AttachmentController::class, 'view'], ['Authentication']);

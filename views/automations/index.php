@@ -174,6 +174,53 @@ ob_start();
                             <option value="webhook">Webhook Externo</option>
                         </select>
                     </div>
+                    <!-- Configuração de Tempo (para gatilhos de tempo sem resposta) -->
+                    <div class="fv-row mb-7" id="kt_time_config_container" style="display: none;">
+                        <label class="required fw-semibold fs-6 mb-2">Tempo de Espera</label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <input type="number" name="trigger_config[wait_time_value]" id="kt_wait_time_value" class="form-control form-control-solid" placeholder="Quantidade" value="30" min="1" />
+                            </div>
+                            <div class="col-md-6">
+                                <select name="trigger_config[wait_time_unit]" id="kt_wait_time_unit" class="form-select form-select-solid">
+                                    <option value="minutes">Minutos</option>
+                                    <option value="hours">Horas</option>
+                                    <option value="days">Dias</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-text mt-2" id="kt_time_config_help">Executar automação após este tempo sem resposta</div>
+                    </div>
+                    <!-- Configuração de Agendamento (para time_based) -->
+                    <div class="fv-row mb-7" id="kt_schedule_config_container" style="display: none;">
+                        <label class="required fw-semibold fs-6 mb-2">Tipo de Agendamento</label>
+                        <select name="trigger_config[schedule_type]" id="kt_schedule_type" class="form-select form-select-solid mb-3">
+                            <option value="daily">Diário</option>
+                            <option value="weekly">Semanal</option>
+                        </select>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="fw-semibold fs-6 mb-2">Hora</label>
+                                <input type="number" name="trigger_config[schedule_hour]" class="form-control form-control-solid" placeholder="Hora (0-23)" value="9" min="0" max="23" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-semibold fs-6 mb-2">Minuto</label>
+                                <input type="number" name="trigger_config[schedule_minute]" class="form-control form-control-solid" placeholder="Minuto (0-59)" value="0" min="0" max="59" />
+                            </div>
+                        </div>
+                        <div id="kt_schedule_day_container" style="display: none;" class="mt-3">
+                            <label class="fw-semibold fs-6 mb-2">Dia da Semana</label>
+                            <select name="trigger_config[schedule_day_of_week]" class="form-select form-select-solid">
+                                <option value="1">Segunda-feira</option>
+                                <option value="2">Terça-feira</option>
+                                <option value="3">Quarta-feira</option>
+                                <option value="4">Quinta-feira</option>
+                                <option value="5">Sexta-feira</option>
+                                <option value="6">Sábado</option>
+                                <option value="7">Domingo</option>
+                            </select>
+                        </div>
+                    </div>
                     <div class="fv-row mb-7" id="kt_funnel_stage_container">
                         <label class="fw-semibold fs-6 mb-2">Vincular a Funil/Estágio</label>
                         <div class="text-muted fs-7 mb-3">Deixe vazio para aplicar a todos os funis/estágios</div>
@@ -274,30 +321,85 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
     
-    // Mostrar/ocultar container de funil/estágio baseado no trigger
+    // Mostrar/ocultar campos de configuração baseado no trigger
     const triggerTypeSelect = document.getElementById("kt_trigger_type");
     const funnelStageContainer = document.getElementById("kt_funnel_stage_container");
+    const timeConfigContainer = document.getElementById("kt_time_config_container");
+    const scheduleConfigContainer = document.getElementById("kt_schedule_config_container");
+    const scheduleDayContainer = document.getElementById("kt_schedule_day_container");
+    const scheduleTypeSelect = document.getElementById("kt_schedule_type");
+    const timeConfigHelp = document.getElementById("kt_time_config_help");
+    const waitTimeValue = document.getElementById("kt_wait_time_value");
     
-    if (triggerTypeSelect && funnelStageContainer) {
-        const triggersWithFunnel = ["new_conversation", "conversation_moved", "conversation_updated", "conversation_resolved", "no_customer_response", "no_agent_response"];
+    if (triggerTypeSelect) {
+        const triggersWithFunnel = ["new_conversation", "message_received", "conversation_moved", "conversation_updated", "conversation_resolved", "no_customer_response", "no_agent_response"];
+        const triggersWithTime = ["no_customer_response", "no_agent_response"];
         
-        triggerTypeSelect.addEventListener("change", function() {
-            if (triggersWithFunnel.includes(this.value)) {
-                funnelStageContainer.style.display = "block";
-            } else {
-                funnelStageContainer.style.display = "none";
-                if (funnelSelect) funnelSelect.value = "";
-                if (stageSelect) {
-                    stageSelect.innerHTML = "<option value=\"\">Todos os Estágios</option>";
-                    stageSelect.disabled = true;
+        function updateTriggerFields() {
+            const triggerType = triggerTypeSelect.value;
+            
+            // Mostrar/ocultar funil/estágio
+            if (funnelStageContainer) {
+                if (triggersWithFunnel.includes(triggerType)) {
+                    funnelStageContainer.style.display = "block";
+                } else {
+                    funnelStageContainer.style.display = "none";
+                    if (funnelSelect) funnelSelect.value = "";
+                    if (stageSelect) {
+                        stageSelect.innerHTML = "<option value=\"\">Todos os Estágios</option>";
+                        stageSelect.disabled = true;
+                    }
                 }
             }
-        });
+            
+            // Mostrar/ocultar configuração de tempo
+            if (timeConfigContainer) {
+                if (triggersWithTime.includes(triggerType)) {
+                    timeConfigContainer.style.display = "block";
+                    if (waitTimeValue) waitTimeValue.setAttribute("required", "required");
+                    
+                    // Ajustar texto de ajuda
+                    if (timeConfigHelp) {
+                        if (triggerType === "no_customer_response") {
+                            timeConfigHelp.textContent = "A automação será executada se o cliente não responder dentro deste prazo";
+                            if (waitTimeValue) waitTimeValue.value = "30";
+                        } else if (triggerType === "no_agent_response") {
+                            timeConfigHelp.textContent = "A automação será executada se o agente não responder dentro deste prazo";
+                            if (waitTimeValue) waitTimeValue.value = "15";
+                        }
+                    }
+                } else {
+                    timeConfigContainer.style.display = "none";
+                    if (waitTimeValue) waitTimeValue.removeAttribute("required");
+                }
+            }
+            
+            // Mostrar/ocultar configuração de agendamento
+            if (scheduleConfigContainer) {
+                if (triggerType === "time_based") {
+                    scheduleConfigContainer.style.display = "block";
+                } else {
+                    scheduleConfigContainer.style.display = "none";
+                }
+            }
+        }
+        
+        // Atualizar campos ao mudar gatilho
+        triggerTypeSelect.addEventListener("change", updateTriggerFields);
         
         // Verificar estado inicial
-        if (!triggersWithFunnel.includes(triggerTypeSelect.value)) {
-            funnelStageContainer.style.display = "none";
-        }
+        updateTriggerFields();
+    }
+    
+    // Mostrar/ocultar dia da semana no agendamento
+    if (scheduleTypeSelect && scheduleDayContainer) {
+        scheduleTypeSelect.addEventListener("change", function() {
+            if (this.value === "weekly") {
+                scheduleDayContainer.style.display = "block";
+            } else {
+                scheduleDayContainer.style.display = "none";
+            }
+        });
     }
     
     const form = document.getElementById("kt_modal_new_automation_form");

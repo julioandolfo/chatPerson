@@ -59,6 +59,14 @@ class Logger
     }
 
     /**
+     * Log de informação
+     */
+    public static function info(string $message, string $file = null): void
+    {
+        self::log("[INFO] {$message}", $file);
+    }
+
+    /**
      * Log de erro
      */
     public static function error(string $message, string $file = null): void

@@ -48,8 +48,11 @@ Este script verifica:
 # Editar crontab
 crontab -e
 
-# Adicionar linha:
+# Adicionar linha (ajuste o caminho para seu servidor):
 * * * * * php /var/www/html/public/scripts/process-scheduled-messages.php >> /var/www/html/logs/scheduled-messages.log 2>&1
+
+# Ou no Laragon/XAMPP Windows:
+* * * * * php C:\laragon\www\chat\public\scripts\process-scheduled-messages.php >> C:\laragon\www\chat\logs\scheduled-messages.log 2>&1
 ```
 
 #### Windows (Task Scheduler):
@@ -97,12 +100,13 @@ tail -f logs/scheduled-messages.log
 # Linux/Mac
 chmod -R 755 public/scripts/
 chmod -R 777 logs/
-chmod -R 777 storage/
 
 # Verificar proprietário
 chown -R www-data:www-data /var/www/html/
 # ou
 chown -R seu-usuario:seu-grupo /var/www/html/
+
+# Windows (não necessário, mas garanta que o usuário tem permissão de escrita na pasta logs/)
 ```
 
 ---

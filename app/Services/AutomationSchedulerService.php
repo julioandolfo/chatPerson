@@ -22,7 +22,7 @@ class AutomationSchedulerService
         
         // Buscar automações ativas
         $sql = "SELECT * FROM automations WHERE trigger_type = ? AND status = ? AND is_active = ? ORDER BY id ASC";
-        $automations = Database::query($sql, ['no_customer_response', 'active', 1]);
+        $automations = Database::fetchAll($sql, ['no_customer_response', 'active', 1]);
         
         Logger::automation("Encontradas " . count($automations) . " automações ativas.");
         
@@ -74,7 +74,7 @@ class AutomationSchedulerService
                 
                 $sql .= " ORDER BY c.id ASC";
                 
-                $conversations = Database::query($sql, $params);
+                $conversations = Database::fetchAll($sql, $params);
                 
                 Logger::automation("  → Encontradas " . count($conversations) . " conversas elegíveis.");
                 
@@ -106,7 +106,7 @@ class AutomationSchedulerService
         
         // Buscar automações ativas
         $sql = "SELECT * FROM automations WHERE trigger_type = ? AND status = ? AND is_active = ? ORDER BY id ASC";
-        $automations = Database::query($sql, ['no_agent_response', 'active', 1]);
+        $automations = Database::fetchAll($sql, ['no_agent_response', 'active', 1]);
         
         Logger::automation("Encontradas " . count($automations) . " automações ativas.");
         
@@ -164,7 +164,7 @@ class AutomationSchedulerService
                 
                 $sql .= " ORDER BY c.id ASC";
                 
-                $conversations = Database::query($sql, $params);
+                $conversations = Database::fetchAll($sql, $params);
                 
                 Logger::automation("  → Encontradas " . count($conversations) . " conversas elegíveis.");
                 
@@ -196,7 +196,7 @@ class AutomationSchedulerService
         
         // Buscar automações ativas
         $sql = "SELECT * FROM automations WHERE trigger_type = ? AND status = ? AND is_active = ? ORDER BY id ASC";
-        $automations = Database::query($sql, ['time_based', 'active', 1]);
+        $automations = Database::fetchAll($sql, ['time_based', 'active', 1]);
         
         Logger::automation("Encontradas " . count($automations) . " automações ativas.");
         
@@ -294,9 +294,9 @@ class AutomationSchedulerService
                 AND created_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE)
             ";
             
-            $result = Database::query($sql, [$automationId, $conversationId, $minutesThreshold]);
+            $result = Database::fetch($sql, [$automationId, $conversationId, $minutesThreshold]);
             
-            return !empty($result) && $result[0]['count'] > 0;
+            return !empty($result) && $result['count'] > 0;
             
         } catch (\Exception $e) {
             Logger::automation("ERRO ao verificar execução recente: " . $e->getMessage());

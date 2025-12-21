@@ -40,19 +40,27 @@ echo "\n";
 
 // 2. Verificar diretório de logs
 echo "📝 Verificando diretório de logs...\n";
-$logsDir = __DIR__ . '/../storage/logs';
+$logsDir = __DIR__ . '/../logs';
 if (is_dir($logsDir)) {
-    echo "  ✅ Diretório storage/logs existe\n";
+    echo "  ✅ Diretório logs existe\n";
     if (is_writable($logsDir)) {
-        echo "  ✅ Diretório storage/logs é gravável\n";
+        echo "  ✅ Diretório logs é gravável\n";
         $success[] = "Diretório de logs existe e é gravável";
     } else {
-        echo "  ⚠️  Diretório storage/logs NÃO é gravável\n";
+        echo "  ⚠️  Diretório logs NÃO é gravável\n";
         $warnings[] = "Diretório de logs não é gravável (chmod 755 ou 777)";
     }
 } else {
-    echo "  ❌ Diretório storage/logs NÃO existe\n";
+    echo "  ❌ Diretório logs NÃO existe\n";
     $errors[] = "Diretório de logs não existe";
+    
+    // Tentar criar o diretório
+    if (!is_dir($logsDir)) {
+        @mkdir($logsDir, 0755, true);
+        if (is_dir($logsDir)) {
+            echo "  ✅ Diretório logs criado automaticamente\n";
+        }
+    }
 }
 
 echo "\n";
@@ -236,9 +244,9 @@ if (count($warnings) > 0) {
 }
 
 echo "📋 CRONS NECESSÁRIOS:\n";
-echo "   1. * * * * * php /caminho/para/public/scripts/process-scheduled-messages.php >> /caminho/para/storage/logs/scheduled-messages.log 2>&1\n";
-echo "   2. * * * * * php /caminho/para/public/scripts/process-reminders.php >> /caminho/para/storage/logs/reminders.log 2>&1\n";
-echo "   3. */5 * * * * php /caminho/para/public/run-scheduled-jobs.php >> /caminho/para/storage/logs/jobs.log 2>&1\n\n";
+echo "   1. * * * * * php /caminho/para/public/scripts/process-scheduled-messages.php >> /caminho/para/logs/scheduled-messages.log 2>&1\n";
+echo "   2. * * * * * php /caminho/para/public/scripts/process-reminders.php >> /caminho/para/logs/reminders.log 2>&1\n";
+echo "   3. */5 * * * * php /caminho/para/public/run-scheduled-jobs.php >> /caminho/para/logs/jobs.log 2>&1\n\n";
 
 echo "🌐 WEBSOCKET:\n";
 echo "   Execute: php public/websocket-server.php\n";

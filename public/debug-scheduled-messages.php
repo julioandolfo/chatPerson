@@ -89,6 +89,12 @@ $scriptPath = realpath(__DIR__ . '/scripts/process-scheduled-messages.php');
 
 // Verificar logs
 $logsDir = __DIR__ . '/../logs';
+
+// Garantir que o diretório de logs existe
+if (!is_dir($logsDir)) {
+    @mkdir($logsDir, 0755, true);
+}
+
 $logFiles = [
     'app.log' => 'Log Geral',
     'scheduled-messages.log' => 'Mensagens Agendadas',

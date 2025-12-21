@@ -19,11 +19,11 @@ const SLAIndicator = {
     /**
      * Inicializar sistema de SLA
      */
-    init: function() {
+    init: async function() {
         console.log('[SLA] Inicializando sistema de indicadores...');
         
-        // Carregar configurações
-        this.loadConfig();
+        // Carregar configurações (aguardar)
+        await this.loadConfig();
         
         // Atualizar todos os indicadores
         this.updateAllIndicators();
@@ -56,6 +56,9 @@ const SLAIndicator = {
                         enabled: data.sla.enable_sla_monitoring !== false
                     };
                     console.log('[SLA] Configurações carregadas:', this.config);
+                    
+                    // Atualizar indicadores imediatamente após carregar config
+                    this.updateAllIndicators();
                 }
             }
         } catch (error) {
@@ -177,13 +180,12 @@ const SLAIndicator = {
         const size = avatar.classList.contains('symbol-35px') ? 35 : 
                     avatar.classList.contains('symbol-50px') ? 50 : 45;
         
-        // viewBox será do tamanho exato do avatar
-        const viewBoxSize = size;
+        // viewBox ligeiramente maior para ficar fora do avatar
+        const viewBoxSize = size + 6;
         const stroke = size >= 50 ? 3.5 : size >= 45 ? 3 : 2.5;
         const inset = stroke / 2;
         const rectSize = viewBoxSize - stroke;
         const rx = Math.max(8, Math.round(size * 0.22)); // cantos arredondados para seguir o avatar
-        const perimeter = 2 * (rectSize * 2 + 0); // 2*(w+h)
         const dashArray = 2 * (rectSize + rectSize);
         
         return `

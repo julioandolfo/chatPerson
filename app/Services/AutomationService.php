@@ -1893,8 +1893,43 @@ class AutomationService
         } else {
             \App\Helpers\Logger::automation("Nenhum intent detectado na resposta da IA");
         }
+
+        // Se não detectou intent, tentar fallback configurado
+        $fallbackNodeId = $metadata['ai_fallback_node_id'] ?? null;
+        if ($targetNodeId ?? false) {
+            // já tratado acima
+        } elseif ($fallbackNodeId) {
+            \App\Helpers\Logger::automation("Nenhum intent detectado. Executando nó de fallback: {$fallbackNodeId}");
+
+            // Limpar metadata de ramificação
+            $metadata['ai_branching_active'] = false;
+            $metadata['ai_interaction_count'] = 0;
+            \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
+
+            try {
+                // Remover a IA antes de seguir fallback
+                \App\Services\ConversationAIService::removeAIAgent($conversation['id']);
+            } catch (\Exception $e) {
+                \App\Helpers\Logger::automation("Falha ao remover IA no fallback: " . $e->getMessage());
+            }
+
+            // Executar nó de fallback dentro da mesma automação
+            $automationId = $metadata['ai_branching_automation_id'] ?? null;
+            if ($automationId) {
+                $automation = \App\Models\Automation::findWithNodes((int)$automationId);
+                $nodes = $automation['nodes'] ?? [];
+                $fallbackNode = self::findNodeById($fallbackNodeId, $nodes);
+                if ($fallbackNode) {
+                    self::executeNode($fallbackNode, $conversation['id'], $nodes, null);
+                    \App\Helpers\Logger::automation("=== handleAIBranchingResponse FIM (fallback executado) ===");
+                    return true;
+                } else {
+                    \App\Helpers\Logger::automation("ERRO: Nó de fallback {$fallbackNodeId} não encontrado na automação {$automationId}");
+                }
+            }
+        }
         
-        // Não detectou intent ou não conseguiu executar, atualizar contador e continuar com IA
+        // Não detectou intent e não há fallback; atualizar contador e continuar com IA
         $metadata['ai_interaction_count'] = $interactionCount;
         \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
         

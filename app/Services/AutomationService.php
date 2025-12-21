@@ -18,6 +18,20 @@ class AutomationService
      * Automation ID atual em execução (para uso em metadata de IA)
      */
     private static ?int $currentAutomationId = null;
+
+    /**
+     * Log específico para intents IA (arquivo dedicado)
+     */
+    private static function logIntent(string $message): void
+    {
+        $logDir = __DIR__ . '/../../logs';
+        if (!is_dir($logDir)) {
+            @mkdir($logDir, 0777, true);
+        }
+        $logFile = $logDir . '/ai-intents.log';
+        $line = '[' . date('Y-m-d H:i:s') . "] {$message}\n";
+        @file_put_contents($logFile, $line, FILE_APPEND);
+    }
     /**
      * Criar automação
      */
@@ -1790,11 +1804,13 @@ class AutomationService
         \App\Helpers\Logger::automation("=== handleAIBranchingResponse INÍCIO ===");
         $senderType = $message['sender_type'] ?? 'unknown';
         \App\Helpers\Logger::automation("Conversa ID: {$conversation['id']}, Sender: {$senderType}, Mensagem: '" . substr($message['content'] ?? '', 0, 100) . "'");
+        self::logIntent("=== handleAIBranchingResponse === conv:{$conversation['id']} sender:{$senderType} msg:'" . ($message['content'] ?? '') . "'");
         
         $metadata = json_decode($conversation['metadata'] ?? '{}', true);
         
         if (empty($metadata['ai_branching_active'])) {
             \App\Helpers\Logger::automation("Ramificação de IA não está ativa. Retornando false.");
+            self::logIntent("ramificacao_inativa");
             return false;
         }
         
@@ -1803,15 +1819,20 @@ class AutomationService
         $maxInteractions = (int)($metadata['ai_max_interactions'] ?? 5);
         
         \App\Helpers\Logger::automation("Interação {$interactionCount}/{$maxInteractions}");
+        self::logIntent("interacao {$interactionCount}/{$maxInteractions}");
         
         // Verificar se atingiu máximo de interações
         if ($interactionCount >= $maxInteractions) {
             \App\Helpers\Logger::automation("Máximo de interações atingido. Escalando para humano...");
+            self::logIntent("max_interactions");
             return self::escalateFromAI($conversation['id'], $metadata);
         }
         
         // Analisar a mensagem para identificar intent (primeiro por keywords, depois por IA semântica)
         $detectedIntent = self::detectAIIntent($message['content'] ?? '', $metadata['ai_intents'] ?? []);
+        if ($detectedIntent) {
+            self::logIntent("match_keywords intent=" . ($detectedIntent['intent'] ?? ''));
+        }
 
         // Fallback: detecção semântica via OpenAI (usando descrição do intent)
         if (!$detectedIntent && !empty($metadata['ai_intents'])) {
@@ -1821,33 +1842,40 @@ class AutomationService
             $semanticEnabled = $metadata['ai_intent_semantic_enabled'] ?? true; // habilitado por padrão
             if ($semanticEnabled) {
                 \App\Helpers\Logger::automation("Nenhum match por keywords. Tentando detecção semântica via OpenAI (min confidence {$minConfidence})");
+                self::logIntent("semantica_on minConf={$minConfidence}");
                 $detectedIntent = self::detectAIIntentSemantic($message['content'] ?? '', $metadata['ai_intents'] ?? [], $minConfidence, (int)$conversation['id']);
             } else {
                 \App\Helpers\Logger::automation("Detecção semântica desabilitada; não será tentada.");
+                self::logIntent("semantica_off");
             }
         }
         
         if ($detectedIntent) {
             \App\Helpers\Logger::automation("Intent detectado: {$detectedIntent['intent']}");
+            self::logIntent("intent_detectado:" . ($detectedIntent['intent'] ?? ''));
             
             // Buscar nó de destino para este intent
             $targetNodeId = $detectedIntent['target_node_id'] ?? null;
             
             if ($targetNodeId) {
                 \App\Helpers\Logger::automation("Executando nó de destino: {$targetNodeId}");
+                self::logIntent("target=" . $targetNodeId);
                 
                 // ✅ PRIMEIRO: Remover a IA IMEDIATAMENTE para evitar que ela responda
                 try {
                     \App\Services\ConversationAIService::removeAIAgent($conversation['id']);
                     \App\Helpers\Logger::automation("✅ IA removida IMEDIATAMENTE para evitar resposta.");
+                    self::logIntent("ia_removida");
                 } catch (\Exception $e) {
                     \App\Helpers\Logger::automation("Falha ao remover IA: " . $e->getMessage());
+                    self::logIntent("ia_remover_erro:" . $e->getMessage());
                 }
                 
                 // Limpar metadata de ramificação
                 $metadata['ai_branching_active'] = false;
                 $metadata['ai_interaction_count'] = 0;
                 \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
+                self::logIntent("ramificacao_off");
 
                 // Mensagem de saída (se configurada no intent)
                 $exitMessage = $detectedIntent['exit_message'] ?? '';
@@ -1860,8 +1888,10 @@ class AutomationService
                             null
                         );
                         \App\Helpers\Logger::automation("📤 Mensagem de saída do intent enviada.");
+                        self::logIntent("exit_msg_enviada");
                     } catch (\Exception $e) {
                         \App\Helpers\Logger::automation("Falha ao enviar mensagem de saída do intent: " . $e->getMessage());
+                        self::logIntent("exit_msg_erro:" . $e->getMessage());
                     }
                 }
                 
@@ -1876,22 +1906,28 @@ class AutomationService
                     
                     if ($targetNode) {
                         \App\Helpers\Logger::automation("Nó de destino encontrado. Executando...");
+                        self::logIntent("target_found exec");
                         // Executar nó de destino
                         self::executeNode($targetNode, $conversation['id'], $nodes, null);
                         
                         \App\Helpers\Logger::automation("=== handleAIBranchingResponse FIM (true - intent executado) ===");
+                        self::logIntent("fim_true");
                         return true;
                     } else {
                         \App\Helpers\Logger::automation("ERRO: Nó de destino não encontrado com ID {$targetNodeId}");
+                        self::logIntent("target_notfound");
                     }
                 } else {
                     \App\Helpers\Logger::automation("ERRO: Automação não encontrada com ID {$automationId}");
+                    self::logIntent("automation_notfound");
                 }
             } else {
                 \App\Helpers\Logger::automation("AVISO: Intent detectado mas sem target_node_id configurado");
+                self::logIntent("intent_sem_target");
             }
         } else {
             \App\Helpers\Logger::automation("Nenhum intent detectado na resposta da IA");
+            self::logIntent("intent_none");
         }
 
         // Se não detectou intent, tentar fallback configurado
@@ -1900,6 +1936,7 @@ class AutomationService
             // já tratado acima
         } elseif ($fallbackNodeId) {
             \App\Helpers\Logger::automation("Nenhum intent detectado. Executando nó de fallback: {$fallbackNodeId}");
+            self::logIntent("fallback_exec target={$fallbackNodeId}");
 
             // Limpar metadata de ramificação
             $metadata['ai_branching_active'] = false;
@@ -1909,8 +1946,10 @@ class AutomationService
             try {
                 // Remover a IA antes de seguir fallback
                 \App\Services\ConversationAIService::removeAIAgent($conversation['id']);
+                self::logIntent("ia_removida_fallback");
             } catch (\Exception $e) {
                 \App\Helpers\Logger::automation("Falha ao remover IA no fallback: " . $e->getMessage());
+                self::logIntent("ia_remover_erro_fallback:" . $e->getMessage());
             }
 
             // Executar nó de fallback dentro da mesma automação
@@ -1922,9 +1961,11 @@ class AutomationService
                 if ($fallbackNode) {
                     self::executeNode($fallbackNode, $conversation['id'], $nodes, null);
                     \App\Helpers\Logger::automation("=== handleAIBranchingResponse FIM (fallback executado) ===");
+                    self::logIntent("fallback_ok");
                     return true;
                 } else {
                     \App\Helpers\Logger::automation("ERRO: Nó de fallback {$fallbackNodeId} não encontrado na automação {$automationId}");
+                    self::logIntent("fallback_notfound");
                 }
             }
         }
@@ -1936,6 +1977,7 @@ class AutomationService
 
         if ($interactionCount >= $maxInteractions) {
             \App\Helpers\Logger::automation("Nenhum intent detectado e limite de interações atingido. Escalando.");
+            self::logIntent("escalate_sem_intent interaction={$interactionCount}");
             return self::escalateFromAI($conversation['id'], $metadata);
         }
 
@@ -1949,11 +1991,14 @@ class AutomationService
                 null
             );
             \App\Helpers\Logger::automation("Feedback de não entendimento enviado ao usuário. Interação {$interactionCount}/{$maxInteractions}.");
+            self::logIntent("clarify_enviado interaction={$interactionCount}");
         } catch (\Exception $e) {
             \App\Helpers\Logger::automation("Falha ao enviar feedback de não entendimento: " . $e->getMessage());
+            self::logIntent("clarify_erro:" . $e->getMessage());
         }
 
         \App\Helpers\Logger::automation("=== handleAIBranchingResponse FIM (false - continua com IA) ===");
+        self::logIntent("fim_false");
         return false; // Continua com IA normal
     }
 

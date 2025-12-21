@@ -15,6 +15,41 @@ const SLAIndicator = {
         workingHoursEnd: '18:00',
         enabled: true
     },
+
+    /**
+     * Calcular minutos dentro do horário de atendimento entre duas datas
+     */
+    getWorkingMinutes: function(start, end) {
+        if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) return 0;
+
+        const [sH, sM] = (this.config.workingHoursStart || '08:00').split(':').map(Number);
+        const [eH, eM] = (this.config.workingHoursEnd || '18:00').split(':').map(Number);
+
+        let total = 0;
+        let cursor = new Date(start);
+
+        while (cursor < end) {
+            const dayStart = new Date(cursor);
+            dayStart.setHours(sH, sM, 0, 0);
+            const dayEnd = new Date(cursor);
+            dayEnd.setHours(eH, eM, 0, 0);
+
+            // janela do dia atual
+            const windowStart = cursor > dayStart ? cursor : dayStart;
+            const windowEnd = end < dayEnd ? end : dayEnd;
+
+            if (windowEnd > windowStart) {
+                total += (windowEnd - windowStart) / 60000; // minutos
+            }
+
+            // avançar para próximo dia
+            cursor = new Date(dayStart);
+            cursor.setDate(cursor.getDate() + 1);
+            cursor.setHours(0, 0, 0, 0);
+        }
+
+        return total;
+    },
     
     /**
      * Inicializar sistema de SLA
@@ -237,19 +272,6 @@ const SLAIndicator = {
             return { percentage: 0, status: 'none', breached: false };
         }
         
-        // Respeitar horário de atendimento, se configurado
-        if (this.config.workingHoursEnabled) {
-            const [startH, startM] = (this.config.workingHoursStart || '08:00').split(':').map(Number);
-            const [endH, endM] = (this.config.workingHoursEnd || '18:00').split(':').map(Number);
-            const start = new Date(now);
-            start.setHours(startH, startM, 0, 0);
-            const end = new Date(now);
-            end.setHours(endH, endM, 0, 0);
-            if (now < start || now > end) {
-                return { percentage: 0, status: 'none', breached: false };
-            }
-        }
-        
         console.log(`[SLA] Calculando para conversa ${conv.id}:`, {
             created_at: conv.created_at,
             first_response_at: conv.first_response_at,
@@ -271,7 +293,9 @@ const SLAIndicator = {
         
         if (waitingFirstResponse) {
             // Calcular SLA de primeira resposta
-            const minutesSinceCreated = (now - createdAt) / 1000 / 60;
+            const minutesSinceCreated = this.config.workingHoursEnabled
+                ? this.getWorkingMinutes(createdAt, now)
+                : (now - createdAt) / 1000 / 60;
             const slaMinutes = this.config.firstResponseTime;
             if (!isFinite(minutesSinceCreated) || !isFinite(slaMinutes) || slaMinutes <= 0) {
                 return { percentage: 0, status: 'none', breached: false };
@@ -294,7 +318,9 @@ const SLAIndicator = {
                 // Verificar se há mensagem pendente do contato (última mensagem é do contato)
                 const contactVsAgent = lastContactAt && (!lastAgentAt || lastContactAt > lastAgentAt);
                 if (contactVsAgent) {
-                    const minutesWaiting = (now - lastContactAt) / 1000 / 60;
+                    const minutesWaiting = this.config.workingHoursEnabled
+                        ? this.getWorkingMinutes(lastContactAt, now)
+                        : (now - lastContactAt) / 1000 / 60;
                     const slaMinutes = this.config.ongoingResponseTime || this.config.firstResponseTime;
                     if (!isFinite(minutesWaiting) || !isFinite(slaMinutes) || slaMinutes <= 0) {
                         return { percentage: 0, status: 'none', breached: false };

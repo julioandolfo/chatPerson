@@ -12820,10 +12820,11 @@ if (!window.__realtimeGlobalNewConvListener) {
         // Verificar se a conversa passa pelos filtros ativos antes de adicionar
         const urlParams = new URLSearchParams(window.location.search);
         
-        // Se há filtros ativos, não adicionar automaticamente (esperar próxima atualização de badges)
+        // Se há filtros ativos, recarregar lista preservando filtros para incluir a nova conversa
         if (urlParams.toString().length > 0) {
-            console.log('Filtros ativos detectados. Conversa será adicionada apenas se passar pelos filtros no próximo refresh.');
-            return; // Não adicionar dinamicamente quando há filtros
+            console.log('Filtros ativos detectados. Recarregando lista filtrada para incluir nova conversa.');
+            refreshConversationList(urlParams);
+            return;
         }
         
         try {
@@ -13109,6 +13110,11 @@ function refreshConversationBadges() {
             // Atualizar badges de não lidas em cada conversa da lista
             data.conversations.forEach(conv => {
                 const conversationItem = document.querySelector(`[data-conversation-id="${conv.id}"]`);
+                // Se a conversa passou pelo filtro, mas ainda não está renderizada, adicionar agora
+                if (!conversationItem) {
+                    addConversationToList(conv);
+                    return;
+                }
                 if (conversationItem) {
                     const badge = conversationItem.querySelector('.conversation-item-badge');
                     const unreadCount = conv.unread_count || 0;

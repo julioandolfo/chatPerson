@@ -214,18 +214,25 @@ class AutomationService
         \App\Helpers\Logger::automation("chatbot_active? " . (isset($metadata['chatbot_active']) ? ($metadata['chatbot_active'] ? 'TRUE' : 'FALSE') : 'NÃO EXISTE'));
         
         // Verificar se ramificação de IA está ativa (prioridade)
+        // NOTA: A detecção de intent agora é feita ANTES da IA processar (em ConversationService)
+        // Esta verificação é mantida como fallback para mensagens antigas
         if (!empty($metadata['ai_branching_active'])) {
-            \App\Helpers\Logger::automation("🤖 Ramificação de IA ATIVA detectada!");
+            \App\Helpers\Logger::automation("🤖 Ramificação de IA ATIVA detectada! (fallback)");
             
-            // Antes tratávamos apenas mensagens da IA; agora também tratamos a resposta do contato
-            \App\Helpers\Logger::automation("Analisando intent na mensagem recebida (sender_type={$message['sender_type']})...");
-            $handled = self::handleAIBranchingResponse($conversation, $message);
-            
-            if ($handled) {
-                \App\Helpers\Logger::automation("✅ Ramificação tratou a mensagem. Roteou para nó específico.");
-                return;
+            // Se for mensagem do contato, já foi tratada em ConversationService
+            if ($message['sender_type'] === 'contact') {
+                \App\Helpers\Logger::automation("⚠️ Mensagem do contato já foi verificada em ConversationService. Pulando...");
+            } else {
+                // Mensagens da IA ainda precisam ser verificadas aqui
+                \App\Helpers\Logger::automation("Analisando intent na mensagem da IA (fallback)...");
+                $handled = self::handleAIBranchingResponse($conversation, $message);
+                
+                if ($handled) {
+                    \App\Helpers\Logger::automation("✅ Ramificação tratou a mensagem. Roteou para nó específico.");
+                    return;
+                }
+                \App\Helpers\Logger::automation("⚠️ handleAIBranchingResponse retornou false. Continuando...");
             }
-            \App\Helpers\Logger::automation("⚠️ handleAIBranchingResponse retornou false. Continuando...");
         }
         
         if (!empty($metadata['chatbot_active'])) {
@@ -1761,11 +1768,13 @@ class AutomationService
 
     /**
      * Tratar resposta da IA e rotear para nó baseado em intent
+     * Também pode ser chamado para detectar intent em mensagens do cliente
      */
-    private static function handleAIBranchingResponse(array $conversation, array $aiMessage): bool
+    public static function handleAIBranchingResponse(array $conversation, array $message): bool
     {
         \App\Helpers\Logger::automation("=== handleAIBranchingResponse INÍCIO ===");
-        \App\Helpers\Logger::automation("Conversa ID: {$conversation['id']}, Mensagem da IA: '" . substr($aiMessage['content'] ?? '', 0, 100) . "'");
+        $senderType = $message['sender_type'] ?? 'unknown';
+        \App\Helpers\Logger::automation("Conversa ID: {$conversation['id']}, Sender: {$senderType}, Mensagem: '" . substr($message['content'] ?? '', 0, 100) . "'");
         
         $metadata = json_decode($conversation['metadata'] ?? '{}', true);
         
@@ -1786,8 +1795,8 @@ class AutomationService
             return self::escalateFromAI($conversation['id'], $metadata);
         }
         
-        // Analisar a resposta da IA para identificar intent (primeiro por keywords, depois por IA semântica)
-        $detectedIntent = self::detectAIIntent($aiMessage['content'] ?? '', $metadata['ai_intents'] ?? []);
+        // Analisar a mensagem para identificar intent (primeiro por keywords, depois por IA semântica)
+        $detectedIntent = self::detectAIIntent($message['content'] ?? '', $metadata['ai_intents'] ?? []);
 
         // Fallback: detecção semântica via OpenAI (usando descrição do intent)
         if (!$detectedIntent && !empty($metadata['ai_intents'])) {
@@ -1797,7 +1806,7 @@ class AutomationService
             $semanticEnabled = $metadata['ai_intent_semantic_enabled'] ?? true; // habilitado por padrão
             if ($semanticEnabled) {
                 \App\Helpers\Logger::automation("Nenhum match por keywords. Tentando detecção semântica via OpenAI (min confidence {$minConfidence})");
-                $detectedIntent = self::detectAIIntentSemantic($aiMessage['content'] ?? '', $metadata['ai_intents'] ?? [], $minConfidence, (int)$conversation['id']);
+                $detectedIntent = self::detectAIIntentSemantic($message['content'] ?? '', $metadata['ai_intents'] ?? [], $minConfidence, (int)$conversation['id']);
             } else {
                 \App\Helpers\Logger::automation("Detecção semântica desabilitada; não será tentada.");
             }

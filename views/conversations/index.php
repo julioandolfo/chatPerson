@@ -1858,11 +1858,15 @@ body.dark-mode .swal2-content {
                     
                     $isActive = ($selectedConversationId == $conv['id']);
                     ?>
+                    <?php
+                    // Usar first_response_at calculado das mensagens se disponível, senão usar o campo da conversa
+                    $firstResponseAt = !empty($conv['first_response_at_calc']) ? $conv['first_response_at_calc'] : ($conv['first_response_at'] ?? '');
+                    ?>
                     <div class="conversation-item <?= $isActive ? 'active' : '' ?> <?= !empty($conv['pinned']) ? 'pinned' : '' ?>" 
                          data-conversation-id="<?= $conv['id'] ?>"
                          data-status="<?= htmlspecialchars($conv['status'] ?? 'open') ?>"
                          data-created-at="<?= htmlspecialchars($conv['created_at'] ?? '') ?>"
-                         data-first-response-at="<?= htmlspecialchars($conv['first_response_at'] ?? '') ?>"
+                         data-first-response-at="<?= htmlspecialchars($firstResponseAt) ?>"
                          data-last-message-at="<?= htmlspecialchars($conv['last_message_at'] ?? '') ?>"
                          data-agent-id="<?= htmlspecialchars($conv['agent_id'] ?? '') ?>"
                          data-onclick="selectConversation">

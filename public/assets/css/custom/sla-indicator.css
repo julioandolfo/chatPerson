@@ -10,15 +10,15 @@
 
 .sla-progress-ring {
     position: absolute;
-    top: -4px;
-    left: -4px;
-    right: -4px;
-    bottom: -4px;
-    width: calc(100% + 8px);
-    height: calc(100% + 8px);
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
     transform: rotate(-90deg);
     pointer-events: none;
-    z-index: 10;
+    z-index: 1;
     overflow: visible;
 }
 
@@ -78,17 +78,17 @@
 /* Badge de SLA estourado */
 .sla-breached-badge {
     position: absolute;
-    top: -5px;
-    right: -5px;
-    width: 18px;
-    height: 18px;
+    top: -3px;
+    right: -3px;
+    width: 16px;
+    height: 16px;
     background: #F1416C;
     border: 2px solid #fff;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 2;
+    z-index: 20;
     animation: sla-badge-pulse 1.5s ease-in-out infinite;
 }
 
@@ -130,21 +130,21 @@
 
 /* Tamanhos diferentes do indicador */
 .symbol-35px .sla-progress-ring {
-    top: -2px;
-    left: -2px;
-    width: calc(100% + 4px);
-    height: calc(100% + 4px);
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
 }
 
 .symbol-35px .sla-progress-ring circle {
-    stroke-width: 2;
+    stroke-width: 2.5;
 }
 
 .symbol-45px .sla-progress-ring {
-    top: -3px;
-    left: -3px;
-    width: calc(100% + 6px);
-    height: calc(100% + 6px);
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
 }
 
 .symbol-45px .sla-progress-ring circle {
@@ -152,14 +152,14 @@
 }
 
 .symbol-50px .sla-progress-ring {
-    top: -3px;
-    left: -3px;
-    width: calc(100% + 6px);
-    height: calc(100% + 6px);
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
 }
 
 .symbol-50px .sla-progress-ring circle {
-    stroke-width: 3;
+    stroke-width: 3.5;
 }
 
 /* Estado sem SLA ativo */

@@ -86,6 +86,7 @@ class Conversation extends Model
                        (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact' AND m.read_at IS NULL) as unread_count,
                        (SELECT content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message,
                        (SELECT created_at FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message_at,
+                       (SELECT created_at FROM messages m WHERE m.conversation_id = c.id AND m.sender_type IN ('agent', 'ai_agent') ORDER BY m.created_at ASC LIMIT 1) as first_response_at_calc,
                        GROUP_CONCAT(DISTINCT CONCAT(t.id, ':', t.name, ':', COALESCE(t.color, '#009ef7')) SEPARATOR '|||') as tags_data,
                        GROUP_CONCAT(DISTINCT CONCAT(cp.user_id, ':', cp_user.name) SEPARATOR '|||') as participants_data,
                        COALESCE(c.pinned, 0) as pinned,

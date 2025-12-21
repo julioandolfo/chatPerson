@@ -165,9 +165,11 @@ const SLAIndicator = {
         const size = avatar.classList.contains('symbol-35px') ? 35 : 
                     avatar.classList.contains('symbol-50px') ? 50 : 45;
         
-        const viewBoxSize = size + 6;
+        // viewBox será do tamanho exato do avatar
+        const viewBoxSize = size;
         const center = viewBoxSize / 2;
-        const radius = (viewBoxSize - 6) / 2;
+        // Radius considerando a stroke-width (3px) para não cortar
+        const radius = (viewBoxSize - 4) / 2;
         const circumference = 2 * Math.PI * radius;
         
         return `
@@ -205,13 +207,22 @@ const SLAIndicator = {
         const createdAt = new Date(conv.created_at);
         const firstResponseAt = conv.first_response_at ? new Date(conv.first_response_at) : null;
         
+        console.log(`[SLA] Calculando para conversa ${conv.id}:`, {
+            created_at: conv.created_at,
+            first_response_at: conv.first_response_at,
+            status: conv.status,
+            agent_id: conv.agent_id
+        });
+        
         // Se conversa está fechada ou resolvida, não calcular SLA
         if (conv.status === 'closed' || conv.status === 'resolved') {
+            console.log(`[SLA] Conversa ${conv.id} está ${conv.status}, ignorando SLA`);
             return { percentage: 0, status: 'none', breached: false };
         }
         
         // Se ainda não há agente atribuído ou não houve primeira resposta
         const waitingFirstResponse = !firstResponseAt;
+        console.log(`[SLA] Conversa ${conv.id} aguardando primeira resposta: ${waitingFirstResponse}`);
         
         if (waitingFirstResponse) {
             // Calcular SLA de primeira resposta

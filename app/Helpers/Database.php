@@ -33,6 +33,18 @@ class Database
     private static function connect(): void
     {
         try {
+            // Log config para debug (remover em produção)
+            $debug = ($_ENV['APP_DEBUG'] ?? 'true') === 'true';
+            if ($debug) {
+                error_log('Database config: ' . json_encode([
+                    'host' => self::$config['host'] ?? 'não definido',
+                    'port' => self::$config['port'] ?? 'não definido',
+                    'database' => self::$config['database'] ?? 'não definido',
+                    'username' => self::$config['username'] ?? 'não definido',
+                    'password' => '***',
+                ]));
+            }
+            
             $dsn = sprintf(
                 'mysql:host=%s;port=%d;dbname=%s;charset=%s',
                 self::$config['host'],
@@ -53,7 +65,8 @@ class Database
             
         } catch (PDOException $e) {
             error_log('Database connection error: ' . $e->getMessage());
-            throw new \RuntimeException('Erro ao conectar ao banco de dados');
+            error_log('DSN attempted: mysql:host=' . (self::$config['host'] ?? '?') . ';port=' . (self::$config['port'] ?? '?') . ';dbname=' . (self::$config['database'] ?? '?'));
+            throw new \RuntimeException('Erro ao conectar ao banco de dados: ' . $e->getMessage());
         }
     }
 

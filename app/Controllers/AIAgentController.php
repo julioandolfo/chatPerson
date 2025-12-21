@@ -59,6 +59,9 @@ class AIAgentController
     {
         $isAjax = Request::isAjax() || Request::get('format') === 'json';
         
+        // Log para debug
+        error_log("AIAgentController::show - ID: {$id}, isAjax: " . ($isAjax ? 'true' : 'false'));
+        
         // Se for AJAX, limpar qualquer output anterior e desabilitar display de erros
         if ($isAjax) {
             while (ob_get_level() > 0) {
@@ -70,6 +73,7 @@ class AIAgentController
         
         // Verificar permissões antes, mas retornar JSON se for AJAX
         if (!Permission::can('ai_agents.view')) {
+            error_log("AIAgentController::show - Sem permissão");
             if ($isAjax) {
                 Response::json([
                     'success' => false,
@@ -81,8 +85,11 @@ class AIAgentController
         }
         
         try {
+            error_log("AIAgentController::show - Buscando agente {$id}");
             $agent = AIAgentService::get($id);
+            
             if (!$agent) {
+                error_log("AIAgentController::show - Agente não encontrado");
                 if ($isAjax) {
                     Response::json([
                         'success' => false,
@@ -94,17 +101,25 @@ class AIAgentController
                 return;
             }
             
+            error_log("AIAgentController::show - Agente encontrado: " . ($agent['name'] ?? 'sem nome'));
+            
             // Se for requisição AJAX, retornar JSON (sem conversas para evitar erros)
             if ($isAjax) {
-                // Obter tools do agente
-                $agentTools = AIAgent::getTools($id);
-                $allTools = AITool::getAllActive();
+                // O agente já vem com tools do AIAgentService::get()
+                // Mas vamos pegar allTools também
+                try {
+                    error_log("AIAgentController::show - Buscando allTools");
+                    $allTools = AITool::getAllActive();
+                    error_log("AIAgentController::show - allTools encontradas: " . count($allTools));
+                } catch (\Exception $e) {
+                    error_log("Erro ao buscar allTools: " . $e->getMessage());
+                    $allTools = [];
+                }
                 
+                error_log("AIAgentController::show - Retornando JSON");
                 Response::json([
                     'success' => true,
-                    'agent' => array_merge($agent, [
-                        'tools' => $agentTools
-                    ]),
+                    'agent' => $agent, // Já inclui tools
                     'allTools' => $allTools
                 ]);
                 return;

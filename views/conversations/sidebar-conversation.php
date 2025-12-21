@@ -485,7 +485,7 @@
 console.log('📋 sidebar-conversation.php carregado');
 
 // Funções de ação do sidebar
-function editContact(contactId) {
+window.editContact = function(contactId) {
     const contactIdValue = contactId || window.currentConversation?.contact_id || 0;
     if (!contactIdValue) {
         const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
@@ -549,17 +549,14 @@ function editContact(contactId) {
             colorScheme: isDarkMode ? 'dark' : 'light'
         });
     });
-}
+};
 
-// Tornar função disponível globalmente
-window.editContact = editContact;
-
-function assignConversation(conversationId) {
+window.assignConversation = function(conversationId) {
     // TODO: Implementar modal de atribuição
     alert('Modal de atribuição em desenvolvimento');
-}
+};
 
-function changeDepartment(conversationId) {
+window.changeDepartment = function(conversationId) {
     const modal = new bootstrap.Modal(document.getElementById('kt_modal_change_department'));
     const conversationIdValue = conversationId || window.currentConversationId || 0;
     document.getElementById('changeDepartmentConversationId').value = conversationIdValue;
@@ -574,17 +571,14 @@ function changeDepartment(conversationId) {
     }
     
     modal.show();
-}
+};
 
-// Tornar função disponível globalmente
-window.changeDepartment = changeDepartment;
-
-function manageTags(conversationId) {
+window.manageTags = function(conversationId) {
     // TODO: Implementar modal de gerenciamento de tags
     alert('Modal de tags em desenvolvimento');
-}
+};
 
-function closeConversation(conversationId) {
+window.closeConversation = function(conversationId) {
     if (!confirm('Deseja realmente encerrar esta conversa?')) {
         return;
     }
@@ -607,9 +601,9 @@ function closeConversation(conversationId) {
         console.error('Erro:', error);
         alert('Erro ao encerrar conversa');
     });
-}
+};
 
-function reopenConversation(conversationId) {
+window.reopenConversation = function(conversationId) {
     if (!confirm('Deseja realmente reabrir esta conversa?')) {
         return;
     }
@@ -632,9 +626,9 @@ function reopenConversation(conversationId) {
         console.error('Erro:', error);
         alert('Erro ao reabrir conversa');
     });
-}
+};
 
-function markAsSpam(conversationId) {
+window.markAsSpam = function(conversationId) {
     if (!confirm('Deseja realmente marcar esta conversa como spam? Esta ação não pode ser desfeita e a conversa será fechada automaticamente.')) {
         return;
     }
@@ -658,9 +652,9 @@ function markAsSpam(conversationId) {
         console.error('Erro:', error);
         alert('Erro ao marcar como spam');
     });
-}
+};
 
-function addNote(conversationId) {
+window.addNote = function(conversationId) {
     const noteText = document.getElementById('newNoteText');
     const content = noteText?.value.trim() || '';
     
@@ -746,13 +740,10 @@ function addNote(conversationId) {
             btn.innerHTML = originalText;
         }
     });
-}
-
-// Tornar função disponível globalmente
-window.addNote = addNote;
+};
 
 // Função para mover conversa de funil/etapa
-function moveConversationStage() {
+window.moveConversationStage = function() {
     const conversationId = window.currentConversationId || 0;
     if (!conversationId) {
         Swal.fire({
@@ -897,9 +888,7 @@ function moveConversationStage() {
             text: 'Erro ao carregar funis: ' + error.message
         });
     });
-}
-
-window.moveConversationStage = moveConversationStage;
+};
 
 // ============================================================================
 // FUNÇÕES DE GERENCIAMENTO DE AGENTES DE IA
@@ -908,7 +897,7 @@ window.moveConversationStage = moveConversationStage;
 /**
  * Carregar status da IA na conversa
  */
-function loadAIAgentStatus(conversationId) {
+window.loadAIAgentStatus = function(conversationId) {
     console.log('loadAIAgentStatus chamado com conversationId:', conversationId);
     
     if (!conversationId) {
@@ -963,13 +952,13 @@ function loadAIAgentStatus(conversationId) {
             updateAIActiveBanner({ has_ai: false }, conversationId);
         }
     });
-}
-console.log('✅ loadAIAgentStatus definida:', typeof loadAIAgentStatus);
+};
+console.log('✅ loadAIAgentStatus definida:', typeof window.loadAIAgentStatus);
 
 /**
  * Atualizar sidebar com status da IA
  */
-function updateAIAgentSidebar(status) {
+window.updateAIAgentSidebar = function(status) {
     console.log('updateAIAgentSidebar chamado com status:', status);
     
     const section = document.getElementById('sidebar-ai-agent-section');
@@ -1057,12 +1046,12 @@ function updateAIAgentSidebar(status) {
         const conversationId = window.currentConversationId || 0;
         updateAIActiveBanner(status, conversationId);
     }
-}
+};
 
 /**
  * Mostrar modal de adicionar agente de IA
  */
-function showAddAIAgentModal() {
+window.showAddAIAgentModal = function() {
     const conversationId = window.currentConversationId || 0;
     if (!conversationId) {
         Swal.fire({
@@ -1167,12 +1156,12 @@ function showAddAIAgentModal() {
             text: 'Erro ao carregar agentes de IA disponíveis'
         });
     });
-}
+};
 
 /**
  * Adicionar agente de IA à conversa
  */
-function addAIAgentToConversation(conversationId, data) {
+window.addAIAgentToConversation = function(conversationId, data) {
     const btn = Swal.getConfirmButton();
     const originalText = btn.innerHTML;
     btn.disabled = true;
@@ -1220,12 +1209,12 @@ function addAIAgentToConversation(conversationId, data) {
         btn.disabled = false;
         btn.innerHTML = originalText;
     });
-}
+};
 
 /**
  * Mostrar histórico de mensagens da IA
  */
-function showAIHistory() {
+window.showAIHistory = function() {
     const conversationId = window.currentConversationId || 0;
     if (!conversationId) {
         Swal.fire({
@@ -1319,12 +1308,12 @@ function showAIHistory() {
             text: error.message || 'Erro ao carregar histórico da IA'
         });
     });
-}
+};
 
 /**
  * Remover agente de IA da conversa
  */
-function removeAIAgent() {
+window.removeAIAgent = function() {
     const conversationId = window.currentConversationId || 0;
     if (!conversationId) {
         Swal.fire({
@@ -1435,19 +1424,22 @@ function removeAIAgent() {
             });
         }
     });
-}
+};
 
 // Função auxiliar para escapar HTML
-function escapeHtml(text) {
+window.escapeHtml = function(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
-}
+};
 
-// Tornar funções disponíveis globalmente
-window.loadAIAgentStatus = loadAIAgentStatus;
-window.showAddAIAgentModal = showAddAIAgentModal;
-window.showAIHistory = showAIHistory;
-window.removeAIAgent = removeAIAgent;
+console.log('✅ Todas as funções do sidebar carregadas:', {
+    editContact: typeof window.editContact,
+    loadAIAgentStatus: typeof window.loadAIAgentStatus,
+    updateAIAgentSidebar: typeof window.updateAIAgentSidebar,
+    showAddAIAgentModal: typeof window.showAddAIAgentModal,
+    showAIHistory: typeof window.showAIHistory,
+    removeAIAgent: typeof window.removeAIAgent
+});
 </script>
 

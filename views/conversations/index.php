@@ -3877,7 +3877,7 @@ window.updateAIAgentSidebar = function(status) {
     
     const statusDiv = document.getElementById('sidebar-ai-status');
     const actionsDiv = document.getElementById('sidebar-ai-actions');
-    const addSection = document.getElementById('sidebar-add-ai-agent');
+    const addSection = document.getElementById('sidebar-ai-add-section');
     
     console.log('Elementos encontrados:', {
         statusDiv: !!statusDiv,
@@ -3937,9 +3937,391 @@ window.updateAIAgentSidebar = function(status) {
     }
 };
 
+/**
+ * Mostrar modal de adicionar agente de IA
+ */
+window.showAddAIAgentModal = function() {
+    const conversationId = window.currentConversationId || 0;
+    if (!conversationId) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Atenção',
+            text: 'Selecione uma conversa primeiro'
+        });
+        return;
+    }
+    
+    // Carregar agentes disponíveis
+    fetch(`<?= \App\Helpers\Url::to('/ai-agents/available') ?>`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success || !data.data || data.data.length === 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Atenção',
+                text: 'Nenhum agente de IA disponível'
+            });
+            return;
+        }
+        
+        const agents = data.data;
+        const agentOptions = agents.map(agent => 
+            `<option value="${agent.id}">${agent.name} (${agent.agent_type})</option>`
+        ).join('');
+        
+        Swal.fire({
+            title: 'Adicionar Agente de IA',
+            html: `
+                <div class="text-start">
+                    <div class="mb-4">
+                        <label class="form-label">Selecione o agente:</label>
+                        <select id="swal-ai-agent-select" class="form-select">
+                            <option value="">Selecione...</option>
+                            ${agentOptions}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-check form-check-custom form-check-solid">
+                            <input class="form-check-input" type="checkbox" id="swal-process-immediately" checked>
+                            <span class="form-check-label">
+                                Processar mensagens imediatamente
+                            </span>
+                        </label>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-check form-check-custom form-check-solid">
+                            <input class="form-check-input" type="checkbox" id="swal-assume-conversation">
+                            <span class="form-check-label">
+                                Assumir conversa (remover agente humano se houver)
+                            </span>
+                        </label>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-check form-check-custom form-check-solid">
+                            <input class="form-check-input" type="checkbox" id="swal-only-if-unassigned">
+                            <span class="form-check-label">
+                                Apenas se não tiver agente atribuído
+                            </span>
+                        </label>
+                    </div>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Adicionar IA',
+            cancelButtonText: 'Cancelar',
+            preConfirm: () => {
+                const agentId = document.getElementById('swal-ai-agent-select').value;
+                if (!agentId) {
+                    Swal.showValidationMessage('Selecione um agente de IA');
+                    return false;
+                }
+                
+                return {
+                    ai_agent_id: agentId,
+                    process_immediately: document.getElementById('swal-process-immediately').checked,
+                    assume_conversation: document.getElementById('swal-assume-conversation').checked,
+                    only_if_unassigned: document.getElementById('swal-only-if-unassigned').checked
+                };
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                window.addAIAgentToConversation(conversationId, result.value);
+            }
+        });
+    })
+    .catch(error => {
+        console.error('Erro ao carregar agentes:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro ao carregar agentes de IA disponíveis'
+        });
+    });
+};
+
+/**
+ * Adicionar agente de IA à conversa
+ */
+window.addAIAgentToConversation = function(conversationId, data) {
+    const btn = Swal.getConfirmButton();
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Adicionando...';
+    
+    fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/ai-agents`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso!',
+                text: result.message || 'Agente de IA adicionado com sucesso',
+                timer: 2000,
+                showConfirmButton: false
+            });
+            
+            // Recarregar status da IA
+            window.loadAIAgentStatus(conversationId);
+            
+            // Recarregar conversa se necessário
+            if (typeof selectConversation === 'function') {
+                selectConversation(conversationId);
+            }
+        } else {
+            throw new Error(result.message || 'Erro ao adicionar agente de IA');
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: error.message || 'Erro ao adicionar agente de IA'
+        });
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    });
+};
+
+/**
+ * Mostrar histórico de mensagens da IA
+ */
+window.showAIHistory = function() {
+    const conversationId = window.currentConversationId || 0;
+    if (!conversationId) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Atenção',
+            text: 'Selecione uma conversa primeiro'
+        });
+        return;
+    }
+    
+    // Carregar mensagens da IA
+    fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/ai-messages?limit=50`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            throw new Error(data.message || 'Erro ao carregar histórico');
+        }
+        
+        const messages = data.data || [];
+        
+        if (messages.length === 0) {
+            Swal.fire({
+                icon: 'info',
+                title: 'Histórico',
+                text: 'Nenhuma mensagem da IA encontrada'
+            });
+            return;
+        }
+        
+        // Carregar nome do agente
+        fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/ai-status`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(statusData => {
+            const agentName = statusData.success && statusData.data?.ai_agent 
+                ? statusData.data.ai_agent.name 
+                : 'Agente de IA';
+            
+            // Formatar mensagens
+            const messagesHtml = messages.map(msg => {
+                const date = new Date(msg.created_at);
+                const formattedDate = date.toLocaleString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                const toolsHtml = msg.tools_used && msg.tools_used.length > 0
+                    ? `<div class="mt-2"><small class="text-muted">🔧 Tools: ${msg.tools_used.join(', ')}</small></div>`
+                    : '';
+                
+                const escapeDiv = document.createElement('div');
+                escapeDiv.textContent = msg.content;
+                const escapedContent = escapeDiv.innerHTML;
+                
+                return `
+                    <div class="border-bottom pb-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <small class="text-muted">${formattedDate}</small>
+                        </div>
+                        <div class="text-gray-800">${escapedContent}</div>
+                        ${toolsHtml}
+                    </div>
+                `;
+            }).join('');
+            
+            Swal.fire({
+                title: `Histórico - ${agentName}`,
+                html: `
+                    <div style="max-height: 400px; overflow-y: auto; text-align: left;">
+                        ${messagesHtml}
+                    </div>
+                `,
+                width: '600px',
+                showConfirmButton: true,
+                confirmButtonText: 'Fechar'
+            });
+        });
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: error.message || 'Erro ao carregar histórico da IA'
+        });
+    });
+};
+
+/**
+ * Remover agente de IA da conversa
+ */
+window.removeAIAgent = function() {
+    const conversationId = window.currentConversationId || 0;
+    if (!conversationId) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Atenção',
+            text: 'Selecione uma conversa primeiro'
+        });
+        return;
+    }
+    
+    Swal.fire({
+        title: 'Remover Agente de IA',
+        html: `
+            <div class="text-start">
+                <p>Deseja realmente remover o agente de IA desta conversa?</p>
+                
+                <div class="mb-3">
+                    <label class="form-check form-check-custom form-check-solid">
+                        <input class="form-check-input" type="checkbox" id="swal-assign-to-human" checked>
+                        <span class="form-check-label">
+                            Atribuir a agente humano após remover
+                        </span>
+                    </label>
+                </div>
+                
+                <div id="swal-human-agent-select-container" style="display: none;">
+                    <label class="form-label">Selecione o agente:</label>
+                    <select id="swal-human-agent-select" class="form-select">
+                        <option value="">Distribuição automática</option>
+                    </select>
+                </div>
+            </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Remover',
+        cancelButtonText: 'Cancelar',
+        didOpen: () => {
+            const assignCheckbox = document.getElementById('swal-assign-to-human');
+            const selectContainer = document.getElementById('swal-human-agent-select-container');
+            
+            assignCheckbox.addEventListener('change', function() {
+                selectContainer.style.display = this.checked ? 'block' : 'none';
+            });
+        },
+        preConfirm: () => {
+            const assignToHuman = document.getElementById('swal-assign-to-human').checked;
+            const humanAgentId = document.getElementById('swal-human-agent-select').value;
+            
+            return {
+                assign_to_human: assignToHuman,
+                human_agent_id: humanAgentId || null,
+                reason: 'Removido manualmente pelo usuário'
+            };
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const btn = Swal.getConfirmButton();
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Removendo...';
+            
+            fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/ai-agents`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify(result.value)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Sucesso!',
+                        text: data.message || 'Agente de IA removido com sucesso',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                    
+                    // Recarregar status da IA
+                    window.loadAIAgentStatus(conversationId);
+                    
+                    // Recarregar conversa se necessário
+                    if (typeof selectConversation === 'function') {
+                        selectConversation(conversationId);
+                    }
+                } else {
+                    throw new Error(data.message || 'Erro ao remover agente de IA');
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: error.message || 'Erro ao remover agente de IA'
+                });
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            });
+        }
+    });
+};
+
 console.log('✅ Funções de IA definidas no escopo global:', {
     loadAIAgentStatus: typeof window.loadAIAgentStatus,
-    updateAIAgentSidebar: typeof window.updateAIAgentSidebar
+    updateAIAgentSidebar: typeof window.updateAIAgentSidebar,
+    showAddAIAgentModal: typeof window.showAddAIAgentModal,
+    addAIAgentToConversation: typeof window.addAIAgentToConversation,
+    showAIHistory: typeof window.showAIHistory,
+    removeAIAgent: typeof window.removeAIAgent
 });
 
 // ============================================

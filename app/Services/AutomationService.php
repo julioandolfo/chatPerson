@@ -321,11 +321,11 @@ class AutomationService
                 // Não processar pelo chatbot, deixar automações normais tratarem
             } else {
                 \App\Helpers\Logger::automation("Chamando handleChatbotResponse...");
-                $handled = self::handleChatbotResponse($conversation, $message);
-                if ($handled) {
+            $handled = self::handleChatbotResponse($conversation, $message);
+            if ($handled) {
                     \App\Helpers\Logger::automation("✅ Chatbot tratou a mensagem. Não disparar outras automações.");
-                    return; // Já roteou para o próximo nó do chatbot, não disparar outras automações aqui
-                }
+                return; // Já roteou para o próximo nó do chatbot, não disparar outras automações aqui
+            }
                 \App\Helpers\Logger::automation("⚠️ handleChatbotResponse retornou false. Continuando com automações normais...");
             }
         } else {
@@ -1200,8 +1200,8 @@ class AutomationService
                 \App\Helpers\Logger::automation("  ✅ Tag '{$tag['name']}' removida da conversa {$conversationId}");
             } else {
                 // Adicionar tag à conversa (padrão)
-                $sql = "INSERT IGNORE INTO conversation_tags (conversation_id, tag_id) VALUES (?, ?)";
-                \App\Helpers\Database::execute($sql, [$conversationId, $tagId]);
+            $sql = "INSERT IGNORE INTO conversation_tags (conversation_id, tag_id) VALUES (?, ?)";
+            \App\Helpers\Database::execute($sql, [$conversationId, $tagId]);
                 \App\Helpers\Logger::automation("  ✅ Tag '{$tag['name']}' adicionada à conversa {$conversationId}");
             }
         } catch (\Exception $e) {
@@ -1311,7 +1311,7 @@ class AutomationService
                 if ($executionId) {
                     \App\Models\AutomationExecution::updateStatus($executionId, 'waiting', "Delay agendado por {$delaySeconds}s");
                 }
-
+                
                 error_log("Delay de {$delaySeconds}s agendado para conversa {$conversationId} (executará em " . date('Y-m-d H:i:s', time() + $delaySeconds) . ")");
                 return; // Pausar aqui; retomará pelo cron
             } catch (\Exception $e) {
@@ -2061,6 +2061,7 @@ class AutomationService
         }
         
         \App\Helpers\Logger::automation("Nenhum intent matched");
+        self::logIntent("keyword_none");
         return null;
     }
 
@@ -2070,6 +2071,7 @@ class AutomationService
     private static function detectAIIntentSemantic(string $aiResponse, array $intents, float $minConfidence = 0.35, ?int $conversationId = null): ?array
     {
         \App\Helpers\Logger::automation("Detectando intent (semântico). Intents: " . count($intents) . ", minConfidence: {$minConfidence}");
+        self::logIntent("semantic_call intents=" . count($intents) . " minConf={$minConfidence} text='" . $aiResponse . "'");
 
         if (empty($intents)) {
             return null;
@@ -2102,12 +2104,15 @@ class AutomationService
             $result = \App\Services\OpenAIService::classifyIntent($aiResponse, $intents, $minConfidence, $context);
             if ($result) {
                 \App\Helpers\Logger::automation("Intent semântico detectado: " . ($result['intent'] ?? '[sem nome]'));
+                self::logIntent("semantic_detected:" . ($result['intent'] ?? ''));
                 return $result;
             }
             \App\Helpers\Logger::automation("Intent semântico não encontrado ou confiança abaixo do mínimo");
+            self::logIntent("semantic_none");
             return null;
         } catch (\Exception $e) {
             \App\Helpers\Logger::automation("Erro ao detectar intent semântico: " . $e->getMessage());
+            self::logIntent("semantic_error:" . $e->getMessage());
             return null;
         }
     }

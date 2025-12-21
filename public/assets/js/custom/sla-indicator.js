@@ -269,7 +269,7 @@ const SLAIndicator = {
         // Falha de dados: sem created_at válido -> não mostra
         if (!createdAt || isNaN(createdAt.getTime())) {
             console.warn('[SLA] Sem created_at válido para conv', conv.id, conv);
-            return { percentage: 0, status: 'none', breached: false };
+            return { percentage: 0, status: 'none', breached: false, show: false };
         }
         
         console.log(`[SLA] Calculando para conversa ${conv.id}:`, {
@@ -284,7 +284,7 @@ const SLAIndicator = {
         // Se conversa está fechada ou resolvida, não calcular SLA
         if (conv.status === 'closed' || conv.status === 'resolved') {
             console.log(`[SLA] Conversa ${conv.id} está ${conv.status}, ignorando SLA`);
-            return { percentage: 0, status: 'none', breached: false };
+            return { percentage: 0, status: 'none', breached: false, show: false };
         }
         
         // Se ainda não há agente atribuído ou não houve primeira resposta
@@ -298,9 +298,10 @@ const SLAIndicator = {
                 : (now - createdAt) / 1000 / 60;
             const slaMinutes = this.config.firstResponseTime;
             if (!isFinite(minutesSinceCreated) || !isFinite(slaMinutes) || slaMinutes <= 0) {
-                return { percentage: 0, status: 'none', breached: false };
+                return { percentage: 0, status: 'none', breached: false, show: false };
             }
-            const percentage = Math.min((minutesSinceCreated / slaMinutes) * 100, 100);
+            const percentageRaw = (minutesSinceCreated / slaMinutes) * 100;
+            const percentage = Math.min(Math.max(percentageRaw, 0.1), 100); // manter anel visível mesmo <1%
             const breached = minutesSinceCreated > slaMinutes;
             
             return {
@@ -310,7 +311,8 @@ const SLAIndicator = {
                 type: 'first_response',
                 elapsed: Math.floor(minutesSinceCreated),
                 limit: slaMinutes,
-                remaining: Math.max(0, Math.ceil(slaMinutes - minutesSinceCreated))
+                remaining: Math.max(0, Math.ceil(slaMinutes - minutesSinceCreated)),
+                show: true
             };
         } else {
             // Se SLA de resolução estiver desativado, usar SLA de resposta contínua
@@ -323,9 +325,10 @@ const SLAIndicator = {
                         : (now - lastContactAt) / 1000 / 60;
                     const slaMinutes = this.config.ongoingResponseTime || this.config.firstResponseTime;
                     if (!isFinite(minutesWaiting) || !isFinite(slaMinutes) || slaMinutes <= 0) {
-                        return { percentage: 0, status: 'none', breached: false };
+                        return { percentage: 0, status: 'none', breached: false, show: false };
                     }
-                    const percentage = Math.min((minutesWaiting / slaMinutes) * 100, 100);
+                    const percentageRaw = (minutesWaiting / slaMinutes) * 100;
+                    const percentage = Math.min(Math.max(percentageRaw, 0.1), 100); // manter anel visível
                     const breached = minutesWaiting > slaMinutes;
                     
                     return {
@@ -335,12 +338,13 @@ const SLAIndicator = {
                         type: 'response',
                         elapsed: Math.floor(minutesWaiting),
                         limit: slaMinutes,
-                        remaining: Math.max(0, Math.ceil(slaMinutes - minutesWaiting))
+                        remaining: Math.max(0, Math.ceil(slaMinutes - minutesWaiting)),
+                        show: true
                     };
                 }
                 
                 // Sem pendências: não mostrar anel
-                return { percentage: 0, status: 'none', breached: false };
+                return { percentage: 0, status: 'none', breached: false, show: false };
             }
             
             // Calcular SLA de resolução (padrão)
@@ -356,7 +360,8 @@ const SLAIndicator = {
                 type: 'resolution',
                 elapsed: Math.floor(minutesSinceCreated),
                 limit: slaMinutes,
-                remaining: Math.max(0, Math.ceil(slaMinutes - minutesSinceCreated))
+                remaining: Math.max(0, Math.ceil(slaMinutes - minutesSinceCreated)),
+                show: true
             };
         }
     },

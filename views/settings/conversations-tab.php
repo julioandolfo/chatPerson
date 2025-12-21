@@ -103,6 +103,49 @@ $sentiment = $cs['sentiment_analysis'] ?? [];
                 </div>
             </div>
         </div>
+        <div class="row">
+            <div class="col-lg-6">
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2">Tempo de Resposta em Conversa (minutos)</label>
+                    <input type="number" name="sla_ongoing_response_time" class="form-control form-control-solid" 
+                           value="<?= $sla['ongoing_response_time'] ?? 15 ?>" min="1" />
+                    <div class="form-text">Tempo para responder novas mensagens durante a conversa</div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="fv-row mb-7">
+                    <label class="d-flex align-items-center">
+                        <input type="checkbox" name="enable_resolution_sla" class="form-check-input me-2" 
+                               <?= ($sla['enable_resolution_sla'] ?? true) ? 'checked' : '' ?> />
+                        <span class="fw-semibold fs-6">Monitorar SLA de Resolução</span>
+                    </label>
+                    <div class="form-text">Desmarque para usar apenas SLA de respostas</div>
+                </div>
+            </div>
+        </div>
+        <div class="fv-row mb-7">
+            <label class="d-flex align-items-center">
+                <input type="checkbox" name="sla_working_hours_enabled" class="form-check-input me-2" 
+                       <?= ($sla['working_hours_enabled'] ?? false) ? 'checked' : '' ?> />
+                <span class="fw-semibold fs-6">Considerar apenas horário de atendimento</span>
+            </label>
+        </div>
+        <div class="row">
+            <div class="col-lg-3">
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2">Início</label>
+                    <input type="time" name="sla_working_hours_start" class="form-control form-control-solid" 
+                           value="<?= $sla['working_hours_start'] ?? '08:00' ?>" />
+                </div>
+            </div>
+            <div class="col-lg-3">
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2">Fim</label>
+                    <input type="time" name="sla_working_hours_end" class="form-control form-control-solid" 
+                           value="<?= $sla['working_hours_end'] ?? '18:00' ?>" />
+                </div>
+            </div>
+        </div>
         <div class="fv-row mb-7">
             <label class="d-flex align-items-center">
                 <input type="checkbox" name="auto_reassign_on_sla_breach" class="form-check-input me-2" 

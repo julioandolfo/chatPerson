@@ -8,6 +8,11 @@ const SLAIndicator = {
     config: {
         firstResponseTime: 15, // minutos
         resolutionTime: 60,   // minutos
+        ongoingResponseTime: 15,
+        enableResolution: true,
+        workingHoursEnabled: false,
+        workingHoursStart: '08:00',
+        workingHoursEnd: '18:00',
         enabled: true
     },
     
@@ -43,6 +48,11 @@ const SLAIndicator = {
                     this.config = {
                         firstResponseTime: data.sla.first_response_time || 15,
                         resolutionTime: data.sla.resolution_time || 60,
+                        ongoingResponseTime: data.sla.ongoing_response_time || 15,
+                        enableResolution: data.sla.enable_resolution_sla !== false,
+                        workingHoursEnabled: data.sla.working_hours_enabled || false,
+                        workingHoursStart: data.sla.working_hours_start || '08:00',
+                        workingHoursEnd: data.sla.working_hours_end || '18:00',
                         enabled: data.sla.enable_sla_monitoring !== false
                     };
                     console.log('[SLA] Configurações carregadas:', this.config);
@@ -98,6 +108,8 @@ const SLAIndicator = {
                 created_at: item.getAttribute('data-created-at'),
                 first_response_at: item.getAttribute('data-first-response-at'),
                 last_message_at: item.getAttribute('data-last-message-at'),
+                last_contact_message_at: item.getAttribute('data-last-contact-message-at'),
+                last_agent_message_at: item.getAttribute('data-last-agent-message-at'),
                 agent_id: item.getAttribute('data-agent-id')
             };
         }
@@ -206,10 +218,27 @@ const SLAIndicator = {
         const now = new Date();
         const createdAt = new Date(conv.created_at);
         const firstResponseAt = conv.first_response_at ? new Date(conv.first_response_at) : null;
+        const lastContactAt = conv.last_contact_message_at ? new Date(conv.last_contact_message_at) : null;
+        const lastAgentAt = conv.last_agent_message_at ? new Date(conv.last_agent_message_at) : null;
+        
+        // Respeitar horário de atendimento, se configurado
+        if (this.config.workingHoursEnabled) {
+            const [startH, startM] = (this.config.workingHoursStart || '08:00').split(':').map(Number);
+            const [endH, endM] = (this.config.workingHoursEnd || '18:00').split(':').map(Number);
+            const start = new Date(now);
+            start.setHours(startH, startM, 0, 0);
+            const end = new Date(now);
+            end.setHours(endH, endM, 0, 0);
+            if (now < start || now > end) {
+                return { percentage: 0, status: 'none', breached: false };
+            }
+        }
         
         console.log(`[SLA] Calculando para conversa ${conv.id}:`, {
             created_at: conv.created_at,
             first_response_at: conv.first_response_at,
+            last_contact_message_at: conv.last_contact_message_at,
+            last_agent_message_at: conv.last_agent_message_at,
             status: conv.status,
             agent_id: conv.agent_id
         });
@@ -241,7 +270,31 @@ const SLAIndicator = {
                 remaining: Math.max(0, Math.ceil(slaMinutes - minutesSinceCreated))
             };
         } else {
-            // Calcular SLA de resolução
+            // Se SLA de resolução estiver desativado, usar SLA de resposta contínua
+            if (!this.config.enableResolution) {
+                // Verificar se há mensagem pendente do contato (última mensagem é do contato)
+                if (lastContactAt && (!lastAgentAt || lastContactAt > lastAgentAt)) {
+                    const minutesWaiting = (now - lastContactAt) / 1000 / 60;
+                    const slaMinutes = this.config.ongoingResponseTime || this.config.firstResponseTime;
+                    const percentage = Math.min((minutesWaiting / slaMinutes) * 100, 100);
+                    const breached = minutesWaiting > slaMinutes;
+                    
+                    return {
+                        percentage: percentage,
+                        status: this.getStatusFromPercentage(percentage, breached),
+                        breached: breached,
+                        type: 'response',
+                        elapsed: Math.floor(minutesWaiting),
+                        limit: slaMinutes,
+                        remaining: Math.max(0, Math.ceil(slaMinutes - minutesWaiting))
+                    };
+                }
+                
+                // Sem pendências: não mostrar anel
+                return { percentage: 0, status: 'none', breached: false };
+            }
+            
+            // Calcular SLA de resolução (padrão)
             const minutesSinceCreated = (now - createdAt) / 1000 / 60;
             const slaMinutes = this.config.resolutionTime;
             const percentage = Math.min((minutesSinceCreated / slaMinutes) * 100, 100);
@@ -283,7 +336,12 @@ const SLAIndicator = {
             avatar.appendChild(tooltip);
         }
         
-        const typeLabel = slaStatus.type === 'first_response' ? 'Primeira Resposta' : 'Resolução';
+        let typeLabel = 'Resolução';
+        if (slaStatus.type === 'first_response') {
+            typeLabel = 'Primeira Resposta';
+        } else if (slaStatus.type === 'response') {
+            typeLabel = 'Resposta em Conversa';
+        }
         
         if (slaStatus.breached) {
             tooltip.textContent = `SLA ${typeLabel} ESTOURADO! (+${slaStatus.elapsed - slaStatus.limit}min)`;

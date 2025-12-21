@@ -1191,11 +1191,11 @@ function renderNode(node) {
     let innerHtml = `
         <div class="d-flex align-items-center justify-content-between mb-2">
             <div class="d-flex align-items-center gap-3">
-                <i class="ki-duotone ${config.icon || "ki-gear"} fs-2" style="color: ${config.color || "#009ef7"};">
-                    <span class="path1"></span>
-                    <span class="path2"></span>
-                </i>
-                <span class="fw-bold">${config.label || node.node_type}</span>
+            <i class="ki-duotone ${config.icon || "ki-gear"} fs-2" style="color: ${config.color || "#009ef7"};">
+                <span class="path1"></span>
+                <span class="path2"></span>
+            </i>
+            <span class="fw-bold">${config.label || node.node_type}</span>
             </div>
             <span class="badge badge-light-secondary fs-9 px-2 py-1" style="font-family: monospace; opacity: 0.7;">${String(node.id || '')}</span>
         </div>
@@ -2467,10 +2467,10 @@ function openNodeConfig(nodeId) {
     
     // Carregar estágios quando funil for selecionado (action_move_stage)
     setTimeout(() => {
-        const funnelSelect = document.getElementById("kt_node_funnel_select");
-        const stageSelect = document.getElementById("kt_node_stage_select");
+    const funnelSelect = document.getElementById("kt_node_funnel_select");
+    const stageSelect = document.getElementById("kt_node_stage_select");
         
-        if (funnelSelect && stageSelect) {
+    if (funnelSelect && stageSelect) {
             console.log('🔄 Configurando listener para action_move_stage');
             console.log('   node.node_data.funnel_id:', node.node_data.funnel_id);
             console.log('   node.node_data.stage_id:', node.node_data.stage_id);

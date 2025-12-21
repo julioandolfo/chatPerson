@@ -79,6 +79,11 @@ class ConversationSettingsService
                 'first_response_time' => 15, // minutos
                 'resolution_time' => 60, // minutos
                 'enable_sla_monitoring' => true,
+                'enable_resolution_sla' => true, // permitir desativar SLA de resolução
+                'ongoing_response_time' => 15, // SLA para respostas durante a conversa
+                'working_hours_enabled' => false,
+                'working_hours_start' => '08:00',
+                'working_hours_end' => '18:00',
                 'auto_reassign_on_sla_breach' => true,
                 'reassign_after_minutes' => 30, // minutos após SLA
             ],
@@ -587,7 +592,7 @@ class ConversationSettingsService
     {
         $settings = self::getSettings();
         
-        if (!$settings['sla']['enable_sla_monitoring']) {
+        if (!$settings['sla']['enable_sla_monitoring'] || !$settings['sla']['enable_resolution_sla']) {
             return true;
         }
         

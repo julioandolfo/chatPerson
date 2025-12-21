@@ -1861,6 +1861,8 @@ body.dark-mode .swal2-content {
                     <?php
                     // Usar first_response_at calculado das mensagens se disponível, senão usar o campo da conversa
                     $firstResponseAt = !empty($conv['first_response_at_calc']) ? $conv['first_response_at_calc'] : ($conv['first_response_at'] ?? '');
+                    $lastContactAt = $conv['last_contact_message_at'] ?? '';
+                    $lastAgentAt = $conv['last_agent_message_at'] ?? '';
                     ?>
                     <div class="conversation-item <?= $isActive ? 'active' : '' ?> <?= !empty($conv['pinned']) ? 'pinned' : '' ?>" 
                          data-conversation-id="<?= $conv['id'] ?>"
@@ -1868,6 +1870,8 @@ body.dark-mode .swal2-content {
                          data-created-at="<?= htmlspecialchars($conv['created_at'] ?? '') ?>"
                          data-first-response-at="<?= htmlspecialchars($firstResponseAt) ?>"
                          data-last-message-at="<?= htmlspecialchars($conv['last_message_at'] ?? '') ?>"
+                         data-last-contact-message-at="<?= htmlspecialchars($lastContactAt) ?>"
+                         data-last-agent-message-at="<?= htmlspecialchars($lastAgentAt) ?>"
                          data-agent-id="<?= htmlspecialchars($conv['agent_id'] ?? '') ?>"
                          data-onclick="selectConversation">
                         <div class="d-flex gap-3 w-100">

@@ -6,6 +6,9 @@
 
 .symbol.symbol-sla {
     position: relative;
+    width: 45px;
+    height: 45px;
+    display: inline-block;
 }
 
 .sla-progress-ring {
@@ -121,7 +124,7 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s;
-    z-index: 10;
+    z-index: 3000;
 }
 
 .symbol.symbol-sla:hover .sla-tooltip {
@@ -179,5 +182,15 @@
 
 [data-bs-theme="dark"] .sla-tooltip {
     background: rgba(43, 43, 64, 0.95);
+}
+
+/* Ajustar label do avatar para não alterar o alinhamento do anel */
+.conversation-item .symbol.symbol-sla .symbol-label,
+.conversation-item .symbol.symbol-sla img {
+    width: 45px;
+    height: 45px;
+    border-radius: 12px;
+    display: block;
+    overflow: hidden;
 }
 

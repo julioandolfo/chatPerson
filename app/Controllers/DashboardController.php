@@ -169,14 +169,21 @@ class DashboardController
     {
         $logDir = __DIR__ . '/../../logs';
         if (!is_dir($logDir)) {
-            mkdir($logDir, 0755, true);
+            @mkdir($logDir, 0777, true);
         }
         
         $logFile = $logDir . '/dash.log';
+        
+        // Verificar se pode escrever
+        if (!is_writable($logDir)) {
+            @chmod($logDir, 0777);
+        }
+        
         $timestamp = date('Y-m-d H:i:s');
         $logMessage = "[{$timestamp}] {$message}\n";
         
-        file_put_contents($logFile, $logMessage, FILE_APPEND);
+        // Tentar escrever, mas não falhar se não conseguir
+        @file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
     }
 
     /**

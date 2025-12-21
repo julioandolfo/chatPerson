@@ -17,7 +17,12 @@ class Logger
     private static function ensureLogDir(): void
     {
         if (!is_dir(self::$logDir)) {
-            mkdir(self::$logDir, 0755, true);
+            @mkdir(self::$logDir, 0777, true);
+        }
+        
+        // Garantir permissões de escrita
+        if (is_dir(self::$logDir) && !is_writable(self::$logDir)) {
+            @chmod(self::$logDir, 0777);
         }
     }
 
@@ -32,7 +37,8 @@ class Logger
         $timestamp = date('Y-m-d H:i:s');
         $logMessage = "[{$timestamp}] {$message}" . PHP_EOL;
         
-        file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
+        // Tentar escrever, mas não falhar se não conseguir (silenciar erro)
+        @file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
     }
 
     /**

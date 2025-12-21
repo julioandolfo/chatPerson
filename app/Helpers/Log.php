@@ -11,7 +11,7 @@ class Log
     /**
      * Diretório de logs
      */
-    private static string $logDir = __DIR__ . '/../../storage/logs/';
+    private static string $logDir = __DIR__ . '/../../logs/';
     
     /**
      * Escrever log em arquivo específico
@@ -20,14 +20,21 @@ class Log
     {
         // Garantir que o diretório existe
         if (!is_dir(self::$logDir)) {
-            mkdir(self::$logDir, 0755, true);
+            @mkdir(self::$logDir, 0777, true);
+        }
+        
+        // Garantir permissões de escrita
+        if (is_dir(self::$logDir) && !is_writable(self::$logDir)) {
+            @chmod(self::$logDir, 0777);
         }
         
         $timestamp = date('Y-m-d H:i:s');
         $logMessage = "[{$timestamp}] [{$level}] {$message}" . PHP_EOL;
         
         $filePath = self::$logDir . $file;
-        file_put_contents($filePath, $logMessage, FILE_APPEND);
+        
+        // Tentar escrever, mas não falhar se não conseguir (silenciar erro)
+        @file_put_contents($filePath, $logMessage, FILE_APPEND | LOCK_EX);
     }
     
     /**

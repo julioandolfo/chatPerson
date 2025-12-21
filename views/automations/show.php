@@ -1062,7 +1062,7 @@ function renderNode(node) {
                node.node_data.ai_intents.length > 0) {
         // Se é AI Agent com ramificação, adicionar handles múltiplos para cada intent
         const intents = node.node_data.ai_intents;
-        innerHtml += '<div class="ai-intents-visual" style="margin-top: 10px; font-size: 11px; color: #7e8299;">';
+        innerHtml += '<div class="ai-intents-visual" style="margin-top: 10px; font-size: 11px; color: #7e8299; padding-right: 6px;">';
         intents.forEach(function(intent, idx) {
             const intentLabel = intent.description || intent.intent || `Intent ${idx + 1}`;
             innerHtml += `
@@ -1072,7 +1072,7 @@ function renderNode(node) {
                          data-node-id="${String(node.id || '')}" 
                          data-handle-type="output" 
                          data-intent-index="${idx}"
-                         style="position: relative; width: 12px; height: 12px; border-radius: 50%; background: #6366f1; margin-left: 4px;">
+                         style="margin-left: auto; width: 12px; height: 12px; border-radius: 50%; background: #6366f1; flex-shrink: 0;">
                     </div>
                 </div>
             `;

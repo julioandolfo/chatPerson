@@ -622,7 +622,12 @@ class AutomationService
                 break;
             case 'action_assign_ai_agent':
                 \App\Helpers\Logger::automation("  Executando: atribuir agente de IA");
-                self::executeAssignAIAgent($nodeData, $conversationId, $executionId);
+                $branchingActive = self::executeAssignAIAgent($nodeData, $conversationId, $executionId);
+                // Se ramificação por intent estiver ativa, pausar o fluxo aqui
+                if ($branchingActive) {
+                    \App\Helpers\Logger::automation("  🤖 Ramificação IA ativa - PAUSANDO fluxo até detecção de intent.");
+                    return;
+                }
                 break;
             case 'action_move_stage':
                 \App\Helpers\Logger::automation("  Executando: mover etapa");
@@ -929,7 +934,7 @@ class AutomationService
     /**
      * Executar ação: atribuir agente de IA
      */
-    private static function executeAssignAIAgent(array $nodeData, int $conversationId, ?int $executionId = null): void
+    private static function executeAssignAIAgent(array $nodeData, int $conversationId, ?int $executionId = null): bool
     {
         \App\Helpers\Logger::automation("executeAssignAIAgent - INÍCIO. Conversa {$conversationId}");
 
@@ -997,6 +1002,7 @@ class AutomationService
             ]);
 
             \App\Helpers\Logger::automation("executeAssignAIAgent - Metadata atualizada (branching " . ($aiBranchingEnabled ? 'ON' : 'OFF') . ").");
+            return (bool)$aiBranchingEnabled;
         } catch (\Exception $e) {
             \App\Helpers\Logger::automation("executeAssignAIAgent - ERRO: " . $e->getMessage());
             throw $e;

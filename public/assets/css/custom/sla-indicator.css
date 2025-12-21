@@ -1,0 +1,180 @@
+/**
+ * Indicador Visual de SLA
+ * Progress bar circular ao redor do avatar
+ * Muda de cor de verde para vermelho conforme o tempo passa
+ */
+
+.symbol.symbol-sla {
+    position: relative;
+}
+
+.sla-progress-ring {
+    position: absolute;
+    top: -3px;
+    left: -3px;
+    width: calc(100% + 6px);
+    height: calc(100% + 6px);
+    transform: rotate(-90deg);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.sla-progress-ring circle {
+    fill: none;
+    stroke-width: 3;
+    transition: stroke-dashoffset 0.3s ease, stroke 0.3s ease;
+}
+
+.sla-progress-ring .sla-ring-bg {
+    stroke: #E4E6EF;
+    stroke-opacity: 0.3;
+}
+
+.sla-progress-ring .sla-ring-progress {
+    stroke-linecap: round;
+}
+
+/* Cores do indicador baseadas no progresso do SLA */
+.sla-status-excellent .sla-ring-progress {
+    stroke: #50CD89; /* Verde - 0-30% do tempo */
+}
+
+.sla-status-good .sla-ring-progress {
+    stroke: #7CDB6E; /* Verde claro - 30-50% */
+}
+
+.sla-status-warning .sla-ring-progress {
+    stroke: #FFC700; /* Amarelo - 50-70% */
+}
+
+.sla-status-critical .sla-ring-progress {
+    stroke: #FF9500; /* Laranja - 70-90% */
+}
+
+.sla-status-danger .sla-ring-progress {
+    stroke: #F1416C; /* Vermelho - 90-100% */
+}
+
+.sla-status-breached .sla-ring-progress {
+    stroke: #D9214E; /* Vermelho escuro - SLA estourado */
+    animation: sla-pulse 2s ease-in-out infinite;
+}
+
+/* Animação para SLA estourado */
+@keyframes sla-pulse {
+    0%, 100% {
+        stroke-opacity: 1;
+        stroke-width: 3;
+    }
+    50% {
+        stroke-opacity: 0.6;
+        stroke-width: 3.5;
+    }
+}
+
+/* Badge de SLA estourado */
+.sla-breached-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    width: 18px;
+    height: 18px;
+    background: #F1416C;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    animation: sla-badge-pulse 1.5s ease-in-out infinite;
+}
+
+.sla-breached-badge i {
+    color: #fff;
+    font-size: 10px;
+}
+
+@keyframes sla-badge-pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+}
+
+/* Tooltip de SLA */
+.sla-tooltip {
+    position: absolute;
+    bottom: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 10;
+}
+
+.symbol.symbol-sla:hover .sla-tooltip {
+    opacity: 1;
+}
+
+/* Tamanhos diferentes do indicador */
+.symbol-35px .sla-progress-ring {
+    top: -2px;
+    left: -2px;
+    width: calc(100% + 4px);
+    height: calc(100% + 4px);
+}
+
+.symbol-35px .sla-progress-ring circle {
+    stroke-width: 2;
+}
+
+.symbol-45px .sla-progress-ring {
+    top: -3px;
+    left: -3px;
+    width: calc(100% + 6px);
+    height: calc(100% + 6px);
+}
+
+.symbol-45px .sla-progress-ring circle {
+    stroke-width: 3;
+}
+
+.symbol-50px .sla-progress-ring {
+    top: -3px;
+    left: -3px;
+    width: calc(100% + 6px);
+    height: calc(100% + 6px);
+}
+
+.symbol-50px .sla-progress-ring circle {
+    stroke-width: 3;
+}
+
+/* Estado sem SLA ativo */
+.sla-status-none .sla-ring-progress {
+    display: none;
+}
+
+/* Dark mode */
+[data-bs-theme="dark"] .sla-progress-ring .sla-ring-bg {
+    stroke: #2B2B40;
+    stroke-opacity: 0.5;
+}
+
+[data-bs-theme="dark"] .sla-breached-badge {
+    border-color: #1E1E2D;
+}
+
+[data-bs-theme="dark"] .sla-tooltip {
+    background: rgba(43, 43, 64, 0.95);
+}
+

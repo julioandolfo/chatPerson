@@ -1600,6 +1600,9 @@ body.dark-mode .swal2-content {
 }
 </style>
 
+<!-- SLA Indicator CSS -->
+<link rel="stylesheet" href="<?= \App\Helpers\Url::asset('assets/css/custom/sla-indicator.css') ?>">
+
 <!-- Script inline para definir função ANTES do HTML do botão -->
 <script>
 // Definir função IMEDIATAMENTE para estar disponível quando o HTML for renderizado
@@ -1857,6 +1860,11 @@ body.dark-mode .swal2-content {
                     ?>
                     <div class="conversation-item <?= $isActive ? 'active' : '' ?> <?= !empty($conv['pinned']) ? 'pinned' : '' ?>" 
                          data-conversation-id="<?= $conv['id'] ?>"
+                         data-status="<?= htmlspecialchars($conv['status'] ?? 'open') ?>"
+                         data-created-at="<?= htmlspecialchars($conv['created_at'] ?? '') ?>"
+                         data-first-response-at="<?= htmlspecialchars($conv['first_response_at'] ?? '') ?>"
+                         data-last-message-at="<?= htmlspecialchars($conv['last_message_at'] ?? '') ?>"
+                         data-agent-id="<?= htmlspecialchars($conv['agent_id'] ?? '') ?>"
                          data-onclick="selectConversation">
                         <div class="d-flex gap-3 w-100">
                             <!-- Checkbox para seleção em massa -->
@@ -15391,6 +15399,9 @@ function updateAIActiveBanner(status, conversationId) {
     }
 }
 </script>
+
+<!-- SLA Indicator JavaScript -->
+<script src="<?= \App\Helpers\Url::asset('assets/js/custom/sla-indicator.js') ?>"></script>
 
 <?php $content = ob_get_clean(); ?>
 

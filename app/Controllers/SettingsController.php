@@ -559,4 +559,25 @@ class SettingsController
             ], 500);
         }
     }
+    
+    /**
+     * Obter configurações de SLA (API pública para frontend)
+     */
+    public function getSLAConfig(): void
+    {
+        try {
+            $settings = ConversationSettingsService::getSettings();
+            $sla = $settings['sla'] ?? [];
+            
+            Response::json([
+                'success' => true,
+                'sla' => $sla
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao obter configurações de SLA'
+            ], 500);
+        }
+    }
 }

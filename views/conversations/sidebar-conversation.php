@@ -138,7 +138,7 @@
                 <div class="sidebar-section" id="sidebar-funnel-stage-section" style="display: none;">
                     <div class="sidebar-section-title d-flex justify-content-between align-items-center">
                         <span>🎯 Funil e Etapa</span>
-                        <button class="btn btn-sm btn-icon btn-light-primary p-0" id="sidebar-move-stage-btn" onclick="moveConversationStage()" title="Mover conversa">
+                        <button class="btn btn-sm btn-icon btn-light-primary p-0" id="sidebar-move-stage-btn" onclick="if(typeof window.moveConversationStage === 'function') { window.moveConversationStage(); } else { console.error('moveConversationStage não definida'); }" title="Mover conversa">
                             <i class="ki-duotone ki-arrows-circle fs-6">
                                 <span class="path1"></span>
                                 <span class="path2"></span>
@@ -484,6 +484,26 @@
 <script>
 console.log('📋 sidebar-conversation.php carregado');
 
+// Adicionar listener ao botão de mover estágio (fallback)
+document.addEventListener('DOMContentLoaded', function() {
+    const moveStageBtn = document.getElementById('sidebar-move-stage-btn');
+    if (moveStageBtn) {
+        console.log('🔧 Adicionando listener ao botão de mover estágio');
+        moveStageBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('🖱️ Botão de mover estágio clicado (via listener)');
+            if (typeof window.moveConversationStage === 'function') {
+                window.moveConversationStage();
+            } else {
+                console.error('❌ moveConversationStage não está definida!');
+            }
+        });
+    } else {
+        console.warn('⚠️ Botão sidebar-move-stage-btn não encontrado');
+    }
+});
+
 // Funções de ação do sidebar
 window.editContact = function(contactId) {
     const contactIdValue = contactId || window.currentConversation?.contact_id || 0;
@@ -743,7 +763,12 @@ window.addNote = function(conversationId) {
 };
 
 // Função para mover conversa de funil/etapa
-window.moveConversationStage = function() {
+console.log('🔧 Definindo window.moveConversationStage...');
+
+// Definir a função de forma global e garantida
+if (typeof window.moveConversationStage !== 'function') {
+    window.moveConversationStage = function() {
+        console.log('✅ moveConversationStage chamada!');
     const conversationId = window.currentConversationId || 0;
     if (!conversationId) {
         Swal.fire({
@@ -888,7 +913,11 @@ window.moveConversationStage = function() {
             text: 'Erro ao carregar funis: ' + error.message
         });
     });
-};
+    };
+    console.log('✅ window.moveConversationStage definida com sucesso!');
+} else {
+    console.warn('⚠️ window.moveConversationStage já estava definida');
+}
 
 // ============================================================================
 // FUNÇÕES DE GERENCIAMENTO DE AGENTES DE IA

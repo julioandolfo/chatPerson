@@ -186,8 +186,18 @@ $styles = <<<HTML
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
 }
 
+.connection-arrow {
+    transition: opacity 0.2s ease, fill 0.2s ease;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
+}
+
 [data-bs-theme="dark"] .connections-overlay path.connection-line {
     filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.4));
+}
+
+[data-bs-theme="dark"] .connection-arrow {
+    fill: #50cd89;
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.5));
 }
 
 .connections-overlay path,
@@ -413,6 +423,16 @@ $styles = <<<HTML
 @keyframes dash {
     to {
         stroke-dashoffset: -10;
+    }
+}
+
+/* Animação de "desenho" para linhas permanentes */
+@keyframes drawLine {
+    from {
+        stroke-dashoffset: var(--path-length);
+    }
+    to {
+        stroke-dashoffset: 0;
     }
 }
 </style>
@@ -2702,13 +2722,21 @@ function startConnection(nodeId, handleType, e, optionIndex) {
             const startX = connectingLine._startX;
             const startY = connectingLine._startY;
             
-            // Calcular pontos de controle
+            // Calcular pontos de controle (mesmos parâmetros da linha permanente)
             const dx = x - startX;
-            const offsetX = Math.min(Math.abs(dx) * 0.5, 100);
+            const dy = y - startY;
+            
+            // Offset horizontal: maior para distâncias maiores
+            const offsetX = Math.max(80, Math.min(Math.abs(dx) * 0.6, 150));
+            
+            // Offset vertical adicional para curvas mais "orgânicas"
+            const offsetY = Math.abs(dy) * 0.2;
+            
+            // Pontos de controle para curva suave (saindo horizontalmente)
             const cp1x = startX + offsetX;
-            const cp1y = startY;
+            const cp1y = startY + offsetY;
             const cp2x = x - offsetX;
-            const cp2y = y;
+            const cp2y = y - offsetY;
             
             // Atualizar path com curva Bézier
             const pathData = `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x} ${y}`;
@@ -2815,22 +2843,25 @@ function renderConnections() {
                 const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
                 group.setAttribute('class', 'connection-group');
                 
-                // Calcular pontos de controle para curva Bézier
+                // Calcular pontos de controle para curva Bézier SUAVE
                 const dx = toPos.x - fromPos.x;
                 const dy = toPos.y - fromPos.y;
                 
                 // Distância entre os pontos
                 const distance = Math.sqrt(dx * dx + dy * dy);
                 
-                // Offset dos pontos de controle (proporcional à distância)
-                const offsetX = Math.min(Math.abs(dx) * 0.5, 100);
-                const offsetY = Math.abs(dy) * 0.3;
+                // Offset horizontal: maior para distâncias maiores
+                // Mínimo de 80px, máximo de 150px, ou 60% da distância horizontal
+                const offsetX = Math.max(80, Math.min(Math.abs(dx) * 0.6, 150));
                 
-                // Pontos de controle para curva suave
+                // Offset vertical adicional para curvas mais "orgânicas"
+                const offsetY = Math.abs(dy) * 0.2;
+                
+                // Pontos de controle para curva suave (saindo horizontalmente)
                 const cp1x = fromPos.x + offsetX;
-                const cp1y = fromPos.y;
+                const cp1y = fromPos.y + offsetY;
                 const cp2x = toPos.x - offsetX;
-                const cp2y = toPos.y;
+                const cp2y = toPos.y - offsetY;
                 
                 // Criar path com curva Bézier cúbica
                 const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -2842,6 +2873,12 @@ function renderConnections() {
                 path.setAttribute('fill', 'none');
                 path.setAttribute('stroke', '#009ef7');
                 path.setAttribute('stroke-width', '2');
+                
+                // Remover animação após renderização inicial (opcional - descomente para animar)
+                // const pathLength = path.getTotalLength();
+                // path.style.strokeDasharray = pathLength;
+                // path.style.strokeDashoffset = pathLength;
+                // setTimeout(() => { path.style.transition = 'stroke-dashoffset 0.4s ease-out'; path.style.strokeDashoffset = '0'; }, 10);
                 
                 // Calcular ponto médio na curva (aproximação usando t=0.5)
                 const t = 0.5;
@@ -2907,18 +2944,41 @@ function renderConnections() {
                     circle.setAttribute('stroke-width', '2');
                 });
                 
+                // Adicionar seta indicando direção do fluxo
+                const arrowSize = 8;
+                const arrowPos = 0.7; // 70% do caminho
+                const arrowX = Math.pow(1-arrowPos, 3) * fromPos.x + 3 * Math.pow(1-arrowPos, 2) * arrowPos * cp1x + 3 * (1-arrowPos) * Math.pow(arrowPos, 2) * cp2x + Math.pow(arrowPos, 3) * toPos.x;
+                const arrowY = Math.pow(1-arrowPos, 3) * fromPos.y + 3 * Math.pow(1-arrowPos, 2) * arrowPos * cp1y + 3 * (1-arrowPos) * Math.pow(arrowPos, 2) * cp2y + Math.pow(arrowPos, 3) * toPos.y;
+                
+                // Calcular ângulo da tangente (derivada da curva Bézier)
+                const t = arrowPos;
+                const dxdt = 3 * Math.pow(1-t, 2) * (cp1x - fromPos.x) + 6 * (1-t) * t * (cp2x - cp1x) + 3 * Math.pow(t, 2) * (toPos.x - cp2x);
+                const dydt = 3 * Math.pow(1-t, 2) * (cp1y - fromPos.y) + 6 * (1-t) * t * (cp2y - cp1y) + 3 * Math.pow(t, 2) * (toPos.y - cp2y);
+                const angle = Math.atan2(dydt, dxdt) * 180 / Math.PI;
+                
+                // Criar seta (triângulo)
+                const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                const arrowPoints = `0,0 ${-arrowSize},${-arrowSize/2} ${-arrowSize},${arrowSize/2}`;
+                arrow.setAttribute('points', arrowPoints);
+                arrow.setAttribute('fill', '#009ef7');
+                arrow.setAttribute('transform', `translate(${arrowX},${arrowY}) rotate(${angle})`);
+                arrow.setAttribute('class', 'connection-arrow');
+                
                 // Destacar linha ao passar mouse
                 path.addEventListener('mouseenter', function() {
                     this.setAttribute('stroke-width', '3');
                     this.style.opacity = '0.8';
+                    arrow.style.opacity = '0.8';
                 });
                 path.addEventListener('mouseleave', function() {
                     this.setAttribute('stroke-width', '2');
                     this.style.opacity = '1';
+                    arrow.style.opacity = '1';
                 });
                 
                 // Montar grupo e adicionar ao SVG
                 group.appendChild(path);
+                group.appendChild(arrow);
                 group.appendChild(deleteBtn);
                 connectionsSvg.appendChild(group);
             }

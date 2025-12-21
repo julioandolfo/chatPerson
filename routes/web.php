@@ -216,6 +216,7 @@ Router::post('/settings/whatsapp', [SettingsController::class, 'saveWhatsApp'], 
 Router::post('/settings/security', [SettingsController::class, 'saveSecurity'], ['Authentication']);
 Router::post('/settings/websocket', [SettingsController::class, 'saveWebSocket'], ['Authentication']);
 Router::post('/settings/conversations', [SettingsController::class, 'saveConversations'], ['Authentication']);
+Router::get('/api/settings/sla', [SettingsController::class, 'getSLAConfig'], ['Authentication']); // API para obter config de SLA
 
 // Rotas de Agentes de IA
 // IMPORTANTE: Rotas específicas DEVEM vir ANTES de rotas com parâmetros dinâmicos

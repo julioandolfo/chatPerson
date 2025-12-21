@@ -3,7 +3,17 @@
  * Script para popular first_response_at nas conversas existentes
  */
 
-require_once __DIR__ . '/../app/bootstrap.php';
+// Carregar configurações
+$appConfig = require __DIR__ . '/../config/app.php';
+
+// Carregar autoloader
+require_once __DIR__ . '/../app/Helpers/autoload.php';
+
+// Definir timezone
+date_default_timezone_set($appConfig['timezone']);
+
+// Definir encoding
+mb_internal_encoding('UTF-8');
 
 echo "════════════════════════════════════════════════════════════\n";
 echo "  POPULANDO first_response_at PARA CONVERSAS EXISTENTES\n";

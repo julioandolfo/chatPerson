@@ -7,15 +7,20 @@
 function up_add_first_response_at_to_conversations() {
     global $pdo;
     
-    $sql = "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS first_response_at TIMESTAMP NULL AFTER resolved_at";
+    // Verificar se coluna já existe
+    $db = isset($pdo) ? $pdo : \App\Helpers\Database::getInstance();
     
-    if (isset($pdo)) {
-        $pdo->exec($sql);
+    $checkSql = "SHOW COLUMNS FROM conversations LIKE 'first_response_at'";
+    $result = $db->query($checkSql)->fetchAll();
+    
+    if (empty($result)) {
+        // Coluna não existe, criar
+        $sql = "ALTER TABLE conversations ADD COLUMN first_response_at TIMESTAMP NULL AFTER resolved_at";
+        $db->exec($sql);
+        echo "✅ Coluna 'first_response_at' adicionada à tabela 'conversations' com sucesso!\n";
     } else {
-        \App\Helpers\Database::getInstance()->exec($sql);
+        echo "ℹ️ Coluna 'first_response_at' já existe na tabela 'conversations'.\n";
     }
-    
-    echo "✅ Coluna 'first_response_at' adicionada à tabela 'conversations' com sucesso!\n";
 }
 
 function down_add_first_response_at_to_conversations() {

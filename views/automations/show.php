@@ -2881,9 +2881,9 @@ function renderConnections() {
                 // setTimeout(() => { path.style.transition = 'stroke-dashoffset 0.4s ease-out'; path.style.strokeDashoffset = '0'; }, 10);
                 
                 // Calcular ponto médio na curva (aproximação usando t=0.5)
-                const t = 0.5;
-                const midX = Math.pow(1-t, 3) * fromPos.x + 3 * Math.pow(1-t, 2) * t * cp1x + 3 * (1-t) * Math.pow(t, 2) * cp2x + Math.pow(t, 3) * toPos.x;
-                const midY = Math.pow(1-t, 3) * fromPos.y + 3 * Math.pow(1-t, 2) * t * cp1y + 3 * (1-t) * Math.pow(t, 2) * cp2y + Math.pow(t, 3) * toPos.y;
+                const tMid = 0.5;
+                const midX = Math.pow(1-tMid, 3) * fromPos.x + 3 * Math.pow(1-tMid, 2) * tMid * cp1x + 3 * (1-tMid) * Math.pow(tMid, 2) * cp2x + Math.pow(tMid, 3) * toPos.x;
+                const midY = Math.pow(1-tMid, 3) * fromPos.y + 3 * Math.pow(1-tMid, 2) * tMid * cp1y + 3 * (1-tMid) * Math.pow(tMid, 2) * cp2y + Math.pow(tMid, 3) * toPos.y;
                 
                 // Criar botão de delete (círculo + ícone)
                 const deleteBtn = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -2951,9 +2951,9 @@ function renderConnections() {
                 const arrowY = Math.pow(1-arrowPos, 3) * fromPos.y + 3 * Math.pow(1-arrowPos, 2) * arrowPos * cp1y + 3 * (1-arrowPos) * Math.pow(arrowPos, 2) * cp2y + Math.pow(arrowPos, 3) * toPos.y;
                 
                 // Calcular ângulo da tangente (derivada da curva Bézier)
-                const t = arrowPos;
-                const dxdt = 3 * Math.pow(1-t, 2) * (cp1x - fromPos.x) + 6 * (1-t) * t * (cp2x - cp1x) + 3 * Math.pow(t, 2) * (toPos.x - cp2x);
-                const dydt = 3 * Math.pow(1-t, 2) * (cp1y - fromPos.y) + 6 * (1-t) * t * (cp2y - cp1y) + 3 * Math.pow(t, 2) * (toPos.y - cp2y);
+                const tArrow = arrowPos;
+                const dxdt = 3 * Math.pow(1-tArrow, 2) * (cp1x - fromPos.x) + 6 * (1-tArrow) * tArrow * (cp2x - cp1x) + 3 * Math.pow(tArrow, 2) * (toPos.x - cp2x);
+                const dydt = 3 * Math.pow(1-tArrow, 2) * (cp1y - fromPos.y) + 6 * (1-tArrow) * tArrow * (cp2y - cp1y) + 3 * Math.pow(tArrow, 2) * (toPos.y - cp2y);
                 const angle = Math.atan2(dydt, dxdt) * 180 / Math.PI;
                 
                 // Criar seta (triângulo)

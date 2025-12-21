@@ -2714,6 +2714,10 @@ document.addEventListener("DOMContentLoaded", function() {
             }
             
             const formData = new FormData(nodeConfigForm);
+
+            // Forçar node_id e node_type corretos no FormData (ignora hidden alterado)
+            formData.set('node_id', node.id);
+            formData.set('node_type', node.node_type);
             
             // DEBUG: Mostrar TODOS os campos do FormData
             console.log('📋 FormData completo:');
@@ -2787,72 +2791,73 @@ document.addEventListener("DOMContentLoaded", function() {
                 
                 console.log('Salvando configuração do AI Agent');
                 console.log('  ai_branching_enabled raw:', nodeData.ai_branching_enabled);
-                console.log('  branchingEnabled processado:', branchingEnabled);
+                console.log('  branchingEnabled processado (inicial):', branchingEnabled);
                 console.log('  ai_intent_semantic_enabled:', nodeData.ai_intent_semantic_enabled);
                 console.log('  ai_intent_confidence:', nodeData.ai_intent_confidence);
                 
+                // Coletar intents sempre, mesmo que o checkbox não esteja marcado
+                const intentInputs = document.querySelectorAll('.ai-intent-item');
+                const intents = [];
+                
+                console.log('  Intent items encontrados:', intentInputs.length);
+                
+                intentInputs.forEach((item, idx) => {
+                    const intentName = item.querySelector(`input[name="ai_intents[${idx}][intent]"]`)?.value?.trim();
+                    const description = item.querySelector(`input[name="ai_intents[${idx}][description]"]`)?.value?.trim();
+                    const keywordsRaw = item.querySelector(`input[name="ai_intents[${idx}][keywords]"]`)?.value || '';
+                    const targetNodeId = item.querySelector(`select[name="ai_intents[${idx}][target_node_id]"]`)?.value;
+                    
+                    const keywords = keywordsRaw.split(',').map(k => k.trim()).filter(k => k.length > 0);
+                    
+                    console.log(`  Intent ${idx}:`);
+                    console.log(`    - name: "${intentName}"`);
+                    console.log(`    - desc: "${description}"`);
+                    console.log(`    - keywords: [${keywords.join(', ')}]`);
+                    console.log(`    - target: "${targetNodeId}"`);
+                    
+                    // Validar: nome e target obrigatórios
+                    if (!intentName || !targetNodeId) {
+                        console.warn(`  Intent ${idx} ignorado - faltando nome ou target`);
+                        return; // pula para próximo
+                    }
+                    
+                    intents.push({
+                        intent: intentName,
+                        description: description || intentName,
+                        keywords: keywords,
+                        target_node_id: targetNodeId
+                    });
+                });
+                
+                // Se havia intents no formulário mas nenhum válido, bloquear salvamento
+                if (intentInputs.length > 0 && intents.length === 0) {
+                    console.error('Nenhum intent válido encontrado. Verifique nome e nó de destino.');
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Configure os intents',
+                        text: 'Cada intent precisa de Nome e Nó de Destino.',
+                    });
+                    return; // não prosseguir com o merge/salvar
+                }
+                
+                // Se o usuário preencheu intents, ativar ramificação automaticamente
+                if (intents.length > 0) {
+                    branchingEnabled = true;
+                    nodeData.ai_branching_enabled = true;
+                    const branchingCheckbox = document.getElementById('kt_ai_branching_enabled');
+                    if (branchingCheckbox) branchingCheckbox.checked = true;
+                }
+
                 // Converter para boolean para salvar corretamente
                 nodeData.ai_branching_enabled = branchingEnabled;
+                nodeData.ai_intents = intents;
                 
-                if (branchingEnabled) {
-                    const intentInputs = document.querySelectorAll('.ai-intent-item');
-                    const intents = [];
-                    
-                    console.log('  Intent items encontrados:', intentInputs.length);
-                    
-                    intentInputs.forEach((item, idx) => {
-                        const intentName = item.querySelector(`input[name="ai_intents[${idx}][intent]"]`)?.value?.trim();
-                        const description = item.querySelector(`input[name="ai_intents[${idx}][description]"]`)?.value?.trim();
-                        const keywordsRaw = item.querySelector(`input[name="ai_intents[${idx}][keywords]"]`)?.value || '';
-                        const targetNodeId = item.querySelector(`select[name="ai_intents[${idx}][target_node_id]"]`)?.value;
-                        
-                        const keywords = keywordsRaw.split(',').map(k => k.trim()).filter(k => k.length > 0);
-                        
-                        console.log(`  Intent ${idx}:`);
-                        console.log(`    - name: "${intentName}"`);
-                        console.log(`    - desc: "${description}"`);
-                        console.log(`    - keywords: [${keywords.join(', ')}]`);
-                        console.log(`    - target: "${targetNodeId}"`);
-                        
-                        // Validar: nome e target obrigatórios
-                        if (!intentName || !targetNodeId) {
-                            console.warn(`  Intent ${idx} ignorado - faltando nome ou target`);
-                            return; // pula para próximo
-                        }
-                        
-                        intents.push({
-                            intent: intentName,
-                            description: description || intentName,
-                            keywords: keywords,
-                            target_node_id: targetNodeId
-                        });
-                    });
-                    
-                    // Se havia intents no formulário mas nenhum válido, bloquear salvamento
-                    if (intentInputs.length > 0 && intents.length === 0) {
-                        console.error('Nenhum intent válido encontrado. Verifique nome e nó de destino.');
-                        Swal.fire({
-                            icon: 'warning',
-                            title: 'Configure os intents',
-                            text: 'Cada intent precisa de Nome e Nó de Destino.',
-                        });
-                        return; // não prosseguir com o merge/salvar
-                    }
-                    
-                    console.log('  Total de intents válidos coletados:', intents.length);
-                    console.log('  Intents:', intents);
-                    
-                    // Se o usuário preencheu intents, ativar ramificação automaticamente
-                    if (intents.length > 0) {
-                        branchingEnabled = true;
-                        nodeData.ai_branching_enabled = true;
-                        const branchingCheckbox = document.getElementById('kt_ai_branching_enabled');
-                        if (branchingCheckbox) branchingCheckbox.checked = true;
-                    }
-                    
-                    nodeData.ai_intents = intents;
+                console.log('  branchingEnabled final:', branchingEnabled);
+                console.log('  Total de intents válidos coletados:', intents.length);
+                console.log('  Intents:', intents);
 
-                    // ✅ Criar conexões automaticamente para cada intent com target definido
+                // ✅ Criar conexões automaticamente para cada intent com target definido
+                if (branchingEnabled && intents.length > 0) {
                     if (!node.node_data.connections) {
                         node.node_data.connections = [];
                     }
@@ -2872,8 +2877,12 @@ document.addEventListener("DOMContentLoaded", function() {
                     });
                     console.log('  Conexões auto-criadas para intents:', node.node_data.connections);
                 } else {
-                    console.log('  Ramificação desabilitada, limpando intents');
+                    console.log('  Ramificação desabilitada ou sem intents, limpando intents e conexões específicas');
                     nodeData.ai_intents = [];
+                    // Remover conexões de intents se existirem
+                    if (node.node_data.connections && node.node_data.connections.length > 0) {
+                        node.node_data.connections = node.node_data.connections.filter(conn => conn.option_index === undefined);
+                    }
                 }
             }
             

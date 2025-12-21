@@ -1753,7 +1753,7 @@ class AutomationService
             $semanticEnabled = $metadata['ai_intent_semantic_enabled'] ?? true; // habilitado por padrão
             if ($semanticEnabled) {
                 \App\Helpers\Logger::automation("Nenhum match por keywords. Tentando detecção semântica via OpenAI (min confidence {$minConfidence})");
-                $detectedIntent = self::detectAIIntentSemantic($aiMessage['content'] ?? '', $metadata['ai_intents'] ?? [], $minConfidence);
+                $detectedIntent = self::detectAIIntentSemantic($aiMessage['content'] ?? '', $metadata['ai_intents'] ?? [], $minConfidence, (int)$conversation['id']);
             } else {
                 \App\Helpers\Logger::automation("Detecção semântica desabilitada; não será tentada.");
             }
@@ -1772,6 +1772,22 @@ class AutomationService
                 $metadata['ai_branching_active'] = false;
                 $metadata['ai_interaction_count'] = 0;
                 \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
+
+                // Mensagem de saída (se configurada no intent)
+                $exitMessage = $detectedIntent['exit_message'] ?? '';
+                if (!empty($exitMessage)) {
+                    try {
+                        \App\Services\ConversationService::sendMessage(
+                            $conversation['id'],
+                            $exitMessage,
+                            'agent',
+                            null
+                        );
+                        \App\Helpers\Logger::automation("Mensagem de saída do intent enviada antes do próximo nó.");
+                    } catch (\Exception $e) {
+                        \App\Helpers\Logger::automation("Falha ao enviar mensagem de saída do intent: " . $e->getMessage());
+                    }
+                }
 
                 // Remover a IA da conversa após identificar a intenção (handoff)
                 try {
@@ -1883,7 +1899,7 @@ class AutomationService
     /**
      * Detectar intent de forma semântica via OpenAI (usando descrição do intent)
      */
-    private static function detectAIIntentSemantic(string $aiResponse, array $intents, float $minConfidence = 0.35): ?array
+    private static function detectAIIntentSemantic(string $aiResponse, array $intents, float $minConfidence = 0.35, ?int $conversationId = null): ?array
     {
         \App\Helpers\Logger::automation("Detectando intent (semântico). Intents: " . count($intents) . ", minConfidence: {$minConfidence}");
 
@@ -1891,8 +1907,31 @@ class AutomationService
             return null;
         }
 
+        // Montar contexto curto da conversa (últimas mensagens)
+        $context = '';
+        if ($conversationId) {
+            try {
+                $messages = \App\Helpers\Database::query(
+                    "SELECT sender_type, content FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 8",
+                    [$conversationId]
+                );
+                $messages = array_reverse($messages); // ordem cronológica
+                $parts = [];
+                foreach ($messages as $msg) {
+                    $role = $msg['sender_type'] ?? 'user';
+                    $txt = trim($msg['content'] ?? '');
+                    if ($txt === '') continue;
+                    // Limitar tamanho de cada trecho para evitar tokens excessivos
+                    $parts[] = strtoupper($role) . ': ' . mb_substr($txt, 0, 200);
+                }
+                $context = implode("\n", $parts);
+            } catch (\Exception $e) {
+                \App\Helpers\Logger::automation("Erro ao montar contexto para intent semântico: " . $e->getMessage());
+            }
+        }
+
         try {
-            $result = \App\Services\OpenAIService::classifyIntent($aiResponse, $intents, $minConfidence);
+            $result = \App\Services\OpenAIService::classifyIntent($aiResponse, $intents, $minConfidence, $context);
             if ($result) {
                 \App\Helpers\Logger::automation("Intent semântico detectado: " . ($result['intent'] ?? '[sem nome]'));
                 return $result;

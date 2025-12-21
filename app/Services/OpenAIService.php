@@ -243,31 +243,55 @@ class OpenAIService
             }
         }
 
+        // Buscar histórico de mensagens da conversa (últimas 20 para contexto, condensadas)
+        $conversationId = $context['conversation']['id'] ?? 0;
+        $conversationMessages = [];
+        if ($conversationId) {
+            $sql = "SELECT sender_type, content FROM messages 
+                    WHERE conversation_id = ? 
+                    ORDER BY id DESC 
+                    LIMIT 20";
+            $conversationMessages = Database::fetchAll($sql, [$conversationId]);
+            $conversationMessages = array_reverse($conversationMessages); // ordem cronológica
+        }
+
+        // Recuperar trechos mais antigos relevantes (RAG leve por palavras-chave)
+        $relevantSnippets = [];
+        if ($conversationId) {
+            $relevantSnippets = self::getRelevantOldMessages($conversationId, $userMessage, 3, 50);
+        }
+
+        // Montar contexto condensado (rolling light) das últimas mensagens
+        $condensed = [];
+        foreach ($conversationMessages as $msg) {
+            $role = $msg['sender_type'] ?? 'user';
+            $txt = trim($msg['content'] ?? '');
+            if ($txt === '') continue;
+            // limitar cada trecho para evitar estouro de tokens
+            $condensed[] = strtoupper($role) . ': ' . mb_substr($txt, 0, 220);
+        }
+        if (!empty($condensed)) {
+            $systemPrompt .= "\n\nContexto recente (últimas mensagens):\n" . implode("\n", $condensed);
+        }
+
+        if (!empty($relevantSnippets)) {
+            $systemPrompt .= "\n\nTrechos relevantes (histórico anterior):\n" . implode("\n", $relevantSnippets);
+        }
+
         $messages[] = [
             'role' => 'system',
             'content' => $systemPrompt
         ];
 
-        // Buscar histórico de mensagens da conversa (últimas 10)
-        $conversationId = $context['conversation']['id'] ?? 0;
-        if ($conversationId) {
-            $sql = "SELECT * FROM messages 
-                    WHERE conversation_id = ? 
-                    ORDER BY created_at DESC 
-                    LIMIT 10";
-            $conversationMessages = Database::fetchAll($sql, [$conversationId]);
-            // Reverter para ordem cronológica
-            $conversationMessages = array_reverse($conversationMessages);
-        } else {
-            $conversationMessages = [];
-        }
-
-        // Adicionar mensagens do histórico
-        foreach ($conversationMessages as $msg) {
+        // Adicionar mensagens do histórico bruto recente (curta janela: últimas 12)
+        $recentWindow = array_slice($conversationMessages, -12);
+        foreach ($recentWindow as $msg) {
             $role = $msg['sender_type'] === 'contact' ? 'user' : 'assistant';
+            $content = trim($msg['content'] ?? '');
+            if ($content === '') continue;
             $messages[] = [
                 'role' => $role,
-                'content' => $msg['content'] ?? ''
+                'content' => $content
             ];
         }
 
@@ -278,6 +302,63 @@ class OpenAIService
         ];
 
         return $messages;
+    }
+
+    /**
+     * RAG leve: busca trechos mais antigos por palavras-chave do texto atual.
+     * - Evita novas chamadas de embedding
+     * - Limita a consultas simples (LIKE) e filtra no PHP
+     */
+    private static function getRelevantOldMessages(int $conversationId, string $query, int $limit = 3, int $offsetRecent = 50): array
+    {
+        // Extrair palavras significativas
+        $tokens = preg_split('/\s+/', mb_strtolower($query));
+        $tokens = array_filter($tokens, function ($t) {
+            return mb_strlen($t) >= 4; // ignorar palavras muito curtas
+        });
+        if (empty($tokens)) {
+            return [];
+        }
+
+        // Buscar mensagens mais antigas (além da janela recente)
+        $placeholders = implode(',', array_fill(0, count($tokens), '?'));
+        // Pegar um lote de mensagens antigas (ignorando as últimas offsetRecent)
+        $sql = "SELECT sender_type, content FROM messages 
+                WHERE conversation_id = ? 
+                AND id <= (SELECT IFNULL(MAX(id) - ?, 0) FROM messages WHERE conversation_id = ?)
+                ORDER BY id DESC
+                LIMIT 200";
+        $rows = Database::fetchAll($sql, [$conversationId, $offsetRecent, $conversationId]);
+
+        $ranked = [];
+        foreach ($rows as $row) {
+            $text = mb_strtolower($row['content'] ?? '');
+            if ($text === '') continue;
+            $score = 0;
+            foreach ($tokens as $tk) {
+                if (strpos($text, $tk) !== false) {
+                    $score++;
+                }
+            }
+            if ($score > 0) {
+                $role = $row['sender_type'] ?? 'user';
+                $ranked[] = [
+                    'score' => $score,
+                    'snippet' => strtoupper($role) . ': ' . mb_substr($row['content'], 0, 240)
+                ];
+            }
+        }
+
+        if (empty($ranked)) {
+            return [];
+        }
+
+        // Ordenar por score desc e pegar top-K
+        usort($ranked, function ($a, $b) {
+            return $b['score'] <=> $a['score'];
+        });
+
+        return array_slice(array_map(fn($r) => $r['snippet'], $ranked), 0, $limit);
     }
 
     /**
@@ -1199,7 +1280,7 @@ class OpenAIService
     /**
      * Classificar intenção de forma semântica usando OpenAI
      */
-    public static function classifyIntent(string $text, array $intents, float $minConfidence = 0.35): ?array
+    public static function classifyIntent(string $text, array $intents, float $minConfidence = 0.35, string $context = ''): ?array
     {
         if (empty($intents)) {
             return null;
@@ -1222,11 +1303,12 @@ class OpenAIService
         $messages = [
             [
                 'role' => 'system',
-                'content' => 'Você é um classificador de intenções. Dado um texto do cliente, escolha o intent mais adequado da lista fornecida e retorne um JSON { "intent": "...", "confidence": 0-1 }. Se não tiver segurança, devolva intent vazio.'
+                'content' => 'Você é um classificador de intenções. Considere o CONTEXTO DA CONVERSA e o texto atual do cliente. Escolha o intent mais adequado da lista fornecida e retorne um JSON { "intent": "...", "confidence": 0-1 }. Se não tiver segurança, devolva intent vazio.'
             ],
             [
                 'role' => 'user',
                 'content' =>
+                    "Contexto (recentes):\n" . ($context ?: 'sem contexto') . "\n\n" .
                     "Texto do cliente: \"{$text}\"\n\n" .
                     "Intents disponíveis:\n" . json_encode($intentList, JSON_UNESCAPED_UNICODE)
             ]

@@ -2954,6 +2954,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     const description = item.querySelector(`input[name="ai_intents[${idx}][description]"]`)?.value?.trim();
                     const keywordsRaw = item.querySelector(`input[name="ai_intents[${idx}][keywords]"]`)?.value || '';
                     const targetNodeId = item.querySelector(`select[name="ai_intents[${idx}][target_node_id]"]`)?.value;
+                        const exitMessage = item.querySelector(`textarea[name="ai_intents[${idx}][exit_message]"]`)?.value?.trim();
                     
                     const keywords = keywordsRaw.split(',').map(k => k.trim()).filter(k => k.length > 0);
                     
@@ -2962,6 +2963,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     console.log(`    - desc: "${description}"`);
                     console.log(`    - keywords: [${keywords.join(', ')}]`);
                     console.log(`    - target: "${targetNodeId}"`);
+                        console.log(`    - exit_message: "${exitMessage}"`);
                     
                     // Validar: nome e target obrigatórios
                     if (!intentName || !targetNodeId) {
@@ -2973,7 +2975,8 @@ document.addEventListener("DOMContentLoaded", function() {
                         intent: intentName,
                         description: description || intentName,
                         keywords: keywords,
-                        target_node_id: targetNodeId
+                            target_node_id: targetNodeId,
+                            exit_message: exitMessage || ''
                     });
                 });
                 
@@ -3617,6 +3620,12 @@ window.addAIIntent = function() {
                     <input type="text" name="ai_intents[${index}][keywords]" class="form-control form-control-sm form-control-solid" placeholder="Ex: comprar, produto, preço" />
                     <div class="form-text">Palavras que indicam este intent na resposta da IA</div>
                 </div>
+
+                <div class="fv-row mb-4">
+                    <label class="fw-semibold fs-7 mb-2">Mensagem de saída (opcional)</label>
+                    <textarea name="ai_intents[${index}][exit_message]" class="form-control form-control-sm form-control-solid" rows="2" placeholder="Mensagem enviada ao detectar este intent antes de seguir para o próximo nó"></textarea>
+                    <div class="form-text">Se preenchido, a IA será removida e esta mensagem será enviada antes de executar o próximo nó.</div>
+                </div>
                 
                 <div class="fv-row">
                     <label class="fw-semibold fs-7 mb-2">Nó de Destino</label>
@@ -3657,7 +3666,7 @@ window.renumberAIIntents = function() {
         item.querySelector('h5').textContent = `Intent #${index + 1}`;
         
         // Atualizar names dos inputs
-        item.querySelectorAll('input, select').forEach(input => {
+        item.querySelectorAll('input, select, textarea').forEach(input => {
             const name = input.getAttribute('name');
             if (name && name.startsWith('ai_intents[')) {
                 const newName = name.replace(/ai_intents\[\d+\]/, `ai_intents[${index}]`);
@@ -3780,6 +3789,7 @@ window.populateAIIntents = function(intents) {
             const descInput = item.querySelector(`input[name="ai_intents[${index}][description]"]`);
             const keywordsInput = item.querySelector(`input[name="ai_intents[${index}][keywords]"]`);
             const targetSelect = item.querySelector(`select[name="ai_intents[${index}][target_node_id]"]`);
+            const exitMessageInput = item.querySelector(`textarea[name="ai_intents[${index}][exit_message]"]`);
             
             if (intentInput) {
                 intentInput.value = intent.intent || '';
@@ -3798,6 +3808,11 @@ window.populateAIIntents = function(intents) {
             if (targetSelect && intent.target_node_id) {
                 targetSelect.value = intent.target_node_id;
                 console.log(`  - Target node: ${intent.target_node_id}`);
+            }
+            const exitMessageInput = item.querySelector(`textarea[name="ai_intents[${index}][exit_message]"]`);
+            if (exitMessageInput) {
+                exitMessageInput.value = intent.exit_message || '';
+                console.log(`  - Exit message: ${intent.exit_message}`);
             }
         }, 100); // Aumentado de 50 para 100ms
     });

@@ -1844,6 +1844,9 @@ class AutomationService
                 \App\Helpers\Logger::automation("Nenhum match por keywords. Tentando detecção semântica via OpenAI (min confidence {$minConfidence})");
                 self::logIntent("semantica_on minConf={$minConfidence}");
                 $detectedIntent = self::detectAIIntentSemantic($message['content'] ?? '', $metadata['ai_intents'] ?? [], $minConfidence, (int)$conversation['id']);
+                if (!$detectedIntent) {
+                    self::logIntent("semantic_result_empty");
+                }
             } else {
                 \App\Helpers\Logger::automation("Detecção semântica desabilitada; não será tentada.");
                 self::logIntent("semantica_off");

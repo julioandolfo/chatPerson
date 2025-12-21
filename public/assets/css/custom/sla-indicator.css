@@ -133,6 +133,13 @@
     opacity: 1;
 }
 
+.sla-tooltip-fixed {
+    position: fixed;
+    bottom: auto;
+    left: 0;
+    transform: translateX(-50%);
+}
+
 /* Tamanhos diferentes do indicador */
 .symbol-35px .sla-progress-ring {
     top: -3px;

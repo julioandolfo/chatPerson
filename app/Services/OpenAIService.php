@@ -22,6 +22,20 @@ class OpenAIService
     const RETRY_DELAY = 1; // segundos
 
     /**
+     * Log auxiliar para debug de intents (mesmo arquivo de intents da AutomationService)
+     */
+    private static function logIntentDebug(string $message): void
+    {
+        $logDir = __DIR__ . '/../../logs';
+        if (!is_dir($logDir)) {
+            @mkdir($logDir, 0777, true);
+        }
+        $logFile = $logDir . '/ai-intents.log';
+        $line = '[' . date('Y-m-d H:i:s') . "] {$message}\n";
+        @file_put_contents($logFile, $line, FILE_APPEND);
+    }
+
+    /**
      * Obter API Key das configurações
      */
     private static function getApiKey(): ?string
@@ -1326,15 +1340,19 @@ class OpenAIService
             $response = self::makeRequest($apiKey, $payload);
             $assistantMessage = $response['choices'][0]['message'] ?? null;
             $content = $assistantMessage['content'] ?? null;
+            self::logIntentDebug("classify_intent_response:" . substr(json_encode($response), 0, 2000));
             if (!$content) {
+                self::logIntentDebug("classify_intent_content_empty");
                 return null;
             }
             $json = json_decode($content, true);
             if (!$json || empty($json['intent'])) {
+                self::logIntentDebug("classify_intent_json_empty content={$content}");
                 return null;
             }
             $confidence = isset($json['confidence']) ? (float)$json['confidence'] : 0.0;
             if ($confidence < $minConfidence) {
+                self::logIntentDebug("classify_intent_conf_low intent=" . ($json['intent'] ?? '') . " conf={$confidence}");
                 return null;
             }
 
@@ -1354,9 +1372,11 @@ class OpenAIService
                 }
             }
 
+            self::logIntentDebug("classify_intent_no_match intent_returned=" . ($json['intent'] ?? ''));
             return null;
         } catch (\Exception $e) {
             error_log('OpenAIService::classifyIntent - erro: ' . $e->getMessage());
+            self::logIntentDebug("classify_intent_error:" . $e->getMessage());
             return null;
         }
     }

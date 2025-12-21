@@ -387,12 +387,24 @@ const SLAIndicator = {
      * Atualizar tooltip
      */
     updateTooltip: function(avatar, slaStatus) {
-        let tooltip = avatar.querySelector('.sla-tooltip');
-        
+        // Criar tooltip global (fora do container) para evitar clip/overflow
+        let tooltip = avatar._slaTooltip;
         if (!tooltip) {
             tooltip = document.createElement('div');
-            tooltip.className = 'sla-tooltip';
-            avatar.appendChild(tooltip);
+            tooltip.className = 'sla-tooltip sla-tooltip-fixed';
+            document.body.appendChild(tooltip);
+            avatar._slaTooltip = tooltip;
+            
+            // Eventos de hover para mostrar/ocultar
+            avatar.addEventListener('mouseenter', () => {
+                tooltip.dataset.visible = '1';
+                tooltip.style.opacity = '1';
+                tooltip.style.pointerEvents = 'none';
+            });
+            avatar.addEventListener('mouseleave', () => {
+                tooltip.dataset.visible = '0';
+                tooltip.style.opacity = '0';
+            });
         }
         
         let typeLabel = 'Resolução';
@@ -406,6 +418,20 @@ const SLAIndicator = {
             tooltip.textContent = `SLA ${typeLabel} ESTOURADO! (+${slaStatus.elapsed - slaStatus.limit}min)`;
         } else {
             tooltip.textContent = `SLA ${typeLabel}: ${slaStatus.remaining}min restantes (${Math.round(slaStatus.percentage)}%)`;
+        }
+
+        // Posicionar tooltip relativo ao viewport (fora do container)
+        const rect = avatar.getBoundingClientRect();
+        const top = rect.bottom + 8;
+        const left = rect.left + rect.width / 2;
+        tooltip.style.position = 'fixed';
+        tooltip.style.top = `${top}px`;
+        tooltip.style.left = `${left}px`;
+        tooltip.style.transform = 'translateX(-50%)';
+        tooltip.style.zIndex = '5000';
+        // Se o mouse não estiver sobre o avatar, mantém escondido
+        if (tooltip.dataset.visible !== '1') {
+            tooltip.style.opacity = '0';
         }
     },
     

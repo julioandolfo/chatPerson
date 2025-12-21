@@ -462,7 +462,7 @@ ob_start();
                 </div>
                 <div class="modal-footer flex-center">
                     <button type="reset" data-bs-dismiss="modal" class="btn btn-light me-3">Cancelar</button>
-                    <button type="submit" id="kt_modal_node_config_submit" class="btn btn-primary">
+                    <button type="submit" id="kt_modal_node_config_submit" class="btn btn-primary" onclick="console.log('🖱️ BOTÃO SALVAR CLICADO!')">
                         <span class="indicator-label">Salvar</span>
                         <span class="indicator-progress">Aguarde...
                         <span class="spinner-border spinner-border-sm align-middle ms-2"></span></span>
@@ -2129,8 +2129,15 @@ function openNodeConfig(nodeId) {
         });
     }
     
-    const modal = new bootstrap.Modal(document.getElementById("kt_modal_node_config"));
+    console.log('✅ Abrindo modal de configuração...');
+    const modalElement = document.getElementById("kt_modal_node_config");
+    console.log('Modal element:', modalElement ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
+    
+    const modal = new bootstrap.Modal(modalElement);
     modal.show();
+    
+    console.log('✅ Modal aberto!');
+    console.log('=== FIM openNodeConfig ===');
 }
 
 function deleteNode(nodeId) {
@@ -2607,14 +2614,37 @@ function saveLayout() {
 
 // Formulário de configuração do nó
 document.addEventListener("DOMContentLoaded", function() {
+    console.log('🔧 DOMContentLoaded - Configurando handler do formulário de nó');
+    
     const nodeConfigForm = document.getElementById("kt_modal_node_config_form");
+    console.log('🔧 Formulário encontrado:', nodeConfigForm ? 'SIM' : 'NÃO');
+    
+    // Adicionar listener para quando o modal for mostrado
+    const modalElement = document.getElementById("kt_modal_node_config");
+    if (modalElement) {
+        modalElement.addEventListener('shown.bs.modal', function () {
+            console.log('📋 MODAL MOSTRADO - Formulário pronto para interação');
+            const form = document.getElementById("kt_modal_node_config_form");
+            console.log('📋 Formulário no evento shown:', form ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
+        });
+    }
+    
     if (nodeConfigForm) {
+        console.log('🔧 Adicionando listener de submit ao formulário');
         nodeConfigForm.addEventListener("submit", function(e) {
+            console.log('💾 ===== SUBMIT DO FORMULÁRIO =====');
             e.preventDefault();
             
             const nodeId = document.getElementById("kt_node_id").value;
+            console.log('💾 Node ID:', nodeId);
+            
             const node = nodes.find(n => String(n.id) === String(nodeId));
-            if (!node) return;
+            console.log('💾 Node encontrado:', node ? `ID ${node.id} - ${node.node_type}` : 'NÃO');
+            
+            if (!node) {
+                console.error('❌ Node não encontrado!');
+                return;
+            }
             
             const formData = new FormData(nodeConfigForm);
             const nodeData = {};
@@ -2790,11 +2820,21 @@ document.addEventListener("DOMContentLoaded", function() {
     rerenderNode(node);
     makeNodeDraggable(String(node.id));
             
-            console.log('Configuração salva. Fechando modal...');
+            console.log('💾 ===== CONFIGURAÇÃO SALVA =====');
+            console.log('💾 Fechando modal...');
             
             const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_node_config"));
-            modal.hide();
+            if (modal) {
+                console.log('💾 Modal encontrado, fechando...');
+                modal.hide();
+            } else {
+                console.error('❌ Modal não encontrado!');
+            }
+            
+            console.log('💾 ===== FIM DO SUBMIT =====');
         });
+    } else {
+        console.error('❌ Formulário "kt_modal_node_config_form" não encontrado no DOM!');
     }
     
     // Carregar estágios quando funil for selecionado (modal de edição)

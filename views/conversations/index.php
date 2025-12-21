@@ -1601,7 +1601,7 @@ body.dark-mode .swal2-content {
 </style>
 
 <!-- SLA Indicator CSS -->
-<link rel="stylesheet" href="<?= \App\Helpers\Url::asset('assets/css/custom/sla-indicator.css') ?>">
+<link rel="stylesheet" href="<?= \App\Helpers\Url::asset('css/custom/sla-indicator.css') ?>">
 
 <!-- Script inline para definir função ANTES do HTML do botão -->
 <script>
@@ -15401,7 +15401,7 @@ function updateAIActiveBanner(status, conversationId) {
 </script>
 
 <!-- SLA Indicator JavaScript -->
-<script src="<?= \App\Helpers\Url::asset('assets/js/custom/sla-indicator.js') ?>"></script>
+<script src="<?= \App\Helpers\Url::asset('js/custom/sla-indicator.js') ?>"></script>
 
 <?php $content = ob_get_clean(); ?>
 

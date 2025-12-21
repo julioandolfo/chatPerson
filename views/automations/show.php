@@ -1251,7 +1251,14 @@ function openNodeConfig(nodeId) {
     
     const config = nodeTypes[node.node_type] || {};
     document.getElementById("kt_modal_node_config_title").textContent = "Configurar: " + config.label;
-    document.getElementById("kt_node_id").value = nodeId;
+    
+    const nodeIdInput = document.getElementById("kt_node_id");
+    console.log('📝 Definindo Node ID no campo hidden...');
+    console.log('  Valor ANTES:', nodeIdInput.value);
+    console.log('  Novo valor:', nodeId);
+    nodeIdInput.value = nodeId;
+    console.log('  Valor DEPOIS:', nodeIdInput.value);
+    
     document.getElementById("kt_node_type").value = node.node_type;
     
     // Gerar conteúdo do formulário baseado no tipo
@@ -1994,6 +2001,15 @@ function openNodeConfig(nodeId) {
     
     document.getElementById("kt_node_config_content").innerHTML = formContent;
     
+    // Verificar se o Node ID ainda está correto após innerHTML
+    const nodeIdAfterInnerHTML = document.getElementById("kt_node_id").value;
+    console.log('🔍 Node ID após innerHTML:', nodeIdAfterInnerHTML);
+    if (String(nodeIdAfterInnerHTML) !== String(nodeId)) {
+        console.error('❌ ALERTA: Node ID foi alterado de', nodeId, 'para', nodeIdAfterInnerHTML);
+        document.getElementById("kt_node_id").value = nodeId; // Corrigir
+        console.log('✅ Node ID corrigido de volta para:', nodeId);
+    }
+    
     // Popular select de nó fallback para chatbot
     if (node.node_type === 'action_chatbot') {
         const fallbackSelect = document.getElementById('kt_chatbot_fallback_node_id');
@@ -2626,6 +2642,33 @@ document.addEventListener("DOMContentLoaded", function() {
             console.log('📋 MODAL MOSTRADO - Formulário pronto para interação');
             const form = document.getElementById("kt_modal_node_config_form");
             console.log('📋 Formulário no evento shown:', form ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
+            
+            // DEBUG: Monitorar mudanças no campo node_id
+            const nodeIdField = document.getElementById("kt_node_id");
+            if (nodeIdField) {
+                console.log('🔍 Node ID no modal shown:', nodeIdField.value);
+                
+                // Criar um observer para detectar mudanças
+                const observer = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        if (mutation.type === 'attributes' && mutation.attributeName === 'value') {
+                            console.log('⚠️ Node ID foi alterado via atributo para:', nodeIdField.value);
+                            console.trace('Stack trace:');
+                        }
+                    });
+                });
+                observer.observe(nodeIdField, { attributes: true });
+                
+                // Também monitorar via propriedade
+                let lastValue = nodeIdField.value;
+                setInterval(function() {
+                    if (nodeIdField.value !== lastValue) {
+                        console.log('⚠️ Node ID foi alterado de', lastValue, 'para', nodeIdField.value);
+                        console.trace('Stack trace:');
+                        lastValue = nodeIdField.value;
+                    }
+                }, 100);
+            }
         });
     }
     
@@ -2647,6 +2690,13 @@ document.addEventListener("DOMContentLoaded", function() {
             }
             
             const formData = new FormData(nodeConfigForm);
+            
+            // DEBUG: Mostrar TODOS os campos do FormData
+            console.log('📋 FormData completo:');
+            for (let [key, value] of formData.entries()) {
+                console.log(`  ${key}: ${value}`);
+            }
+            
             const nodeData = {};
             // Suporte a campos array (name="field[]") e checkboxes
             for (let [key, value] of formData.entries()) {

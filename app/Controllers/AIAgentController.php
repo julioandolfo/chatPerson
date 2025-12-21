@@ -57,9 +57,28 @@ class AIAgentController
      */
     public function show(int $id): void
     {
-        Permission::abortIfCannot('ai_agents.view');
-        
         $isAjax = Request::isAjax() || Request::get('format') === 'json';
+        
+        // Se for AJAX, limpar qualquer output anterior e desabilitar display de erros
+        if ($isAjax) {
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            ini_set('display_errors', '0');
+            error_reporting(0);
+        }
+        
+        // Verificar permissões antes, mas retornar JSON se for AJAX
+        if (!Permission::can('ai_agents.view')) {
+            if ($isAjax) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Sem permissão para visualizar agentes de IA'
+                ], 403);
+                return;
+            }
+            Permission::abortIfCannot('ai_agents.view');
+        }
         
         try {
             $agent = AIAgentService::get($id);

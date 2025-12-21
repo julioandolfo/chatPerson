@@ -121,8 +121,7 @@ ob_start();
                         <h3 class="card-title">Tools Disponíveis</h3>
                         <?php if (\App\Helpers\Permission::can('ai_agents.edit')): ?>
                         <div class="card-toolbar">
-                            <?php if (!empty($availableTools) || empty($agent['tools'])): ?>
-                            <?php if ($hasAvailableTools || empty($agent['tools'])): ?>
+                            <?php if (!empty($availableTools)): ?>
                             <button type="button" class="btn btn-sm btn-light-primary" data-bs-toggle="modal" data-bs-target="#kt_modal_add_tool">
                                 <i class="ki-duotone ki-plus fs-2"></i>
                                 Adicionar Tool

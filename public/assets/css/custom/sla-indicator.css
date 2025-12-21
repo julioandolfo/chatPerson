@@ -125,7 +125,8 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s;
-    z-index: 3000;
+    z-index: 4000;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.35));
 }
 
 .symbol.symbol-sla:hover .sla-tooltip {

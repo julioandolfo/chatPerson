@@ -187,7 +187,12 @@ const SLAIndicator = {
         }
         
         // Atualizar progresso
-        this.updateProgress(existingIndicator, slaStatus);
+        if (slaStatus.show === false) {
+            existingIndicator.style.display = 'none';
+        } else {
+            existingIndicator.style.display = 'block';
+            this.updateProgress(existingIndicator, slaStatus);
+        }
         
         // Atualizar classes de status
         avatar.className = avatar.className.replace(/sla-status-\w+/g, '');

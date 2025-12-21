@@ -1974,6 +1974,7 @@ class AutomationService
         $interactionCount++;
         $metadata['ai_interaction_count'] = $interactionCount;
         \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
+        self::logIntent("no_intent_no_fallback interaction={$interactionCount}/{$maxInteractions}");
 
         if ($interactionCount >= $maxInteractions) {
             \App\Helpers\Logger::automation("Nenhum intent detectado e limite de interações atingido. Escalando.");

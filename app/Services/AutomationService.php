@@ -1751,11 +1751,15 @@ class AutomationService
 
         // Fallback: detecção semântica via OpenAI (usando descrição do intent)
         if (!$detectedIntent && !empty($metadata['ai_intents'])) {
+            // Ajuste: permitir confiança mínima mais baixa para intents simples
             $minConfidence = isset($metadata['ai_intent_confidence']) ? (float)$metadata['ai_intent_confidence'] : 0.35;
+            $minConfidence = max(0.2, $minConfidence); // não deixar abaixo de 0.2
             $semanticEnabled = $metadata['ai_intent_semantic_enabled'] ?? true; // habilitado por padrão
             if ($semanticEnabled) {
                 \App\Helpers\Logger::automation("Nenhum match por keywords. Tentando detecção semântica via OpenAI (min confidence {$minConfidence})");
                 $detectedIntent = self::detectAIIntentSemantic($aiMessage['content'] ?? '', $metadata['ai_intents'] ?? [], $minConfidence);
+            } else {
+                \App\Helpers\Logger::automation("Detecção semântica desabilitada; não será tentada.");
             }
         }
         

@@ -4794,7 +4794,8 @@ function checkForNewMessages(conversationId) {
         console.error('ID de conversa inválido:', conversationId);
         return;
     }
-    const url = `<?= \App\Helpers\Url::to('/conversations') ?>/${conversationIdNum}?last_message_id=${lastMessageIdNum}`;
+    // Usar endpoint de mensagens, não a página da conversa, para evitar 404 e carregar apenas JSON
+    const url = `<?= \App\Helpers\Url::to('/conversations') ?>/${conversationIdNum}/messages?last_message_id=${lastMessageIdNum}`;
     fetch(url, {
         headers: {
             'X-Requested-With': 'XMLHttpRequest',

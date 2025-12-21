@@ -1,6 +1,13 @@
 # Imagem base com Apache
 FROM php:8.2-apache
 
+# PHP error logging global (Docker/Coolify best practice)
+RUN printf "log_errors=On\n\
+error_reporting=E_ALL\n\
+display_errors=Off\n\
+error_log=/proc/self/fd/2\n" \
+> /usr/local/etc/php/conf.d/99-errors.ini
+
 # Instala dependências de sistema
 RUN apt-get update && apt-get install -y \
     git \

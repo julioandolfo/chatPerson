@@ -1929,10 +1929,30 @@ class AutomationService
             }
         }
         
-        // Não detectou intent e não há fallback; atualizar contador e continuar com IA
+        // Não detectou intent e não há fallback: incrementar interação e enviar feedback
+        $interactionCount++;
         $metadata['ai_interaction_count'] = $interactionCount;
         \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
-        
+
+        if ($interactionCount >= $maxInteractions) {
+            \App\Helpers\Logger::automation("Nenhum intent detectado e limite de interações atingido. Escalando.");
+            return self::escalateFromAI($conversation['id'], $metadata);
+        }
+
+        // Mensagem de esclarecimento para o usuário
+        $clarifyMessage = "Não consegui identificar sua intenção. Pode esclarecer ou ser mais específico?";
+        try {
+            \App\Services\ConversationService::sendMessage(
+                $conversation['id'],
+                $clarifyMessage,
+                'agent',
+                null
+            );
+            \App\Helpers\Logger::automation("Feedback de não entendimento enviado ao usuário. Interação {$interactionCount}/{$maxInteractions}.");
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::automation("Falha ao enviar feedback de não entendimento: " . $e->getMessage());
+        }
+
         \App\Helpers\Logger::automation("=== handleAIBranchingResponse FIM (false - continua com IA) ===");
         return false; // Continua com IA normal
     }

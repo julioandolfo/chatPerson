@@ -226,10 +226,16 @@ const SLAIndicator = {
      */
     calculateSLAStatus: function(conv) {
         const now = new Date();
-        const createdAt = new Date(conv.created_at);
+        const createdAt = conv.created_at ? new Date(conv.created_at) : null;
         const firstResponseAt = conv.first_response_at ? new Date(conv.first_response_at) : null;
         const lastContactAt = conv.last_contact_message_at ? new Date(conv.last_contact_message_at) : null;
         const lastAgentAt = conv.last_agent_message_at ? new Date(conv.last_agent_message_at) : null;
+        
+        // Falha de dados: sem created_at válido -> não mostra
+        if (!createdAt || isNaN(createdAt.getTime())) {
+            console.warn('[SLA] Sem created_at válido para conv', conv.id, conv);
+            return { percentage: 0, status: 'none', breached: false };
+        }
         
         // Respeitar horário de atendimento, se configurado
         if (this.config.workingHoursEnabled) {
@@ -267,6 +273,9 @@ const SLAIndicator = {
             // Calcular SLA de primeira resposta
             const minutesSinceCreated = (now - createdAt) / 1000 / 60;
             const slaMinutes = this.config.firstResponseTime;
+            if (!isFinite(minutesSinceCreated) || !isFinite(slaMinutes) || slaMinutes <= 0) {
+                return { percentage: 0, status: 'none', breached: false };
+            }
             const percentage = Math.min((minutesSinceCreated / slaMinutes) * 100, 100);
             const breached = minutesSinceCreated > slaMinutes;
             
@@ -283,9 +292,13 @@ const SLAIndicator = {
             // Se SLA de resolução estiver desativado, usar SLA de resposta contínua
             if (!this.config.enableResolution) {
                 // Verificar se há mensagem pendente do contato (última mensagem é do contato)
-                if (lastContactAt && (!lastAgentAt || lastContactAt > lastAgentAt)) {
+                const contactVsAgent = lastContactAt && (!lastAgentAt || lastContactAt > lastAgentAt);
+                if (contactVsAgent) {
                     const minutesWaiting = (now - lastContactAt) / 1000 / 60;
                     const slaMinutes = this.config.ongoingResponseTime || this.config.firstResponseTime;
+                    if (!isFinite(minutesWaiting) || !isFinite(slaMinutes) || slaMinutes <= 0) {
+                        return { percentage: 0, status: 'none', breached: false };
+                    }
                     const percentage = Math.min((minutesWaiting / slaMinutes) * 100, 100);
                     const breached = minutesWaiting > slaMinutes;
                     

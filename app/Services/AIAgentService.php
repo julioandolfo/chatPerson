@@ -172,8 +172,19 @@ class AIAgentService
             return null;
         }
 
-        $agent['tools'] = AIAgent::getTools($id);
-        $agent['stats'] = \App\Models\AIConversation::getAgentStats($id);
+        try {
+            $agent['tools'] = AIAgent::getTools($id);
+        } catch (\Exception $e) {
+            error_log("Erro ao buscar tools do agente {$id}: " . $e->getMessage());
+            $agent['tools'] = [];
+        }
+
+        try {
+            $agent['stats'] = \App\Models\AIConversation::getAgentStats($id);
+        } catch (\Exception $e) {
+            error_log("Erro ao buscar estatísticas do agente {$id}: " . $e->getMessage());
+            $agent['stats'] = [];
+        }
 
         return $agent;
     }

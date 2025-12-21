@@ -1988,10 +1988,6 @@ class ConversationController
      */
     public function getAvailableAIAgents(): void
     {
-        // Desabilitar display de erros para evitar HTML no JSON
-        ini_set('display_errors', '0');
-        error_reporting(0);
-        
         // Limpar qualquer output anterior
         while (ob_get_level() > 0) {
             ob_end_clean();
@@ -1999,19 +1995,16 @@ class ConversationController
         ob_start();
         
         try {
-            \App\Helpers\Logger::api('Requisição recebida em getAvailableAIAgents', [
-                'user_id' => \App\Helpers\Auth::id()
-            ]);
+            error_log('=== getAvailableAIAgents INÍCIO ===');
             
             // Qualquer usuário logado pode ver agentes disponíveis
             // Permission::abortIfCannot('conversations.view.own');
             
+            error_log('Chamando ConversationAIService::getAvailableAgents()');
             $agents = \App\Services\ConversationAIService::getAvailableAgents();
             
-            \App\Helpers\Logger::api('Agentes disponíveis encontrados', [
-                'count' => count($agents),
-                'agents' => $agents
-            ]);
+            error_log('Agentes retornados: ' . count($agents));
+            error_log('Dados: ' . json_encode($agents));
             
             ob_end_clean();
             header('Content-Type: application/json');
@@ -2021,12 +2014,9 @@ class ConversationController
             ]);
             exit;
         } catch (\Exception $e) {
-            \App\Helpers\Logger::error('Erro ao buscar agentes disponíveis', [
-                'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString()
-            ]);
+            error_log('❌ ERRO em getAvailableAIAgents: ' . $e->getMessage());
+            error_log('Arquivo: ' . $e->getFile() . ':' . $e->getLine());
+            error_log('Stack: ' . $e->getTraceAsString());
             
             ob_end_clean();
             header('Content-Type: application/json');
@@ -2034,7 +2024,7 @@ class ConversationController
             echo json_encode([
                 'success' => false,
                 'message' => $e->getMessage(),
-                'file' => $e->getFile(),
+                'file' => basename($e->getFile()),
                 'line' => $e->getLine()
             ]);
             exit;

@@ -59,10 +59,12 @@ class AIAgentController
     {
         Permission::abortIfCannot('ai_agents.view');
         
+        $isAjax = Request::isAjax() || Request::get('format') === 'json';
+        
         try {
             $agent = AIAgentService::get($id);
             if (!$agent) {
-                if (Request::isAjax() || Request::get('format') === 'json') {
+                if ($isAjax) {
                     Response::json([
                         'success' => false,
                         'message' => 'Agente de IA não encontrado'
@@ -73,13 +75,11 @@ class AIAgentController
                 return;
             }
             
-            $allTools = AITool::getAllActive();
-            $conversations = \App\Models\AIConversation::getByAgent($id, 20);
-            
-            // Se for requisição AJAX, retornar JSON
-            if (Request::isAjax() || Request::get('format') === 'json') {
+            // Se for requisição AJAX, retornar JSON (sem conversas para evitar erros)
+            if ($isAjax) {
                 // Obter tools do agente
                 $agentTools = AIAgent::getTools($id);
+                $allTools = AITool::getAllActive();
                 
                 Response::json([
                     'success' => true,
@@ -91,13 +91,23 @@ class AIAgentController
                 return;
             }
             
+            // Para requisições não-AJAX, buscar conversas também
+            $allTools = AITool::getAllActive();
+            $conversations = [];
+            try {
+                $conversations = \App\Models\AIConversation::getByAgent($id, 20);
+            } catch (\Exception $e) {
+                error_log("Erro ao buscar conversas do agente {$id}: " . $e->getMessage());
+                // Continuar sem conversas
+            }
+            
             Response::view('ai-agents/show', [
                 'agent' => $agent,
                 'allTools' => $allTools,
                 'conversations' => $conversations
             ]);
         } catch (\Exception $e) {
-            if (Request::isAjax() || Request::get('format') === 'json') {
+            if ($isAjax) {
                 Response::json([
                     'success' => false,
                     'message' => $e->getMessage()

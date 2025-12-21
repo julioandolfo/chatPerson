@@ -45,13 +45,43 @@ $styles = <<<HTML
     left: 15px;
     z-index: 20;
     display: flex;
-    gap: 6px;
+    gap: 4px;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 4px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+[data-bs-theme="dark"] .automation-canvas-toolbar {
+    background: rgba(30, 30, 45, 0.95);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .automation-canvas-toolbar .btn {
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
     padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.automation-canvas-toolbar #automation_zoom_label {
+    min-width: 50px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: center;
+    background: transparent;
+    border: none;
+    color: #3f4254;
+    padding: 0 8px;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    letter-spacing: 0.5px;
+}
+
+[data-bs-theme="dark"] .automation-canvas-toolbar #automation_zoom_label {
+    color: #b5b5c3;
 }
 
 .automation-canvas-viewport {
@@ -78,37 +108,19 @@ $styles = <<<HTML
     position: relative;
     width: 2000px;
     height: 1200px;
-    background: repeating-linear-gradient(
-        0deg,
-        rgba(0, 0, 0, 0.03),
-        rgba(0, 0, 0, 0.03) 1px,
-        transparent 1px,
-        transparent 50px
-    ),
-    repeating-linear-gradient(
-        90deg,
-        rgba(0, 0, 0, 0.03),
-        rgba(0, 0, 0, 0.03) 1px,
-        transparent 1px,
-        transparent 50px
-    );
+    background-color: transparent;
+    background-image: 
+        linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+    background-position: 0 0;
 }
 
 [data-bs-theme="dark"] #kt_automation_canvas {
-    background: repeating-linear-gradient(
-        0deg,
-        rgba(255, 255, 255, 0.05),
-        rgba(255, 255, 255, 0.05) 1px,
-        transparent 1px,
-        transparent 50px
-    ),
-    repeating-linear-gradient(
-        90deg,
-        rgba(255, 255, 255, 0.05),
-        rgba(255, 255, 255, 0.05) 1px,
-        transparent 1px,
-        transparent 50px
-    );
+    background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 50px 50px;
 }
 
 .automation-node {
@@ -299,8 +311,28 @@ $styles = <<<HTML
     box-shadow: 0 2px 4px rgba(99, 102, 241, 0.5);
 }
 
+.ai-intent-row {
+    transition: background-color 0.2s ease;
+}
+
+.ai-intent-row:hover {
+    background-color: rgba(99, 102, 241, 0.08);
+}
+
 .ai-intent-row:hover .node-connection-handle.ai-intent-handle {
     transform: translateY(-50%) scale(1.2);
+}
+
+.ai-intents-visual {
+    border-top-color: #e4e6ef;
+}
+
+[data-bs-theme="dark"] .ai-intents-visual {
+    border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-bs-theme="dark"] .ai-intent-row:hover {
+    background-color: rgba(99, 102, 241, 0.15);
 }
 
 .connecting-line {
@@ -384,15 +416,16 @@ ob_start();
             <!--begin::Canvas Principal-->
                 <div class="automation-editor">
                     <div class="automation-canvas-toolbar">
-                        <button type="button" class="btn btn-light" id="automation_zoom_out" title="Diminuir zoom">
-                            <i class="ki-duotone ki-minus fs-2"></i>
+                        <button type="button" class="btn btn-light btn-sm" id="automation_zoom_out" title="Diminuir zoom (Ctrl + Scroll)">
+                            <i class="ki-duotone ki-minus fs-3"></i>
                         </button>
-                        <div class="btn btn-light disabled px-3" id="automation_zoom_label">100%</div>
-                        <button type="button" class="btn btn-light" id="automation_zoom_in" title="Aumentar zoom">
-                            <i class="ki-duotone ki-plus fs-2"></i>
+                        <div id="automation_zoom_label">100%</div>
+                        <button type="button" class="btn btn-light btn-sm" id="automation_zoom_in" title="Aumentar zoom (Ctrl + Scroll)">
+                            <i class="ki-duotone ki-plus fs-3"></i>
                         </button>
-                        <button type="button" class="btn btn-light" id="automation_zoom_reset" title="Resetar zoom">
-                            <i class="ki-duotone ki-arrows-circle fs-2"></i>
+                        <div style="width: 1px; height: 20px; background: rgba(0,0,0,0.1); margin: 0 2px;"></div>
+                        <button type="button" class="btn btn-light btn-sm" id="automation_zoom_reset" title="Resetar zoom e posição">
+                            <i class="ki-duotone ki-arrows-circle fs-3"></i>
                         </button>
                     </div>
                     <div class="automation-canvas-viewport" id="automation_canvas_viewport">
@@ -882,6 +915,13 @@ function applyCanvasTransform() {
     if (zoomLabel) {
         zoomLabel.textContent = Math.round(canvasScale * 100) + '%';
     }
+    
+    // Atualizar o tamanho do grid para se adaptar ao zoom
+    // Dividir por canvasScale para manter o grid visualmente do mesmo tamanho
+    if (canvas) {
+        const gridSize = 50 / canvasScale;
+        canvas.style.backgroundSize = `${gridSize}px ${gridSize}px`;
+    }
 }
 
 function setCanvasScale(newScale, focalX, focalY) {
@@ -1110,18 +1150,18 @@ function renderNode(node) {
         console.log('🎯 Renderizando AI Agent com intents:', node.id, 'Total:', intents.length);
         console.log('   Intents:', intents);
         
-        innerHtml += '<div class="ai-intents-visual" style="margin-top: 10px; font-size: 11px; color: #7e8299; padding-right: 20px;">';
+        innerHtml += '<div class="ai-intents-visual" style="margin-top: 10px; border-top: 1px solid #e4e6ef; padding-top: 8px;">';
         intents.forEach(function(intent, idx) {
             const intentLabel = intent.description || intent.intent || `Intent ${idx + 1}`;
             console.log(`   -> Intent ${idx}: ${intentLabel}`);
             innerHtml += `
-                <div class="ai-intent-row" style="position: relative; display: flex; align-items: center; gap: 8px; padding: 6px 0; min-height: 24px;">
-                    <span style="flex: 1; min-width: 0; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${intentLabel}">🎯 ${intentLabel}</span>
+                <div class="ai-intent-row" style="position: relative; padding: 6px 8px; padding-right: 24px; margin: 0 -15px; min-height: 28px; display: flex; align-items: center;">
+                    <span style="font-size: 11px; color: #7e8299; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${intentLabel}">🎯 ${intentLabel}</span>
                     <div class="node-connection-handle output ai-intent-handle" 
                          data-node-id="${String(node.id || '')}" 
                          data-handle-type="output" 
                          data-intent-index="${idx}"
-                         style="position: absolute; right: -10px; top: 50%; transform: translateY(-50%); width: 12px; height: 12px; border-radius: 50%; background: #6366f1; border: 2px solid white; cursor: crosshair; z-index: 80;">
+                         style="position: absolute; right: -6px; top: 50%; transform: translateY(-50%); width: 12px; height: 12px; border-radius: 50%; background: #6366f1; border: 2px solid white; cursor: crosshair; z-index: 80; pointer-events: all;">
                     </div>
                 </div>
             `;

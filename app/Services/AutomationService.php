@@ -1772,6 +1772,14 @@ class AutomationService
                 $metadata['ai_branching_active'] = false;
                 $metadata['ai_interaction_count'] = 0;
                 \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
+
+                // Remover a IA da conversa após identificar a intenção (handoff)
+                try {
+                    \App\Services\ConversationAIService::removeAIAgent($conversation['id']);
+                    \App\Helpers\Logger::automation("IA removida da conversa após roteamento por intent.");
+                } catch (\Exception $e) {
+                    \App\Helpers\Logger::automation("Falha ao remover IA após roteamento: " . $e->getMessage());
+                }
                 
                 // Buscar automação e nó de destino
                 $automationId = $metadata['ai_branching_automation_id'];

@@ -967,7 +967,7 @@ class AutomationService
                     \App\Helpers\Logger::automation("executeAssignAIAgent - usando primeiro agente disponível ID {$aiAgentId}");
                 } else {
                     \App\Helpers\Logger::automation("executeAssignAIAgent - Nenhum agente de IA disponível.");
-                    return;
+                    return false;
                 }
             }
 

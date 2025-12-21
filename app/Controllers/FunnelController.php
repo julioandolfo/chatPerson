@@ -481,7 +481,7 @@ class FunnelController
                         FROM funnel_stages fs
                         INNER JOIN funnels f ON fs.funnel_id = f.id
                         WHERE f.status = 'active'
-                        ORDER BY f.name ASC, fs.position ASC, fs.id ASC";
+                        ORDER BY f.name ASC, fs.stage_order ASC, fs.position ASC, fs.id ASC";
                 $stages = \App\Helpers\Database::fetchAll($sql);
                 
                 Response::json([
@@ -576,9 +576,14 @@ class FunnelController
         try {
             $stages = \App\Models\FunnelStage::where('funnel_id', '=', $id);
             
-            // Ordenar por posição
+            // Ordenar por stage_order (com fallback para position e id)
             usort($stages, function($a, $b) {
-                return ($a['position'] ?? 0) - ($b['position'] ?? 0);
+                $orderA = $a['stage_order'] ?? $a['position'] ?? 0;
+                $orderB = $b['stage_order'] ?? $b['position'] ?? 0;
+                if ($orderA === $orderB) {
+                    return ($a['id'] ?? 0) - ($b['id'] ?? 0);
+                }
+                return $orderA - $orderB;
             });
             
             Response::json([

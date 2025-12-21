@@ -215,6 +215,8 @@ Router::post('/settings/websocket', [SettingsController::class, 'saveWebSocket']
 Router::post('/settings/conversations', [SettingsController::class, 'saveConversations'], ['Authentication']);
 
 // Rotas de Agentes de IA
+// IMPORTANTE: Rotas específicas DEVEM vir ANTES de rotas com parâmetros dinâmicos
+Router::get('/ai-agents/available', [ConversationController::class, 'getAvailableAIAgents'], ['Authentication']);
 Router::get('/ai-agents', [AIAgentController::class, 'index'], ['Authentication']);
 Router::get('/ai-agents/{id}', [AIAgentController::class, 'show'], ['Authentication']);
 Router::post('/ai-agents', [AIAgentController::class, 'store'], ['Authentication']);
@@ -261,9 +263,10 @@ Router::post('/roles/{id}/permissions', [RoleController::class, 'assignPermissio
 Router::post('/roles/{id}/permissions/remove', [RoleController::class, 'removePermission'], ['Authentication']);
 
 // Rotas de Departments
+// IMPORTANTE: Rotas específicas DEVEM vir ANTES de rotas com parâmetros dinâmicos
 Router::get('/departments', [DepartmentController::class, 'index'], ['Authentication']);
-Router::get('/departments/{id}', [DepartmentController::class, 'show'], ['Authentication']);
 Router::get('/departments/{id}/json', [DepartmentController::class, 'getJson'], ['Authentication']);
+Router::get('/departments/{id}', [DepartmentController::class, 'show'], ['Authentication']);
 Router::post('/departments', [DepartmentController::class, 'store'], ['Authentication']);
 Router::post('/departments/{id}', [DepartmentController::class, 'update'], ['Authentication']);
 Router::delete('/departments/{id}', [DepartmentController::class, 'destroy'], ['Authentication']);
@@ -271,11 +274,12 @@ Router::post('/departments/{id}/agents', [DepartmentController::class, 'addAgent
 Router::post('/departments/{id}/agents/remove', [DepartmentController::class, 'removeAgent'], ['Authentication']);
 
 // Rotas de Tags
+// IMPORTANTE: Rotas específicas DEVEM vir ANTES de rotas com parâmetros dinâmicos
+Router::get('/tags/all', [TagController::class, 'getAll'], ['Authentication']);
 Router::get('/tags', [TagController::class, 'index'], ['Authentication']);
 Router::post('/tags', [TagController::class, 'store'], ['Authentication']);
 Router::post('/tags/{id}', [TagController::class, 'update'], ['Authentication']);
 Router::delete('/tags/{id}', [TagController::class, 'destroy'], ['Authentication']);
-Router::get('/tags/all', [TagController::class, 'getAll'], ['Authentication']);
 Router::post('/conversations/{id}/tags', [TagController::class, 'addToConversation'], ['Authentication']);
 Router::post('/conversations/{id}/tags/remove', [TagController::class, 'removeFromConversation'], ['Authentication']);
 Router::get('/conversations/{id}/tags', [TagController::class, 'getByConversation'], ['Authentication']);
@@ -285,7 +289,6 @@ Router::get('/conversations/{id}/ai-status', [ConversationController::class, 'ge
 Router::get('/conversations/{id}/ai-messages', [ConversationController::class, 'getAIMessages'], ['Authentication']);
 Router::post('/conversations/{id}/ai-agents', [ConversationController::class, 'addAIAgent'], ['Authentication']);
 Router::delete('/conversations/{id}/ai-agents', [ConversationController::class, 'removeAIAgent'], ['Authentication']);
-Router::get('/ai-agents/available', [ConversationController::class, 'getAvailableAIAgents'], ['Authentication']);
 
 // Rotas de Notificações
 Router::get('/notifications', [NotificationController::class, 'index'], ['Authentication']);

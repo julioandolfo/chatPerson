@@ -1988,9 +1988,9 @@ class ConversationController
      */
     public function getAvailableAIAgents(): void
     {
-        // Mostrar erros temporariamente para debug
-        ini_set('display_errors', '1');
-        error_reporting(E_ALL);
+        // Desabilitar display de erros para evitar HTML no JSON
+        ini_set('display_errors', '0');
+        error_reporting(0);
         
         // Limpar qualquer output anterior
         while (ob_get_level() > 0) {

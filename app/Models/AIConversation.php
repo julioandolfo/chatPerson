@@ -28,7 +28,7 @@ class AIConversation extends Model
      */
     public static function getByAgent(int $agentId, int $limit = 50, int $offset = 0): array
     {
-        $sql = "SELECT ac.*, c.subject, c.status as conversation_status, ct.name as contact_name
+        $sql = "SELECT ac.*, c.status as conversation_status, ct.name as contact_name, ct.phone as contact_phone
                 FROM ai_conversations ac
                 INNER JOIN conversations c ON ac.conversation_id = c.id
                 LEFT JOIN contacts ct ON c.contact_id = ct.id

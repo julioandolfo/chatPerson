@@ -54,9 +54,10 @@ class AIAgent extends Model
      */
     public static function getActiveConversations(int $agentId): array
     {
-        $sql = "SELECT ac.*, c.subject, c.status as conversation_status
+        $sql = "SELECT ac.*, c.status as conversation_status, ct.name as contact_name
                 FROM ai_conversations ac
                 INNER JOIN conversations c ON ac.conversation_id = c.id
+                LEFT JOIN contacts ct ON c.contact_id = ct.id
                 WHERE ac.ai_agent_id = ? AND ac.status = 'active'
                 ORDER BY ac.created_at DESC";
         return Database::fetchAll($sql, [$agentId]);

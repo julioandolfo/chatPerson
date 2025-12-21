@@ -368,7 +368,73 @@ ob_start();
 $content = ob_get_clean(); 
 $scripts = '
 <script>
+// Função global para editar agente
+function editAgent(id) {
+    // Carregar dados do agente
+    fetch("' . \App\Helpers\Url::to('/ai-agents') . '/" + id, {
+        headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "Accept": "application/json"
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json();
+        }
+        throw new Error("Erro ao carregar agente");
+    })
+    .then(data => {
+        if (data.success && data.agent) {
+            const agent = data.agent;
+            
+            // Preencher formulário
+            document.getElementById("edit_agent_id").value = agent.id;
+            document.getElementById("edit_name").value = agent.name || "";
+            document.getElementById("edit_description").value = agent.description || "";
+            document.getElementById("edit_agent_type").value = agent.agent_type || "GENERAL";
+            document.getElementById("edit_prompt").value = agent.prompt || "";
+            document.getElementById("edit_model").value = agent.model || "gpt-4";
+            document.getElementById("edit_temperature").value = agent.temperature || 0.7;
+            document.getElementById("edit_max_tokens").value = agent.max_tokens || 2000;
+            document.getElementById("edit_max_conversations").value = agent.max_conversations || "";
+            document.getElementById("edit_enabled").checked = agent.enabled == 1 || agent.enabled === true;
+            
+            // Carregar tools do agente
+            if (agent.tools && agent.tools.length > 0) {
+                agent.tools.forEach(tool => {
+                    const checkbox = document.getElementById("edit_tool_" + tool.id);
+                    if (checkbox) {
+                        checkbox.checked = true;
+                    }
+                });
+            } else {
+                // Desmarcar todos
+                document.querySelectorAll(".tool-checkbox-edit").forEach(cb => cb.checked = false);
+            }
+            
+            // Abrir modal
+            const modal = new bootstrap.Modal(document.getElementById("kt_modal_edit_ai_agent"));
+            modal.show();
+        } else {
+            Swal.fire({
+                icon: "error",
+                title: "Erro",
+                text: data.message || "Erro ao carregar dados do agente"
+            });
+        }
+    })
+    .catch(error => {
+        console.error("Erro:", error);
+        Swal.fire({
+            icon: "error",
+            title: "Erro",
+            text: "Não foi possível carregar os dados do agente"
+        });
+    });
+}
+
 document.addEventListener("DOMContentLoaded", function() {
+    // Formulário de criação
     const form = document.getElementById("kt_modal_new_ai_agent_form");
     if (form) {
         form.addEventListener("submit", function(e) {
@@ -436,70 +502,6 @@ document.addEventListener("DOMContentLoaded", function() {
                     title: "Erro",
                     text: "Erro ao criar agente de IA"
                 });
-            });
-        });
-    }
-    
-    function editAgent(id) {
-        // Carregar dados do agente
-        fetch("' . \App\Helpers\Url::to('/ai-agents') . '/" + id, {
-            headers: {
-                "X-Requested-With": "XMLHttpRequest",
-                "Accept": "application/json"
-            }
-        })
-        .then(response => {
-            if (response.ok) {
-                return response.json();
-            }
-            throw new Error("Erro ao carregar agente");
-        })
-        .then(data => {
-            if (data.success && data.agent) {
-                const agent = data.agent;
-                
-                // Preencher formulário
-                document.getElementById("edit_agent_id").value = agent.id;
-                document.getElementById("edit_name").value = agent.name || "";
-                document.getElementById("edit_description").value = agent.description || "";
-                document.getElementById("edit_agent_type").value = agent.agent_type || "GENERAL";
-                document.getElementById("edit_prompt").value = agent.prompt || "";
-                document.getElementById("edit_model").value = agent.model || "gpt-4";
-                document.getElementById("edit_temperature").value = agent.temperature || 0.7;
-                document.getElementById("edit_max_tokens").value = agent.max_tokens || 2000;
-                document.getElementById("edit_max_conversations").value = agent.max_conversations || "";
-                document.getElementById("edit_enabled").checked = agent.enabled == 1 || agent.enabled === true;
-                
-                // Carregar tools do agente
-                if (agent.tools && agent.tools.length > 0) {
-                    agent.tools.forEach(tool => {
-                        const checkbox = document.getElementById("edit_tool_" + tool.id);
-                        if (checkbox) {
-                            checkbox.checked = true;
-                        }
-                    });
-                } else {
-                    // Desmarcar todos
-                    document.querySelectorAll(".tool-checkbox-edit").forEach(cb => cb.checked = false);
-                }
-                
-                // Abrir modal
-                const modal = new bootstrap.Modal(document.getElementById("kt_modal_edit_ai_agent"));
-                modal.show();
-            } else {
-                Swal.fire({
-                    icon: "error",
-                    title: "Erro",
-                    text: data.message || "Erro ao carregar dados do agente"
-                });
-            }
-        })
-        .catch(error => {
-            console.error("Erro:", error);
-            Swal.fire({
-                icon: "error",
-                title: "Erro",
-                text: "Não foi possível carregar os dados do agente"
             });
         });
     }

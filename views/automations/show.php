@@ -1119,9 +1119,9 @@ function rerenderNode(node) {
 
 // Configurar drag de tipos de nós do painel lateral
 function setupNodeTypeDrag() {
-    const nodeTypes = document.querySelectorAll(".automation-node-type");
+    const nodeTypeElements = document.querySelectorAll(".automation-node-type");
     
-    nodeTypes.forEach(nodeType => {
+    nodeTypeElements.forEach(nodeType => {
         nodeType.addEventListener("dragstart", function(e) {
             const nodeTypeData = this.dataset.nodeType;
             const actionType = this.dataset.actionType || null;
@@ -1235,6 +1235,10 @@ function makeNodeDraggable(nodeId) {
 function openNodeConfig(nodeId) {
     const node = nodes.find(n => String(n.id) === String(nodeId));
     if (!node) return;
+    
+    // Guardar referência global para uso no submit (evitar sobrescrita do hidden)
+    window.currentNodeIdForModal = nodeId;
+    window.currentNodeRefForModal = node;
     
     console.log('=== openNodeConfig chamado ===');
     console.log('Node ID:', nodeId);
@@ -2678,10 +2682,14 @@ document.addEventListener("DOMContentLoaded", function() {
             console.log('💾 ===== SUBMIT DO FORMULÁRIO =====');
             e.preventDefault();
             
-            const nodeId = document.getElementById("kt_node_id").value;
-            console.log('💾 Node ID:', nodeId);
+            // Usar sempre o ID guardado ao abrir para evitar sobrescrita do hidden
+            const nodeIdFromHidden = document.getElementById("kt_node_id").value;
+            const nodeId = window.currentNodeIdForModal ?? nodeIdFromHidden;
+            document.getElementById("kt_node_id").value = nodeId; // força o valor correto
+            console.log('💾 Node ID (from hidden):', nodeIdFromHidden);
+            console.log('💾 Node ID (current/global):', nodeId);
             
-            const node = nodes.find(n => String(n.id) === String(nodeId));
+            const node = window.currentNodeRefForModal || nodes.find(n => String(n.id) === String(nodeId));
             console.log('💾 Node encontrado:', node ? `ID ${node.id} - ${node.node_type}` : 'NÃO');
             
             if (!node) {

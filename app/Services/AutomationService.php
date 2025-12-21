@@ -1775,7 +1775,8 @@ class AutomationService
                 
                 // Buscar automação e nó de destino
                 $automationId = $metadata['ai_branching_automation_id'];
-                $automation = \App\Models\Automation::find($automationId);
+                // Precisamos dos nós: usar findWithNodes para garantir que venham juntos
+                $automation = \App\Models\Automation::findWithNodes((int)$automationId);
                 
                 if ($automation) {
                     $nodes = $automation['nodes'] ?? [];

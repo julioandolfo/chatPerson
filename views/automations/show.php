@@ -147,6 +147,18 @@ $styles = <<<HTML
     color: #f1f1f2 !important;
 }
 
+.automation-node .badge.badge-light-secondary {
+    background-color: rgba(0, 0, 0, 0.08);
+    color: #5e6278;
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+[data-bs-theme="dark"] .automation-node .badge.badge-light-secondary {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #92929f;
+}
+
 .connections-overlay {
     position: absolute;
     top: 0;
@@ -267,6 +279,28 @@ $styles = <<<HTML
 
 [data-bs-theme="dark"] .node-connection-handle:hover {
     background: #009ef7;
+}
+
+.node-connection-handle.ai-intent-handle {
+    background: #6366f1 !important;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
+    transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.node-connection-handle.ai-intent-handle:hover {
+    background: #4f46e5 !important;
+    transform: translateY(-50%) scale(1.4);
+    box-shadow: 0 3px 8px rgba(99, 102, 241, 0.5);
+}
+
+[data-bs-theme="dark"] .node-connection-handle.ai-intent-handle {
+    border-color: #1e1e2d;
+    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.5);
+}
+
+.ai-intent-row:hover .node-connection-handle.ai-intent-handle {
+    transform: translateY(-50%) scale(1.2);
 }
 
 .connecting-line {
@@ -985,6 +1019,15 @@ function renderNode(node) {
         return; // Não renderizar novamente
     }
     
+    console.log('🎨 renderNode chamado para:', node.id, 'Tipo:', node.node_type);
+    if (node.node_type === 'action_assign_ai_agent') {
+        console.log('  -> É AI Agent, verificando intents...');
+        console.log('  -> ai_intents existe?', !!node.node_data.ai_intents);
+        console.log('  -> É array?', Array.isArray(node.node_data.ai_intents));
+        console.log('  -> Tamanho:', node.node_data.ai_intents?.length);
+        console.log('  -> Conteúdo:', node.node_data.ai_intents);
+    }
+    
     const config = nodeTypes[node.node_type] || {};
     const nodeElement = document.createElement("div");
     nodeElement.id = String(node.id); // Garantir que o ID seja string para o DOM
@@ -1010,12 +1053,15 @@ function renderNode(node) {
     
     // HTML básico do nó
     let innerHtml = `
-        <div class="d-flex align-items-center gap-3 mb-2">
-            <i class="ki-duotone ${config.icon || "ki-gear"} fs-2" style="color: ${config.color || "#009ef7"};">
-                <span class="path1"></span>
-                <span class="path2"></span>
-            </i>
-            <span class="fw-bold">${config.label || node.node_type}</span>
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="d-flex align-items-center gap-3">
+                <i class="ki-duotone ${config.icon || "ki-gear"} fs-2" style="color: ${config.color || "#009ef7"};">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                <span class="fw-bold">${config.label || node.node_type}</span>
+            </div>
+            <span class="badge badge-light-secondary fs-9 px-2 py-1" style="font-family: monospace; opacity: 0.7;">${String(node.id || '')}</span>
         </div>
         <div class="text-muted fs-7">${node.node_data.label || ""}</div>
         <div class="mt-3 d-flex gap-2" style="position: relative; z-index: 100;">
@@ -1059,19 +1105,23 @@ function renderNode(node) {
                node.node_data.ai_intents && 
                Array.isArray(node.node_data.ai_intents) &&
                node.node_data.ai_intents.length > 0) {
-        // Se é AI Agent e há intents configurados, renderizar handles (mesmo que o flag esteja off, para evitar sumir quando o checkbox não foi salvo corretamente)
+        // Se é AI Agent e há intents configurados, renderizar handles
         const intents = node.node_data.ai_intents;
-        innerHtml += '<div class="ai-intents-visual" style="margin-top: 10px; font-size: 11px; color: #7e8299; padding-right: 6px;">';
+        console.log('🎯 Renderizando AI Agent com intents:', node.id, 'Total:', intents.length);
+        console.log('   Intents:', intents);
+        
+        innerHtml += '<div class="ai-intents-visual" style="margin-top: 10px; font-size: 11px; color: #7e8299; padding-right: 20px;">';
         intents.forEach(function(intent, idx) {
             const intentLabel = intent.description || intent.intent || `Intent ${idx + 1}`;
+            console.log(`   -> Intent ${idx}: ${intentLabel}`);
             innerHtml += `
-                <div class="ai-intent-row" style="display: flex; align-items: center; gap: 8px; padding: 4px 0;">
-                    <span style="flex: 1; min-width: 0; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${intentLabel}">🎯 ${intentLabel}</span>
+                <div class="ai-intent-row" style="position: relative; display: flex; align-items: center; gap: 8px; padding: 6px 0; min-height: 24px;">
+                    <span style="flex: 1; min-width: 0; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${intentLabel}">🎯 ${intentLabel}</span>
                     <div class="node-connection-handle output ai-intent-handle" 
                          data-node-id="${String(node.id || '')}" 
                          data-handle-type="output" 
                          data-intent-index="${idx}"
-                         style="margin-left: auto; width: 12px; height: 12px; border-radius: 50%; background: #6366f1; flex-shrink: 0;">
+                         style="position: absolute; right: -10px; top: 50%; transform: translateY(-50%); width: 12px; height: 12px; border-radius: 50%; background: #6366f1; border: 2px solid white; cursor: crosshair; z-index: 80;">
                     </div>
                 </div>
             `;
@@ -2902,17 +2952,20 @@ document.addEventListener("DOMContentLoaded", function() {
             
             // Log específico para AI Agent
             if (node.node_type === "action_assign_ai_agent") {
-                console.log('AI Agent - Verificação final:');
+                console.log('🤖 AI Agent - Verificação final ANTES de re-render:');
                 console.log('  ai_branching_enabled:', node.node_data.ai_branching_enabled);
-                console.log('  ai_intents:', node.node_data.ai_intents);
+                console.log('  ai_intents (tipo, tamanho):', typeof node.node_data.ai_intents, Array.isArray(node.node_data.ai_intents) ? node.node_data.ai_intents.length : 'N/A');
+                console.log('  ai_intents (conteúdo):', JSON.stringify(node.node_data.ai_intents, null, 2));
                 console.log('  ai_max_interactions:', node.node_data.ai_max_interactions);
                 console.log('  ai_fallback_node_id:', node.node_data.ai_fallback_node_id);
+                console.log('  connections:', node.node_data.connections);
             }
             
             // Atualizar referência global
             window.nodes = nodes;
             
     // Re-render para refletir handles e dados atualizados
+    console.log('🔄 Re-renderizando nó:', node.id, 'Tipo:', node.node_type);
     rerenderNode(node);
     makeNodeDraggable(String(node.id));
             

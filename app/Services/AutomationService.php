@@ -15,6 +15,10 @@ use App\Helpers\Validator;
 class AutomationService
 {
     /**
+     * Automation ID atual em execução (para uso em metadata de IA)
+     */
+    private static ?int $currentAutomationId = null;
+    /**
      * Criar automação
      */
     public static function create(array $data): int
@@ -509,6 +513,8 @@ class AutomationService
     public static function executeAutomation(int $automationId, int $conversationId, bool $logExecution = true): void
     {
         \App\Helpers\Logger::automation("=== executeAutomation INÍCIO === automationId: {$automationId}, conversationId: {$conversationId}");
+        // Guardar Automation ID atual para uso em nós (ex: ramificação IA)
+        self::$currentAutomationId = $automationId;
         
         $automation = Automation::findWithNodes($automationId);
         if (!$automation) {
@@ -578,6 +584,9 @@ class AutomationService
             }
             error_log("Erro ao executar automação {$automationId}: " . $e->getMessage());
             throw $e;
+        } finally {
+            // Limpar referência do Automation ID atual
+            self::$currentAutomationId = null;
         }
         
         \App\Helpers\Logger::automation("=== executeAutomation FIM ===");
@@ -913,6 +922,83 @@ class AutomationService
             if ($executionId) {
                 \App\Models\AutomationExecution::updateStatus($executionId, 'failed', "Erro na atribuição: " . $e->getMessage());
             }
+            throw $e;
+        }
+    }
+
+    /**
+     * Executar ação: atribuir agente de IA
+     */
+    private static function executeAssignAIAgent(array $nodeData, int $conversationId, ?int $executionId = null): void
+    {
+        \App\Helpers\Logger::automation("executeAssignAIAgent - INÍCIO. Conversa {$conversationId}");
+
+        // Dados do form
+        $aiAgentId         = !empty($nodeData['ai_agent_id']) ? (int)$nodeData['ai_agent_id'] : null;
+        $processImmediately= !empty($nodeData['process_immediately']);
+        $assumeConversation= !empty($nodeData['assume_conversation']);
+        $onlyIfUnassigned  = !empty($nodeData['only_if_unassigned']);
+
+        // Configuração de ramificação/intent
+        $aiBranchingEnabled        = !empty($nodeData['ai_branching_enabled']);
+        $aiIntents                 = $nodeData['ai_intents'] ?? [];
+        $aiMaxInteractions         = isset($nodeData['ai_max_interactions']) ? (int)$nodeData['ai_max_interactions'] : 5;
+        $aiFallbackNodeId          = !empty($nodeData['ai_fallback_node_id']) ? (int)$nodeData['ai_fallback_node_id'] : null;
+        $aiSemanticEnabled         = array_key_exists('ai_intent_semantic_enabled', $nodeData) ? (bool)$nodeData['ai_intent_semantic_enabled'] : true;
+        $aiIntentConfidence        = isset($nodeData['ai_intent_confidence']) ? (float)$nodeData['ai_intent_confidence'] : 0.35;
+
+        // Se há intents configurados, força ramificação ligada
+        if (!empty($aiIntents)) {
+            $aiBranchingEnabled = true;
+        }
+
+        try {
+            // Se não informou agente, pegar o primeiro disponível
+            if (!$aiAgentId) {
+                $available = \App\Services\ConversationAIService::getAvailableAgents();
+                $first = $available[0]['id'] ?? null;
+                if ($first) {
+                    $aiAgentId = (int)$first;
+                    \App\Helpers\Logger::automation("executeAssignAIAgent - usando primeiro agente disponível ID {$aiAgentId}");
+                } else {
+                    \App\Helpers\Logger::automation("executeAssignAIAgent - Nenhum agente de IA disponível.");
+                    return;
+                }
+            }
+
+            // Atribuir IA à conversa
+            \App\Services\ConversationAIService::addAIAgent($conversationId, [
+                'ai_agent_id'       => $aiAgentId,
+                'process_immediately'=> $processImmediately,
+                'assume_conversation'=> $assumeConversation,
+                'only_if_unassigned' => $onlyIfUnassigned,
+            ]);
+
+            \App\Helpers\Logger::automation("executeAssignAIAgent - IA atribuída com sucesso (ID {$aiAgentId}).");
+
+            // Atualizar metadata para ramificação por intent
+            $conversation = Conversation::find($conversationId);
+            $metadata = json_decode($conversation['metadata'] ?? '{}', true);
+            if (!is_array($metadata)) {
+                $metadata = [];
+            }
+
+            $metadata['ai_branching_active']          = (bool)$aiBranchingEnabled;
+            $metadata['ai_intents']                   = is_array($aiIntents) ? $aiIntents : [];
+            $metadata['ai_max_interactions']          = $aiMaxInteractions;
+            $metadata['ai_fallback_node_id']          = $aiFallbackNodeId;
+            $metadata['ai_intent_semantic_enabled']   = $aiSemanticEnabled;
+            $metadata['ai_intent_confidence']         = $aiIntentConfidence;
+            $metadata['ai_interaction_count']         = 0;
+            $metadata['ai_branching_automation_id']   = self::$currentAutomationId;
+
+            Conversation::update($conversationId, [
+                'metadata' => json_encode($metadata)
+            ]);
+
+            \App\Helpers\Logger::automation("executeAssignAIAgent - Metadata atualizada (branching " . ($aiBranchingEnabled ? 'ON' : 'OFF') . ").");
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::automation("executeAssignAIAgent - ERRO: " . $e->getMessage());
             throw $e;
         }
     }

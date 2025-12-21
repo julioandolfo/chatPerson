@@ -1066,13 +1066,13 @@ function renderNode(node) {
         intents.forEach(function(intent, idx) {
             const intentLabel = intent.description || intent.intent || `Intent ${idx + 1}`;
             innerHtml += `
-                <div class="ai-intent-row" style="position: relative; padding: 4px 0; padding-right: 20px;">
-                    <span style="display: inline-block; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${intentLabel}">🎯 ${intentLabel}</span>
+                <div class="ai-intent-row" style="display: flex; align-items: center; gap: 8px; padding: 4px 0;">
+                    <span style="flex: 1; min-width: 0; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${intentLabel}">🎯 ${intentLabel}</span>
                     <div class="node-connection-handle output ai-intent-handle" 
                          data-node-id="${String(node.id || '')}" 
                          data-handle-type="output" 
                          data-intent-index="${idx}"
-                         style="right: -10px; top: 50%; transform: translateY(-50%); background: #6366f1;">
+                         style="position: relative; width: 12px; height: 12px; border-radius: 50%; background: #6366f1; margin-left: 4px;">
                     </div>
                 </div>
             `;

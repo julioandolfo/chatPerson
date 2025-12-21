@@ -764,7 +764,8 @@ ob_start();
 var nodes = <?= $nodesJson ?>;
 // Garantir que nodes seja acessível globalmente
 window.nodes = nodes;
-let nodeTypes = <?= $nodeTypesJson ?>;
+// Usar var para evitar erro de redeclaração se outros scripts também definirem nodeTypes
+var nodeTypes = <?= $nodeTypesJson ?>;
 let nextNodeId = <?= $nextNodeId ?>;
 let selectedNode = null;
 let canvas = null;
@@ -1262,6 +1263,15 @@ function openNodeConfig(nodeId) {
     console.log('  Novo valor:', nodeId);
     nodeIdInput.value = nodeId;
     console.log('  Valor DEPOIS:', nodeIdInput.value);
+    
+    // Guard rails: manter o valor enquanto o modal estiver aberto
+    if (window.nodeIdGuardInterval) clearInterval(window.nodeIdGuardInterval);
+    window.nodeIdGuardInterval = setInterval(() => {
+        if (nodeIdInput.value !== String(nodeId)) {
+            console.warn('⚠️ Node ID alterado externamente para', nodeIdInput.value, '-> restaurando para', nodeId);
+            nodeIdInput.value = nodeId;
+        }
+    }, 100);
     
     document.getElementById("kt_node_type").value = node.node_type;
     
@@ -2674,6 +2684,12 @@ document.addEventListener("DOMContentLoaded", function() {
                 }, 100);
             }
         });
+        modalElement.addEventListener('hidden.bs.modal', function () {
+            if (window.nodeIdGuardInterval) {
+                clearInterval(window.nodeIdGuardInterval);
+                window.nodeIdGuardInterval = null;
+            }
+        });
     }
     
     if (nodeConfigForm) {
@@ -2761,9 +2777,9 @@ document.addEventListener("DOMContentLoaded", function() {
             // Tratamento específico para AI Agent: coletar intents
             if (node.node_type === "action_assign_ai_agent") {
                 // Checkbox retorna 'on' quando marcado, ou undefined quando desmarcado
-                const branchingEnabled = nodeData.ai_branching_enabled === 'on' || 
-                                        nodeData.ai_branching_enabled === '1' || 
-                                        nodeData.ai_branching_enabled === true;
+                let branchingEnabled = nodeData.ai_branching_enabled === 'on' || 
+                                       nodeData.ai_branching_enabled === '1' || 
+                                       nodeData.ai_branching_enabled === true;
 
                 // Configurações de interpretação semântica
                 nodeData.ai_intent_semantic_enabled = formData.has('ai_intent_semantic_enabled');
@@ -2825,6 +2841,15 @@ document.addEventListener("DOMContentLoaded", function() {
                     
                     console.log('  Total de intents válidos coletados:', intents.length);
                     console.log('  Intents:', intents);
+                    
+                    // Se o usuário preencheu intents, ativar ramificação automaticamente
+                    if (intents.length > 0) {
+                        branchingEnabled = true;
+                        nodeData.ai_branching_enabled = true;
+                        const branchingCheckbox = document.getElementById('kt_ai_branching_enabled');
+                        if (branchingCheckbox) branchingCheckbox.checked = true;
+                    }
+                    
                     nodeData.ai_intents = intents;
 
                     // ✅ Criar conexões automaticamente para cada intent com target definido

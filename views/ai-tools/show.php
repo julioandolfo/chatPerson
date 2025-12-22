@@ -655,9 +655,9 @@ function executeN8NTest() {
     resultDiv.style.display = "none";
     
     fetch("' . \App\Helpers\Url::to('/ai-tools') . '/" + toolId + "/test-n8n", {
-        method: 'POST',
+        method: "POST",
         headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
         },
         body: JSON.stringify({
             webhook_id: webhookId || null,
@@ -675,24 +675,24 @@ function executeN8NTest() {
         resultDiv.style.display = "block";
         
         let html = `
-            <div class="card ${result.success ? 'bg-light-success' : 'bg-light-danger'}">
+            <div class="card ${result.success ? "bg-light-success" : "bg-light-danger"}">
                 <div class="card-body">
                     <div class="d-flex align-items-center mb-3">
-                        <i class="ki-duotone ${result.success ? 'ki-check-circle' : 'ki-cross-circle'} fs-2x ${result.success ? 'text-success' : 'text-danger'} me-3">
+                        <i class="ki-duotone ${result.success ? "ki-check-circle" : "ki-cross-circle"} fs-2x ${result.success ? "text-success" : "text-danger"} me-3">
                             <span class="path1"></span>
                             <span class="path2"></span>
                         </i>
                         <div>
-                            <h5 class="mb-0">${result.success ? 'Sucesso!' : 'Erro'}</h5>
+                            <h5 class="mb-0">${result.success ? "Sucesso!" : "Erro"}</h5>
                             <div class="text-muted">HTTP ${result.http_code || 'N/A'}</div>
                         </div>
                     </div>
                     
                     <div class="mb-3">
-                        <strong>URL:</strong> <code>${result.url || 'N/A'}</code><br>
-                        <strong>Método:</strong> <code>${result.method || 'N/A'}</code><br>
-                        ${result.curl_info ? `<strong>Tempo:</strong> ${(result.curl_info.total_time * 1000).toFixed(2)}ms<br>` : ''}
-                        ${result.curl_info ? `<strong>Tamanho:</strong> ${(result.curl_info.size_download / 1024).toFixed(2)} KB` : ''}
+                        <strong>URL:</strong> <code>${result.url || "N/A"}</code><br>
+                        <strong>Método:</strong> <code>${result.method || "N/A"}</code><br>
+                        ${result.curl_info ? `<strong>Tempo:</strong> ${(result.curl_info.total_time * 1000).toFixed(2)}ms<br>` : ""}
+                        ${result.curl_info ? `<strong>Tamanho:</strong> ${(result.curl_info.size_download / 1024).toFixed(2)} KB` : ""}
                     </div>
                     
                     ${result.request ? `
@@ -700,14 +700,14 @@ function executeN8NTest() {
                         <strong>Requisição Enviada:</strong>
                         <pre class="bg-white p-3 rounded mt-2" style="max-height: 200px; overflow-y: auto;">${JSON.stringify(result.request, null, 2)}</pre>
                     </div>
-                    ` : ''}
+                    ` : ""}
                     
                     <div>
                         <strong>Resposta:</strong>
                         <pre class="bg-white p-3 rounded mt-2" style="max-height: 400px; overflow-y: auto;">${JSON.stringify(result.response || result, null, 2)}</pre>
                     </div>
                     
-                    ${result.message ? `<div class="alert alert-${result.success ? 'success' : 'danger'} mt-3">${result.message}</div>` : ''}
+                    ${result.message ? `<div class="alert alert-${result.success ? "success" : "danger"} mt-3">${result.message}</div>` : ""}
                 </div>
             </div>
         `;
@@ -715,7 +715,7 @@ function executeN8NTest() {
         resultContent.innerHTML = html;
         
         // Scroll para resultado
-        resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        resultDiv.scrollIntoView({ behavior: "smooth", block: "nearest" });
     })
     .catch(error => {
         executeBtn.removeAttribute("data-kt-indicator");
@@ -724,7 +724,7 @@ function executeN8NTest() {
         resultDiv.style.display = "block";
         resultContent.innerHTML = `
             <div class="alert alert-danger">
-                <strong>Erro:</strong> ${error.message || 'Erro ao executar teste'}
+                <strong>Erro:</strong> ${error.message || "Erro ao executar teste"}
             </div>
         `;
     });

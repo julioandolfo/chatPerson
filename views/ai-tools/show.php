@@ -128,17 +128,17 @@ ob_start();
                     
                     <div class="mb-5">
                         <label class="form-label fw-semibold">Dados (JSON) - Para POST, PUT, PATCH</label>
-                        <textarea class="form-control" id="test_data" rows="5" placeholder='{"key": "value"}'></textarea>
+                        <textarea class="form-control" id="test_data" rows="5" placeholder="{&quot;key&quot;: &quot;value&quot;}"></textarea>
                     </div>
                     
                     <div class="mb-5">
                         <label class="form-label fw-semibold">Query Params (JSON) - Para GET</label>
-                        <textarea class="form-control" id="test_query_params" rows="3" placeholder='{"param": "value"}'></textarea>
+                        <textarea class="form-control" id="test_query_params" rows="3" placeholder="{&quot;param&quot;: &quot;value&quot;}"></textarea>
                     </div>
                     
                     <div class="mb-5">
                         <label class="form-label fw-semibold">Headers Customizados (JSON)</label>
-                        <textarea class="form-control" id="test_headers" rows="3" placeholder='{"X-Custom-Header": "value"}'></textarea>
+                        <textarea class="form-control" id="test_headers" rows="3" placeholder="{&quot;X-Custom-Header&quot;: &quot;value&quot;}"></textarea>
                     </div>
                     
                     <div class="d-flex justify-content-end">
@@ -295,6 +295,9 @@ ob_start();
 $content = ob_get_clean(); 
 $scripts = '
 <script>
+// URL base para requisições
+const AI_TOOLS_BASE_URL = ' . json_encode(\App\Helpers\Url::to('/ai-tools')) . ';
+
 let editParameterCounter = 0;
 
 // Configurações por tipo de tool (mesmo do index.php)
@@ -654,7 +657,7 @@ function executeN8NTest() {
     executeBtn.disabled = true;
     resultDiv.style.display = "none";
     
-    fetch(' . json_encode(\App\Helpers\Url::to('/ai-tools')) . ' + "/" + toolId + "/test-n8n", {
+    fetch(AI_TOOLS_BASE_URL + "/" + toolId + "/test-n8n", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -796,7 +799,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const enabled = formData.get("enabled") === "on" || formData.get("enabled") === "true";
             formData.set("enabled", enabled ? "1" : "0");
             
-            fetch("' . \App\Helpers\Url::to('/ai-tools') . '/" + toolId, {
+            fetch(AI_TOOLS_BASE_URL + "/" + toolId, {
                 method: "POST",
                 headers: {
                     "X-Requested-With": "XMLHttpRequest"

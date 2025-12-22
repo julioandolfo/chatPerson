@@ -164,6 +164,7 @@ const SLAIndicator = {
         
         // Calcular status do SLA
         const slaStatus = this.calculateSLAStatus(conv);
+        console.log(`[SLA] Status calculado para conversa ${conv.id}:`, slaStatus);
         
         // Remover classes SLA do conversation-item (se aplicadas por engano)
         const conversationItem = avatar.closest('.conversation-item');
@@ -172,14 +173,15 @@ const SLAIndicator = {
             conversationItem.classList.remove('symbol-sla');
         }
         
-        // Se não houver violação, não mostrar indicador
-        if (slaStatus.percentage === 0 && !slaStatus.breached) {
+        // Se não houver violação ou show === false, não mostrar indicador
+        if (slaStatus.show === false || (slaStatus.percentage === 0 && !slaStatus.breached)) {
             if (existingIndicator) {
                 existingIndicator.remove();
             }
             avatar.classList.remove('symbol-sla');
             // Remover todas as classes sla-status do avatar
             avatar.className = avatar.className.replace(/sla-status-\w+/g, '');
+            console.log(`[SLA] Indicador oculto para conversa ${conv.id}`);
             return;
         }
         
@@ -193,6 +195,7 @@ const SLAIndicator = {
             const indicator = this.createIndicatorSVG(avatar);
             avatar.insertAdjacentHTML('afterbegin', indicator);
             existingIndicator = avatar.querySelector('.sla-progress-ring');
+            console.log(`[SLA] Indicador criado para conversa ${conv.id}`, existingIndicator);
         }
         
         // Atualizar progresso
@@ -229,20 +232,21 @@ const SLAIndicator = {
         const size = avatar.classList.contains('symbol-35px') ? 35 : 
                     avatar.classList.contains('symbol-50px') ? 50 : 45;
         
-        // viewBox do mesmo tamanho do avatar (sem extrapolar)
-        const viewBoxSize = size;
+        // viewBox ligeiramente maior para acomodar o stroke ao redor
+        const viewBoxSize = size + 6; // +6px para o stroke (3px de cada lado)
         const stroke = size >= 50 ? 3 : size >= 45 ? 2.5 : 2;
-        const inset = stroke / 2;
-        const rectSize = viewBoxSize - stroke;
-        const rx = Math.max(6, Math.round(size * 0.20)); // cantos arredondados para seguir o avatar
-        const dashArray = 2 * (rectSize + rectSize);
+        const inset = 3; // deslocamento fixo de 3px (metade dos 6px extras)
+        const rectSize = size; // tamanho original do avatar
+        const rx = Math.max(10, Math.round(size * 0.22)); // cantos arredondados para seguir o avatar
+        const dashArray = 2 * (rectSize + rectSize); // perímetro do retângulo
         
         return `
             <svg class="sla-progress-ring" width="${viewBoxSize}" height="${viewBoxSize}" viewBox="0 0 ${viewBoxSize} ${viewBoxSize}">
                 <rect class="sla-ring-bg"
                       x="${inset}" y="${inset}"
                       width="${rectSize}" height="${rectSize}"
-                      rx="${rx}" ry="${rx}">
+                      rx="${rx}" ry="${rx}"
+                      stroke-width="${stroke}">
                 </rect>
                 <rect class="sla-ring-progress"
                       x="${inset}" y="${inset}"

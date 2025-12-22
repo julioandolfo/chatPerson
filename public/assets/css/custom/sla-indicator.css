@@ -7,18 +7,18 @@
 .symbol.symbol-sla {
     position: relative;
     display: inline-block;
-    overflow: hidden; /* contém o SVG completamente dentro do avatar */
+    overflow: visible; /* permite o stroke ficar visível ao redor do avatar */
 }
 
 .sla-progress-ring {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    top: -3px; /* compensa o stroke para ficar ao redor */
+    left: -3px;
+    width: calc(100% + 6px); /* adiciona espaço para o stroke */
+    height: calc(100% + 6px);
     transform: rotate(-90deg);
     pointer-events: none;
-    z-index: 1;
+    z-index: 0; /* fica atrás do conteúdo do avatar */
 }
 
 .sla-progress-ring circle,
@@ -26,6 +26,7 @@
     fill: none;
     stroke-width: 3;
     transition: stroke-dashoffset 0.3s ease, stroke 0.3s ease;
+    vector-effect: non-scaling-stroke; /* mantém espessura consistente */
 }
 
 .sla-progress-ring .sla-ring-bg {
@@ -142,6 +143,13 @@
     height: 35px;
 }
 
+.symbol-35px .sla-progress-ring {
+    top: -2.5px;
+    left: -2.5px;
+    width: calc(100% + 5px);
+    height: calc(100% + 5px);
+}
+
 .symbol-35px .sla-progress-ring circle,
 .symbol-35px .sla-progress-ring rect {
     stroke-width: 2;
@@ -152,6 +160,13 @@
     height: 45px;
 }
 
+.symbol-45px .sla-progress-ring {
+    top: -3px;
+    left: -3px;
+    width: calc(100% + 6px);
+    height: calc(100% + 6px);
+}
+
 .symbol-45px .sla-progress-ring circle,
 .symbol-45px .sla-progress-ring rect {
     stroke-width: 2.5;
@@ -160,6 +175,13 @@
 .symbol-50px.symbol-sla {
     width: 50px;
     height: 50px;
+}
+
+.symbol-50px .sla-progress-ring {
+    top: -3px;
+    left: -3px;
+    width: calc(100% + 6px);
+    height: calc(100% + 6px);
 }
 
 .symbol-50px .sla-progress-ring circle,
@@ -193,6 +215,8 @@
     height: 45px;
     border-radius: 12px; /* mantém cantos arredondados, não círculo */
     overflow: hidden;
+    position: relative;
+    z-index: 2; /* fica acima do anel */
 }
 
 .conversation-item .symbol.symbol-sla .symbol-label {
@@ -200,8 +224,19 @@
     align-items: center;
     justify-content: center;
     text-align: center;
-    position: relative;
-    z-index: 2;
+}
+
+/* Garantir que os tamanhos do symbol-label sejam corretos para cada tamanho */
+.symbol-35px.symbol-sla .symbol-label,
+.symbol-35px.symbol-sla img {
+    width: 35px;
+    height: 35px;
+}
+
+.symbol-50px.symbol-sla .symbol-label,
+.symbol-50px.symbol-sla img {
+    width: 50px;
+    height: 50px;
 }
 
 /* IMPORTANTE: Garantir que o SLA NÃO aplique bordas/outline ao card da conversa */

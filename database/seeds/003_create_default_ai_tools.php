@@ -83,20 +83,37 @@ function seed_default_ai_tools() {
         [
             'name' => 'Escalar para Humano',
             'slug' => 'escalar_para_humano',
-            'description' => 'Escala a conversa para um agente humano quando necessário',
+            'description' => 'Escala a conversa para um agente humano quando necessário, com opções de atribuição inteligente',
             'tool_type' => 'system',
             'function_schema' => json_encode([
                 'type' => 'function',
                 'function' => [
                     'name' => 'escalar_para_humano',
-                    'description' => 'Escala a conversa para um agente humano quando a situação requer intervenção humana',
+                    'description' => 'Escala a conversa para um agente humano quando a situação requer intervenção humana. Pode especificar motivo e observações.',
                     'parameters' => [
                         'type' => 'object',
-                        'properties' => []
+                        'properties' => [
+                            'reason' => [
+                                'type' => 'string',
+                                'description' => 'Motivo da escalação (ex: "Cliente solicitou falar com gerente", "Situação complexa que requer análise humana", "Negociação de valores")'
+                            ],
+                            'notes' => [
+                                'type' => 'string',
+                                'description' => 'Observações adicionais ou contexto importante para o agente humano'
+                            ]
+                        ],
+                        'required' => ['reason']
                     ]
                 ]
             ], JSON_UNESCAPED_UNICODE),
-            'config' => null,
+            'config' => json_encode([
+                'escalation_type' => 'auto',
+                'priority' => 'normal',
+                'add_escalation_note' => true,
+                'notify_agent' => false,
+                'send_transition_message' => true,
+                'transition_message' => 'Vou transferir você para um de nossos especialistas. Aguarde um momento, por favor.'
+            ], JSON_UNESCAPED_UNICODE),
             'enabled' => true
         ],
         [

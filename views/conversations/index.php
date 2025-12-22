@@ -4013,8 +4013,15 @@ window.updateAIAgentSidebar = function(status) {
  * Mostrar modal de adicionar agente de IA
  */
 window.showAddAIAgentModal = function() {
+    console.log('🤖 showAddAIAgentModal chamado');
+    console.log('🔍 window.currentConversationId:', window.currentConversationId);
+    console.log('🔍 typeof window.currentConversationId:', typeof window.currentConversationId);
+    
     const conversationId = window.currentConversationId || 0;
+    console.log('🔍 conversationId após || 0:', conversationId);
+    
     if (!conversationId) {
+        console.warn('⚠️ conversationId vazio ou zero, mostrando alerta');
         Swal.fire({
             icon: 'warning',
             title: 'Atenção',
@@ -4022,6 +4029,8 @@ window.showAddAIAgentModal = function() {
         });
         return;
     }
+    
+    console.log('✅ conversationId válido:', conversationId);
     
     // Carregar agentes disponíveis
     const url = `<?= \App\Helpers\Url::to('/ai-agents/available') ?>`;
@@ -5108,7 +5117,9 @@ function selectConversation(id) {
             updateChatHeader(data.conversation);
             
             // Resetar paginação
-            currentConversationId = id;
+            currentConversationId = parseInt(id);
+            window.currentConversationId = currentConversationId; // Garantir que window também é atualizado
+            console.log('🔄 currentConversationId atualizado para:', currentConversationId);
             currentContactAvatar = data.conversation.contact_avatar || null; // Armazenar avatar do contato
             isLoadingMessages = false;
             hasMoreMessages = true;
@@ -6853,6 +6864,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (selectedConversationId) {
         // IMPORTANTE: Definir currentConversationId para que funcionalidades como Assistente IA funcionem
         currentConversationId = parseInt(selectedConversationId);
+        window.currentConversationId = currentConversationId; // Garantir que window também é atualizado
+        console.log('🔄 [DOMContentLoaded] currentConversationId definido:', currentConversationId);
         
         // Marcar conversa como ativa na lista
         document.querySelectorAll('.conversation-item').forEach(item => {

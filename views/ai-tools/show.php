@@ -368,7 +368,17 @@ const toolTypeConfigs = {
         ]
     },
     system: {
-        fields: []
+        fields: [
+            { name: "escalation_type", label: "Tipo de Escalação", type: "select", required: false, options: ["auto", "department", "agent", "round_robin", "funnel_stage"], default: "auto", help: "auto: Sistema decide | department: Setor específico | agent: Agente específico | round_robin: Distribuição | funnel_stage: Automação via etapa" },
+            { name: "department_id", label: "Setor (se escalation_type = department)", type: "number", required: false, placeholder: "ID do setor" },
+            { name: "agent_id", label: "Agente (se escalation_type = agent)", type: "number", required: false, placeholder: "ID do agente" },
+            { name: "funnel_stage_id", label: "Etapa do Funil (se escalation_type = funnel_stage)", type: "number", required: false, placeholder: "ID da etapa", help: "Mover para esta etapa e usar automação dela" },
+            { name: "priority", label: "Prioridade da Conversa", type: "select", required: false, options: ["low", "normal", "high", "urgent"], default: "normal", help: "Prioridade ao escalar para humano" },
+            { name: "add_escalation_note", label: "Adicionar nota de escalação", type: "checkbox", required: false, default: true, help: "Adiciona nota interna explicando motivo da escalação" },
+            { name: "notify_agent", label: "Notificar agente via WhatsApp/Email", type: "checkbox", required: false, default: false, help: "Envia notificação externa ao agente atribuído" },
+            { name: "send_transition_message", label: "Enviar mensagem de transição ao cliente", type: "checkbox", required: false, default: true, help: "Envia mensagem informando que será transferido" },
+            { name: "transition_message", label: "Mensagem de transição", type: "textarea", required: false, placeholder: "Vou transferir você para um de nossos especialistas...", default: "Vou transferir você para um de nossos especialistas. Aguarde um momento, por favor.", help: "Mensagem enviada ao cliente antes da transferência" }
+        ]
     },
     followup: {
         fields: []

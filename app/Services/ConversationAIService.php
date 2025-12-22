@@ -160,14 +160,33 @@ class ConversationAIService
     }
 
     /**
+     * Log específico para agentes de IA
+     */
+    private static function logAI(string $message): void
+    {
+        $logDir = __DIR__ . '/../../logs';
+        if (!is_dir($logDir)) {
+            @mkdir($logDir, 0777, true);
+        }
+        $logFile = $logDir . '/ai-agents.log';
+        $line = '[' . date('Y-m-d H:i:s') . "] {$message}\n";
+        @file_put_contents($logFile, $line, FILE_APPEND);
+    }
+
+    /**
      * Adicionar agente de IA à conversa
      */
     public static function addAIAgent(int $conversationId, array $data): array
     {
+        self::logAI("=== addAIAgent INÍCIO === conversationId={$conversationId}");
+        self::logAI("Dados recebidos: " . json_encode($data));
+        
         $conversation = Conversation::find($conversationId);
         if (!$conversation) {
+            self::logAI("ERRO: Conversa não encontrada");
             throw new \Exception('Conversa não encontrada');
         }
+        self::logAI("Conversa encontrada: ID={$conversation['id']}, status={$conversation['status']}");
 
         $errors = Validator::validate($data, [
             'ai_agent_id' => 'required|integer',
@@ -177,6 +196,7 @@ class ConversationAIService
         ]);
 
         if (!empty($errors)) {
+            self::logAI("ERRO: Validação falhou: " . json_encode($errors));
             throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));
         }
 
@@ -184,32 +204,44 @@ class ConversationAIService
         $processImmediately = $data['process_immediately'] ?? false;
         $assumeConversation = $data['assume_conversation'] ?? false;
         $onlyIfUnassigned = $data['only_if_unassigned'] ?? false;
+        
+        self::logAI("Parâmetros: aiAgentId={$aiAgentId}, processImmediately=" . ($processImmediately ? 'true' : 'false') . 
+                   ", assumeConversation=" . ($assumeConversation ? 'true' : 'false') . 
+                   ", onlyIfUnassigned=" . ($onlyIfUnassigned ? 'true' : 'false'));
 
         // Verificar se agente existe e está ativo
         $aiAgent = AIAgent::find($aiAgentId);
         if (!$aiAgent || !$aiAgent['enabled']) {
+            self::logAI("ERRO: Agente de IA não encontrado ou inativo (aiAgentId={$aiAgentId})");
             throw new \Exception('Agente de IA não encontrado ou inativo');
         }
+        self::logAI("Agente encontrado: {$aiAgent['name']} (ID={$aiAgent['id']})");
 
         // Verificar se pode receber mais conversas
         if (!AIAgent::canReceiveMoreConversations($aiAgentId)) {
+            self::logAI("ERRO: Agente atingiu limite de conversas");
             throw new \Exception('Agente de IA atingiu o limite máximo de conversas');
         }
 
         // Verificar se já tem IA ativa
         $existingAI = AIConversation::getByConversationId($conversationId);
+        self::logAI("IA existente: " . ($existingAI ? "ID={$existingAI['id']}, status={$existingAI['status']}" : "nenhuma"));
+        
         if ($existingAI && $existingAI['status'] === 'active') {
+            self::logAI("ERRO: Conversa já possui IA ativa");
             throw new \Exception('Conversa já possui um agente de IA ativo');
         }
 
         // Verificar se tem agente humano (se only_if_unassigned = true)
         if ($onlyIfUnassigned && !empty($conversation['agent_id'])) {
+            self::logAI("ERRO: Conversa já possui agente humano e only_if_unassigned=true");
             throw new \Exception('Conversa já possui agente humano atribuído');
         }
 
         // Se assume_conversation = true, remover agente humano
         if ($assumeConversation && !empty($conversation['agent_id'])) {
             $oldAgentId = $conversation['agent_id'];
+            self::logAI("Removendo agente humano ID={$oldAgentId}");
             Conversation::update($conversationId, ['agent_id' => null]);
             
             // Atualizar contagem do agente antigo
@@ -217,15 +249,18 @@ class ConversationAIService
         }
 
         // Criar registro de conversa de IA
+        self::logAI("Criando registro AIConversation...");
         $aiConversationId = AIConversation::create([
             'conversation_id' => $conversationId,
             'ai_agent_id' => $aiAgentId,
             'messages' => json_encode([]),
             'status' => 'active'
         ]);
+        self::logAI("AIConversation criada: ID={$aiConversationId}");
 
         // Atualizar contagem de conversas do agente
         AIAgent::updateConversationsCount($aiAgentId);
+        self::logAI("Contagem do agente atualizada");
 
         // Processar mensagem imediatamente se solicitado
         if ($processImmediately) {
@@ -292,29 +327,43 @@ class ConversationAIService
      */
     public static function removeAIAgent(int $conversationId, array $data = []): array
     {
+        self::logAI("=== removeAIAgent INÍCIO === conversationId={$conversationId}");
+        self::logAI("Dados recebidos: " . json_encode($data));
+        
         $conversation = Conversation::find($conversationId);
         if (!$conversation) {
+            self::logAI("ERRO: Conversa não encontrada");
             throw new \Exception('Conversa não encontrada');
         }
 
         $assignToHuman = $data['assign_to_human'] ?? false;
         $humanAgentId = isset($data['human_agent_id']) ? (int)$data['human_agent_id'] : null;
         $reason = $data['reason'] ?? 'Removido manualmente';
+        
+        self::logAI("Parâmetros: assignToHuman=" . ($assignToHuman ? 'true' : 'false') . 
+                   ", humanAgentId=" . ($humanAgentId ?? 'null') . 
+                   ", reason={$reason}");
 
         // Verificar se tem IA ativa
         $aiConversation = AIConversation::getByConversationId($conversationId);
+        self::logAI("AIConversation: " . ($aiConversation ? "ID={$aiConversation['id']}, status={$aiConversation['status']}" : "nenhuma"));
+        
         if (!$aiConversation || $aiConversation['status'] !== 'active') {
+            self::logAI("ERRO: Conversa não possui IA ativa");
             throw new \Exception('Conversa não possui agente de IA ativo');
         }
 
         $aiAgent = AIAgent::find($aiConversation['ai_agent_id']);
         $aiAgentName = $aiAgent ? $aiAgent['name'] : 'Agente de IA';
+        self::logAI("Removendo agente: {$aiAgentName} (ID={$aiConversation['ai_agent_id']})");
 
         // Desativar conversa de IA
         AIConversation::updateStatus($aiConversation['id'], 'removed');
+        self::logAI("Status atualizado para 'removed'");
         
         // Atualizar contagem de conversas do agente
         AIAgent::updateConversationsCount($aiConversation['ai_agent_id']);
+        self::logAI("Contagem do agente atualizada");
 
         // Atribuir a humano se solicitado
         if ($assignToHuman) {

@@ -474,7 +474,8 @@ ob_start();
 <?php
 $content = ob_get_clean();
 $usersUrl = \App\Helpers\Url::to('/users');
-$scripts = <<<JAVASCRIPT
+$scripts = '<script>window.USERS_URL = "' . $usersUrl . '";</script>';
+$scripts .= <<<'JAVASCRIPT'
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     const table = document.querySelector("#kt_users_table");
@@ -728,7 +729,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const formData = new FormData();
             formData.append("role_id", roleId);
             
-            fetch("$usersUrl/" + userId + "/roles", {
+            fetch(window.USERS_URL + "/" + userId + "/roles", {
                 method: "POST",
                 headers: {
                     "X-Requested-With": "XMLHttpRequest"
@@ -779,7 +780,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const formData = new FormData();
             formData.append("department_id", departmentId);
             
-            fetch("$usersUrl/" + userId + "/departments", {
+            fetch(window.USERS_URL + "/" + userId + "/departments", {
                 method: "POST",
                 headers: {
                     "X-Requested-With": "XMLHttpRequest"
@@ -813,7 +814,7 @@ document.addEventListener("DOMContentLoaded", function() {
             return;
         }
         
-        fetch("$usersUrl/" + userId, {
+        fetch(window.USERS_URL + "/" + userId, {
             method: "DELETE",
             headers: {
                 "X-Requested-With": "XMLHttpRequest"

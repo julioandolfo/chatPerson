@@ -1081,8 +1081,15 @@ window.updateAIAgentSidebar = function(status) {
  * Mostrar modal de adicionar agente de IA
  */
 window.showAddAIAgentModal = function() {
+    console.log('🤖 [sidebar] showAddAIAgentModal chamado');
+    console.log('🔍 [sidebar] window.currentConversationId:', window.currentConversationId);
+    console.log('🔍 [sidebar] typeof window.currentConversationId:', typeof window.currentConversationId);
+    
     const conversationId = window.currentConversationId || 0;
+    console.log('🔍 [sidebar] conversationId após || 0:', conversationId);
+    
     if (!conversationId) {
+        console.warn('⚠️ [sidebar] conversationId vazio ou zero, mostrando alerta');
         Swal.fire({
             icon: 'warning',
             title: 'Atenção',
@@ -1090,6 +1097,8 @@ window.showAddAIAgentModal = function() {
         });
         return;
     }
+    
+    console.log('✅ [sidebar] conversationId válido:', conversationId);
     
     // Carregar agentes disponíveis
     fetch(`<?= \App\Helpers\Url::to('/ai-agents/available') ?>`, {

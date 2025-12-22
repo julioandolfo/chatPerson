@@ -637,22 +637,252 @@ class OpenAIService
                 return ['success' => true, 'message' => 'Conversa movida para o estágio'];
 
             case 'escalar_para_humano':
-                // Marcar conversa para escalação
-                Conversation::update($conversationId, [
-                    'status' => 'open',
-                    'assigned_to' => null // Será atribuída automaticamente
-                ]);
-                
-                // Atualizar status da conversa de IA
-                $aiConversation = AIConversation::whereFirst('conversation_id', '=', $conversationId);
-                if ($aiConversation) {
-                    AIConversation::updateStatus($aiConversation['id'], 'escalated');
-                }
-                
-                return ['success' => true, 'message' => 'Conversa escalada para agente humano'];
+                return self::escalateToHuman($conversationId, $arguments, $config, $context);
 
             default:
                 return ['error' => 'System tool não reconhecida: ' . $functionName];
+        }
+    }
+
+    /**
+     * Escalar conversa para agente humano
+     */
+    private static function escalateToHuman(int $conversationId, array $arguments, array $config, array $context): array
+    {
+        try {
+            $conversation = Conversation::find($conversationId);
+            if (!$conversation) {
+                return ['error' => 'Conversa não encontrada'];
+            }
+
+            // Configurações da tool
+            $escalationType = $config['escalation_type'] ?? 'auto';
+            $departmentId = $config['department_id'] ?? null;
+            $agentId = $config['agent_id'] ?? null;
+            $funnelStageId = $config['funnel_stage_id'] ?? null;
+            $priority = $config['priority'] ?? 'normal';
+            $addNote = $config['add_escalation_note'] ?? true;
+            $notifyAgent = $config['notify_agent'] ?? false;
+
+            // Argumentos da IA (motivo da escalação, etc)
+            $reason = $arguments['reason'] ?? $arguments['motivo'] ?? 'Escalação solicitada pelo agente de IA';
+            $notes = $arguments['notes'] ?? $arguments['observacoes'] ?? '';
+
+            $assignedTo = null;
+            $escalationMethod = 'auto';
+
+            // Determinar para quem atribuir baseado no tipo de escalação
+            switch ($escalationType) {
+                case 'agent':
+                    // Atribuir a agente específico
+                    if ($agentId) {
+                        $agent = \App\Models\User::find($agentId);
+                        if ($agent && $agent['role'] !== 'ai_agent') {
+                            $assignedTo = $agentId;
+                            $escalationMethod = 'agent_specific';
+                        }
+                    }
+                    break;
+
+                case 'department':
+                    // Atribuir a setor específico (round-robin dentro do setor)
+                    if ($departmentId) {
+                        $assignedTo = self::assignToDepartment($conversationId, $departmentId);
+                        $escalationMethod = 'department';
+                    }
+                    break;
+
+                case 'round_robin':
+                    // Distribuição round-robin entre todos agentes disponíveis
+                    $assignedTo = self::assignRoundRobin($conversationId);
+                    $escalationMethod = 'round_robin';
+                    break;
+
+                case 'funnel_stage':
+                    // Mover para etapa do funil e usar automação dela
+                    if ($funnelStageId) {
+                        Conversation::update($conversationId, [
+                            'funnel_stage_id' => $funnelStageId
+                        ]);
+                        
+                        // Executar automação da etapa (se houver)
+                        \App\Services\AutomationService::checkStageAutomations($conversationId, $funnelStageId);
+                        
+                        $escalationMethod = 'funnel_stage';
+                        // Não atribuir agente aqui, deixar automação decidir
+                    }
+                    break;
+
+                case 'auto':
+                default:
+                    // Sistema decide automaticamente (usa regras de distribuição)
+                    $assignedTo = self::autoAssignAgent($conversationId);
+                    $escalationMethod = 'auto';
+                    break;
+            }
+
+            // Atualizar conversa
+            $updateData = [
+                'status' => 'open',
+                'priority' => $priority
+            ];
+
+            if ($assignedTo !== null) {
+                $updateData['assigned_to'] = $assignedTo;
+            }
+
+            Conversation::update($conversationId, $updateData);
+
+            // Atualizar status da conversa de IA
+            $aiConversation = \App\Models\AIConversation::whereFirst('conversation_id', '=', $conversationId);
+            if ($aiConversation) {
+                \App\Models\AIConversation::updateStatus($aiConversation['id'], 'escalated');
+            }
+
+            // Adicionar nota interna
+            if ($addNote) {
+                $noteText = "🤖 **Escalação Automática via IA**\n\n";
+                $noteText .= "**Motivo**: {$reason}\n";
+                $noteText .= "**Método**: {$escalationMethod}\n";
+                if ($notes) {
+                    $noteText .= "**Observações**: {$notes}\n";
+                }
+                $noteText .= "**Prioridade**: {$priority}\n";
+                $noteText .= "**Data/Hora**: " . date('d/m/Y H:i:s');
+
+                \App\Models\Message::create([
+                    'conversation_id' => $conversationId,
+                    'message_type' => 'note',
+                    'content' => $noteText,
+                    'sender_type' => 'system',
+                    'status' => 'sent'
+                ]);
+            }
+
+            // Notificar agente (se configurado e agente foi atribuído)
+            if ($notifyAgent && $assignedTo) {
+                self::notifyAssignedAgent($assignedTo, $conversationId, $reason);
+            }
+
+            // Enviar mensagem de transição ao cliente (opcional)
+            if ($config['send_transition_message'] ?? false) {
+                $transitionMessage = $config['transition_message'] ?? 'Vou transferir você para um de nossos especialistas. Aguarde um momento, por favor.';
+                
+                \App\Models\Message::create([
+                    'conversation_id' => $conversationId,
+                    'message_type' => 'text',
+                    'content' => $transitionMessage,
+                    'sender_type' => 'agent',
+                    'sender_id' => 0, // Sistema
+                    'status' => 'sent'
+                ]);
+
+                // Enviar via canal (WhatsApp, etc)
+                if ($conversation['channel'] === 'whatsapp' && !empty($conversation['integration_id'])) {
+                    \App\Services\WhatsAppService::sendMessage(
+                        $conversation['integration_id'],
+                        $conversation['contact_identifier'],
+                        $transitionMessage
+                    );
+                }
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Conversa escalada para agente humano',
+                'escalation_method' => $escalationMethod,
+                'assigned_to' => $assignedTo,
+                'priority' => $priority
+            ];
+
+        } catch (\Exception $e) {
+            error_log("Erro ao escalar conversa {$conversationId}: " . $e->getMessage());
+            return ['error' => 'Erro ao escalar conversa: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Atribuir conversa a setor (round-robin dentro do setor)
+     */
+    private static function assignToDepartment(int $conversationId, int $departmentId): ?int
+    {
+        // Buscar agentes do setor que estão online/disponíveis
+        $agents = Database::fetchAll(
+            "SELECT u.id, u.name, 
+                    COUNT(c.id) as active_conversations
+             FROM users u
+             LEFT JOIN user_departments ud ON ud.user_id = u.id
+             LEFT JOIN conversations c ON c.assigned_to = u.id AND c.status IN ('open', 'pending')
+             WHERE ud.department_id = ? 
+                   AND u.role IN ('agent', 'supervisor', 'admin')
+                   AND u.status = 'active'
+             GROUP BY u.id
+             ORDER BY active_conversations ASC, RAND()
+             LIMIT 1",
+            [$departmentId]
+        );
+
+        return $agents[0]['id'] ?? null;
+    }
+
+    /**
+     * Atribuir conversa via round-robin
+     */
+    private static function assignRoundRobin(int $conversationId): ?int
+    {
+        // Buscar agente com menos conversas ativas
+        $agents = Database::fetchAll(
+            "SELECT u.id, u.name, 
+                    COUNT(c.id) as active_conversations
+             FROM users u
+             LEFT JOIN conversations c ON c.assigned_to = u.id AND c.status IN ('open', 'pending')
+             WHERE u.role IN ('agent', 'supervisor', 'admin')
+                   AND u.status = 'active'
+             GROUP BY u.id
+             ORDER BY active_conversations ASC, RAND()
+             LIMIT 1"
+        );
+
+        return $agents[0]['id'] ?? null;
+    }
+
+    /**
+     * Atribuição automática (usa regras de distribuição do sistema)
+     */
+    private static function autoAssignAgent(int $conversationId): ?int
+    {
+        // Usar serviço de distribuição existente
+        return \App\Services\ConversationService::autoAssignAgent($conversationId);
+    }
+
+    /**
+     * Notificar agente atribuído
+     */
+    private static function notifyAssignedAgent(int $agentId, int $conversationId, string $reason): void
+    {
+        try {
+            $agent = \App\Models\User::find($agentId);
+            $conversation = Conversation::find($conversationId);
+
+            if (!$agent || !$conversation) {
+                return;
+            }
+
+            // Notificação via WebSocket (tempo real)
+            \App\Helpers\WebSocket::notifyUser($agentId, [
+                'type' => 'escalation_assigned',
+                'conversation_id' => $conversationId,
+                'reason' => $reason,
+                'priority' => $conversation['priority'] ?? 'normal'
+            ]);
+
+            // TODO: Implementar notificação via WhatsApp/Email se necessário
+            // if ($agent['notification_preferences']['escalation_external'] ?? false) {
+            //     // Enviar WhatsApp ou Email
+            // }
+
+        } catch (\Exception $e) {
+            error_log("Erro ao notificar agente {$agentId}: " . $e->getMessage());
         }
     }
 

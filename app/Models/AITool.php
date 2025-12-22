@@ -16,11 +16,22 @@ class AITool extends Model
     protected bool $timestamps = true;
 
     /**
-     * Obter tool por slug
+     * Obter tool por slug ou nome da função
      */
     public static function findBySlug(string $slug): ?array
     {
-        return self::whereFirst('slug', '=', $slug);
+        // Primeiro, tentar buscar por slug
+        $tool = self::whereFirst('slug', '=', $slug);
+        if ($tool) {
+            return $tool;
+        }
+        
+        // Se não encontrar, buscar por nome da função no function_schema
+        $sql = "SELECT * FROM ai_tools 
+                WHERE JSON_UNQUOTE(JSON_EXTRACT(function_schema, '$.function.name')) = ?
+                   OR JSON_UNQUOTE(JSON_EXTRACT(function_schema, '$.name')) = ?
+                LIMIT 1";
+        return \App\Helpers\Database::fetch($sql, [$slug, $slug]);
     }
 
     /**

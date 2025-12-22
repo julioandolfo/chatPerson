@@ -510,6 +510,7 @@ class OpenAIService
                 if (!$tool || !$tool['enabled']) {
                     \App\Helpers\ConversationDebug::toolResponse($conversationId, $functionName, 'Tool não encontrada ou inativa', false);
                     $results[] = [
+                        'tool_call_id' => $toolCallId,
                         'name' => $functionName,
                         'result' => ['error' => 'Tool não encontrada ou inativa']
                     ];
@@ -527,7 +528,9 @@ class OpenAIService
                 }
 
                 if (!$toolAssigned) {
+                    \App\Helpers\ConversationDebug::toolResponse($conversationId, $functionName, 'Tool não atribuída a este agente', false);
                     $results[] = [
+                        'tool_call_id' => $toolCallId,
                         'name' => $functionName,
                         'result' => ['error' => 'Tool não atribuída a este agente']
                     ];

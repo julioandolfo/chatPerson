@@ -266,7 +266,8 @@ class AIAgentService
                 'name' => $contact['name'],
                 'email' => $contact['email'],
                 'phone' => $contact['phone']
-            ] : null
+            ] : null,
+            'user_message' => $message // Mensagem do usuário para passar às tools
         ];
 
         // Processar com OpenAI

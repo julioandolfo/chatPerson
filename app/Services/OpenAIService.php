@@ -1282,6 +1282,15 @@ class OpenAIService
             $arguments['contact'] = $context['contact'];
         }
         
+        // IMPORTANTE: Adicionar a mensagem do usuário automaticamente se não estiver nos argumentos
+        // Isso é necessário porque o schema da tool pode não definir o parâmetro 'message'
+        if (empty($arguments['message']) && !empty($context['user_message'])) {
+            $arguments['message'] = $context['user_message'];
+        }
+        if (empty($arguments['client_message']) && !empty($context['user_message'])) {
+            $arguments['client_message'] = $context['user_message'];
+        }
+        
         // Construir URL do webhook
         $webhookUrl = rtrim($n8nUrl, '/') . rtrim($webhookPath, '/') . '/' . ltrim($workflowId, '/');
         

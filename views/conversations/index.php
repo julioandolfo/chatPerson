@@ -8457,6 +8457,14 @@ function renderDateSeparator(dateString) {
 
 // Adicionar mensagem ao chat dinamicamente
 function addMessageToChat(message) {
+    console.log('📨 addMessageToChat chamada com:', {
+        id: message.id,
+        sender_type: message.sender_type,
+        direction: message.direction,
+        type: message.type,
+        message_type: message.message_type
+    });
+    
     const chatMessages = document.getElementById('chatMessages');
     if (!chatMessages) return null;
 
@@ -12697,6 +12705,14 @@ if (typeof window.wsClient !== 'undefined') {
         
         // Se é a conversa atual, adicionar mensagem dinamicamente
         if (currentConversationId == data.conversation_id && data.message) {
+            console.log('🔍 DEBUG: Mensagem recebida via WebSocket/Polling:', {
+                id: data.message.id,
+                content: data.message.content?.substring(0, 50),
+                sender_type: data.message.sender_type,
+                direction: data.message.direction,
+                message_type: data.message.message_type,
+                type: data.message.type
+            });
             addMessageToChat(data.message);
             
             // Remover badge se existir (mensagem já foi marcada como lida no backend)

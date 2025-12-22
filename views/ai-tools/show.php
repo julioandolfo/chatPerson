@@ -295,15 +295,16 @@ ob_start();
 $content = ob_get_clean(); 
 
 // Preparar JSON para injetar no script sem interpolação de template literals
-$aiToolsBaseUrl = json_encode(\App\Helpers\Url::to('/ai-tools'));
-$functionSchemaJson = json_encode($functionSchema, JSON_UNESCAPED_UNICODE);
-$configJson = json_encode($config, JSON_UNESCAPED_UNICODE);
-$toolIdJson = json_encode($tool['id'] ?? 0);
+$jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP;
+$aiToolsBaseUrl = json_encode(\App\Helpers\Url::to('/ai-tools'), $jsonFlags);
+$functionSchemaJson = json_encode($functionSchema, $jsonFlags);
+$configJson = json_encode($config, $jsonFlags);
+$toolIdJson = json_encode($tool['id'] ?? 0, $jsonFlags);
 
 $scripts = <<<'SCRIPTS'
 <script>
 // URL base para requisições
-const AI_TOOLS_BASE_URL = __AI_TOOLS_BASE_URL__;
+const AI_TOOLS_BASE_URL = JSON.parse(__AI_TOOLS_BASE_URL__);
 
 let editParameterCounter = 0;
 
@@ -553,8 +554,8 @@ function buildEditConfig() {
 
 // Preencher campos ao abrir modal de edição
 function populateEditFields() {
-    const functionSchema = __FUNCTION_SCHEMA__;
-    const config = __CONFIG__;
+    const functionSchema = JSON.parse(__FUNCTION_SCHEMA__);
+    const config = JSON.parse(__CONFIG__);
     
     if (functionSchema && functionSchema.function) {
         document.getElementById("kt_edit_function_name").value = functionSchema.function.name || "";
@@ -616,7 +617,7 @@ function toggleN8NTestPanel() {
 }
 
 function executeN8NTest() {
-    const toolId = __TOOL_ID__;
+    const toolId = JSON.parse(__TOOL_ID__);
     const webhookId = document.getElementById("test_webhook_id").value.trim();
     const method = document.getElementById("test_method").value;
     const dataStr = document.getElementById("test_data").value.trim();

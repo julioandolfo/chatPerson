@@ -1371,6 +1371,9 @@ class ConversationService
                 $message['direction'] = 'incoming';
             }
             
+            // Log detalhado para debug
+            Logger::debug("🔍 Mensagem preparada para WebSocket: messageId={$messageId}, sender_type={$message['sender_type']}, direction={$message['direction']}, type={$message['type']}", 'conversas.log');
+            
             // Notificar via WebSocket
             try {
                 Logger::debug("Notificando nova mensagem via WebSocket: conversationId={$conversationId}, messageId={$messageId}, direction={$message['direction']}", 'conversas.log');

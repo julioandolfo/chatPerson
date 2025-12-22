@@ -1291,6 +1291,49 @@ class OpenAIService
             $arguments['client_message'] = $context['user_message'];
         }
         
+        // ============================================================
+        // CONTEXTO COMPLETO PARA O N8N (histórico + resumo + agente)
+        // ============================================================
+        
+        // 1. Buscar histórico das últimas mensagens (resumido)
+        $includeHistory = $config['include_history'] ?? true; // Ativado por padrão
+        $historyLimit = (int)($config['history_limit'] ?? 10);
+        
+        if ($includeHistory && $conversationId > 0) {
+            $historyMessages = self::getConversationHistoryForN8N($conversationId, $historyLimit);
+            if (!empty($historyMessages)) {
+                $arguments['conversation_history'] = $historyMessages;
+            }
+        }
+        
+        // 2. Buscar resumo da conversa (se existir no metadata)
+        if ($conversationId > 0 && !empty($context['conversation'])) {
+            $metadata = $context['conversation']['metadata'] ?? null;
+            if (is_string($metadata)) {
+                $metadata = json_decode($metadata, true);
+            }
+            
+            if (!empty($metadata['conversation_summary'])) {
+                $arguments['conversation_summary'] = $metadata['conversation_summary'];
+            }
+            
+            // Adicionar outros dados úteis do metadata
+            if (!empty($metadata['ai_collected_data'])) {
+                $arguments['collected_data'] = $metadata['ai_collected_data'];
+            }
+        }
+        
+        // 3. Adicionar informações do agente (para manter consistência de persona)
+        $includeAgentInfo = $config['include_agent_info'] ?? true;
+        if ($includeAgentInfo && !empty($context['agent'])) {
+            $agent = $context['agent'];
+            $arguments['agent_info'] = [
+                'name' => $agent['name'] ?? 'Assistente',
+                'persona' => $agent['persona'] ?? null,
+                'prompt_summary' => isset($agent['prompt']) ? substr($agent['prompt'], 0, 500) : null
+            ];
+        }
+        
         // Construir URL do webhook
         $webhookUrl = rtrim($n8nUrl, '/') . rtrim($webhookPath, '/') . '/' . ltrim($workflowId, '/');
         
@@ -1311,6 +1354,16 @@ class OpenAIService
         foreach ($customHeaders as $key => $value) {
             $headers[] = $key . ': ' . $value;
         }
+        
+        // Log do payload que será enviado ao N8N
+        \App\Helpers\ConversationDebug::info($conversationId, "N8N Payload", [
+            'url' => $webhookUrl,
+            'has_history' => !empty($arguments['conversation_history']),
+            'history_count' => count($arguments['conversation_history'] ?? []),
+            'has_summary' => !empty($arguments['conversation_summary']),
+            'has_agent_info' => !empty($arguments['agent_info']),
+            'message' => $arguments['message'] ?? $arguments['client_message'] ?? null
+        ]);
         
         // Fazer requisição POST ao webhook (passa todos os arguments da IA)
         $ch = curl_init($webhookUrl);
@@ -1692,6 +1745,58 @@ class OpenAIService
         }
         
         return $func;
+    }
+
+    /**
+     * Obter histórico da conversa formatado para enviar ao N8N
+     * Retorna um resumo compacto das últimas mensagens
+     */
+    private static function getConversationHistoryForN8N(int $conversationId, int $limit = 10): array
+    {
+        $sql = "SELECT m.content, m.sender_type, m.created_at,
+                       CASE 
+                           WHEN m.sender_type = 'contact' THEN ct.name
+                           WHEN m.sender_type = 'agent' AND m.ai_agent_id IS NOT NULL THEN ai.name
+                           WHEN m.sender_type = 'agent' THEN u.name
+                           ELSE 'Sistema'
+                       END as sender_name
+                FROM messages m
+                LEFT JOIN contacts ct ON m.sender_type = 'contact' AND m.sender_id = ct.id
+                LEFT JOIN users u ON m.sender_type = 'agent' AND m.sender_id = u.id
+                LEFT JOIN ai_agents ai ON m.ai_agent_id = ai.id
+                WHERE m.conversation_id = ?
+                ORDER BY m.created_at DESC
+                LIMIT ?";
+        
+        $messages = \App\Helpers\Database::fetchAll($sql, [$conversationId, $limit]);
+        
+        if (empty($messages)) {
+            return [];
+        }
+        
+        // Inverter para ordem cronológica
+        $messages = array_reverse($messages);
+        
+        // Formatar para envio
+        $history = [];
+        foreach ($messages as $msg) {
+            $role = $msg['sender_type'] === 'contact' ? 'cliente' : 'assistente';
+            $content = $msg['content'];
+            
+            // Truncar mensagens muito longas
+            if (strlen($content) > 300) {
+                $content = substr($content, 0, 300) . '...';
+            }
+            
+            $history[] = [
+                'role' => $role,
+                'sender' => $msg['sender_name'],
+                'message' => $content,
+                'time' => $msg['created_at']
+            ];
+        }
+        
+        return $history;
     }
 
     /**

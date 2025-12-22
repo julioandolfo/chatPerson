@@ -259,6 +259,7 @@ class AIAgentService
         // Obter contexto da conversa
         $conversation = \App\Models\Conversation::findWithRelations($conversationId);
         $contact = \App\Models\Contact::find($conversation['contact_id'] ?? null);
+        $agent = \App\Models\AIAgent::find($agentId);
         
         $context = [
             'conversation' => $conversation,
@@ -267,7 +268,13 @@ class AIAgentService
                 'email' => $contact['email'],
                 'phone' => $contact['phone']
             ] : null,
-            'user_message' => $message // Mensagem do usuário para passar às tools
+            'user_message' => $message, // Mensagem do usuário para passar às tools
+            'agent' => $agent ? [
+                'id' => $agent['id'],
+                'name' => $agent['name'],
+                'persona' => $agent['persona'] ?? null,
+                'prompt' => $agent['prompt'] ?? null
+            ] : null
         ];
 
         // Processar com OpenAI

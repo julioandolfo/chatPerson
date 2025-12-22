@@ -228,7 +228,10 @@ const toolTypeConfigs = {
             { name: "timeout", label: "Timeout (segundos)", type: "number", required: false, placeholder: "60", default: "60" },
             { name: "custom_headers", label: "Headers Customizados (JSON)", type: "textarea", required: false, placeholder: "{\"X-Custom-Header\": \"value\"}" },
             { name: "use_raw_response", label: "Usar resposta direta (não reenviar para OpenAI)", type: "checkbox", required: false, default: false, help: "Se ativo, a resposta do N8N será enviada diretamente ao cliente sem processamento adicional da IA" },
-            { name: "raw_response_field", label: "Campo da resposta direta", type: "text", required: false, placeholder: "output", default: "output", help: "Campo JSON com a mensagem. Suporta: output, message, data.message. Arrays são tratados automaticamente." }
+            { name: "raw_response_field", label: "Campo da resposta direta", type: "text", required: false, placeholder: "output", default: "output", help: "Campo JSON com a mensagem. Suporta: output, message, data.message. Arrays são tratados automaticamente." },
+            { name: "include_history", label: "Incluir histórico da conversa", type: "checkbox", required: false, default: true, help: "Envia as últimas mensagens da conversa para o N8N ter contexto" },
+            { name: "history_limit", label: "Quantidade de mensagens no histórico", type: "number", required: false, placeholder: "10", default: "10", help: "Número de mensagens anteriores a enviar (máx: 20)" },
+            { name: "include_agent_info", label: "Incluir informações do agente", type: "checkbox", required: false, default: true, help: "Envia nome, persona e resumo do prompt do agente para manter consistência" }
         ]
     },
     api: {

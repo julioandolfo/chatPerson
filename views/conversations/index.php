@@ -1594,6 +1594,12 @@ body.dark-mode .swal2-html-container {
     color: #e0e0e0 !important;
 }
 
+/* Borda verde para conversas sem SLA ativo (última mensagem do agente) */
+.conversation-item.sla-ok {
+    border: 2px solid #50cd89 !important;
+    box-shadow: 0 0 0 1px #e4f7ec;
+}
+
 [data-bs-theme="dark"] .swal2-content,
 body.dark-mode .swal2-content {
     color: #e0e0e0 !important;
@@ -1863,8 +1869,9 @@ body.dark-mode .swal2-content {
                     $firstResponseAt = !empty($conv['first_response_at_calc']) ? $conv['first_response_at_calc'] : ($conv['first_response_at'] ?? '');
                     $lastContactAt = $conv['last_contact_message_at'] ?? '';
                     $lastAgentAt = $conv['last_agent_message_at'] ?? '';
+                    $lastMessageFromAgent = !empty($lastAgentAt) && (empty($lastContactAt) || strtotime($lastAgentAt) >= strtotime($lastContactAt));
                     ?>
-                    <div class="conversation-item <?= $isActive ? 'active' : '' ?> <?= !empty($conv['pinned']) ? 'pinned' : '' ?>" 
+                    <div class="conversation-item <?= $isActive ? 'active' : '' ?> <?= !empty($conv['pinned']) ? 'pinned' : '' ?> <?= $lastMessageFromAgent ? 'sla-ok' : '' ?>" 
                          data-conversation-id="<?= $conv['id'] ?>"
                          data-status="<?= htmlspecialchars($conv['status'] ?? 'open') ?>"
                          data-created-at="<?= htmlspecialchars($conv['created_at'] ?? '') ?>"
@@ -4716,6 +4723,32 @@ function updateConversationMeta(conversationItem, conv) {
     conversationItem.dataset.updatedAt = updatedAt;
 }
 
+// Determinar se a última mensagem foi do agente (para mostrar borda verde/SLA ok)
+function isLastMessageFromAgent(data) {
+    const lastAgent = data.last_agent_message_at || data.lastAgentMessageAt || '';
+    const lastContact = data.last_contact_message_at || data.lastContactMessageAt || '';
+    if (!lastAgent) return false;
+    if (!lastContact) return true;
+    const agentTs = Date.parse(lastAgent);
+    const contactTs = Date.parse(lastContact);
+    if (isNaN(agentTs)) return false;
+    if (isNaN(contactTs)) return true;
+    return agentTs >= contactTs;
+}
+
+function applySlaVisualState(conversationItem, conv) {
+    if (!conversationItem) return;
+    const lastMessageFromAgent = isLastMessageFromAgent({
+        last_agent_message_at: conv?.last_agent_message_at ?? conversationItem.dataset.lastAgentMessageAt,
+        lastContactMessageAt: conv?.last_contact_message_at ?? conversationItem.dataset.lastContactMessageAt
+    });
+    if (lastMessageFromAgent) {
+        conversationItem.classList.add('sla-ok');
+    } else {
+        conversationItem.classList.remove('sla-ok');
+    }
+}
+
 function sortConversationList() {
     const list = document.querySelector('.conversations-list-items');
     if (!list) return;
@@ -4788,6 +4821,9 @@ function applyConversationUpdate(conv) {
     conversationItem.dataset.lastContactMessageAt = lastContactAt;
     conversationItem.dataset.lastAgentMessageAt = lastAgentAt;
     conversationItem.dataset.agentId = conv.agent_id || conversationItem.dataset.agentId || '';
+
+    // Atualizar estado visual de SLA (borda verde quando última msg é do agente)
+    applySlaVisualState(conversationItem, conv);
 
     // ⚠️ IMPORTANTE: Respeitar conversas marcadas manualmente como não lidas
     const isManuallyMarkedAsUnread = window.manuallyMarkedAsUnread && window.manuallyMarkedAsUnread.has(conv.id);
@@ -9510,7 +9546,8 @@ function sendMessage() {
             }
             
             // Atualizar lista de conversas
-            updateConversationInList(conversationId, message);
+            const agentTs = data.message?.created_at || new Date().toISOString();
+            updateConversationInList(conversationId, message, agentTs);
         } else {
             // Remover mensagem temporária em caso de erro
             const tempMsg = document.querySelector(`[data-temp-id="${tempMessage.id}"]`);
@@ -9533,21 +9570,29 @@ function sendMessage() {
     });
 }
 
-function updateConversationInList(conversationId, lastMessage) {
+function updateConversationInList(conversationId, lastMessage, agentTimestamp = null) {
     const conversationItem = document.querySelector(`[data-conversation-id="${conversationId}"]`);
     if (conversationItem) {
         const preview = conversationItem.querySelector('.conversation-item-preview');
         const time = conversationItem.querySelector('.conversation-item-time');
+        const nowIso = agentTimestamp || new Date().toISOString();
         if (preview) {
             const maxChars = 37;
             preview.textContent = lastMessage.substring(0, maxChars) + (lastMessage.length > maxChars ? '...' : '');
         }
         if (time) {
             // Usar formatTime para tempo relativo (Agora, 1min, etc)
-            time.textContent = formatTime(new Date().toISOString());
+            time.textContent = formatTime(nowIso);
             // Atualizar data-updated-at
-            conversationItem.setAttribute('data-updated-at', new Date().toISOString());
+            conversationItem.setAttribute('data-updated-at', nowIso);
         }
+        
+        // Atualizar datasets de SLA e reaplicar visual (última mensagem do agente)
+        conversationItem.dataset.lastAgentMessageAt = nowIso;
+        applySlaVisualState(conversationItem, {
+            last_agent_message_at: nowIso,
+            last_contact_message_at: conversationItem.dataset.lastContactMessageAt
+        });
         
         // Garantir dropdown de ações
         ensureActionsDropdown(conversationItem, conversationItem.classList.contains('pinned'), conversationId);
@@ -12903,6 +12948,7 @@ function addConversationToList(conv) {
     const lastAgentAt = conv.last_agent_message_at || '';
     const createdAt = conv.created_at || '';
     const lastMessageAt = conv.last_message_at || conv.updated_at || '';
+    const lastMessageFromAgent = lastAgentAt && (!lastContactAt || new Date(lastAgentAt) >= new Date(lastContactAt));
 
     // Criar HTML do item
     const avatarHtml = conv.contact_avatar
@@ -12910,7 +12956,7 @@ function addConversationToList(conv) {
         : `<div class="symbol-label bg-light-primary text-primary fw-bold">${initials}</div>`;
 
     const conversationHtml = `
-        <div class="conversation-item ${isActive ? 'active' : ''} ${pinned ? 'pinned' : ''}" 
+        <div class="conversation-item ${isActive ? 'active' : ''} ${pinned ? 'pinned' : ''} ${lastMessageFromAgent ? 'sla-ok' : ''}" 
              data-conversation-id="${conv.id}"
              data-status="${escapeHtml(conv.status || 'open')}"
              data-created-at="${escapeHtml(createdAt)}"
@@ -13155,6 +13201,16 @@ function refreshConversationBadges() {
                             preview.textContent = content;
                         }
                     }
+                    
+                    // Atualizar datasets de SLA e datas
+                    if (conv.last_contact_message_at) {
+                        conversationItem.dataset.lastContactMessageAt = conv.last_contact_message_at;
+                    }
+                    if (conv.last_agent_message_at) {
+                        conversationItem.dataset.lastAgentMessageAt = conv.last_agent_message_at;
+                    }
+                    // Reaplicar estado visual de SLA (borda verde quando última msg é do agente)
+                    applySlaVisualState(conversationItem, conv);
                     
                     // Atualizar meta e resortear
                     updateConversationMeta(conversationItem, conv);

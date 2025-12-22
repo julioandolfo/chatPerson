@@ -2069,12 +2069,33 @@ class WhatsAppService
                 }
             }
 
+            // Bloqueio: não criar conversa para contatos especiais (whatsapp_id = system)
+            $contactWhatsappId = $contact['whatsapp_id'] ?? '';
+            if (strcasecmp($contactWhatsappId, 'system') === 0) {
+                Logger::quepasa("processWebhook - whatsapp_id=system detectado para contato {$contact['id']}. Ignorando criação de conversa/mensagem.");
+                return;
+            }
+
             // Criar ou buscar conversa
             Logger::quepasa("processWebhook - Buscando conversa existente: contact_id={$contact['id']}, channel=whatsapp, account_id={$account['id']}");
             $conversation = \App\Models\Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['id']);
             Logger::quepasa("processWebhook - Resultado da busca: " . ($conversation ? "Encontrada (ID={$conversation['id']}, status={$conversation['status']})" : "Não encontrada"));
             $isNewConversation = false;
             $shouldReopenAsNew = false;
+
+            // Trava: não criar conversa se a primeira mensagem for exatamente o nome do contato (caso sem mídia)
+            if (
+                !$conversation &&
+                $messageType === 'text' &&
+                empty($mediaUrl)
+            ) {
+                $normalizedMessage = mb_strtolower(trim(preg_replace('/\s+/', ' ', (string)$message)));
+                $normalizedContactName = mb_strtolower(trim(preg_replace('/\s+/', ' ', (string)($contact['name'] ?? ''))));
+                if (!empty($normalizedMessage) && $normalizedMessage === $normalizedContactName) {
+                    Logger::quepasa("processWebhook - Ignorando criação de conversa: primeira mensagem igual ao nome do contato ({$normalizedContactName})");
+                    return;
+                }
+            }
             
             // Verificar se conversa está fechada/resolvida e se deve reabrir
             if ($conversation && in_array($conversation['status'], ['closed', 'resolved'])) {

@@ -122,5 +122,14 @@ class AIAgent extends Model
         
         return Database::fetchAll($sql, $params);
     }
+
+    /**
+     * Obter todos os agentes
+     */
+    public static function getAll(): array
+    {
+        $sql = "SELECT * FROM ai_agents ORDER BY name ASC";
+        return Database::fetchAll($sql);
+    }
 }
 

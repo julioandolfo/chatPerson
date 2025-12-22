@@ -82,8 +82,25 @@ class OpenAIService
                     ? json_decode($tool['function_schema'], true) 
                     : ($tool['function_schema'] ?? []);
                 
-                if (!empty($functionSchema)) {
+                if (empty($functionSchema)) {
+                    continue;
+                }
+
+                // Normalizar formato do schema para OpenAI
+                // OpenAI espera: { "type": "function", "function": { "name": "...", "description": "...", "parameters": {...} } }
+                if (isset($functionSchema['type']) && $functionSchema['type'] === 'function') {
+                    // Já está no formato completo
                     $functions[] = $functionSchema;
+                } elseif (isset($functionSchema['name'])) {
+                    // Formato direto (apenas function) - envolver
+                    $functions[] = [
+                        'type' => 'function',
+                        'function' => $functionSchema
+                    ];
+                } else {
+                    // Formato inválido - pular com warning
+                    error_log("OpenAIService: function_schema inválido para tool '{$tool['name']}' (ID: {$tool['id']})");
+                    continue;
                 }
             }
 
@@ -100,9 +117,7 @@ class OpenAIService
 
             // Adicionar tools se houver
             if (!empty($functions)) {
-                $payload['tools'] = array_map(function($func) {
-                    return ['type' => 'function', 'function' => $func];
-                }, $functions);
+                $payload['tools'] = $functions;
             }
 
             // Fazer requisição à API

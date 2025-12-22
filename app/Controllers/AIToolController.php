@@ -10,6 +10,7 @@ use App\Helpers\Response;
 use App\Helpers\Request;
 use App\Helpers\Permission;
 use App\Services\AIToolService;
+use App\Services\AIToolValidationService;
 
 class AIToolController
 {
@@ -154,6 +155,61 @@ class AIToolController
                 'success' => false,
                 'message' => $e->getMessage()
             ], 400);
+        }
+    }
+
+    /**
+     * Validar todas as tools
+     */
+    public function validate(): void
+    {
+        Permission::abortIfCannot('ai_tools.view');
+        
+        try {
+            $report = AIToolValidationService::generateReport();
+            
+            Response::json([
+                'success' => true,
+                'report' => $report
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Validar tool específica
+     */
+    public function validateTool(int $id): void
+    {
+        Permission::abortIfCannot('ai_tools.view');
+        
+        try {
+            $tool = AIToolService::get($id);
+            if (!$tool) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Tool não encontrada'
+                ], 404);
+                return;
+            }
+            
+            $validation = AIToolValidationService::validateTool($tool);
+            
+            Response::json([
+                'success' => true,
+                'tool_id' => $id,
+                'tool_name' => $tool['name'],
+                'validation' => $validation
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
 }

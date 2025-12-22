@@ -105,7 +105,7 @@ class OpenAIService
             }
             
             \App\Helpers\ConversationDebug::aiAgent($conversationId, "Tools carregadas: " . count($functions), [
-                'tools' => array_map(fn($f) => $f['name'] ?? 'unknown', $functions),
+                'tools' => array_map(fn($f) => $f['function']['name'] ?? $f['name'] ?? 'unknown', $functions),
                 'tools_full' => $functions
             ]);
 
@@ -123,6 +123,11 @@ class OpenAIService
             // Adicionar tools se houver
             if (!empty($functions)) {
                 $payload['tools'] = array_map(function($func) {
+                    // Se já tem o wrapper {type: function, function: {...}}, usar diretamente
+                    if (isset($func['type']) && $func['type'] === 'function' && isset($func['function'])) {
+                        return $func;
+                    }
+                    // Senão, adicionar o wrapper
                     return ['type' => 'function', 'function' => $func];
                 }, $functions);
             }

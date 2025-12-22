@@ -17,22 +17,19 @@ echo '<h1>🔧 Corrigindo Schemas de AI Tools</h1><pre>';
 
 try {
     // Carregar configuração do banco diretamente
-    $configFile = __DIR__ . '/../config/config.php';
+    $configFile = __DIR__ . '/../config/database.php';
     if (!file_exists($configFile)) {
         throw new Exception("Arquivo de configuração não encontrado: $configFile");
     }
     
-    // Definir constantes se não existirem
-    if (!defined('DB_HOST')) {
-        $config = require $configFile;
-    }
+    $config = require $configFile;
     
     // Conectar ao banco
-    $host = defined('DB_HOST') ? DB_HOST : ($_ENV['DB_HOST'] ?? 'localhost');
-    $port = defined('DB_PORT') ? DB_PORT : ($_ENV['DB_PORT'] ?? '3306');
-    $database = defined('DB_DATABASE') ? DB_DATABASE : ($_ENV['DB_DATABASE'] ?? 'chat');
-    $username = defined('DB_USERNAME') ? DB_USERNAME : ($_ENV['DB_USERNAME'] ?? 'root');
-    $password = defined('DB_PASSWORD') ? DB_PASSWORD : ($_ENV['DB_PASSWORD'] ?? '');
+    $host = $config['host'] ?? 'localhost';
+    $port = $config['port'] ?? '3306';
+    $database = $config['database'] ?? 'chat';
+    $username = $config['username'] ?? 'root';
+    $password = $config['password'] ?? '';
     
     echo "Conectando ao banco: $host:$port/$database\n";
     

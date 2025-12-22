@@ -7,7 +7,19 @@
 .symbol.symbol-sla {
     position: relative;
     display: inline-block;
-    overflow: visible; /* permite o stroke ficar visível ao redor do avatar */
+    isolation: isolate; /* cria contexto de empilhamento isolado */
+}
+
+/* Container para o indicador SLA - evita "vazamento" visual */
+.symbol.symbol-sla::before {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    right: -4px;
+    bottom: -4px;
+    pointer-events: none;
+    z-index: -1;
 }
 
 .sla-progress-ring {
@@ -249,8 +261,12 @@
 .conversation-item.sla-status-warning,
 .conversation-item.sla-status-critical,
 .conversation-item.sla-status-danger,
-.conversation-item.sla-status-breached {
-    border: none !important;
+.conversation-item.sla-status-breached,
+.conversation-item.sla-ok {
+    border-left: 1px solid var(--bs-border-color) !important; /* restaurar borda padrão */
+    border-right: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
     outline: none !important;
     box-shadow: none !important;
 }
@@ -259,5 +275,10 @@
 .conversation-item .symbol.symbol-sla {
     border: none !important;
     outline: none !important;
+}
+
+/* Remover qualquer efeito visual de SLA do conversation-item */
+.conversation-item:not(.active):not(.pinned) {
+    border-color: var(--bs-border-color) !important;
 }
 

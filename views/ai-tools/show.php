@@ -294,7 +294,7 @@ ob_start();
 <?php 
 $content = ob_get_clean(); 
 $aiToolsBaseUrl = json_encode(\App\Helpers\Url::to('/ai-tools'));
-$scripts = <<<SCRIPTS
+$scripts = <<<'SCRIPTS'
 <script>
 // URL base para requisições
 const AI_TOOLS_BASE_URL = {$aiToolsBaseUrl};

@@ -1594,11 +1594,7 @@ body.dark-mode .swal2-html-container {
     color: #e0e0e0 !important;
 }
 
-/* Borda verde para conversas sem SLA ativo (última mensagem do agente) */
-.conversation-item.sla-ok {
-    border: 2px solid #50cd89 !important;
-    box-shadow: 0 0 0 1px #e4f7ec;
-}
+/* Removido: Borda verde aplicada pelo sistema de indicador SLA ao avatar, não ao card */
 
 [data-bs-theme="dark"] .swal2-content,
 body.dark-mode .swal2-content {
@@ -1871,7 +1867,7 @@ body.dark-mode .swal2-content {
                     $lastAgentAt = $conv['last_agent_message_at'] ?? '';
                     $lastMessageFromAgent = !empty($lastAgentAt) && (empty($lastContactAt) || strtotime($lastAgentAt) >= strtotime($lastContactAt));
                     ?>
-                    <div class="conversation-item <?= $isActive ? 'active' : '' ?> <?= !empty($conv['pinned']) ? 'pinned' : '' ?> <?= $lastMessageFromAgent ? 'sla-ok' : '' ?>" 
+                    <div class="conversation-item <?= $isActive ? 'active' : '' ?> <?= !empty($conv['pinned']) ? 'pinned' : '' ?>" 
                          data-conversation-id="<?= $conv['id'] ?>"
                          data-status="<?= htmlspecialchars($conv['status'] ?? 'open') ?>"
                          data-created-at="<?= htmlspecialchars($conv['created_at'] ?? '') ?>"
@@ -4737,16 +4733,13 @@ function isLastMessageFromAgent(data) {
 }
 
 function applySlaVisualState(conversationItem, conv) {
-    if (!conversationItem) return;
-    const lastMessageFromAgent = isLastMessageFromAgent({
-        last_agent_message_at: conv?.last_agent_message_at ?? conversationItem.dataset.lastAgentMessageAt,
-        lastContactMessageAt: conv?.last_contact_message_at ?? conversationItem.dataset.lastContactMessageAt
-    });
-    if (lastMessageFromAgent) {
-        conversationItem.classList.add('sla-ok');
-    } else {
+    // DESABILITADO: Não aplicar classes SLA ao conversation-item
+    // O sistema de SLA (sla-indicator.js) é responsável por aplicar classes apenas ao avatar
+    // Remover qualquer classe sla-ok que possa ter sido adicionada
+    if (conversationItem) {
         conversationItem.classList.remove('sla-ok');
     }
+    return;
 }
 
 function sortConversationList() {
@@ -12947,7 +12940,7 @@ function addConversationToList(conv) {
         : `<div class="symbol-label bg-light-primary text-primary fw-bold">${initials}</div>`;
 
     const conversationHtml = `
-        <div class="conversation-item ${isActive ? 'active' : ''} ${pinned ? 'pinned' : ''} ${lastMessageFromAgent ? 'sla-ok' : ''}" 
+        <div class="conversation-item ${isActive ? 'active' : ''} ${pinned ? 'pinned' : ''}" 
              data-conversation-id="${conv.id}"
              data-status="${escapeHtml(conv.status || 'open')}"
              data-created-at="${escapeHtml(createdAt)}"

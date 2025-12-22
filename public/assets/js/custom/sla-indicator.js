@@ -57,6 +57,17 @@ const SLAIndicator = {
     init: async function() {
         console.log('[SLA] Inicializando sistema de indicadores...');
         
+        // Limpar qualquer classe/estilo SLA indevido dos conversation-items
+        document.querySelectorAll('.conversation-item').forEach(item => {
+            item.className = item.className.replace(/sla-status-\w+/g, '');
+            item.classList.remove('symbol-sla', 'sla-ok');
+            item.style.border = '';
+            item.style.borderLeft = '';
+            item.style.borderColor = '';
+            item.style.boxShadow = '';
+            item.style.outline = '';
+        });
+        
         // Carregar configurações (aguardar)
         await this.loadConfig();
         
@@ -114,6 +125,10 @@ const SLAIndicator = {
         const conversations = document.querySelectorAll('.conversation-item');
         
         conversations.forEach(item => {
+            // Limpar classes/estilos SLA indevidos do conversation-item
+            item.className = item.className.replace(/sla-status-\w+/g, '');
+            item.classList.remove('symbol-sla', 'sla-ok');
+            
             const convId = item.getAttribute('data-conversation-id');
             const avatar = item.querySelector('.symbol-45px, .symbol-50px, .symbol-35px');
             
@@ -170,7 +185,13 @@ const SLAIndicator = {
         const conversationItem = avatar.closest('.conversation-item');
         if (conversationItem) {
             conversationItem.className = conversationItem.className.replace(/sla-status-\w+/g, '');
-            conversationItem.classList.remove('symbol-sla');
+            conversationItem.classList.remove('symbol-sla', 'sla-ok');
+            // Remover qualquer estilo inline que possa ter sido aplicado
+            conversationItem.style.border = '';
+            conversationItem.style.borderLeft = '';
+            conversationItem.style.borderColor = '';
+            conversationItem.style.boxShadow = '';
+            conversationItem.style.outline = '';
         }
         
         // Se não houver violação ou show === false, não mostrar indicador

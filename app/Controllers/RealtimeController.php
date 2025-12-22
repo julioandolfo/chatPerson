@@ -146,15 +146,28 @@ class RealtimeController
                         foreach ($messages as $msg) {
                             if (!isset($msg['id'])) continue;
                             
+                            $senderType = $msg['sender_type'] ?? 'contact';
+                            
+                            // Determinar direction baseado em sender_type
+                            // Mensagens de agentes são sempre outgoing (enviadas pelo sistema/agente)
+                            // Mensagens de contatos são sempre incoming (recebidas)
+                            $direction = ($senderType === 'agent') ? 'outgoing' : 'incoming';
+                            
+                            // Determinar type baseado em message_type
+                            $messageType = $msg['message_type'] ?? 'text';
+                            $type = ($messageType === 'note') ? 'note' : 'message';
+                            
                             $updates['new_messages'][] = [
                                 'conversation_id' => $convId,
                                 'id' => $msg['id'],
                                 'content' => $msg['content'] ?? '',
-                                'sender_type' => $msg['sender_type'] ?? 'contact',
+                                'sender_type' => $senderType,
                                 'sender_id' => $msg['sender_id'] ?? null,
                                 'sender_name' => $msg['sender_name'] ?? null,
                                 'created_at' => $msg['created_at'] ?? date('Y-m-d H:i:s'),
-                                'message_type' => $msg['message_type'] ?? 'text'
+                                'message_type' => $messageType,
+                                'type' => $type,
+                                'direction' => $direction
                             ];
                         }
 

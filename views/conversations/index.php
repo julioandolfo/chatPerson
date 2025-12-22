@@ -12634,6 +12634,9 @@ if (typeof window.wsClient !== 'undefined') {
         console.log('Handler new_message acionado:', data);
         const currentConversationId = window.currentConversationId ?? parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
         
+        // Disparar evento personalizado para o sistema de SLA
+        document.dispatchEvent(new CustomEvent('realtime:new_message', { detail: data }));
+        
         // Atualizar lista de conversas
         const conversationItem = document.querySelector(`[data-conversation-id="${data.conversation_id}"]`);
         if (conversationItem) {
@@ -12667,6 +12670,21 @@ if (typeof window.wsClient !== 'undefined') {
             
             // Garantir dropdown de ações
             ensureActionsDropdown(conversationItem, pinned, data.conversation_id);
+            
+            // Atualizar indicador SLA em tempo real
+            if (window.SLAIndicator && data.message) {
+                // Atualizar dados relevantes para SLA
+                if (data.message.sender_type === 'contact') {
+                    conversationItem.dataset.lastContactMessageAt = data.message.created_at;
+                } else if (data.message.sender_type === 'agent') {
+                    conversationItem.dataset.lastAgentMessageAt = data.message.created_at;
+                }
+                // Forçar atualização do indicador
+                const convData = window.SLAIndicator.getConversationData(data.conversation_id);
+                if (convData) {
+                    window.SLAIndicator.updateConversation(data.conversation_id, convData);
+                }
+            }
 
             // Reordenar lista após atualização (respeita timestamp e pinned)
             sortConversationList();
@@ -12724,6 +12742,9 @@ if (typeof window.wsClient !== 'undefined') {
     // Handler para conversa atualizada (marca como lida, etc)
     window.wsClient.on('conversation_updated', (data) => {
         if (data && data.conversation_id) {
+            // Disparar evento personalizado para o sistema de SLA
+            document.dispatchEvent(new CustomEvent('realtime:conversation_updated', { detail: data }));
+            
             // Atualiza badge/preview/tempo
             applyConversationUpdate(data.conversation || { id: data.conversation_id, unread_count: data.unread_count });
             // Move para topo se não for a conversa atual (feito no handler abaixo)
@@ -12733,6 +12754,10 @@ if (typeof window.wsClient !== 'undefined') {
     // Handler para novas conversas criadas
     window.wsClient.on('new_conversation', (data) => {
         console.log('Nova conversa recebida (WS/Poll):', data);
+        
+        // Disparar evento personalizado para o sistema de SLA
+        document.dispatchEvent(new CustomEvent('realtime:new_conversation', { detail: data }));
+        
         try {
             // Adicionar nova conversa à lista sem recarregar a página
             if (data.conversation) {

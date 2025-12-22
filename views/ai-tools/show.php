@@ -293,11 +293,17 @@ ob_start();
 
 <?php 
 $content = ob_get_clean(); 
+
+// Preparar JSON para injetar no script sem interpolação de template literals
 $aiToolsBaseUrl = json_encode(\App\Helpers\Url::to('/ai-tools'));
+$functionSchemaJson = json_encode($functionSchema, JSON_UNESCAPED_UNICODE);
+$configJson = json_encode($config, JSON_UNESCAPED_UNICODE);
+$toolIdJson = json_encode($tool['id'] ?? 0);
+
 $scripts = <<<'SCRIPTS'
 <script>
 // URL base para requisições
-const AI_TOOLS_BASE_URL = {$aiToolsBaseUrl};
+const AI_TOOLS_BASE_URL = __AI_TOOLS_BASE_URL__;
 
 let editParameterCounter = 0;
 
@@ -547,8 +553,8 @@ function buildEditConfig() {
 
 // Preencher campos ao abrir modal de edição
 function populateEditFields() {
-    const functionSchema = <?= json_encode($functionSchema, JSON_UNESCAPED_UNICODE) ?>;
-    const config = <?= json_encode($config, JSON_UNESCAPED_UNICODE) ?>;
+    const functionSchema = __FUNCTION_SCHEMA__;
+    const config = __CONFIG__;
     
     if (functionSchema && functionSchema.function) {
         document.getElementById("kt_edit_function_name").value = functionSchema.function.name || "";
@@ -610,7 +616,7 @@ function toggleN8NTestPanel() {
 }
 
 function executeN8NTest() {
-    const toolId = ' . json_encode($tool['id'] ?? 0) . ';
+    const toolId = __TOOL_ID__;
     const webhookId = document.getElementById("test_webhook_id").value.trim();
     const method = document.getElementById("test_method").value;
     const dataStr = document.getElementById("test_data").value.trim();
@@ -830,6 +836,12 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 </script>
 SCRIPTS;
+
+$scripts = str_replace(
+    ['__AI_TOOLS_BASE_URL__', '__FUNCTION_SCHEMA__', '__CONFIG__', '__TOOL_ID__'],
+    [$aiToolsBaseUrl, $functionSchemaJson, $configJson, $toolIdJson],
+    $scripts
+);
 ?>
 
 <?php include __DIR__ . '/../layouts/metronic/app.php'; ?>

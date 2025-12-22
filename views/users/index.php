@@ -497,7 +497,7 @@ document.addEventListener("DOMContentLoaded", function() {
     
     const form = document.getElementById("kt_modal_new_user_form");
     if (form) {
-        console.log('📝 Formulário de novo usuário encontrado, registrando handler AJAX');
+        console.log('[FORM] Formulário de novo usuário encontrado, registrando handler AJAX');
         
         // Remover o onsubmit inline para usar o listener
         form.onsubmit = null;
@@ -505,7 +505,7 @@ document.addEventListener("DOMContentLoaded", function() {
         form.addEventListener("submit", function(e) {
             e.preventDefault();
             e.stopPropagation();
-            console.log('✅ Submit interceptado, enviando via AJAX');
+            console.log('[OK] Submit interceptado, enviando via AJAX');
             
             const submitBtn = document.getElementById("kt_modal_new_user_submit");
             submitBtn.setAttribute("data-kt-indicator", "on");
@@ -522,11 +522,11 @@ document.addEventListener("DOMContentLoaded", function() {
                 body: new URLSearchParams(formData)
             })
             .then(response => {
-                console.log('📡 Resposta recebida:', response.status, response.statusText);
+                console.log('[RESPONSE] Resposta recebida:', response.status, response.statusText);
                 return response.json();
             })
             .then(data => {
-                console.log('📊 Dados:', data);
+                console.log('[DATA] Dados:', data);
                 submitBtn.removeAttribute("data-kt-indicator");
                 submitBtn.disabled = false;
                 
@@ -564,7 +564,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 }
             })
             .catch(error => {
-                console.error('❌ Erro:', error);
+                console.error('[ERROR] Erro:', error);
                 submitBtn.removeAttribute("data-kt-indicator");
                 submitBtn.disabled = false;
                 
@@ -580,7 +580,7 @@ document.addEventListener("DOMContentLoaded", function() {
             });
         });
     } else {
-        console.error('❌ Formulário kt_modal_new_user_form não encontrado!');
+        console.error('[ERROR] Formulário kt_modal_new_user_form não encontrado!');
     }
     
     // Função para editar usuário (aceita elemento button ou link)

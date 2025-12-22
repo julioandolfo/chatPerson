@@ -74,12 +74,52 @@ const SLAIndicator = {
         // Atualizar todos os indicadores
         this.updateAllIndicators();
         
-        // Atualizar a cada 30 segundos
+        // Atualizar a cada 10 segundos para resposta mais rápida
         setInterval(() => {
             this.updateAllIndicators();
-        }, 30000);
+        }, 10000);
         
         console.log('[SLA] Sistema inicializado com sucesso');
+        
+        // Integrar com eventos de tempo real
+        this.setupRealtimeListeners();
+    },
+    
+    /**
+     * Configurar listeners para eventos de tempo real (WebSocket/Polling)
+     */
+    setupRealtimeListeners: function() {
+        // Listener global para novas mensagens
+        document.addEventListener('realtime:new_message', (event) => {
+            if (event.detail && event.detail.conversation_id) {
+                const convData = this.getConversationData(event.detail.conversation_id);
+                if (convData) {
+                    this.updateConversation(event.detail.conversation_id, convData);
+                }
+            }
+        });
+        
+        // Listener global para conversas atualizadas
+        document.addEventListener('realtime:conversation_updated', (event) => {
+            if (event.detail && event.detail.conversation_id) {
+                const convData = this.getConversationData(event.detail.conversation_id);
+                if (convData) {
+                    this.updateConversation(event.detail.conversation_id, convData);
+                }
+            }
+        });
+        
+        // Listener global para nova conversa adicionada
+        document.addEventListener('realtime:new_conversation', (event) => {
+            if (event.detail && event.detail.conversation) {
+                // Aguardar DOM ser atualizado
+                setTimeout(() => {
+                    this.updateConversation(event.detail.conversation.id, event.detail.conversation);
+                }, 100);
+            }
+        });
+        
+        console.log('[SLA] Listeners de tempo real configurados');
     },
     
     /**
@@ -255,7 +295,7 @@ const SLAIndicator = {
         
         // viewBox ligeiramente maior para acomodar o stroke ao redor
         const viewBoxSize = size + 6; // +6px para o stroke (3px de cada lado)
-        const stroke = size >= 50 ? 3 : size >= 45 ? 2.5 : 2;
+        const stroke = size >= 50 ? 4.5 : size >= 45 ? 4 : 3; // aumentado para melhor visibilidade
         const inset = 3; // deslocamento fixo de 3px (metade dos 6px extras)
         const rectSize = size; // tamanho original do avatar
         const rx = Math.max(10, Math.round(size * 0.22)); // cantos arredondados para seguir o avatar

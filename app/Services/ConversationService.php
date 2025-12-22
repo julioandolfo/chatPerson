@@ -1359,9 +1359,21 @@ class ConversationService
         }
         
         if ($message) {
+            // Adicionar campos necessários para o frontend (type e direction)
+            $message['type'] = ($message['message_type'] ?? 'text') === 'note' ? 'note' : 'message';
+            
+            // Determinar direction baseado em sender_type
+            // Mensagens de agentes são sempre outgoing (enviadas pelo sistema/agente)
+            // Mensagens de contatos são sempre incoming (recebidas)
+            if (($message['sender_type'] ?? '') === 'agent') {
+                $message['direction'] = 'outgoing';
+            } else {
+                $message['direction'] = 'incoming';
+            }
+            
             // Notificar via WebSocket
             try {
-                Logger::debug("Notificando nova mensagem via WebSocket: conversationId={$conversationId}, messageId={$messageId}", 'conversas.log');
+                Logger::debug("Notificando nova mensagem via WebSocket: conversationId={$conversationId}, messageId={$messageId}, direction={$message['direction']}", 'conversas.log');
                 \App\Helpers\WebSocket::notifyNewMessage($conversationId, $message);
             } catch (\Exception $e) {
                 error_log("Erro ao notificar WebSocket: " . $e->getMessage());
@@ -1572,6 +1584,18 @@ class ConversationService
         }
 
         if ($message) {
+            // Adicionar campos necessários para o frontend (type e direction)
+            $message['type'] = ($message['message_type'] ?? 'text') === 'note' ? 'note' : 'message';
+            
+            // Determinar direction baseado em sender_type
+            // Mensagens de agentes são sempre outgoing (enviadas pelo sistema/agente)
+            // Mensagens de contatos são sempre incoming (recebidas)
+            if (($message['sender_type'] ?? '') === 'agent') {
+                $message['direction'] = 'outgoing';
+            } else {
+                $message['direction'] = 'incoming';
+            }
+            
             // Notificar via WebSocket
             try {
                 \App\Helpers\WebSocket::notifyNewMessage($targetConversationId, $message);

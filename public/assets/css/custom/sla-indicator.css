@@ -36,7 +36,7 @@
 .sla-progress-ring circle,
 .sla-progress-ring rect {
     fill: none;
-    stroke-width: 3;
+    stroke-width: 4; /* aumentado de 3 para 4 */
     transition: stroke-dashoffset 0.3s ease, stroke 0.3s ease;
     vector-effect: non-scaling-stroke; /* mantém espessura consistente */
 }
@@ -164,7 +164,7 @@
 
 .symbol-35px .sla-progress-ring circle,
 .symbol-35px .sla-progress-ring rect {
-    stroke-width: 2;
+    stroke-width: 3; /* aumentado de 2 para 3 */
 }
 
 .symbol-45px.symbol-sla {
@@ -181,7 +181,7 @@
 
 .symbol-45px .sla-progress-ring circle,
 .symbol-45px .sla-progress-ring rect {
-    stroke-width: 2.5;
+    stroke-width: 4; /* aumentado de 2.5 para 4 */
 }
 
 .symbol-50px.symbol-sla {
@@ -198,7 +198,7 @@
 
 .symbol-50px .sla-progress-ring circle,
 .symbol-50px .sla-progress-ring rect {
-    stroke-width: 3;
+    stroke-width: 4.5; /* aumentado de 3 para 4.5 */
 }
 
 /* Estado sem SLA ativo */

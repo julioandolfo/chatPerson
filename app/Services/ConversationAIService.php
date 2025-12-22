@@ -27,11 +27,12 @@ class ConversationAIService
             throw new \Exception('Conversa não encontrada');
         }
 
-        error_log("ConversationAIService::getAIStatus - Conversa encontrada, buscando AIConversation...");
+        self::logAI("getAIStatus - Buscando AIConversation para conversationId={$conversationId}");
         $aiConversation = AIConversation::getByConversationId($conversationId);
-        error_log("ConversationAIService::getAIStatus - AIConversation: " . ($aiConversation ? json_encode($aiConversation) : 'null'));
+        self::logAI("getAIStatus - AIConversation: " . ($aiConversation ? "ID={$aiConversation['id']}, status={$aiConversation['status']}, ai_agent_id={$aiConversation['ai_agent_id']}" : 'null'));
         
         if (!$aiConversation || $aiConversation['status'] !== 'active') {
+            self::logAI("getAIStatus - Retornando has_ai=false (aiConversation=" . ($aiConversation ? "status={$aiConversation['status']}" : 'null') . ")");
             return [
                 'has_ai' => false,
                 'ai_agent' => null,
@@ -40,6 +41,8 @@ class ConversationAIService
                 'tools_used' => []
             ];
         }
+        
+        self::logAI("getAIStatus - IA ativa encontrada, buscando dados do agente...");
 
         $aiAgent = AIAgent::find($aiConversation['ai_agent_id']);
         

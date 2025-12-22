@@ -1830,10 +1830,18 @@ class AutomationService
      */
     public static function handleAIBranchingResponse(array $conversation, array $message): bool
     {
+        $conversationId = (int)$conversation['id'];
+        
         \App\Helpers\Logger::automation("=== handleAIBranchingResponse INÍCIO ===");
         $senderType = $message['sender_type'] ?? 'unknown';
-        \App\Helpers\Logger::automation("Conversa ID: {$conversation['id']}, Sender: {$senderType}, Mensagem: '" . substr($message['content'] ?? '', 0, 100) . "'");
-        self::logIntent("=== handleAIBranchingResponse === conv:{$conversation['id']} sender:{$senderType} msg:'" . ($message['content'] ?? '') . "'");
+        \App\Helpers\Logger::automation("Conversa ID: {$conversationId}, Sender: {$senderType}, Mensagem: '" . substr($message['content'] ?? '', 0, 100) . "'");
+        self::logIntent("=== handleAIBranchingResponse === conv:{$conversationId} sender:{$senderType} msg:'" . ($message['content'] ?? '') . "'");
+        
+        // Debug log para conversa específica
+        \App\Helpers\ConversationDebug::automation($conversationId, "AI Branching Response iniciado", [
+            'sender_type' => $senderType,
+            'message' => substr($message['content'] ?? '', 0, 200)
+        ]);
         
         $metadata = json_decode($conversation['metadata'] ?? '{}', true);
         self::logIntent("metadata ai_active=" . (!empty($metadata['ai_branching_active']) ? '1' : '0') .
@@ -1883,9 +1891,15 @@ class AutomationService
         }
         
         // Analisar a mensagem para identificar intent (primeiro por keywords, depois por IA semântica)
+        \App\Helpers\ConversationDebug::intentDetection($conversationId, "Iniciando detecção de intent", [
+            'message' => $message['content'] ?? '',
+            'intents_count' => count($metadata['ai_intents'] ?? [])
+        ]);
+        
         $detectedIntent = self::detectAIIntent($message['content'] ?? '', $metadata['ai_intents'] ?? []);
         if ($detectedIntent) {
             self::logIntent("match_keywords intent=" . ($detectedIntent['intent'] ?? ''));
+            \App\Helpers\ConversationDebug::intentDetection($conversationId, "✅ Intent detectado por keywords", $detectedIntent);
         }
 
         // Fallback: detecção semântica via OpenAI (usando descrição do intent)
@@ -1897,19 +1911,29 @@ class AutomationService
             if ($semanticEnabled) {
                 \App\Helpers\Logger::automation("Nenhum match por keywords. Tentando detecção semântica via OpenAI (min confidence {$minConfidence})");
                 self::logIntent("semantica_on minConf={$minConfidence}");
-                $detectedIntent = self::detectAIIntentSemantic($message['content'] ?? '', $metadata['ai_intents'] ?? [], $minConfidence, (int)$conversation['id']);
+                
+                \App\Helpers\ConversationDebug::intentDetection($conversationId, "Tentando detecção semântica via OpenAI", [
+                    'min_confidence' => $minConfidence
+                ]);
+                
+                $detectedIntent = self::detectAIIntentSemantic($message['content'] ?? '', $metadata['ai_intents'] ?? [], $minConfidence, $conversationId);
                 if (!$detectedIntent) {
                     self::logIntent("semantic_result_empty");
+                    \App\Helpers\ConversationDebug::intentDetection($conversationId, "❌ Detecção semântica não retornou intent");
+                } else {
+                    \App\Helpers\ConversationDebug::intentDetection($conversationId, "✅ Intent detectado por OpenAI", $detectedIntent);
                 }
             } else {
                 \App\Helpers\Logger::automation("Detecção semântica desabilitada; não será tentada.");
                 self::logIntent("semantica_off");
+                \App\Helpers\ConversationDebug::intentDetection($conversationId, "Detecção semântica desabilitada");
             }
         }
         
         if ($detectedIntent) {
             \App\Helpers\Logger::automation("Intent detectado: {$detectedIntent['intent']}");
             self::logIntent("intent_detectado:" . ($detectedIntent['intent'] ?? ''));
+            \App\Helpers\ConversationDebug::automation($conversationId, "Intent detectado - executando fluxo", $detectedIntent);
             
             // Buscar nó de destino para este intent
             $targetNodeId = $detectedIntent['target_node_id'] ?? null;
@@ -2031,16 +2055,26 @@ class AutomationService
         $metadata['ai_interaction_count'] = $interactionCount;
         \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
         self::logIntent("no_intent_no_fallback interaction={$interactionCount}/{$maxInteractions}");
+        
+        \App\Helpers\ConversationDebug::automation($conversationId, "Nenhum intent detectado", [
+            'interaction_count' => $interactionCount,
+            'max_interactions' => $maxInteractions,
+            'fallback_node_id' => $fallbackNodeId
+        ]);
 
         if ($interactionCount >= $maxInteractions) {
             \App\Helpers\Logger::automation("Nenhum intent detectado e limite de interações atingido. Escalando.");
             self::logIntent("escalate_sem_intent interaction={$interactionCount}");
+            \App\Helpers\ConversationDebug::automation($conversationId, "Escalando para humano", [
+                'reason' => 'max_interactions_reached'
+            ]);
             return self::escalateFromAI($conversation['id'], $metadata);
         }
 
         // Mensagem de esclarecimento: só a partir da 2ª interação para não poluir na primeira
         if ($interactionCount >= 2) {
             $clarifyMessage = "Não consegui identificar sua intenção. Pode esclarecer ou ser mais específico?";
+            \App\Helpers\ConversationDebug::messageSent($conversationId, $clarifyMessage, 'clarify');
             try {
                 \App\Services\ConversationService::sendMessage(
                     $conversation['id'],
@@ -2053,13 +2087,16 @@ class AutomationService
             } catch (\Exception $e) {
                 \App\Helpers\Logger::automation("Falha ao enviar feedback de não entendimento: " . $e->getMessage());
                 self::logIntent("clarify_erro:" . $e->getMessage());
+                \App\Helpers\ConversationDebug::error($conversationId, 'clarify', $e->getMessage());
             }
         } else {
             self::logIntent("clarify_skip_first interaction={$interactionCount}");
+            \App\Helpers\ConversationDebug::automation($conversationId, "Pulando mensagem de clarificação (primeira interação)");
         }
 
         \App\Helpers\Logger::automation("=== handleAIBranchingResponse FIM (false - continua com IA) ===");
         self::logIntent("fim_false");
+        \App\Helpers\ConversationDebug::automation($conversationId, "AI Branching Response finalizado - retornando false (continua com IA normal)");
         return false; // Continua com IA normal
     }
 

@@ -55,22 +55,37 @@ class OpenAIService
     {
         $startTime = microtime(true);
         
+        // Debug log
+        \App\Helpers\ConversationDebug::aiAgent($conversationId, "processMessage iniciado", [
+            'agentId' => $agentId,
+            'message' => substr($message, 0, 200),
+            'contextKeys' => array_keys($context)
+        ]);
+        
         try {
             // Obter agente
             $agent = AIAgent::find($agentId);
             if (!$agent || !$agent['enabled']) {
+                \App\Helpers\ConversationDebug::error($conversationId, 'processMessage', 'Agente não encontrado ou inativo', ['agentId' => $agentId]);
                 throw new \Exception('Agente de IA não encontrado ou inativo');
             }
+            
+            \App\Helpers\ConversationDebug::aiAgent($conversationId, "Agente encontrado: {$agent['name']}", [
+                'model' => $agent['model'],
+                'temperature' => $agent['temperature']
+            ]);
 
             // Verificar rate limiting e limites de custo
             $costControlCheck = \App\Services\AICostControlService::canProcessMessage($agentId);
             if (!$costControlCheck['allowed']) {
+                \App\Helpers\ConversationDebug::error($conversationId, 'processMessage', 'Rate limit/custo atingido', $costControlCheck);
                 throw new \Exception($costControlCheck['reason'] ?? 'Limite de rate ou custo atingido');
             }
 
             // Obter API Key
             $apiKey = self::getApiKey();
             if (empty($apiKey)) {
+                \App\Helpers\ConversationDebug::error($conversationId, 'processMessage', 'API Key não configurada');
                 throw new \Exception('API Key da OpenAI não configurada. Configure em Configurações > OpenAI');
             }
 
@@ -86,6 +101,10 @@ class OpenAIService
                     $functions[] = $functionSchema;
                 }
             }
+            
+            \App\Helpers\ConversationDebug::aiAgent($conversationId, "Tools carregadas: " . count($functions), [
+                'tools' => array_map(fn($f) => $f['name'] ?? 'unknown', $functions)
+            ]);
 
             // Construir mensagens do histórico
             $messages = self::buildMessages($agent, $message, $context);
@@ -106,19 +125,34 @@ class OpenAIService
             }
 
             // Fazer requisição à API
+            \App\Helpers\ConversationDebug::openAIRequest($conversationId, 'chat/completions', [
+                'model' => $payload['model'],
+                'messages_count' => count($payload['messages']),
+                'tools_count' => count($functions),
+                'temperature' => $payload['temperature']
+            ]);
+            
             $response = self::makeRequest($apiKey, $payload);
             
             // Processar resposta
             $assistantMessage = $response['choices'][0]['message'] ?? null;
             if (!$assistantMessage) {
+                \App\Helpers\ConversationDebug::error($conversationId, 'OpenAI', 'Resposta inválida', $response);
                 throw new \Exception('Resposta inválida da API OpenAI');
             }
 
             $content = $assistantMessage['content'] ?? '';
             $toolCalls = $assistantMessage['tool_calls'] ?? null;
+            
+            \App\Helpers\ConversationDebug::openAIResponse($conversationId, 'chat/completions', [
+                'content_preview' => substr($content, 0, 200),
+                'tool_calls' => $toolCalls ? count($toolCalls) : 0,
+                'tokens' => $response['usage'] ?? []
+            ], $response['usage']['total_tokens'] ?? 0);
 
             // Se há tool calls, executar e reenviar
             if (!empty($toolCalls)) {
+                \App\Helpers\ConversationDebug::aiAgent($conversationId, "OpenAI solicitou " . count($toolCalls) . " tool calls");
                 $functionResults = self::executeToolCalls($toolCalls, $conversationId, $agentId, $context);
                 
                 // Verificar se alguma tool retornou resposta direta (use_raw_response)
@@ -452,7 +486,10 @@ class OpenAIService
             $functionName = $call['function']['name'] ?? null;
             $functionArguments = json_decode($call['function']['arguments'] ?? '{}', true);
 
+            \App\Helpers\ConversationDebug::toolCall($conversationId, $functionName ?? 'unknown', $functionArguments);
+
             if (!$functionName || !$toolCallId) {
+                \App\Helpers\ConversationDebug::error($conversationId, 'executeToolCalls', 'Tool call sem nome ou ID');
                 continue;
             }
 
@@ -460,6 +497,7 @@ class OpenAIService
                 // Buscar tool pelo nome da function
                 $tool = AITool::findBySlug($functionName);
                 if (!$tool || !$tool['enabled']) {
+                    \App\Helpers\ConversationDebug::toolResponse($conversationId, $functionName, 'Tool não encontrada ou inativa', false);
                     $results[] = [
                         'name' => $functionName,
                         'result' => ['error' => 'Tool não encontrada ou inativa']
@@ -487,6 +525,8 @@ class OpenAIService
 
                 // Executar tool
                 $result = self::executeTool($tool, $functionArguments, $conversationId, $context);
+                
+                \App\Helpers\ConversationDebug::toolResponse($conversationId, $functionName, $result, !isset($result['error']));
 
                 // Registrar uso da tool
                 $aiConversation = AIConversation::whereFirst('conversation_id', '=', $conversationId);

@@ -1103,6 +1103,14 @@ class ConversationService
      */
     public static function sendMessage(int $conversationId, string $content, string $senderType = 'agent', ?int $senderId = null, array $attachments = [], ?string $messageType = null, ?int $quotedMessageId = null, ?int $aiAgentId = null, ?int $messageTimestamp = null): ?int
     {
+        // Debug log
+        \App\Helpers\ConversationDebug::messageReceived($conversationId, $content, $senderType, [
+            'senderId' => $senderId,
+            'aiAgentId' => $aiAgentId,
+            'attachments_count' => count($attachments),
+            'messageType' => $messageType
+        ]);
+        
         if ($senderId === null && $aiAgentId === null) {
             $senderId = \App\Helpers\Auth::id();
         }

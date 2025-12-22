@@ -20,7 +20,23 @@ class AIConversation extends Model
      */
     public static function getByConversationId(int $conversationId): ?array
     {
-        return self::whereFirst('conversation_id', '=', $conversationId);
+        // Primeiro, tentar encontrar uma conversa ativa
+        $sql = "SELECT * FROM ai_conversations 
+                WHERE conversation_id = ? AND status = 'active' 
+                ORDER BY created_at DESC 
+                LIMIT 1";
+        $activeConversation = \App\Helpers\Database::fetch($sql, [$conversationId]);
+        
+        if ($activeConversation) {
+            return $activeConversation;
+        }
+        
+        // Se não houver ativa, retornar a mais recente (para histórico)
+        $sql = "SELECT * FROM ai_conversations 
+                WHERE conversation_id = ? 
+                ORDER BY created_at DESC 
+                LIMIT 1";
+        return \App\Helpers\Database::fetch($sql, [$conversationId]);
     }
 
     /**

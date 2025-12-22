@@ -4183,10 +4183,17 @@ window.addAIAgentToConversation = function(conversationId, data) {
             });
             
             // Recarregar status da IA
-            window.loadAIAgentStatus(conversationId);
+            console.log('🔄 Recarregando status da IA após adicionar, conversationId:', conversationId);
+            
+            // Aguardar um pouco para garantir que o banco foi atualizado
+            setTimeout(() => {
+                console.log('🔄 Chamando loadAIAgentStatus após timeout');
+                window.loadAIAgentStatus(conversationId);
+            }, 500);
             
             // Recarregar conversa se necessário
             if (typeof selectConversation === 'function') {
+                console.log('🔄 Chamando selectConversation para recarregar');
                 selectConversation(conversationId);
             }
         } else {

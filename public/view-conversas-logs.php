@@ -3,7 +3,7 @@
  * Visualizador de Logs de Conversas
  */
 
-$logFile = __DIR__ . '/../storage/logs/conversas.log';
+$logFile = __DIR__ . '/../logs/conversas.log';
 
 // Criar arquivo se não existir
 if (!file_exists($logFile)) {

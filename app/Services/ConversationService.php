@@ -1371,14 +1371,15 @@ class ConversationService
                 $message['direction'] = 'incoming';
             }
             
-            // Log detalhado para debug
-            Logger::debug("🔍 Mensagem preparada para WebSocket: messageId={$messageId}, sender_type={$message['sender_type']}, direction={$message['direction']}, type={$message['type']}", 'conversas.log');
+            // Log detalhado para debug (usar info ao invés de debug para sempre logar)
+            Logger::info("🔍 Mensagem preparada para WebSocket: messageId={$messageId}, sender_type={$message['sender_type']}, direction={$message['direction']}, type={$message['type']}", 'conversas.log');
             
             // Notificar via WebSocket
             try {
-                Logger::debug("Notificando nova mensagem via WebSocket: conversationId={$conversationId}, messageId={$messageId}, direction={$message['direction']}", 'conversas.log');
+                Logger::info("📤 Notificando nova mensagem via WebSocket: conversationId={$conversationId}, messageId={$messageId}, direction={$message['direction']}", 'conversas.log');
                 \App\Helpers\WebSocket::notifyNewMessage($conversationId, $message);
             } catch (\Exception $e) {
+                Logger::error("❌ Erro ao notificar WebSocket: " . $e->getMessage(), 'conversas.log');
                 error_log("Erro ao notificar WebSocket: " . $e->getMessage());
             }
             

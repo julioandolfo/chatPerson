@@ -8457,13 +8457,19 @@ function renderDateSeparator(dateString) {
 
 // Adicionar mensagem ao chat dinamicamente
 function addMessageToChat(message) {
-    console.log('📨 addMessageToChat chamada com:', {
-        id: message.id,
-        sender_type: message.sender_type,
-        direction: message.direction,
-        type: message.type,
-        message_type: message.message_type
+    console.group('📨 addMessageToChat');
+    console.log('Mensagem recebida:', message);
+    console.table({
+        'ID': message.id,
+        'sender_type': message.sender_type,
+        'direction': message.direction,
+        'type': message.type,
+        'message_type': message.message_type
     });
+    
+    const isIncoming = message.direction === 'incoming';
+    console.log(`Será renderizada como: ${isIncoming ? '⬅️ INCOMING (esquerda)' : '➡️ OUTGOING (direita)'}`);
+    console.groupEnd();
     
     const chatMessages = document.getElementById('chatMessages');
     if (!chatMessages) return null;
@@ -12705,14 +12711,27 @@ if (typeof window.wsClient !== 'undefined') {
         
         // Se é a conversa atual, adicionar mensagem dinamicamente
         if (currentConversationId == data.conversation_id && data.message) {
-            console.log('🔍 DEBUG: Mensagem recebida via WebSocket/Polling:', {
-                id: data.message.id,
-                content: data.message.content?.substring(0, 50),
-                sender_type: data.message.sender_type,
-                direction: data.message.direction,
-                message_type: data.message.message_type,
-                type: data.message.type
+            console.group('🔍 DEBUG: Nova mensagem via WebSocket/Polling');
+            console.log('Dados completos:', data);
+            console.table({
+                'ID': data.message.id,
+                'Conteúdo': data.message.content?.substring(0, 50),
+                'sender_type': data.message.sender_type,
+                'direction': data.message.direction,
+                'message_type': data.message.message_type,
+                'type': data.message.type
             });
+            
+            // Validação de campos críticos
+            if (!data.message.direction) {
+                console.error('❌ ERRO: Campo "direction" está AUSENTE!');
+            } else if (data.message.direction === 'outgoing' && data.message.sender_type === 'contact') {
+                console.error('❌ ERRO: Mensagem do contato (sender_type=contact) mas direction=outgoing (deveria ser incoming)');
+            } else if (data.message.direction === 'incoming' && data.message.sender_type === 'contact') {
+                console.log('✅ CORRETO: Mensagem do contato com direction=incoming');
+            }
+            
+            console.groupEnd();
             addMessageToChat(data.message);
             
             // Remover badge se existir (mensagem já foi marcada como lida no backend)

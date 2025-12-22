@@ -497,7 +497,7 @@ document.addEventListener("DOMContentLoaded", function() {
     
     const form = document.getElementById("kt_modal_new_user_form");
     if (form) {
-        console.log('[FORM] Formulário de novo usuário encontrado, registrando handler AJAX');
+        console.log('[FORM] Formulario de novo usuario encontrado, registrando handler AJAX');
         
         // Remover o onsubmit inline para usar o listener
         form.onsubmit = null;
@@ -531,12 +531,12 @@ document.addEventListener("DOMContentLoaded", function() {
                 submitBtn.disabled = false;
                 
                 if (data.success) {
-                    // Usar SweetAlert2 se disponível, senão usar toast
+                    // Usar SweetAlert2 se disponivel, senao usar toast
                     if (typeof Swal !== 'undefined') {
                         Swal.fire({
                             icon: 'success',
                             title: 'Sucesso!',
-                            text: data.message || 'Usuário criado com sucesso!',
+                            text: data.message || 'Usuario criado com sucesso!',
                             timer: 2000,
                             showConfirmButton: false
                         }).then(() => {
@@ -545,21 +545,21 @@ document.addEventListener("DOMContentLoaded", function() {
                             location.reload();
                         });
                     } else {
-                        alert(data.message || 'Usuário criado com sucesso!');
+                        alert(data.message || 'Usuario criado com sucesso!');
                         const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_new_user"));
                         if (modal) modal.hide();
                         location.reload();
                     }
                 } else {
-                    // Mostrar erro de forma mais amigável
+                    // Mostrar erro de forma mais amigavel
                     if (typeof Swal !== 'undefined') {
                         Swal.fire({
                             icon: 'error',
                             title: 'Erro',
-                            text: data.message || 'Erro ao criar usuário'
+                            text: data.message || 'Erro ao criar usuario'
                         });
                     } else {
-                        alert("Erro: " + (data.message || "Erro ao criar usuário"));
+                        alert("Erro: " + (data.message || "Erro ao criar usuario"));
                     }
                 }
             })
@@ -572,18 +572,18 @@ document.addEventListener("DOMContentLoaded", function() {
                     Swal.fire({
                         icon: 'error',
                         title: 'Erro',
-                        text: 'Erro ao criar usuário. Verifique o console para mais detalhes.'
+                        text: 'Erro ao criar usuario. Verifique o console para mais detalhes.'
                     });
                 } else {
-                    alert("Erro ao criar usuário. Verifique o console para mais detalhes.");
+                    alert("Erro ao criar usuario. Verifique o console para mais detalhes.");
                 }
             });
         });
     } else {
-        console.error('[ERROR] Formulário kt_modal_new_user_form não encontrado!');
+        console.error('[ERROR] Formulario kt_modal_new_user_form nao encontrado!');
     }
     
-    // Função para editar usuário (aceita elemento button ou link)
+    // Funcao para editar usuario (aceita elemento button ou link)
     window.editUser = function(element) {
         const userId = element.getAttribute("data-user-id");
         const userName = element.getAttribute("data-user-name") || "";
@@ -606,13 +606,13 @@ document.addEventListener("DOMContentLoaded", function() {
         const baseUrl = window.location.origin;
         form.action = baseUrl + "/users/" + userId;
         
-        console.log("Editando usuário:", userId, "URL:", form.action);
+        console.log("Editando usuario:", userId, "URL:", form.action);
         
         const modal = new bootstrap.Modal(document.getElementById("kt_modal_edit_user"));
         modal.show();
     };
     
-    // Form de edição
+    // Form de edicao
     const editForm = document.getElementById("kt_modal_edit_user_form");
     if (editForm) {
         editForm.addEventListener("submit", function(e) {
@@ -629,7 +629,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 formData.delete("password");
             }
             
-            console.log("Enviando atualização para:", editForm.action);
+            console.log("Enviando atualizacao para:", editForm.action);
             console.log("FormData:", Object.fromEntries(formData));
             
             fetch(editForm.action, {
@@ -655,7 +655,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     Swal.fire({
                         icon: 'success',
                         title: 'Sucesso!',
-                        text: data.message || 'Usuário atualizado com sucesso!',
+                        text: data.message || 'Usuario atualizado com sucesso!',
                         timer: 2000,
                         showConfirmButton: false
                     }).then(() => {
@@ -667,24 +667,24 @@ document.addEventListener("DOMContentLoaded", function() {
                     Swal.fire({
                         icon: 'error',
                         title: 'Erro!',
-                        text: data.message || 'Erro ao atualizar usuário'
+                        text: data.message || 'Erro ao atualizar usuario'
                     });
                 }
             })
             .catch(error => {
-                console.error("Erro ao atualizar usuário:", error);
+                console.error("Erro ao atualizar usuario:", error);
                 submitBtn.removeAttribute("data-kt-indicator");
                 submitBtn.disabled = false;
                 Swal.fire({
                     icon: 'error',
                     title: 'Erro!',
-                    text: error.message || 'Erro ao atualizar usuário'
+                    text: error.message || 'Erro ao atualizar usuario'
                 });
             });
         });
     }
     
-    // Função para atribuir role rapidamente
+    // Funcao para atribuir role rapidamente
     window.quickAssignRole = function(link) {
         const userId = link.getAttribute("data-user-id");
         document.getElementById("quick_role_user_id").value = userId;
@@ -694,7 +694,7 @@ document.addEventListener("DOMContentLoaded", function() {
         modal.show();
     };
     
-    // Função para atribuir setor rapidamente
+    // Funcao para atribuir setor rapidamente
     window.quickAssignDepartment = function(link) {
         const userId = link.getAttribute("data-user-id");
         document.getElementById("quick_dept_user_id").value = userId;
@@ -704,7 +704,7 @@ document.addEventListener("DOMContentLoaded", function() {
         modal.show();
     };
     
-    // Form de atribuição rápida de role
+    // Form de atribuicao rapida de role
     const quickRoleForm = document.getElementById("kt_modal_quick_assign_role_form");
     if (quickRoleForm) {
         quickRoleForm.addEventListener("submit", function(e) {
@@ -755,7 +755,7 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
     
-    // Form de atribuição rápida de setor
+    // Form de atribuicao rapida de setor
     const quickDeptForm = document.getElementById("kt_modal_quick_assign_department_form");
     if (quickDeptForm) {
         quickDeptForm.addEventListener("submit", function(e) {
@@ -806,9 +806,9 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
     
-    // Função para deletar usuário
+    // Funcao para deletar usuario
     window.deleteUser = function(userId, userName) {
-        if (!confirm("Tem certeza que deseja deletar o usuário \"" + userName + "\"?\n\nEsta ação não pode ser desfeita.")) {
+        if (!confirm("Tem certeza que deseja deletar o usuario \"" + userName + "\"?\n\nEsta acao nao pode ser desfeita.")) {
             return;
         }
         
@@ -823,11 +823,11 @@ document.addEventListener("DOMContentLoaded", function() {
             if (data.success) {
                 location.reload();
             } else {
-                alert("Erro: " + (data.message || "Erro ao deletar usuário"));
+                alert("Erro: " + (data.message || "Erro ao deletar usuario"));
             }
         })
         .catch(error => {
-            alert("Erro ao deletar usuário");
+            alert("Erro ao deletar usuario");
         });
     };
 });

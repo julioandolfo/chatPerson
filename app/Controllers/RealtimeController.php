@@ -157,6 +157,9 @@ class RealtimeController
                             $messageType = $msg['message_type'] ?? 'text';
                             $type = ($messageType === 'note') ? 'note' : 'message';
                             
+                            // Log para debug
+                            \App\Helpers\Logger::info("📨 Polling: Nova mensagem - convId={$convId}, msgId={$msg['id']}, sender_type={$senderType}, direction={$direction}", 'conversas.log');
+                            
                             $updates['new_messages'][] = [
                                 'conversation_id' => $convId,
                                 'id' => $msg['id'],

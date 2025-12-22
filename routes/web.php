@@ -253,6 +253,7 @@ Router::get('/ai-assistant/stats', [AIAssistantController::class, 'getStats'], [
 
 // Rotas de Tools de IA
 Router::get('/ai-tools', [AIToolController::class, 'index'], ['Authentication']);
+Router::post('/ai-tools/{id}/test-n8n', [AIToolController::class, 'testN8N'], ['Authentication']);
 Router::get('/ai-tools/{id}', [AIToolController::class, 'show'], ['Authentication']);
 Router::post('/ai-tools', [AIToolController::class, 'store'], ['Authentication']);
 Router::post('/ai-tools/{id}', [AIToolController::class, 'update'], ['Authentication']);

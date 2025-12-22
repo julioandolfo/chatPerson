@@ -98,6 +98,8 @@ class OpenAIService
                     : ($tool['function_schema'] ?? []);
                 
                 if (!empty($functionSchema)) {
+                    // Corrigir schema se properties for array vazio (deveria ser objeto)
+                    $functionSchema = self::normalizeToolSchema($functionSchema);
                     $functions[] = $functionSchema;
                 }
             }
@@ -1621,6 +1623,58 @@ class OpenAIService
             default:
                 return ['error' => 'Document tool não reconhecida: ' . $functionName];
         }
+    }
+
+    /**
+     * Normalizar schema de tool para formato correto da OpenAI
+     * Corrige problemas como properties: [] ao invés de properties: {}
+     */
+    private static function normalizeToolSchema(array $schema): array
+    {
+        // Se é o formato wrapper {type: function, function: {...}}
+        if (isset($schema['function'])) {
+            $schema['function'] = self::normalizeFunctionSchema($schema['function']);
+        } else {
+            // É o schema direto
+            $schema = self::normalizeFunctionSchema($schema);
+        }
+        
+        return $schema;
+    }
+
+    /**
+     * Normalizar o schema da função
+     */
+    private static function normalizeFunctionSchema(array $func): array
+    {
+        // Corrigir parameters
+        if (isset($func['parameters'])) {
+            $params = &$func['parameters'];
+            
+            // Garantir que type é 'object'
+            if (!isset($params['type'])) {
+                $params['type'] = 'object';
+            }
+            
+            // Corrigir properties: [] para properties: {}
+            if (isset($params['properties']) && is_array($params['properties']) && empty($params['properties'])) {
+                $params['properties'] = new \stdClass(); // Será convertido para {} no JSON
+            }
+            
+            // Garantir required existe
+            if (!isset($params['required'])) {
+                $params['required'] = [];
+            }
+        } else {
+            // Adicionar parameters padrão se não existir
+            $func['parameters'] = [
+                'type' => 'object',
+                'properties' => new \stdClass(),
+                'required' => []
+            ];
+        }
+        
+        return $func;
     }
 
     /**

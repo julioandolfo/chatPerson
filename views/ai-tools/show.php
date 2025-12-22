@@ -552,14 +552,12 @@ function buildEditFunctionSchema() {
         }
     });
     
+    // Garantir que properties é sempre um objeto (não array vazio)
     const params = {
         type: "object",
-        properties: properties
+        properties: Object.keys(properties).length > 0 ? properties : {},
+        required: required // Sempre incluir required, mesmo vazio
     };
-    
-    if (required.length > 0) {
-        params.required = required;
-    }
     
     return {
         type: "function",

@@ -30,6 +30,9 @@ class AIToolService
             throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));
         }
 
+        // Normalizar function_schema antes de salvar
+        $data['function_schema'] = self::normalizeFunctionSchema($data['function_schema']);
+        
         // Serializar JSON fields
         $data['function_schema'] = json_encode($data['function_schema'], JSON_UNESCAPED_UNICODE);
         if (isset($data['config']) && is_array($data['config'])) {
@@ -70,8 +73,9 @@ class AIToolService
             throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));
         }
 
-        // Serializar JSON fields
+        // Normalizar function_schema antes de salvar
         if (isset($data['function_schema']) && is_array($data['function_schema'])) {
+            $data['function_schema'] = self::normalizeFunctionSchema($data['function_schema']);
             $data['function_schema'] = json_encode($data['function_schema'], JSON_UNESCAPED_UNICODE);
         }
         if (isset($data['config']) && is_array($data['config'])) {
@@ -132,6 +136,49 @@ class AIToolService
     }
 
     /**
+     * Normalizar function schema para formato correto da OpenAI
+     * Corrige problemas como properties: [] ao invés de properties: {}
+     */
+    private static function normalizeFunctionSchema(array $schema): array
+    {
+        // Se é o formato wrapper {type: function, function: {...}}
+        if (isset($schema['function'])) {
+            $func = &$schema['function'];
+        } else {
+            $func = &$schema;
+        }
+        
+        // Corrigir parameters
+        if (isset($func['parameters'])) {
+            $params = &$func['parameters'];
+            
+            // Garantir que type é 'object'
+            if (!isset($params['type'])) {
+                $params['type'] = 'object';
+            }
+            
+            // Corrigir properties: [] para properties: {} (objeto vazio)
+            if (!isset($params['properties']) || (is_array($params['properties']) && empty($params['properties']))) {
+                $params['properties'] = new \stdClass(); // Será {} no JSON
+            }
+            
+            // Garantir required existe
+            if (!isset($params['required'])) {
+                $params['required'] = [];
+            }
+        } else {
+            // Adicionar parameters padrão se não existir
+            $func['parameters'] = [
+                'type' => 'object',
+                'properties' => new \stdClass(),
+                'required' => []
+            ];
+        }
+        
+        return $schema;
+    }
+
+    /**
      * Obter tools padrão do sistema
      */
     public static function getDefaultTools(): array
@@ -149,7 +196,8 @@ class AIToolService
                         'description' => 'Busca conversas anteriores do mesmo contato para contexto',
                         'parameters' => [
                             'type' => 'object',
-                            'properties' => []
+                            'properties' => new \stdClass(),
+                            'required' => []
                         ]
                     ]
                 ]
@@ -189,7 +237,8 @@ class AIToolService
                         'description' => 'Escala a conversa para um agente humano quando necessário',
                         'parameters' => [
                             'type' => 'object',
-                            'properties' => []
+                            'properties' => new \stdClass(),
+                            'required' => []
                         ]
                     ]
                 ]

@@ -2,57 +2,66 @@
 /**
  * Script para corrigir schemas de AI Tools no banco de dados
  * Corrige problemas como properties: [] ao invés de properties: {}
- * 
- * Acesse via: https://seu-dominio.com/fix-ai-tools-schema.php
  */
 
-// Carregar apenas o autoloader e config, sem passar pelo Router
-require_once __DIR__ . '/../vendor/autoload.php';
-require_once __DIR__ . '/../config/config.php';
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
-use App\Helpers\Database;
+header('Content-Type: text/html; charset=utf-8');
 
-// Se for acesso web, mostrar como HTML
-$isWeb = php_sapi_name() !== 'cli';
-
-if ($isWeb) {
-    header('Content-Type: text/html; charset=utf-8');
-    echo '<!DOCTYPE html><html><head><title>Fix AI Tools Schema</title>';
-    echo '<style>body{font-family:monospace;background:#0d1117;color:#c9d1d9;padding:20px;}';
-    echo 'h1{color:#58a6ff;}.ok{color:#3fb950;}.fix{color:#f0883e;}.error{color:#f85149;}</style>';
-    echo '</head><body>';
-    echo '<h1>🔧 Corrigindo Schemas de AI Tools</h1><pre>';
-}
-
-function output($msg, $class = '') {
-    global $isWeb;
-    if ($isWeb && $class) {
-        echo "<span class='$class'>$msg</span>\n";
-    } else {
-        echo $msg . "\n";
-    }
-}
-
-output("=== Corrigindo schemas de AI Tools ===\n");
+echo '<!DOCTYPE html><html><head><title>Fix AI Tools Schema</title>';
+echo '<style>body{font-family:monospace;background:#0d1117;color:#c9d1d9;padding:20px;}';
+echo 'h1{color:#58a6ff;}.ok{color:#3fb950;}.fix{color:#f0883e;}.error{color:#f85149;}pre{white-space:pre-wrap;}</style>';
+echo '</head><body>';
+echo '<h1>🔧 Corrigindo Schemas de AI Tools</h1><pre>';
 
 try {
-    // Buscar todas as tools
-    $tools = Database::fetchAll("SELECT id, name, function_schema FROM ai_tools");
+    // Carregar configuração do banco diretamente
+    $configFile = __DIR__ . '/../config/config.php';
+    if (!file_exists($configFile)) {
+        throw new Exception("Arquivo de configuração não encontrado: $configFile");
+    }
     
-    output("Encontradas " . count($tools) . " tools\n");
+    // Definir constantes se não existirem
+    if (!defined('DB_HOST')) {
+        $config = require $configFile;
+    }
+    
+    // Conectar ao banco
+    $host = defined('DB_HOST') ? DB_HOST : ($_ENV['DB_HOST'] ?? 'localhost');
+    $port = defined('DB_PORT') ? DB_PORT : ($_ENV['DB_PORT'] ?? '3306');
+    $database = defined('DB_DATABASE') ? DB_DATABASE : ($_ENV['DB_DATABASE'] ?? 'chat');
+    $username = defined('DB_USERNAME') ? DB_USERNAME : ($_ENV['DB_USERNAME'] ?? 'root');
+    $password = defined('DB_PASSWORD') ? DB_PASSWORD : ($_ENV['DB_PASSWORD'] ?? '');
+    
+    echo "Conectando ao banco: $host:$port/$database\n";
+    
+    $dsn = "mysql:host=$host;port=$port;dbname=$database;charset=utf8mb4";
+    $pdo = new PDO($dsn, $username, $password, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+    ]);
+    
+    echo "✅ Conexão estabelecida!\n\n";
+    
+    // Buscar todas as tools
+    $stmt = $pdo->query("SELECT id, name, function_schema FROM ai_tools");
+    $tools = $stmt->fetchAll();
+    
+    echo "Encontradas " . count($tools) . " tools\n\n";
     
     $fixed = 0;
     $errors = 0;
     $ok = 0;
     
     foreach ($tools as $tool) {
-        $msg = "Tool #{$tool['id']}: {$tool['name']}... ";
+        echo "Tool #{$tool['id']}: {$tool['name']}... ";
         
         try {
             $schema = json_decode($tool['function_schema'], true);
             
             if (!$schema) {
-                output($msg . "SKIP (schema vazio ou inválido)");
+                echo "SKIP (schema vazio ou inválido)\n";
                 continue;
             }
             
@@ -62,37 +71,38 @@ try {
             if ($needsFix) {
                 $newSchemaJson = json_encode($fixedSchema, JSON_UNESCAPED_UNICODE);
                 
-                $stmt = Database::getInstance()->prepare("UPDATE ai_tools SET function_schema = ? WHERE id = ?");
-                $stmt->execute([$newSchemaJson, $tool['id']]);
+                $updateStmt = $pdo->prepare("UPDATE ai_tools SET function_schema = ? WHERE id = ?");
+                $updateStmt->execute([$newSchemaJson, $tool['id']]);
                 
-                output($msg . "✅ CORRIGIDO", 'fix');
-                output("   Antes:  " . substr($tool['function_schema'], 0, 100) . "...");
-                output("   Depois: " . substr($newSchemaJson, 0, 100) . "...");
+                echo "<span class='fix'>✅ CORRIGIDO</span>\n";
+                echo "   Antes:  " . htmlspecialchars(substr($tool['function_schema'], 0, 150)) . "...\n";
+                echo "   Depois: " . htmlspecialchars(substr($newSchemaJson, 0, 150)) . "...\n";
                 $fixed++;
             } else {
-                output($msg . "OK (não precisa correção)", 'ok');
+                echo "<span class='ok'>OK</span>\n";
                 $ok++;
             }
         } catch (Exception $e) {
-            output($msg . "❌ ERRO: " . $e->getMessage(), 'error');
+            echo "<span class='error'>❌ ERRO: " . htmlspecialchars($e->getMessage()) . "</span>\n";
             $errors++;
         }
     }
     
-    output("\n=== Resultado ===");
-    output("✅ Corrigidas: $fixed", $fixed > 0 ? 'fix' : '');
-    output("✔️ Já estavam OK: $ok", 'ok');
-    output("❌ Erros: $errors", $errors > 0 ? 'error' : '');
+    echo "\n=== Resultado ===\n";
+    echo "<span class='fix'>✅ Corrigidas: $fixed</span>\n";
+    echo "<span class='ok'>✔️ Já estavam OK: $ok</span>\n";
+    if ($errors > 0) {
+        echo "<span class='error'>❌ Erros: $errors</span>\n";
+    }
     
 } catch (Exception $e) {
-    output("❌ ERRO FATAL: " . $e->getMessage(), 'error');
+    echo "<span class='error'>❌ ERRO: " . htmlspecialchars($e->getMessage()) . "</span>\n";
+    echo "<span class='error'>Trace: " . htmlspecialchars($e->getTraceAsString()) . "</span>\n";
 }
 
-if ($isWeb) {
-    echo '</pre>';
-    echo '<p><a href="view-conversation-debug.php" style="color:#58a6ff;">← Voltar ao Debug</a></p>';
-    echo '</body></html>';
-}
+echo '</pre>';
+echo '<p><a href="view-conversation-debug.php" style="color:#58a6ff;">← Voltar ao Debug</a></p>';
+echo '</body></html>';
 
 /**
  * Normalizar schema e retornar se precisa de correção
@@ -145,4 +155,3 @@ function normalizeSchema(array $schema, &$needsFix): array
     
     return $schema;
 }
-

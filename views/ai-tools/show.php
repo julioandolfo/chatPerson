@@ -121,31 +121,26 @@ ob_start();
                         </div>
                     </div>
                     
-                    <div class="mb-5">
-                        <label class="form-label fw-semibold">💬 Mensagem do Cliente (simulação)</label>
-                        <textarea class="form-control" id="test_client_message" rows="2" placeholder="Ex: Qual o preço do produto X?"></textarea>
-                        <div class="form-text">Simula a mensagem que o cliente enviaria. Será incluída nos dados enviados ao N8N.</div>
+                    <div class="row mb-5">
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold">💬 Mensagem do Cliente (simulação)</label>
+                            <textarea class="form-control" id="test_client_message" rows="2" placeholder="Ex: Qual o preço do produto X?"></textarea>
+                            <div class="form-text">Simula a mensagem que o cliente enviaria.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">🔑 ID da Conversa</label>
+                            <input type="text" class="form-control" id="test_conversation_id" value="test-conv-12345" placeholder="ID único da conversa">
+                            <div class="form-text">Para memória do agente no N8N</div>
+                        </div>
                     </div>
                     
                     <div class="separator separator-dashed my-5"></div>
                     <!--end::Simulação de Mensagem-->
                     
-                    <div class="row mb-5">
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Webhook ID</label>
-                            <input type="text" class="form-control" id="test_webhook_id" placeholder="Deixe vazio para usar o padrão">
-                            <div class="form-text">ID do webhook ou URL completa</div>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Método HTTP</label>
-                            <select class="form-select" id="test_method">
-                                <option value="GET">GET</option>
-                                <option value="POST" selected>POST</option>
-                                <option value="PUT">PUT</option>
-                                <option value="DELETE">DELETE</option>
-                                <option value="PATCH">PATCH</option>
-                            </select>
-                        </div>
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold">Webhook ID</label>
+                        <input type="text" class="form-control" id="test_webhook_id" placeholder="Deixe vazio para usar o padrão">
+                        <div class="form-text">ID do webhook ou URL completa. Método: <strong>POST</strong> (igual à execução real)</div>
                     </div>
                     
                     <div class="mb-5">
@@ -155,12 +150,7 @@ ob_start();
                     </div>
                     
                     <div class="mb-5">
-                        <label class="form-label fw-semibold">Query Params (JSON) - Para GET</label>
-                        <textarea class="form-control" id="test_query_params" rows="3" placeholder="{&quot;param&quot;: &quot;value&quot;}"></textarea>
-                    </div>
-                    
-                    <div class="mb-5">
-                        <label class="form-label fw-semibold">Headers Customizados (JSON)</label>
+                        <label class="form-label fw-semibold">Headers Customizados (JSON) - Opcional</label>
                         <textarea class="form-control" id="test_headers" rows="3" placeholder="{&quot;X-Custom-Header&quot;: &quot;value&quot;}"></textarea>
                     </div>
                     
@@ -360,7 +350,7 @@ const toolTypeConfigs = {
             { name: "timeout", label: "Timeout (segundos)", type: "number", required: false, placeholder: "60", default: "60" },
             { name: "custom_headers", label: "Headers Customizados (JSON)", type: "textarea", required: false, placeholder: "{\"X-Custom-Header\": \"value\"}" },
             { name: "use_raw_response", label: "Usar resposta direta (não reenviar para OpenAI)", type: "checkbox", required: false, default: false, help: "Se ativo, a resposta do N8N será enviada diretamente ao cliente sem processamento adicional da IA" },
-            { name: "raw_response_field", label: "Campo da resposta direta", type: "text", required: false, placeholder: "message", default: "message", help: "Nome do campo JSON que contém a mensagem a enviar (ex: message, response, text)" }
+            { name: "raw_response_field", label: "Campo da resposta direta", type: "text", required: false, placeholder: "output", default: "output", help: "Campo JSON com a mensagem. Suporta: output, message, data.message. Arrays são tratados automaticamente." }
         ]
     },
     api: {
@@ -692,10 +682,11 @@ function toggleN8NTestPanel() {
 function executeN8NTest() {
     const toolId = __TOOL_ID__;
     const webhookId = document.getElementById("test_webhook_id").value.trim();
-    const method = document.getElementById("test_method").value;
+    const method = "POST"; // Sempre POST, igual à execução real
     const clientMessage = document.getElementById("test_client_message").value.trim();
+    const conversationId = document.getElementById("test_conversation_id").value.trim() || "test-conv-" + Date.now();
     const dataStr = document.getElementById("test_data").value.trim();
-    const queryParamsStr = document.getElementById("test_query_params").value.trim();
+    const queryParamsStr = ""; // Não usado em POST
     const headersStr = document.getElementById("test_headers").value.trim();
     
     const executeBtn = document.getElementById("btn_execute_test");
@@ -706,6 +697,11 @@ function executeN8NTest() {
     let data = {};
     let queryParams = {};
     let headers = {};
+    
+    // Incluir ID da conversa (para memória do agente no N8N)
+    data.conversation_id = conversationId;
+    data.session_id = conversationId;
+    data.thread_id = conversationId;
     
     // Incluir mensagem do cliente nos dados
     if (clientMessage) {

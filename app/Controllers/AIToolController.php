@@ -240,10 +240,46 @@ class AIToolController
             
             $data = Request::post();
             $webhookId = $data['webhook_id'] ?? null;
-            $method = strtoupper($data['method'] ?? 'POST');
+            $method = 'POST'; // Sempre POST, igual à execução real
             $requestData = $data['data'] ?? [];
             $queryParams = $data['query_params'] ?? [];
             $headers = $data['headers'] ?? [];
+            
+            // Simular o formato exato que a IA envia em produção
+            // A IA envia os argumentos + metadados da conversa
+            $simulatedPayload = [
+                // Metadados da conversa (sempre presentes)
+                'conversation_id' => $requestData['conversation_id'] ?? 'test-' . time(),
+                'session_id' => $requestData['session_id'] ?? $requestData['conversation_id'] ?? 'test-' . time(),
+                'thread_id' => $requestData['thread_id'] ?? $requestData['conversation_id'] ?? 'test-' . time(),
+            ];
+            
+            // Adicionar mensagem se fornecida
+            if (!empty($requestData['message'])) {
+                $simulatedPayload['message'] = $requestData['message'];
+            }
+            if (!empty($requestData['client_message'])) {
+                $simulatedPayload['client_message'] = $requestData['client_message'];
+            }
+            if (!empty($requestData['text'])) {
+                $simulatedPayload['text'] = $requestData['text'];
+            }
+            
+            // Adicionar dados do contato simulado
+            $simulatedPayload['contact'] = [
+                'name' => 'Cliente Teste',
+                'email' => 'teste@exemplo.com',
+                'phone' => '11999999999'
+            ];
+            
+            // Mesclar com dados adicionais (argumentos extras da função)
+            foreach ($requestData as $key => $value) {
+                if (!isset($simulatedPayload[$key])) {
+                    $simulatedPayload[$key] = $value;
+                }
+            }
+            
+            $requestData = $simulatedPayload;
             
             // Obter configuração da tool
             $config = is_string($tool['config']) 

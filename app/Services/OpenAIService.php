@@ -542,7 +542,7 @@ class OpenAIService
                 return self::executeDatabaseTool($tool, $arguments, $config);
             
             case 'n8n':
-                return self::executeN8NTool($tool, $arguments, $config);
+                return self::executeN8NTool($tool, $arguments, $config, $conversationId, $context);
             
             case 'api':
                 return self::executeAPITool($tool, $arguments, $config);
@@ -958,7 +958,7 @@ class OpenAIService
     /**
      * Executar N8N Tools (integração com N8N workflows)
      */
-    private static function executeN8NTool(array $tool, array $arguments, array $config): array
+    private static function executeN8NTool(array $tool, array $arguments, array $config, int $conversationId = 0, array $context = []): array
     {
         $functionName = $tool['name'] ?? '';
         $n8nUrl = $config['n8n_url'] ?? null;
@@ -984,6 +984,18 @@ class OpenAIService
         
         if (!$workflowId) {
             return ['error' => 'ID do webhook não configurado'];
+        }
+        
+        // Adicionar ID da conversa e contexto aos argumentos (para memória do agente no N8N)
+        if ($conversationId > 0) {
+            $arguments['conversation_id'] = $conversationId;
+            $arguments['session_id'] = (string)$conversationId;
+            $arguments['thread_id'] = (string)$conversationId;
+        }
+        
+        // Adicionar informações do contato se disponíveis
+        if (!empty($context['contact'])) {
+            $arguments['contact'] = $context['contact'];
         }
         
         // Construir URL do webhook
@@ -1043,35 +1055,96 @@ class OpenAIService
         
         // Se use_raw_response está ativo, extrair a mensagem direta do N8N
         if ($useRawResponse && $result['success']) {
-            // Tentar extrair a mensagem do campo configurado
-            $rawMessage = null;
-            
-            // Verificar campos possíveis em ordem de prioridade
-            $fieldsToTry = [$rawResponseField, 'message', 'response', 'text', 'content', 'reply'];
-            
-            foreach ($fieldsToTry as $field) {
-                if (isset($responseData[$field]) && is_string($responseData[$field]) && !empty($responseData[$field])) {
-                    $rawMessage = $responseData[$field];
-                    break;
-                }
-            }
-            
-            // Se a resposta é uma string direta, usar
-            if ($rawMessage === null && is_string($response) && !empty(trim($response))) {
-                $decoded = json_decode($response, true);
-                if ($decoded === null) {
-                    // Não é JSON, usar a string direta
-                    $rawMessage = trim($response);
-                }
-            }
+            $rawMessage = self::extractN8NMessage($responseData, $response, $rawResponseField);
             
             if ($rawMessage !== null) {
                 $result['use_raw_response'] = true;
                 $result['raw_message'] = $rawMessage;
+                $result['extracted_from'] = $rawResponseField;
             }
         }
         
         return $result;
+    }
+
+    /**
+     * Extrair mensagem da resposta do N8N
+     * Lida com diferentes formatos: arrays, objetos, campos aninhados
+     */
+    private static function extractN8NMessage($responseData, string $rawResponse, string $configuredField): ?string
+    {
+        // Se responseData é null, tentar parsear rawResponse
+        if ($responseData === null) {
+            $responseData = json_decode($rawResponse, true);
+        }
+        
+        // Campos a tentar, começando pelo configurado
+        $fieldsToTry = array_unique(array_filter([
+            $configuredField, 
+            'output', 
+            'message', 
+            'response', 
+            'text', 
+            'content', 
+            'reply',
+            'answer',
+            'result'
+        ]));
+        
+        // Se a resposta é um array indexado (ex: [{...}]), pegar o primeiro elemento
+        if (is_array($responseData) && isset($responseData[0]) && is_array($responseData[0])) {
+            $responseData = $responseData[0];
+        }
+        
+        // Tentar extrair de cada campo
+        foreach ($fieldsToTry as $field) {
+            // Suporta notação com ponto para campos aninhados (ex: "data.message")
+            $value = self::getNestedValue($responseData, $field);
+            
+            if ($value !== null && is_string($value) && !empty(trim($value))) {
+                return trim($value);
+            }
+        }
+        
+        // Se a resposta bruta é uma string simples (não JSON), usar diretamente
+        if (is_string($rawResponse) && !empty(trim($rawResponse))) {
+            $decoded = json_decode($rawResponse, true);
+            if ($decoded === null && json_last_error() !== JSON_ERROR_NONE) {
+                // Não é JSON válido, usar a string direta
+                return trim($rawResponse);
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * Obter valor aninhado de um array usando notação de ponto
+     * Ex: getNestedValue($data, "data.user.name")
+     */
+    private static function getNestedValue($data, string $path)
+    {
+        if (!is_array($data)) {
+            return null;
+        }
+        
+        // Primeiro tentar acesso direto
+        if (isset($data[$path])) {
+            return $data[$path];
+        }
+        
+        // Tentar notação com ponto
+        $keys = explode('.', $path);
+        $value = $data;
+        
+        foreach ($keys as $key) {
+            if (!is_array($value) || !isset($value[$key])) {
+                return null;
+            }
+            $value = $value[$key];
+        }
+        
+        return $value;
     }
 
     /**

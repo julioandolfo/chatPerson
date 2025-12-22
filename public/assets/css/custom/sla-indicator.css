@@ -9,6 +9,9 @@
     width: 45px;
     height: 45px;
     display: inline-block;
+    contain: paint; /* evita que o stroke "pinte" fora do avatar */
+    isolation: isolate; /* cria stacking context isolado do card */
+    overflow: visible; /* mantém o stroke visível dentro do avatar */
 }
 
 .sla-progress-ring {

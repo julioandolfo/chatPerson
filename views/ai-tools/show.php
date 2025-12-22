@@ -91,6 +91,76 @@ ob_start();
             </div>
         </div>
         <?php endif; ?>
+        
+        <?php if ($tool['tool_type'] === 'n8n'): ?>
+        <!--begin::Seção de Teste N8N-->
+        <div class="mb-5">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <label class="fw-semibold fs-6 mb-0">Testar Webhook N8N</label>
+                <button type="button" class="btn btn-sm btn-primary" id="btn_test_n8n">
+                    <i class="ki-duotone ki-play fs-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Testar Disparo
+                </button>
+            </div>
+            
+            <div class="card bg-light" id="n8n_test_panel" style="display: none;">
+                <div class="card-body">
+                    <div class="row mb-5">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Webhook ID</label>
+                            <input type="text" class="form-control" id="test_webhook_id" placeholder="Deixe vazio para usar o padrão">
+                            <div class="form-text">ID do webhook ou URL completa</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Método HTTP</label>
+                            <select class="form-select" id="test_method">
+                                <option value="GET">GET</option>
+                                <option value="POST" selected>POST</option>
+                                <option value="PUT">PUT</option>
+                                <option value="DELETE">DELETE</option>
+                                <option value="PATCH">PATCH</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold">Dados (JSON) - Para POST, PUT, PATCH</label>
+                        <textarea class="form-control" id="test_data" rows="5" placeholder='{"key": "value"}'></textarea>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold">Query Params (JSON) - Para GET</label>
+                        <textarea class="form-control" id="test_query_params" rows="3" placeholder='{"param": "value"}'></textarea>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold">Headers Customizados (JSON)</label>
+                        <textarea class="form-control" id="test_headers" rows="3" placeholder='{"X-Custom-Header": "value"}'></textarea>
+                    </div>
+                    
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-light me-2" id="btn_cancel_test">Cancelar</button>
+                        <button type="button" class="btn btn-primary" id="btn_execute_test">
+                            <span class="indicator-label">Executar Teste</span>
+                            <span class="indicator-progress">Aguardando...
+                                <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                            </span>
+                        </button>
+                    </div>
+                    
+                    <div id="test_result" class="mt-5" style="display: none;">
+                        <div class="separator separator-dashed mb-5"></div>
+                        <h5 class="fw-semibold mb-3">Resultado do Teste</h5>
+                        <div id="test_result_content"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!--end::Seção de Teste N8N-->
+        <?php endif; ?>
     </div>
 </div>
 <!--end::Card-->
@@ -527,6 +597,139 @@ function populateEditFields() {
     }
 }
 
+// Funções para teste N8N
+function toggleN8NTestPanel() {
+    const panel = document.getElementById("n8n_test_panel");
+    if (panel) {
+        panel.style.display = panel.style.display === "none" ? "block" : "none";
+    }
+}
+
+function executeN8NTest() {
+    const toolId = ' . ($tool['id'] ?? 0) . ';
+    const webhookId = document.getElementById("test_webhook_id").value.trim();
+    const method = document.getElementById("test_method").value;
+    const dataStr = document.getElementById("test_data").value.trim();
+    const queryParamsStr = document.getElementById("test_query_params").value.trim();
+    const headersStr = document.getElementById("test_headers").value.trim();
+    
+    const executeBtn = document.getElementById("btn_execute_test");
+    const resultDiv = document.getElementById("test_result");
+    const resultContent = document.getElementById("test_result_content");
+    
+    // Validar e parsear JSONs
+    let data = {};
+    let queryParams = {};
+    let headers = {};
+    
+    try {
+        if (dataStr) {
+            data = JSON.parse(dataStr);
+        }
+    } catch (e) {
+        alert("Erro: Dados inválidos (não é um JSON válido)");
+        return;
+    }
+    
+    try {
+        if (queryParamsStr) {
+            queryParams = JSON.parse(queryParamsStr);
+        }
+    } catch (e) {
+        alert("Erro: Query Params inválidos (não é um JSON válido)");
+        return;
+    }
+    
+    try {
+        if (headersStr) {
+            headers = JSON.parse(headersStr);
+        }
+    } catch (e) {
+        alert("Erro: Headers inválidos (não é um JSON válido)");
+        return;
+    }
+    
+    // Preparar requisição
+    executeBtn.setAttribute("data-kt-indicator", "on");
+    executeBtn.disabled = true;
+    resultDiv.style.display = "none";
+    
+    fetch("' . \App\Helpers\Url::to('/ai-tools') . '/" + toolId + "/test-n8n", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            webhook_id: webhookId || null,
+            method: method,
+            data: data,
+            query_params: queryParams,
+            headers: headers
+        })
+    })
+    .then(response => response.json())
+    .then(result => {
+        executeBtn.removeAttribute("data-kt-indicator");
+        executeBtn.disabled = false;
+        
+        resultDiv.style.display = "block";
+        
+        let html = `
+            <div class="card ${result.success ? 'bg-light-success' : 'bg-light-danger'}">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <i class="ki-duotone ${result.success ? 'ki-check-circle' : 'ki-cross-circle'} fs-2x ${result.success ? 'text-success' : 'text-danger'} me-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        <div>
+                            <h5 class="mb-0">${result.success ? 'Sucesso!' : 'Erro'}</h5>
+                            <div class="text-muted">HTTP ${result.http_code || 'N/A'}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>URL:</strong> <code>${result.url || 'N/A'}</code><br>
+                        <strong>Método:</strong> <code>${result.method || 'N/A'}</code><br>
+                        ${result.curl_info ? `<strong>Tempo:</strong> ${(result.curl_info.total_time * 1000).toFixed(2)}ms<br>` : ''}
+                        ${result.curl_info ? `<strong>Tamanho:</strong> ${(result.curl_info.size_download / 1024).toFixed(2)} KB` : ''}
+                    </div>
+                    
+                    ${result.request ? `
+                    <div class="mb-3">
+                        <strong>Requisição Enviada:</strong>
+                        <pre class="bg-white p-3 rounded mt-2" style="max-height: 200px; overflow-y: auto;">${JSON.stringify(result.request, null, 2)}</pre>
+                    </div>
+                    ` : ''}
+                    
+                    <div>
+                        <strong>Resposta:</strong>
+                        <pre class="bg-white p-3 rounded mt-2" style="max-height: 400px; overflow-y: auto;">${JSON.stringify(result.response || result, null, 2)}</pre>
+                    </div>
+                    
+                    ${result.message ? `<div class="alert alert-${result.success ? 'success' : 'danger'} mt-3">${result.message}</div>` : ''}
+                </div>
+            </div>
+        `;
+        
+        resultContent.innerHTML = html;
+        
+        // Scroll para resultado
+        resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    })
+    .catch(error => {
+        executeBtn.removeAttribute("data-kt-indicator");
+        executeBtn.disabled = false;
+        
+        resultDiv.style.display = "block";
+        resultContent.innerHTML = `
+            <div class="alert alert-danger">
+                <strong>Erro:</strong> ${error.message || 'Erro ao executar teste'}
+            </div>
+        `;
+    });
+}
+
 document.addEventListener("DOMContentLoaded", function() {
     // Preencher campos quando modal de edição for aberto
     const editModal = document.getElementById("kt_modal_edit_ai_tool");
@@ -538,6 +741,25 @@ document.addEventListener("DOMContentLoaded", function() {
     const toolTypeSelect = document.getElementById("kt_edit_tool_type");
     if (toolTypeSelect) {
         toolTypeSelect.addEventListener("change", updateEditConfigFields);
+    }
+    
+    // Event listeners para teste N8N
+    const btnTestN8N = document.getElementById("btn_test_n8n");
+    if (btnTestN8N) {
+        btnTestN8N.addEventListener("click", toggleN8NTestPanel);
+    }
+    
+    const btnCancelTest = document.getElementById("btn_cancel_test");
+    if (btnCancelTest) {
+        btnCancelTest.addEventListener("click", function() {
+            document.getElementById("n8n_test_panel").style.display = "none";
+            document.getElementById("test_result").style.display = "none";
+        });
+    }
+    
+    const btnExecuteTest = document.getElementById("btn_execute_test");
+    if (btnExecuteTest) {
+        btnExecuteTest.addEventListener("click", executeN8NTest);
     }
     
     const form = document.getElementById("kt_modal_edit_ai_tool_form");

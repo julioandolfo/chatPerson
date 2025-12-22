@@ -212,5 +212,167 @@ class AIToolController
             ], 500);
         }
     }
+
+    /**
+     * Testar webhook N8N
+     */
+    public function testN8N(int $id): void
+    {
+        Permission::abortIfCannot('ai_tools.view');
+        
+        try {
+            $tool = AIToolService::get($id);
+            if (!$tool) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Tool não encontrada'
+                ], 404);
+                return;
+            }
+            
+            if ($tool['tool_type'] !== 'n8n') {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Esta funcionalidade é apenas para tools do tipo N8N'
+                ], 400);
+                return;
+            }
+            
+            $data = Request::post();
+            $webhookId = $data['webhook_id'] ?? null;
+            $method = strtoupper($data['method'] ?? 'POST');
+            $requestData = $data['data'] ?? [];
+            $queryParams = $data['query_params'] ?? [];
+            $headers = $data['headers'] ?? [];
+            
+            // Obter configuração da tool
+            $config = is_string($tool['config']) 
+                ? json_decode($tool['config'], true) 
+                : ($tool['config'] ?? []);
+            
+            $n8nUrl = $config['n8n_url'] ?? null;
+            $defaultWebhookId = $config['webhook_id'] ?? null;
+            $webhookPath = $config['webhook_path'] ?? '/webhook';
+            $apiKey = $config['api_key'] ?? null;
+            $timeout = (int)($config['timeout'] ?? 60);
+            $customHeaders = $config['custom_headers'] ?? [];
+            
+            if (!$n8nUrl) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'URL do N8N não configurada na tool'
+                ], 400);
+                return;
+            }
+            
+            $finalWebhookId = $webhookId ?? $defaultWebhookId;
+            if (!$finalWebhookId) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'ID do webhook não fornecido e não configurado na tool'
+                ], 400);
+                return;
+            }
+            
+            // Construir URL
+            if (filter_var($finalWebhookId, FILTER_VALIDATE_URL)) {
+                $webhookUrl = $finalWebhookId;
+            } else {
+                $webhookUrl = rtrim($n8nUrl, '/') . rtrim($webhookPath, '/') . '/' . ltrim($finalWebhookId, '/');
+            }
+            
+            // Adicionar query params se método for GET
+            if ($method === 'GET' && !empty($queryParams)) {
+                $separator = strpos($webhookUrl, '?') !== false ? '&' : '?';
+                $webhookUrl .= $separator . http_build_query($queryParams);
+            }
+            
+            // Preparar headers
+            $requestHeaders = [];
+            
+            if (in_array($method, ['POST', 'PUT', 'PATCH'])) {
+                $requestHeaders[] = 'Content-Type: application/json';
+            }
+            
+            if ($apiKey) {
+                $requestHeaders[] = 'X-N8N-API-KEY: ' . $apiKey;
+            }
+            
+            foreach ($customHeaders as $key => $value) {
+                $requestHeaders[] = $key . ': ' . $value;
+            }
+            
+            foreach ($headers as $key => $value) {
+                $requestHeaders[] = $key . ': ' . $value;
+            }
+            
+            // Fazer requisição
+            $ch = curl_init($webhookUrl);
+            
+            $curlOptions = [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CUSTOMREQUEST => $method,
+                CURLOPT_HTTPHEADER => $requestHeaders,
+                CURLOPT_TIMEOUT => $timeout,
+                CURLOPT_CONNECTTIMEOUT => 10,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_MAXREDIRS => 5
+            ];
+            
+            if (in_array($method, ['POST', 'PUT', 'PATCH']) && !empty($requestData)) {
+                $curlOptions[CURLOPT_POSTFIELDS] = json_encode($requestData, JSON_UNESCAPED_UNICODE);
+            }
+            
+            curl_setopt_array($ch, $curlOptions);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            $curlInfo = curl_getinfo($ch);
+            curl_close($ch);
+            
+            if ($error) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro de conexão: ' . $error,
+                    'url' => $webhookUrl,
+                    'method' => $method
+                ], 500);
+                return;
+            }
+            
+            // Tentar decodificar JSON
+            $responseData = json_decode($response, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $responseData = [
+                    'raw_response' => $response,
+                    'content_type' => 'text/plain'
+                ];
+            }
+            
+            Response::json([
+                'success' => $httpCode >= 200 && $httpCode < 300,
+                'http_code' => $httpCode,
+                'url' => $webhookUrl,
+                'method' => $method,
+                'request' => [
+                    'data' => $requestData,
+                    'query_params' => $queryParams,
+                    'headers' => $requestHeaders
+                ],
+                'response' => $responseData,
+                'curl_info' => [
+                    'total_time' => $curlInfo['total_time'] ?? 0,
+                    'size_download' => $curlInfo['size_download'] ?? 0
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
 

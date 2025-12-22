@@ -108,6 +108,28 @@ ob_start();
             
             <div class="card bg-light" id="n8n_test_panel" style="display: none;">
                 <div class="card-body">
+                    <!--begin::Simulação de Mensagem-->
+                    <div class="alert alert-info d-flex align-items-center mb-5">
+                        <i class="ki-duotone ki-information-5 fs-2hx text-info me-4">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div class="d-flex flex-column">
+                            <h4 class="mb-1 text-info">Simulação de Conversa</h4>
+                            <span>Preencha a mensagem do cliente para simular como a IA enviaria para o N8N</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold">💬 Mensagem do Cliente (simulação)</label>
+                        <textarea class="form-control" id="test_client_message" rows="2" placeholder="Ex: Qual o preço do produto X?"></textarea>
+                        <div class="form-text">Simula a mensagem que o cliente enviaria. Será incluída nos dados enviados ao N8N.</div>
+                    </div>
+                    
+                    <div class="separator separator-dashed my-5"></div>
+                    <!--end::Simulação de Mensagem-->
+                    
                     <div class="row mb-5">
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Webhook ID</label>
@@ -127,8 +149,9 @@ ob_start();
                     </div>
                     
                     <div class="mb-5">
-                        <label class="form-label fw-semibold">Dados (JSON) - Para POST, PUT, PATCH</label>
-                        <textarea class="form-control" id="test_data" rows="5" placeholder="{&quot;key&quot;: &quot;value&quot;}"></textarea>
+                        <label class="form-label fw-semibold">Dados Adicionais (JSON) - Opcional</label>
+                        <textarea class="form-control" id="test_data" rows="4" placeholder="{&quot;produto&quot;: &quot;caneta azul&quot;, &quot;loja&quot;: &quot;matriz&quot;}"></textarea>
+                        <div class="form-text">Dados extras que seriam passados pela IA como argumentos da função</div>
                     </div>
                     
                     <div class="mb-5">
@@ -670,6 +693,7 @@ function executeN8NTest() {
     const toolId = __TOOL_ID__;
     const webhookId = document.getElementById("test_webhook_id").value.trim();
     const method = document.getElementById("test_method").value;
+    const clientMessage = document.getElementById("test_client_message").value.trim();
     const dataStr = document.getElementById("test_data").value.trim();
     const queryParamsStr = document.getElementById("test_query_params").value.trim();
     const headersStr = document.getElementById("test_headers").value.trim();
@@ -683,9 +707,18 @@ function executeN8NTest() {
     let queryParams = {};
     let headers = {};
     
+    // Incluir mensagem do cliente nos dados
+    if (clientMessage) {
+        data.message = clientMessage;
+        data.client_message = clientMessage;
+        data.text = clientMessage;
+    }
+    
     try {
         if (dataStr) {
-            data = JSON.parse(dataStr);
+            // Mesclar dados adicionais com a mensagem
+            const additionalData = JSON.parse(dataStr);
+            data = { ...data, ...additionalData };
         }
     } catch (e) {
         alert("Erro: Dados inválidos (não é um JSON válido)");

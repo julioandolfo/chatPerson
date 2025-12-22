@@ -334,9 +334,10 @@ const toolTypeConfigs = {
             { name: "webhook_id", label: "ID do Webhook Padrão", type: "text", required: false, placeholder: "abc123" },
             { name: "webhook_path", label: "Caminho do Webhook", type: "text", required: false, placeholder: "/webhook", default: "/webhook" },
             { name: "api_key", label: "API Key do N8N", type: "text", required: false, placeholder: "opcional" },
-            { name: "default_method", label: "Método HTTP Padrão", type: "select", required: false, options: ["GET", "POST", "PUT", "DELETE", "PATCH"], default: "POST" },
             { name: "timeout", label: "Timeout (segundos)", type: "number", required: false, placeholder: "60", default: "60" },
-            { name: "custom_headers", label: "Headers Customizados (JSON)", type: "textarea", required: false, placeholder: "{\"X-Custom-Header\": \"value\"}" }
+            { name: "custom_headers", label: "Headers Customizados (JSON)", type: "textarea", required: false, placeholder: "{\"X-Custom-Header\": \"value\"}" },
+            { name: "use_raw_response", label: "Usar resposta direta (não reenviar para OpenAI)", type: "checkbox", required: false, default: false, help: "Se ativo, a resposta do N8N será enviada diretamente ao cliente sem processamento adicional da IA" },
+            { name: "raw_response_field", label: "Campo da resposta direta", type: "text", required: false, placeholder: "message", default: "message", help: "Nome do campo JSON que contém a mensagem a enviar (ex: message, response, text)" }
         ]
     },
     api: {
@@ -459,7 +460,19 @@ function updateEditConfigFields() {
         fieldDiv.className = "fv-row mb-5";
         
         let inputHtml = "";
-        if (field.type === "select") {
+        let labelHtml = "";
+        
+        if (field.type === "checkbox") {
+            // Checkbox com label inline
+            inputHtml = `
+                <div class="form-check form-switch">
+                    <input type="checkbox" class="form-check-input config-field" data-field="${field.name}" id="edit_config_${field.name}" ${field.default ? "checked" : ""} />
+                    <label class="form-check-label fw-semibold fs-7" for="edit_config_${field.name}">${field.label}</label>
+                </div>
+                ${field.help ? `<div class="form-text text-muted">${field.help}</div>` : ""}
+            `;
+            fieldDiv.innerHTML = inputHtml;
+        } else if (field.type === "select") {
             inputHtml = `<select class="form-control form-control-solid config-field" data-field="${field.name}" ${field.required ? "required" : ""}>`;
             if (field.options) {
                 field.options.forEach(opt => {
@@ -467,16 +480,17 @@ function updateEditConfigFields() {
                 });
             }
             inputHtml += `</select>`;
+            labelHtml = `<label class="fw-semibold fs-7 mb-2">${field.label}${field.required ? " <span class=\"text-danger\">*</span>" : ""}</label>`;
+            fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
         } else if (field.type === "textarea") {
             inputHtml = `<textarea class="form-control form-control-solid config-field" data-field="${field.name}" rows="3" ${field.required ? "required" : ""} placeholder="${field.placeholder || ""}"></textarea>`;
+            labelHtml = `<label class="fw-semibold fs-7 mb-2">${field.label}${field.required ? " <span class=\"text-danger\">*</span>" : ""}</label>`;
+            fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
         } else {
             inputHtml = `<input type="${field.type}" class="form-control form-control-solid config-field" data-field="${field.name}" ${field.required ? "required" : ""} placeholder="${field.placeholder || ""}" value="${field.default || ""}" />`;
+            labelHtml = `<label class="fw-semibold fs-7 mb-2">${field.label}${field.required ? " <span class=\"text-danger\">*</span>" : ""}</label>`;
+            fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
         }
-        
-        fieldDiv.innerHTML = `
-            <label class="fw-semibold fs-7 mb-2">${field.label}${field.required ? " <span class=\"text-danger\">*</span>" : ""}</label>
-            ${inputHtml}
-        `;
         
         configFields.appendChild(fieldDiv);
         console.log(`Campo ${field.name} adicionado`);
@@ -541,12 +555,20 @@ function buildEditConfig() {
     
     document.querySelectorAll("#kt_edit_config_fields .config-field").forEach(field => {
         const fieldName = field.dataset.field;
+        
+        // Tratar checkbox separadamente
+        if (field.type === "checkbox") {
+            config[fieldName] = field.checked;
+            if (field.checked) hasConfig = true;
+            return;
+        }
+        
         const value = field.value.trim();
         
         if (value) {
             if (field.type === "number") {
                 config[fieldName] = value ? parseFloat(value) : null;
-            } else if (field.tagName === "TEXTAREA" && fieldName === "headers") {
+            } else if (field.tagName === "TEXTAREA" && (fieldName === "headers" || fieldName === "custom_headers")) {
                 try {
                     config[fieldName] = JSON.parse(value);
                 } catch (e) {
@@ -612,7 +634,10 @@ function populateEditFields() {
                     const field = document.querySelector(`#kt_edit_config_fields .config-field[data-field="${key}"]`);
                     console.log(`Campo ${key}:`, field, "Valor:", config[key]);
                     if (field) {
-                        if (field.tagName === "TEXTAREA" && typeof config[key] === "object") {
+                        // Tratar checkbox separadamente
+                        if (field.type === "checkbox") {
+                            field.checked = !!config[key];
+                        } else if (field.tagName === "TEXTAREA" && typeof config[key] === "object") {
                             field.value = JSON.stringify(config[key], null, 2);
                         } else if (field.tagName === "TEXTAREA" && typeof config[key] === "string") {
                             // Se já é string, usar direto

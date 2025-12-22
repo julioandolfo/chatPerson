@@ -121,30 +121,46 @@ class OpenAIService
             if (!empty($toolCalls)) {
                 $functionResults = self::executeToolCalls($toolCalls, $conversationId, $agentId, $context);
                 
-                // Adicionar mensagem do assistente com tool calls
-                $messages[] = $assistantMessage;
-                
-                // Adicionar resultados das tools
+                // Verificar se alguma tool retornou resposta direta (use_raw_response)
+                $directResponse = null;
                 foreach ($functionResults as $result) {
-                    $messages[] = [
-                        'role' => 'tool',
-                        'tool_call_id' => $result['tool_call_id'],
-                        'content' => json_encode($result['result'], JSON_UNESCAPED_UNICODE)
-                    ];
+                    if (!empty($result['use_raw_response']) && !empty($result['raw_message'])) {
+                        $directResponse = $result['raw_message'];
+                        break;
+                    }
                 }
+                
+                // Se há resposta direta, usar sem reenviar para OpenAI
+                if ($directResponse !== null) {
+                    $content = $directResponse;
+                    // Não contabilizar tokens adicionais da OpenAI
+                } else {
+                    // Fluxo normal: reenviar para OpenAI com resultados
+                    // Adicionar mensagem do assistente com tool calls
+                    $messages[] = $assistantMessage;
+                    
+                    // Adicionar resultados das tools
+                    foreach ($functionResults as $result) {
+                        $messages[] = [
+                            'role' => 'tool',
+                            'tool_call_id' => $result['tool_call_id'],
+                            'content' => json_encode($result['result'], JSON_UNESCAPED_UNICODE)
+                        ];
+                    }
 
-                // Reenviar para OpenAI com resultados
-                $payload['messages'] = $messages;
-                $response = self::makeRequest($apiKey, $payload);
-                
-                $assistantMessage = $response['choices'][0]['message'] ?? null;
-                $content = $assistantMessage['content'] ?? '';
-                
-                // Adicionar tokens adicionais
-                $usage = $response['usage'] ?? [];
-                $tokensUsed += $usage['total_tokens'] ?? 0;
-                $tokensPrompt += $usage['prompt_tokens'] ?? 0;
-                $tokensCompletion += $usage['completion_tokens'] ?? 0;
+                    // Reenviar para OpenAI com resultados
+                    $payload['messages'] = $messages;
+                    $response = self::makeRequest($apiKey, $payload);
+                    
+                    $assistantMessage = $response['choices'][0]['message'] ?? null;
+                    $content = $assistantMessage['content'] ?? '';
+                    
+                    // Adicionar tokens adicionais
+                    $usage = $response['usage'] ?? [];
+                    $tokensUsed += $usage['total_tokens'] ?? 0;
+                    $tokensPrompt += $usage['prompt_tokens'] ?? 0;
+                    $tokensCompletion += $usage['completion_tokens'] ?? 0;
+                }
             }
 
             // Calcular tokens e custo
@@ -947,117 +963,115 @@ class OpenAIService
         $functionName = $tool['name'] ?? '';
         $n8nUrl = $config['n8n_url'] ?? null;
         $webhookId = $config['webhook_id'] ?? null;
+        $webhookPath = $config['webhook_path'] ?? '/webhook';
         $apiKey = $config['api_key'] ?? null;
+        $useRawResponse = !empty($config['use_raw_response']);
+        $rawResponseField = $config['raw_response_field'] ?? 'message';
+        $timeout = (int)($config['timeout'] ?? 60);
         
         if (!$n8nUrl) {
             return ['error' => 'URL do N8N não configurada'];
         }
         
-        switch ($functionName) {
-            case 'executar_workflow_n8n':
-                $workflowId = $arguments['workflow_id'] ?? $webhookId;
-                $data = $arguments['data'] ?? [];
-                
-                if (!$workflowId) {
-                    return ['error' => 'ID do workflow não fornecido'];
-                }
-                
-                // Construir URL do webhook
-                $webhookUrl = rtrim($n8nUrl, '/') . '/webhook/' . $workflowId;
-                
-                // Preparar headers
-                $headers = [
-                    'Content-Type: application/json'
-                ];
-                
-                if ($apiKey) {
-                    $headers[] = 'X-N8N-API-KEY: ' . $apiKey;
-                }
-                
-                // Fazer requisição POST ao webhook
-                $ch = curl_init($webhookUrl);
-                curl_setopt_array($ch, [
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_POST => true,
-                    CURLOPT_POSTFIELDS => json_encode($data),
-                    CURLOPT_HTTPHEADER => $headers,
-                    CURLOPT_TIMEOUT => 60, // N8N pode demorar mais
-                    CURLOPT_CONNECTTIMEOUT => 10
-                ]);
-                
-                $response = curl_exec($ch);
-                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                $error = curl_error($ch);
-                curl_close($ch);
-                
-                if ($error) {
-                    return ['error' => 'Erro ao executar workflow N8N: ' . $error];
-                }
-                
-                $responseData = json_decode($response, true);
-                if (json_last_error() !== JSON_ERROR_NONE) {
-                    $responseData = ['raw_response' => $response];
-                }
-                
-                return [
-                    'success' => $httpCode >= 200 && $httpCode < 300,
-                    'http_code' => $httpCode,
-                    'workflow_id' => $workflowId,
-                    'response' => $responseData
-                ];
-            
-            case 'buscar_dados_n8n':
-                $endpoint = $arguments['endpoint'] ?? null;
-                $queryParams = $arguments['query_params'] ?? [];
-                
-                if (!$endpoint) {
-                    return ['error' => 'Endpoint não fornecido'];
-                }
-                
-                // Construir URL
-                $url = rtrim($n8nUrl, '/') . '/api/v1/' . ltrim($endpoint, '/');
-                if (!empty($queryParams)) {
-                    $url .= '?' . http_build_query($queryParams);
-                }
-                
-                // Preparar headers
-                $headers = [];
-                if ($apiKey) {
-                    $headers[] = 'X-N8N-API-KEY: ' . $apiKey;
-                }
-                
-                // Fazer requisição GET
-                $ch = curl_init($url);
-                curl_setopt_array($ch, [
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_HTTPHEADER => $headers,
-                    CURLOPT_TIMEOUT => 30,
-                    CURLOPT_CONNECTTIMEOUT => 10
-                ]);
-                
-                $response = curl_exec($ch);
-                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                $error = curl_error($ch);
-                curl_close($ch);
-                
-                if ($error) {
-                    return ['error' => 'Erro ao buscar dados do N8N: ' . $error];
-                }
-                
-                $responseData = json_decode($response, true);
-                if (json_last_error() !== JSON_ERROR_NONE) {
-                    $responseData = ['raw_response' => $response];
-                }
-                
-                return [
-                    'success' => $httpCode >= 200 && $httpCode < 300,
-                    'http_code' => $httpCode,
-                    'data' => $responseData
-                ];
-            
-            default:
-                return ['error' => 'N8N tool não reconhecida: ' . $functionName];
+        // Para qualquer função N8N, executar o webhook genérico
+        // A função específica é identificada pelo function_schema, mas a execução é via webhook
+        $workflowId = $arguments['workflow_id'] ?? $webhookId;
+        
+        // Se não tem workflow_id nos argumentos nem na config, usar o próprio functionName como webhook
+        if (!$workflowId) {
+            $workflowId = $webhookId;
         }
+        
+        if (!$workflowId) {
+            return ['error' => 'ID do webhook não configurado'];
+        }
+        
+        // Construir URL do webhook
+        $webhookUrl = rtrim($n8nUrl, '/') . rtrim($webhookPath, '/') . '/' . ltrim($workflowId, '/');
+        
+        // Preparar headers
+        $headers = [
+            'Content-Type: application/json'
+        ];
+        
+        if ($apiKey) {
+            $headers[] = 'X-N8N-API-KEY: ' . $apiKey;
+        }
+        
+        // Adicionar headers customizados se configurados
+        $customHeaders = $config['custom_headers'] ?? [];
+        if (is_string($customHeaders)) {
+            $customHeaders = json_decode($customHeaders, true) ?? [];
+        }
+        foreach ($customHeaders as $key => $value) {
+            $headers[] = $key . ': ' . $value;
+        }
+        
+        // Fazer requisição POST ao webhook (passa todos os arguments da IA)
+        $ch = curl_init($webhookUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($arguments, JSON_UNESCAPED_UNICODE),
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_TIMEOUT => $timeout,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_FOLLOWLOCATION => true
+        ]);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        
+        if ($error) {
+            return ['error' => 'Erro ao executar workflow N8N: ' . $error];
+        }
+        
+        $responseData = json_decode($response, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            // Se não é JSON válido, tratar como texto
+            $responseData = ['raw_response' => $response];
+        }
+        
+        $result = [
+            'success' => $httpCode >= 200 && $httpCode < 300,
+            'http_code' => $httpCode,
+            'workflow_id' => $workflowId,
+            'response' => $responseData
+        ];
+        
+        // Se use_raw_response está ativo, extrair a mensagem direta do N8N
+        if ($useRawResponse && $result['success']) {
+            // Tentar extrair a mensagem do campo configurado
+            $rawMessage = null;
+            
+            // Verificar campos possíveis em ordem de prioridade
+            $fieldsToTry = [$rawResponseField, 'message', 'response', 'text', 'content', 'reply'];
+            
+            foreach ($fieldsToTry as $field) {
+                if (isset($responseData[$field]) && is_string($responseData[$field]) && !empty($responseData[$field])) {
+                    $rawMessage = $responseData[$field];
+                    break;
+                }
+            }
+            
+            // Se a resposta é uma string direta, usar
+            if ($rawMessage === null && is_string($response) && !empty(trim($response))) {
+                $decoded = json_decode($response, true);
+                if ($decoded === null) {
+                    // Não é JSON, usar a string direta
+                    $rawMessage = trim($response);
+                }
+            }
+            
+            if ($rawMessage !== null) {
+                $result['use_raw_response'] = true;
+                $result['raw_message'] = $rawMessage;
+            }
+        }
+        
+        return $result;
     }
 
     /**

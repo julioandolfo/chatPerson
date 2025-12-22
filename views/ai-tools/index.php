@@ -221,8 +221,13 @@ const toolTypeConfigs = {
     },
     n8n: {
         fields: [
-            { name: "webhook_url", label: "Webhook URL", type: "url", required: true, placeholder: "https://n8n.exemplo.com/webhook/..." },
-            { name: "api_key", label: "API Key (opcional)", type: "text", required: false }
+            { name: "n8n_url", label: "URL Base do N8N", type: "url", required: true, placeholder: "https://n8n.exemplo.com", help: "URL base da instalação do N8N" },
+            { name: "webhook_id", label: "ID do Webhook Padrão", type: "text", required: false, placeholder: "abc123", help: "ID padrão do webhook (pode ser sobrescrito na chamada)" },
+            { name: "webhook_path", label: "Caminho do Webhook", type: "text", required: false, placeholder: "/webhook", default: "/webhook", help: "Caminho base dos webhooks (/webhook, /webhook-test, etc)" },
+            { name: "api_key", label: "API Key do N8N", type: "text", required: false, placeholder: "opcional", help: "Chave de API para autenticação" },
+            { name: "default_method", label: "Método HTTP Padrão", type: "select", required: false, options: ["GET", "POST", "PUT", "DELETE", "PATCH"], default: "POST", help: "Método HTTP padrão para chamadas" },
+            { name: "timeout", label: "Timeout (segundos)", type: "number", required: false, placeholder: "60", default: "60", help: "Tempo limite para requisições em segundos" },
+            { name: "custom_headers", label: "Headers Customizados (JSON)", type: "textarea", required: false, placeholder: '{"X-Custom-Header": "value"}', help: "Headers HTTP adicionais em formato JSON" }
         ]
     },
     api: {

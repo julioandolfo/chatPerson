@@ -4934,6 +4934,14 @@ function checkForNewMessages(conversationId) {
                 if (!existingMsg) {
                     addMessageToChat(msg);
                     lastMessageId = Math.max(lastMessageId || 0, msg.id || 0);
+                    
+                    // Disparar evento para atualizar SLA
+                    document.dispatchEvent(new CustomEvent('realtime:new_message', { 
+                        detail: { 
+                            conversation_id: conversationId, 
+                            message: msg 
+                        } 
+                    }));
                 }
             });
             
@@ -4976,6 +4984,21 @@ function updateConversationListPreview(conversationId, lastMessage) {
             }
             // Atualizar data-updated-at para ordenação correta (sempre)
             conversationItem.setAttribute('data-updated-at', lastMessage.created_at);
+        }
+        
+        // Atualizar datasets de SLA/tempos
+        if (lastMessage.sender_type === 'contact') {
+            conversationItem.dataset.lastContactMessageAt = lastMessage.created_at;
+        } else if (lastMessage.sender_type === 'agent') {
+            conversationItem.dataset.lastAgentMessageAt = lastMessage.created_at;
+        }
+        
+        // Atualizar indicador SLA em tempo real
+        if (window.SLAIndicator) {
+            const convData = window.SLAIndicator.getConversationData(conversationId);
+            if (convData) {
+                window.SLAIndicator.updateConversation(conversationId, convData);
+            }
         }
         
         // Garantir dropdown de ações está atualizado (preservar se estava aberto)
@@ -9600,9 +9623,20 @@ function updateConversationInList(conversationId, lastMessage) {
         }
         if (time) {
             // Usar formatTime para tempo relativo (Agora, 1min, etc)
-            time.textContent = formatTime(new Date().toISOString());
+            const timestamp = new Date().toISOString();
+            time.textContent = formatTime(timestamp);
             // Atualizar data-updated-at
-            conversationItem.setAttribute('data-updated-at', new Date().toISOString());
+            conversationItem.setAttribute('data-updated-at', timestamp);
+            // Atualizar dataset para SLA (mensagem do agente)
+            conversationItem.dataset.lastAgentMessageAt = timestamp;
+        }
+        
+        // Atualizar indicador SLA em tempo real
+        if (window.SLAIndicator) {
+            const convData = window.SLAIndicator.getConversationData(conversationId);
+            if (convData) {
+                window.SLAIndicator.updateConversation(conversationId, convData);
+            }
         }
         
         // Garantir dropdown de ações
@@ -12662,6 +12696,7 @@ if (typeof window.wsClient !== 'undefined') {
         const currentConversationId = window.currentConversationId ?? parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
         
         // Disparar evento personalizado para o sistema de SLA
+        console.log('[WebSocket/Poll] Disparando evento realtime:new_message para SLA');
         document.dispatchEvent(new CustomEvent('realtime:new_message', { detail: data }));
         
         // Atualizar lista de conversas
@@ -13276,6 +13311,12 @@ function refreshConversationBadges() {
                     sortConversationList();
                 }
             });
+
+            // Atualizar todos os indicadores SLA após atualizar a lista
+            if (window.SLAIndicator) {
+                console.log('[refreshConversationBadges] Atualizando todos os indicadores SLA');
+                window.SLAIndicator.updateAllIndicators();
+            }
 
             // Reinscrever conversas visíveis para receber eventos de polling/new_message
             subscribeVisibleConversations();

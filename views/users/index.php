@@ -473,7 +473,8 @@ ob_start();
 
 <?php
 $content = ob_get_clean();
-$scripts = '
+$usersUrl = \App\Helpers\Url::to('/users');
+$scripts = <<<JAVASCRIPT
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     const table = document.querySelector("#kt_users_table");
@@ -497,7 +498,7 @@ document.addEventListener("DOMContentLoaded", function() {
     
     const form = document.getElementById("kt_modal_new_user_form");
     if (form) {
-        console.log('[FORM] Formulario de novo usuario encontrado, registrando handler AJAX');
+        console.log("[FORM] Formulario de novo usuario encontrado, registrando handler AJAX");
         
         // Remover o onsubmit inline para usar o listener
         form.onsubmit = null;
@@ -505,7 +506,7 @@ document.addEventListener("DOMContentLoaded", function() {
         form.addEventListener("submit", function(e) {
             e.preventDefault();
             e.stopPropagation();
-            console.log('[OK] Submit interceptado, enviando via AJAX');
+            console.log("[OK] Submit interceptado, enviando via AJAX");
             
             const submitBtn = document.getElementById("kt_modal_new_user_submit");
             submitBtn.setAttribute("data-kt-indicator", "on");
@@ -522,21 +523,21 @@ document.addEventListener("DOMContentLoaded", function() {
                 body: new URLSearchParams(formData)
             })
             .then(response => {
-                console.log('[RESPONSE] Resposta recebida:', response.status, response.statusText);
+                console.log("[RESPONSE] Resposta recebida:", response.status, response.statusText);
                 return response.json();
             })
             .then(data => {
-                console.log('[DATA] Dados:', data);
+                console.log("[DATA] Dados:", data);
                 submitBtn.removeAttribute("data-kt-indicator");
                 submitBtn.disabled = false;
                 
                 if (data.success) {
                     // Usar SweetAlert2 se disponivel, senao usar toast
-                    if (typeof Swal !== 'undefined') {
+                    if (typeof Swal !== "undefined") {
                         Swal.fire({
-                            icon: 'success',
-                            title: 'Sucesso!',
-                            text: data.message || 'Usuario criado com sucesso!',
+                            icon: "success",
+                            title: "Sucesso!",
+                            text: data.message || "Usuario criado com sucesso!",
                             timer: 2000,
                             showConfirmButton: false
                         }).then(() => {
@@ -545,18 +546,18 @@ document.addEventListener("DOMContentLoaded", function() {
                             location.reload();
                         });
                     } else {
-                        alert(data.message || 'Usuario criado com sucesso!');
+                        alert(data.message || "Usuario criado com sucesso!");
                         const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_new_user"));
                         if (modal) modal.hide();
                         location.reload();
                     }
                 } else {
                     // Mostrar erro de forma mais amigavel
-                    if (typeof Swal !== 'undefined') {
+                    if (typeof Swal !== "undefined") {
                         Swal.fire({
-                            icon: 'error',
-                            title: 'Erro',
-                            text: data.message || 'Erro ao criar usuario'
+                            icon: "error",
+                            title: "Erro",
+                            text: data.message || "Erro ao criar usuario"
                         });
                     } else {
                         alert("Erro: " + (data.message || "Erro ao criar usuario"));
@@ -564,15 +565,15 @@ document.addEventListener("DOMContentLoaded", function() {
                 }
             })
             .catch(error => {
-                console.error('[ERROR] Erro:', error);
+                console.error("[ERROR] Erro:", error);
                 submitBtn.removeAttribute("data-kt-indicator");
                 submitBtn.disabled = false;
                 
                 if (typeof Swal !== 'undefined') {
                     Swal.fire({
-                        icon: 'error',
-                        title: 'Erro',
-                        text: 'Erro ao criar usuario. Verifique o console para mais detalhes.'
+                        icon: "error",
+                        title: "Erro",
+                        text: "Erro ao criar usuario. Verifique o console para mais detalhes."
                     });
                 } else {
                     alert("Erro ao criar usuario. Verifique o console para mais detalhes.");
@@ -580,7 +581,7 @@ document.addEventListener("DOMContentLoaded", function() {
             });
         });
     } else {
-        console.error('[ERROR] Formulario kt_modal_new_user_form nao encontrado!');
+        console.error("[ERROR] Formulario kt_modal_new_user_form nao encontrado!");
     }
     
     // Funcao para editar usuario (aceita elemento button ou link)
@@ -653,9 +654,9 @@ document.addEventListener("DOMContentLoaded", function() {
                 
                 if (data.success) {
                     Swal.fire({
-                        icon: 'success',
-                        title: 'Sucesso!',
-                        text: data.message || 'Usuario atualizado com sucesso!',
+                        icon: "success",
+                        title: "Sucesso!",
+                        text: data.message || "Usuario atualizado com sucesso!",
                         timer: 2000,
                         showConfirmButton: false
                     }).then(() => {
@@ -665,9 +666,9 @@ document.addEventListener("DOMContentLoaded", function() {
                     });
                 } else {
                     Swal.fire({
-                        icon: 'error',
-                        title: 'Erro!',
-                        text: data.message || 'Erro ao atualizar usuario'
+                        icon: "error",
+                        title: "Erro!",
+                        text: data.message || "Erro ao atualizar usuario"
                     });
                 }
             })
@@ -676,9 +677,9 @@ document.addEventListener("DOMContentLoaded", function() {
                 submitBtn.removeAttribute("data-kt-indicator");
                 submitBtn.disabled = false;
                 Swal.fire({
-                    icon: 'error',
-                    title: 'Erro!',
-                    text: error.message || 'Erro ao atualizar usuario'
+                    icon: "error",
+                    title: "Erro!",
+                    text: error.message || "Erro ao atualizar usuario"
                 });
             });
         });
@@ -727,7 +728,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const formData = new FormData();
             formData.append("role_id", roleId);
             
-            fetch("' . \App\Helpers\Url::to('/users') . '/" + userId + "/roles", {
+            fetch("$usersUrl/" + userId + "/roles", {
                 method: "POST",
                 headers: {
                     "X-Requested-With": "XMLHttpRequest"
@@ -778,7 +779,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const formData = new FormData();
             formData.append("department_id", departmentId);
             
-            fetch("' . \App\Helpers\Url::to('/users') . '/" + userId + "/departments", {
+            fetch("$usersUrl/" + userId + "/departments", {
                 method: "POST",
                 headers: {
                     "X-Requested-With": "XMLHttpRequest"
@@ -812,7 +813,7 @@ document.addEventListener("DOMContentLoaded", function() {
             return;
         }
         
-        fetch("' . \App\Helpers\Url::to('/users') . '/" + userId, {
+        fetch("$usersUrl/" + userId, {
             method: "DELETE",
             headers: {
                 "X-Requested-With": "XMLHttpRequest"
@@ -831,7 +832,8 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     };
 });
-</script>';
+</script>
+JAVASCRIPT;
 ?>
 
 <?php include __DIR__ . '/../layouts/metronic/app.php'; ?>

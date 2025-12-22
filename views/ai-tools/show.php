@@ -294,11 +294,12 @@ ob_start();
 <?php 
 $content = ob_get_clean(); 
 
-// Preparar JSON para injetar no script sem interpolação de template literals
+// Preparar JSON para injetar no script - double encode para usar com JSON.parse()
 $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP;
-$aiToolsBaseUrl = json_encode(\App\Helpers\Url::to('/ai-tools'), $jsonFlags);
-$functionSchemaJson = json_encode($functionSchema, $jsonFlags);
-$configJson = json_encode($config, $jsonFlags);
+// Double encode: primeiro converte para JSON, depois converte a string JSON para string JS segura
+$aiToolsBaseUrl = json_encode(json_encode(\App\Helpers\Url::to('/ai-tools')), $jsonFlags);
+$functionSchemaJson = json_encode(json_encode($functionSchema, JSON_UNESCAPED_UNICODE), $jsonFlags);
+$configJson = json_encode(json_encode($config, JSON_UNESCAPED_UNICODE), $jsonFlags);
 $toolIdJson = json_encode($tool['id'] ?? 0, $jsonFlags);
 
 $scripts = <<<'SCRIPTS'
@@ -343,7 +344,7 @@ const toolTypeConfigs = {
             { name: "base_url", label: "Base URL da API", type: "url", required: true, placeholder: "https://api.exemplo.com/v1" },
             { name: "api_key", label: "API Key", type: "text", required: false },
             { name: "auth_type", label: "Tipo de Autenticação", type: "select", required: false, options: ["none", "bearer", "basic", "api_key"], default: "bearer" },
-            { name: "headers", label: "Headers Adicionais (JSON)", type: "textarea", required: false, placeholder: \'{"X-Custom-Header": "value"}\' }
+            { name: "headers", label: "Headers Adicionais (JSON)", type: "textarea", required: false, placeholder: '{"X-Custom-Header": "value"}' }
         ]
     },
     document: {
@@ -428,7 +429,7 @@ function removeEditFunctionParameter(id) {
     
     const container = document.getElementById("kt_edit_function_parameters");
     if (container.children.length === 0) {
-        container.innerHTML = \'<div class="text-muted fs-7 mb-3">Nenhum parâmetro adicionado. Clique em "Adicionar Parâmetro" para adicionar.</div>\';
+        container.innerHTML = '<div class="text-muted fs-7 mb-3">Nenhum parâmetro adicionado. Clique em "Adicionar Parâmetro" para adicionar.</div>';
     }
 }
 
@@ -571,7 +572,7 @@ function populateEditFields() {
         document.getElementById("kt_edit_function_description").value = functionSchema.function.description || "";
         
         // Limpar parâmetros existentes
-        document.getElementById("kt_edit_function_parameters").innerHTML = \'<div class="text-muted fs-7 mb-3">Nenhum parâmetro adicionado. Clique em "Adicionar Parâmetro" para adicionar.</div>\';
+        document.getElementById("kt_edit_function_parameters").innerHTML = '<div class="text-muted fs-7 mb-3">Nenhum parâmetro adicionado. Clique em "Adicionar Parâmetro" para adicionar.</div>';
         editParameterCounter = 0;
         
         // Preencher parâmetros
@@ -641,7 +642,7 @@ function toggleN8NTestPanel() {
 }
 
 function executeN8NTest() {
-    const toolId = JSON.parse(__TOOL_ID__);
+    const toolId = __TOOL_ID__;
     const webhookId = document.getElementById("test_webhook_id").value.trim();
     const method = document.getElementById("test_method").value;
     const dataStr = document.getElementById("test_data").value.trim();

@@ -13,12 +13,12 @@
 
 .sla-progress-ring {
     position: absolute;
-    top: -3px;
-    left: -3px;
-    right: -3px;
-    bottom: -3px;
-    width: calc(100% + 6px);
-    height: calc(100% + 6px);
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
     transform: rotate(-90deg);
     pointer-events: none;
     z-index: 1;
@@ -142,10 +142,10 @@
 
 /* Tamanhos diferentes do indicador */
 .symbol-35px .sla-progress-ring {
-    top: -3px;
-    left: -3px;
-    width: calc(100% + 6px);
-    height: calc(100% + 6px);
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
 }
 
 .symbol-35px .sla-progress-ring circle,
@@ -154,10 +154,10 @@
 }
 
 .symbol-45px .sla-progress-ring {
-    top: -3px;
-    left: -3px;
-    width: calc(100% + 6px);
-    height: calc(100% + 6px);
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
 }
 
 .symbol-45px .sla-progress-ring circle,
@@ -166,10 +166,10 @@
 }
 
 .symbol-50px .sla-progress-ring {
-    top: -3px;
-    left: -3px;
-    width: calc(100% + 6px);
-    height: calc(100% + 6px);
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
 }
 
 .symbol-50px .sla-progress-ring circle,

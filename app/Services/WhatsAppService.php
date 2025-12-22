@@ -2069,13 +2069,6 @@ class WhatsAppService
                 }
             }
 
-            // Bloqueio: não criar conversa para contatos especiais (whatsapp_id = system)
-            $contactWhatsappId = $contact['whatsapp_id'] ?? '';
-            if (strcasecmp($contactWhatsappId, 'system') === 0) {
-                Logger::quepasa("processWebhook - whatsapp_id=system detectado para contato {$contact['id']}. Ignorando criação de conversa/mensagem.");
-                return;
-            }
-
             // Criar ou buscar conversa
             Logger::quepasa("processWebhook - Buscando conversa existente: contact_id={$contact['id']}, channel=whatsapp, account_id={$account['id']}");
             $conversation = \App\Models\Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['id']);

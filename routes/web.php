@@ -257,9 +257,6 @@ Router::get('/ai-tools/{id}', [AIToolController::class, 'show'], ['Authenticatio
 Router::post('/ai-tools', [AIToolController::class, 'store'], ['Authentication']);
 Router::post('/ai-tools/{id}', [AIToolController::class, 'update'], ['Authentication']);
 Router::delete('/ai-tools/{id}', [AIToolController::class, 'destroy'], ['Authentication']);
-Router::get('/ai-tools/validate/all', [AIToolController::class, 'validate'], ['Authentication']);
-Router::get('/ai-tools/{id}/validate', [AIToolController::class, 'validateTool'], ['Authentication']);
-Router::post('/ai-tools/{id}/test-n8n', [AIToolController::class, 'testN8N'], ['Authentication']);
 
 // Rotas de Roles e Permissões
 Router::get('/roles', [RoleController::class, 'index'], ['Authentication']);

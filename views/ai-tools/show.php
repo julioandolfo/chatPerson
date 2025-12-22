@@ -293,10 +293,11 @@ ob_start();
 
 <?php 
 $content = ob_get_clean(); 
-$scripts = '
+$aiToolsBaseUrl = json_encode(\App\Helpers\Url::to('/ai-tools'));
+$scripts = <<<SCRIPTS
 <script>
 // URL base para requisições
-const AI_TOOLS_BASE_URL = ' . json_encode(\App\Helpers\Url::to('/ai-tools')) . ';
+const AI_TOOLS_BASE_URL = {$aiToolsBaseUrl};
 
 let editParameterCounter = 0;
 
@@ -828,7 +829,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 </script>
-';
+SCRIPTS;
 ?>
 
 <?php include __DIR__ . '/../layouts/metronic/app.php'; ?>

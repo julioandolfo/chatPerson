@@ -20,6 +20,20 @@ class AutomationService
     private static ?int $currentAutomationId = null;
 
     /**
+     * Verificar se uma automação está ativa (status + is_active)
+     */
+    private static function isAutomationActive(int $automationId): bool
+    {
+        $automation = Automation::find($automationId);
+        if (!$automation) {
+            return false;
+        }
+        $statusOk = ($automation['status'] ?? 'inactive') === 'active';
+        $flagOk = !empty($automation['is_active']);
+        return $statusOk && $flagOk;
+    }
+
+    /**
      * Log específico para intents IA (arquivo dedicado)
      */
     private static function logIntent(string $message): void
@@ -530,14 +544,20 @@ class AutomationService
     public static function executeAutomation(int $automationId, int $conversationId, bool $logExecution = true): void
     {
         \App\Helpers\Logger::automation("=== executeAutomation INÍCIO === automationId: {$automationId}, conversationId: {$conversationId}");
-        // Guardar Automation ID atual para uso em nós (ex: ramificação IA)
-        self::$currentAutomationId = $automationId;
-        
         $automation = Automation::findWithNodes($automationId);
         if (!$automation) {
             \App\Helpers\Logger::automation("ERRO: Automação não encontrada! automationId: {$automationId}");
             return;
         }
+
+        // Validar se automação está ativa
+        if (($automation['status'] ?? 'inactive') !== 'active' || empty($automation['is_active'])) {
+            \App\Helpers\Logger::automation("Automação {$automationId} está inativa. Execução abortada.");
+            return;
+        }
+
+        // Guardar Automation ID atual para uso em nós (ex: ramificação IA)
+        self::$currentAutomationId = $automationId;
         
         if (empty($automation['nodes'])) {
             \App\Helpers\Logger::automation("ERRO: Automação sem nós! automationId: {$automationId}");
@@ -616,6 +636,15 @@ class AutomationService
     {
         \App\Helpers\Logger::automation("  → executeNode: ID {$node['id']}, Tipo: {$node['node_type']}");
         
+        // Checar se automação permaneceu ativa durante o fluxo
+        if (self::$currentAutomationId && !self::isAutomationActive(self::$currentAutomationId)) {
+            \App\Helpers\Logger::automation("  ⚠️ Automação " . self::$currentAutomationId . " está inativa. Encerrando fluxo.");
+            if ($executionId) {
+                \App\Models\AutomationExecution::updateStatus($executionId, 'cancelled', 'automation_inactive');
+            }
+            return;
+        }
+
         $nodeData = $node['node_data'] ?? [];
         
         // Atualizar log com nó atual
@@ -1822,6 +1851,23 @@ class AutomationService
             return false;
         }
         
+        // Se a automação original estiver inativa, cancelar ramificação
+        $automationId = $metadata['ai_branching_automation_id'] ?? null;
+        if ($automationId && !self::isAutomationActive((int)$automationId)) {
+            \App\Helpers\Logger::automation("Automação {$automationId} inativa durante ramificação IA. Encerrando.");
+            self::logIntent("automation_inactive_ramificacao id={$automationId}");
+            $metadata['ai_branching_active'] = false;
+            $metadata['ai_interaction_count'] = 0;
+            \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
+            try {
+                \App\Services\ConversationAIService::removeAIAgent($conversation['id']);
+                self::logIntent("ia_removida_automation_inativa");
+            } catch (\Exception $e) {
+                self::logIntent("ia_remover_erro_automation_inativa:" . $e->getMessage());
+            }
+            return false;
+        }
+
         // Incrementar contador de interações (uma única vez neste fluxo)
         $interactionCount = (int)($metadata['ai_interaction_count'] ?? 0) + 1;
         $maxInteractions = (int)($metadata['ai_max_interactions'] ?? 5);
@@ -2412,6 +2458,10 @@ class AutomationService
         if (!$automation || empty($automation['nodes'])) {
             return;
         }
+        if (($automation['status'] ?? 'inactive') !== 'active' || empty($automation['is_active'])) {
+            \App\Helpers\Logger::automation("Automação {$automationId} inativa (contato). Execução abortada.");
+            return;
+        }
 
         // Encontrar nó inicial (trigger)
         $startNode = null;
@@ -2585,6 +2635,10 @@ class AutomationService
     {
         $automation = Automation::findWithNodes($automationId);
         if (!$automation || empty($automation['nodes'])) {
+            return;
+        }
+        if (($automation['status'] ?? 'inactive') !== 'active' || empty($automation['is_active'])) {
+            \App\Helpers\Logger::automation("Automação {$automationId} inativa (webhook). Execução abortada.");
             return;
         }
 

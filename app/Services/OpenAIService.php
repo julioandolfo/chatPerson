@@ -82,25 +82,8 @@ class OpenAIService
                     ? json_decode($tool['function_schema'], true) 
                     : ($tool['function_schema'] ?? []);
                 
-                if (empty($functionSchema)) {
-                    continue;
-                }
-
-                // Normalizar formato do schema para OpenAI
-                // OpenAI espera: { "type": "function", "function": { "name": "...", "description": "...", "parameters": {...} } }
-                if (isset($functionSchema['type']) && $functionSchema['type'] === 'function') {
-                    // Já está no formato completo
+                if (!empty($functionSchema)) {
                     $functions[] = $functionSchema;
-                } elseif (isset($functionSchema['name'])) {
-                    // Formato direto (apenas function) - envolver
-                    $functions[] = [
-                        'type' => 'function',
-                        'function' => $functionSchema
-                    ];
-                } else {
-                    // Formato inválido - pular com warning
-                    error_log("OpenAIService: function_schema inválido para tool '{$tool['name']}' (ID: {$tool['id']})");
-                    continue;
                 }
             }
 
@@ -117,7 +100,9 @@ class OpenAIService
 
             // Adicionar tools se houver
             if (!empty($functions)) {
-                $payload['tools'] = $functions;
+                $payload['tools'] = array_map(function($func) {
+                    return ['type' => 'function', 'function' => $func];
+                }, $functions);
             }
 
             // Fazer requisição à API
@@ -963,10 +948,6 @@ class OpenAIService
         $n8nUrl = $config['n8n_url'] ?? null;
         $webhookId = $config['webhook_id'] ?? null;
         $apiKey = $config['api_key'] ?? null;
-        $defaultMethod = strtoupper($config['default_method'] ?? 'POST');
-        $customHeaders = $config['custom_headers'] ?? [];
-        $webhookPath = $config['webhook_path'] ?? '/webhook'; // Suporta /webhook, /webhook-test, etc
-        $timeout = (int)($config['timeout'] ?? 60);
         
         if (!$n8nUrl) {
             return ['error' => 'URL do N8N não configurada'];
@@ -974,183 +955,109 @@ class OpenAIService
         
         switch ($functionName) {
             case 'executar_workflow_n8n':
-            case 'chamar_webhook_n8n':
-                $workflowId = $arguments['webhook_id'] ?? $arguments['workflow_id'] ?? $webhookId;
-                $data = $arguments['data'] ?? $arguments['body'] ?? [];
-                $method = strtoupper($arguments['method'] ?? $defaultMethod);
-                $queryParams = $arguments['query_params'] ?? $arguments['query'] ?? [];
-                $headers = $arguments['headers'] ?? [];
+                $workflowId = $arguments['workflow_id'] ?? $webhookId;
+                $data = $arguments['data'] ?? [];
                 
                 if (!$workflowId) {
-                    return ['error' => 'ID do webhook/workflow não fornecido'];
+                    return ['error' => 'ID do workflow não fornecido'];
                 }
                 
                 // Construir URL do webhook
-                // Suporta diferentes formatos:
-                // - /webhook/{id}
-                // - /webhook-test/{id}
-                // - URL completa fornecida
-                if (filter_var($workflowId, FILTER_VALIDATE_URL)) {
-                    $webhookUrl = $workflowId;
-                } else {
-                    $webhookUrl = rtrim($n8nUrl, '/') . rtrim($webhookPath, '/') . '/' . ltrim($workflowId, '/');
-                }
-                
-                // Adicionar query params se método for GET
-                if ($method === 'GET' && !empty($queryParams)) {
-                    $separator = strpos($webhookUrl, '?') !== false ? '&' : '?';
-                    $webhookUrl .= $separator . http_build_query($queryParams);
-                }
+                $webhookUrl = rtrim($n8nUrl, '/') . '/webhook/' . $workflowId;
                 
                 // Preparar headers
-                $requestHeaders = [];
+                $headers = [
+                    'Content-Type: application/json'
+                ];
                 
-                // Headers padrão
-                if (in_array($method, ['POST', 'PUT', 'PATCH'])) {
-                    $requestHeaders[] = 'Content-Type: application/json';
-                }
-                
-                // API Key do N8N
                 if ($apiKey) {
-                    $requestHeaders[] = 'X-N8N-API-KEY: ' . $apiKey;
+                    $headers[] = 'X-N8N-API-KEY: ' . $apiKey;
                 }
                 
-                // Headers customizados da configuração
-                foreach ($customHeaders as $key => $value) {
-                    $requestHeaders[] = $key . ': ' . $value;
+                // Fazer requisição POST ao webhook
+                $ch = curl_init($webhookUrl);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_POST => true,
+                    CURLOPT_POSTFIELDS => json_encode($data),
+                    CURLOPT_HTTPHEADER => $headers,
+                    CURLOPT_TIMEOUT => 60, // N8N pode demorar mais
+                    CURLOPT_CONNECTTIMEOUT => 10
+                ]);
+                
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $error = curl_error($ch);
+                curl_close($ch);
+                
+                if ($error) {
+                    return ['error' => 'Erro ao executar workflow N8N: ' . $error];
                 }
                 
-                // Headers customizados dos argumentos (sobrescrevem configuração)
-                foreach ($headers as $key => $value) {
-                    $requestHeaders[] = $key . ': ' . $value;
+                $responseData = json_decode($response, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    $responseData = ['raw_response' => $response];
                 }
-                
-                // Fazer requisição HTTP
-                $result = self::makeN8NRequest($webhookUrl, $method, $data, $requestHeaders, $timeout);
                 
                 return [
-                    'success' => $result['success'],
-                    'http_code' => $result['http_code'],
-                    'webhook_id' => $workflowId,
-                    'method' => $method,
-                    'url' => $webhookUrl,
-                    'response' => $result['data'],
-                    'error' => $result['error'] ?? null
+                    'success' => $httpCode >= 200 && $httpCode < 300,
+                    'http_code' => $httpCode,
+                    'workflow_id' => $workflowId,
+                    'response' => $responseData
                 ];
             
             case 'buscar_dados_n8n':
-            case 'consultar_api_n8n':
                 $endpoint = $arguments['endpoint'] ?? null;
-                $queryParams = $arguments['query_params'] ?? $arguments['query'] ?? [];
-                $method = strtoupper($arguments['method'] ?? 'GET');
-                $data = $arguments['data'] ?? $arguments['body'] ?? [];
-                $headers = $arguments['headers'] ?? [];
+                $queryParams = $arguments['query_params'] ?? [];
                 
                 if (!$endpoint) {
                     return ['error' => 'Endpoint não fornecido'];
                 }
                 
                 // Construir URL
-                if (filter_var($endpoint, FILTER_VALIDATE_URL)) {
-                    $url = $endpoint;
-                } else {
-                    $url = rtrim($n8nUrl, '/') . '/api/v1/' . ltrim($endpoint, '/');
-                }
-                
-                // Adicionar query params
+                $url = rtrim($n8nUrl, '/') . '/api/v1/' . ltrim($endpoint, '/');
                 if (!empty($queryParams)) {
-                    $separator = strpos($url, '?') !== false ? '&' : '?';
-                    $url .= $separator . http_build_query($queryParams);
+                    $url .= '?' . http_build_query($queryParams);
                 }
                 
                 // Preparar headers
-                $requestHeaders = [];
-                
+                $headers = [];
                 if ($apiKey) {
-                    $requestHeaders[] = 'X-N8N-API-KEY: ' . $apiKey;
+                    $headers[] = 'X-N8N-API-KEY: ' . $apiKey;
                 }
                 
-                // Headers customizados da configuração
-                foreach ($customHeaders as $key => $value) {
-                    $requestHeaders[] = $key . ': ' . $value;
+                // Fazer requisição GET
+                $ch = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_HTTPHEADER => $headers,
+                    CURLOPT_TIMEOUT => 30,
+                    CURLOPT_CONNECTTIMEOUT => 10
+                ]);
+                
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $error = curl_error($ch);
+                curl_close($ch);
+                
+                if ($error) {
+                    return ['error' => 'Erro ao buscar dados do N8N: ' . $error];
                 }
                 
-                // Headers customizados dos argumentos
-                foreach ($headers as $key => $value) {
-                    $requestHeaders[] = $key . ': ' . $value;
+                $responseData = json_decode($response, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    $responseData = ['raw_response' => $response];
                 }
-                
-                // Fazer requisição HTTP
-                $result = self::makeN8NRequest($url, $method, $data, $requestHeaders, 30);
                 
                 return [
-                    'success' => $result['success'],
-                    'http_code' => $result['http_code'],
-                    'method' => $method,
-                    'url' => $url,
-                    'data' => $result['data'],
-                    'error' => $result['error'] ?? null
+                    'success' => $httpCode >= 200 && $httpCode < 300,
+                    'http_code' => $httpCode,
+                    'data' => $responseData
                 ];
             
             default:
                 return ['error' => 'N8N tool não reconhecida: ' . $functionName];
         }
-    }
-
-    /**
-     * Função auxiliar para fazer requisições HTTP ao N8N
-     */
-    private static function makeN8NRequest(string $url, string $method, array $data = [], array $headers = [], int $timeout = 60): array
-    {
-        $ch = curl_init($url);
-        
-        $curlOptions = [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_CUSTOMREQUEST => $method,
-            CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_TIMEOUT => $timeout,
-            CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_MAXREDIRS => 5
-        ];
-        
-        // Adicionar dados para métodos que suportam body
-        if (in_array($method, ['POST', 'PUT', 'PATCH']) && !empty($data)) {
-            $curlOptions[CURLOPT_POSTFIELDS] = json_encode($data, JSON_UNESCAPED_UNICODE);
-        }
-        
-        curl_setopt_array($ch, $curlOptions);
-        
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-        
-        if ($error) {
-            return [
-                'success' => false,
-                'http_code' => 0,
-                'error' => 'Erro de conexão: ' . $error,
-                'data' => null
-            ];
-        }
-        
-        // Tentar decodificar JSON
-        $responseData = json_decode($response, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            // Se não for JSON, retornar como texto
-            $responseData = [
-                'raw_response' => $response,
-                'content_type' => 'text/plain'
-            ];
-        }
-        
-        return [
-            'success' => $httpCode >= 200 && $httpCode < 300,
-            'http_code' => $httpCode,
-            'data' => $responseData,
-            'error' => ($httpCode >= 400) ? "HTTP {$httpCode}" : null
-        ];
     }
 
     /**

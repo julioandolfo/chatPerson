@@ -684,7 +684,7 @@ function executeN8NTest() {
                         </i>
                         <div>
                             <h5 class="mb-0">${result.success ? "Sucesso!" : "Erro"}</h5>
-                            <div class="text-muted">HTTP ${result.http_code || 'N/A'}</div>
+                            <div class="text-muted">HTTP ${result.http_code || "N/A"}</div>
                         </div>
                     </div>
                     

@@ -165,16 +165,25 @@ const SLAIndicator = {
         // Calcular status do SLA
         const slaStatus = this.calculateSLAStatus(conv);
         
+        // Remover classes SLA do conversation-item (se aplicadas por engano)
+        const conversationItem = avatar.closest('.conversation-item');
+        if (conversationItem) {
+            conversationItem.className = conversationItem.className.replace(/sla-status-\w+/g, '');
+            conversationItem.classList.remove('symbol-sla');
+        }
+        
         // Se não houver violação, não mostrar indicador
         if (slaStatus.percentage === 0 && !slaStatus.breached) {
             if (existingIndicator) {
                 existingIndicator.remove();
             }
             avatar.classList.remove('symbol-sla');
+            // Remover todas as classes sla-status do avatar
+            avatar.className = avatar.className.replace(/sla-status-\w+/g, '');
             return;
         }
         
-        // Adicionar classe symbol-sla
+        // Adicionar classe symbol-sla APENAS ao avatar
         if (!avatar.classList.contains('symbol-sla')) {
             avatar.classList.add('symbol-sla');
         }
@@ -194,7 +203,7 @@ const SLAIndicator = {
             this.updateProgress(existingIndicator, slaStatus);
         }
         
-        // Atualizar classes de status
+        // Atualizar classes de status APENAS no avatar (não no conversation-item)
         avatar.className = avatar.className.replace(/sla-status-\w+/g, '');
         avatar.classList.add(`sla-status-${slaStatus.status}`);
         
@@ -220,12 +229,12 @@ const SLAIndicator = {
         const size = avatar.classList.contains('symbol-35px') ? 35 : 
                     avatar.classList.contains('symbol-50px') ? 50 : 45;
         
-        // viewBox ligeiramente maior para ficar fora do avatar
-        const viewBoxSize = size + 6;
-        const stroke = size >= 50 ? 3.5 : size >= 45 ? 3 : 2.5;
+        // viewBox do mesmo tamanho do avatar (sem extrapolar)
+        const viewBoxSize = size;
+        const stroke = size >= 50 ? 3 : size >= 45 ? 2.5 : 2;
         const inset = stroke / 2;
         const rectSize = viewBoxSize - stroke;
-        const rx = Math.max(8, Math.round(size * 0.22)); // cantos arredondados para seguir o avatar
+        const rx = Math.max(6, Math.round(size * 0.20)); // cantos arredondados para seguir o avatar
         const dashArray = 2 * (rectSize + rectSize);
         
         return `

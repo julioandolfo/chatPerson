@@ -6,26 +6,19 @@
 
 .symbol.symbol-sla {
     position: relative;
-    width: 45px;
-    height: 45px;
     display: inline-block;
-    contain: paint; /* evita que o stroke "pinte" fora do avatar */
-    isolation: isolate; /* cria stacking context isolado do card */
-    overflow: visible; /* mantém o stroke visível dentro do avatar */
+    overflow: hidden; /* contém o SVG completamente dentro do avatar */
 }
 
 .sla-progress-ring {
     position: absolute;
     top: 0;
     left: 0;
-    right: 0;
-    bottom: 0;
     width: 100%;
     height: 100%;
     transform: rotate(-90deg);
     pointer-events: none;
     z-index: 1;
-    overflow: visible;
 }
 
 .sla-progress-ring circle,
@@ -144,40 +137,34 @@
 }
 
 /* Tamanhos diferentes do indicador */
-.symbol-35px .sla-progress-ring {
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+.symbol-35px.symbol-sla {
+    width: 35px;
+    height: 35px;
 }
 
 .symbol-35px .sla-progress-ring circle,
 .symbol-35px .sla-progress-ring rect {
-    stroke-width: 2.5;
+    stroke-width: 2;
 }
 
-.symbol-45px .sla-progress-ring {
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+.symbol-45px.symbol-sla {
+    width: 45px;
+    height: 45px;
 }
 
 .symbol-45px .sla-progress-ring circle,
 .symbol-45px .sla-progress-ring rect {
-    stroke-width: 3;
+    stroke-width: 2.5;
 }
 
-.symbol-50px .sla-progress-ring {
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+.symbol-50px.symbol-sla {
+    width: 50px;
+    height: 50px;
 }
 
 .symbol-50px .sla-progress-ring circle,
 .symbol-50px .sla-progress-ring rect {
-    stroke-width: 3.5;
+    stroke-width: 3;
 }
 
 /* Estado sem SLA ativo */
@@ -215,5 +202,27 @@
     text-align: center;
     position: relative;
     z-index: 2;
+}
+
+/* IMPORTANTE: Garantir que o SLA NÃO aplique bordas/outline ao card da conversa */
+.conversation-item {
+    outline: none !important;
+}
+
+.conversation-item.sla-status-excellent,
+.conversation-item.sla-status-good,
+.conversation-item.sla-status-warning,
+.conversation-item.sla-status-critical,
+.conversation-item.sla-status-danger,
+.conversation-item.sla-status-breached {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* Garantir que apenas o SVG dentro do avatar tenha as cores do SLA */
+.conversation-item .symbol.symbol-sla {
+    border: none !important;
+    outline: none !important;
 }
 

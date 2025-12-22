@@ -1822,7 +1822,7 @@ class AutomationService
             return false;
         }
         
-        // Incrementar contador de interações
+        // Incrementar contador de interações (uma única vez neste fluxo)
         $interactionCount = (int)($metadata['ai_interaction_count'] ?? 0) + 1;
         $maxInteractions = (int)($metadata['ai_max_interactions'] ?? 5);
         
@@ -1981,8 +1981,7 @@ class AutomationService
             }
         }
         
-        // Não detectou intent e não há fallback: incrementar interação e enviar feedback
-        $interactionCount++;
+        // Não detectou intent e não há fallback: atualizar contador e (opcional) enviar feedback
         $metadata['ai_interaction_count'] = $interactionCount;
         \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
         self::logIntent("no_intent_no_fallback interaction={$interactionCount}/{$maxInteractions}");
@@ -1993,20 +1992,24 @@ class AutomationService
             return self::escalateFromAI($conversation['id'], $metadata);
         }
 
-        // Mensagem de esclarecimento para o usuário
-        $clarifyMessage = "Não consegui identificar sua intenção. Pode esclarecer ou ser mais específico?";
-        try {
-            \App\Services\ConversationService::sendMessage(
-                $conversation['id'],
-                $clarifyMessage,
-                'agent',
-                null
-            );
-            \App\Helpers\Logger::automation("Feedback de não entendimento enviado ao usuário. Interação {$interactionCount}/{$maxInteractions}.");
-            self::logIntent("clarify_enviado interaction={$interactionCount}");
-        } catch (\Exception $e) {
-            \App\Helpers\Logger::automation("Falha ao enviar feedback de não entendimento: " . $e->getMessage());
-            self::logIntent("clarify_erro:" . $e->getMessage());
+        // Mensagem de esclarecimento: só a partir da 2ª interação para não poluir na primeira
+        if ($interactionCount >= 2) {
+            $clarifyMessage = "Não consegui identificar sua intenção. Pode esclarecer ou ser mais específico?";
+            try {
+                \App\Services\ConversationService::sendMessage(
+                    $conversation['id'],
+                    $clarifyMessage,
+                    'agent',
+                    null
+                );
+                \App\Helpers\Logger::automation("Feedback de não entendimento enviado ao usuário. Interação {$interactionCount}/{$maxInteractions}.");
+                self::logIntent("clarify_enviado interaction={$interactionCount}");
+            } catch (\Exception $e) {
+                \App\Helpers\Logger::automation("Falha ao enviar feedback de não entendimento: " . $e->getMessage());
+                self::logIntent("clarify_erro:" . $e->getMessage());
+            }
+        } else {
+            self::logIntent("clarify_skip_first interaction={$interactionCount}");
         }
 
         \App\Helpers\Logger::automation("=== handleAIBranchingResponse FIM (false - continua com IA) ===");

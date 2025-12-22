@@ -202,7 +202,15 @@
     width: 45px;
     height: 45px;
     border-radius: 12px; /* mantém cantos arredondados, não círculo */
-    display: block;
     overflow: hidden;
+}
+
+.conversation-item .symbol.symbol-sla .symbol-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    position: relative;
+    z-index: 2;
 }
 

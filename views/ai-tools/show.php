@@ -606,7 +606,7 @@ function toggleN8NTestPanel() {
 }
 
 function executeN8NTest() {
-    const toolId = ' . ($tool['id'] ?? 0) . ';
+    const toolId = ' . json_encode($tool['id'] ?? 0) . ';
     const webhookId = document.getElementById("test_webhook_id").value.trim();
     const method = document.getElementById("test_method").value;
     const dataStr = document.getElementById("test_data").value.trim();
@@ -654,7 +654,7 @@ function executeN8NTest() {
     executeBtn.disabled = true;
     resultDiv.style.display = "none";
     
-    fetch("' . \App\Helpers\Url::to('/ai-tools') . '/" + toolId + "/test-n8n", {
+    fetch(' . json_encode(\App\Helpers\Url::to('/ai-tools')) . ' + "/" + toolId + "/test-n8n", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",

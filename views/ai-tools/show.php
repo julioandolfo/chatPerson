@@ -438,7 +438,11 @@ function updateEditConfigFields() {
     const configSection = document.getElementById("kt_edit_config_section");
     const configFields = document.getElementById("kt_edit_config_fields");
     
+    console.log("updateEditConfigFields chamado para tipo:", toolType);
+    console.log("Configs disponíveis:", toolTypeConfigs[toolType]);
+    
     if (!toolType || !toolTypeConfigs[toolType] || toolTypeConfigs[toolType].fields.length === 0) {
+        console.log("Sem campos de config para este tipo");
         configSection.style.display = "none";
         return;
     }
@@ -447,6 +451,8 @@ function updateEditConfigFields() {
     configFields.innerHTML = "";
     
     const fields = toolTypeConfigs[toolType].fields;
+    console.log(`Renderizando ${fields.length} campos de config para ${toolType}`);
+    
     fields.forEach(field => {
         const fieldDiv = document.createElement("div");
         fieldDiv.className = "fv-row mb-5";
@@ -472,7 +478,10 @@ function updateEditConfigFields() {
         `;
         
         configFields.appendChild(fieldDiv);
+        console.log(`Campo ${field.name} adicionado`);
     });
+    
+    console.log("Campos de config renderizados com sucesso");
 }
 
 // Construir JSON do function schema (edição)
@@ -585,26 +594,41 @@ function populateEditFields() {
         }
     }
     
-    // Atualizar campos de config
+    // Atualizar campos de config - FORÇAR atualização
     const toolType = document.getElementById("kt_edit_tool_type").value;
+    console.log("Tool Type no modal:", toolType);
+    console.log("Config a preencher:", config);
+    
     if (toolType) {
+        // Renderizar campos de configuração
         updateEditConfigFields();
         
-        // Preencher valores de config
+        // Preencher valores de config após renderizar os campos
         if (config && Object.keys(config).length > 0) {
             setTimeout(() => {
+                console.log("Preenchendo campos de config...");
                 Object.keys(config).forEach(key => {
                     const field = document.querySelector(`#kt_edit_config_fields .config-field[data-field="${key}"]`);
+                    console.log(`Campo ${key}:`, field, "Valor:", config[key]);
                     if (field) {
                         if (field.tagName === "TEXTAREA" && typeof config[key] === "object") {
                             field.value = JSON.stringify(config[key], null, 2);
-                        } else {
+                        } else if (field.tagName === "TEXTAREA" && typeof config[key] === "string") {
+                            // Se já é string, usar direto
                             field.value = config[key];
+                        } else {
+                            field.value = config[key] || "";
                         }
+                    } else {
+                        console.warn(`Campo não encontrado: ${key}`);
                     }
                 });
-            }, 100);
+            }, 200);
+        } else {
+            console.log("Nenhuma config para preencher");
         }
+    } else {
+        console.warn("Tool type não definido!");
     }
 }
 
@@ -843,6 +867,11 @@ $scripts = str_replace(
     [$aiToolsBaseUrl, $functionSchemaJson, $configJson, $toolIdJson],
     $scripts
 );
+
+// Debug: Log dos dados enviados
+error_log("AI Tool Show - Tool ID: " . ($tool['id'] ?? 'N/A'));
+error_log("AI Tool Show - Tool Type: " . ($tool['tool_type'] ?? 'N/A'));
+error_log("AI Tool Show - Config JSON: " . $configJson);
 ?>
 
 <?php include __DIR__ . '/../layouts/metronic/app.php'; ?>

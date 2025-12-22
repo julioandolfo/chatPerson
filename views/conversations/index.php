@@ -4915,6 +4915,19 @@ function checkForNewMessages(conversationId) {
     .then(response => response.json())
     .then(data => {
         if (data.success && data.messages && data.messages.length > 0) {
+            console.group('🔍 checkForNewMessages: Polling antigo recebeu mensagens');
+            console.log(`Total de mensagens novas: ${data.messages.length}`);
+            data.messages.forEach((msg, index) => {
+                console.log(`Mensagem ${index + 1}:`, {
+                    id: msg.id,
+                    sender_type: msg.sender_type,
+                    direction: msg.direction,
+                    type: msg.type,
+                    content: msg.content?.substring(0, 30)
+                });
+            });
+            console.groupEnd();
+            
             // Adicionar apenas mensagens novas
             data.messages.forEach(msg => {
                 const existingMsg = chatMessages.querySelector(`[data-message-id="${msg.id}"]`);

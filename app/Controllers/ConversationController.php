@@ -1639,8 +1639,34 @@ class ConversationController
             // Buscar mensagens
             $messages = \App\Models\Message::getMessagesWithSenderDetails($id, $limit, null, $beforeId);
             
+            // Adicionar campos type e direction para cada mensagem
+            foreach ($messages as &$msg) {
+                // Determinar type baseado em message_type
+                if (($msg['message_type'] ?? 'text') === 'note') {
+                    $msg['type'] = 'note';
+                } else {
+                    $msg['type'] = 'message';
+                }
+                
+                // Determinar direction baseado em sender_type
+                // Mensagens de agentes são sempre outgoing (enviadas pelo sistema/agente)
+                // Mensagens de contatos são sempre incoming (recebidas)
+                if (($msg['sender_type'] ?? '') === 'agent') {
+                    $msg['direction'] = 'outgoing';
+                } else {
+                    $msg['direction'] = 'incoming';
+                }
+            }
+            unset($msg); // Limpar referência
+            
             // Contar total de mensagens
             $total = \App\Models\Message::countByConversation($id);
+            
+            // Log para debug
+            if (!empty($messages)) {
+                \App\Helpers\Logger::info("📤 getMessages: Retornando " . count($messages) . " mensagens com direction", 'conversas.log');
+                \App\Helpers\Logger::info("📤 getMessages: Primeira mensagem - id={$messages[0]['id']}, sender_type={$messages[0]['sender_type']}, direction={$messages[0]['direction']}", 'conversas.log');
+            }
             
             // Limpar output buffer novamente antes de retornar JSON
             while (ob_get_level() > 0) {

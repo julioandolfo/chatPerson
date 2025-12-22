@@ -103,7 +103,8 @@ class OpenAIService
             }
             
             \App\Helpers\ConversationDebug::aiAgent($conversationId, "Tools carregadas: " . count($functions), [
-                'tools' => array_map(fn($f) => $f['name'] ?? 'unknown', $functions)
+                'tools' => array_map(fn($f) => $f['name'] ?? 'unknown', $functions),
+                'tools_full' => $functions
             ]);
 
             // Construir mensagens do histórico
@@ -269,6 +270,9 @@ class OpenAIService
 
         } catch (\Exception $e) {
             error_log("Erro ao processar mensagem com OpenAI: " . $e->getMessage());
+            \App\Helpers\ConversationDebug::error($conversationId, 'OpenAI::processMessage', $e->getMessage(), [
+                'trace' => substr($e->getTraceAsString(), 0, 1000)
+            ]);
             throw $e;
         }
     }

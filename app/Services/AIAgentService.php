@@ -289,6 +289,11 @@ class AIAgentService
         } catch (\Exception $e) {
             error_log("Erro ao processar mensagem com agente de IA: " . $e->getMessage());
             
+            // Log de debug detalhado
+            \App\Helpers\ConversationDebug::error($conversationId, 'AIAgentService::processMessage', $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             // Enviar mensagem de erro ao usuário
             \App\Services\ConversationService::sendMessage(
                 $conversationId,

@@ -2096,11 +2096,11 @@ class AutomationService
         $context = '';
         if ($conversationId) {
             try {
-                $messages = \App\Helpers\Database::query(
+                $messages = \App\Helpers\Database::fetchAll(
                     "SELECT sender_type, content FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 8",
                     [$conversationId]
                 );
-                $messages = array_reverse($messages); // ordem cronológica
+                $messages = is_array($messages) ? array_reverse($messages) : [];
                 $parts = [];
                 foreach ($messages as $msg) {
                     $role = $msg['sender_type'] ?? 'user';
@@ -2112,6 +2112,7 @@ class AutomationService
                 $context = implode("\n", $parts);
             } catch (\Exception $e) {
                 \App\Helpers\Logger::automation("Erro ao montar contexto para intent semântico: " . $e->getMessage());
+                self::logIntent("semantic_context_error:" . $e->getMessage());
             }
         }
 

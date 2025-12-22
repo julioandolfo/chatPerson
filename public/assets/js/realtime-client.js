@@ -219,6 +219,23 @@ class RealtimeClient {
     processPollingUpdates(updates) {
         if (updates.new_messages) {
             updates.new_messages.forEach(msg => {
+                console.group('🔍 RealtimeClient: Processando nova mensagem do polling');
+                console.log('Mensagem recebida do backend:', msg);
+                console.table({
+                    'ID': msg.id,
+                    'conversation_id': msg.conversation_id,
+                    'sender_type': msg.sender_type,
+                    'direction': msg.direction,
+                    'type': msg.type
+                });
+                
+                if (!msg.direction) {
+                    console.error('❌ ERRO: Campo "direction" AUSENTE na resposta do polling!');
+                } else {
+                    console.log(`✅ Campo direction presente: ${msg.direction}`);
+                }
+                console.groupEnd();
+                
                 this.emit('new_message', {
                     conversation_id: msg.conversation_id,
                     message: msg

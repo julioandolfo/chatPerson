@@ -160,18 +160,35 @@ class RealtimeController
                             // Log para debug
                             \App\Helpers\Logger::info("📨 Polling: Nova mensagem - convId={$convId}, msgId={$msg['id']}, sender_type={$senderType}, direction={$direction}", 'conversas.log');
                             
-                            $updates['new_messages'][] = [
+                            $messageData = [
                                 'conversation_id' => $convId,
                                 'id' => $msg['id'],
                                 'content' => $msg['content'] ?? '',
                                 'sender_type' => $senderType,
                                 'sender_id' => $msg['sender_id'] ?? null,
                                 'sender_name' => $msg['sender_name'] ?? null,
+                                'sender_avatar' => $msg['sender_avatar'] ?? null,
                                 'created_at' => $msg['created_at'] ?? date('Y-m-d H:i:s'),
                                 'message_type' => $messageType,
                                 'type' => $type,
-                                'direction' => $direction
+                                'direction' => $direction,
+                                'attachments' => $msg['attachments'] ?? [],
+                                'status' => $msg['status'] ?? 'sent',
+                                'external_id' => $msg['external_id'] ?? null,
+                                'ai_agent_id' => $msg['ai_agent_id'] ?? null,
+                                'ai_agent_name' => $msg['ai_agent_name'] ?? null,
+                                'quoted_message_id' => $msg['quoted_message_id'] ?? null,
+                                'quoted_text' => $msg['quoted_text'] ?? null,
+                                'quoted_sender_name' => $msg['quoted_sender_name'] ?? null,
+                                'delivered_at' => $msg['delivered_at'] ?? null,
+                                'read_at' => $msg['read_at'] ?? null,
+                                'error_message' => $msg['error_message'] ?? null
                             ];
+                            
+                            // Log do que será enviado
+                            \App\Helpers\Logger::info("📤 Polling: Enviando para frontend - " . json_encode($messageData), 'conversas.log');
+                            
+                            $updates['new_messages'][] = $messageData;
                         }
 
                         // Verificar se a conversa foi atualizada

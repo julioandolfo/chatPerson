@@ -45,7 +45,11 @@ function renderAttachment($attachment) {
         return $html;
     }
     
-    $url = \App\Helpers\Url::to($attachment['path'] ?? '');
+    // ✅ CORRIGIDO: Usar campo 'url' se disponível, senão construir a partir de 'path'
+    $url = !empty($attachment['url']) 
+        ? $attachment['url'] 
+        : \App\Helpers\Url::to('/' . ltrim($attachment['path'] ?? '', '/'));
+    
     $name = htmlspecialchars($attachment['original_name'] ?? 'Anexo');
     
     $html = '<div class="attachment-item mb-2">';
@@ -12698,7 +12702,17 @@ function renderAttachmentHtml(attachment) {
         </div>`;
     } else if (type === 'audio' || (mimeType && mimeType.startsWith('audio/'))) {
         // Renderização de áudio estilo WhatsApp com largura adequada
-        const audioUrl = url || (attachment.path ? `<?= \App\Helpers\Url::to('/attachments') ?>/${encodeURIComponent(attachment.path)}` : '');
+        // ✅ CORRIGIDO: Usar URL direta se começar com / (áudios TTS), senão usar rota de attachments
+        let audioUrl = url;
+        if (!audioUrl && attachment.path) {
+            if (attachment.path.startsWith('assets/') || attachment.path.startsWith('/assets/')) {
+                // Arquivo público (TTS, etc) - acesso direto
+                audioUrl = '<?= \App\Helpers\Url::to('/') ?>' + attachment.path.replace(/^\//, '');
+            } else {
+                // Arquivo de upload - usar rota de attachments
+                audioUrl = `<?= \App\Helpers\Url::to('/attachments') ?>/${encodeURIComponent(attachment.path)}`;
+            }
+        }
         
         // ✅ NOVO: Verificar se há transcrição
         let transcriptionHtml = '';
@@ -12730,7 +12744,7 @@ function renderAttachmentHtml(attachment) {
                 </div>
                 <div class="flex-grow-1" style="min-width: 300px;">
                     <audio controls style="width: 100%; outline: none;" preload="metadata" onclick="event.stopPropagation();">
-                        <source src="${audioUrl}" type="${mimeType || 'audio/webm'}">
+                        <source src="${audioUrl}" type="${mimeType || 'audio/ogg; codecs=opus'}">
                         Seu navegador não suporta o elemento de áudio.
                     </audio>
                     ${transcriptionHtml}

@@ -1525,15 +1525,11 @@ class ConversationService
                     if (!empty($metadata['ai_branching_active'])) {
                         \App\Helpers\Logger::automation("🔍 AI Branching ativo - Verificando intent na mensagem do CLIENTE antes de processar com IA...");
                         
-                        // Criar array com mensagem do cliente para detecção
-                        $clientMessage = [
-                            'content' => $processedContent,
-                            'sender_type' => 'contact',
-                            'id' => $messageId
-                        ];
-                        
-                        // Verificar intent na mensagem do cliente
-                        $intentDetected = \App\Services\AutomationService::handleAIBranchingResponse($conversation, $clientMessage);
+                        // ✅ CORRIGIDO: Usar nova função que detecta intent DIRETO na mensagem do cliente
+                        $intentDetected = \App\Services\AutomationService::detectIntentInClientMessage(
+                            $conversation, 
+                            $processedContent
+                        );
                         
                         if ($intentDetected) {
                             \App\Helpers\Logger::automation("✅ Intent detectado na mensagem do CLIENTE! Fluxo roteado SEM chamar IA.");

@@ -2112,6 +2112,125 @@ class AutomationService
     }
 
     /**
+     * 🆕 Detectar intent DIRETAMENTE na mensagem do CLIENTE (antes da IA responder)
+     * Retorna true se detectou e executou o intent, false caso contrário
+     */
+    public static function detectIntentInClientMessage(array $conversation, string $clientMessage): bool
+    {
+        $conversationId = (int)$conversation['id'];
+        
+        \App\Helpers\Logger::automation("=== detectIntentInClientMessage INÍCIO ===");
+        \App\Helpers\Logger::automation("🔍 Verificando intent na MENSAGEM DO CLIENTE antes de chamar IA...");
+        \App\Helpers\Logger::automation("Conversa ID: {$conversationId}, Mensagem: '" . substr($clientMessage, 0, 100) . "'");
+        
+        $metadata = json_decode($conversation['metadata'] ?? '{}', true);
+        
+        // Verificar se ramificação está ativa
+        if (empty($metadata['ai_branching_active'])) {
+            \App\Helpers\Logger::automation("⚠️ Ramificação de IA não está ativa. Retornando false.");
+            return false;
+        }
+        
+        // Se a automação original estiver inativa, cancelar ramificação
+        $automationId = $metadata['ai_branching_automation_id'] ?? null;
+        if ($automationId && !self::isAutomationActive((int)$automationId)) {
+            \App\Helpers\Logger::automation("Automação {$automationId} inativa. Encerrando ramificação.");
+            $metadata['ai_branching_active'] = false;
+            $metadata['ai_interaction_count'] = 0;
+            \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
+            try {
+                \App\Services\ConversationAIService::removeAIAgent($conversation['id']);
+            } catch (\Exception $e) {
+                // Ignorar erro
+            }
+            return false;
+        }
+        
+        // Detectar intent na mensagem do cliente
+        \App\Helpers\Logger::automation("🔍 Tentando detectar intent (keywords)...");
+        $detectedIntent = self::detectAIIntent($clientMessage, $metadata['ai_intents'] ?? []);
+        
+        if (!$detectedIntent) {
+            // Fallback: detecção semântica via OpenAI
+            $minConfidence = isset($metadata['ai_intent_confidence']) ? (float)$metadata['ai_intent_confidence'] : 0.35;
+            $minConfidence = max(0.2, $minConfidence);
+            $semanticEnabled = $metadata['ai_intent_semantic_enabled'] ?? true;
+            
+            if ($semanticEnabled) {
+                \App\Helpers\Logger::automation("🔍 Nenhum match por keywords. Tentando detecção semântica...");
+                $detectedIntent = self::detectAIIntentSemantic($clientMessage, $metadata['ai_intents'] ?? [], $minConfidence, $conversationId);
+            }
+        }
+        
+        if (!$detectedIntent) {
+            \App\Helpers\Logger::automation("⚠️ Nenhum intent detectado na mensagem do cliente.");
+            return false;
+        }
+        
+        // ✅ INTENT DETECTADO! Executar fluxo
+        \App\Helpers\Logger::automation("✅ Intent detectado na mensagem do cliente: {$detectedIntent['intent']}");
+        
+        $targetNodeId = $detectedIntent['target_node_id'] ?? null;
+        if (!$targetNodeId) {
+            \App\Helpers\Logger::automation("⚠️ Intent sem target_node_id configurado. Ignorando.");
+            return false;
+        }
+        
+        \App\Helpers\Logger::automation("📍 Target node ID: {$targetNodeId}");
+        
+        // ✅ PRIMEIRO: Remover a IA IMEDIATAMENTE para evitar que ela responda
+        try {
+            \App\Services\ConversationAIService::removeAIAgent($conversation['id']);
+            \App\Helpers\Logger::automation("✅ IA removida IMEDIATAMENTE para evitar resposta.");
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::automation("⚠️ Falha ao remover IA: " . $e->getMessage());
+        }
+        
+        // Limpar metadata de ramificação
+        $metadata['ai_branching_active'] = false;
+        $metadata['ai_interaction_count'] = 0;
+        \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
+        
+        // Mensagem de saída (se configurada no intent)
+        $exitMessage = $detectedIntent['exit_message'] ?? '';
+        if (!empty($exitMessage)) {
+            try {
+                \App\Services\ConversationService::sendMessage(
+                    $conversation['id'],
+                    $exitMessage,
+                    'agent',
+                    null
+                );
+                \App\Helpers\Logger::automation("📤 Mensagem de saída do intent enviada.");
+            } catch (\Exception $e) {
+                \App\Helpers\Logger::automation("⚠️ Falha ao enviar mensagem de saída: " . $e->getMessage());
+            }
+        }
+        
+        // Buscar automação e nó de destino
+        $automation = \App\Models\Automation::findWithNodes((int)$automationId);
+        
+        if ($automation) {
+            $nodes = $automation['nodes'] ?? [];
+            $targetNode = array_values(array_filter($nodes, fn($n) => $n['id'] == $targetNodeId))[0] ?? null;
+            
+            if ($targetNode) {
+                \App\Helpers\Logger::automation("✅ Nó de destino encontrado. Executando...");
+                self::executeNode($targetNode, $conversation['id'], $nodes, null);
+                \App\Helpers\Logger::automation("=== detectIntentInClientMessage FIM (true - intent executado) ===");
+                return true;
+            } else {
+                \App\Helpers\Logger::automation("❌ ERRO: Nó de destino não encontrado com ID {$targetNodeId}");
+            }
+        } else {
+            \App\Helpers\Logger::automation("❌ ERRO: Automação não encontrada com ID {$automationId}");
+        }
+        
+        \App\Helpers\Logger::automation("=== detectIntentInClientMessage FIM (false - erro ao executar) ===");
+        return false;
+    }
+    
+    /**
      * Detectar intent baseado na resposta da IA
      */
     private static function detectAIIntent(string $aiResponse, array $intents): ?array

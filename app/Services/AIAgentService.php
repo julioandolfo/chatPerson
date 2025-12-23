@@ -361,15 +361,19 @@ class AIAgentService
                     
                     if ($ttsResult['success'] && !empty($ttsResult['audio_path'])) {
                         // Criar attachment para o áudio
+                        // ✅ CORRIGIDO: Usar caminho relativo correto e adicionar URL
                         $audioAttachment = [
-                            'path' => $ttsResult['audio_url'],
+                            'path' => ltrim($ttsResult['audio_url'], '/'), // Remove / inicial para consistência
+                            'url' => $ttsResult['audio_url'], // ✅ NOVO: URL completa para renderização no chat
                             'type' => 'audio',
-                            'mime_type' => 'audio/ogg',
+                            'mime_type' => 'audio/ogg; codecs=opus', // ✅ CORRIGIDO: MIME type completo com codec
+                            'mimetype' => 'audio/ogg; codecs=opus', // Compatibilidade
                             'filename' => basename($ttsResult['audio_path']),
-                            'size' => filesize($ttsResult['audio_path'])
+                            'size' => filesize($ttsResult['audio_path']),
+                            'extension' => 'ogg'
                         ];
                         
-                        \App\Helpers\Logger::info("AIAgentService::processMessage - ✅ Áudio gerado: " . $ttsResult['audio_path'] . " (cost=$" . $ttsResult['cost'] . ")");
+                        \App\Helpers\Logger::info("AIAgentService::processMessage - ✅ Áudio gerado: " . $ttsResult['audio_path'] . " (cost=$" . $ttsResult['cost'] . ", url=" . $ttsResult['audio_url'] . ")");
                     } else {
                         \App\Helpers\Logger::error("AIAgentService::processMessage - ❌ Falha ao gerar áudio: " . ($ttsResult['error'] ?? 'Erro desconhecido'));
                     }

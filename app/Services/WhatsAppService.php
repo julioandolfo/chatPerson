@@ -933,6 +933,12 @@ class WhatsAppService
      */
     public static function processWebhook(array $payload): void
     {
+        \App\Helpers\Logger::info("═══ WhatsAppService::processWebhook INÍCIO ═══", [
+            'payloadKeys' => array_keys($payload),
+            'trackid' => $payload['trackid'] ?? null,
+            'wid' => $payload['wid'] ?? null
+        ]);
+        
         try {
             // Identificar conta pelo trackid, chatid, wid ou phone
             $trackid = $payload['trackid'] ?? null;
@@ -2373,6 +2379,13 @@ class WhatsAppService
             try {
                 // Passar quoted_message_id para registrar reply corretamente
                 // E passar timestamp original do WhatsApp para preservar ordem correta
+                \App\Helpers\Logger::info("WhatsAppService::processWebhook - CHAMANDO ConversationService::sendMessage", [
+                    'conversationId' => $conversation['id'],
+                    'contactId' => $contact['id'],
+                    'messageLength' => strlen($message),
+                    'attachmentsCount' => count($attachments)
+                ]);
+                
                 $messageId = \App\Services\ConversationService::sendMessage(
                     $conversation['id'],
                     $message ?: '',
@@ -2384,6 +2397,10 @@ class WhatsAppService
                     null,              // aiAgentId
                     $timestamp         // timestamp original da mensagem do WhatsApp
                 );
+                
+                \App\Helpers\Logger::info("WhatsAppService::processWebhook - ConversationService::sendMessage RETORNOU", [
+                    'messageId' => $messageId
+                ]);
                 
                 if (!empty($externalId) && $messageId) {
                     Logger::quepasa("processWebhook - Salvando external_id: externalId={$externalId}, messageId={$messageId}");
@@ -2408,6 +2425,12 @@ class WhatsAppService
                     }
                 }
             } catch (\Exception $e) {
+                \App\Helpers\Logger::error("WhatsAppService::processWebhook - EXCEÇÃO ao chamar ConversationService::sendMessage", [
+                    'error' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => substr($e->getTraceAsString(), 0, 1000)
+                ]);
                 Logger::quepasa("Erro ao criar mensagem via ConversationService: " . $e->getMessage());
                 Logger::quepasa("processWebhook - Stack trace: " . $e->getTraceAsString());
                 // Fallback: criar mensagem diretamente se ConversationService falhar

@@ -106,12 +106,12 @@ class TTSIntelligentService
             try {
                 $conversation = \App\Models\Conversation::find($conversationId);
                 if ($conversation) {
-                    // Verificar últimas mensagens do cliente
-                    $recentMessages = \App\Models\Message::where('conversation_id', '=', $conversationId)
-                        ->where('sender_type', '=', 'contact')
-                        ->orderBy('created_at', 'DESC')
-                        ->limit(3)
-                        ->get();
+                    // Verificar últimas mensagens do cliente usando SQL direto
+                    $sql = "SELECT * FROM messages 
+                            WHERE conversation_id = ? AND sender_type = 'contact'
+                            ORDER BY created_at DESC 
+                            LIMIT 3";
+                    $recentMessages = \App\Helpers\Database::fetchAll($sql, [$conversationId]);
                     
                     if (!empty($recentMessages)) {
                         $lastMessage = $recentMessages[0];

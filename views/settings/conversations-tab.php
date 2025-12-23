@@ -529,6 +529,17 @@ $tts = $cs['text_to_speech'] ?? [];
                 </label>
                 <div class="form-text">Se desmarcado, texto transcrito será salvo apenas em metadata</div>
             </div>
+            
+            <!-- ✅ NOVO: Exibir transcrição no chat -->
+            <div class="fv-row mb-7">
+                <label class="d-flex align-items-center">
+                    <input type="checkbox" name="audio_transcription_show_transcription_in_chat" class="form-check-input me-2" 
+                           <?= ($transcription['show_transcription_in_chat'] ?? true) ? 'checked' : '' ?> />
+                    <span class="fw-semibold fs-6">📝 Exibir transcrição abaixo dos áudios no chat</span>
+                </label>
+                <div class="form-text">Recomendado! Melhora UX mostrando o texto abaixo de todos os áudios (recebidos e enviados)</div>
+            </div>
+            
             <div class="fv-row mb-7">
                 <label class="fw-semibold fs-6 mb-2">Limite de Custo Diário (USD)</label>
                 <input type="number" name="audio_transcription_cost_limit_per_day" class="form-control form-control-solid" 
@@ -592,6 +603,18 @@ $tts = $cs['text_to_speech'] ?? [];
             <div id="tts_intelligent_settings" style="display: <?= ($tts['send_mode'] ?? 'intelligent') === 'intelligent' ? 'block' : 'none' ?>;">
                 <div class="separator separator-dashed my-5"></div>
                 <h5 class="fw-bold mb-4">⚙️ Configurações do Modo Inteligente</h5>
+                
+                <!-- ✅ NOVO: Primeira mensagem sempre texto -->
+                <div class="fv-row mb-7">
+                    <label class="d-flex align-items-center">
+                        <input type="checkbox" name="tts_intelligent_first_message_always_text" class="form-check-input me-2" 
+                               <?= ($tts['intelligent_rules']['first_message_always_text'] ?? true) ? 'checked' : '' ?> />
+                        <span class="fw-semibold fs-6">📝 Primeira mensagem sempre em texto</span>
+                    </label>
+                    <div class="form-text ms-6">Evita enviar áudio logo no primeiro contato. Recomendado!</div>
+                </div>
+                
+                <div class="separator separator-dashed my-5"></div>
                 
                 <div class="fv-row mb-7">
                     <label class="d-flex align-items-center">
@@ -671,6 +694,23 @@ $tts = $cs['text_to_speech'] ?? [];
                         <span class="fw-semibold fs-6">Preferir áudio se cliente enviou áudio recentemente</span>
                     </label>
                 </div>
+                
+                <!-- ✅ NOVO: Prompt customizável -->
+                <div class="separator separator-dashed my-5"></div>
+                
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2 d-flex align-items-center">
+                        💬 Comportamento Customizado (Opcional)
+                        <span class="badge badge-light-warning ms-2">Em Desenvolvimento</span>
+                    </label>
+                    <textarea name="tts_intelligent_custom_behavior_prompt" class="form-control form-control-solid" rows="3" placeholder="Ex: Enviar áudio apenas quando a resposta for casual e amigável. Respostas técnicas ou com instruções devem ser sempre em texto."><?= htmlspecialchars($tts['intelligent_rules']['custom_behavior_prompt'] ?? '') ?></textarea>
+                    <div class="form-text">
+                        <strong>Futuro:</strong> Descreva regras adicionais em linguagem natural para auxiliar o sistema inteligente.
+                        Por ora, use as opções específicas acima para melhor controle.
+                    </div>
+                </div>
+                
+                <div class="separator separator-dashed my-5"></div>
                 
                 <div class="fv-row mb-7">
                     <label class="fw-semibold fs-6 mb-2">Modo padrão (quando não há regras aplicáveis)</label>

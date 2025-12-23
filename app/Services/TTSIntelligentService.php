@@ -25,6 +25,24 @@ class TTSIntelligentService
         
         Logger::info("TTSIntelligentService::decideSendMode - Analisando (conv={$conversationId}, len={$textLength})");
         
+        // ✅ NOVO: Verificar se é primeira mensagem da IA
+        if (!empty($rules['first_message_always_text'])) {
+            try {
+                // Buscar se já existe alguma mensagem da IA nesta conversa
+                $sql = "SELECT COUNT(*) as count FROM messages 
+                        WHERE conversation_id = ? AND sender_type = 'agent'";
+                $result = \App\Helpers\Database::fetch($sql, [$conversationId]);
+                $aiMessageCount = $result['count'] ?? 0;
+                
+                if ($aiMessageCount == 0) {
+                    Logger::info("TTSIntelligentService::decideSendMode - Primeira mensagem da IA, usando text_only");
+                    return 'text_only';
+                }
+            } catch (\Exception $e) {
+                Logger::error("TTSIntelligentService::decideSendMode - Erro ao verificar primeira mensagem: " . $e->getMessage());
+            }
+        }
+        
         // 1. Verificar tamanho do texto
         if (!empty($rules['use_text_length'])) {
             if ($textLength > ($rules['min_chars_for_text'] ?? 1000)) {

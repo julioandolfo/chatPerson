@@ -82,6 +82,24 @@ function renderAttachment($attachment) {
         $html .= '<source src="' . $url . '" type="' . ($attachment['mime_type'] ?? $attachment['mimetype'] ?? 'audio/webm') . '">';
         $html .= 'Seu navegador não suporta áudio.';
         $html .= '</audio>';
+        
+        // ✅ NOVO: Exibir transcrição se disponível e configurado
+        $transcription = $attachment['transcription'] ?? null;
+        if ($transcription && !empty($transcription['text'])) {
+            $settings = \App\Services\ConversationSettingsService::getSettings();
+            $showTranscription = $settings['audio_transcription']['show_transcription_in_chat'] ?? true;
+            
+            if ($showTranscription) {
+                $html .= '<div class="audio-transcription mt-2" style="padding: 8px; background: rgba(0,0,0,0.05); border-radius: 6px; border-left: 3px solid #3b82f6;">';
+                $html .= '<div class="d-flex align-items-center gap-1 mb-1">';
+                $html .= '<i class="ki-duotone ki-text fs-7 text-muted"><span class="path1"></span><span class="path2"></span></i>';
+                $html .= '<span class="text-muted fs-8 fw-semibold">Transcrição:</span>';
+                $html .= '</div>';
+                $html .= '<div class="fs-7" style="color: rgba(0,0,0,0.7);">' . nl2br(htmlspecialchars($transcription['text'])) . '</div>';
+                $html .= '</div>';
+            }
+        }
+        
         $html .= '</div>';
         $html .= '</div>';
         $html .= '</div>';
@@ -12681,6 +12699,27 @@ function renderAttachmentHtml(attachment) {
     } else if (type === 'audio' || (mimeType && mimeType.startsWith('audio/'))) {
         // Renderização de áudio estilo WhatsApp com largura adequada
         const audioUrl = url || (attachment.path ? `<?= \App\Helpers\Url::to('/attachments') ?>/${encodeURIComponent(attachment.path)}` : '');
+        
+        // ✅ NOVO: Verificar se há transcrição
+        let transcriptionHtml = '';
+        if (attachment.transcription && attachment.transcription.text) {
+            // Verificar configuração (assumir true se não estiver definido)
+            const showTranscription = <?= json_encode(\App\Services\ConversationSettingsService::getSettings()['audio_transcription']['show_transcription_in_chat'] ?? true) ?>;
+            
+            if (showTranscription) {
+                const transcriptionText = escapeHtml(attachment.transcription.text);
+                transcriptionHtml = `
+                    <div class="audio-transcription mt-2" style="padding: 8px; background: rgba(0,0,0,0.05); border-radius: 6px; border-left: 3px solid #3b82f6;">
+                        <div class="d-flex align-items-center gap-1 mb-1">
+                            <i class="ki-duotone ki-text fs-7 text-muted"><span class="path1"></span><span class="path2"></span></i>
+                            <span class="text-muted fs-8 fw-semibold">Transcrição:</span>
+                        </div>
+                        <div class="fs-7" style="color: rgba(0,0,0,0.7);">${nl2br(transcriptionText)}</div>
+                    </div>
+                `;
+            }
+        }
+        
         html += `<div class="attachment audio-attachment">
             <div class="d-flex align-items-center gap-2">
                 <div class="me-1" style="flex-shrink: 0;">
@@ -12694,6 +12733,7 @@ function renderAttachmentHtml(attachment) {
                         <source src="${audioUrl}" type="${mimeType || 'audio/webm'}">
                         Seu navegador não suporta o elemento de áudio.
                     </audio>
+                    ${transcriptionHtml}
                 </div>
             </div>
         </div>`;

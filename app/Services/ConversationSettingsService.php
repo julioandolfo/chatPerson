@@ -179,6 +179,7 @@ class ConversationSettingsService
                 'update_message_content' => true, // Atualizar conteúdo da mensagem com texto transcrito
                 'max_file_size_mb' => 25, // Limite de tamanho do arquivo (25MB é limite da OpenAI)
                 'cost_limit_per_day' => 10.00, // Limite de custo diário em USD ($0.006/minuto)
+                'show_transcription_in_chat' => true, // ✅ NOVO: Exibir transcrição abaixo do áudio no chat
             ],
             
             // Text-to-Speech (Geração de Áudio)
@@ -200,6 +201,8 @@ class ConversationSettingsService
                 
                 // Regras Inteligentes (modo 'intelligent')
                 'intelligent_rules' => [
+                    'first_message_always_text' => true, // ✅ NOVO: Primeira mensagem sempre em texto
+                    
                     'use_text_length' => true, // Considerar tamanho do texto
                     'max_chars_for_audio' => 500, // Máximo de caracteres para enviar como áudio
                     'min_chars_for_text' => 1000, // Mínimo de caracteres para forçar texto
@@ -225,6 +228,8 @@ class ConversationSettingsService
                     'use_conversation_history' => false, // Considerar histórico da conversa
                     'prefer_audio_if_client_sent_audio' => true, // Preferir áudio se cliente enviou áudio
                     'prefer_text_if_client_sent_text' => false, // Preferir texto se cliente enviou texto
+                    
+                    'custom_behavior_prompt' => '', // ✅ NOVO: Prompt customizável (em desenvolvimento)
                     
                     'default_mode' => 'audio_only', // Modo padrão quando não há regras aplicáveis
                 ],

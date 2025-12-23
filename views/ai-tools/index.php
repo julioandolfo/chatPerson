@@ -255,7 +255,7 @@ const toolTypeConfigs = {
             { name: "base_url", label: "Base URL da API", type: "url", required: true, placeholder: "https://api.exemplo.com/v1" },
             { name: "api_key", label: "API Key", type: "text", required: false },
             { name: "auth_type", label: "Tipo de Autenticação", type: "select", required: false, options: ["none", "bearer", "basic", "api_key"], default: "bearer" },
-            { name: "headers", label: "Headers Adicionais (JSON)", type: "textarea", required: false, placeholder: '{"X-Custom-Header": "value"}' }
+            { name: "headers", label: "Headers Adicionais (JSON)", type: "textarea", required: false, placeholder: "{\"X-Custom-Header\": \"value\"}" }
         ]
     },
     document: {

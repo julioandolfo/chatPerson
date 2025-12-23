@@ -130,6 +130,9 @@ ob_start();
                             <option value="funnel_stage">📊 Mover para Funil/Etapa</option>
                             <option value="funnel_stage_smart">🧠 Mover para Funil/Etapa (Inteligente)</option>
                         </select>
+                        <button type="button" class="btn btn-sm btn-light-warning mt-2" onclick="console.log('Teste manual'); updateConfigFields();">
+                            🧪 Teste Manual
+                        </button>
                     </div>
                     
                     <!-- Function Schema Fields -->
@@ -441,18 +444,38 @@ function removeFunctionParameter(id) {
 
 // Atualizar campos de config baseado no tipo
 function updateConfigFields() {
-    console.log("updateConfigFields chamada");
-    const toolType = document.getElementById("kt_tool_type").value;
+    console.log("=== updateConfigFields INICIADA ===");
+    
+    const toolTypeElement = document.getElementById("kt_tool_type");
+    console.log("Element kt_tool_type:", toolTypeElement);
+    
+    if (!toolTypeElement) {
+        console.error("ERRO: Elemento kt_tool_type não encontrado!");
+        return;
+    }
+    
+    const toolType = toolTypeElement.value;
     console.log("Tool type selecionado:", toolType);
     
     const configSection = document.getElementById("kt_config_section");
     const configFields = document.getElementById("kt_config_fields");
     
+    console.log("configSection:", configSection);
+    console.log("configFields:", configFields);
+    
+    if (!configSection || !configFields) {
+        console.error("ERRO: Elementos de config não encontrados!");
+        return;
+    }
+    
     if (!toolType) {
-        console.log("Nenhum tipo selecionado");
+        console.log("Nenhum tipo selecionado - ocultando seção");
         configSection.style.display = "none";
         return;
     }
+    
+    console.log("Verificando toolTypeConfigs[" + toolType + "]...");
+    console.log("toolTypeConfigs disponíveis:", Object.keys(toolTypeConfigs));
     
     if (!toolTypeConfigs[toolType]) {
         console.log("Config não encontrada para tipo:", toolType);
@@ -460,13 +483,16 @@ function updateConfigFields() {
         return;
     }
     
+    console.log("Config encontrada para tipo:", toolType);
+    console.log("Fields:", toolTypeConfigs[toolType].fields);
+    
     if (toolTypeConfigs[toolType].fields.length === 0) {
         console.log("Tipo não tem campos de config:", toolType);
         configSection.style.display = "none";
         return;
     }
     
-    console.log("Mostrando config para tipo:", toolType, "com", toolTypeConfigs[toolType].fields.length, "campos");
+    console.log("✅ Mostrando config para tipo:", toolType, "com", toolTypeConfigs[toolType].fields.length, "campos");
     configSection.style.display = "block";
     configFields.innerHTML = "";
     
@@ -707,17 +733,28 @@ function buildConfig() {
 }
 
 document.addEventListener("DOMContentLoaded", function() {
-    console.log("AI Tools: DOMContentLoaded disparado");
+    console.log("=== AI Tools: DOMContentLoaded disparado ===");
+    
+    // Verificar se toolTypeConfigs existe
+    console.log("toolTypeConfigs existe?", typeof toolTypeConfigs !== 'undefined');
+    console.log("toolTypeConfigs:", toolTypeConfigs);
     
     // Atualizar campos de config quando tipo mudar
     const toolTypeSelect = document.getElementById("kt_tool_type");
-    console.log("AI Tools: toolTypeSelect encontrado:", toolTypeSelect);
+    console.log("toolTypeSelect encontrado:", toolTypeSelect);
+    console.log("kt_config_section existe?", document.getElementById("kt_config_section"));
+    console.log("kt_config_fields existe?", document.getElementById("kt_config_fields"));
     
     if (toolTypeSelect) {
+        console.log("Registrando event listener no select...");
         toolTypeSelect.addEventListener("change", function() {
-            console.log("AI Tools: Tipo de tool mudou para:", this.value);
+            console.log("=== EVENT CHANGE DISPARADO ===");
+            console.log("Tipo selecionado:", this.value);
             updateConfigFields();
         });
+        console.log("Event listener registrado com sucesso!");
+    } else {
+        console.error("ERRO: toolTypeSelect não encontrado!");
     }
     
     const form = document.getElementById("kt_modal_new_ai_tool_form");

@@ -225,6 +225,7 @@ ob_start();
                             <option value="followup" <?= ($tool['tool_type'] ?? '') === 'followup' ? 'selected' : '' ?>>Followup</option>
                             <option value="human_escalation" <?= ($tool['tool_type'] ?? '') === 'human_escalation' ? 'selected' : '' ?>>🧑‍💼 Escalar para Humano</option>
                             <option value="funnel_stage" <?= ($tool['tool_type'] ?? '') === 'funnel_stage' ? 'selected' : '' ?>>📊 Mover para Funil/Etapa</option>
+                            <option value="funnel_stage_smart" <?= ($tool['tool_type'] ?? '') === 'funnel_stage_smart' ? 'selected' : '' ?>>🧠 Mover para Funil/Etapa (Inteligente)</option>
                         </select>
                     </div>
                     
@@ -449,6 +450,38 @@ const toolTypeConfigs = {
               help: "Use {stage_name}, {funnel_name}, {reason} como variáveis" },
             { name: "trigger_automation", label: "Disparar automação da etapa", type: "checkbox", required: false, default: true,
               help: "Executa automações configuradas na etapa de destino" }
+        ]
+    },
+    funnel_stage_smart: {
+        fields: [
+            { name: "max_options", label: "Máximo de etapas para análise", type: "number", required: false, 
+              default: "30", placeholder: "30", 
+              help: "Quantidade máxima de funis/etapas para IA analisar (afeta custo de tokens)" },
+            { name: "allowed_funnels", label: "Restringir a funis específicos", type: "funnel_multi_select", required: false,
+              help: "Deixe vazio para considerar todos os funis ativos" },
+            { name: "min_confidence", label: "Confiança mínima (%)", type: "number", required: false,
+              default: "70", placeholder: "70", min: 0, max: 100,
+              help: "Confiança mínima para mover automaticamente. Abaixo disso, usa fallback" },
+            { name: "fallback_funnel_id", label: "Funil Fallback", type: "funnel_select", required: false,
+              help: "Funil para usar quando IA não tiver confiança suficiente" },
+            { name: "fallback_stage_id", label: "Etapa Fallback", type: "stage_select", required: false,
+              dependsOn: "fallback_funnel_id", help: "Etapa fallback" },
+            { name: "fallback_action", label: "Ação se baixa confiança", type: "select", required: false,
+              options: [
+                { value: "use_fallback", label: "Usar funil/etapa fallback" },
+                { value: "keep_current", label: "Manter etapa atual" },
+                { value: "ask_client", label: "Perguntar ao cliente" },
+                { value: "escalate", label: "Escalar para humano" }
+              ], default: "use_fallback" },
+            { name: "include_history", label: "Incluir histórico na análise", type: "checkbox", required: false, default: true,
+              help: "Envia últimas mensagens para IA analisar contexto" },
+            { name: "history_limit", label: "Mensagens do histórico", type: "number", required: false,
+              default: "10", placeholder: "10", help: "Quantidade de mensagens recentes para análise" },
+            { name: "keep_agent", label: "Manter agente atual", type: "checkbox", required: false, default: true },
+            { name: "remove_ai_after", label: "Remover IA após mover", type: "checkbox", required: false, default: false },
+            { name: "add_note", label: "Adicionar nota com justificativa", type: "checkbox", required: false, default: true,
+              help: "Adiciona nota interna com a justificativa da IA" },
+            { name: "trigger_automation", label: "Disparar automação da etapa", type: "checkbox", required: false, default: true }
         ]
     }
 };

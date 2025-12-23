@@ -600,6 +600,45 @@ ob_start();
                                 <label class="fw-semibold fs-6 mb-2">Descrição</label>
                                 <textarea name="description" id="kt_stage_description" class="form-control form-control-solid" rows="3" placeholder="Descrição do estágio"></textarea>
                             </div>
+                            
+                            <!--begin::IA Fields-->
+                            <div class="separator separator-dashed my-5"></div>
+                            <div class="notice d-flex bg-light-primary rounded border-primary border border-dashed p-4 mb-5">
+                                <i class="ki-duotone ki-abstract-24 fs-2tx text-primary me-4">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <div class="d-flex flex-stack flex-grow-1">
+                                    <div class="fw-semibold">
+                                        <h4 class="text-gray-900 fw-bold">🧠 Configurações para IA Inteligente</h4>
+                                        <div class="fs-7 text-gray-600">Estas descrições ajudam a IA a entender quando mover conversas para esta etapa automaticamente.</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="fv-row mb-7">
+                                <label class="fw-semibold fs-6 mb-2">
+                                    <i class="ki-duotone ki-abstract-26 fs-5 me-1 text-primary"><span class="path1"></span><span class="path2"></span></i>
+                                    Descrição para IA
+                                </label>
+                                <textarea name="ai_description" id="kt_stage_ai_description" class="form-control form-control-solid" rows="4" placeholder="Descreva quando uma conversa deve estar nesta etapa. Ex: 'Cliente demonstrou interesse em comprar mas ainda não informou o que deseja. Precisa de qualificação inicial.'"></textarea>
+                                <div class="form-text text-muted">
+                                    Seja específico sobre o contexto e intenção do cliente que caracteriza esta etapa.
+                                </div>
+                            </div>
+                            
+                            <div class="fv-row mb-7">
+                                <label class="fw-semibold fs-6 mb-2">
+                                    <i class="ki-duotone ki-tag fs-5 me-1 text-primary"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                    Palavras-chave para IA
+                                </label>
+                                <input type="text" name="ai_keywords" id="kt_stage_ai_keywords" class="form-control form-control-solid" placeholder="comprar, orçamento, preço, valor, interesse" />
+                                <div class="form-text text-muted">
+                                    Palavras-chave separadas por vírgula que indicam esta etapa.
+                                </div>
+                            </div>
+                            <!--end::IA Fields-->
+                            
                             <div class="fv-row mb-7">
                                 <label class="fw-semibold fs-6 mb-2">Cor</label>
                                 <input type="color" name="color" id="kt_stage_color" class="form-control form-control-solid form-control-color" value="#009ef7" />

@@ -273,6 +273,12 @@ function editStage(stageId, name, description, color) {
                 document.getElementById("kt_stage_auto_assign_department").value = stage.auto_assign_department_id || "";
                 document.getElementById("kt_stage_auto_assign_method").value = stage.auto_assign_method || "round-robin";
                 
+                // Campos de IA
+                const aiDescEl = document.getElementById("kt_stage_ai_description");
+                if (aiDescEl) aiDescEl.value = stage.ai_description || "";
+                const aiKeywordsEl = document.getElementById("kt_stage_ai_keywords");
+                if (aiKeywordsEl) aiKeywordsEl.value = stage.ai_keywords || "";
+                
                 // Preencher arrays (blocked_stages, required_stages, required_tags, blocked_tags)
                 if (stage.blocked_stages) {
                     const blockedStages = typeof stage.blocked_stages === "string" ? JSON.parse(stage.blocked_stages) : stage.blocked_stages;

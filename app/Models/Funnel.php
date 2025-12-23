@@ -11,7 +11,7 @@ class Funnel extends Model
 {
     protected string $table = 'funnels';
     protected string $primaryKey = 'id';
-    protected array $fillable = ['name', 'description', 'is_default', 'status'];
+    protected array $fillable = ['name', 'description', 'ai_description', 'is_default', 'status'];
     protected bool $timestamps = true;
 
     /**

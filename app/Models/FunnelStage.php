@@ -12,7 +12,8 @@ class FunnelStage extends Model
     protected string $table = 'funnel_stages';
     protected string $primaryKey = 'id';
     protected array $fillable = [
-        'funnel_id', 'name', 'description', 'position', 'color', 'is_default',
+        'funnel_id', 'name', 'description', 'ai_description', 'ai_keywords', 
+        'position', 'color', 'is_default',
         'max_conversations', 'allow_move_back', 'allow_skip_stages',
         'blocked_stages', 'required_stages', 'required_tags', 'blocked_tags',
         'auto_assign', 'auto_assign_department_id', 'auto_assign_method',

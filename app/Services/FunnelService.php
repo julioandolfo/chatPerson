@@ -137,6 +137,8 @@ class FunnelService
         $errors = Validator::validate($data, [
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'ai_description' => 'nullable|string',
+            'ai_keywords' => 'nullable|string|max:500',
             'position' => 'nullable|integer',
             'color' => 'nullable|string|max:20',
             'is_default' => 'nullable|boolean',
@@ -231,6 +233,8 @@ class FunnelService
         $errors = Validator::validate($data, [
             'name' => 'nullable|string|max:255',
             'description' => 'nullable|string',
+            'ai_description' => 'nullable|string',
+            'ai_keywords' => 'nullable|string|max:500',
             'position' => 'nullable|integer',
             'color' => 'nullable|string|max:20',
             'is_default' => 'nullable|boolean',

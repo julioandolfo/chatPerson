@@ -616,6 +616,9 @@ class OpenAIService
             case 'funnel_stage':
                 return self::executeFunnelStageTool($tool, $arguments, $config, $conversationId, $context);
             
+            case 'funnel_stage_smart':
+                return self::executeFunnelStageSmartTool($tool, $arguments, $config, $conversationId, $context);
+            
             default:
                 return ['error' => 'Tipo de tool não suportado: ' . $toolType];
         }
@@ -1999,6 +2002,314 @@ class OpenAIService
         } catch (\Exception $e) {
             \App\Helpers\ConversationDebug::error($conversationId, 'executeFunnelStageTool', $e->getMessage());
             return ['error' => 'Erro ao mover para etapa: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Executar Funnel Stage Smart Tool (Mover para Funil/Etapa Inteligente)
+     * A IA analisa a conversa e decide qual o melhor funil/etapa baseado nas descrições
+     */
+    private static function executeFunnelStageSmartTool(array $tool, array $arguments, array $config, int $conversationId, array $context): array
+    {
+        try {
+            \App\Helpers\ConversationDebug::log($conversationId, "🧠 Executando Funnel Stage Smart Tool");
+            
+            // Configurações
+            $maxOptions = (int)($config['max_options'] ?? 30);
+            $allowedFunnels = $config['allowed_funnels'] ?? []; // Array de IDs
+            $minConfidence = (int)($config['min_confidence'] ?? 70) / 100; // Converter para decimal
+            $fallbackFunnelId = $config['fallback_funnel_id'] ?? null;
+            $fallbackStageId = $config['fallback_stage_id'] ?? null;
+            $fallbackAction = $config['fallback_action'] ?? 'use_fallback';
+            $includeHistory = $config['include_history'] ?? true;
+            $historyLimit = (int)($config['history_limit'] ?? 10);
+            $keepAgent = $config['keep_agent'] ?? true;
+            $removeAIAfter = !empty($config['remove_ai_after']);
+            $addNote = $config['add_note'] ?? true;
+            $triggerAutomation = $config['trigger_automation'] ?? true;
+            
+            // Contexto passado pela IA
+            $aiContext = $arguments['context'] ?? $arguments['reason'] ?? '';
+            
+            $conversation = Conversation::find($conversationId);
+            if (!$conversation) {
+                return ['error' => 'Conversa não encontrada'];
+            }
+            
+            // Buscar funis e etapas com descrições para IA
+            $funnelsData = self::getFunnelsWithAIDescriptions($allowedFunnels, $maxOptions);
+            
+            if (empty($funnelsData)) {
+                return ['error' => 'Nenhum funil/etapa encontrado para classificação'];
+            }
+            
+            // Montar contexto da conversa
+            $conversationContext = '';
+            if ($includeHistory) {
+                $messages = Database::fetchAll(
+                    "SELECT content, sender_type FROM messages 
+                     WHERE conversation_id = ? AND content IS NOT NULL AND content != ''
+                     ORDER BY created_at DESC LIMIT ?",
+                    [$conversationId, $historyLimit]
+                );
+                
+                $messages = array_reverse($messages);
+                foreach ($messages as $msg) {
+                    $role = $msg['sender_type'] === 'contact' ? 'Cliente' : 'Atendente';
+                    $conversationContext .= "{$role}: {$msg['content']}\n";
+                }
+            }
+            
+            // Adicionar contexto passado pela IA
+            if ($aiContext) {
+                $conversationContext .= "\nObservação da IA: {$aiContext}\n";
+            }
+            
+            // Classificar com OpenAI
+            $classification = self::classifyFunnelStage($conversationContext, $funnelsData, $conversationId);
+            
+            \App\Helpers\ConversationDebug::log($conversationId, "Classificação: " . json_encode($classification));
+            
+            // Verificar confiança
+            $confidence = $classification['confidence'] ?? 0;
+            $selectedFunnelId = $classification['funnel_id'] ?? null;
+            $selectedStageId = $classification['stage_id'] ?? null;
+            $reason = $classification['reason'] ?? 'Classificação automática pela IA';
+            
+            if ($confidence < $minConfidence || !$selectedFunnelId || !$selectedStageId) {
+                \App\Helpers\ConversationDebug::log($conversationId, "Confiança baixa ({$confidence} < {$minConfidence}), usando fallback: {$fallbackAction}");
+                
+                switch ($fallbackAction) {
+                    case 'use_fallback':
+                        if ($fallbackFunnelId && $fallbackStageId) {
+                            $selectedFunnelId = $fallbackFunnelId;
+                            $selectedStageId = $fallbackStageId;
+                            $reason = "Classificação com baixa confiança. Usando fallback.";
+                        } else {
+                            return ['error' => 'Classificação incerta e fallback não configurado'];
+                        }
+                        break;
+                        
+                    case 'keep_current':
+                        return [
+                            'success' => true,
+                            'message' => 'Mantendo etapa atual devido a baixa confiança na classificação',
+                            'classification_confidence' => $confidence,
+                            'action' => 'kept_current'
+                        ];
+                        
+                    case 'ask_client':
+                        return [
+                            'success' => false,
+                            'needs_clarification' => true,
+                            'message' => 'Não consegui identificar com certeza. Você pode me dizer mais sobre o que precisa?',
+                            'classification_confidence' => $confidence
+                        ];
+                        
+                    case 'escalate':
+                        // Chamar tool de escalação
+                        return [
+                            'success' => false,
+                            'needs_escalation' => true,
+                            'message' => 'Classificação incerta, recomendo escalar para humano',
+                            'classification_confidence' => $confidence
+                        ];
+                        
+                    default:
+                        return ['error' => 'Ação de fallback não reconhecida'];
+                }
+            }
+            
+            // Verificar se funil e etapa existem
+            $funnel = Funnel::find($selectedFunnelId);
+            if (!$funnel) {
+                return ['error' => 'Funil classificado não encontrado: ' . $selectedFunnelId];
+            }
+            
+            $stage = FunnelStage::find($selectedStageId);
+            if (!$stage || $stage['funnel_id'] != $selectedFunnelId) {
+                return ['error' => 'Etapa classificada não encontrada ou não pertence ao funil'];
+            }
+            
+            $oldStageId = $conversation['funnel_stage_id'];
+            $oldFunnelId = $conversation['funnel_id'];
+            
+            // Atualizar conversa
+            $updateData = [
+                'funnel_id' => $selectedFunnelId,
+                'funnel_stage_id' => $selectedStageId
+            ];
+            
+            if (!$keepAgent) {
+                $updateData['assigned_user_id'] = null;
+            }
+            
+            Conversation::update($conversationId, $updateData);
+            
+            // Remover IA se configurado
+            if ($removeAIAfter) {
+                ConversationAIService::removeAIAgent($conversationId);
+            }
+            
+            // Adicionar nota com justificativa da IA
+            if ($addNote) {
+                Activity::create([
+                    'conversation_id' => $conversationId,
+                    'user_id' => null,
+                    'activity_type' => 'stage_change',
+                    'content' => json_encode([
+                        'from_funnel_id' => $oldFunnelId,
+                        'to_funnel_id' => $selectedFunnelId,
+                        'from_stage_id' => $oldStageId,
+                        'to_stage_id' => $selectedStageId,
+                        'ai_classification' => [
+                            'confidence' => $confidence,
+                            'reason' => $reason,
+                            'funnel_name' => $funnel['name'],
+                            'stage_name' => $stage['name']
+                        ],
+                        'by' => 'ai_smart_tool'
+                    ]),
+                    'is_internal' => true
+                ]);
+            }
+            
+            // Disparar automação
+            if ($triggerAutomation) {
+                AutomationService::triggerByStageChange($conversationId, $selectedStageId);
+            }
+            
+            \App\Helpers\ConversationDebug::log($conversationId, "✅ Smart: Movido para {$funnel['name']} / {$stage['name']} (confiança: " . round($confidence * 100) . "%)");
+            
+            return [
+                'success' => true,
+                'message' => "Conversa classificada e movida para {$funnel['name']} / {$stage['name']}",
+                'funnel_id' => $selectedFunnelId,
+                'funnel_name' => $funnel['name'],
+                'stage_id' => $selectedStageId,
+                'stage_name' => $stage['name'],
+                'confidence' => $confidence,
+                'reason' => $reason
+            ];
+            
+        } catch (\Exception $e) {
+            \App\Helpers\ConversationDebug::error($conversationId, 'executeFunnelStageSmartTool', $e->getMessage());
+            return ['error' => 'Erro ao classificar/mover: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Buscar funis e etapas com descrições para IA
+     */
+    private static function getFunnelsWithAIDescriptions(array $allowedFunnelIds = [], int $maxOptions = 30): array
+    {
+        $sql = "SELECT f.id as funnel_id, f.name as funnel_name, f.description as funnel_description, 
+                       f.ai_description as funnel_ai_description,
+                       fs.id as stage_id, fs.name as stage_name, fs.description as stage_description,
+                       fs.ai_description as stage_ai_description, fs.ai_keywords
+                FROM funnels f
+                INNER JOIN funnel_stages fs ON f.id = fs.funnel_id
+                WHERE f.status = 'active'";
+        
+        $params = [];
+        
+        if (!empty($allowedFunnelIds)) {
+            $placeholders = implode(',', array_fill(0, count($allowedFunnelIds), '?'));
+            $sql .= " AND f.id IN ({$placeholders})";
+            $params = array_merge($params, $allowedFunnelIds);
+        }
+        
+        $sql .= " ORDER BY f.name, fs.stage_order, fs.position LIMIT ?";
+        $params[] = $maxOptions;
+        
+        return Database::fetchAll($sql, $params);
+    }
+
+    /**
+     * Classificar conversa para funil/etapa usando OpenAI
+     */
+    private static function classifyFunnelStage(string $conversationContext, array $funnelsData, int $conversationId): array
+    {
+        $apiKey = Setting::get('openai_api_key');
+        if (!$apiKey) {
+            return ['error' => 'API Key OpenAI não configurada'];
+        }
+        
+        // Montar lista de opções para o prompt
+        $optionsText = "";
+        $currentFunnel = "";
+        
+        foreach ($funnelsData as $row) {
+            if ($row['funnel_name'] !== $currentFunnel) {
+                $currentFunnel = $row['funnel_name'];
+                $funnelDesc = $row['funnel_ai_description'] ?: $row['funnel_description'] ?: 'Sem descrição';
+                $optionsText .= "\n### Funil: {$row['funnel_name']} (ID: {$row['funnel_id']})\n";
+                $optionsText .= "Descrição: {$funnelDesc}\n";
+                $optionsText .= "Etapas:\n";
+            }
+            
+            $stageDesc = $row['stage_ai_description'] ?: $row['stage_description'] ?: 'Sem descrição';
+            $keywords = $row['ai_keywords'] ? " [Keywords: {$row['ai_keywords']}]" : '';
+            $optionsText .= "- {$row['stage_name']} (ID: {$row['stage_id']}): {$stageDesc}{$keywords}\n";
+        }
+        
+        $systemPrompt = <<<PROMPT
+Você é um classificador de conversas. Analise o contexto da conversa e determine o melhor funil e etapa para esta conversa.
+
+## Contexto da Conversa:
+{$conversationContext}
+
+## Funis e Etapas Disponíveis:
+{$optionsText}
+
+## Instruções:
+1. Analise o contexto da conversa
+2. Identifique a intenção principal do cliente
+3. Escolha o funil e etapa mais apropriados
+4. Retorne sua análise em JSON
+
+## Responda APENAS em JSON válido:
+{
+  "funnel_id": <número>,
+  "funnel_name": "<nome do funil>",
+  "stage_id": <número>,
+  "stage_name": "<nome da etapa>",
+  "confidence": <número entre 0 e 1>,
+  "reason": "<justificativa breve da escolha>"
+}
+PROMPT;
+
+        try {
+            $response = self::makeRequest($apiKey, [
+                'model' => 'gpt-4o-mini',
+                'messages' => [
+                    ['role' => 'system', 'content' => 'Você é um classificador preciso. Responda apenas em JSON válido.'],
+                    ['role' => 'user', 'content' => $systemPrompt]
+                ],
+                'temperature' => 0.3,
+                'max_tokens' => 300
+            ]);
+            
+            $content = $response['choices'][0]['message']['content'] ?? '';
+            
+            // Extrair JSON da resposta
+            $content = trim($content);
+            if (preg_match('/\{[\s\S]*\}/', $content, $matches)) {
+                $content = $matches[0];
+            }
+            
+            $result = json_decode($content, true);
+            
+            if (json_last_error() === JSON_ERROR_NONE && isset($result['funnel_id'])) {
+                return $result;
+            }
+            
+            \App\Helpers\ConversationDebug::error($conversationId, 'classifyFunnelStage', 'Resposta inválida: ' . $content);
+            return ['confidence' => 0, 'error' => 'Resposta inválida da IA'];
+            
+        } catch (\Exception $e) {
+            \App\Helpers\ConversationDebug::error($conversationId, 'classifyFunnelStage', $e->getMessage());
+            return ['confidence' => 0, 'error' => $e->getMessage()];
         }
     }
 

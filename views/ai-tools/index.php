@@ -528,7 +528,7 @@ function updateConfigFields() {
         if (field.showIf) fieldDiv.dataset.showIf = field.showIf;
         
         let inputHtml = "";
-        let labelHtml = `<label class="fw-semibold fs-7 mb-2">${field.label}${field.required ? " <span class=\\"text-danger\\">*</span>" : ""}</label>`;
+        let labelHtml = `<label class="fw-semibold fs-7 mb-2">${field.label}${field.required ? ' <span class="text-danger">*</span>' : ""}</label>`;
         
         if (field.type === "checkbox") {
             inputHtml = `

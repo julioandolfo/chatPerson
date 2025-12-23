@@ -604,15 +604,15 @@ function updateEditConfigFields() {
                 });
             }
             inputHtml += `</select>`;
-            labelHtml = `<label class="fw-semibold fs-7 mb-2">${field.label}${field.required ? " <span class=\"text-danger\">*</span>" : ""}</label>`;
+            labelHtml = `<label class="fw-semibold fs-7 mb-2">${field.label}${field.required ? ' <span class="text-danger">*</span>' : ""}</label>`;
             fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
         } else if (field.type === "textarea") {
             inputHtml = `<textarea class="form-control form-control-solid config-field" data-field="${field.name}" rows="3" ${field.required ? "required" : ""} placeholder="${field.placeholder || ""}"></textarea>`;
-            labelHtml = `<label class="fw-semibold fs-7 mb-2">${field.label}${field.required ? " <span class=\"text-danger\">*</span>" : ""}</label>`;
+            labelHtml = `<label class="fw-semibold fs-7 mb-2">${field.label}${field.required ? ' <span class="text-danger">*</span>' : ""}</label>`;
             fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
         } else {
             inputHtml = `<input type="${field.type}" class="form-control form-control-solid config-field" data-field="${field.name}" ${field.required ? "required" : ""} placeholder="${field.placeholder || ""}" value="${field.default || ""}" />`;
-            labelHtml = `<label class="fw-semibold fs-7 mb-2">${field.label}${field.required ? " <span class=\"text-danger\">*</span>" : ""}</label>`;
+            labelHtml = `<label class="fw-semibold fs-7 mb-2">${field.label}${field.required ? ' <span class="text-danger">*</span>' : ""}</label>`;
             fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
         }
         

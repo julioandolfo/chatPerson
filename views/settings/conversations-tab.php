@@ -739,7 +739,8 @@ $tts = $cs['text_to_speech'] ?? [];
                         <div class="fv-row mb-7">
                             <label class="fw-semibold fs-6 mb-2">Estabilidade</label>
                             <input type="number" name="text_to_speech_stability" class="form-control form-control-solid" 
-                                   value="<?= $tts['stability'] ?? 0.5 ?>" min="0" max="1" step="0.1" />
+                                   value="<?= $tts['stability'] ?? 0.5 ?>" min="0" max="1" step="0.1" 
+                                   data-provider="elevenlabs" />
                             <div class="form-text">0.0 = mais variável, 1.0 = mais estável</div>
                         </div>
                     </div>
@@ -747,7 +748,8 @@ $tts = $cs['text_to_speech'] ?? [];
                         <div class="fv-row mb-7">
                             <label class="fw-semibold fs-6 mb-2">Similaridade</label>
                             <input type="number" name="text_to_speech_similarity_boost" class="form-control form-control-solid" 
-                                   value="<?= $tts['similarity_boost'] ?? 0.75 ?>" min="0" max="1" step="0.1" />
+                                   value="<?= $tts['similarity_boost'] ?? 0.75 ?>" min="0" max="1" step="0.1" 
+                                   data-provider="elevenlabs" />
                             <div class="form-text">Quão similar à voz original (0.0 a 1.0)</div>
                         </div>
                     </div>
@@ -755,7 +757,8 @@ $tts = $cs['text_to_speech'] ?? [];
                         <div class="fv-row mb-7">
                             <label class="fw-semibold fs-6 mb-2">Velocidade</label>
                             <input type="number" name="text_to_speech_speed" class="form-control form-control-solid" 
-                                   value="<?= $tts['speed'] ?? 1.0 ?>" min="0.25" max="4.0" step="0.1" />
+                                   value="<?= $tts['speed'] ?? 1.0 ?>" min="0.25" max="4.0" step="0.1" 
+                                   data-provider="elevenlabs" />
                             <div class="form-text">Velocidade de fala (0.25 a 4.0)</div>
                         </div>
                     </div>
@@ -864,15 +867,31 @@ document.addEventListener("DOMContentLoaded", function() {
     const openaiSettings = document.getElementById("tts_openai_settings");
     const elevenlabsSettings = document.getElementById("tts_elevenlabs_settings");
     if (ttsProviderSelect && openaiSettings && elevenlabsSettings) {
-        ttsProviderSelect.addEventListener("change", function() {
-            if (this.value === "openai") {
+        function toggleProviderSettings(provider) {
+            if (provider === "openai") {
                 openaiSettings.style.display = "block";
                 elevenlabsSettings.style.display = "none";
+                // Desabilitar campos do ElevenLabs para evitar validação quando escondidos
+                document.querySelectorAll('[data-provider="elevenlabs"]').forEach(function(input) {
+                    input.disabled = true;
+                    input.removeAttribute('required');
+                });
             } else {
                 openaiSettings.style.display = "none";
                 elevenlabsSettings.style.display = "block";
+                // Habilitar campos do ElevenLabs
+                document.querySelectorAll('[data-provider="elevenlabs"]').forEach(function(input) {
+                    input.disabled = false;
+                });
             }
+        }
+        
+        ttsProviderSelect.addEventListener("change", function() {
+            toggleProviderSettings(this.value);
         });
+        
+        // Inicializar estado correto ao carregar página
+        toggleProviderSettings(ttsProviderSelect.value);
     }
     
     // Toggle modo de envio (mostrar/esconder configurações inteligentes)
@@ -992,6 +1011,20 @@ document.addEventListener("DOMContentLoaded", function() {
         // Atualizar regras de porcentagem antes de enviar
         updatePercentageRulesHidden();
         
+        // Desabilitar campos escondidos antes de validar/enviar para evitar erro de validação
+        const provider = document.getElementById("tts_provider_select")?.value || "openai";
+        if (provider === "openai") {
+            document.querySelectorAll('[data-provider="elevenlabs"]').forEach(function(input) {
+                input.disabled = true;
+                input.removeAttribute('required');
+            });
+        } else {
+            document.querySelectorAll('[data-provider="openai"]').forEach(function(input) {
+                input.disabled = true;
+                input.removeAttribute('required');
+            });
+        }
+        
         const submitBtn = form.querySelector("button[type=\"submit\"]");
         submitBtn.setAttribute("data-kt-indicator", "on");
         submitBtn.disabled = true;
@@ -1010,6 +1043,11 @@ document.addEventListener("DOMContentLoaded", function() {
             submitBtn.removeAttribute("data-kt-indicator");
             submitBtn.disabled = false;
             
+            // Reabilitar campos após envio
+            document.querySelectorAll('[data-provider]').forEach(function(input) {
+                input.disabled = false;
+            });
+            
             if (data.success) {
                 alert(data.message || "Configurações salvas com sucesso!");
             } else {
@@ -1019,6 +1057,12 @@ document.addEventListener("DOMContentLoaded", function() {
         .catch(error => {
             submitBtn.removeAttribute("data-kt-indicator");
             submitBtn.disabled = false;
+            
+            // Reabilitar campos após erro
+            document.querySelectorAll('[data-provider]').forEach(function(input) {
+                input.disabled = false;
+            });
+            
             alert("Erro ao salvar configurações");
         });
     }

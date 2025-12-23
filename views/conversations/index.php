@@ -5162,6 +5162,12 @@ function selectConversation(id) {
             } else {
                 console.warn('❌ [selectConversation] loadAIAgentStatus não está disponível');
             }
+            // Carregar status da automação
+            if (typeof loadAutomationStatus === 'function') {
+                loadAutomationStatus(id);
+            } else {
+                console.warn('❌ [selectConversation] loadAutomationStatus não está disponível');
+            }
             
             // Atualizar timeline quando conversa é selecionada
             updateConversationTimeline(data.conversation.id);

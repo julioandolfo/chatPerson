@@ -1912,6 +1912,57 @@ class ConversationController
     }
 
     /**
+     * Obter status da automação ativa na conversa
+     */
+    public function getAutomationStatus(int $id): void
+    {
+        $config = $this->prepareJsonResponse();
+        
+        try {
+            Permission::abortIfCannot('conversations.view.own');
+            
+            $sql = "SELECT ae.automation_id, ae.status as execution_status, ae.created_at as execution_at,
+                           a.name as automation_name, a.status as automation_status, a.trigger_type
+                    FROM automation_executions ae
+                    LEFT JOIN automations a ON a.id = ae.automation_id
+                    WHERE ae.conversation_id = ?
+                    ORDER BY ae.created_at DESC
+                    LIMIT 1";
+            $row = \App\Helpers\Database::fetch($sql, [$id]);
+            
+            $data = [
+                'has_automation' => (bool)$row,
+                'automation' => null
+            ];
+            
+            if ($row) {
+                $data['automation'] = [
+                    'id' => (int)$row['automation_id'],
+                    'name' => $row['automation_name'] ?? 'Automação',
+                    'automation_status' => $row['automation_status'] ?? 'inactive',
+                    'execution_status' => $row['execution_status'] ?? null,
+                    'trigger_type' => $row['trigger_type'] ?? null,
+                    'last_execution_at' => $row['execution_at'] ?? null
+                ];
+            }
+            
+            ob_end_clean();
+            Response::json([
+                'success' => true,
+                'data' => $data
+            ]);
+        } catch (\Exception $e) {
+            ob_end_clean();
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        } finally {
+            $this->restoreAfterJsonResponse($config);
+        }
+    }
+
+    /**
      * Obter mensagens da IA na conversa
      */
     public function getAIMessages(int $id): void

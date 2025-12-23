@@ -294,6 +294,7 @@ Router::get('/conversations/{id}/ai-status', [ConversationController::class, 'ge
 Router::get('/conversations/{id}/ai-messages', [ConversationController::class, 'getAIMessages'], ['Authentication']);
 Router::post('/conversations/{id}/ai-agents', [ConversationController::class, 'addAIAgent'], ['Authentication']);
 Router::delete('/conversations/{id}/ai-agents', [ConversationController::class, 'removeAIAgent'], ['Authentication']);
+Router::get('/conversations/{id}/automation-status', [ConversationController::class, 'getAutomationStatus'], ['Authentication']);
 
 // Rotas de Notificações
 Router::get('/notifications', [NotificationController::class, 'index'], ['Authentication']);

@@ -261,6 +261,18 @@
                 </div>
                 
                 <div class="separator my-5"></div>
+
+                <!-- Automação -->
+                <div class="sidebar-section" id="sidebar-automation-section">
+                    <div class="sidebar-section-title d-flex justify-content-between align-items-center">
+                        <span>⚙️ Automação</span>
+                    </div>
+                    <div id="sidebar-automation-status">
+                        <div class="text-muted fs-7">Carregando...</div>
+                    </div>
+                </div>
+
+                <div class="separator my-5"></div>
                 
                 <!-- Informações da Conversa -->
                 <div class="sidebar-section">
@@ -980,6 +992,73 @@ window.loadAIAgentStatus = function(conversationId) {
         if (typeof updateAIActiveBanner === 'function') {
             updateAIActiveBanner({ has_ai: false }, conversationId);
         }
+    });
+};
+
+/**
+ * Atualizar sidebar com status da automação
+ */
+window.updateAutomationSidebar = function(data) {
+    const statusDiv = document.getElementById('sidebar-automation-status');
+    if (!statusDiv) {
+        console.error('sidebar-automation-status não encontrado');
+        return;
+    }
+    
+    if (!data || !data.has_automation || !data.automation) {
+        statusDiv.innerHTML = '<div class="text-muted fs-7">Nenhuma automação ativa</div>';
+        return;
+    }
+    
+    const automation = data.automation;
+    const execStatus = automation.execution_status || 'unknown';
+    const autoStatus = automation.automation_status || 'inactive';
+    const lastExec = automation.last_execution_at ? formatTime(automation.last_execution_at) : '—';
+    
+    statusDiv.innerHTML = `
+        <div class="d-flex flex-column gap-1">
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge ${autoStatus === 'active' ? 'badge-success' : 'badge-light'}">${autoStatus === 'active' ? 'Ativa' : 'Inativa'}</span>
+                ${automation.trigger_type ? `<span class="badge badge-light">${escapeHtml(automation.trigger_type)}</span>` : ''}
+            </div>
+            <div class="fw-semibold">${escapeHtml(automation.name || 'Automação')}</div>
+            <div class="text-muted fs-8">Execução: ${escapeHtml(execStatus)}</div>
+            <div class="text-muted fs-8">Última: ${lastExec}</div>
+        </div>
+    `;
+};
+
+/**
+ * Carregar status da automação
+ */
+window.loadAutomationStatus = function(conversationId) {
+    if (!conversationId) {
+        updateAutomationSidebar({ has_automation: false });
+        return;
+    }
+    
+    const statusDiv = document.getElementById('sidebar-automation-status');
+    if (statusDiv) {
+        statusDiv.innerHTML = '<div class="text-muted fs-7">Carregando...</div>';
+    }
+    
+    const url = `<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/automation-status`;
+    fetch(url, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateAutomationSidebar(data.data);
+        } else {
+            updateAutomationSidebar({ has_automation: false });
+        }
+    })
+    .catch(() => {
+        updateAutomationSidebar({ has_automation: false });
     });
 };
 console.log('✅ loadAIAgentStatus definida:', typeof window.loadAIAgentStatus);

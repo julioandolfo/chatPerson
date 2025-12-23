@@ -1516,22 +1516,45 @@ class ConversationService
             
             $aiConversation = \App\Models\AIConversation::getByConversationId($conversationId);
             if ($aiConversation && $aiConversation['status'] === 'active') {
-                // ✅ CORRIGIDO: Não verificar intent na mensagem do contato
-                // A verificação de intent será feita APÓS a IA responder (em AIAgentService)
-                // Isso permite que o contador conte "interações funcionais" (respostas da IA sem intent)
-                
                 try {
-                    // Processar mensagem com agente de IA em background (assíncrono)
-                    // Por enquanto, processar diretamente (em produção, usar fila de jobs)
-                    // ✅ Usar conteúdo processado (pode ser texto transcrito se for áudio)
-                    $aiResponse = \App\Services\AIAgentService::processMessage(
-                        $conversationId,
-                        $aiConversation['ai_agent_id'],
-                        $processedContent // Usar conteúdo processado (transcrito se disponível)
-                    );
+                    // ✅ NOVO: Verificar intent na mensagem do CLIENTE antes de chamar IA
+                    $conversation = \App\Models\Conversation::find($conversationId);
+                    $metadata = json_decode($conversation['metadata'] ?? '{}', true);
                     
-                    // A resposta já foi enviada pelo processMessage
-                    // A verificação de intent será feita após a resposta da IA
+                    $intentDetected = false;
+                    if (!empty($metadata['ai_branching_active'])) {
+                        \App\Helpers\Logger::automation("🔍 AI Branching ativo - Verificando intent na mensagem do CLIENTE antes de processar com IA...");
+                        
+                        // Criar array com mensagem do cliente para detecção
+                        $clientMessage = [
+                            'content' => $processedContent,
+                            'sender_type' => 'contact',
+                            'id' => $messageId
+                        ];
+                        
+                        // Verificar intent na mensagem do cliente
+                        $intentDetected = \App\Services\AutomationService::handleAIBranchingResponse($conversation, $clientMessage);
+                        
+                        if ($intentDetected) {
+                            \App\Helpers\Logger::automation("✅ Intent detectado na mensagem do CLIENTE! Fluxo roteado SEM chamar IA.");
+                            // Intent foi detectado, mensagem de saída já foi enviada, fluxo foi roteado
+                            // NÃO processar com IA
+                            return $messageId;
+                        } else {
+                            \App\Helpers\Logger::automation("⚠️ Nenhum intent detectado. Processando normalmente com IA...");
+                        }
+                    }
+                    
+                    // Se não detectou intent, processar com IA normalmente
+                    if (!$intentDetected) {
+                        $aiResponse = \App\Services\AIAgentService::processMessage(
+                            $conversationId,
+                            $aiConversation['ai_agent_id'],
+                            $processedContent // Usar conteúdo processado (transcrito se disponível)
+                        );
+                        
+                        // A resposta já foi enviada pelo processMessage
+                    }
                 } catch (\Exception $e) {
                     error_log("Erro ao processar mensagem com agente de IA: " . $e->getMessage());
                     // Continuar normalmente mesmo se falhar

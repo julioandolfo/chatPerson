@@ -440,31 +440,9 @@ class AIAgentService
             
             \App\Helpers\Logger::info("AIAgentService::processMessage - DEPOIS de sendMessage (aiMessageId={$aiMessageId})");
 
-            // ✅ CORRIGIDO: Verificar intent na RESPOSTA DA IA após ela responder
-            // Isso permite contar "interações funcionais" (respostas sem intent detectado)
-            $conversation = \App\Models\Conversation::find($conversationId);
-            $metadata = json_decode($conversation['metadata'] ?? '{}', true);
-            
-            if (!empty($metadata['ai_branching_active'])) {
-                \App\Helpers\Logger::automation("🔍 Verificando intent na RESPOSTA DA IA após processamento...");
-                
-                // Criar array com mensagem da IA para detecção
-                $aiMessageForDetection = [
-                    'content' => $response['content'],
-                    'sender_type' => 'agent',
-                    'id' => $aiMessageId
-                ];
-                
-                // Verificar intent na resposta da IA
-                $handled = \App\Services\AutomationService::handleAIBranchingResponse($conversation, $aiMessageForDetection);
-                
-                if ($handled) {
-                    \App\Helpers\Logger::automation("✅ Intent detectado na resposta da IA! Fluxo roteado.");
-                    // Intent foi detectado e tratado, fluxo foi roteado
-                } else {
-                    \App\Helpers\Logger::automation("⚠️ Nenhum intent detectado na resposta da IA. Continuando normalmente.");
-                }
-            }
+            // ✅ REMOVIDO: Verificação de intent na resposta da IA
+            // Agora a verificação é feita ANTES de chamar a IA, na mensagem do cliente
+            // Isso evita que a IA responda antes de detectar a intenção
 
             \App\Helpers\Logger::info("═══ AIAgentService::processMessage SUCESSO ═══ conv={$conversationId}, aiMessageId={$aiMessageId}");
             

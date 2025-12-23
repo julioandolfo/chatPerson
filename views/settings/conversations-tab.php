@@ -872,17 +872,21 @@ document.addEventListener("DOMContentLoaded", function() {
                 openaiSettings.style.display = "block";
                 elevenlabsSettings.style.display = "none";
                 // Desabilitar campos do ElevenLabs para evitar validação quando escondidos
-                document.querySelectorAll('[data-provider="elevenlabs"]').forEach(function(input) {
-                    input.disabled = true;
-                    input.removeAttribute('required');
-                });
+                setTimeout(function() {
+                    document.querySelectorAll('[data-provider="elevenlabs"]').forEach(function(input) {
+                        input.disabled = true;
+                        input.removeAttribute('required');
+                    });
+                }, 100);
             } else {
                 openaiSettings.style.display = "none";
                 elevenlabsSettings.style.display = "block";
                 // Habilitar campos do ElevenLabs
-                document.querySelectorAll('[data-provider="elevenlabs"]').forEach(function(input) {
-                    input.disabled = false;
-                });
+                setTimeout(function() {
+                    document.querySelectorAll('[data-provider="elevenlabs"]').forEach(function(input) {
+                        input.disabled = false;
+                    });
+                }, 100);
             }
         }
         
@@ -891,7 +895,9 @@ document.addEventListener("DOMContentLoaded", function() {
         });
         
         // Inicializar estado correto ao carregar página
-        toggleProviderSettings(ttsProviderSelect.value);
+        setTimeout(function() {
+            toggleProviderSettings(ttsProviderSelect.value);
+        }, 200);
     }
     
     // Toggle modo de envio (mostrar/esconder configurações inteligentes)

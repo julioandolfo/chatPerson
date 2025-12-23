@@ -74,11 +74,7 @@ class TTSService
         $settings = self::getSettings();
         $provider = $options['provider'] ?? $settings['provider'] ?? self::PROVIDER_OPENAI;
 
-        Logger::info("TTSService::generateAudio - Iniciando geração de áudio", [
-            'provider' => $provider,
-            'text_length' => strlen($text),
-            'options' => $options
-        ]);
+        Logger::info("TTSService::generateAudio - Iniciando (provider={$provider}, len=" . strlen($text) . ")");
 
         try {
             switch ($provider) {
@@ -227,13 +223,7 @@ class TTSService
 
         $executionTime = microtime(true) - $startTime;
 
-        Logger::info("TTSService::generateWithOpenAI - ✅ Áudio gerado com sucesso", [
-            'file' => $finalPath,
-            'size' => filesize($finalPath),
-            'cost' => $cost,
-            'duration' => round($duration, 2),
-            'execution_time' => round($executionTime, 2)
-        ]);
+        Logger::info("TTSService::generateWithOpenAI - ✅ Áudio gerado: {$finalPath} (" . filesize($finalPath) . " bytes, cost=$" . number_format($cost, 4) . ", time=" . round($executionTime, 2) . "s)");
 
         return [
             'success' => true,

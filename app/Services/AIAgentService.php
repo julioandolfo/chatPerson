@@ -349,10 +349,7 @@ class AIAgentService
             
             if (!empty($ttsSettings['enabled']) && !empty($ttsSettings['auto_generate_audio'])) {
                 try {
-                    \App\Helpers\Logger::info("AIAgentService::processMessage - Gerando áudio com TTS", [
-                        'provider' => $ttsSettings['provider'] ?? 'openai',
-                        'text_length' => strlen($response['content'])
-                    ]);
+                    \App\Helpers\Logger::info("AIAgentService::processMessage - Gerando áudio com TTS (provider=" . ($ttsSettings['provider'] ?? 'openai') . ", len=" . strlen($response['content']) . ")");
                     
                     $ttsResult = \App\Services\TTSService::generateAudio($response['content'], [
                         'voice_id' => $ttsSettings['voice_id'] ?? null,
@@ -372,10 +369,7 @@ class AIAgentService
                             'size' => filesize($ttsResult['audio_path'])
                         ];
                         
-                        \App\Helpers\Logger::info("AIAgentService::processMessage - ✅ Áudio gerado com sucesso", [
-                            'audio_path' => $ttsResult['audio_path'],
-                            'cost' => $ttsResult['cost']
-                        ]);
+                        \App\Helpers\Logger::info("AIAgentService::processMessage - ✅ Áudio gerado: " . $ttsResult['audio_path'] . " (cost=$" . $ttsResult['cost'] . ")");
                     } else {
                         \App\Helpers\Logger::error("AIAgentService::processMessage - ❌ Falha ao gerar áudio: " . ($ttsResult['error'] ?? 'Erro desconhecido'));
                     }

@@ -23,11 +23,7 @@ class TTSIntelligentService
         $textLength = mb_strlen($text);
         $textLower = mb_strtolower($text);
         
-        Logger::info("TTSIntelligentService::decideSendMode - Analisando mensagem", [
-            'conversationId' => $conversationId,
-            'textLength' => $textLength,
-            'rules' => $rules
-        ]);
+        Logger::info("TTSIntelligentService::decideSendMode - Analisando (conv={$conversationId}, len={$textLength})");
         
         // 1. Verificar tamanho do texto
         if (!empty($rules['use_text_length'])) {

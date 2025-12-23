@@ -1218,10 +1218,7 @@ class ConversationService
                     }
                     
                     if ($shouldTranscribe) {
-                        \App\Helpers\Logger::info("ConversationService::sendMessage - Iniciando transcrição automática de áudio", [
-                            'messageId' => $messageId,
-                            'conversationId' => $conversationId
-                        ]);
+                        \App\Helpers\Logger::info("ConversationService::sendMessage - Iniciando transcrição automática (msg={$messageId}, conv={$conversationId})");
                         
                         // Pegar primeiro anexo de áudio
                         $audioAttachment = null;
@@ -1251,11 +1248,7 @@ class ConversationService
                                             'content' => $transcriptionResult['text']
                                         ]);
                                         
-                                        \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Transcrição concluída e mensagem atualizada", [
-                                            'messageId' => $messageId,
-                                            'textLength' => strlen($transcriptionResult['text']),
-                                            'cost' => $transcriptionResult['cost']
-                                        ]);
+                                        \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Transcrição concluída (msg={$messageId}, len=" . strlen($transcriptionResult['text']) . ", cost=$" . $transcriptionResult['cost'] . ")");
                                         
                                         // Atualizar variável $content para usar no processamento com IA abaixo
                                         $content = $transcriptionResult['text'];
@@ -1275,9 +1268,7 @@ class ConversationService
                                         // Usar texto transcrito para processamento com IA mesmo se não atualizar content
                                         $content = $transcriptionResult['text'];
                                         
-                                        \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Transcrição salva em metadata", [
-                                            'messageId' => $messageId
-                                        ]);
+                                        \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Transcrição salva em metadata (msg={$messageId})");
                                     }
                                 } else {
                                     \App\Helpers\Logger::error("ConversationService::sendMessage - ❌ Falha na transcrição: " . ($transcriptionResult['error'] ?? 'Erro desconhecido'));
@@ -1515,11 +1506,7 @@ class ConversationService
                         if ($message && !empty(trim($message['content'] ?? '')) && $message['content'] !== $content) {
                             // Mensagem foi atualizada com transcrição
                             $processedContent = $message['content'];
-                            \App\Helpers\Logger::info("ConversationService::sendMessage - Usando texto transcrito para processar com IA", [
-                                'messageId' => $messageId,
-                                'originalLength' => strlen($content),
-                                'transcribedLength' => strlen($processedContent)
-                            ]);
+                            \App\Helpers\Logger::info("ConversationService::sendMessage - Usando texto transcrito para IA (msg={$messageId}, original=" . strlen($content) . ", transcribed=" . strlen($processedContent) . ")");
                         }
                     }
                 } catch (\Exception $e) {

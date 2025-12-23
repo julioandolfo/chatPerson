@@ -175,13 +175,7 @@ class ElevenLabsService
 
         $executionTime = microtime(true) - $startTime;
 
-        Logger::info("ElevenLabsService::generateAudio - ✅ Áudio gerado com sucesso", [
-            'file' => $finalPath,
-            'size' => filesize($finalPath),
-            'cost' => $cost,
-            'duration' => round($duration, 2),
-            'execution_time' => round($executionTime, 2)
-        ]);
+        Logger::info("ElevenLabsService::generateAudio - ✅ Áudio gerado: {$finalPath} (" . filesize($finalPath) . " bytes, cost=$" . number_format($cost, 4) . ", time=" . round($executionTime, 2) . "s)");
 
         return [
             'success' => true,

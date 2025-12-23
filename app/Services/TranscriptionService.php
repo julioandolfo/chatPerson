@@ -68,11 +68,7 @@ class TranscriptionService
     {
         $startTime = microtime(true);
         
-        Logger::info("TranscriptionService::transcribe - Iniciando transcrição", [
-            'file' => $audioFilePath,
-            'size' => file_exists($audioFilePath) ? filesize($audioFilePath) : 0,
-            'options' => $options
-        ]);
+        Logger::info("TranscriptionService::transcribe - Iniciando (file=" . basename($audioFilePath) . ", size=" . (file_exists($audioFilePath) ? filesize($audioFilePath) : 0) . ")");
 
         // Validar arquivo
         if (!file_exists($audioFilePath)) {
@@ -197,12 +193,7 @@ class TranscriptionService
 
                 $executionTime = microtime(true) - $startTime;
 
-                Logger::info("TranscriptionService::transcribe - ✅ Transcrição bem-sucedida", [
-                    'text_length' => strlen($text),
-                    'duration_seconds' => $duration,
-                    'cost' => $cost,
-                    'execution_time' => round($executionTime, 2)
-                ]);
+                Logger::info("TranscriptionService::transcribe - ✅ Transcrição OK (len=" . strlen($text) . ", duration={$duration}s, cost=$" . number_format($cost, 4) . ", time=" . round($executionTime, 2) . "s)");
 
                 return [
                     'success' => true,

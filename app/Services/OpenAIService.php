@@ -13,7 +13,13 @@ use App\Models\Setting;
 use App\Models\Message;
 use App\Models\Conversation;
 use App\Models\Contact;
+use App\Models\User;
+use App\Models\Department;
+use App\Models\Funnel;
+use App\Models\FunnelStage;
+use App\Models\Activity;
 use App\Helpers\Database;
+use App\Services\ConversationAIService;
 
 class OpenAIService
 {
@@ -178,30 +184,30 @@ class OpenAIService
                     // Não contabilizar tokens adicionais da OpenAI
                 } else {
                     // Fluxo normal: reenviar para OpenAI com resultados
-                    // Adicionar mensagem do assistente com tool calls
-                    $messages[] = $assistantMessage;
-                    
-                    // Adicionar resultados das tools
-                    foreach ($functionResults as $result) {
-                        $messages[] = [
-                            'role' => 'tool',
-                            'tool_call_id' => $result['tool_call_id'],
-                            'content' => json_encode($result['result'], JSON_UNESCAPED_UNICODE)
-                        ];
-                    }
+                // Adicionar mensagem do assistente com tool calls
+                $messages[] = $assistantMessage;
+                
+                // Adicionar resultados das tools
+                foreach ($functionResults as $result) {
+                    $messages[] = [
+                        'role' => 'tool',
+                        'tool_call_id' => $result['tool_call_id'],
+                        'content' => json_encode($result['result'], JSON_UNESCAPED_UNICODE)
+                    ];
+                }
 
-                    // Reenviar para OpenAI com resultados
-                    $payload['messages'] = $messages;
-                    $response = self::makeRequest($apiKey, $payload);
-                    
-                    $assistantMessage = $response['choices'][0]['message'] ?? null;
-                    $content = $assistantMessage['content'] ?? '';
-                    
-                    // Adicionar tokens adicionais
-                    $usage = $response['usage'] ?? [];
-                    $tokensUsed += $usage['total_tokens'] ?? 0;
-                    $tokensPrompt += $usage['prompt_tokens'] ?? 0;
-                    $tokensCompletion += $usage['completion_tokens'] ?? 0;
+                // Reenviar para OpenAI com resultados
+                $payload['messages'] = $messages;
+                $response = self::makeRequest($apiKey, $payload);
+                
+                $assistantMessage = $response['choices'][0]['message'] ?? null;
+                $content = $assistantMessage['content'] ?? '';
+                
+                // Adicionar tokens adicionais
+                $usage = $response['usage'] ?? [];
+                $tokensUsed += $usage['total_tokens'] ?? 0;
+                $tokensPrompt += $usage['prompt_tokens'] ?? 0;
+                $tokensCompletion += $usage['completion_tokens'] ?? 0;
                 }
             }
 
@@ -604,6 +610,12 @@ class OpenAIService
             case 'document':
                 return self::executeDocumentTool($tool, $arguments, $config);
             
+            case 'human_escalation':
+                return self::executeHumanEscalationTool($tool, $arguments, $config, $conversationId, $context);
+            
+            case 'funnel_stage':
+                return self::executeFunnelStageTool($tool, $arguments, $config, $conversationId, $context);
+            
             default:
                 return ['error' => 'Tipo de tool não suportado: ' . $toolType];
         }
@@ -755,7 +767,7 @@ class OpenAIService
                 case 'funnel_stage':
                     // Mover para etapa do funil e usar automação dela
                     if ($funnelStageId) {
-                        Conversation::update($conversationId, [
+                Conversation::update($conversationId, [
                             'funnel_stage_id' => $funnelStageId
                         ]);
                         
@@ -786,13 +798,13 @@ class OpenAIService
             }
 
             Conversation::update($conversationId, $updateData);
-
-            // Atualizar status da conversa de IA
+                
+                // Atualizar status da conversa de IA
             $aiConversation = \App\Models\AIConversation::whereFirst('conversation_id', '=', $conversationId);
-            if ($aiConversation) {
+                if ($aiConversation) {
                 \App\Models\AIConversation::updateStatus($aiConversation['id'], 'escalated');
-            }
-
+                }
+                
             // Adicionar nota interna
             if ($addNote) {
                 $noteText = "🤖 **Escalação Automática via IA**\n\n";
@@ -1259,10 +1271,10 @@ class OpenAIService
         
         // Para qualquer função N8N, executar o webhook genérico
         // A função específica é identificada pelo function_schema, mas a execução é via webhook
-        $workflowId = $arguments['workflow_id'] ?? $webhookId;
-        
+                $workflowId = $arguments['workflow_id'] ?? $webhookId;
+                
         // Se não tem workflow_id nos argumentos nem na config, usar o próprio functionName como webhook
-        if (!$workflowId) {
+                if (!$workflowId) {
             $workflowId = $webhookId;
         }
         
@@ -1332,20 +1344,20 @@ class OpenAIService
                 'persona' => $agent['persona'] ?? null,
                 'prompt_summary' => isset($agent['prompt']) ? substr($agent['prompt'], 0, 500) : null
             ];
-        }
-        
-        // Construir URL do webhook
+                }
+                
+                // Construir URL do webhook
         $webhookUrl = rtrim($n8nUrl, '/') . rtrim($webhookPath, '/') . '/' . ltrim($workflowId, '/');
-        
-        // Preparar headers
-        $headers = [
-            'Content-Type: application/json'
-        ];
-        
-        if ($apiKey) {
-            $headers[] = 'X-N8N-API-KEY: ' . $apiKey;
-        }
-        
+                
+                // Preparar headers
+                $headers = [
+                    'Content-Type: application/json'
+                ];
+                
+                if ($apiKey) {
+                    $headers[] = 'X-N8N-API-KEY: ' . $apiKey;
+                }
+                
         // Adicionar headers customizados se configurados
         $customHeaders = $config['custom_headers'] ?? [];
         if (is_string($customHeaders)) {
@@ -1366,39 +1378,39 @@ class OpenAIService
         ]);
         
         // Fazer requisição POST ao webhook (passa todos os arguments da IA)
-        $ch = curl_init($webhookUrl);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
+                $ch = curl_init($webhookUrl);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => json_encode($arguments, JSON_UNESCAPED_UNICODE),
-            CURLOPT_HTTPHEADER => $headers,
+                    CURLOPT_HTTPHEADER => $headers,
             CURLOPT_TIMEOUT => $timeout,
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_FOLLOWLOCATION => true
-        ]);
-        
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-        
-        if ($error) {
-            return ['error' => 'Erro ao executar workflow N8N: ' . $error];
-        }
-        
-        $responseData = json_decode($response, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
+                ]);
+                
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $error = curl_error($ch);
+                curl_close($ch);
+                
+                if ($error) {
+                    return ['error' => 'Erro ao executar workflow N8N: ' . $error];
+                }
+                
+                $responseData = json_decode($response, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
             // Se não é JSON válido, tratar como texto
-            $responseData = ['raw_response' => $response];
-        }
-        
+                    $responseData = ['raw_response' => $response];
+                }
+                
         $result = [
-            'success' => $httpCode >= 200 && $httpCode < 300,
-            'http_code' => $httpCode,
-            'workflow_id' => $workflowId,
-            'response' => $responseData
-        ];
-        
+                    'success' => $httpCode >= 200 && $httpCode < 300,
+                    'http_code' => $httpCode,
+                    'workflow_id' => $workflowId,
+                    'response' => $responseData
+                ];
+            
         // Se use_raw_response está ativo, extrair a mensagem direta do N8N
         if ($useRawResponse && $result['success']) {
             $rawMessage = self::extractN8NMessage($responseData, $response, $rawResponseField);
@@ -1422,8 +1434,8 @@ class OpenAIService
         // Se responseData é null, tentar parsear rawResponse
         if ($responseData === null) {
             $responseData = json_decode($rawResponse, true);
-        }
-        
+                }
+                
         // Campos a tentar, começando pelo configurado
         $fieldsToTry = array_unique(array_filter([
             $configuredField, 
@@ -1446,7 +1458,7 @@ class OpenAIService
         foreach ($fieldsToTry as $field) {
             // Suporta notação com ponto para campos aninhados (ex: "data.message")
             $value = self::getNestedValue($responseData, $field);
-            
+                
             if ($value !== null && is_string($value) && !empty(trim($value))) {
                 return trim($value);
             }
@@ -1459,8 +1471,8 @@ class OpenAIService
                 // Não é JSON válido, usar a string direta
                 return trim($rawResponse);
             }
-        }
-        
+                }
+                
         return null;
     }
 
@@ -1692,6 +1704,301 @@ class OpenAIService
             
             default:
                 return ['error' => 'Document tool não reconhecida: ' . $functionName];
+        }
+    }
+
+    /**
+     * Executar Human Escalation Tool (Escalar para Humano)
+     */
+    private static function executeHumanEscalationTool(array $tool, array $arguments, array $config, int $conversationId, array $context): array
+    {
+        try {
+            \App\Helpers\ConversationDebug::log($conversationId, "🧑‍💼 Executando Human Escalation Tool");
+            
+            $escalationType = $config['escalation_type'] ?? 'auto';
+            $departmentId = $config['department_id'] ?? null;
+            $agentId = $config['agent_id'] ?? null;
+            $distributionMethod = $config['distribution_method'] ?? 'round_robin';
+            $considerAvailability = !empty($config['consider_availability']);
+            $considerLimits = !empty($config['consider_limits']);
+            $allowAIAgents = !empty($config['allow_ai_agents']);
+            $forceAssign = !empty($config['force_assign']);
+            $removeAIAfter = $config['remove_ai_after'] ?? true;
+            $sendNotification = $config['send_notification'] ?? true;
+            $escalationMessage = $config['escalation_message'] ?? null;
+            
+            // Razão e notas passadas pela IA
+            $reason = $arguments['reason'] ?? 'Solicitado pela IA';
+            $notes = $arguments['notes'] ?? null;
+            
+            $conversation = Conversation::find($conversationId);
+            if (!$conversation) {
+                return ['error' => 'Conversa não encontrada'];
+            }
+            
+            $assignedAgentId = null;
+            $assignedAgentName = null;
+            
+            switch ($escalationType) {
+                case 'agent':
+                    // Atribuir a agente específico
+                    if (!$agentId) {
+                        return ['error' => 'Agente não configurado na tool'];
+                    }
+                    
+                    $agent = User::find($agentId);
+                    if (!$agent) {
+                        return ['error' => 'Agente não encontrado'];
+                    }
+                    
+                    // Verificar disponibilidade se não forçar
+                    if (!$forceAssign && $considerAvailability && $agent['status'] !== 'active') {
+                        return ['error' => 'Agente não está disponível no momento'];
+                    }
+                    
+                    $assignedAgentId = $agentId;
+                    $assignedAgentName = $agent['name'];
+                    break;
+                    
+                case 'department':
+                    // Atribuir a agente do setor
+                    if (!$departmentId) {
+                        return ['error' => 'Setor não configurado na tool'];
+                    }
+                    
+                    $agentsInDept = Department::getAgents($departmentId);
+                    if (empty($agentsInDept)) {
+                        return ['error' => 'Nenhum agente encontrado no setor'];
+                    }
+                    
+                    // Filtrar por disponibilidade se necessário
+                    if ($considerAvailability) {
+                        $agentsInDept = array_filter($agentsInDept, fn($a) => $a['status'] === 'active');
+                    }
+                    
+                    if (empty($agentsInDept)) {
+                        return ['error' => 'Nenhum agente disponível no setor'];
+                    }
+                    
+                    // Escolher agente (round robin simplificado - pegar com menos conversas)
+                    $selectedAgent = null;
+                    $minConversations = PHP_INT_MAX;
+                    
+                    foreach ($agentsInDept as $agent) {
+                        $count = Database::fetchColumn(
+                            "SELECT COUNT(*) FROM conversations WHERE assigned_user_id = ? AND status = 'open'",
+                            [$agent['id']]
+                        );
+                        
+                        if ($considerLimits) {
+                            $maxConversations = $agent['max_conversations'] ?? 50;
+                            if ($count >= $maxConversations) continue;
+                        }
+                        
+                        if ($count < $minConversations) {
+                            $minConversations = $count;
+                            $selectedAgent = $agent;
+                        }
+                    }
+                    
+                    if (!$selectedAgent) {
+                        return ['error' => 'Todos os agentes do setor estão no limite'];
+                    }
+                    
+                    $assignedAgentId = $selectedAgent['id'];
+                    $assignedAgentName = $selectedAgent['name'];
+                    break;
+                    
+                case 'custom':
+                    // Distribuição personalizada
+                    $settings = [
+                        'method' => $distributionMethod,
+                        'department_id' => $departmentId,
+                        'consider_availability' => $considerAvailability,
+                        'consider_limits' => $considerLimits,
+                        'allow_ai_agents' => $allowAIAgents
+                    ];
+                    
+                    $assignedAgentId = ConversationService::autoAssignAgent($conversationId, $settings);
+                    
+                    if (!$assignedAgentId) {
+                        return ['error' => 'Não foi possível encontrar um agente disponível'];
+                    }
+                    
+                    $agent = User::find($assignedAgentId);
+                    $assignedAgentName = $agent['name'] ?? 'Agente';
+                    break;
+                    
+                case 'auto':
+                default:
+                    // Usar distribuição automática do sistema
+                    $assignedAgentId = ConversationService::autoAssignAgent($conversationId);
+                    
+                    if (!$assignedAgentId) {
+                        return ['error' => 'Não foi possível atribuir a um agente automaticamente'];
+                    }
+                    
+                    $agent = User::find($assignedAgentId);
+                    $assignedAgentName = $agent['name'] ?? 'Agente';
+                    break;
+            }
+            
+            // Atribuir conversa ao agente
+            Conversation::update($conversationId, [
+                'assigned_user_id' => $assignedAgentId
+            ]);
+            
+            // Remover IA da conversa se configurado
+            if ($removeAIAfter) {
+                ConversationAIService::removeAIAgent($conversationId);
+            }
+            
+            // Adicionar nota interna
+            if ($notes || $reason) {
+                Activity::create([
+                    'conversation_id' => $conversationId,
+                    'user_id' => null,
+                    'activity_type' => 'ai_escalation',
+                    'content' => json_encode([
+                        'reason' => $reason,
+                        'notes' => $notes,
+                        'assigned_to' => $assignedAgentName,
+                        'escalation_type' => $escalationType
+                    ]),
+                    'is_internal' => true
+                ]);
+            }
+            
+            // Notificar agente humano
+            if ($sendNotification && $assignedAgentId) {
+                // TODO: Implementar notificação via WebSocket
+                \App\Helpers\ConversationDebug::log($conversationId, "Notificação enviada para agente: {$assignedAgentName}");
+            }
+            
+            \App\Helpers\ConversationDebug::log($conversationId, "✅ Escalado para: {$assignedAgentName} (ID: {$assignedAgentId})");
+            
+            return [
+                'success' => true,
+                'message' => "Conversa transferida para {$assignedAgentName}",
+                'assigned_agent_id' => $assignedAgentId,
+                'assigned_agent_name' => $assignedAgentName,
+                'escalation_type' => $escalationType,
+                'reason' => $reason,
+                // Se tiver mensagem de escalação, retornar como resposta direta
+                'use_raw_response' => !empty($escalationMessage),
+                'raw_message' => $escalationMessage
+            ];
+            
+        } catch (\Exception $e) {
+            \App\Helpers\ConversationDebug::error($conversationId, 'executeHumanEscalationTool', $e->getMessage());
+            return ['error' => 'Erro ao escalar para humano: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Executar Funnel Stage Tool (Mover para Funil/Etapa)
+     */
+    private static function executeFunnelStageTool(array $tool, array $arguments, array $config, int $conversationId, array $context): array
+    {
+        try {
+            \App\Helpers\ConversationDebug::log($conversationId, "📊 Executando Funnel Stage Tool");
+            
+            $funnelId = $config['funnel_id'] ?? null;
+            $stageId = $config['stage_id'] ?? null;
+            $keepAgent = $config['keep_agent'] ?? true;
+            $removeAIAfter = !empty($config['remove_ai_after']);
+            $addNote = $config['add_note'] ?? true;
+            $noteTemplate = $config['note_template'] ?? 'Movido para {stage_name} pela IA. Motivo: {reason}';
+            $triggerAutomation = $config['trigger_automation'] ?? true;
+            
+            // Razão passada pela IA
+            $reason = $arguments['reason'] ?? 'Ação automática da IA';
+            
+            if (!$funnelId || !$stageId) {
+                return ['error' => 'Funil e/ou Etapa não configurados na tool'];
+            }
+            
+            $conversation = Conversation::find($conversationId);
+            if (!$conversation) {
+                return ['error' => 'Conversa não encontrada'];
+            }
+            
+            // Verificar se funil e etapa existem
+            $funnel = Funnel::find($funnelId);
+            if (!$funnel) {
+                return ['error' => 'Funil não encontrado'];
+            }
+            
+            $stage = FunnelStage::find($stageId);
+            if (!$stage || $stage['funnel_id'] != $funnelId) {
+                return ['error' => 'Etapa não encontrada ou não pertence ao funil'];
+            }
+            
+            $oldStageId = $conversation['funnel_stage_id'];
+            $oldFunnelId = $conversation['funnel_id'];
+            
+            // Atualizar conversa
+            $updateData = [
+                'funnel_id' => $funnelId,
+                'funnel_stage_id' => $stageId
+            ];
+            
+            // Se não manter agente, remover atribuição
+            if (!$keepAgent) {
+                $updateData['assigned_user_id'] = null;
+            }
+            
+            Conversation::update($conversationId, $updateData);
+            
+            // Remover IA se configurado
+            if ($removeAIAfter) {
+                ConversationAIService::removeAIAgent($conversationId);
+            }
+            
+            // Adicionar nota interna
+            if ($addNote) {
+                $noteContent = str_replace(
+                    ['{stage_name}', '{funnel_name}', '{reason}'],
+                    [$stage['name'], $funnel['name'], $reason],
+                    $noteTemplate
+                );
+                
+                Activity::create([
+                    'conversation_id' => $conversationId,
+                    'user_id' => null,
+                    'activity_type' => 'stage_change',
+                    'content' => json_encode([
+                        'from_funnel_id' => $oldFunnelId,
+                        'to_funnel_id' => $funnelId,
+                        'from_stage_id' => $oldStageId,
+                        'to_stage_id' => $stageId,
+                        'note' => $noteContent,
+                        'by' => 'ai_tool'
+                    ]),
+                    'is_internal' => true
+                ]);
+            }
+            
+            // Disparar automação da etapa se configurado
+            if ($triggerAutomation) {
+                AutomationService::triggerByStageChange($conversationId, $stageId);
+            }
+            
+            \App\Helpers\ConversationDebug::log($conversationId, "✅ Movido para Funil: {$funnel['name']} / Etapa: {$stage['name']}");
+            
+            return [
+                'success' => true,
+                'message' => "Conversa movida para {$funnel['name']} / {$stage['name']}",
+                'funnel_id' => $funnelId,
+                'funnel_name' => $funnel['name'],
+                'stage_id' => $stageId,
+                'stage_name' => $stage['name'],
+                'reason' => $reason
+            ];
+            
+        } catch (\Exception $e) {
+            \App\Helpers\ConversationDebug::error($conversationId, 'executeFunnelStageTool', $e->getMessage());
+            return ['error' => 'Erro ao mover para etapa: ' . $e->getMessage()];
         }
     }
 

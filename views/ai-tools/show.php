@@ -223,6 +223,8 @@ ob_start();
                             <option value="system" <?= ($tool['tool_type'] ?? '') === 'system' ? 'selected' : '' ?>>System</option>
                             <option value="api" <?= ($tool['tool_type'] ?? '') === 'api' ? 'selected' : '' ?>>API</option>
                             <option value="followup" <?= ($tool['tool_type'] ?? '') === 'followup' ? 'selected' : '' ?>>Followup</option>
+                            <option value="human_escalation" <?= ($tool['tool_type'] ?? '') === 'human_escalation' ? 'selected' : '' ?>>🧑‍💼 Escalar para Humano</option>
+                            <option value="funnel_stage" <?= ($tool['tool_type'] ?? '') === 'funnel_stage' ? 'selected' : '' ?>>📊 Mover para Funil/Etapa</option>
                         </select>
                     </div>
                     
@@ -385,6 +387,69 @@ const toolTypeConfigs = {
     },
     followup: {
         fields: []
+    },
+    human_escalation: {
+        fields: [
+            { name: "escalation_type", label: "Tipo de Escalação", type: "select", required: true, 
+              options: [
+                { value: "auto", label: "Automático (usa config do sistema)" },
+                { value: "department", label: "Setor Específico" },
+                { value: "agent", label: "Agente Específico" },
+                { value: "custom", label: "Personalizado" }
+              ], default: "auto" },
+            { name: "department_id", label: "Setor", type: "department_select", required: false, 
+              showIf: "escalation_type:department,custom", help: "Selecione o setor de destino" },
+            { name: "agent_id", label: "Agente", type: "agent_select", required: false, 
+              showIf: "escalation_type:agent", help: "Selecione o agente específico" },
+            { name: "distribution_method", label: "Método de Distribuição", type: "select", required: false,
+              showIf: "escalation_type:custom",
+              options: [
+                { value: "round_robin", label: "Round Robin (sequencial)" },
+                { value: "by_load", label: "Por Carga (menos conversas)" },
+                { value: "by_performance", label: "Por Performance" },
+                { value: "by_specialty", label: "Por Especialidade" },
+                { value: "percentage", label: "Por Porcentagem" }
+              ], default: "round_robin" },
+            { name: "consider_availability", label: "Considerar disponibilidade (online)", type: "checkbox", required: false, default: true,
+              showIf: "escalation_type:custom" },
+            { name: "consider_limits", label: "Considerar limite máximo de conversas", type: "checkbox", required: false, default: true,
+              showIf: "escalation_type:custom" },
+            { name: "allow_ai_agents", label: "Permitir agentes de IA", type: "checkbox", required: false, default: false,
+              showIf: "escalation_type:custom" },
+            { name: "force_assign", label: "Forçar atribuição (ignora regras)", type: "checkbox", required: false, default: false,
+              showIf: "escalation_type:agent" },
+            { name: "fallback_action", label: "Se não encontrar agente", type: "select", required: false,
+              showIf: "escalation_type:custom,department",
+              options: [
+                { value: "queue", label: "Manter em fila" },
+                { value: "any_agent", label: "Atribuir a qualquer agente" },
+                { value: "move_stage", label: "Mover para etapa" }
+              ], default: "queue" },
+            { name: "remove_ai_after", label: "Remover IA após escalação", type: "checkbox", required: false, default: true,
+              help: "Remove o agente de IA da conversa após escalar" },
+            { name: "send_notification", label: "Notificar agente humano", type: "checkbox", required: false, default: true },
+            { name: "escalation_message", label: "Mensagem ao cliente", type: "textarea", required: false,
+              placeholder: "Estou transferindo você para um de nossos especialistas...",
+              help: "Mensagem enviada ao cliente ao escalar (deixe vazio para não enviar)" }
+        ]
+    },
+    funnel_stage: {
+        fields: [
+            { name: "funnel_id", label: "Funil", type: "funnel_select", required: true, 
+              help: "Selecione o funil de destino" },
+            { name: "stage_id", label: "Etapa", type: "stage_select", required: true, 
+              dependsOn: "funnel_id", help: "Selecione a etapa de destino" },
+            { name: "keep_agent", label: "Manter agente atual", type: "checkbox", required: false, default: true,
+              help: "Se desmarcado, remove o agente e usa regras da etapa" },
+            { name: "remove_ai_after", label: "Remover IA após mover", type: "checkbox", required: false, default: false },
+            { name: "add_note", label: "Adicionar nota interna", type: "checkbox", required: false, default: true },
+            { name: "note_template", label: "Template da nota", type: "textarea", required: false,
+              showIf: "add_note:true",
+              placeholder: "Movido para {stage_name} pela IA. Motivo: {reason}",
+              help: "Use {stage_name}, {funnel_name}, {reason} como variáveis" },
+            { name: "trigger_automation", label: "Disparar automação da etapa", type: "checkbox", required: false, default: true,
+              help: "Executa automações configuradas na etapa de destino" }
+        ]
     }
 };
 

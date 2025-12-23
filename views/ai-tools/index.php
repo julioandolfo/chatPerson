@@ -126,6 +126,8 @@ ob_start();
                             <option value="system">System</option>
                             <option value="api">API</option>
                             <option value="followup">Followup</option>
+                            <option value="human_escalation">🧑‍💼 Escalar para Humano</option>
+                            <option value="funnel_stage">📊 Mover para Funil/Etapa</option>
                         </select>
                     </div>
                     
@@ -196,9 +198,21 @@ ob_start();
 
 <?php 
 $content = ob_get_clean(); 
+
+// Preparar dados para JavaScript
+$departmentsJson = json_encode($departments ?? [], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+$funnelsJson = json_encode($funnels ?? [], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+$agentsJson = json_encode($agents ?? [], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+
 $scripts = '
 <script>
 let parameterCounter = 0;
+
+// Dados do backend para selects dinâmicos
+const availableDepartments = ' . $departmentsJson . ';
+const availableFunnels = ' . $funnelsJson . ';
+const availableAgents = ' . $agentsJson . ';
+const funnelStages = {}; // Será preenchido dinamicamente
 
 // Configurações por tipo de tool
 const toolTypeConfigs = {
@@ -253,6 +267,69 @@ const toolTypeConfigs = {
     },
     followup: {
         fields: [] // Followup tools geralmente não precisam de config
+    },
+    human_escalation: {
+        fields: [
+            { name: "escalation_type", label: "Tipo de Escalação", type: "select", required: true, 
+              options: [
+                { value: "auto", label: "Automático (usa config do sistema)" },
+                { value: "department", label: "Setor Específico" },
+                { value: "agent", label: "Agente Específico" },
+                { value: "custom", label: "Personalizado" }
+              ], default: "auto" },
+            { name: "department_id", label: "Setor", type: "department_select", required: false, 
+              showIf: "escalation_type:department,custom", help: "Selecione o setor de destino" },
+            { name: "agent_id", label: "Agente", type: "agent_select", required: false, 
+              showIf: "escalation_type:agent", help: "Selecione o agente específico" },
+            { name: "distribution_method", label: "Método de Distribuição", type: "select", required: false,
+              showIf: "escalation_type:custom",
+              options: [
+                { value: "round_robin", label: "Round Robin (sequencial)" },
+                { value: "by_load", label: "Por Carga (menos conversas)" },
+                { value: "by_performance", label: "Por Performance" },
+                { value: "by_specialty", label: "Por Especialidade" },
+                { value: "percentage", label: "Por Porcentagem" }
+              ], default: "round_robin" },
+            { name: "consider_availability", label: "Considerar disponibilidade (online)", type: "checkbox", required: false, default: true,
+              showIf: "escalation_type:custom" },
+            { name: "consider_limits", label: "Considerar limite máximo de conversas", type: "checkbox", required: false, default: true,
+              showIf: "escalation_type:custom" },
+            { name: "allow_ai_agents", label: "Permitir agentes de IA", type: "checkbox", required: false, default: false,
+              showIf: "escalation_type:custom" },
+            { name: "force_assign", label: "Forçar atribuição (ignora regras)", type: "checkbox", required: false, default: false,
+              showIf: "escalation_type:agent" },
+            { name: "fallback_action", label: "Se não encontrar agente", type: "select", required: false,
+              showIf: "escalation_type:custom,department",
+              options: [
+                { value: "queue", label: "Manter em fila" },
+                { value: "any_agent", label: "Atribuir a qualquer agente" },
+                { value: "move_stage", label: "Mover para etapa" }
+              ], default: "queue" },
+            { name: "remove_ai_after", label: "Remover IA após escalação", type: "checkbox", required: false, default: true,
+              help: "Remove o agente de IA da conversa após escalar" },
+            { name: "send_notification", label: "Notificar agente humano", type: "checkbox", required: false, default: true },
+            { name: "escalation_message", label: "Mensagem ao cliente", type: "textarea", required: false,
+              placeholder: "Estou transferindo você para um de nossos especialistas...",
+              help: "Mensagem enviada ao cliente ao escalar (deixe vazio para não enviar)" }
+        ]
+    },
+    funnel_stage: {
+        fields: [
+            { name: "funnel_id", label: "Funil", type: "funnel_select", required: true, 
+              help: "Selecione o funil de destino" },
+            { name: "stage_id", label: "Etapa", type: "stage_select", required: true, 
+              dependsOn: "funnel_id", help: "Selecione a etapa de destino" },
+            { name: "keep_agent", label: "Manter agente atual", type: "checkbox", required: false, default: true,
+              help: "Se desmarcado, remove o agente e usa regras da etapa" },
+            { name: "remove_ai_after", label: "Remover IA após mover", type: "checkbox", required: false, default: false },
+            { name: "add_note", label: "Adicionar nota interna", type: "checkbox", required: false, default: true },
+            { name: "note_template", label: "Template da nota", type: "textarea", required: false,
+              showIf: "add_note:true",
+              placeholder: "Movido para {stage_name} pela IA. Motivo: {reason}",
+              help: "Use {stage_name}, {funnel_name}, {reason} como variáveis" },
+            { name: "trigger_automation", label: "Disparar automação da etapa", type: "checkbox", required: false, default: true,
+              help: "Executa automações configuradas na etapa de destino" }
+        ]
     }
 };
 
@@ -346,12 +423,13 @@ function updateConfigFields() {
     fields.forEach(field => {
         const fieldDiv = document.createElement("div");
         fieldDiv.className = "fv-row mb-5";
+        fieldDiv.id = `field_wrapper_${field.name}`;
+        if (field.showIf) fieldDiv.dataset.showIf = field.showIf;
         
         let inputHtml = "";
-        let labelHtml = "";
+        let labelHtml = `<label class="fw-semibold fs-7 mb-2">${field.label}${field.required ? " <span class=\\"text-danger\\">*</span>" : ""}</label>`;
         
         if (field.type === "checkbox") {
-            // Checkbox com label inline
             inputHtml = `
                 <div class="form-check form-switch">
                     <input type="checkbox" class="form-check-input config-field" data-field="${field.name}" id="config_${field.name}" ${field.default ? "checked" : ""} />
@@ -362,26 +440,118 @@ function updateConfigFields() {
             fieldDiv.innerHTML = inputHtml;
         } else if (field.type === "select") {
             inputHtml = `<select class="form-control form-control-solid config-field" data-field="${field.name}" ${field.required ? "required" : ""}>`;
+            inputHtml += `<option value="">Selecione...</option>`;
             if (field.options) {
                 field.options.forEach(opt => {
-                    inputHtml += `<option value="${opt}" ${opt === field.default ? "selected" : ""}>${opt}</option>`;
+                    if (typeof opt === "object") {
+                        inputHtml += `<option value="${opt.value}" ${opt.value === field.default ? "selected" : ""}>${opt.label}</option>`;
+                    } else {
+                        inputHtml += `<option value="${opt}" ${opt === field.default ? "selected" : ""}>${opt}</option>`;
+                    }
                 });
             }
             inputHtml += `</select>`;
-            labelHtml = `<label class="fw-semibold fs-7 mb-2">${field.label}${field.required ? " <span class=\"text-danger\">*</span>" : ""}</label>`;
+            fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
+        } else if (field.type === "department_select") {
+            inputHtml = `<select class="form-control form-control-solid config-field" data-field="${field.name}" ${field.required ? "required" : ""}>`;
+            inputHtml += `<option value="">Selecione o setor...</option>`;
+            availableDepartments.forEach(dept => {
+                inputHtml += `<option value="${dept.id}">${dept.name}</option>`;
+            });
+            inputHtml += `</select>`;
+            fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
+        } else if (field.type === "agent_select") {
+            inputHtml = `<select class="form-control form-control-solid config-field" data-field="${field.name}" ${field.required ? "required" : ""}>`;
+            inputHtml += `<option value="">Selecione o agente...</option>`;
+            availableAgents.forEach(agent => {
+                inputHtml += `<option value="${agent.id}">${agent.name} (${agent.email})</option>`;
+            });
+            inputHtml += `</select>`;
+            fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
+        } else if (field.type === "funnel_select") {
+            inputHtml = `<select class="form-control form-control-solid config-field" data-field="${field.name}" id="config_${field.name}" ${field.required ? "required" : ""} onchange="loadFunnelStages(this.value)">`;
+            inputHtml += `<option value="">Selecione o funil...</option>`;
+            availableFunnels.forEach(funnel => {
+                inputHtml += `<option value="${funnel.id}">${funnel.name}</option>`;
+            });
+            inputHtml += `</select>`;
+            fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
+        } else if (field.type === "stage_select") {
+            inputHtml = `<select class="form-control form-control-solid config-field" data-field="${field.name}" id="config_${field.name}" ${field.required ? "required" : ""} disabled>`;
+            inputHtml += `<option value="">Selecione o funil primeiro...</option>`;
+            inputHtml += `</select>`;
             fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
         } else if (field.type === "textarea") {
             inputHtml = `<textarea class="form-control form-control-solid config-field" data-field="${field.name}" rows="3" ${field.required ? "required" : ""} placeholder="${field.placeholder || ""}"></textarea>`;
-            labelHtml = `<label class="fw-semibold fs-7 mb-2">${field.label}${field.required ? " <span class=\"text-danger\">*</span>" : ""}</label>`;
             fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
         } else {
             inputHtml = `<input type="${field.type}" class="form-control form-control-solid config-field" data-field="${field.name}" ${field.required ? "required" : ""} placeholder="${field.placeholder || ""}" value="${field.default || ""}" />`;
-            labelHtml = `<label class="fw-semibold fs-7 mb-2">${field.label}${field.required ? " <span class=\"text-danger\">*</span>" : ""}</label>`;
             fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
         }
         
         configFields.appendChild(fieldDiv);
     });
+    
+    // Adicionar event listeners para campos condicionais
+    setupConditionalFields();
+}
+
+// Configurar campos condicionais (showIf)
+function setupConditionalFields() {
+    const configFields = document.querySelectorAll(".config-field");
+    configFields.forEach(field => {
+        field.addEventListener("change", updateConditionalVisibility);
+    });
+    updateConditionalVisibility();
+}
+
+// Atualizar visibilidade de campos condicionais
+function updateConditionalVisibility() {
+    const wrappers = document.querySelectorAll("[data-show-if]");
+    wrappers.forEach(wrapper => {
+        const condition = wrapper.dataset.showIf;
+        const [fieldName, expectedValues] = condition.split(":");
+        const values = expectedValues.split(",");
+        
+        const field = document.querySelector(`[data-field="${fieldName}"]`);
+        if (field) {
+            let currentValue = field.type === "checkbox" ? field.checked.toString() : field.value;
+            wrapper.style.display = values.includes(currentValue) ? "block" : "none";
+        }
+    });
+}
+
+// Carregar etapas do funil selecionado
+async function loadFunnelStages(funnelId) {
+    const stageSelect = document.getElementById("config_stage_id");
+    if (!stageSelect) return;
+    
+    if (!funnelId) {
+        stageSelect.innerHTML = `<option value="">Selecione o funil primeiro...</option>`;
+        stageSelect.disabled = true;
+        return;
+    }
+    
+    stageSelect.innerHTML = `<option value="">Carregando...</option>`;
+    stageSelect.disabled = true;
+    
+    try {
+        const response = await fetch(`/funnels/${funnelId}/stages/json`);
+        const data = await response.json();
+        
+        stageSelect.innerHTML = `<option value="">Selecione a etapa...</option>`;
+        if (data.stages && data.stages.length > 0) {
+            data.stages.forEach(stage => {
+                stageSelect.innerHTML += `<option value="${stage.id}">${stage.name}</option>`;
+            });
+            stageSelect.disabled = false;
+        } else {
+            stageSelect.innerHTML = `<option value="">Nenhuma etapa encontrada</option>`;
+        }
+    } catch (error) {
+        console.error("Erro ao carregar etapas:", error);
+        stageSelect.innerHTML = `<option value="">Erro ao carregar etapas</option>`;
+    }
 }
 
 // Construir JSON do function schema

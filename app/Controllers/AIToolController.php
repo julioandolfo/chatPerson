@@ -36,14 +36,27 @@ class AIToolController
         try {
             $tools = AIToolService::list($filters);
             
+            // Carregar dados para tools de escalação e funil
+            $departments = \App\Models\Department::all();
+            $funnels = \App\Models\Funnel::whereActive();
+            $agents = \App\Helpers\Database::fetchAll(
+                "SELECT id, name, email FROM users WHERE status = 'active' AND role != 'super_admin' ORDER BY name"
+            );
+            
             Response::view('ai-tools/index', [
                 'tools' => $tools,
-                'filters' => $filters
+                'filters' => $filters,
+                'departments' => $departments,
+                'funnels' => $funnels,
+                'agents' => $agents
             ]);
         } catch (\Exception $e) {
             Response::view('ai-tools/index', [
                 'tools' => [],
                 'filters' => $filters,
+                'departments' => [],
+                'funnels' => [],
+                'agents' => [],
                 'error' => $e->getMessage()
             ]);
         }
@@ -71,8 +84,18 @@ class AIToolController
                 $tool['config'] = json_decode($tool['config'], true);
             }
             
+            // Carregar dados para tools de escalação e funil
+            $departments = \App\Models\Department::all();
+            $funnels = \App\Models\Funnel::whereActive();
+            $agents = \App\Helpers\Database::fetchAll(
+                "SELECT id, name, email FROM users WHERE status = 'active' AND role != 'super_admin' ORDER BY name"
+            );
+            
             Response::view('ai-tools/show', [
-                'tool' => $tool
+                'tool' => $tool,
+                'departments' => $departments,
+                'funnels' => $funnels,
+                'agents' => $agents
             ]);
         } catch (\Exception $e) {
             Response::forbidden($e->getMessage());

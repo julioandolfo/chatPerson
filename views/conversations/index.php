@@ -13061,7 +13061,7 @@ function addConversationToList(conv) {
     const createdAt = conv.created_at || '';
     const lastMessageAt = conv.last_message_at || conv.updated_at || '';
     const lastMessageFromAgent = lastAgentAt && (!lastContactAt || new Date(lastAgentAt) >= new Date(lastContactAt));
-
+    
     // Criar HTML do item
     const avatarHtml = conv.contact_avatar
         ? `<div class="symbol-label"><img src="${escapeHtml(conv.contact_avatar)}" alt="${escapeHtml(name)}" class="h-45px w-45px rounded" style="object-fit: cover;"></div>`

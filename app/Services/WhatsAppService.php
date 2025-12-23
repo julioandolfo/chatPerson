@@ -2069,88 +2069,107 @@ class WhatsAppService
                 }
             }
 
-            // Criar ou buscar conversa (protegido por lock no contato para evitar duplicatas em bursts)
+            // Criar ou buscar conversa (proteção contra duplicatas; se falhar lock, usa fallback sem transação)
             $conversation = null;
             $isNewConversation = false;
             $shouldReopenAsNew = false;
             $db = \App\Helpers\Database::getInstance();
+            $usedLock = false;
             try {
-                $db->beginTransaction();
-                
-                // Lock no contato para serializar criação de conversas desse contato
-                $db->query("SELECT id FROM contacts WHERE id = :id FOR UPDATE", ['id' => $contact['id']]);
-                
-                Logger::quepasa("processWebhook - Buscando conversa existente (com lock): contact_id={$contact['id']}, channel=whatsapp, account_id={$account['id']}");
-                $conversation = \App\Models\Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['id']);
-                Logger::quepasa("processWebhook - Resultado da busca: " . ($conversation ? "Encontrada (ID={$conversation['id']}, status={$conversation['status']})" : "Não encontrada"));
-                
-                // Se ainda não existir, criar dentro da transação
-                if (!$conversation) {
-                    // Trava: não criar conversa se a primeira mensagem for exatamente o nome do contato (caso sem mídia)
-                    if (
-                        $messageType === 'text' &&
-                        empty($mediaUrl)
-                    ) {
-                        $normalizedMessage = mb_strtolower(trim(preg_replace('/\s+/', ' ', (string)$message)));
-                        $normalizedContactName = mb_strtolower(trim(preg_replace('/\s+/', ' ', (string)($contact['name'] ?? ''))));
-                        if (!empty($normalizedMessage) && $normalizedMessage === $normalizedContactName) {
-                            Logger::quepasa("processWebhook - Ignorando criação de conversa: primeira mensagem igual ao nome do contato ({$normalizedContactName})");
-                            $db->rollBack();
-                            return;
-                        }
-                    }
+                if (method_exists($db, 'beginTransaction')) {
+                    $db->beginTransaction();
+                    $usedLock = true;
                     
-                    $logMessage = $shouldReopenAsNew 
-                        ? "processWebhook - Criando NOVA conversa (reabertura após período de graça)..."
-                        : "processWebhook - Conversa não encontrada, criando nova...";
-                    Logger::quepasa($logMessage);
+                    // Lock no contato para serializar criação de conversas desse contato
+                    $db->query("SELECT id FROM contacts WHERE id = :id FOR UPDATE", ['id' => $contact['id']]);
                     
-                    try {
-                        $conversationData = [
-                            'contact_id' => $contact['id'],
-                            'channel' => 'whatsapp',
-                            'whatsapp_account_id' => $account['id']
-                        ];
-                        
-                        if (!empty($account['default_funnel_id'])) {
-                            $conversationData['funnel_id'] = $account['default_funnel_id'];
-                            Logger::quepasa("processWebhook - Usando funil padrão da integração: {$account['default_funnel_id']}");
-                        }
-                        if (!empty($account['default_stage_id'])) {
-                            $conversationData['stage_id'] = $account['default_stage_id'];
-                            Logger::quepasa("processWebhook - Usando estágio padrão da integração: {$account['default_stage_id']}");
-                        }
-                        
-                        $conversation = \App\Services\ConversationService::create($conversationData, false);
-                        $isNewConversation = true;
-                        Logger::quepasa("processWebhook - Conversa criada via ConversationService: ID={$conversation['id']} (automações serão executadas após salvar mensagem)");
-                    } catch (\Exception $e) {
-                        Logger::quepasa("Erro ao criar conversa via ConversationService: " . $e->getMessage());
-                        Logger::quepasa("Stack trace: " . $e->getTraceAsString());
-                        try {
-                            $conversationId = \App\Models\Conversation::create([
-                                'contact_id' => $contact['id'],
-                                'channel' => 'whatsapp',
-                                'whatsapp_account_id' => $account['id'],
-                                'status' => 'open'
-                            ]);
-                            $conversation = \App\Models\Conversation::find($conversationId);
-                            $isNewConversation = true;
-                            Logger::quepasa("processWebhook - Conversa criada via fallback: ID={$conversationId}");
-                        } catch (\Exception $e2) {
-                            Logger::error("Erro ao criar conversa via fallback: " . $e2->getMessage());
-                            $db->rollBack();
-                            throw $e2;
-                        }
-                    }
+                    Logger::quepasa("processWebhook - Buscando conversa existente (com lock): contact_id={$contact['id']}, channel=whatsapp, account_id={$account['id']}");
+                    $conversation = \App\Models\Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['id']);
+                    Logger::quepasa("processWebhook - Resultado da busca: " . ($conversation ? "Encontrada (ID={$conversation['id']}, status={$conversation['status']})" : "Não encontrada"));
                 }
-                
-                $db->commit();
             } catch (\Throwable $e) {
+                Logger::quepasa("processWebhook - ⚠️ Falha ao aplicar lock no contato, seguindo sem transação. Erro: " . $e->getMessage());
+                $usedLock = false;
                 if ($db->inTransaction()) {
                     $db->rollBack();
                 }
-                throw $e;
+            }
+            
+            // Se não encontrou (ou não conseguiu lock), buscar normalmente
+            if (!$conversation) {
+                if (!$usedLock) {
+                    Logger::quepasa("processWebhook - Buscando conversa existente (sem lock): contact_id={$contact['id']}, channel=whatsapp, account_id={$account['id']}");
+                    $conversation = \App\Models\Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['id']);
+                }
+            }
+            
+            // Se ainda não existir, criar (usar transação se lock ativo, senão criar direto)
+            if (!$conversation) {
+                // Trava: não criar conversa se a primeira mensagem for exatamente o nome do contato (caso sem mídia)
+                if (
+                    $messageType === 'text' &&
+                    empty($mediaUrl)
+                ) {
+                    $normalizedMessage = mb_strtolower(trim(preg_replace('/\s+/', ' ', (string)$message)));
+                    $normalizedContactName = mb_strtolower(trim(preg_replace('/\s+/', ' ', (string)($contact['name'] ?? ''))));
+                    if (!empty($normalizedMessage) && $normalizedMessage === $normalizedContactName) {
+                        Logger::quepasa("processWebhook - Ignorando criação de conversa: primeira mensagem igual ao nome do contato ({$normalizedContactName})");
+                        if ($usedLock && $db->inTransaction()) {
+                            $db->rollBack();
+                        }
+                        return;
+                    }
+                }
+                
+                $logMessage = $shouldReopenAsNew 
+                    ? "processWebhook - Criando NOVA conversa (reabertura após período de graça)..."
+                    : "processWebhook - Conversa não encontrada, criando nova...";
+                Logger::quepasa($logMessage);
+                
+                try {
+                    $conversationData = [
+                        'contact_id' => $contact['id'],
+                        'channel' => 'whatsapp',
+                        'whatsapp_account_id' => $account['id']
+                    ];
+                    
+                    if (!empty($account['default_funnel_id'])) {
+                        $conversationData['funnel_id'] = $account['default_funnel_id'];
+                        Logger::quepasa("processWebhook - Usando funil padrão da integração: {$account['default_funnel_id']}");
+                    }
+                    if (!empty($account['default_stage_id'])) {
+                        $conversationData['stage_id'] = $account['default_stage_id'];
+                        Logger::quepasa("processWebhook - Usando estágio padrão da integração: {$account['default_stage_id']}");
+                    }
+                    
+                    $conversation = \App\Services\ConversationService::create($conversationData, false);
+                    $isNewConversation = true;
+                    Logger::quepasa("processWebhook - Conversa criada via ConversationService: ID={$conversation['id']} (automações serão executadas após salvar mensagem)");
+                } catch (\Exception $e) {
+                    Logger::quepasa("Erro ao criar conversa via ConversationService: " . $e->getMessage());
+                    Logger::quepasa("Stack trace: " . $e->getTraceAsString());
+                    try {
+                        $conversationId = \App\Models\Conversation::create([
+                            'contact_id' => $contact['id'],
+                            'channel' => 'whatsapp',
+                            'whatsapp_account_id' => $account['id'],
+                            'status' => 'open'
+                        ]);
+                        $conversation = \App\Models\Conversation::find($conversationId);
+                        $isNewConversation = true;
+                        Logger::quepasa("processWebhook - Conversa criada via fallback: ID={$conversationId}");
+                    } catch (\Exception $e2) {
+                        Logger::error("Erro ao criar conversa via fallback: " . $e2->getMessage());
+                        if ($usedLock && $db->inTransaction()) {
+                            $db->rollBack();
+                        }
+                        throw $e2;
+                    }
+                }
+            }
+            
+            if ($usedLock && $db->inTransaction()) {
+                $db->commit();
             }
 
             // Trava: não criar conversa se a primeira mensagem for exatamente o nome do contato (caso sem mídia)

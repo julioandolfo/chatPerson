@@ -311,14 +311,17 @@ ob_start();
 $content = ob_get_clean(); 
 
 // Preparar JavaScript para injetar no script
+// Usar flags de segurança para evitar quebra de sintaxe JavaScript
+$jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES;
+
 ob_start();
 ?>
 <script>
 // URL base para requisições
-const AI_TOOLS_BASE_URL = <?= json_encode(\App\Helpers\Url::to('/ai-tools'), JSON_UNESCAPED_UNICODE) ?>;
-const FUNCTION_SCHEMA_DATA = <?= json_encode(!empty($functionSchema) ? $functionSchema : null, JSON_UNESCAPED_UNICODE) ?>;
-const CONFIG_DATA = <?= json_encode(!empty($config) ? $config : null, JSON_UNESCAPED_UNICODE) ?>;
-const TOOL_ID = <?= json_encode($tool['id'] ?? 0) ?>;
+const AI_TOOLS_BASE_URL = <?= json_encode(\App\Helpers\Url::to('/ai-tools'), $jsonFlags) ?>;
+const FUNCTION_SCHEMA_DATA = <?= json_encode(!empty($functionSchema) ? $functionSchema : null, $jsonFlags) ?>;
+const CONFIG_DATA = <?= json_encode(!empty($config) ? $config : null, $jsonFlags) ?>;
+const TOOL_ID = <?= json_encode($tool['id'] ?? 0, $jsonFlags) ?>;
 
 let editParameterCounter = 0;
 

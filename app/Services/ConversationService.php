@@ -1395,31 +1395,9 @@ class ConversationService
         if ($senderType === 'contact') {
             $aiConversation = \App\Models\AIConversation::getByConversationId($conversationId);
             if ($aiConversation && $aiConversation['status'] === 'active') {
-                // ✅ VERIFICAR INTENT ANTES DE PROCESSAR COM IA
-                $conversation = \App\Models\Conversation::find($conversationId);
-                $metadata = json_decode($conversation['metadata'] ?? '{}', true);
-                
-                // Se há branching de IA ativo, verificar intent na mensagem do cliente ANTES de processar
-                if (!empty($metadata['ai_branching_active'])) {
-                    \App\Helpers\Logger::automation("🔍 Verificando intent na mensagem do cliente ANTES de processar com IA...");
-                    
-                    // Criar array simulando mensagem para detecção
-                    $messageForDetection = [
-                        'content' => $content,
-                        'sender_type' => 'contact'
-                    ];
-                    
-                    // Tentar detectar intent
-                    $handled = \App\Services\AutomationService::handleAIBranchingResponse($conversation, $messageForDetection);
-                    
-                    if ($handled) {
-                        \App\Helpers\Logger::automation("✅ Intent detectado na mensagem do cliente! IA NÃO vai processar.");
-                        // Intent foi detectado e tratado, NÃO processar com IA
-                        return $messageId;
-                    }
-                    
-                    \App\Helpers\Logger::automation("⚠️ Nenhum intent detectado. IA vai processar normalmente.");
-                }
+                // ✅ CORRIGIDO: Não verificar intent na mensagem do contato
+                // A verificação de intent será feita APÓS a IA responder (em AIAgentService)
+                // Isso permite que o contador conte "interações funcionais" (respostas da IA sem intent)
                 
                 try {
                     // Processar mensagem com agente de IA em background (assíncrono)
@@ -1431,6 +1409,7 @@ class ConversationService
                     );
                     
                     // A resposta já foi enviada pelo processMessage
+                    // A verificação de intent será feita após a resposta da IA
                 } catch (\Exception $e) {
                     error_log("Erro ao processar mensagem com agente de IA: " . $e->getMessage());
                     // Continuar normalmente mesmo se falhar

@@ -242,16 +242,16 @@ class AutomationService
         \App\Helpers\Logger::automation("chatbot_active? " . (isset($metadata['chatbot_active']) ? ($metadata['chatbot_active'] ? 'TRUE' : 'FALSE') : 'NÃO EXISTE'));
         
         // Verificar se ramificação de IA está ativa (prioridade)
-        // NOTA: A detecção de intent agora é feita ANTES da IA processar (em ConversationService)
-        // Esta verificação é mantida como fallback para mensagens antigas
+        // ✅ CORRIGIDO: A detecção de intent agora é feita APÓS a IA responder (em AIAgentService)
+        // Esta verificação é mantida como fallback para mensagens da IA que podem chegar via outros caminhos
         if (!empty($metadata['ai_branching_active'])) {
             \App\Helpers\Logger::automation("🤖 Ramificação de IA ATIVA detectada! (fallback)");
             
-            // Se for mensagem do contato, já foi tratada em ConversationService
+            // Se for mensagem do contato, não verificar aqui (será verificado após IA responder)
             if ($message['sender_type'] === 'contact') {
-                \App\Helpers\Logger::automation("⚠️ Mensagem do contato já foi verificada em ConversationService. Pulando...");
+                \App\Helpers\Logger::automation("⚠️ Mensagem do contato - verificação será feita após IA responder. Pulando...");
             } else {
-                // Mensagens da IA ainda precisam ser verificadas aqui
+                // Mensagens da IA podem ser verificadas aqui como fallback
                 \App\Helpers\Logger::automation("Analisando intent na mensagem da IA (fallback)...");
                 $handled = self::handleAIBranchingResponse($conversation, $message);
                 
@@ -1837,6 +1837,14 @@ class AutomationService
         \App\Helpers\Logger::automation("Conversa ID: {$conversationId}, Sender: {$senderType}, Mensagem: '" . substr($message['content'] ?? '', 0, 100) . "'");
         self::logIntent("=== handleAIBranchingResponse === conv:{$conversationId} sender:{$senderType} msg:'" . ($message['content'] ?? '') . "'");
         
+        // ✅ CORRIGIDO: Só processar mensagens da IA (não do contato)
+        // A verificação de intent deve ser feita na RESPOSTA DA IA, não na mensagem do contato
+        if ($senderType !== 'agent') {
+            \App\Helpers\Logger::automation("⚠️ Mensagem não é da IA (sender: {$senderType}). Ignorando verificação de intent.");
+            self::logIntent("sender_not_agent sender={$senderType}");
+            return false;
+        }
+        
         // Debug log para conversa específica
         \App\Helpers\ConversationDebug::automation($conversationId, "AI Branching Response iniciado", [
             'sender_type' => $senderType,
@@ -1876,25 +1884,20 @@ class AutomationService
             return false;
         }
 
-        // Incrementar contador de interações (uma única vez neste fluxo)
-        $interactionCount = (int)($metadata['ai_interaction_count'] ?? 0) + 1;
+        // ✅ CORRIGIDO: NÃO incrementar contador aqui
+        // O contador será incrementado APENAS quando não detectar intent (após tentar detectar)
+        $currentInteractionCount = (int)($metadata['ai_interaction_count'] ?? 0);
         $maxInteractions = (int)($metadata['ai_max_interactions'] ?? 5);
-        
-        \App\Helpers\Logger::automation("Interação {$interactionCount}/{$maxInteractions}");
-        self::logIntent("interacao {$interactionCount}/{$maxInteractions}");
-        
-        // Verificar se atingiu máximo de interações
-        if ($interactionCount >= $maxInteractions) {
-            \App\Helpers\Logger::automation("Máximo de interações atingido. Escalando para humano...");
-            self::logIntent("max_interactions");
-            return self::escalateFromAI($conversation['id'], $metadata);
-        }
         
         // Analisar a mensagem para identificar intent (primeiro por keywords, depois por IA semântica)
         \App\Helpers\ConversationDebug::intentDetection($conversationId, "Iniciando detecção de intent", [
             'message' => $message['content'] ?? '',
             'intents_count' => count($metadata['ai_intents'] ?? [])
         ]);
+        
+        // ✅ Inicializar variáveis
+        $detectedIntent = null;
+        $targetNodeId = null;
         
         $detectedIntent = self::detectAIIntent($message['content'] ?? '', $metadata['ai_intents'] ?? []);
         if ($detectedIntent) {
@@ -2051,10 +2054,14 @@ class AutomationService
             }
         }
         
-        // Não detectou intent e não há fallback: atualizar contador e (opcional) enviar feedback
+        // ✅ CORRIGIDO: Incrementar contador APENAS quando não detectou intent
+        // Isso conta "interações funcionais" (respostas da IA sem intent detectado)
+        $interactionCount = $currentInteractionCount + 1;
         $metadata['ai_interaction_count'] = $interactionCount;
         \App\Models\Conversation::update($conversation['id'], ['metadata' => json_encode($metadata)]);
         self::logIntent("no_intent_no_fallback interaction={$interactionCount}/{$maxInteractions}");
+        
+        \App\Helpers\Logger::automation("✅ Contador incrementado: {$interactionCount}/{$maxInteractions} (interação funcional - resposta da IA sem intent)");
         
         \App\Helpers\ConversationDebug::automation($conversationId, "Nenhum intent detectado", [
             'interaction_count' => $interactionCount,
@@ -2062,27 +2069,31 @@ class AutomationService
             'fallback_node_id' => $fallbackNodeId
         ]);
 
+        // Verificar se atingiu máximo de interações funcionais
         if ($interactionCount >= $maxInteractions) {
-            \App\Helpers\Logger::automation("Nenhum intent detectado e limite de interações atingido. Escalando.");
+            \App\Helpers\Logger::automation("Máximo de interações funcionais atingido ({$interactionCount}/{$maxInteractions}). Escalando para humano.");
             self::logIntent("escalate_sem_intent interaction={$interactionCount}");
             \App\Helpers\ConversationDebug::automation($conversationId, "Escalando para humano", [
-                'reason' => 'max_interactions_reached'
+                'reason' => 'max_interactions_reached',
+                'interaction_count' => $interactionCount
             ]);
             return self::escalateFromAI($conversation['id'], $metadata);
         }
 
-        // Mensagem de esclarecimento: só a partir da 2ª interação para não poluir na primeira
+        // ✅ CORRIGIDO: Mensagem de esclarecimento com sender_type='system' (não 'agent')
+        // Só enviar a partir da 2ª interação funcional para não poluir na primeira
         if ($interactionCount >= 2) {
             $clarifyMessage = "Não consegui identificar sua intenção. Pode esclarecer ou ser mais específico?";
             \App\Helpers\ConversationDebug::messageSent($conversationId, $clarifyMessage, 'clarify');
             try {
+                // ✅ CORRIGIDO: sender_type='system' para aparecer como mensagem do sistema
                 \App\Services\ConversationService::sendMessage(
                     $conversation['id'],
                     $clarifyMessage,
-                    'agent',
+                    'system', // ✅ Mudado de 'agent' para 'system'
                     null
                 );
-                \App\Helpers\Logger::automation("Feedback de não entendimento enviado ao usuário. Interação {$interactionCount}/{$maxInteractions}.");
+                \App\Helpers\Logger::automation("Feedback de não entendimento enviado ao usuário (como mensagem do sistema). Interação funcional {$interactionCount}/{$maxInteractions}.");
                 self::logIntent("clarify_enviado interaction={$interactionCount}");
             } catch (\Exception $e) {
                 \App\Helpers\Logger::automation("Falha ao enviar feedback de não entendimento: " . $e->getMessage());
@@ -2091,7 +2102,7 @@ class AutomationService
             }
         } else {
             self::logIntent("clarify_skip_first interaction={$interactionCount}");
-            \App\Helpers\ConversationDebug::automation($conversationId, "Pulando mensagem de clarificação (primeira interação)");
+            \App\Helpers\ConversationDebug::automation($conversationId, "Pulando mensagem de clarificação (primeira interação funcional)");
         }
 
         \App\Helpers\Logger::automation("=== handleAIBranchingResponse FIM (false - continua com IA) ===");

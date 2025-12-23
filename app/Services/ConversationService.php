@@ -1103,15 +1103,7 @@ class ConversationService
      */
     public static function sendMessage(int $conversationId, string $content, string $senderType = 'agent', ?int $senderId = null, array $attachments = [], ?string $messageType = null, ?int $quotedMessageId = null, ?int $aiAgentId = null, ?int $messageTimestamp = null): ?int
     {
-        \App\Helpers\Logger::info("═══ ConversationService::sendMessage INÍCIO ═══", [
-            'conversationId' => $conversationId,
-            'senderType' => $senderType,
-            'senderId' => $senderId,
-            'aiAgentId' => $aiAgentId,
-            'contentLength' => strlen($content),
-            'attachmentsCount' => count($attachments),
-            'messageType' => $messageType
-        ]);
+        \App\Helpers\Logger::info("═══ ConversationService::sendMessage INÍCIO ═══ conv={$conversationId}, type={$senderType}, sender={$senderId}, aiAgent={$aiAgentId}, contentLen=" . strlen($content) . ", attachments=" . count($attachments));
         
         // Debug log
         \App\Helpers\ConversationDebug::messageReceived($conversationId, $content, $senderType, [
@@ -1127,7 +1119,7 @@ class ConversationService
 
         // Validar que há conteúdo ou anexos
         if (empty(trim($content ?? '')) && empty($attachments)) {
-            \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO: Mensagem vazia sem anexos");
+            \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO: Mensagem vazia sem anexos (conv={$conversationId})");
             throw new \Exception('Mensagem não pode estar vazia');
         }
         
@@ -1205,15 +1197,11 @@ class ConversationService
             $messageData['attachments'] = $attachmentsData;
         }
 
-        \App\Helpers\Logger::info("ConversationService::sendMessage - Criando mensagem no banco", [
-            'messageData_keys' => array_keys($messageData)
-        ]);
+        \App\Helpers\Logger::info("ConversationService::sendMessage - Criando mensagem no banco (keys: " . implode(', ', array_keys($messageData)) . ")");
         
         $messageId = Message::createMessage($messageData);
         
-        \App\Helpers\Logger::info("ConversationService::sendMessage - Mensagem criada no banco", [
-            'messageId' => $messageId
-        ]);
+        \App\Helpers\Logger::info("ConversationService::sendMessage - Mensagem criada no banco: messageId={$messageId}");
 
         // ✅ NOVO: Transcrever áudio automaticamente se for mensagem do contato com áudio
         if ($senderType === 'contact' && $messageType === 'audio' && !empty($attachmentsData)) {
@@ -1307,11 +1295,7 @@ class ConversationService
         }
 
         // **ENVIAR PARA WHATSAPP** se a mensagem for do agente e canal for WhatsApp
-        \App\Helpers\Logger::info("ConversationService::sendMessage - Verificando envio WhatsApp", [
-            'senderType' => $senderType,
-            'channel' => $conversation['channel'],
-            'whatsapp_account_id' => $conversation['whatsapp_account_id'] ?? null
-        ]);
+        \App\Helpers\Logger::info("ConversationService::sendMessage - Verificando envio WhatsApp (type={$senderType}, channel={$conversation['channel']}, wa_id=" . ($conversation['whatsapp_account_id'] ?? 'NULL') . ")");
         
         if ($senderType === 'agent' && $conversation['channel'] === 'whatsapp' && !empty($conversation['whatsapp_account_id'])) {
             \App\Helpers\Logger::info("ConversationService::sendMessage - Condições para WhatsApp atendidas, processando envio");
@@ -1319,9 +1303,7 @@ class ConversationService
                 // Obter contato para pegar o telefone
                 $contact = \App\Models\Contact::find($conversation['contact_id']);
                 if ($contact && !empty($contact['phone'])) {
-                    \App\Helpers\Logger::info("ConversationService::sendMessage - Contato encontrado, preparando envio", [
-                        'phone' => $contact['phone']
-                    ]);
+                    \App\Helpers\Logger::info("ConversationService::sendMessage - Contato encontrado: phone={$contact['phone']}");
                     // Preparar opções para envio
                     $options = [];
                     
@@ -1426,12 +1408,7 @@ class ConversationService
                     }
                     
                     // Enviar mensagem via WhatsApp
-                    \App\Helpers\Logger::info("ConversationService::sendMessage - Chamando WhatsAppService::sendMessage", [
-                        'whatsapp_account_id' => $conversation['whatsapp_account_id'],
-                        'phone' => $contact['phone'],
-                        'contentLength' => strlen($content),
-                        'options_keys' => array_keys($options)
-                    ]);
+                    \App\Helpers\Logger::info("ConversationService::sendMessage - Chamando WhatsAppService::sendMessage (wa_id={$conversation['whatsapp_account_id']}, phone={$contact['phone']}, contentLen=" . strlen($content) . ")");
                     
                     $whatsappResult = \App\Services\WhatsAppService::sendMessage(
                         $conversation['whatsapp_account_id'],
@@ -1440,10 +1417,7 @@ class ConversationService
                         $options
                     );
                     
-                    \App\Helpers\Logger::info("ConversationService::sendMessage - WhatsApp respondeu", [
-                        'success' => $whatsappResult['success'] ?? false,
-                        'message_id' => $whatsappResult['message_id'] ?? null
-                    ]);
+                    \App\Helpers\Logger::info("ConversationService::sendMessage - WhatsApp respondeu: success=" . ($whatsappResult['success'] ?? false) . ", msg_id=" . ($whatsappResult['message_id'] ?? 'NULL'));
                     
                     // Atualizar status e external_id da mensagem
                     if ($whatsappResult['success']) {
@@ -1456,9 +1430,7 @@ class ConversationService
                     \App\Helpers\Logger::warning("ConversationService::sendMessage - Contato não encontrado ou sem telefone");
                 }
             } catch (\Exception $e) {
-                \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO ao enviar WhatsApp", [
-                    'error' => $e->getMessage()
-                ]);
+                \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO ao enviar WhatsApp: " . $e->getMessage());
                 error_log("Erro ao enviar mensagem para WhatsApp: " . $e->getMessage());
                 // Marcar mensagem como erro
                 Message::update($messageId, [
@@ -1653,10 +1625,7 @@ class ConversationService
             }
         }
 
-        \App\Helpers\Logger::info("═══ ConversationService::sendMessage FIM ═══", [
-            'messageId' => $messageId,
-            'conversationId' => $conversationId
-        ]);
+        \App\Helpers\Logger::info("═══ ConversationService::sendMessage FIM ═══ messageId={$messageId}, conv={$conversationId}");
 
         return $messageId;
     }

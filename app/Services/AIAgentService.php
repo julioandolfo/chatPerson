@@ -300,11 +300,7 @@ class AIAgentService
      */
     public static function processMessage(int $conversationId, int $agentId, string $message): array
     {
-        \App\Helpers\Logger::info("═══ AIAgentService::processMessage INÍCIO ═══", [
-            'conversationId' => $conversationId,
-            'agentId' => $agentId,
-            'messageLength' => strlen($message)
-        ]);
+        \App\Helpers\Logger::info("═══ AIAgentService::processMessage INÍCIO ═══ conv={$conversationId}, agent={$agentId}, msgLen=" . strlen($message));
         
         // Obter contexto da conversa
         $conversation = \App\Models\Conversation::findWithRelations($conversationId);
@@ -331,9 +327,7 @@ class AIAgentService
         try {
             \App\Helpers\Logger::info("AIAgentService::processMessage - Chamando OpenAIService::processMessage");
             $response = OpenAIService::processMessage($conversationId, $agentId, $message, $context);
-            \App\Helpers\Logger::info("AIAgentService::processMessage - OpenAI respondeu", [
-                'contentLength' => strlen($response['content'] ?? '')
-            ]);
+            \App\Helpers\Logger::info("AIAgentService::processMessage - OpenAI respondeu (contentLen=" . strlen($response['content'] ?? '') . ")");
 
             // Delay humanizado antes de responder (configurável por agente)
             $settings = is_string($agent['settings'] ?? null) 
@@ -397,12 +391,7 @@ class AIAgentService
             $attachments = [];
             $messageType = null;
             
-            \App\Helpers\Logger::info("AIAgentService::processMessage - ANTES de decidir envio", [
-                'conversationId' => $conversationId,
-                'audioAttachment' => !empty($audioAttachment),
-                'sendMode' => $sendMode,
-                'contentLength' => strlen($messageContent)
-            ]);
+            \App\Helpers\Logger::info("AIAgentService::processMessage - ANTES de decidir envio (audio=" . (!empty($audioAttachment) ? 'SIM' : 'NÃO') . ", mode={$sendMode}, contentLen=" . strlen($messageContent) . ")");
             
             // Se modo é 'intelligent', decidir automaticamente
             if ($sendMode === 'intelligent' && $audioAttachment) {
@@ -413,10 +402,7 @@ class AIAgentService
                     $intelligentRules
                 );
                 
-                \App\Helpers\Logger::info("AIAgentService::processMessage - Modo inteligente escolheu: {$sendMode}", [
-                    'conversationId' => $conversationId,
-                    'stats' => \App\Services\TTSIntelligentService::getDecisionStats($response['content'], $intelligentRules)
-                ]);
+                \App\Helpers\Logger::info("AIAgentService::processMessage - Modo inteligente escolheu: {$sendMode}");
             }
             
             if ($audioAttachment) {
@@ -444,13 +430,7 @@ class AIAgentService
                 }
             }
             
-            \App\Helpers\Logger::info("AIAgentService::processMessage - ANTES de sendMessage", [
-                'conversationId' => $conversationId,
-                'messageContentLength' => strlen($messageContent),
-                'attachmentsCount' => count($attachments),
-                'messageType' => $messageType,
-                'agentId' => $agentId
-            ]);
+            \App\Helpers\Logger::info("AIAgentService::processMessage - ANTES de sendMessage (contentLen=" . strlen($messageContent) . ", attachments=" . count($attachments) . ", type={$messageType})");
             
             // Criar mensagem na conversa
             $aiMessageId = \App\Services\ConversationService::sendMessage(
@@ -464,10 +444,7 @@ class AIAgentService
                 $agentId // aiAgentId
             );
             
-            \App\Helpers\Logger::info("AIAgentService::processMessage - DEPOIS de sendMessage", [
-                'conversationId' => $conversationId,
-                'aiMessageId' => $aiMessageId
-            ]);
+            \App\Helpers\Logger::info("AIAgentService::processMessage - DEPOIS de sendMessage (aiMessageId={$aiMessageId})");
 
             // ✅ CORRIGIDO: Verificar intent na RESPOSTA DA IA após ela responder
             // Isso permite contar "interações funcionais" (respostas sem intent detectado)
@@ -495,18 +472,11 @@ class AIAgentService
                 }
             }
 
-            \App\Helpers\Logger::info("═══ AIAgentService::processMessage SUCESSO ═══", [
-                'conversationId' => $conversationId,
-                'aiMessageId' => $aiMessageId
-            ]);
+            \App\Helpers\Logger::info("═══ AIAgentService::processMessage SUCESSO ═══ conv={$conversationId}, aiMessageId={$aiMessageId}");
             
             return $response;
         } catch (\Exception $e) {
-            \App\Helpers\Logger::error("═══ AIAgentService::processMessage ERRO ═══", [
-                'conversationId' => $conversationId,
-                'error' => $e->getMessage(),
-                'trace' => substr($e->getTraceAsString(), 0, 500)
-            ]);
+            \App\Helpers\Logger::error("═══ AIAgentService::processMessage ERRO ═══ conv={$conversationId}: " . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
             
             error_log("Erro ao processar mensagem com agente de IA: " . $e->getMessage());
             

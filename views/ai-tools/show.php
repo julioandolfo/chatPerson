@@ -310,18 +310,18 @@ ob_start();
 <?php 
 $content = ob_get_clean(); 
 
-// Preparar JSON para injetar no script - double encode para usar com JSON.parse()
+// Preparar JSON para injetar no script
 $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP;
-// Double encode: primeiro converte para JSON, depois converte a string JSON para string JS segura
-$aiToolsBaseUrl = json_encode(json_encode(\App\Helpers\Url::to('/ai-tools')), $jsonFlags);
-$functionSchemaJson = json_encode(json_encode($functionSchema, JSON_UNESCAPED_UNICODE), $jsonFlags);
-$configJson = json_encode(json_encode($config, JSON_UNESCAPED_UNICODE), $jsonFlags);
+// Encode uma vez para inserir diretamente como string JavaScript
+$aiToolsBaseUrl = json_encode(\App\Helpers\Url::to('/ai-tools'), $jsonFlags);
+$functionSchemaJson = json_encode($functionSchema, $jsonFlags);
+$configJson = json_encode($config, $jsonFlags);
 $toolIdJson = json_encode($tool['id'] ?? 0, $jsonFlags);
 
 $scripts = <<<'SCRIPTS'
 <script>
 // URL base para requisições
-const AI_TOOLS_BASE_URL = JSON.parse(__AI_TOOLS_BASE_URL__);
+const AI_TOOLS_BASE_URL = __AI_TOOLS_BASE_URL__;
 
 let editParameterCounter = 0;
 
@@ -708,8 +708,8 @@ function buildEditConfig() {
 
 // Preencher campos ao abrir modal de edição
 function populateEditFields() {
-    const functionSchema = JSON.parse(__FUNCTION_SCHEMA__);
-    const config = JSON.parse(__CONFIG__);
+    const functionSchema = __FUNCTION_SCHEMA__ || null;
+    const config = __CONFIG__ || null;
     
     if (functionSchema && functionSchema.function) {
         document.getElementById("kt_edit_function_name").value = functionSchema.function.name || "";

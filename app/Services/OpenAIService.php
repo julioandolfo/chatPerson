@@ -1251,7 +1251,7 @@ class OpenAIService
         $apiKey = $config['api_key'] ?? null;
         $useRawResponse = !empty($config['use_raw_response']);
         $rawResponseField = $config['raw_response_field'] ?? 'message';
-        $timeout = (int)($config['timeout'] ?? 60);
+        $timeout = (int)($config['timeout'] ?? 120);
         
         if (!$n8nUrl) {
             return ['error' => 'URL do N8N não configurada'];

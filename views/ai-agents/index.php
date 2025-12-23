@@ -177,6 +177,30 @@ ob_start();
                         <label class="fw-semibold fs-6 mb-2">Limite de Conversas Simultâneas</label>
                         <input type="number" name="max_conversations" class="form-control form-control-solid" placeholder="Deixe em branco para ilimitado" min="1" />
                     </div>
+                    
+                    <!--begin::Delay Humanizado-->
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">
+                            <i class="ki-duotone ki-timer fs-4 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                            Delay Humanizado (segundos)
+                        </label>
+                        <div class="row">
+                            <div class="col-6">
+                                <input type="number" name="response_delay_min" class="form-control form-control-solid" placeholder="Mínimo" min="0" max="60" value="0" />
+                                <div class="form-text">Delay mínimo</div>
+                            </div>
+                            <div class="col-6">
+                                <input type="number" name="response_delay_max" class="form-control form-control-solid" placeholder="Máximo" min="0" max="60" value="0" />
+                                <div class="form-text">Delay máximo</div>
+                            </div>
+                        </div>
+                        <div class="form-text text-info mt-2">
+                            <i class="ki-duotone ki-information-5 fs-7 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                            Tempo aleatório antes de responder para parecer mais natural. Ex: 5-10 segundos.
+                        </div>
+                    </div>
+                    <!--end::Delay Humanizado-->
+                    
                     <div class="fv-row mb-7">
                         <label class="d-flex align-items-center">
                             <input type="checkbox" name="enabled" class="form-check-input me-2" checked />
@@ -306,6 +330,30 @@ ob_start();
                         <label class="fw-semibold fs-6 mb-2">Limite de Conversas Simultâneas</label>
                         <input type="number" name="max_conversations" id="edit_max_conversations" class="form-control form-control-solid" placeholder="Deixe em branco para ilimitado" min="1" />
                     </div>
+                    
+                    <!--begin::Delay Humanizado-->
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">
+                            <i class="ki-duotone ki-timer fs-4 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                            Delay Humanizado (segundos)
+                        </label>
+                        <div class="row">
+                            <div class="col-6">
+                                <input type="number" name="response_delay_min" id="edit_response_delay_min" class="form-control form-control-solid" placeholder="Mínimo" min="0" max="60" value="0" />
+                                <div class="form-text">Delay mínimo</div>
+                            </div>
+                            <div class="col-6">
+                                <input type="number" name="response_delay_max" id="edit_response_delay_max" class="form-control form-control-solid" placeholder="Máximo" min="0" max="60" value="0" />
+                                <div class="form-text">Delay máximo</div>
+                            </div>
+                        </div>
+                        <div class="form-text text-info mt-2">
+                            <i class="ki-duotone ki-information-5 fs-7 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                            Tempo aleatório antes de responder para parecer mais natural. Ex: 5-10 segundos.
+                        </div>
+                    </div>
+                    <!--end::Delay Humanizado-->
+                    
                     <div class="fv-row mb-7">
                         <label class="d-flex align-items-center">
                             <input type="checkbox" name="enabled" id="edit_enabled" class="form-check-input me-2" />
@@ -398,6 +446,11 @@ function editAgent(id) {
             document.getElementById("edit_max_tokens").value = agent.max_tokens || 2000;
             document.getElementById("edit_max_conversations").value = agent.max_conversations || "";
             document.getElementById("edit_enabled").checked = agent.enabled == 1 || agent.enabled === true;
+            
+            // Carregar delay humanizado das settings
+            const settings = agent.settings ? (typeof agent.settings === 'string' ? JSON.parse(agent.settings) : agent.settings) : {};
+            document.getElementById("edit_response_delay_min").value = settings.response_delay_min || 0;
+            document.getElementById("edit_response_delay_max").value = settings.response_delay_max || 0;
             
             // Carregar tools do agente
             if (agent.tools && agent.tools.length > 0) {

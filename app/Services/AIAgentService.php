@@ -35,6 +35,28 @@ class AIAgentService
         if (isset($data['max_tokens']) && $data['max_tokens'] !== '' && $data['max_tokens'] !== null) {
             $data['max_tokens'] = (int)$data['max_tokens'];
         }
+        
+        // Processar settings com delay humanizado
+        $settings = [];
+        if (isset($data['settings']) && is_string($data['settings'])) {
+            $settings = json_decode($data['settings'], true) ?? [];
+        } elseif (isset($data['settings']) && is_array($data['settings'])) {
+            $settings = $data['settings'];
+        }
+        
+        // Adicionar delay humanizado às settings
+        if (isset($data['response_delay_min'])) {
+            $settings['response_delay_min'] = (int)$data['response_delay_min'];
+            unset($data['response_delay_min']);
+        }
+        if (isset($data['response_delay_max'])) {
+            $settings['response_delay_max'] = (int)$data['response_delay_max'];
+            unset($data['response_delay_max']);
+        }
+        
+        if (!empty($settings)) {
+            $data['settings'] = json_encode($settings, JSON_UNESCAPED_UNICODE);
+        }
 
         $errors = Validator::validate($data, [
             'name' => 'required|string|max:255',
@@ -94,6 +116,28 @@ class AIAgentService
         // Converter max_tokens para int se presente
         if (isset($data['max_tokens']) && $data['max_tokens'] !== '' && $data['max_tokens'] !== null) {
             $data['max_tokens'] = (int)$data['max_tokens'];
+        }
+        
+        // Processar settings com delay humanizado (merge com existentes)
+        $existingSettings = [];
+        if (!empty($agent['settings'])) {
+            $existingSettings = is_string($agent['settings']) 
+                ? (json_decode($agent['settings'], true) ?? []) 
+                : ($agent['settings'] ?? []);
+        }
+        
+        // Adicionar delay humanizado às settings
+        if (isset($data['response_delay_min'])) {
+            $existingSettings['response_delay_min'] = (int)$data['response_delay_min'];
+            unset($data['response_delay_min']);
+        }
+        if (isset($data['response_delay_max'])) {
+            $existingSettings['response_delay_max'] = (int)$data['response_delay_max'];
+            unset($data['response_delay_max']);
+        }
+        
+        if (!empty($existingSettings)) {
+            $data['settings'] = json_encode($existingSettings, JSON_UNESCAPED_UNICODE);
         }
 
         $errors = Validator::validate($data, [
@@ -280,6 +324,20 @@ class AIAgentService
         // Processar com OpenAI
         try {
             $response = OpenAIService::processMessage($conversationId, $agentId, $message, $context);
+
+            // Delay humanizado antes de responder (configurável por agente)
+            $settings = is_string($agent['settings'] ?? null) 
+                ? json_decode($agent['settings'], true) 
+                : ($agent['settings'] ?? []);
+            
+            $minDelay = (int)($settings['response_delay_min'] ?? 0); // segundos
+            $maxDelay = (int)($settings['response_delay_max'] ?? 0); // segundos
+            
+            if ($minDelay > 0 && $maxDelay >= $minDelay) {
+                $delay = rand($minDelay, $maxDelay);
+                \App\Helpers\ConversationDebug::log($conversationId, "Delay humanizado: {$delay}s (min: {$minDelay}, max: {$maxDelay})");
+                sleep($delay);
+            }
 
             // Criar mensagem na conversa
             \App\Services\ConversationService::sendMessage(

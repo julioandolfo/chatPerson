@@ -225,7 +225,7 @@ const toolTypeConfigs = {
             { name: "webhook_id", label: "ID do Webhook Padrão", type: "text", required: false, placeholder: "abc123" },
             { name: "webhook_path", label: "Caminho do Webhook", type: "text", required: false, placeholder: "/webhook", default: "/webhook" },
             { name: "api_key", label: "API Key do N8N", type: "text", required: false, placeholder: "opcional" },
-            { name: "timeout", label: "Timeout (segundos)", type: "number", required: false, placeholder: "60", default: "60" },
+            { name: "timeout", label: "Timeout (segundos)", type: "number", required: false, placeholder: "120", default: "120", help: "Tempo máximo de espera pela resposta do N8N. Use 180+ para fluxos complexos com IA." },
             { name: "custom_headers", label: "Headers Customizados (JSON)", type: "textarea", required: false, placeholder: "{\"X-Custom-Header\": \"value\"}" },
             { name: "use_raw_response", label: "Usar resposta direta (não reenviar para OpenAI)", type: "checkbox", required: false, default: false, help: "Se ativo, a resposta do N8N será enviada diretamente ao cliente sem processamento adicional da IA" },
             { name: "raw_response_field", label: "Campo da resposta direta", type: "text", required: false, placeholder: "output", default: "output", help: "Campo JSON com a mensagem. Suporta: output, message, data.message. Arrays são tratados automaticamente." },

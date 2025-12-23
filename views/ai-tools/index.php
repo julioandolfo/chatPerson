@@ -205,14 +205,15 @@ $departmentsJson = json_encode($departments ?? [], JSON_HEX_TAG | JSON_HEX_APOS 
 $funnelsJson = json_encode($funnels ?? [], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 $agentsJson = json_encode($agents ?? [], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
-$scripts = '
+ob_start();
+?>
 <script>
 let parameterCounter = 0;
 
 // Dados do backend para selects dinâmicos
-const availableDepartments = ' . $departmentsJson . ';
-const availableFunnels = ' . $funnelsJson . ';
-const availableAgents = ' . $agentsJson . ';
+const availableDepartments = <?= $departmentsJson ?>;
+const availableFunnels = <?= $funnelsJson ?>;
+const availableAgents = <?= $agentsJson ?>;
 const funnelStages = {}; // Será preenchido dinamicamente
 
 // Configurações por tipo de tool
@@ -502,7 +503,8 @@ function updateConfigFields() {
             inputHtml += `</select>`;
             fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
         } else if (field.type === "funnel_select") {
-            inputHtml = `<select class="form-control form-control-solid config-field" data-field="${field.name}" id="config_${field.name}" ${field.required ? "required" : ""} onchange="loadFunnelStages(this.value, 'config_${field.dependsOn ? field.name.replace('funnel', 'stage') : 'stage_id'}')">`;
+            const stageSelectId = field.dependsOn ? "config_" + field.name.replace("funnel", "stage") : "config_stage_id";
+            inputHtml = `<select class="form-control form-control-solid config-field" data-field="${field.name}" id="config_${field.name}" ${field.required ? "required" : ""} onchange="loadFunnelStages(this.value, '${stageSelectId}')">`;
             inputHtml += `<option value="">Selecione o funil...</option>`;
             availableFunnels.forEach(funnel => {
                 inputHtml += `<option value="${funnel.id}">${funnel.name}</option>`;
@@ -727,7 +729,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const enabled = formData.get("enabled") === "on" || formData.get("enabled") === "true";
             formData.set("enabled", enabled ? "1" : "0");
             
-            fetch("' . \App\Helpers\Url::to('/ai-tools') . '", {
+            fetch("<?= \App\Helpers\Url::to('/ai-tools') ?>", {
                 method: "POST",
                 headers: {
                     "X-Requested-With": "XMLHttpRequest"
@@ -756,7 +758,8 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 </script>
-';
+<?php 
+$scripts = ob_get_clean();
 ?>
 
 <?php include __DIR__ . '/../layouts/metronic/app.php'; ?>

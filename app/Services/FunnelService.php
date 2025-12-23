@@ -21,6 +21,7 @@ class FunnelService
         $errors = Validator::validate($data, [
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'ai_description' => 'nullable|string',
             'is_default' => 'nullable|boolean',
             'status' => 'nullable|string|in:active,inactive'
         ]);
@@ -97,6 +98,7 @@ class FunnelService
         $errors = Validator::validate($data, [
             'name' => 'nullable|string|max:255',
             'description' => 'nullable|string',
+            'ai_description' => 'nullable|string',
             'is_default' => 'nullable|boolean',
             'status' => 'nullable|string|in:active,inactive'
         ]);

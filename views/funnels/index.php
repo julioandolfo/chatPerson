@@ -130,6 +130,34 @@ ob_start();
                         <label class="fw-semibold fs-6 mb-2">Descrição</label>
                         <textarea name="description" class="form-control form-control-solid" rows="3" placeholder="Descrição do funil"></textarea>
                     </div>
+                    
+                    <!--begin::IA Fields-->
+                    <div class="separator separator-dashed my-5"></div>
+                    <div class="notice d-flex bg-light-primary rounded border-primary border border-dashed p-4 mb-5">
+                        <i class="ki-duotone ki-abstract-24 fs-2tx text-primary me-4">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        <div class="d-flex flex-stack flex-grow-1">
+                            <div class="fw-semibold">
+                                <h4 class="text-gray-900 fw-bold">🧠 Configurações para IA Inteligente</h4>
+                                <div class="fs-7 text-gray-600">Esta descrição ajuda a IA a entender quando conversas devem ser movidas para este funil automaticamente.</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">
+                            <i class="ki-duotone ki-abstract-26 fs-5 me-1 text-primary"><span class="path1"></span><span class="path2"></span></i>
+                            Descrição para IA
+                        </label>
+                        <textarea name="ai_description" class="form-control form-control-solid" rows="4" placeholder="Descreva o objetivo deste funil e quando uma conversa deve estar aqui. Ex: 'Funil de vendas para novos clientes interessados em nossos produtos. Inclui etapas desde o primeiro contato até o fechamento.'"></textarea>
+                        <div class="form-text text-muted">
+                            Seja específico sobre o contexto e tipo de clientes/conversas que pertencem a este funil.
+                        </div>
+                    </div>
+                    <!--end::IA Fields-->
+                    
                     <div class="fv-row mb-7">
                         <label class="fw-semibold fs-6 mb-2">Status</label>
                         <select name="status" class="form-select form-select-solid">
@@ -186,6 +214,34 @@ ob_start();
                         <label class="fw-semibold fs-6 mb-2">Descrição</label>
                         <textarea name="description" id="kt_edit_funnel_description" class="form-control form-control-solid" rows="3" placeholder="Descrição do funil"></textarea>
                     </div>
+                    
+                    <!--begin::IA Fields-->
+                    <div class="separator separator-dashed my-5"></div>
+                    <div class="notice d-flex bg-light-primary rounded border-primary border border-dashed p-4 mb-5">
+                        <i class="ki-duotone ki-abstract-24 fs-2tx text-primary me-4">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        <div class="d-flex flex-stack flex-grow-1">
+                            <div class="fw-semibold">
+                                <h4 class="text-gray-900 fw-bold">🧠 Configurações para IA Inteligente</h4>
+                                <div class="fs-7 text-gray-600">Esta descrição ajuda a IA a entender quando conversas devem ser movidas para este funil automaticamente.</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">
+                            <i class="ki-duotone ki-abstract-26 fs-5 me-1 text-primary"><span class="path1"></span><span class="path2"></span></i>
+                            Descrição para IA
+                        </label>
+                        <textarea name="ai_description" id="kt_edit_funnel_ai_description" class="form-control form-control-solid" rows="4" placeholder="Descreva o objetivo deste funil e quando uma conversa deve estar aqui. Ex: 'Funil de vendas para novos clientes interessados em nossos produtos. Inclui etapas desde o primeiro contato até o fechamento.'"></textarea>
+                        <div class="form-text text-muted">
+                            Seja específico sobre o contexto e tipo de clientes/conversas que pertencem a este funil.
+                        </div>
+                    </div>
+                    <!--end::IA Fields-->
+                    
                     <div class="fv-row mb-7">
                         <label class="fw-semibold fs-6 mb-2">Status</label>
                         <select name="status" id="kt_edit_funnel_status" class="form-select form-select-solid">
@@ -226,6 +282,7 @@ function editFunnel(funnelId, funnel) {
     document.getElementById("kt_edit_funnel_id").value = funnelId;
     document.getElementById("kt_edit_funnel_name").value = funnel.name;
     document.getElementById("kt_edit_funnel_description").value = funnel.description || "";
+    document.getElementById("kt_edit_funnel_ai_description").value = funnel.ai_description || "";
     document.getElementById("kt_edit_funnel_status").value = funnel.status;
     document.getElementById("kt_edit_funnel_default").checked = funnel.is_default == 1;
     

@@ -351,7 +351,7 @@ const toolTypeConfigs = {
             { name: "webhook_path", label: "Caminho do Webhook", type: "text", required: false, placeholder: "/webhook", default: "/webhook" },
             { name: "api_key", label: "API Key do N8N", type: "text", required: false, placeholder: "opcional" },
             { name: "timeout", label: "Timeout (segundos)", type: "number", required: false, placeholder: "120", default: "120", help: "Tempo máximo de espera pela resposta do N8N. Use 180+ para fluxos complexos com IA." },
-            { name: "custom_headers", label: "Headers Customizados (JSON)", type: "textarea", required: false, placeholder: "{\"X-Custom-Header\": \"value\"}" },
+            { name: "custom_headers", label: "Headers Customizados (JSON)", type: "textarea", required: false, placeholder: '{"X-Custom-Header": "value"}' },
             { name: "use_raw_response", label: "Usar resposta direta (não reenviar para OpenAI)", type: "checkbox", required: false, default: false, help: "Se ativo, a resposta do N8N será enviada diretamente ao cliente sem processamento adicional da IA" },
             { name: "raw_response_field", label: "Campo da resposta direta", type: "text", required: false, placeholder: "output", default: "output", help: "Campo JSON com a mensagem. Suporta: output, message, data.message. Arrays são tratados automaticamente." },
             { name: "include_history", label: "Incluir histórico da conversa", type: "checkbox", required: false, default: true, help: "Envia as últimas mensagens da conversa para o N8N ter contexto" },
@@ -364,7 +364,7 @@ const toolTypeConfigs = {
             { name: "base_url", label: "Base URL da API", type: "url", required: true, placeholder: "https://api.exemplo.com/v1" },
             { name: "api_key", label: "API Key", type: "text", required: false },
             { name: "auth_type", label: "Tipo de Autenticação", type: "select", required: false, options: ["none", "bearer", "basic", "api_key"], default: "bearer" },
-            { name: "headers", label: "Headers Adicionais (JSON)", type: "textarea", required: false, placeholder: "{\"X-Custom-Header\": \"value\"}" }
+            { name: "headers", label: "Headers Adicionais (JSON)", type: "textarea", required: false, placeholder: '{"X-Custom-Header": "value"}' }
         ]
     },
     document: {

@@ -1196,6 +1196,97 @@ class ConversationService
 
         $messageId = Message::createMessage($messageData);
 
+        // ✅ NOVO: Transcrever áudio automaticamente se for mensagem do contato com áudio
+        if ($senderType === 'contact' && $messageType === 'audio' && !empty($attachmentsData)) {
+            try {
+                $transcriptionSettings = \App\Services\TranscriptionService::getSettings();
+                
+                // Verificar se transcrição está habilitada
+                if (!empty($transcriptionSettings['enabled']) && !empty($transcriptionSettings['auto_transcribe'])) {
+                    // Verificar se deve transcrever apenas para agentes de IA
+                    $shouldTranscribe = true;
+                    if (!empty($transcriptionSettings['only_for_ai_agents'])) {
+                        $aiConversation = \App\Models\AIConversation::getByConversationId($conversationId);
+                        $shouldTranscribe = ($aiConversation && $aiConversation['status'] === 'active');
+                    }
+                    
+                    if ($shouldTranscribe) {
+                        \App\Helpers\Logger::info("ConversationService::sendMessage - Iniciando transcrição automática de áudio", [
+                            'messageId' => $messageId,
+                            'conversationId' => $conversationId
+                        ]);
+                        
+                        // Pegar primeiro anexo de áudio
+                        $audioAttachment = null;
+                        foreach ($attachmentsData as $att) {
+                            if (($att['type'] ?? '') === 'audio') {
+                                $audioAttachment = $att;
+                                break;
+                            }
+                        }
+                        
+                        if ($audioAttachment && !empty($audioAttachment['path'])) {
+                            // Construir caminho completo do arquivo
+                            $audioFilePath = __DIR__ . '/../../public' . $audioAttachment['path'];
+                            
+                            // Verificar se arquivo existe
+                            if (file_exists($audioFilePath)) {
+                                // Transcrever
+                                $transcriptionResult = \App\Services\TranscriptionService::transcribe($audioFilePath, [
+                                    'language' => $transcriptionSettings['language'] ?? 'pt',
+                                    'model' => $transcriptionSettings['model'] ?? 'whisper-1'
+                                ]);
+                                
+                                if ($transcriptionResult['success'] && !empty($transcriptionResult['text'])) {
+                                    // Atualizar conteúdo da mensagem com texto transcrito
+                                    if (!empty($transcriptionSettings['update_message_content'])) {
+                                        Message::update($messageId, [
+                                            'content' => $transcriptionResult['text']
+                                        ]);
+                                        
+                                        \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Transcrição concluída e mensagem atualizada", [
+                                            'messageId' => $messageId,
+                                            'textLength' => strlen($transcriptionResult['text']),
+                                            'cost' => $transcriptionResult['cost']
+                                        ]);
+                                        
+                                        // Atualizar variável $content para usar no processamento com IA abaixo
+                                        $content = $transcriptionResult['text'];
+                                    } else {
+                                        // Salvar transcrição em metadata ou campo separado
+                                        $metadata = json_decode(Message::find($messageId)['metadata'] ?? '{}', true);
+                                        $metadata['transcription'] = [
+                                            'text' => $transcriptionResult['text'],
+                                            'cost' => $transcriptionResult['cost'],
+                                            'duration' => $transcriptionResult['duration'] ?? null,
+                                            'created_at' => date('Y-m-d H:i:s')
+                                        ];
+                                        Message::update($messageId, [
+                                            'metadata' => json_encode($metadata, JSON_UNESCAPED_UNICODE)
+                                        ]);
+                                        
+                                        // Usar texto transcrito para processamento com IA mesmo se não atualizar content
+                                        $content = $transcriptionResult['text'];
+                                        
+                                        \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Transcrição salva em metadata", [
+                                            'messageId' => $messageId
+                                        ]);
+                                    }
+                                } else {
+                                    \App\Helpers\Logger::error("ConversationService::sendMessage - ❌ Falha na transcrição: " . ($transcriptionResult['error'] ?? 'Erro desconhecido'));
+                                }
+                            } else {
+                                \App\Helpers\Logger::error("ConversationService::sendMessage - Arquivo de áudio não encontrado: {$audioFilePath}");
+                            }
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                \App\Helpers\Logger::error("ConversationService::sendMessage - Erro ao transcrever áudio: " . $e->getMessage());
+                // Não bloquear criação da mensagem se transcrição falhar
+            }
+        }
+
         // **ENVIAR PARA WHATSAPP** se a mensagem for do agente e canal for WhatsApp
         if ($senderType === 'agent' && $conversation['channel'] === 'whatsapp' && !empty($conversation['whatsapp_account_id'])) {
             try {
@@ -1393,6 +1484,29 @@ class ConversationService
             
         // Se mensagem é do contato e conversa está atribuída a agente de IA, processar automaticamente
         if ($senderType === 'contact') {
+            // ✅ NOVO: Se mensagem tem áudio e transcrição está habilitada, usar texto transcrito
+            $processedContent = $content;
+            if ($messageType === 'audio' && !empty($attachmentsData)) {
+                try {
+                    $transcriptionSettings = \App\Services\TranscriptionService::getSettings();
+                    if (!empty($transcriptionSettings['enabled']) && !empty($transcriptionSettings['auto_transcribe'])) {
+                        // Buscar transcrição na mensagem recém-criada (se foi atualizada)
+                        $message = Message::find($messageId);
+                        if ($message && !empty(trim($message['content'] ?? '')) && $message['content'] !== $content) {
+                            // Mensagem foi atualizada com transcrição
+                            $processedContent = $message['content'];
+                            \App\Helpers\Logger::info("ConversationService::sendMessage - Usando texto transcrito para processar com IA", [
+                                'messageId' => $messageId,
+                                'originalLength' => strlen($content),
+                                'transcribedLength' => strlen($processedContent)
+                            ]);
+                        }
+                    }
+                } catch (\Exception $e) {
+                    \App\Helpers\Logger::error("ConversationService::sendMessage - Erro ao obter transcrição: " . $e->getMessage());
+                }
+            }
+            
             $aiConversation = \App\Models\AIConversation::getByConversationId($conversationId);
             if ($aiConversation && $aiConversation['status'] === 'active') {
                 // ✅ CORRIGIDO: Não verificar intent na mensagem do contato
@@ -1402,10 +1516,11 @@ class ConversationService
                 try {
                     // Processar mensagem com agente de IA em background (assíncrono)
                     // Por enquanto, processar diretamente (em produção, usar fila de jobs)
+                    // ✅ Usar conteúdo processado (pode ser texto transcrito se for áudio)
                     $aiResponse = \App\Services\AIAgentService::processMessage(
                         $conversationId,
                         $aiConversation['ai_agent_id'],
-                        $content
+                        $processedContent // Usar conteúdo processado (transcrito se disponível)
                     );
                     
                     // A resposta já foi enviada pelo processMessage

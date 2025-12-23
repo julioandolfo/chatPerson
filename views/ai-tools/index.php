@@ -441,15 +441,32 @@ function removeFunctionParameter(id) {
 
 // Atualizar campos de config baseado no tipo
 function updateConfigFields() {
+    console.log("updateConfigFields chamada");
     const toolType = document.getElementById("kt_tool_type").value;
+    console.log("Tool type selecionado:", toolType);
+    
     const configSection = document.getElementById("kt_config_section");
     const configFields = document.getElementById("kt_config_fields");
     
-    if (!toolType || !toolTypeConfigs[toolType] || toolTypeConfigs[toolType].fields.length === 0) {
+    if (!toolType) {
+        console.log("Nenhum tipo selecionado");
         configSection.style.display = "none";
         return;
     }
     
+    if (!toolTypeConfigs[toolType]) {
+        console.log("Config não encontrada para tipo:", toolType);
+        configSection.style.display = "none";
+        return;
+    }
+    
+    if (toolTypeConfigs[toolType].fields.length === 0) {
+        console.log("Tipo não tem campos de config:", toolType);
+        configSection.style.display = "none";
+        return;
+    }
+    
+    console.log("Mostrando config para tipo:", toolType, "com", toolTypeConfigs[toolType].fields.length, "campos");
     configSection.style.display = "block";
     configFields.innerHTML = "";
     
@@ -690,10 +707,17 @@ function buildConfig() {
 }
 
 document.addEventListener("DOMContentLoaded", function() {
+    console.log("AI Tools: DOMContentLoaded disparado");
+    
     // Atualizar campos de config quando tipo mudar
     const toolTypeSelect = document.getElementById("kt_tool_type");
+    console.log("AI Tools: toolTypeSelect encontrado:", toolTypeSelect);
+    
     if (toolTypeSelect) {
-        toolTypeSelect.addEventListener("change", updateConfigFields);
+        toolTypeSelect.addEventListener("change", function() {
+            console.log("AI Tools: Tipo de tool mudou para:", this.value);
+            updateConfigFields();
+        });
     }
     
     const form = document.getElementById("kt_modal_new_ai_tool_form");

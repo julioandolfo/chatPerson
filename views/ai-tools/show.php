@@ -310,18 +310,15 @@ ob_start();
 <?php 
 $content = ob_get_clean(); 
 
-// Preparar JSON para injetar no script
-$jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP;
-// Encode uma vez para inserir diretamente como string JavaScript
-$aiToolsBaseUrl = json_encode(\App\Helpers\Url::to('/ai-tools'), $jsonFlags);
-$functionSchemaJson = json_encode($functionSchema, $jsonFlags);
-$configJson = json_encode($config, $jsonFlags);
-$toolIdJson = json_encode($tool['id'] ?? 0, $jsonFlags);
-
-$scripts = <<<'SCRIPTS'
+// Preparar JavaScript para injetar no script
+ob_start();
+?>
 <script>
 // URL base para requisições
-const AI_TOOLS_BASE_URL = __AI_TOOLS_BASE_URL__;
+const AI_TOOLS_BASE_URL = <?= json_encode(\App\Helpers\Url::to('/ai-tools'), JSON_UNESCAPED_UNICODE) ?>;
+const FUNCTION_SCHEMA_DATA = <?= json_encode(!empty($functionSchema) ? $functionSchema : null, JSON_UNESCAPED_UNICODE) ?>;
+const CONFIG_DATA = <?= json_encode(!empty($config) ? $config : null, JSON_UNESCAPED_UNICODE) ?>;
+const TOOL_ID = <?= json_encode($tool['id'] ?? 0) ?>;
 
 let editParameterCounter = 0;
 
@@ -708,8 +705,8 @@ function buildEditConfig() {
 
 // Preencher campos ao abrir modal de edição
 function populateEditFields() {
-    const functionSchema = __FUNCTION_SCHEMA__ || null;
-    const config = __CONFIG__ || null;
+    const functionSchema = FUNCTION_SCHEMA_DATA;
+    const config = CONFIG_DATA;
     
     if (functionSchema && functionSchema.function) {
         document.getElementById("kt_edit_function_name").value = functionSchema.function.name || "";
@@ -789,7 +786,7 @@ function toggleN8NTestPanel() {
 }
 
 function executeN8NTest() {
-    const toolId = __TOOL_ID__;
+    const toolId = TOOL_ID;
     const webhookId = document.getElementById("test_webhook_id").value.trim();
     const method = "POST"; // Sempre POST, igual à execução real
     const clientMessage = document.getElementById("test_client_message").value.trim();
@@ -930,16 +927,29 @@ function executeN8NTest() {
 }
 
 document.addEventListener("DOMContentLoaded", function() {
+    console.log("AI Tools Show: DOMContentLoaded disparado");
+    console.log("FUNCTION_SCHEMA_DATA:", FUNCTION_SCHEMA_DATA);
+    console.log("CONFIG_DATA:", CONFIG_DATA);
+    console.log("TOOL_ID:", TOOL_ID);
+    
     // Preencher campos quando modal de edição for aberto
     const editModal = document.getElementById("kt_modal_edit_ai_tool");
     if (editModal) {
-        editModal.addEventListener("shown.bs.modal", populateEditFields);
+        editModal.addEventListener("shown.bs.modal", function() {
+            console.log("Modal de edição aberto");
+            populateEditFields();
+        });
     }
     
     // Atualizar campos de config quando tipo mudar (edição)
     const toolTypeSelect = document.getElementById("kt_edit_tool_type");
+    console.log("Edit toolTypeSelect encontrado:", toolTypeSelect);
+    
     if (toolTypeSelect) {
-        toolTypeSelect.addEventListener("change", updateEditConfigFields);
+        toolTypeSelect.addEventListener("change", function() {
+            console.log("Tipo de tool mudou para:", this.value);
+            updateEditConfigFields();
+        });
     }
     
     // Event listeners para teste N8N
@@ -1024,19 +1034,8 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 </script>
-SCRIPTS;
-
-$scripts = str_replace(
-    ['__AI_TOOLS_BASE_URL__', '__FUNCTION_SCHEMA__', '__CONFIG__', '__TOOL_ID__'],
-    [$aiToolsBaseUrl, $functionSchemaJson, $configJson, $toolIdJson],
-    $scripts
-);
-
-// Debug: Log dos dados enviados
-error_log("AI Tool Show - Tool ID: " . ($tool['id'] ?? 'N/A'));
-error_log("AI Tool Show - Tool Type: " . ($tool['tool_type'] ?? 'N/A'));
-error_log("AI Tool Show - Config JSON: " . $configJson);
+<?php
+$scripts = ob_get_clean();
+include __DIR__ . '/../layouts/metronic/app.php'; 
 ?>
-
-<?php include __DIR__ . '/../layouts/metronic/app.php'; ?>
 

@@ -241,7 +241,16 @@ ob_start();
                     <input type="password" name="openai_api_key" class="form-control form-control-solid" 
                            value="<?= htmlspecialchars($generalSettings['openai_api_key'] ?? '') ?>" 
                            placeholder="sk-..." autocomplete="off" />
-                    <div class="form-text">Chave de API da OpenAI para uso com Agentes de IA. Obtenha em <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a></div>
+                    <div class="form-text">Chave de API da OpenAI para uso com Agentes de IA e TTS. Obtenha em <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a></div>
+                </div>
+                <div class="separator separator-dashed my-5"></div>
+                <h4 class="fw-bold mb-4">ElevenLabs (Text-to-Speech)</h4>
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2">API Key</label>
+                    <input type="password" name="elevenlabs_api_key" class="form-control form-control-solid" 
+                           value="<?= htmlspecialchars($generalSettings['elevenlabs_api_key'] ?? '') ?>" 
+                           placeholder="..." autocomplete="off" />
+                    <div class="form-text">Chave de API do ElevenLabs para geração de áudio com IA (opcional). Obtenha em <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank">elevenlabs.io</a></div>
                 </div>
                 <div class="d-flex justify-content-end">
                     <button type="submit" class="btn btn-primary">

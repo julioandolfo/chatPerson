@@ -339,6 +339,7 @@ class SettingsController
             SettingService::set('auto_assign_conversations', isset($data['auto_assign_conversations']), 'boolean', 'general');
             SettingService::set('conversation_timeout_minutes', (int)($data['conversation_timeout_minutes'] ?? 30), 'integer', 'general');
             SettingService::set('openai_api_key', $data['openai_api_key'] ?? '', 'string', 'general');
+            SettingService::set('elevenlabs_api_key', $data['elevenlabs_api_key'] ?? '', 'string', 'general');
             
             Response::json([
                 'success' => true,
@@ -544,6 +545,61 @@ class SettingsController
                     'negative_tag_id' => !empty($data['sentiment_negative_tag_id']) ? (int)$data['sentiment_negative_tag_id'] : null,
                     'cost_limit_per_day' => isset($data['sentiment_cost_limit_per_day']) ? (float)$data['sentiment_cost_limit_per_day'] : 5.00,
                 ],
+                'audio_transcription' => [
+                    'enabled' => isset($data['audio_transcription_enabled']),
+                    'auto_transcribe' => isset($data['audio_transcription_auto_transcribe']),
+                    'only_for_ai_agents' => isset($data['audio_transcription_only_for_ai_agents']),
+                    'language' => $data['audio_transcription_language'] ?? 'pt',
+                    'model' => 'whisper-1',
+                    'update_message_content' => isset($data['audio_transcription_update_message_content']),
+                    'max_file_size_mb' => isset($data['audio_transcription_max_file_size_mb']) ? (int)$data['audio_transcription_max_file_size_mb'] : 25,
+                    'cost_limit_per_day' => isset($data['audio_transcription_cost_limit_per_day']) ? (float)$data['audio_transcription_cost_limit_per_day'] : 10.00,
+                ],
+                'text_to_speech' => [
+                    'enabled' => isset($data['text_to_speech_enabled']),
+                    'provider' => $data['text_to_speech_provider'] ?? 'openai',
+                    'auto_generate_audio' => isset($data['text_to_speech_auto_generate_audio']),
+                    'only_for_ai_agents' => isset($data['text_to_speech_only_for_ai_agents']),
+                    'send_mode' => $data['text_to_speech_send_mode'] ?? 'intelligent', // 'text_only', 'audio_only', 'both', 'intelligent'
+                    'voice_id' => $data['text_to_speech_provider'] === 'elevenlabs' 
+                        ? ($data['text_to_speech_voice_id_elevenlabs'] ?? '21m00Tcm4TlvDq8ikWAM')
+                        : ($data['text_to_speech_voice_id_openai'] ?? 'alloy'),
+                    'model' => $data['text_to_speech_provider'] === 'elevenlabs'
+                        ? ($data['text_to_speech_model_elevenlabs'] ?? 'eleven_multilingual_v2')
+                        : ($data['text_to_speech_model_openai'] ?? 'tts-1'),
+                    'language' => $data['text_to_speech_language'] ?? 'pt',
+                    'speed' => isset($data['text_to_speech_speed']) ? (float)$data['text_to_speech_speed'] : 1.0,
+                    'stability' => isset($data['text_to_speech_stability']) ? (float)$data['text_to_speech_stability'] : 0.5,
+                    'similarity_boost' => isset($data['text_to_speech_similarity_boost']) ? (float)$data['text_to_speech_similarity_boost'] : 0.75,
+                    'output_format' => $data['text_to_speech_output_format'] ?? 'mp3',
+                    'convert_to_whatsapp_format' => isset($data['text_to_speech_convert_to_whatsapp_format']),
+                    'cost_limit_per_day' => isset($data['text_to_speech_cost_limit_per_day']) ? (float)$data['text_to_speech_cost_limit_per_day'] : 5.00,
+                    'intelligent_rules' => [
+                        'use_text_length' => isset($data['tts_intelligent_use_text_length']),
+                        'max_chars_for_audio' => isset($data['tts_intelligent_max_chars_for_audio']) ? (int)$data['tts_intelligent_max_chars_for_audio'] : 500,
+                        'min_chars_for_text' => isset($data['tts_intelligent_min_chars_for_text']) ? (int)$data['tts_intelligent_min_chars_for_text'] : 1000,
+                        'use_content_type' => true,
+                        'force_text_if_urls' => isset($data['tts_intelligent_force_text_if_urls']),
+                        'force_text_if_code' => isset($data['tts_intelligent_force_text_if_code']),
+                        'force_text_if_numbers' => false,
+                        'max_numbers_for_audio' => 5,
+                        'use_complexity' => isset($data['tts_intelligent_use_complexity']),
+                        'force_text_if_complex' => true,
+                        'complexity_keywords' => !empty($data['tts_intelligent_complexity_keywords']) 
+                            ? array_map('trim', explode(',', $data['tts_intelligent_complexity_keywords']))
+                            : ['instrução', 'passo a passo', 'tutorial', 'configuração', 'instalar', 'configurar', 'ajustar'],
+                        'use_emojis' => isset($data['tts_intelligent_use_emojis']),
+                        'max_emojis_for_audio' => isset($data['tts_intelligent_max_emojis_for_audio']) ? (int)$data['tts_intelligent_max_emojis_for_audio'] : 3,
+                        'use_time' => false,
+                        'audio_hours_start' => 8,
+                        'audio_hours_end' => 20,
+                        'timezone' => 'America/Sao_Paulo',
+                        'use_conversation_history' => true,
+                        'prefer_audio_if_client_sent_audio' => isset($data['tts_intelligent_prefer_audio_if_client_sent_audio']),
+                        'prefer_text_if_client_sent_text' => false,
+                        'default_mode' => $data['tts_intelligent_default_mode'] ?? 'audio_only',
+                    ],
+                ],
             ];
             
             if (ConversationSettingsService::saveSettings($settings)) {
@@ -582,6 +638,28 @@ class SettingsController
             Response::json([
                 'success' => false,
                 'message' => 'Erro ao obter configurações de SLA'
+            ], 500);
+        }
+    }
+    
+    /**
+     * Obter vozes disponíveis do ElevenLabs
+     */
+    public function getElevenLabsVoices(): void
+    {
+        Permission::abortIfCannot('admin.settings');
+        
+        try {
+            $voices = \App\Services\ElevenLabsService::getAvailableVoices();
+            
+            Response::json([
+                'success' => true,
+                'voices' => $voices
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao obter vozes: ' . $e->getMessage()
             ], 500);
         }
     }

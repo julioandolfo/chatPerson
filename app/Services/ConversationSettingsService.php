@@ -180,6 +180,55 @@ class ConversationSettingsService
                 'max_file_size_mb' => 25, // Limite de tamanho do arquivo (25MB é limite da OpenAI)
                 'cost_limit_per_day' => 10.00, // Limite de custo diário em USD ($0.006/minuto)
             ],
+            
+            // Text-to-Speech (Geração de Áudio)
+            'text_to_speech' => [
+                'enabled' => false, // Habilitar/desabilitar geração de áudio
+                'provider' => 'openai', // 'openai' ou 'elevenlabs'
+                'auto_generate_audio' => false, // Gerar áudio automaticamente para respostas da IA
+                'only_for_ai_agents' => true, // Só gerar áudio se for resposta de agente de IA
+                'send_mode' => 'intelligent', // 'text_only', 'audio_only', 'both', 'intelligent' - Modo de envio
+                'voice_id' => null, // ID da voz (específico por provider)
+                'model' => null, // Modelo (específico por provider, null = usar padrão)
+                'language' => 'pt', // Idioma
+                'speed' => 1.0, // Velocidade (0.25 a 4.0)
+                'stability' => 0.5, // Estabilidade (ElevenLabs: 0.0 a 1.0)
+                'similarity_boost' => 0.75, // Similaridade (ElevenLabs: 0.0 a 1.0)
+                'output_format' => 'mp3', // mp3, opus, ogg, pcm
+                'convert_to_whatsapp_format' => true, // Converter para formato compatível com WhatsApp
+                'cost_limit_per_day' => 5.00, // Limite de custo diário em USD
+                
+                // Regras Inteligentes (modo 'intelligent')
+                'intelligent_rules' => [
+                    'use_text_length' => true, // Considerar tamanho do texto
+                    'max_chars_for_audio' => 500, // Máximo de caracteres para enviar como áudio
+                    'min_chars_for_text' => 1000, // Mínimo de caracteres para forçar texto
+                    
+                    'use_content_type' => true, // Considerar tipo de conteúdo
+                    'force_text_if_urls' => true, // Forçar texto se contém URLs
+                    'force_text_if_code' => true, // Forçar texto se contém código/formatação
+                    'force_text_if_numbers' => false, // Forçar texto se contém muitos números
+                    'max_numbers_for_audio' => 5, // Máximo de números para enviar como áudio
+                    
+                    'use_complexity' => true, // Considerar complexidade
+                    'force_text_if_complex' => true, // Forçar texto se muito complexo
+                    'complexity_keywords' => ['instrução', 'passo a passo', 'tutorial', 'configuração', 'instalar', 'configurar', 'ajustar'],
+                    
+                    'use_emojis' => true, // Considerar emojis
+                    'max_emojis_for_audio' => 3, // Máximo de emojis para enviar como áudio
+                    
+                    'use_time' => false, // Considerar horário
+                    'audio_hours_start' => 8, // Horário início para preferir áudio
+                    'audio_hours_end' => 20, // Horário fim para preferir áudio
+                    'timezone' => 'America/Sao_Paulo', // Timezone
+                    
+                    'use_conversation_history' => false, // Considerar histórico da conversa
+                    'prefer_audio_if_client_sent_audio' => true, // Preferir áudio se cliente enviou áudio
+                    'prefer_text_if_client_sent_text' => false, // Preferir texto se cliente enviou texto
+                    
+                    'default_mode' => 'audio_only', // Modo padrão quando não há regras aplicáveis
+                ],
+            ],
         ];
     }
 

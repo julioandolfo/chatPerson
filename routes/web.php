@@ -217,6 +217,7 @@ Router::post('/settings/security', [SettingsController::class, 'saveSecurity'], 
 Router::post('/settings/websocket', [SettingsController::class, 'saveWebSocket'], ['Authentication']);
 Router::post('/settings/conversations', [SettingsController::class, 'saveConversations'], ['Authentication']);
 Router::get('/api/settings/sla', [SettingsController::class, 'getSLAConfig'], ['Authentication']); // API para obter config de SLA
+Router::get('/api/elevenlabs/voices', [SettingsController::class, 'getElevenLabsVoices'], ['Authentication']); // API para obter vozes do ElevenLabs
 
 // Rotas de Agentes de IA
 // IMPORTANTE: Rotas específicas DEVEM vir ANTES de rotas com parâmetros dinâmicos

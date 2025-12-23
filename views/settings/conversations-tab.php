@@ -9,6 +9,8 @@ $dist = $cs['distribution'] ?? [];
 $pctDist = $cs['percentage_distribution'] ?? [];
 $reassign = $cs['reassignment'] ?? [];
 $sentiment = $cs['sentiment_analysis'] ?? [];
+$transcription = $cs['audio_transcription'] ?? [];
+$tts = $cs['text_to_speech'] ?? [];
 ?>
 <form id="kt_settings_conversations_form" class="form">
     <!--begin::Configurações de Chat-->
@@ -468,6 +470,340 @@ $sentiment = $cs['sentiment_analysis'] ?? [];
     </div>
     <!--end::Análise de Sentimento-->
     
+    <div class="separator separator-dashed my-10"></div>
+    
+    <!--begin::Transcrição de Áudio-->
+    <div class="mb-10">
+        <h4 class="fw-bold mb-4">Transcrição de Áudio (OpenAI Whisper)</h4>
+        <div class="fv-row mb-7">
+            <label class="d-flex align-items-center">
+                <input type="checkbox" name="audio_transcription_enabled" class="form-check-input me-2" 
+                       id="audio_transcription_enabled"
+                       <?= ($transcription['enabled'] ?? false) ? 'checked' : '' ?> />
+                <span class="fw-semibold fs-6">Habilitar transcrição automática de áudio</span>
+            </label>
+            <div class="form-text">Transcreve automaticamente mensagens de áudio recebidas usando OpenAI Whisper</div>
+        </div>
+        
+        <div id="audio_transcription_settings" style="display: <?= ($transcription['enabled'] ?? false) ? 'block' : 'none' ?>;">
+            <div class="fv-row mb-7">
+                <label class="d-flex align-items-center">
+                    <input type="checkbox" name="audio_transcription_auto_transcribe" class="form-check-input me-2" 
+                           <?= ($transcription['auto_transcribe'] ?? true) ? 'checked' : '' ?> />
+                    <span class="fw-semibold fs-6">Transcrever automaticamente quando áudio chegar</span>
+                </label>
+            </div>
+            <div class="fv-row mb-7">
+                <label class="d-flex align-items-center">
+                    <input type="checkbox" name="audio_transcription_only_for_ai_agents" class="form-check-input me-2" 
+                           <?= ($transcription['only_for_ai_agents'] ?? true) ? 'checked' : '' ?> />
+                    <span class="fw-semibold fs-6">Só transcrever se conversa tem agente de IA atribuído</span>
+                </label>
+            </div>
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Idioma</label>
+                        <select name="audio_transcription_language" class="form-select form-select-solid">
+                            <option value="pt" <?= ($transcription['language'] ?? 'pt') === 'pt' ? 'selected' : '' ?>>Português</option>
+                            <option value="en" <?= ($transcription['language'] ?? '') === 'en' ? 'selected' : '' ?>>Inglês</option>
+                            <option value="es" <?= ($transcription['language'] ?? '') === 'es' ? 'selected' : '' ?>>Espanhol</option>
+                        </select>
+                        <div class="form-text">Idioma do áudio para melhor precisão</div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Limite de Tamanho (MB)</label>
+                        <input type="number" name="audio_transcription_max_file_size_mb" class="form-control form-control-solid" 
+                               value="<?= $transcription['max_file_size_mb'] ?? 25 ?>" min="1" max="25" />
+                        <div class="form-text">Tamanho máximo do arquivo de áudio (limite da OpenAI: 25MB)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="fv-row mb-7">
+                <label class="d-flex align-items-center">
+                    <input type="checkbox" name="audio_transcription_update_message_content" class="form-check-input me-2" 
+                           <?= ($transcription['update_message_content'] ?? true) ? 'checked' : '' ?> />
+                    <span class="fw-semibold fs-6">Atualizar conteúdo da mensagem com texto transcrito</span>
+                </label>
+                <div class="form-text">Se desmarcado, texto transcrito será salvo apenas em metadata</div>
+            </div>
+            <div class="fv-row mb-7">
+                <label class="fw-semibold fs-6 mb-2">Limite de Custo Diário (USD)</label>
+                <input type="number" name="audio_transcription_cost_limit_per_day" class="form-control form-control-solid" 
+                       value="<?= $transcription['cost_limit_per_day'] ?? 10.00 ?>" min="0" step="0.01" />
+                <div class="form-text">Limite máximo de custo por dia ($0.006 por minuto de áudio)</div>
+            </div>
+        </div>
+    </div>
+    <!--end::Transcrição de Áudio-->
+    
+    <div class="separator separator-dashed my-10"></div>
+    
+    <!--begin::Text-to-Speech (Geração de Áudio)-->
+    <div class="mb-10">
+        <h4 class="fw-bold mb-4">Text-to-Speech (Geração de Áudio com IA)</h4>
+        <div class="fv-row mb-7">
+            <label class="d-flex align-items-center">
+                <input type="checkbox" name="text_to_speech_enabled" class="form-check-input me-2" 
+                       id="text_to_speech_enabled"
+                       <?= ($tts['enabled'] ?? false) ? 'checked' : '' ?> />
+                <span class="fw-semibold fs-6">Habilitar geração automática de áudio</span>
+            </label>
+            <div class="form-text">Gera áudio automaticamente para respostas da IA usando TTS</div>
+        </div>
+        
+        <div id="text_to_speech_settings" style="display: <?= ($tts['enabled'] ?? false) ? 'block' : 'none' ?>;">
+            <div class="fv-row mb-7">
+                <label class="fw-semibold fs-6 mb-2">Provider</label>
+                <select name="text_to_speech_provider" class="form-select form-select-solid" id="tts_provider_select">
+                    <option value="openai" <?= ($tts['provider'] ?? 'openai') === 'openai' ? 'selected' : '' ?>>OpenAI TTS (Recomendado - Mais barato)</option>
+                    <option value="elevenlabs" <?= ($tts['provider'] ?? '') === 'elevenlabs' ? 'selected' : '' ?>>ElevenLabs (Mais vozes - Mais caro)</option>
+                </select>
+                <div class="form-text">Escolha o provedor de TTS. OpenAI usa a mesma API key, ElevenLabs requer configuração separada.</div>
+            </div>
+            
+            <div class="fv-row mb-7">
+                <label class="d-flex align-items-center">
+                    <input type="checkbox" name="text_to_speech_auto_generate_audio" class="form-check-input me-2" 
+                           <?= ($tts['auto_generate_audio'] ?? false) ? 'checked' : '' ?> />
+                    <span class="fw-semibold fs-6">Gerar áudio automaticamente para respostas da IA</span>
+                </label>
+            </div>
+            <div class="fv-row mb-7">
+                <label class="fw-semibold fs-6 mb-2">Modo de Envio</label>
+                <select name="text_to_speech_send_mode" class="form-select form-select-solid" id="tts_send_mode_select">
+                    <option value="intelligent" <?= ($tts['send_mode'] ?? 'intelligent') === 'intelligent' ? 'selected' : '' ?>>🤖 Inteligente (Recomendado)</option>
+                    <option value="audio_only" <?= ($tts['send_mode'] ?? '') === 'audio_only' ? 'selected' : '' ?>>🎤 Somente Áudio</option>
+                    <option value="text_only" <?= ($tts['send_mode'] ?? '') === 'text_only' ? 'selected' : '' ?>>📝 Somente Texto</option>
+                    <option value="both" <?= ($tts['send_mode'] ?? '') === 'both' ? 'selected' : '' ?>>🎤📝 Áudio + Texto como Legenda</option>
+                </select>
+                <div class="form-text">
+                    <strong>⚠️ IMPORTANTE:</strong> O sistema sempre envia UMA ÚNICA mensagem. Não envia duas mensagens separadas.<br><br>
+                    <strong>🤖 Inteligente:</strong> Decide automaticamente baseado em regras configuráveis (tamanho, URLs, código, etc).<br>
+                    <strong>🎤 Somente Áudio:</strong> Envia apenas o áudio (sem texto). Cliente ouve a mensagem.<br>
+                    <strong>📝 Somente Texto:</strong> Envia apenas o texto (sem áudio). Cliente lê a mensagem.<br>
+                    <strong>🎤📝 Áudio + Texto:</strong> Envia uma mensagem com áudio e texto aparece como legenda/caption no WhatsApp.
+                </div>
+            </div>
+            
+            <!-- Configurações do Modo Inteligente -->
+            <div id="tts_intelligent_settings" style="display: <?= ($tts['send_mode'] ?? 'intelligent') === 'intelligent' ? 'block' : 'none' ?>;">
+                <div class="separator separator-dashed my-5"></div>
+                <h5 class="fw-bold mb-4">⚙️ Configurações do Modo Inteligente</h5>
+                
+                <div class="fv-row mb-7">
+                    <label class="d-flex align-items-center">
+                        <input type="checkbox" name="tts_intelligent_use_text_length" class="form-check-input me-2" 
+                               <?= ($tts['intelligent_rules']['use_text_length'] ?? true) ? 'checked' : '' ?> />
+                        <span class="fw-semibold fs-6">Considerar tamanho do texto</span>
+                    </label>
+                </div>
+                <div class="row">
+                    <div class="col-lg-6">
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">Máx. caracteres para áudio</label>
+                            <input type="number" name="tts_intelligent_max_chars_for_audio" class="form-control form-control-solid" 
+                                   value="<?= $tts['intelligent_rules']['max_chars_for_audio'] ?? 500 ?>" min="50" max="2000" />
+                            <div class="form-text">Textos acima disso preferem texto</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">Mín. caracteres para forçar texto</label>
+                            <input type="number" name="tts_intelligent_min_chars_for_text" class="form-control form-control-solid" 
+                                   value="<?= $tts['intelligent_rules']['min_chars_for_text'] ?? 1000 ?>" min="200" max="5000" />
+                            <div class="form-text">Textos acima disso sempre usam texto</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="fv-row mb-7">
+                    <label class="d-flex align-items-center">
+                        <input type="checkbox" name="tts_intelligent_force_text_if_urls" class="form-check-input me-2" 
+                               <?= ($tts['intelligent_rules']['force_text_if_urls'] ?? true) ? 'checked' : '' ?> />
+                        <span class="fw-semibold fs-6">Forçar texto se contém URLs</span>
+                    </label>
+                </div>
+                
+                <div class="fv-row mb-7">
+                    <label class="d-flex align-items-center">
+                        <input type="checkbox" name="tts_intelligent_force_text_if_code" class="form-check-input me-2" 
+                               <?= ($tts['intelligent_rules']['force_text_if_code'] ?? true) ? 'checked' : '' ?> />
+                        <span class="fw-semibold fs-6">Forçar texto se contém código/formatação</span>
+                    </label>
+                </div>
+                
+                <div class="fv-row mb-7">
+                    <label class="d-flex align-items-center">
+                        <input type="checkbox" name="tts_intelligent_use_emojis" class="form-check-input me-2" 
+                               <?= ($tts['intelligent_rules']['use_emojis'] ?? true) ? 'checked' : '' ?> />
+                        <span class="fw-semibold fs-6">Considerar quantidade de emojis</span>
+                    </label>
+                </div>
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2">Máx. emojis para áudio</label>
+                    <input type="number" name="tts_intelligent_max_emojis_for_audio" class="form-control form-control-solid" 
+                           value="<?= $tts['intelligent_rules']['max_emojis_for_audio'] ?? 3 ?>" min="0" max="20" />
+                    <div class="form-text">Mensagens com mais emojis preferem texto</div>
+                </div>
+                
+                <div class="fv-row mb-7">
+                    <label class="d-flex align-items-center">
+                        <input type="checkbox" name="tts_intelligent_use_complexity" class="form-check-input me-2" 
+                               <?= ($tts['intelligent_rules']['use_complexity'] ?? true) ? 'checked' : '' ?> />
+                        <span class="fw-semibold fs-6">Forçar texto se contém palavras-chave técnicas</span>
+                    </label>
+                </div>
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2">Palavras-chave técnicas (separadas por vírgula)</label>
+                    <input type="text" name="tts_intelligent_complexity_keywords" class="form-control form-control-solid" 
+                           value="<?= htmlspecialchars(implode(', ', $tts['intelligent_rules']['complexity_keywords'] ?? ['instrução', 'passo a passo', 'tutorial', 'configuração', 'instalar', 'configurar', 'ajustar'])) ?>" 
+                           placeholder="instrução, passo a passo, tutorial" />
+                    <div class="form-text">Mensagens com essas palavras sempre usam texto</div>
+                </div>
+                
+                <div class="fv-row mb-7">
+                    <label class="d-flex align-items-center">
+                        <input type="checkbox" name="tts_intelligent_prefer_audio_if_client_sent_audio" class="form-check-input me-2" 
+                               <?= ($tts['intelligent_rules']['prefer_audio_if_client_sent_audio'] ?? true) ? 'checked' : '' ?> />
+                        <span class="fw-semibold fs-6">Preferir áudio se cliente enviou áudio recentemente</span>
+                    </label>
+                </div>
+                
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2">Modo padrão (quando não há regras aplicáveis)</label>
+                    <select name="tts_intelligent_default_mode" class="form-select form-select-solid">
+                        <option value="audio_only" <?= ($tts['intelligent_rules']['default_mode'] ?? 'audio_only') === 'audio_only' ? 'selected' : '' ?>>Somente Áudio</option>
+                        <option value="text_only" <?= ($tts['intelligent_rules']['default_mode'] ?? '') === 'text_only' ? 'selected' : '' ?>>Somente Texto</option>
+                        <option value="both" <?= ($tts['intelligent_rules']['default_mode'] ?? '') === 'both' ? 'selected' : '' ?>>Áudio + Texto</option>
+                    </select>
+                </div>
+            </div>
+            <div class="fv-row mb-7">
+                <label class="d-flex align-items-center">
+                    <input type="checkbox" name="text_to_speech_only_for_ai_agents" class="form-check-input me-2" 
+                           <?= ($tts['only_for_ai_agents'] ?? true) ? 'checked' : '' ?> />
+                    <span class="fw-semibold fs-6">Só gerar áudio se for resposta de agente de IA</span>
+                </label>
+            </div>
+            
+            <!-- Configurações OpenAI TTS -->
+            <div id="tts_openai_settings" style="display: <?= ($tts['provider'] ?? 'openai') === 'openai' ? 'block' : 'none' ?>;">
+                <div class="row">
+                    <div class="col-lg-6">
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">Modelo</label>
+                            <select name="text_to_speech_model_openai" class="form-select form-select-solid">
+                                <option value="tts-1" <?= ($tts['model'] ?? 'tts-1') === 'tts-1' ? 'selected' : '' ?>>TTS-1 (Rápido)</option>
+                                <option value="tts-1-hd" <?= ($tts['model'] ?? '') === 'tts-1-hd' ? 'selected' : '' ?>>TTS-1-HD (Alta Qualidade)</option>
+                            </select>
+                            <div class="form-text">TTS-1 é mais rápido, TTS-1-HD tem melhor qualidade</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">Voz</label>
+                            <select name="text_to_speech_voice_id_openai" class="form-select form-select-solid">
+                                <option value="alloy" <?= ($tts['voice_id'] ?? 'alloy') === 'alloy' ? 'selected' : '' ?>>Alloy (Neutra)</option>
+                                <option value="echo" <?= ($tts['voice_id'] ?? '') === 'echo' ? 'selected' : '' ?>>Echo (Masculina)</option>
+                                <option value="fable" <?= ($tts['voice_id'] ?? '') === 'fable' ? 'selected' : '' ?>>Fable (Neutra Expressiva)</option>
+                                <option value="onyx" <?= ($tts['voice_id'] ?? '') === 'onyx' ? 'selected' : '' ?>>Onyx (Masculina Profunda)</option>
+                                <option value="nova" <?= ($tts['voice_id'] ?? '') === 'nova' ? 'selected' : '' ?>>Nova (Feminina Suave)</option>
+                                <option value="shimmer" <?= ($tts['voice_id'] ?? '') === 'shimmer' ? 'selected' : '' ?>>Shimmer (Feminina Brilhante)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Configurações ElevenLabs -->
+            <div id="tts_elevenlabs_settings" style="display: <?= ($tts['provider'] ?? '') === 'elevenlabs' ? 'block' : 'none' ?>;">
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2">Voice ID</label>
+                    <input type="text" name="text_to_speech_voice_id_elevenlabs" class="form-control form-control-solid" 
+                           value="<?= htmlspecialchars($tts['voice_id'] ?? '21m00Tcm4TlvDq8ikWAM') ?>" 
+                           placeholder="21m00Tcm4TlvDq8ikWAM" />
+                    <div class="form-text">ID da voz do ElevenLabs. Use "21m00Tcm4TlvDq8ikWAM" (Rachel) como padrão ou configure uma voz customizada.</div>
+                    <button type="button" class="btn btn-sm btn-light-primary mt-2" id="load_elevenlabs_voices">
+                        <i class="ki-duotone ki-arrows-circle fs-5 me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Carregar Vozes Disponíveis
+                    </button>
+                </div>
+                <div class="row">
+                    <div class="col-lg-4">
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">Estabilidade</label>
+                            <input type="number" name="text_to_speech_stability" class="form-control form-control-solid" 
+                                   value="<?= $tts['stability'] ?? 0.5 ?>" min="0" max="1" step="0.1" />
+                            <div class="form-text">0.0 = mais variável, 1.0 = mais estável</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">Similaridade</label>
+                            <input type="number" name="text_to_speech_similarity_boost" class="form-control form-control-solid" 
+                                   value="<?= $tts['similarity_boost'] ?? 0.75 ?>" min="0" max="1" step="0.1" />
+                            <div class="form-text">Quão similar à voz original (0.0 a 1.0)</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">Velocidade</label>
+                            <input type="number" name="text_to_speech_speed" class="form-control form-control-solid" 
+                                   value="<?= $tts['speed'] ?? 1.0 ?>" min="0.25" max="4.0" step="0.1" />
+                            <div class="form-text">Velocidade de fala (0.25 a 4.0)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Configurações Comuns -->
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Idioma</label>
+                        <select name="text_to_speech_language" class="form-select form-select-solid">
+                            <option value="pt" <?= ($tts['language'] ?? 'pt') === 'pt' ? 'selected' : '' ?>>Português</option>
+                            <option value="en" <?= ($tts['language'] ?? '') === 'en' ? 'selected' : '' ?>>Inglês</option>
+                            <option value="es" <?= ($tts['language'] ?? '') === 'es' ? 'selected' : '' ?>>Espanhol</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Formato de Saída</label>
+                        <select name="text_to_speech_output_format" class="form-select form-select-solid">
+                            <option value="mp3" <?= ($tts['output_format'] ?? 'mp3') === 'mp3' ? 'selected' : '' ?>>MP3</option>
+                            <option value="opus" <?= ($tts['output_format'] ?? '') === 'opus' ? 'selected' : '' ?>>Opus (Recomendado para WhatsApp)</option>
+                            <option value="ogg" <?= ($tts['output_format'] ?? '') === 'ogg' ? 'selected' : '' ?>>OGG</option>
+                        </select>
+                        <div class="form-text">Formato do arquivo de áudio gerado</div>
+                    </div>
+                </div>
+            </div>
+            <div class="fv-row mb-7">
+                <label class="d-flex align-items-center">
+                    <input type="checkbox" name="text_to_speech_convert_to_whatsapp_format" class="form-check-input me-2" 
+                           <?= ($tts['convert_to_whatsapp_format'] ?? true) ? 'checked' : '' ?> />
+                    <span class="fw-semibold fs-6">Converter automaticamente para formato compatível com WhatsApp</span>
+                </label>
+                <div class="form-text">Converte para OGG/Opus se necessário (requer FFmpeg instalado)</div>
+            </div>
+            <div class="fv-row mb-7">
+                <label class="fw-semibold fs-6 mb-2">Limite de Custo Diário (USD)</label>
+                <input type="number" name="text_to_speech_cost_limit_per_day" class="form-control form-control-solid" 
+                       value="<?= $tts['cost_limit_per_day'] ?? 5.00 ?>" min="0" step="0.01" />
+                <div class="form-text">OpenAI: $0.015/1k chars | ElevenLabs: $0.18/1k chars</div>
+            </div>
+        </div>
+    </div>
+    <!--end::Text-to-Speech-->
+    
     <div class="d-flex justify-content-end">
         <button type="submit" class="btn btn-primary">
             <span class="indicator-label">Salvar Configurações</span>
@@ -502,6 +838,49 @@ document.addEventListener("DOMContentLoaded", function() {
     if (sentimentEnabled && sentimentContainer) {
         sentimentEnabled.addEventListener("change", function() {
             sentimentContainer.style.display = this.checked ? "block" : "none";
+        });
+    }
+    
+    // Toggle transcrição de áudio
+    const transcriptionEnabled = document.getElementById("audio_transcription_enabled");
+    const transcriptionContainer = document.getElementById("audio_transcription_settings");
+    if (transcriptionEnabled && transcriptionContainer) {
+        transcriptionEnabled.addEventListener("change", function() {
+            transcriptionContainer.style.display = this.checked ? "block" : "none";
+        });
+    }
+    
+    // Toggle text-to-speech
+    const ttsEnabled = document.getElementById("text_to_speech_enabled");
+    const ttsContainer = document.getElementById("text_to_speech_settings");
+    if (ttsEnabled && ttsContainer) {
+        ttsEnabled.addEventListener("change", function() {
+            ttsContainer.style.display = this.checked ? "block" : "none";
+        });
+    }
+    
+    // Toggle provider TTS (OpenAI/ElevenLabs)
+    const ttsProviderSelect = document.getElementById("tts_provider_select");
+    const openaiSettings = document.getElementById("tts_openai_settings");
+    const elevenlabsSettings = document.getElementById("tts_elevenlabs_settings");
+    if (ttsProviderSelect && openaiSettings && elevenlabsSettings) {
+        ttsProviderSelect.addEventListener("change", function() {
+            if (this.value === "openai") {
+                openaiSettings.style.display = "block";
+                elevenlabsSettings.style.display = "none";
+            } else {
+                openaiSettings.style.display = "none";
+                elevenlabsSettings.style.display = "block";
+            }
+        });
+    }
+    
+    // Toggle modo de envio (mostrar/esconder configurações inteligentes)
+    const ttsSendModeSelect = document.getElementById("tts_send_mode_select");
+    const intelligentSettings = document.getElementById("tts_intelligent_settings");
+    if (ttsSendModeSelect && intelligentSettings) {
+        ttsSendModeSelect.addEventListener("change", function() {
+            intelligentSettings.style.display = (this.value === "intelligent") ? "block" : "none";
         });
     }
     

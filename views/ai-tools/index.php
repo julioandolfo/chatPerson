@@ -130,9 +130,6 @@ ob_start();
                             <option value="funnel_stage">📊 Mover para Funil/Etapa</option>
                             <option value="funnel_stage_smart">🧠 Mover para Funil/Etapa (Inteligente)</option>
                         </select>
-                        <button type="button" class="btn btn-sm btn-light-warning mt-2" onclick="console.log('Teste manual'); updateConfigFields();">
-                            🧪 Teste Manual
-                        </button>
                     </div>
                     
                     <!-- Function Schema Fields -->
@@ -203,21 +200,48 @@ ob_start();
 <?php 
 $content = ob_get_clean(); 
 
-// Preparar dados para JavaScript
-$departmentsJson = json_encode($departments ?? [], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
-$funnelsJson = json_encode($funnels ?? [], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
-$agentsJson = json_encode($agents ?? [], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+// Preparar dados para JavaScript com flags de segurança completas
+$jsonFlags = JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+$departmentsJson = json_encode($departments ?? [], $jsonFlags) ?: '[]';
+$funnelsJson = json_encode($funnels ?? [], $jsonFlags) ?: '[]';
+$agentsJson = json_encode($agents ?? [], $jsonFlags) ?: '[]';
 
 ob_start();
 ?>
 <script>
+console.log("=== AI TOOLS SCRIPT INICIANDO ===");
+
 let parameterCounter = 0;
 
 // Dados do backend para selects dinâmicos
-const availableDepartments = <?= $departmentsJson ?>;
-const availableFunnels = <?= $funnelsJson ?>;
-const availableAgents = <?= $agentsJson ?>;
+let availableDepartments, availableFunnels, availableAgents;
+try {
+    availableDepartments = <?= $departmentsJson ?>;
+    console.log("availableDepartments carregado:", availableDepartments.length, "itens");
+} catch(e) {
+    console.error("ERRO ao carregar departmentsJson:", e);
+    availableDepartments = [];
+}
+
+try {
+    availableFunnels = <?= $funnelsJson ?>;
+    console.log("availableFunnels carregado:", availableFunnels.length, "itens");
+} catch(e) {
+    console.error("ERRO ao carregar funnelsJson:", e);
+    availableFunnels = [];
+}
+
+try {
+    availableAgents = <?= $agentsJson ?>;
+    console.log("availableAgents carregado:", availableAgents.length, "itens");
+} catch(e) {
+    console.error("ERRO ao carregar agentsJson:", e);
+    availableAgents = [];
+}
+
 const funnelStages = {}; // Será preenchido dinamicamente
+
+console.log("Dados do backend carregados com sucesso!");
 
 // Configurações por tipo de tool
 const toolTypeConfigs = {
@@ -268,10 +292,10 @@ const toolTypeConfigs = {
         ]
     },
     system: {
-        fields: [] // System tools geralmente não precisam de config
+        fields: []
     },
     followup: {
-        fields: [] // Followup tools geralmente não precisam de config
+        fields: []
     },
     human_escalation: {
         fields: [

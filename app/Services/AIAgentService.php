@@ -339,14 +339,102 @@ class AIAgentService
                 sleep($delay);
             }
 
+            // ✅ NOVO: Gerar áudio se TTS estiver habilitado
+            $audioAttachment = null;
+            $ttsSettings = \App\Services\TTSService::getSettings();
+            
+            if (!empty($ttsSettings['enabled']) && !empty($ttsSettings['auto_generate_audio'])) {
+                try {
+                    \App\Helpers\Logger::info("AIAgentService::processMessage - Gerando áudio com TTS", [
+                        'provider' => $ttsSettings['provider'] ?? 'openai',
+                        'text_length' => strlen($response['content'])
+                    ]);
+                    
+                    $ttsResult = \App\Services\TTSService::generateAudio($response['content'], [
+                        'voice_id' => $ttsSettings['voice_id'] ?? null,
+                        'model' => $ttsSettings['model'] ?? null,
+                        'language' => $ttsSettings['language'] ?? 'pt',
+                        'speed' => $ttsSettings['speed'] ?? 1.0,
+                        'convert_to_whatsapp_format' => $ttsSettings['convert_to_whatsapp_format'] ?? true
+                    ]);
+                    
+                    if ($ttsResult['success'] && !empty($ttsResult['audio_path'])) {
+                        // Criar attachment para o áudio
+                        $audioAttachment = [
+                            'path' => $ttsResult['audio_url'],
+                            'type' => 'audio',
+                            'mime_type' => 'audio/ogg',
+                            'filename' => basename($ttsResult['audio_path']),
+                            'size' => filesize($ttsResult['audio_path'])
+                        ];
+                        
+                        \App\Helpers\Logger::info("AIAgentService::processMessage - ✅ Áudio gerado com sucesso", [
+                            'audio_path' => $ttsResult['audio_path'],
+                            'cost' => $ttsResult['cost']
+                        ]);
+                    } else {
+                        \App\Helpers\Logger::error("AIAgentService::processMessage - ❌ Falha ao gerar áudio: " . ($ttsResult['error'] ?? 'Erro desconhecido'));
+                    }
+                } catch (\Exception $e) {
+                    \App\Helpers\Logger::error("AIAgentService::processMessage - Erro ao gerar áudio: " . $e->getMessage());
+                    // Continuar mesmo se falhar
+                }
+            }
+
+            // ✅ NOVO: Decidir conteúdo da mensagem baseado no modo de envio
+            $sendMode = $ttsSettings['send_mode'] ?? 'intelligent'; // 'text_only', 'audio_only', 'both', 'intelligent'
+            $messageContent = $response['content'];
+            $attachments = [];
+            $messageType = null;
+            
+            // Se modo é 'intelligent', decidir automaticamente
+            if ($sendMode === 'intelligent' && $audioAttachment) {
+                $intelligentRules = $ttsSettings['intelligent_rules'] ?? [];
+                $sendMode = \App\Services\TTSIntelligentService::decideSendMode(
+                    $response['content'],
+                    $conversationId,
+                    $intelligentRules
+                );
+                
+                \App\Helpers\Logger::info("AIAgentService::processMessage - Modo inteligente escolheu: {$sendMode}", [
+                    'conversationId' => $conversationId,
+                    'stats' => \App\Services\TTSIntelligentService::getDecisionStats($response['content'], $intelligentRules)
+                ]);
+            }
+            
+            if ($audioAttachment) {
+                // Aplicar modo de envio decidido
+                switch ($sendMode) {
+                    case 'audio_only':
+                        // Enviar SOMENTE áudio (sem texto)
+                        $messageContent = ''; // Texto vazio
+                        $attachments = [$audioAttachment];
+                        $messageType = 'audio';
+                        break;
+                    
+                    case 'both':
+                        // Enviar texto + áudio (texto como legenda)
+                        $attachments = [$audioAttachment];
+                        $messageType = 'audio';
+                        break;
+                    
+                    case 'text_only':
+                    default:
+                        // Enviar SOMENTE texto (ignorar áudio gerado)
+                        $attachments = [];
+                        $messageType = null;
+                        break;
+                }
+            }
+            
             // Criar mensagem na conversa
             $aiMessageId = \App\Services\ConversationService::sendMessage(
                 $conversationId,
-                $response['content'],
+                $messageContent,
                 'agent',
                 null, // AI agent não tem user_id
-                [],
-                null, // messageType
+                $attachments,
+                $messageType,
                 null, // quotedMessageId
                 $agentId // aiAgentId
             );

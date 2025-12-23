@@ -79,6 +79,7 @@ class SettingService
             'conversation_timeout_minutes' => Setting::get('conversation_timeout_minutes', 30),
             'conversation_reopen_grace_period_minutes' => Setting::get('conversation_reopen_grace_period_minutes', 10),
             'openai_api_key' => Setting::get('openai_api_key', ''),
+            'elevenlabs_api_key' => Setting::get('elevenlabs_api_key', ''),
             'chat_agent_name_enabled' => Setting::get('chat_agent_name_enabled', false),
         ];
     }

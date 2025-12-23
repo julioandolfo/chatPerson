@@ -229,8 +229,23 @@ ob_start();
                         </select>
                     </div>
                     
-                    <!-- Function Schema Fields -->
-                    <div class="fv-row mb-7">
+                    <!-- Aviso de Function Schema Automático (para tipos especiais) -->
+                    <div class="fv-row mb-7" id="kt_edit_auto_schema_notice" style="display: none;">
+                        <div class="alert alert-info d-flex align-items-center">
+                            <i class="ki-duotone ki-information-5 fs-2x text-info me-4">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            <div>
+                                <h4 class="mb-1 text-info">Function Schema Automático</h4>
+                                <span id="kt_edit_auto_schema_message">O function schema será gerado automaticamente com base nas configurações abaixo.</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Function Schema Fields (para tipos customizáveis) -->
+                    <div class="fv-row mb-7" id="kt_edit_function_schema_section">
                         <label class="required fw-semibold fs-6 mb-2">Function Schema</label>
                         <div class="card bg-light p-5">
                             <div class="fv-row mb-5">
@@ -324,6 +339,54 @@ const CONFIG_DATA = <?= json_encode(!empty($config) ? $config : null, $jsonFlags
 const TOOL_ID = <?= json_encode($tool['id'] ?? 0, $jsonFlags) ?>;
 
 let editParameterCounter = 0;
+
+// Tipos que têm function schema automático (não precisam de configuração manual)
+const autoSchemaTypes = {
+    human_escalation: {
+        message: "Esta tool irá escalar a conversa para um atendente humano. O function schema será gerado automaticamente.",
+        defaultSchema: {
+            type: "function",
+            function: {
+                name: "escalar_para_humano",
+                description: "Escala a conversa para um atendente humano quando o cliente solicita ou quando a IA não consegue resolver",
+                parameters: { type: "object", properties: { motivo: { type: "string", description: "Motivo da escalação" } }, required: ["motivo"] }
+            }
+        }
+    },
+    funnel_stage: {
+        message: "Esta tool irá mover a conversa para uma etapa específica do funil. O function schema será gerado automaticamente.",
+        defaultSchema: {
+            type: "function",
+            function: {
+                name: "mover_para_etapa",
+                description: "Move a conversa para uma etapa específica do funil de vendas",
+                parameters: { type: "object", properties: { motivo: { type: "string", description: "Motivo para mover" } }, required: [] }
+            }
+        }
+    },
+    funnel_stage_smart: {
+        message: "Esta tool irá analisar a conversa e decidir para qual etapa mover. O function schema será gerado automaticamente.",
+        defaultSchema: {
+            type: "function",
+            function: {
+                name: "analisar_e_mover_etapa",
+                description: "Analisa o contexto e decide para qual etapa mover",
+                parameters: { type: "object", properties: { contexto: { type: "string", description: "Contexto da conversa" } }, required: ["contexto"] }
+            }
+        }
+    },
+    followup: {
+        message: "Esta tool irá agendar um follow-up para a conversa. O function schema será gerado automaticamente.",
+        defaultSchema: {
+            type: "function",
+            function: {
+                name: "agendar_followup",
+                description: "Agenda um follow-up para retomar contato com o cliente",
+                parameters: { type: "object", properties: { data_hora: { type: "string", description: "Data/hora do follow-up" }, mensagem: { type: "string", description: "Mensagem" } }, required: ["data_hora", "mensagem"] }
+            }
+        }
+    }
+};
 
 // Configurações por tipo de tool (mesmo do index.php)
 const toolTypeConfigs = {
@@ -558,6 +621,40 @@ function removeEditFunctionParameter(id) {
     }
 }
 
+// Atualizar visibilidade do Function Schema baseado no tipo (edição)
+function updateEditFunctionSchemaVisibility(toolType) {
+    const schemaSection = document.getElementById("kt_edit_function_schema_section");
+    const autoNotice = document.getElementById("kt_edit_auto_schema_notice");
+    const autoMessage = document.getElementById("kt_edit_auto_schema_message");
+    const functionNameInput = document.getElementById("kt_edit_function_name");
+    const functionDescInput = document.getElementById("kt_edit_function_description");
+    
+    if (!schemaSection || !autoNotice) return;
+    
+    if (autoSchemaTypes[toolType]) {
+        // Tipo com schema automático - ocultar campos manuais
+        schemaSection.style.display = "none";
+        autoNotice.style.display = "block";
+        autoMessage.textContent = autoSchemaTypes[toolType].message;
+        
+        // Remover required dos inputs
+        if (functionNameInput) functionNameInput.removeAttribute("required");
+        if (functionDescInput) functionDescInput.removeAttribute("required");
+        
+        console.log("Schema automático para tipo:", toolType);
+    } else {
+        // Tipo customizável - mostrar campos manuais
+        schemaSection.style.display = "block";
+        autoNotice.style.display = "none";
+        
+        // Adicionar required nos inputs
+        if (functionNameInput) functionNameInput.setAttribute("required", "required");
+        if (functionDescInput) functionDescInput.setAttribute("required", "required");
+        
+        console.log("Schema manual para tipo:", toolType);
+    }
+}
+
 // Atualizar campos de config baseado no tipo (edição)
 function updateEditConfigFields() {
     const toolType = document.getElementById("kt_edit_tool_type").value;
@@ -565,6 +662,10 @@ function updateEditConfigFields() {
     const configFields = document.getElementById("kt_edit_config_fields");
     
     console.log("updateEditConfigFields chamado para tipo:", toolType);
+    
+    // Atualizar visibilidade do function schema
+    updateEditFunctionSchemaVisibility(toolType);
+    
     console.log("Configs disponíveis:", toolTypeConfigs[toolType]);
     
     if (!toolType || !toolTypeConfigs[toolType] || toolTypeConfigs[toolType].fields.length === 0) {
@@ -625,6 +726,15 @@ function updateEditConfigFields() {
 
 // Construir JSON do function schema (edição)
 function buildEditFunctionSchema() {
+    const toolType = document.getElementById("kt_edit_tool_type").value;
+    
+    // Se é um tipo com schema automático, usar o schema padrão
+    if (autoSchemaTypes[toolType]) {
+        console.log("Usando schema automático para tipo:", toolType);
+        return autoSchemaTypes[toolType].defaultSchema;
+    }
+    
+    // Caso contrário, construir schema manual
     const functionName = document.getElementById("kt_edit_function_name").value;
     const functionDescription = document.getElementById("kt_edit_function_description").value;
     

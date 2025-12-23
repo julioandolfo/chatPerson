@@ -1936,9 +1936,16 @@ class ConversationController
             ];
             
             if ($row) {
+                $autoId = (int)$row['automation_id'];
+                // Nome amigável mesmo se automação estiver sem nome ou removida
+                $resolvedName = $row['automation_name'] ?? '';
+                if (empty($resolvedName) && $autoId) {
+                    $resolvedName = 'Automação #' . $autoId;
+                }
+                
                 $data['automation'] = [
-                    'id' => (int)$row['automation_id'],
-                    'name' => $row['automation_name'] ?? 'Automação',
+                    'id' => $autoId,
+                    'name' => $resolvedName ?: 'Automação',
                     'automation_status' => $row['automation_status'] ?? 'inactive',
                     'execution_status' => $row['execution_status'] ?? null,
                     'trigger_type' => $row['trigger_type'] ?? null,

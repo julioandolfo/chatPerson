@@ -28,8 +28,6 @@ class Api4ComCallController
         $page = (int)($filters['page'] ?? 1);
         $limit = 50;
         $offset = ($page - 1) * $limit;
-
-        $db = \App\Helpers\Database::getInstance();
         
         $where = ['1=1'];
         $params = [];
@@ -83,7 +81,7 @@ class Api4ComCallController
         $params[] = $limit;
         $params[] = $offset;
 
-        $calls = $db->fetchAll($sql, $params);
+        $calls = \App\Helpers\Database::fetchAll($sql, $params);
 
         foreach ($calls as &$call) {
             if (!empty($call['metadata'])) {
@@ -94,7 +92,8 @@ class Api4ComCallController
         }
 
         $countSql = "SELECT COUNT(*) as total FROM api4com_calls ac WHERE {$whereClause}";
-        $total = $db->fetch($countSql, array_slice($params, 0, -2))['total'] ?? 0;
+        $countResult = \App\Helpers\Database::fetch($countSql, array_slice($params, 0, -2));
+        $total = $countResult['total'] ?? 0;
 
         Response::view('api4com-calls/index', [
             'calls' => $calls,

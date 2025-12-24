@@ -308,6 +308,13 @@ document.addEventListener('DOMContentLoaded', function() {
     
     <!-- Header do Sidebar (sempre presente) -->
     <div class="sidebar-header">
+        <!-- Botão Voltar (Mobile/Tablet) -->
+        <button class="btn btn-sm btn-icon btn-light sidebar-back-btn d-none" onclick="closeConversationSidebar()" title="Voltar" id="sidebarBackBtn">
+            <i class="ki-duotone ki-arrow-left fs-2">
+                <span class="path1"></span>
+                <span class="path2"></span>
+            </i>
+        </button>
         <ul class="nav nav-tabs nav-line-tabs nav-line-tabs-2x border-transparent fs-7 fw-bold">
             <li class="nav-item">
                 <a class="nav-link active" data-bs-toggle="tab" href="#kt_tab_details">Detalhes</a>

@@ -1527,15 +1527,290 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     background: var(--bs-gray-400);
 }
 
-/* Responsivo */
-@media (max-width: 991px) {
+/* ============================================================================
+   RESPONSIVIDADE MOBILE
+   ============================================================================ */
+
+/* Mobile: Layout vertical com navegação entre views */
+@media (max-width: 767px) {
+    /* Layout principal - vertical em mobile */
     .conversations-layout {
-        height: calc(100vh - 70px);
+        flex-direction: column;
+        height: calc(100vh - 60px);
+        margin: 0;
+        padding: 0;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    /* Sistema de views - apenas uma visível por vez */
+    .conversations-list,
+    .chat-area,
+    .conversation-sidebar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: 100%;
+        transition: transform 0.3s ease, opacity 0.3s ease;
+        z-index: 1;
+    }
+    
+    /* View ativa */
+    .conversations-list.mobile-active,
+    .chat-area.mobile-active,
+    .conversation-sidebar.mobile-active {
+        z-index: 10;
+        transform: translateX(0);
+        opacity: 1;
+    }
+    
+    /* Views inativas - escondidas à esquerda ou direita */
+    .conversations-list:not(.mobile-active) {
+        transform: translateX(-100%);
+        opacity: 0;
+        pointer-events: none;
+    }
+    
+    .chat-area:not(.mobile-active) {
+        transform: translateX(100%);
+        opacity: 0;
+        pointer-events: none;
+    }
+    
+    .conversation-sidebar:not(.mobile-active) {
+        transform: translateX(100%);
+        opacity: 0;
+        pointer-events: none;
+    }
+    
+    /* Lista de conversas - full width em mobile */
+    .conversations-list {
+        width: 100%;
+        max-width: 100%;
+        border-right: none;
+    }
+    
+    .conversations-list-header {
+        padding: 15px;
+        position: sticky;
+        top: 0;
+        background: var(--bs-body-bg);
+        z-index: 100;
+        border-bottom: 1px solid var(--bs-border-color);
+    }
+    
+    .conversations-list-filters {
+        padding: 10px 15px;
+        position: sticky;
+        top: 0;
+        background: var(--bs-body-bg);
+        z-index: 99;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Área de chat - full width em mobile */
+    .chat-area {
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    .chat-header {
+        padding: 15px;
+        position: sticky;
+        top: 0;
+        background: var(--bs-body-bg);
+        z-index: 100;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    .chat-header-info {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    /* Botão voltar no header do chat (mobile) */
+    .chat-header-back-btn {
+        display: flex !important;
+        margin-right: 10px;
+    }
+    
+    /* Ocultar busca de mensagens em mobile (pode ser acessada via menu) */
+    .chat-header .position-relative.d-flex.gap-2 {
+        display: none !important;
+    }
+    
+    /* Botões do header - ajustar tamanho */
+    .chat-header .btn {
+        padding: 8px !important;
+        min-width: 40px;
+        height: 40px;
+    }
+    
+    /* Mensagens - padding reduzido em mobile */
+    .chat-messages {
+        padding: 15px;
+    }
+    
+    /* Mensagens - largura maior em mobile */
+    .message-content {
+        max-width: 85% !important;
+    }
+    
+    /* Input de mensagem - fixo no rodapé */
+    .chat-input-container {
+        position: sticky;
+        bottom: 0;
+        background: var(--bs-body-bg);
+        padding: 15px;
+        border-top: 1px solid var(--bs-border-color);
+        z-index: 100;
+    }
+    
+    /* Sidebar como drawer full-screen */
+    .conversation-sidebar {
+        width: 100% !important;
+        max-width: 100% !important;
+        border-left: none;
+        z-index: 1000;
+    }
+    
+    .conversation-sidebar.open {
+        width: 100% !important;
+    }
+    
+    /* Header do sidebar com botão voltar */
+    .sidebar-header {
+        padding: 15px;
+        position: sticky;
+        top: 0;
+        background: var(--bs-body-bg);
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .sidebar-back-btn {
+        display: flex !important;
+        flex-shrink: 0;
+    }
+    
+    .sidebar-header .nav {
+        flex: 1;
+    }
+    
+    /* Overlay quando sidebar aberto */
+    .sidebar-overlay {
+        display: block;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+    
+    .sidebar-overlay.active {
+        opacity: 1;
+        pointer-events: all;
+    }
+    
+    /* Cards de conversa mais compactos */
+    .conversation-item {
+        padding: 12px 15px;
+    }
+    
+    .conversation-item-name {
+        font-size: 14px;
+    }
+    
+    .conversation-item-preview {
+        font-size: 12px;
+    }
+    
+    /* Filtros - scroll horizontal */
+    .conversations-list-filters .d-flex {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 5px;
+    }
+    
+    .conversations-list-filters select {
+        min-width: 120px;
+        flex-shrink: 0;
+    }
+}
+
+/* Tablet: Layout híbrido */
+@media (min-width: 768px) and (max-width: 991px) {
+    .conversations-layout {
+        height: calc(100vh - 80px);
     }
     
     .conversations-list {
-        width: 100%;
-        max-width: 380px;
+        width: 320px;
+        flex-shrink: 0;
+    }
+    
+    .chat-area {
+        flex: 1;
+    }
+    
+    /* Sidebar como drawer lateral */
+    .conversation-sidebar {
+        position: fixed;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        width: 0;
+        max-width: 400px;
+        z-index: 1000;
+        transition: width 0.3s ease;
+    }
+    
+    .conversation-sidebar.open {
+        width: 400px !important;
+    }
+    
+    .sidebar-overlay {
+        display: block;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.3);
+        z-index: 999;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+    
+    .sidebar-overlay.active {
+        opacity: 1;
+        pointer-events: all;
+    }
+}
+
+/* Desktop: Manter layout original */
+@media (min-width: 992px) {
+    .chat-header-back-btn,
+    .sidebar-back-btn {
+        display: none !important;
+    }
+    
+    .sidebar-overlay {
+        display: none !important;
     }
 }
 /* Animações para Assistente IA */
@@ -2082,6 +2357,13 @@ body.dark-mode .swal2-content {
         
         <!-- Header do Chat (sempre presente, mas pode estar oculto) -->
         <div class="chat-header" id="chatHeader" style="<?= empty($selectedConversation) ? 'display: none;' : '' ?>">
+            <!-- Botão Voltar (Mobile) -->
+            <button class="btn btn-sm btn-icon btn-light chat-header-back-btn d-none" onclick="showListView()" title="Voltar para lista" id="chatHeaderBackBtn" style="display: none;">
+                <i class="ki-duotone ki-arrow-left fs-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+            </button>
             <div class="chat-header-info">
                 <div class="symbol symbol-circle symbol-50px">
                     <?php
@@ -13883,14 +14165,194 @@ function insertEmoji(emoji) {
     Swal.close();
 }
 
-// Toggle sidebar de detalhes
+// ============================================================================
+// SISTEMA DE NAVEGAÇÃO MOBILE
+// ============================================================================
+
+// Detectar se está em mobile
+function isMobile() {
+    return window.innerWidth <= 767;
+}
+
+function isTablet() {
+    return window.innerWidth >= 768 && window.innerWidth <= 991;
+}
+
+// Gerenciar views mobile
+function showListView() {
+    const listView = document.getElementById('conversationsListView');
+    const chatView = document.getElementById('chatAreaView');
+    const sidebarView = document.getElementById('conversationSidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    
+    if (isMobile()) {
+        // Mobile: mostrar apenas lista
+        if (listView) listView.classList.add('mobile-active');
+        if (chatView) chatView.classList.remove('mobile-active');
+        if (sidebarView) sidebarView.classList.remove('mobile-active');
+        if (overlay) overlay.classList.remove('active');
+    }
+}
+
+function showChatView() {
+    const listView = document.getElementById('conversationsListView');
+    const chatView = document.getElementById('chatAreaView');
+    const sidebarView = document.getElementById('conversationSidebar');
+    const backBtn = document.getElementById('chatHeaderBackBtn');
+    
+    if (isMobile()) {
+        // Mobile: mostrar apenas chat
+        if (listView) listView.classList.remove('mobile-active');
+        if (chatView) chatView.classList.add('mobile-active');
+        if (sidebarView) sidebarView.classList.remove('mobile-active');
+        if (backBtn) backBtn.classList.remove('d-none');
+    }
+}
+
+function showDetailsView() {
+    const listView = document.getElementById('conversationsListView');
+    const chatView = document.getElementById('chatAreaView');
+    const sidebarView = document.getElementById('conversationSidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    
+    if (isMobile() || isTablet()) {
+        // Mobile/Tablet: mostrar sidebar como drawer
+        if (listView) listView.classList.remove('mobile-active');
+        if (chatView) chatView.classList.remove('mobile-active');
+        if (sidebarView) {
+            sidebarView.classList.add('mobile-active');
+            sidebarView.classList.add('open');
+        }
+        if (overlay) overlay.classList.add('active');
+    }
+}
+
+// Toggle sidebar de detalhes (adaptado para mobile)
 function toggleConversationSidebar() {
     const sidebar = document.getElementById('conversationSidebar');
-    if (sidebar) {
+    const overlay = document.getElementById('sidebarOverlay');
+    
+    if (!sidebar) return;
+    
+    if (isMobile() || isTablet()) {
+        // Mobile/Tablet: usar sistema de views
+        if (sidebar.classList.contains('open')) {
+            closeConversationSidebar();
+        } else {
+            showDetailsView();
+        }
+    } else {
+        // Desktop: toggle normal
         sidebar.classList.toggle('open');
         localStorage.setItem('conversationSidebarOpen', sidebar.classList.contains('open'));
     }
 }
+
+function closeConversationSidebar() {
+    const sidebar = document.getElementById('conversationSidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    
+    if (sidebar) {
+        sidebar.classList.remove('open');
+        if (isMobile() || isTablet()) {
+            sidebar.classList.remove('mobile-active');
+            // Voltar para chat view
+            showChatView();
+        }
+    }
+    if (overlay) overlay.classList.remove('active');
+    localStorage.setItem('conversationSidebarOpen', 'false');
+}
+
+// Inicializar navegação mobile ao carregar
+document.addEventListener('DOMContentLoaded', function() {
+    // Detectar tamanho da tela e ajustar views
+    function handleResize() {
+        if (!isMobile() && !isTablet()) {
+            // Desktop: mostrar tudo lado a lado
+            const listView = document.getElementById('conversationsListView');
+            const chatView = document.getElementById('chatAreaView');
+            const sidebarView = document.getElementById('conversationSidebar');
+            const backBtn = document.getElementById('chatHeaderBackBtn');
+            
+            if (listView) listView.classList.add('mobile-active');
+            if (chatView) chatView.classList.add('mobile-active');
+            if (backBtn) backBtn.classList.add('d-none');
+            
+            // Restaurar estado do sidebar se estava aberto
+            const sidebarWasOpen = localStorage.getItem('conversationSidebarOpen') === 'true';
+            if (sidebarView && sidebarWasOpen) {
+                sidebarView.classList.add('open');
+            }
+        } else if (isMobile()) {
+            // Mobile: mostrar apenas lista inicialmente
+            showListView();
+        }
+    }
+    
+    // Executar ao carregar
+    handleResize();
+    
+    // Executar ao redimensionar
+    let resizeTimeout;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(handleResize, 250);
+    });
+    
+    // Se já tem conversa selecionada, mostrar chat view em mobile
+    const selectedConversationId = <?= json_encode($selectedConversationId ?? null) ?>;
+    if (selectedConversationId && isMobile()) {
+        setTimeout(() => {
+            showChatView();
+            // Mostrar botão voltar
+            const backBtn = document.getElementById('chatHeaderBackBtn');
+            if (backBtn) backBtn.style.display = 'flex';
+        }, 100);
+    }
+    
+    // Interceptar cliques em conversation-item para mobile
+    document.querySelectorAll('.conversation-item').forEach(item => {
+        item.addEventListener('click', function(e) {
+            // Se não for clique em checkbox ou botão de ação
+            if (!e.target.closest('.conversation-checkbox') && 
+                !e.target.closest('.conversation-item-actions') &&
+                !e.target.closest('.dropdown')) {
+                const conversationId = this.getAttribute('data-conversation-id');
+                if (conversationId && isMobile()) {
+                    // Aguardar um pouco para selectConversation processar
+                    setTimeout(() => {
+                        showChatView();
+                        const backBtn = document.getElementById('chatHeaderBackBtn');
+                        if (backBtn) backBtn.style.display = 'flex';
+                    }, 100);
+                }
+            }
+        });
+    });
+});
+
+// Modificar selectConversation para usar navegação mobile
+// Aguardar que a função seja definida
+document.addEventListener('DOMContentLoaded', function() {
+    // Aguardar um pouco para garantir que selectConversation foi definida
+    setTimeout(function() {
+        if (typeof selectConversation === 'function') {
+            const originalSelectConversation = selectConversation;
+            window.selectConversation = function(conversationId) {
+                // Chamar função original
+                originalSelectConversation(conversationId);
+                
+                // Em mobile, mostrar chat view após selecionar
+                if (isMobile()) {
+                    setTimeout(() => {
+                        showChatView();
+                    }, 300);
+                }
+            };
+        }
+    }, 500);
+});
 
 // Sistema de Polling já declarado acima (antes de selectConversation)
 

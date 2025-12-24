@@ -248,5 +248,5 @@ function deleteAccount(id, name) {
 </script>';
 ?>
 
-<?php include __DIR__ . '/../layouts/metronic/app.php'; ?>
+<?php include __DIR__ . '/../../layouts/metronic/app.php'; ?>
 

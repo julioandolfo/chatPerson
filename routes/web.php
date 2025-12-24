@@ -32,6 +32,8 @@ use App\Controllers\AIAssistantController;
 use App\Controllers\RealtimeController;
 use App\Controllers\LogController;
 use App\Controllers\SoundSettingsController;
+use App\Controllers\Api4ComController;
+use App\Controllers\Api4ComCallController;
 
 // Rotas públicas
 Router::get('/', function() {
@@ -201,6 +203,7 @@ Router::post('/users/update-availability', [UserController::class, 'updateAvaila
 // Rotas de Integrações
 Router::get('/integrations', [IntegrationController::class, 'index'], ['Authentication']);
 Router::get('/integrations/whatsapp', [IntegrationController::class, 'whatsapp'], ['Authentication']);
+Router::get('/integrations/api4com', [IntegrationController::class, 'api4com'], ['Authentication']);
 Router::post('/integrations/whatsapp', [IntegrationController::class, 'createWhatsAppAccount'], ['Authentication']);
 Router::post('/integrations/whatsapp/{id}/settings', [IntegrationController::class, 'updateWhatsAppAccountSettings'], ['Authentication']); // Atualizar funil/etapa padrão
 Router::post('/integrations/whatsapp/{id}', [IntegrationController::class, 'updateWhatsAppAccount'], ['Authentication']);
@@ -210,6 +213,26 @@ Router::get('/integrations/whatsapp/{id}/status', [IntegrationController::class,
 Router::post('/integrations/whatsapp/{id}/disconnect', [IntegrationController::class, 'disconnect'], ['Authentication']);
 Router::post('/integrations/whatsapp/{id}/test', [IntegrationController::class, 'sendTestMessage'], ['Authentication']);
 Router::post('/integrations/whatsapp/{id}/webhook', [IntegrationController::class, 'configureWebhook'], ['Authentication']);
+
+// Rotas de Integrações Api4Com
+Router::get('/integrations/api4com', [Api4ComController::class, 'index'], ['Authentication']);
+Router::post('/integrations/api4com', [Api4ComController::class, 'create'], ['Authentication']);
+Router::post('/integrations/api4com/{id}', [Api4ComController::class, 'update'], ['Authentication']);
+Router::delete('/integrations/api4com/{id}', [Api4ComController::class, 'delete'], ['Authentication']);
+Router::post('/integrations/api4com/{id}/sync-extensions', [Api4ComController::class, 'syncExtensions'], ['Authentication']);
+
+// Rotas de Chamadas Api4Com
+Router::get('/api4com-calls', [Api4ComCallController::class, 'index'], ['Authentication']);
+Router::post('/api4com-calls', [Api4ComCallController::class, 'create'], ['Authentication']);
+Router::get('/api4com-calls/{id}', [Api4ComCallController::class, 'show'], ['Authentication']);
+Router::post('/api4com-calls/{id}/end', [Api4ComCallController::class, 'end'], ['Authentication']);
+Router::get('/api4com-calls/conversation/{conversationId}', [Api4ComCallController::class, 'getByConversation'], ['Authentication']);
+Router::get('/api4com-calls/statistics', [Api4ComCallController::class, 'statistics'], ['Authentication']);
+// Webhook público para Api4Com (sem autenticação)
+Router::post('/api4com-calls/webhook', [Api4ComCallController::class, 'webhook']);
+
+// Rota para iniciar chamada a partir de conversa
+Router::post('/conversations/{id}/api4com-call', [ConversationController::class, 'startApi4ComCall'], ['Authentication']);
 
 // Webhook público para WhatsApp (sem autenticação)
 Router::post('/whatsapp-webhook', [WebhookController::class, 'whatsapp']);

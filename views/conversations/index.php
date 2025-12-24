@@ -2156,6 +2156,28 @@ body.dark-mode .swal2-content {
                     </i>
                 </button>
                 
+                <?php if (!empty($selectedConversation) && !empty($selectedConversation['contact_phone'])): ?>
+                    <?php
+                    // Verificar se há conta Api4Com habilitada
+                    $api4comAccount = \App\Models\Api4ComAccount::getFirstEnabled();
+                    $hasApi4Com = !empty($api4comAccount);
+                    $currentUserId = \App\Helpers\Auth::id();
+                    $hasExtension = false;
+                    if ($hasApi4Com && $currentUserId) {
+                        $extension = \App\Models\Api4ComExtension::findByUserAndAccount($currentUserId, $api4comAccount['id']);
+                        $hasExtension = !empty($extension) && $extension['status'] === 'active';
+                    }
+                    ?>
+                    <?php if ($hasApi4Com && $hasExtension && \App\Helpers\Permission::can('api4com_calls.create')): ?>
+                    <button class="btn btn-sm btn-icon btn-light-success" onclick="startApi4ComCall(<?= $selectedConversation['id'] ?>)" title="Ligar via Api4Com" id="btnApi4ComCall">
+                        <i class="ki-duotone ki-phone fs-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                    </button>
+                    <?php endif; ?>
+                <?php endif; ?>
+                
                 <button class="btn btn-sm btn-icon btn-light-primary" onclick="toggleConversationSidebar()" title="Detalhes da conversa">
                     <i class="ki-duotone ki-burger-menu fs-2">
                         <span class="path1"></span>
@@ -4018,6 +4040,70 @@ body.dark-mode .swal2-content {
 /**
  * Mostrar modal para mencionar/convidar agente
  */
+function startApi4ComCall(conversationId) {
+    if (!conversationId) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'ID da conversa não encontrado'
+        });
+        return;
+    }
+    
+    // Desabilitar botão durante a requisição
+    const btn = document.getElementById('btnApi4ComCall');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    }
+    
+    fetch("<?= \App\Helpers\Url::to('/conversations') ?>/" + conversationId + "/api4com-call", {
+        method: "POST",
+        headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "Content-Type": "application/json"
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="ki-duotone ki-phone fs-2"><span class="path1"></span><span class="path2"></span></i>';
+        }
+        
+        if (data.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Chamada Iniciada',
+                text: 'Chamada iniciada com sucesso!',
+                timer: 2000,
+                showConfirmButton: false
+            });
+            
+            // Atualizar interface se necessário
+            // Você pode adicionar um indicador visual de chamada em andamento aqui
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: data.message || 'Erro ao iniciar chamada'
+            });
+        }
+    })
+    .catch(error => {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="ki-duotone ki-phone fs-2"><span class="path1"></span><span class="path2"></span></i>';
+        }
+        
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro ao iniciar chamada: ' + error.message
+        });
+    });
+}
+
 function showMentionAgentModal() {
     const conversationId = window.currentConversationId;
     if (!conversationId) {

@@ -8,7 +8,9 @@ namespace App\Controllers;
 use App\Helpers\Response;
 use App\Helpers\Permission;
 use App\Services\ConversationService;
+use App\Services\Api4ComService;
 use App\Models\User;
+use App\Models\Conversation;
 
 class ConversationController
 {
@@ -790,6 +792,83 @@ class ConversationController
                 'success' => false,
                 'message' => $e->getMessage()
             ], 400);
+        }
+    }
+
+    /**
+     * Iniciar chamada Api4Com a partir de uma conversa
+     */
+    public function startApi4ComCall(int $id): void
+    {
+        Permission::abortIfCannot('api4com_calls.create');
+        
+        try {
+            $conversation = Conversation::find($id);
+            if (!$conversation) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Conversa não encontrada'
+                ], 404);
+                return;
+            }
+
+            // Verificar se há conta Api4Com habilitada
+            $account = \App\Models\Api4ComAccount::getFirstEnabled();
+            if (!$account) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Nenhuma conta Api4Com configurada'
+                ], 400);
+                return;
+            }
+
+            // Obter número do contato
+            $contact = \App\Models\Contact::find($conversation['contact_id']);
+            if (!$contact || empty($contact['phone'])) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Contato não possui número de telefone'
+                ], 400);
+                return;
+            }
+
+            // Buscar ramal do usuário logado
+            $userId = \App\Helpers\Auth::id();
+            $extension = \App\Models\Api4ComExtension::findByUserAndAccount($userId, $account['id']);
+            if (!$extension || $extension['status'] !== 'active') {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Ramal não configurado para seu usuário. Configure em Integrações → Api4Com'
+                ], 400);
+                return;
+            }
+
+            $data = [
+                'api4com_account_id' => $account['id'],
+                'contact_id' => $contact['id'],
+                'to_number' => $contact['phone'],
+                'agent_id' => $userId,
+                'conversation_id' => $id,
+                'extension_id' => $extension['id']
+            ];
+
+            $call = Api4ComService::createCall($data);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Chamada iniciada com sucesso!',
+                'call' => $call
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao iniciar chamada: ' . $e->getMessage()
+            ], 500);
         }
     }
 

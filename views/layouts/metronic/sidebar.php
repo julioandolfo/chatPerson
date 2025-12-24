@@ -263,6 +263,23 @@
                                 <span class="menu-title">WhatsApp</span>
                             </a>
                         </div>
+                        <div data-kt-menu-trigger="click" class="menu-item menu-accordion">
+                            <a class="menu-link <?= isActive('/integrations/api4com', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/integrations/api4com') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Api4Com</span>
+                            </a>
+                        </div>
+                        <?php if (\App\Helpers\Permission::can('api4com_calls.view')): ?>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/api4com-calls', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/api4com-calls') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Chamadas Api4Com</span>
+                            </a>
+                        </div>
                         <div class="menu-item">
                             <a class="menu-link" href="<?= \App\Helpers\Url::to('/integrations') ?>">
                                 <span class="menu-bullet">

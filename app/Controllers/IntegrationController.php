@@ -25,6 +25,20 @@ class IntegrationController
     }
 
     /**
+     * Configurar Api4Com
+     */
+    public function api4com(): void
+    {
+        Permission::abortIfCannot('api4com.view');
+        
+        $accounts = \App\Models\Api4ComAccount::all();
+        
+        Response::view('integrations/api4com/index', [
+            'accounts' => $accounts
+        ]);
+    }
+
+    /**
      * Configurar WhatsApp
      */
     public function whatsapp(): void

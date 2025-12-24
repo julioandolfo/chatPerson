@@ -207,9 +207,18 @@ class SoundNotificationService
         }
         
         // Criar diretório se não existir
-        $uploadDir = realpath(__DIR__ . '/../../') . '/' . self::CUSTOM_SOUNDS_DIR;
+        $baseDir = dirname(__DIR__, 2); // Volta 2 níveis: app/Services -> raiz
+        $uploadDir = $baseDir . '/' . self::CUSTOM_SOUNDS_DIR;
+        
         if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
+            if (!mkdir($uploadDir, 0755, true)) {
+                throw new \RuntimeException('Não foi possível criar o diretório de upload: ' . $uploadDir);
+            }
+        }
+        
+        // Verificar se o diretório é gravável
+        if (!is_writable($uploadDir)) {
+            throw new \RuntimeException('Diretório de upload não tem permissão de escrita: ' . $uploadDir);
         }
         
         // Gerar nome único

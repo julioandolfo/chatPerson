@@ -133,6 +133,15 @@ function seed_roles_and_permissions() {
         ['name' => 'Editar contas WhatsApp', 'slug' => 'whatsapp.edit', 'description' => 'Editar contas WhatsApp', 'module' => 'whatsapp'],
         ['name' => 'Deletar contas WhatsApp', 'slug' => 'whatsapp.delete', 'description' => 'Deletar contas WhatsApp', 'module' => 'whatsapp'],
         
+        // Api4Com
+        ['name' => 'Ver contas Api4Com', 'slug' => 'api4com.view', 'description' => 'Ver contas Api4Com', 'module' => 'api4com'],
+        ['name' => 'Criar contas Api4Com', 'slug' => 'api4com.create', 'description' => 'Criar contas Api4Com', 'module' => 'api4com'],
+        ['name' => 'Editar contas Api4Com', 'slug' => 'api4com.edit', 'description' => 'Editar contas Api4Com', 'module' => 'api4com'],
+        ['name' => 'Deletar contas Api4Com', 'slug' => 'api4com.delete', 'description' => 'Deletar contas Api4Com', 'module' => 'api4com'],
+        ['name' => 'Ver chamadas Api4Com', 'slug' => 'api4com_calls.view', 'description' => 'Ver chamadas Api4Com', 'module' => 'api4com_calls'],
+        ['name' => 'Criar chamadas Api4Com', 'slug' => 'api4com_calls.create', 'description' => 'Iniciar chamadas Api4Com', 'module' => 'api4com_calls'],
+        ['name' => 'Encerrar chamadas Api4Com', 'slug' => 'api4com_calls.end', 'description' => 'Encerrar chamadas Api4Com', 'module' => 'api4com_calls'],
+        
         // Integrações
         ['name' => 'Ver integrações', 'slug' => 'integrations.view', 'description' => 'Ver integrações', 'module' => 'integrations'],
         
@@ -187,6 +196,9 @@ function seed_roles_and_permissions() {
         'voice_calls.view',    // Ver chamadas de voz
         'voice_calls.create',  // Criar chamadas de voz
         'voice_calls.end',     // Encerrar chamadas de voz
+        'api4com_calls.view',  // Ver chamadas Api4Com
+        'api4com_calls.create', // Criar chamadas Api4Com
+        'api4com_calls.end',   // Encerrar chamadas Api4Com
     ];
     foreach ($agentPermissions as $slug) {
         if (isset($permissionIds[$slug])) {

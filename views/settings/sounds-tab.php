@@ -316,8 +316,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Carregar sons personalizados
-    loadCustomSounds();
+    // Carregar sons disponíveis e sons personalizados
+    loadAvailableSounds().then(() => {
+        loadCustomSounds();
+    });
     
     // Form submit
     document.getElementById('soundSettingsForm').addEventListener('submit', function(e) {
@@ -382,28 +384,73 @@ function toggleQuietHours(enabled) {
     }
 }
 
+// Cache de sons disponíveis
+let availableSoundsCache = [];
+
+// Carregar sons disponíveis
+function loadAvailableSounds() {
+    if (availableSoundsCache.length > 0) {
+        return Promise.resolve(availableSoundsCache);
+    }
+    
+    return fetch('<?= \App\Helpers\Url::to("/settings/sounds/available") ?>', {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.sounds) {
+            availableSoundsCache = data.sounds;
+            return data.sounds;
+        }
+        return [];
+    })
+    .catch(error => {
+        console.error('Erro ao carregar sons:', error);
+        return [];
+    });
+}
+
+// Obter URL correta de um som pelo filename
+function getSoundUrl(filename) {
+    const sound = availableSoundsCache.find(s => s.filename === filename);
+    if (sound && sound.url) {
+        return sound.url;
+    }
+    // Fallback: assumir que é som do sistema
+    return '/assets/sounds/' + filename;
+}
+
 function testSound(eventKey) {
     const select = document.getElementById(eventKey + '_sound');
     const soundFile = select ? select.value : null;
     
     if (!soundFile) return;
     
-    playSound('/assets/sounds/' + soundFile);
+    loadAvailableSounds().then(() => {
+        const url = getSoundUrl(soundFile);
+        playSound(url);
+    });
 }
 
 function testAllSounds() {
     const checkboxes = document.querySelectorAll('.sound-event-row input[type="checkbox"]:checked');
     let delay = 0;
     
-    checkboxes.forEach((checkbox, index) => {
-        const row = checkbox.closest('.sound-event-row');
-        const select = row.querySelector('select');
-        if (select && select.value) {
-            setTimeout(() => {
-                playSound('/assets/sounds/' + select.value);
-            }, delay);
-            delay += 1500; // 1.5 segundos entre cada som
-        }
+    loadAvailableSounds().then(() => {
+        checkboxes.forEach((checkbox, index) => {
+            const row = checkbox.closest('.sound-event-row');
+            const select = row.querySelector('select');
+            if (select && select.value) {
+                setTimeout(() => {
+                    const url = getSoundUrl(select.value);
+                    playSound(url);
+                }, delay);
+                delay += 1500; // 1.5 segundos entre cada som
+            }
+        });
     });
 }
 
@@ -518,29 +565,82 @@ function renderCustomSoundsList(sounds) {
         return;
     }
     
-    container.innerHTML = sounds.map(sound => `
-        <div class="d-flex align-items-center justify-content-between p-3 border rounded mb-2">
-            <div class="d-flex align-items-center gap-2">
-                <button type="button" class="btn btn-sm btn-icon btn-light-primary" onclick="playSound('${sound.url}')">
-                    <i class="ki-duotone ki-speaker fs-5">
+    // Obter eventos de som disponíveis
+    const soundEvents = <?= json_encode(UserSoundSettings::SOUND_EVENTS) ?>;
+    
+    container.innerHTML = sounds.map(sound => {
+        const safeUrl = escapeHtml(sound.url);
+        const safeFilename = escapeHtml(sound.filename);
+        const safeName = escapeHtml(sound.name);
+        
+        return `
+        <div class="d-flex flex-column p-3 border rounded mb-2">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-icon btn-light-primary" onclick="playSound('${safeUrl}')">
+                        <i class="ki-duotone ki-speaker fs-5">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                    </button>
+                    <span class="fw-semibold">${safeName}</span>
+                </div>
+                <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="deleteCustomSound(${sound.id})">
+                    <i class="ki-duotone ki-trash fs-5">
                         <span class="path1"></span>
                         <span class="path2"></span>
                         <span class="path3"></span>
+                        <span class="path4"></span>
+                        <span class="path5"></span>
                     </i>
                 </button>
-                <span class="fw-semibold">${escapeHtml(sound.name)}</span>
             </div>
-            <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="deleteCustomSound(${sound.id})">
-                <i class="ki-duotone ki-trash fs-5">
-                    <span class="path1"></span>
-                    <span class="path2"></span>
-                    <span class="path3"></span>
-                    <span class="path4"></span>
-                    <span class="path5"></span>
-                </i>
-            </button>
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-muted fs-7">Aplicar a:</span>
+                <select class="form-select form-select-sm form-select-solid" onchange="applySoundToEvent('${safeFilename}', this.value)">
+                    <option value="">Selecione um alerta...</option>
+                    ${Object.keys(soundEvents).map(eventKey => `
+                        <option value="${eventKey}">${escapeHtml(soundEvents[eventKey].label)}</option>
+                    `).join('')}
+                </select>
+            </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
+}
+
+function applySoundToEvent(soundFilename, eventKey) {
+    if (!eventKey || !soundFilename) return;
+    
+    const select = document.getElementById(eventKey + '_sound');
+    if (select) {
+        select.value = soundFilename;
+        
+        // Habilitar o evento se estiver desabilitado
+        const checkbox = document.getElementById(eventKey + '_enabled');
+        if (checkbox && !checkbox.checked) {
+            checkbox.checked = true;
+            toggleSoundEvent(eventKey, true);
+        }
+        
+        Swal.fire({
+            icon: 'success',
+            title: 'Som aplicado!',
+            text: 'O som foi aplicado ao alerta. Clique em Salvar para confirmar.',
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 2000
+        });
+        
+        // Resetar o select
+        const customSoundRow = event.target.closest('.d-flex.flex-column');
+        if (customSoundRow) {
+            const selectInRow = customSoundRow.querySelector('select');
+            if (selectInRow) selectInRow.value = '';
+        }
+    }
 }
 
 function escapeHtml(text) {

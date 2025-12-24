@@ -71,6 +71,18 @@ class Url
     }
 
     /**
+     * Gerar URL completa com protocolo e domínio
+     */
+    public static function fullUrl(string $path = ''): string
+    {
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $relativePath = self::to($path);
+        
+        return $protocol . '://' . $host . $relativePath;
+    }
+
+    /**
      * Formatar tempo relativo (há X tempo)
      */
     public static function timeAgo(string $datetime): string

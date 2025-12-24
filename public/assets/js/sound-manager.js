@@ -11,6 +11,9 @@
         // Configurações carregadas do servidor
         settings: null,
         
+        // Lista de sons disponíveis (sistema + customizados)
+        availableSounds: [],
+        
         // Elemento de áudio reutilizável
         audioElement: null,
         
@@ -20,8 +23,11 @@
         // Flag para indicar se está inicializado
         initialized: false,
         
-        // URL base para sons
+        // URL base para sons do sistema
         soundsBaseUrl: '/assets/sounds/',
+        
+        // URL base para sons customizados
+        customSoundsBaseUrl: '/storage/sounds/',
         
         // Eventos disponíveis
         events: {
@@ -65,7 +71,39 @@
          * Carregar configurações do servidor
          */
         loadSettings: function() {
-            fetch('/settings/sounds', {
+            // Carregar sons disponíveis primeiro
+            this.loadAvailableSounds().then(() => {
+                // Depois carregar configurações
+                fetch('/settings/sounds', {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'same-origin'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.settings) {
+                        this.settings = data.settings;
+                        console.log('[SoundManager] ✅ Configurações carregadas:', this.settings);
+                        
+                        // Pré-carregar sons habilitados
+                        this.preloadSounds();
+                    }
+                })
+                .catch(error => {
+                    console.error('[SoundManager] ❌ Erro ao carregar configurações:', error);
+                    // Usar configurações padrão
+                    this.settings = this.getDefaultSettings();
+                });
+            });
+        },
+
+        /**
+         * Carregar lista de sons disponíveis
+         */
+        loadAvailableSounds: function() {
+            return fetch('/settings/sounds/available', {
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
                     'Accept': 'application/json'
@@ -74,18 +112,14 @@
             })
             .then(response => response.json())
             .then(data => {
-                if (data.success && data.settings) {
-                    this.settings = data.settings;
-                    console.log('[SoundManager] ✅ Configurações carregadas:', this.settings);
-                    
-                    // Pré-carregar sons habilitados
-                    this.preloadSounds();
+                if (data.success && data.sounds) {
+                    this.availableSounds = data.sounds;
+                    console.log('[SoundManager] ✅ Sons disponíveis carregados:', this.availableSounds.length);
                 }
             })
             .catch(error => {
-                console.error('[SoundManager] ❌ Erro ao carregar configurações:', error);
-                // Usar configurações padrão
-                this.settings = this.getDefaultSettings();
+                console.error('[SoundManager] ❌ Erro ao carregar sons disponíveis:', error);
+                this.availableSounds = [];
             });
         },
 
@@ -94,6 +128,9 @@
          */
         reloadSettings: function() {
             console.log('[SoundManager] Recarregando configurações...');
+            // Limpar cache de áudio
+            this.audioCache = {};
+            // Recarregar tudo
             this.loadSettings();
         },
 
@@ -143,9 +180,12 @@
             soundFields.forEach(field => {
                 const soundFile = this.settings[field];
                 if (soundFile && !this.audioCache[soundFile]) {
-                    const audio = new Audio(this.soundsBaseUrl + soundFile);
-                    audio.preload = 'auto';
-                    this.audioCache[soundFile] = audio;
+                    const url = this.getSoundUrl(soundFile);
+                    if (url) {
+                        const audio = new Audio(url);
+                        audio.preload = 'auto';
+                        this.audioCache[soundFile] = audio;
+                    }
                 }
             });
             
@@ -245,6 +285,22 @@
         },
 
         /**
+         * Obter URL completa de um arquivo de som
+         */
+        getSoundUrl: function(filename) {
+            if (!filename) return null;
+            
+            // Buscar na lista de sons disponíveis
+            const sound = this.availableSounds.find(s => s.filename === filename);
+            if (sound && sound.url) {
+                return sound.url;
+            }
+            
+            // Fallback: assumir que é som do sistema
+            return this.soundsBaseUrl + filename;
+        },
+
+        /**
          * Obter volume configurado (0-1)
          */
         getVolume: function() {
@@ -281,7 +337,12 @@
         playFile: function(filename) {
             try {
                 const volume = this.getVolume();
-                const url = this.soundsBaseUrl + filename;
+                const url = this.getSoundUrl(filename);
+                
+                if (!url) {
+                    console.error('[SoundManager] ❌ URL não encontrada para:', filename);
+                    return false;
+                }
                 
                 // Tentar usar áudio do cache
                 let audio = this.audioCache[filename];
@@ -294,13 +355,17 @@
                     // Criar novo áudio
                     audio = new Audio(url);
                     audio.volume = volume;
-                    audio.play().catch(e => console.warn('[SoundManager] Erro ao tocar:', e));
+                    audio.play().catch(e => {
+                        console.warn('[SoundManager] Erro ao tocar:', e);
+                        // Se falhar, tentar recarregar sons disponíveis
+                        this.loadAvailableSounds();
+                    });
                     
                     // Adicionar ao cache
                     this.audioCache[filename] = audio;
                 }
                 
-                console.log('[SoundManager] ✅ Tocando:', filename, 'Volume:', volume);
+                console.log('[SoundManager] ✅ Tocando:', filename, 'URL:', url, 'Volume:', volume);
                 return true;
             } catch (error) {
                 console.error('[SoundManager] ❌ Erro ao reproduzir som:', error);

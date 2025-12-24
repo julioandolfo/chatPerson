@@ -145,8 +145,9 @@ ob_start();
                     <div class="fv-row mb-7">
                         <label class="fw-semibold fs-6 mb-2">Webhook URL</label>
                         <input type="url" name="webhook_url" class="form-control form-control-solid" 
-                               placeholder="https://seudominio.com/api4com-calls/webhook" />
-                        <div class="form-text">URL para receber webhooks da Api4Com</div>
+                               value="<?= \App\Helpers\Url::fullUrl('/api4com-calls/webhook') ?>" 
+                               readonly />
+                        <div class="form-text">URL para receber webhooks da Api4Com (gerada automaticamente)</div>
                     </div>
                     <div class="fv-row mb-7">
                         <div class="form-check form-switch form-check-custom form-check-solid">

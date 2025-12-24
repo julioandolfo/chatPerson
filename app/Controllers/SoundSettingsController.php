@@ -210,11 +210,11 @@ class SoundSettingsController
                 throw new \InvalidArgumentException('Arquivo de som não especificado');
             }
             
-            // Retornar dados para o frontend tocar o som
+            // Retornar dados para o frontend tocar o som com URL correta
             Response::json([
                 'success' => true,
                 'sound' => $soundFile,
-                'url' => '/assets/sounds/' . $soundFile,
+                'url' => SoundNotificationService::getSoundUrl($soundFile),
                 'volume' => $volume / 100
             ]);
         } catch (\Exception $e) {
@@ -236,6 +236,62 @@ class SoundSettingsController
                 'success' => true,
                 'sound_data' => $soundData
             ]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Servir arquivo de som do storage
+     * GET /storage/sounds/{filename}
+     */
+    public function serveSound(string $filename): void
+    {
+        try {
+            $userId = Auth::id();
+            
+            // Validar nome do arquivo (prevenir directory traversal)
+            if (strpos($filename, '..') !== false || strpos($filename, '/') !== false) {
+                Response::forbidden('Nome de arquivo inválido');
+                return;
+            }
+            
+            // Buscar som no banco
+            $sql = "SELECT * FROM custom_sounds WHERE filename = ? AND (user_id IS NULL OR user_id = ?)";
+            $sound = \App\Helpers\Database::fetch($sql, [$filename, $userId]);
+            
+            if (!$sound) {
+                Response::notFound('Som não encontrado');
+                return;
+            }
+            
+            // Verificar se arquivo existe
+            $baseDir = dirname(__DIR__, 2); // Volta 2 níveis: app/Controllers -> raiz
+            $filePath = $baseDir . '/' . SoundNotificationService::CUSTOM_SOUNDS_DIR . '/' . $filename;
+            
+            if (!file_exists($filePath)) {
+                Response::notFound('Arquivo não encontrado');
+                return;
+            }
+            
+            // Determinar MIME type
+            $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+            $mimeTypes = [
+                'mp3' => 'audio/mpeg',
+                'wav' => 'audio/wav',
+                'ogg' => 'audio/ogg',
+                'webm' => 'audio/webm'
+            ];
+            $mimeType = $mimeTypes[$extension] ?? 'audio/mpeg';
+            
+            // Enviar arquivo
+            header('Content-Type: ' . $mimeType);
+            header('Content-Length: ' . filesize($filePath));
+            header('Cache-Control: public, max-age=31536000');
+            header('Content-Disposition: inline; filename="' . basename($filename) . '"');
+            
+            readfile($filePath);
+            exit;
         } catch (\Exception $e) {
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
         }

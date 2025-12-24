@@ -277,6 +277,33 @@ class SoundNotificationService
     }
 
     /**
+     * Verificar se um arquivo de som é customizado ou do sistema
+     */
+    public static function isCustomSound(string $filename): bool
+    {
+        // Verificar se é som padrão do sistema
+        if (isset(self::DEFAULT_SOUNDS[$filename])) {
+            return false;
+        }
+        
+        // Verificar no banco se é customizado
+        $sql = "SELECT id FROM custom_sounds WHERE filename = ? AND is_system = 0 LIMIT 1";
+        $result = Database::fetch($sql, [$filename]);
+        return $result !== null;
+    }
+
+    /**
+     * Obter URL completa de um arquivo de som
+     */
+    public static function getSoundUrl(string $filename): string
+    {
+        if (self::isCustomSound($filename)) {
+            return '/storage/sounds/' . $filename;
+        }
+        return '/assets/sounds/' . $filename;
+    }
+
+    /**
      * Obter dados para tocar som de um evento
      */
     public static function getSoundDataForEvent(int $userId, string $event): ?array
@@ -297,7 +324,7 @@ class SoundNotificationService
         return [
             'event' => $event,
             'sound' => $soundFile,
-            'url' => '/assets/sounds/' . $soundFile,
+            'url' => self::getSoundUrl($soundFile),
             'volume' => $volume / 100 // Converter para 0-1
         ];
     }

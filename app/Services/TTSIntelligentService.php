@@ -11,6 +11,107 @@ use App\Helpers\Logger;
 class TTSIntelligentService
 {
     /**
+     * 🆕 Detectar intenção de áudio/texto usando IA (mais assertivo)
+     * Usa OpenAI para classificar a intenção do cliente
+     * 
+     * @param string $clientMessage Mensagem do cliente
+     * @param int $conversationId ID da conversa
+     * @return string|null 'prefer_audio', 'no_audio', ou null se não detectou
+     */
+    public static function detectAudioPreferenceWithAI(string $clientMessage, int $conversationId): ?string
+    {
+        try {
+            // Verificar se OpenAI está configurada
+            $apiKey = \App\Models\Setting::get('openai_api_key') ?: getenv('OPENAI_API_KEY');
+            if (empty($apiKey)) {
+                Logger::info("TTSIntelligentService::detectAudioPreferenceWithAI - OpenAI não configurada, pulando detecção por IA");
+                return null;
+            }
+            
+            // Obter contexto da conversa (últimas 3 mensagens)
+            $sql = "SELECT sender_type, content FROM messages 
+                    WHERE conversation_id = ? 
+                    ORDER BY created_at DESC 
+                    LIMIT 3";
+            $recentMessages = \App\Helpers\Database::fetchAll($sql, [$conversationId]);
+            
+            $context = '';
+            foreach (array_reverse($recentMessages) as $msg) {
+                $sender = $msg['sender_type'] === 'contact' ? 'Cliente' : 'IA';
+                $context .= "{$sender}: {$msg['content']}\n";
+            }
+            
+            // Prompt para classificação
+            $messages = [
+                [
+                    'role' => 'system',
+                    'content' => 'Você é um classificador de intenções sobre preferência de comunicação. Analise a mensagem do cliente e determine se ele quer receber áudio ou texto. Retorne APENAS um JSON: {"preference": "prefer_audio" ou "no_audio" ou null, "confidence": 0.0-1.0}. Se não tiver certeza, retorne null.'
+                ],
+                [
+                    'role' => 'user',
+                    'content' => "Contexto da conversa:\n{$context}\n\nMensagem atual do cliente: \"{$clientMessage}\"\n\nO cliente está pedindo para receber áudio, pedindo para parar de receber áudio, ou apenas conversando normalmente?"
+                ]
+            ];
+            
+            $payload = [
+                'model' => 'gpt-4o-mini',
+                'messages' => $messages,
+                'temperature' => 0.1,
+                'max_tokens' => 100,
+                'response_format' => ['type' => 'json_object']
+            ];
+            
+            Logger::info("TTSIntelligentService::detectAudioPreferenceWithAI - Chamando OpenAI para detectar preferência");
+            
+            $ch = curl_init('https://api.openai.com/v1/chat/completions');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . $apiKey
+                ],
+                CURLOPT_POSTFIELDS => json_encode($payload),
+                CURLOPT_TIMEOUT => 5
+            ]);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            if ($httpCode !== 200) {
+                Logger::error("TTSIntelligentService::detectAudioPreferenceWithAI - Erro HTTP {$httpCode}: " . substr($response, 0, 200));
+                return null;
+            }
+            
+            $data = json_decode($response, true);
+            $content = $data['choices'][0]['message']['content'] ?? null;
+            
+            if (!$content) {
+                Logger::error("TTSIntelligentService::detectAudioPreferenceWithAI - Resposta vazia da OpenAI");
+                return null;
+            }
+            
+            $result = json_decode($content, true);
+            $confidence = (float)($result['confidence'] ?? 0.0);
+            $preference = $result['preference'] ?? null;
+            
+            // Só aceitar se confiança >= 0.7
+            if ($confidence >= 0.7 && in_array($preference, ['prefer_audio', 'no_audio'])) {
+                Logger::info("TTSIntelligentService::detectAudioPreferenceWithAI - ✅ Detectado: {$preference} (confiança: {$confidence})");
+                return $preference;
+            }
+            
+            Logger::info("TTSIntelligentService::detectAudioPreferenceWithAI - Confiança baixa ou preferência inválida: {$preference} (conf: {$confidence})");
+            return null;
+            
+        } catch (\Exception $e) {
+            Logger::error("TTSIntelligentService::detectAudioPreferenceWithAI - Erro: " . $e->getMessage());
+            return null;
+        }
+    }
+    
+    /**
      * Decidir modo de envio baseado em regras inteligentes
      * 
      * @param string $text Texto da mensagem da IA
@@ -64,6 +165,8 @@ class TTSIntelligentService
             
             if ($lastClientMessage && !empty($lastClientMessage['content'])) {
                 $lastClientMessageLower = mb_strtolower($lastClientMessage['content']);
+                
+                // Verificar solicitação de áudio
                 foreach ($audioRequestKeywords as $keyword) {
                     if (stripos($lastClientMessageLower, $keyword) !== false) {
                         Logger::info("TTSIntelligentService::decideSendMode - 🎤 Cliente PEDIU explicitamente um áudio na última mensagem! Forçando audio_only");
@@ -72,6 +175,28 @@ class TTSIntelligentService
                         self::saveClientPreference($conversationId, 'prefer_audio');
                         
                         return 'audio_only';
+                    }
+                }
+                
+                // Verificar solicitação para NÃO enviar áudio
+                $negativeKeywords = [
+                    'não envie áudio', 'não mande áudio', 'sem áudio', 'apenas texto',
+                    'só texto', 'somente texto', 'prefiro texto', 'não gosto de áudio',
+                    'pare de enviar áudio', 'não quero áudio', 'volta com texto',
+                    'pode voltar com texto', 'volta para texto', 'voltar com texto',
+                    'pode voltar para texto', 'prefiro texto mesmo', 'só texto mesmo',
+                    'apenas texto mesmo', 'sem áudio por favor', 'não precisa de áudio',
+                    'não quero mais áudio', 'pare com áudio', 'chega de áudio'
+                ];
+                
+                foreach ($negativeKeywords as $keyword) {
+                    if (stripos($lastClientMessageLower, $keyword) !== false) {
+                        Logger::info("TTSIntelligentService::decideSendMode - ⚠️ Cliente pediu para NÃO enviar áudios na última mensagem! Forçando text_only");
+                        
+                        // Salvar preferência na metadata da conversa (sobrescrever qualquer preferência anterior)
+                        self::saveClientPreference($conversationId, 'no_audio');
+                        
+                        return 'text_only';
                     }
                 }
             }
@@ -314,7 +439,23 @@ class TTSIntelligentService
         Logger::info("TTSIntelligentService - 🔄 Modo Adaptativo: Analisando comportamento do cliente...");
         
         try {
-            // 0️⃣ PRIMEIRO: Verificar se cliente PEDIU explicitamente um áudio na mensagem atual OU na última mensagem
+            // 0️⃣ PRIMEIRO: Tentar detecção por IA (se habilitada e mensagem do cliente disponível)
+            if ($clientMessage !== null && !empty(trim($clientMessage))) {
+                Logger::info("TTSIntelligentService - 🤖 Tentando detecção por IA...");
+                $aiPreference = self::detectAudioPreferenceWithAI($clientMessage, $conversationId);
+                
+                if ($aiPreference === 'prefer_audio') {
+                    Logger::info("TTSIntelligentService - 🤖 IA detectou: PREFER_AUDIO");
+                    self::saveClientPreference($conversationId, 'prefer_audio');
+                    return 'audio_only';
+                } elseif ($aiPreference === 'no_audio') {
+                    Logger::info("TTSIntelligentService - 🤖 IA detectou: NO_AUDIO");
+                    self::saveClientPreference($conversationId, 'no_audio');
+                    return 'text_only';
+                }
+            }
+            
+            // 1️⃣ SEGUNDO: Verificar se cliente PEDIU explicitamente um áudio na mensagem atual OU na última mensagem
             $audioRequestKeywords = [
                 'manda um áudio', 'manda um audio', 'envia um áudio', 'envia um audio',
                 'manda áudio', 'manda audio', 'envia áudio', 'envia audio',
@@ -367,25 +508,58 @@ class TTSIntelligentService
                 Logger::error("TTSIntelligentService - Erro ao verificar última mensagem do cliente: " . $e->getMessage());
             }
             
-            // 1️⃣ Verificar se cliente pediu para NÃO enviar áudios
+            // 1️⃣ PRIMEIRO: Verificar se cliente pediu para NÃO enviar áudios na mensagem atual OU última mensagem
             $negativeKeywords = [
                 'não envie áudio', 'não mande áudio', 'sem áudio', 'apenas texto',
                 'só texto', 'somente texto', 'prefiro texto', 'não gosto de áudio',
-                'pare de enviar áudio', 'não quero áudio'
+                'pare de enviar áudio', 'não quero áudio', 'volta com texto',
+                'pode voltar com texto', 'volta para texto', 'voltar com texto',
+                'pode voltar para texto', 'prefiro texto mesmo', 'só texto mesmo',
+                'apenas texto mesmo', 'sem áudio por favor', 'não precisa de áudio',
+                'não quero mais áudio', 'pare com áudio', 'chega de áudio'
             ];
             
-            foreach ($negativeKeywords as $keyword) {
-                if (stripos($textLower, $keyword) !== false) {
-                    Logger::info("TTSIntelligentService - ⚠️ Cliente pediu para NÃO enviar áudios! Usando text_only");
-                    
-                    // Salvar preferência na metadata da conversa
-                    self::saveClientPreference($conversationId, 'no_audio');
-                    
-                    return 'text_only';
+            // Verificar na mensagem do cliente fornecida (se houver)
+            if ($clientMessage !== null) {
+                $clientMessageLower = mb_strtolower($clientMessage);
+                foreach ($negativeKeywords as $keyword) {
+                    if (stripos($clientMessageLower, $keyword) !== false) {
+                        Logger::info("TTSIntelligentService - ⚠️ Cliente pediu para NÃO enviar áudios na mensagem atual! Usando text_only");
+                        
+                        // Salvar preferência na metadata da conversa (sobrescrever qualquer preferência anterior)
+                        self::saveClientPreference($conversationId, 'no_audio');
+                        
+                        return 'text_only';
+                    }
                 }
             }
             
-            // 2️⃣ Verificar se há preferência salva
+            // Verificar na última mensagem do cliente (se não foi fornecida)
+            try {
+                $sql = "SELECT content FROM messages 
+                        WHERE conversation_id = ? AND sender_type = 'contact'
+                        ORDER BY created_at DESC 
+                        LIMIT 1";
+                $lastClientMessage = \App\Helpers\Database::fetch($sql, [$conversationId]);
+                
+                if ($lastClientMessage && !empty($lastClientMessage['content'])) {
+                    $lastClientMessageLower = mb_strtolower($lastClientMessage['content']);
+                    foreach ($negativeKeywords as $keyword) {
+                        if (stripos($lastClientMessageLower, $keyword) !== false) {
+                            Logger::info("TTSIntelligentService - ⚠️ Cliente pediu para NÃO enviar áudios na última mensagem! Usando text_only");
+                            
+                            // Salvar preferência na metadata da conversa (sobrescrever qualquer preferência anterior)
+                            self::saveClientPreference($conversationId, 'no_audio');
+                            
+                            return 'text_only';
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                Logger::error("TTSIntelligentService - Erro ao verificar última mensagem do cliente: " . $e->getMessage());
+            }
+            
+            // 2️⃣ Verificar se há preferência salva (só se não detectou mudança na mensagem atual)
             $savedPreference = self::getClientPreference($conversationId);
             if ($savedPreference === 'prefer_audio') {
                 Logger::info("TTSIntelligentService - 🎤 Cliente tem preferência salva: PREFER_AUDIO");

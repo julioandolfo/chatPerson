@@ -324,6 +324,34 @@ class Api4ComController
     }
 
     /**
+     * Testar conexão com a API Api4Com
+     */
+    public function testConnection(int $id): void
+    {
+        Permission::abortIfCannot('api4com.view');
+        
+        try {
+            $account = Api4ComAccount::find($id);
+            if (!$account) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Conta não encontrada'
+                ], 404);
+                return;
+            }
+
+            $result = \App\Services\Api4ComService::testConnection($id);
+            
+            Response::json($result);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao testar conexão: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Criar ramal manualmente
      */
     public function createExtension(int $accountId): void

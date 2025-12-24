@@ -96,6 +96,15 @@ ob_start();
                                         </i>
                                     </button>
                                     <?php endif; ?>
+                                    <button type="button" class="btn btn-light-warning btn-sm" 
+                                            onclick="testConnection(<?= $account['id'] ?>)"
+                                            title="Testar Conexão com a API">
+                                        <i class="ki-duotone ki-check-circle fs-4">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        Testar
+                                    </button>
                                     <?php if (\App\Helpers\Permission::can('api4com.delete')): ?>
                                     <button type="button" class="btn btn-light-danger btn-sm" 
                                             onclick="deleteAccount(<?= $account['id'] ?>, '<?= htmlspecialchars($account['name'], ENT_QUOTES) ?>')"
@@ -522,6 +531,49 @@ function editAccount(id) {
     })
     .catch(error => {
         alert("Erro ao carregar dados da conta");
+    });
+}
+
+function testConnection(accountId) {
+    const btn = event.target.closest("button");
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = \'<span class="spinner-border spinner-border-sm"></span> Testando...\';
+    
+    fetch("' . \App\Helpers\Url::to('/integrations/api4com') . '/" + accountId + "/test", {
+        method: "POST",
+        headers: {
+            "X-Requested-With": "XMLHttpRequest"
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        
+        if (data.success) {
+            let msg = "✅ " + data.message + "\\n\\n";
+            msg += "👤 Usuário: " + (data.user?.name || "N/A") + "\\n";
+            msg += "📧 Email: " + (data.user?.email || "N/A") + "\\n";
+            msg += "🔑 Perfil: " + (data.user?.role || "N/A") + "\\n";
+            msg += "⏱️ Tempo de resposta: " + data.response_time + "ms";
+            alert(msg);
+        } else {
+            let msg = "❌ Falha na conexão\\n\\n";
+            msg += data.message || "Erro desconhecido";
+            if (data.http_code) {
+                msg += "\\n\\nCódigo HTTP: " + data.http_code;
+            }
+            if (data.response_time) {
+                msg += "\\nTempo: " + data.response_time + "ms";
+            }
+            alert(msg);
+        }
+    })
+    .catch(error => {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        alert("❌ Erro ao testar conexão: " + error.message);
     });
 }
 

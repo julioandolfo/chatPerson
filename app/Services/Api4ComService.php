@@ -458,6 +458,91 @@ class Api4ComService
     }
 
     /**
+     * Testar conexão com a API Api4Com
+     * Valida o token usando o endpoint /api/v1/users/me
+     * 
+     * @param int $accountId ID da conta
+     * @return array Resultado do teste
+     */
+    public static function testConnection(int $accountId): array
+    {
+        $account = Api4ComAccount::find($accountId);
+        if (!$account) {
+            throw new \InvalidArgumentException('Conta Api4Com não encontrada');
+        }
+
+        $apiUrl = rtrim($account['api_url'], '/');
+        $token = $account['api_token'];
+        
+        // Endpoint: GET /api/v1/users/me (conforme documentação de autenticação)
+        $url = $apiUrl . '/api/v1/users/me';
+        
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Authorization: ' . $token
+            ],
+            CURLOPT_TIMEOUT => 15
+        ]);
+
+        $startTime = microtime(true);
+        $response = curl_exec($ch);
+        $endTime = microtime(true);
+        $responseTime = round(($endTime - $startTime) * 1000); // em ms
+        
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($error) {
+            return [
+                'success' => false,
+                'message' => 'Erro de conexão: ' . $error,
+                'response_time' => $responseTime
+            ];
+        }
+
+        $data = json_decode($response, true);
+
+        if ($httpCode >= 200 && $httpCode < 300 && is_array($data)) {
+            return [
+                'success' => true,
+                'message' => 'Conexão estabelecida com sucesso!',
+                'user' => [
+                    'name' => $data['name'] ?? 'N/A',
+                    'email' => $data['email'] ?? 'N/A',
+                    'role' => $data['role'] ?? 'N/A'
+                ],
+                'response_time' => $responseTime,
+                'http_code' => $httpCode
+            ];
+        } elseif ($httpCode === 401) {
+            return [
+                'success' => false,
+                'message' => 'Token inválido ou expirado. Gere um novo token no painel Api4Com.',
+                'response_time' => $responseTime,
+                'http_code' => $httpCode
+            ];
+        } else {
+            $errorMsg = 'Erro na API';
+            if (is_array($data)) {
+                $errorMsg = $data['error'] ?? $data['message'] ?? "HTTP {$httpCode}";
+                if (is_array($errorMsg)) {
+                    $errorMsg = json_encode($errorMsg);
+                }
+            }
+            return [
+                'success' => false,
+                'message' => $errorMsg,
+                'response_time' => $responseTime,
+                'http_code' => $httpCode
+            ];
+        }
+    }
+
+    /**
      * Buscar ramais da API Api4Com
      * 
      * @param int $accountId ID da conta

@@ -180,7 +180,7 @@ class SLAMonitoringService
     }
 
     /**
-     * Obter estatísticas de SLA
+     * Obter estatísticas de SLA (GERAL, HUMANO e IA separados)
      */
     public static function getSLAStats(array $filters = []): array
     {
@@ -188,7 +188,9 @@ class SLAMonitoringService
         $firstResponseSLA = $settings['sla']['first_response_time'];
         $resolutionSLA = $settings['sla']['resolution_time'];
 
-        // Conversas dentro do SLA de primeira resposta
+        // =========== ESTATÍSTICAS GERAIS (inclui IA e Humanos) ===========
+        
+        // Conversas dentro do SLA de primeira resposta (GERAL)
         $sql = "SELECT COUNT(*) as total
                 FROM conversations c
                 WHERE c.status IN ('open', 'pending')
@@ -201,7 +203,7 @@ class SLAMonitoringService
         
         $withinSLA = Database::fetch($sql, [$firstResponseSLA]);
         
-        // Conversas excedendo SLA de primeira resposta
+        // Conversas excedendo SLA de primeira resposta (GERAL)
         $sql = "SELECT COUNT(*) as total
                 FROM conversations c
                 WHERE c.status IN ('open', 'pending')
@@ -214,7 +216,7 @@ class SLAMonitoringService
         
         $exceededSLA = Database::fetch($sql, [$firstResponseSLA]);
         
-        // Conversas dentro do SLA de resolução
+        // Conversas dentro do SLA de resolução (GERAL)
         $sql = "SELECT COUNT(*) as total
                 FROM conversations c
                 WHERE c.status = 'closed'
@@ -222,16 +224,181 @@ class SLAMonitoringService
         
         $resolvedWithinSLA = Database::fetch($sql, [$resolutionSLA]);
         
+        // =========== ESTATÍSTICAS APENAS HUMANOS (exclui IA) ===========
+        
+        // Conversas dentro do SLA de primeira resposta (HUMANO)
+        $sqlHuman = "SELECT COUNT(*) as total
+                     FROM conversations c
+                     WHERE c.status IN ('open', 'pending')
+                     AND EXISTS (
+                         SELECT 1 FROM messages m 
+                         WHERE m.conversation_id = c.id 
+                         AND m.sender_type = 'agent'
+                         AND m.ai_agent_id IS NULL
+                         AND TIMESTAMPDIFF(MINUTE, c.created_at, m.created_at) <= ?
+                     )";
+        
+        $withinSLAHuman = Database::fetch($sqlHuman, [$firstResponseSLA]);
+        
+        // Conversas excedendo SLA de primeira resposta (HUMANO)
+        // Considera apenas conversas que têm agente humano atribuído mas sem resposta humana
+        $sqlHumanExceeded = "SELECT COUNT(*) as total
+                            FROM conversations c
+                            WHERE c.status IN ('open', 'pending')
+                            AND c.agent_id IS NOT NULL
+                            AND c.agent_id > 0
+                            AND TIMESTAMPDIFF(MINUTE, c.created_at, NOW()) > ?
+                            AND NOT EXISTS (
+                                SELECT 1 FROM messages m 
+                                WHERE m.conversation_id = c.id 
+                                AND m.sender_type = 'agent'
+                                AND m.ai_agent_id IS NULL
+                            )";
+        
+        $exceededSLAHuman = Database::fetch($sqlHumanExceeded, [$firstResponseSLA]);
+        
+        // =========== ESTATÍSTICAS APENAS IA ===========
+        
+        // Conversas dentro do SLA de primeira resposta (IA)
+        $sqlAI = "SELECT COUNT(*) as total
+                  FROM conversations c
+                  WHERE c.status IN ('open', 'pending')
+                  AND EXISTS (
+                      SELECT 1 FROM messages m 
+                      WHERE m.conversation_id = c.id 
+                      AND m.sender_type = 'agent'
+                      AND m.ai_agent_id IS NOT NULL
+                      AND TIMESTAMPDIFF(MINUTE, c.created_at, m.created_at) <= ?
+                  )";
+        
+        $withinSLAAI = Database::fetch($sqlAI, [$firstResponseSLA]);
+        
+        // Total de conversas abertas
+        $sqlTotalOpen = "SELECT COUNT(*) as total FROM conversations WHERE status IN ('open', 'pending')";
+        $totalOpen = Database::fetch($sqlTotalOpen);
+        
         return [
+            // Estatísticas GERAIS (inclui IA + Humanos)
             'first_response' => [
                 'sla_minutes' => $firstResponseSLA,
                 'within_sla' => (int)($withinSLA['total'] ?? 0),
                 'exceeded' => (int)($exceededSLA['total'] ?? 0),
-                'total_open' => (int)($withinSLA['total'] ?? 0) + (int)($exceededSLA['total'] ?? 0)
+                'total_open' => (int)($totalOpen['total'] ?? 0)
             ],
             'resolution' => [
                 'sla_minutes' => $resolutionSLA,
                 'within_sla' => (int)($resolvedWithinSLA['total'] ?? 0)
+            ],
+            
+            // Estatísticas HUMANOS (exclui IA)
+            'first_response_human' => [
+                'sla_minutes' => $firstResponseSLA,
+                'within_sla' => (int)($withinSLAHuman['total'] ?? 0),
+                'exceeded' => (int)($exceededSLAHuman['total'] ?? 0),
+            ],
+            
+            // Estatísticas IA
+            'first_response_ai' => [
+                'sla_minutes' => $firstResponseSLA,
+                'within_sla' => (int)($withinSLAAI['total'] ?? 0),
+                // IA raramente excede SLA (responde em segundos)
+            ]
+        ];
+    }
+
+    /**
+     * Obter taxa de cumprimento de SLA separada por tipo
+     */
+    public static function getSLAComplianceRates(?string $dateFrom = null, ?string $dateTo = null): array
+    {
+        $dateFrom = $dateFrom ?? date('Y-m-01');
+        $dateTo = $dateTo ?? date('Y-m-d') . ' 23:59:59';
+        
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
+        
+        $settings = ConversationSettingsService::getSettings();
+        $firstResponseSLA = $settings['sla']['first_response_time'];
+        
+        // Taxa de SLA GERAL
+        $sqlGeneral = "SELECT 
+                        COUNT(*) as total,
+                        COUNT(CASE WHEN TIMESTAMPDIFF(MINUTE, 
+                            c.created_at,
+                            (SELECT MIN(m.created_at) FROM messages m 
+                             WHERE m.conversation_id = c.id AND m.sender_type = 'agent')
+                        ) <= ? THEN 1 END) as within_sla
+                       FROM conversations c
+                       WHERE c.created_at >= ? AND c.created_at <= ?
+                       AND EXISTS (
+                           SELECT 1 FROM messages m 
+                           WHERE m.conversation_id = c.id AND m.sender_type = 'agent'
+                       )";
+        
+        $generalStats = Database::fetch($sqlGeneral, [$firstResponseSLA, $dateFrom, $dateTo]);
+        
+        // Taxa de SLA HUMANOS
+        $sqlHuman = "SELECT 
+                        COUNT(*) as total,
+                        COUNT(CASE WHEN TIMESTAMPDIFF(MINUTE, 
+                            c.created_at,
+                            (SELECT MIN(m.created_at) FROM messages m 
+                             WHERE m.conversation_id = c.id AND m.sender_type = 'agent' AND m.ai_agent_id IS NULL)
+                        ) <= ? THEN 1 END) as within_sla
+                     FROM conversations c
+                     WHERE c.created_at >= ? AND c.created_at <= ?
+                     AND EXISTS (
+                         SELECT 1 FROM messages m 
+                         WHERE m.conversation_id = c.id AND m.sender_type = 'agent' AND m.ai_agent_id IS NULL
+                     )";
+        
+        $humanStats = Database::fetch($sqlHuman, [$firstResponseSLA, $dateFrom, $dateTo]);
+        
+        // Taxa de SLA IA
+        $sqlAI = "SELECT 
+                    COUNT(*) as total,
+                    COUNT(CASE WHEN TIMESTAMPDIFF(MINUTE, 
+                        c.created_at,
+                        (SELECT MIN(m.created_at) FROM messages m 
+                         WHERE m.conversation_id = c.id AND m.sender_type = 'agent' AND m.ai_agent_id IS NOT NULL)
+                    ) <= ? THEN 1 END) as within_sla
+                  FROM conversations c
+                  WHERE c.created_at >= ? AND c.created_at <= ?
+                  AND EXISTS (
+                      SELECT 1 FROM messages m 
+                      WHERE m.conversation_id = c.id AND m.sender_type = 'agent' AND m.ai_agent_id IS NOT NULL
+                  )";
+        
+        $aiStats = Database::fetch($sqlAI, [$firstResponseSLA, $dateFrom, $dateTo]);
+        
+        $generalTotal = (int)($generalStats['total'] ?? 0);
+        $generalWithin = (int)($generalStats['within_sla'] ?? 0);
+        $humanTotal = (int)($humanStats['total'] ?? 0);
+        $humanWithin = (int)($humanStats['within_sla'] ?? 0);
+        $aiTotal = (int)($aiStats['total'] ?? 0);
+        $aiWithin = (int)($aiStats['within_sla'] ?? 0);
+        
+        return [
+            'general' => [
+                'total' => $generalTotal,
+                'within_sla' => $generalWithin,
+                'rate' => $generalTotal > 0 ? round(($generalWithin / $generalTotal) * 100, 2) : 0
+            ],
+            'human' => [
+                'total' => $humanTotal,
+                'within_sla' => $humanWithin,
+                'rate' => $humanTotal > 0 ? round(($humanWithin / $humanTotal) * 100, 2) : 0
+            ],
+            'ai' => [
+                'total' => $aiTotal,
+                'within_sla' => $aiWithin,
+                'rate' => $aiTotal > 0 ? round(($aiWithin / $aiTotal) * 100, 2) : 0
+            ],
+            'sla_minutes' => $firstResponseSLA,
+            'period' => [
+                'from' => $dateFrom,
+                'to' => $dateTo
             ]
         ];
     }

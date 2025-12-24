@@ -121,13 +121,14 @@ class AgentPerformanceService
     }
 
     /**
-     * Total de mensagens enviadas pelo agente
+     * Total de mensagens enviadas pelo agente (APENAS HUMANO - exclui IA)
      */
     private static function getTotalMessages(int $agentId, string $dateFrom, string $dateTo): int
     {
         $sql = "SELECT COUNT(*) as count FROM messages 
                 WHERE sender_id = ? 
                 AND sender_type = 'agent'
+                AND ai_agent_id IS NULL
                 AND created_at >= ? 
                 AND created_at <= ?";
         
@@ -136,27 +137,56 @@ class AgentPerformanceService
     }
 
     /**
-     * Tempo médio de primeira resposta (em minutos)
+     * Tempo médio de primeira resposta do agente HUMANO (em minutos)
+     * Calcula a partir do momento que o agente foi atribuído (não desde o início da conversa)
+     * Considera apenas mensagens do cliente APÓS a atribuição do agente
      */
     private static function getAverageFirstResponseTime(int $agentId, string $dateFrom, string $dateTo): ?float
     {
-        $sql = "SELECT AVG(TIMESTAMPDIFF(MINUTE, c.created_at, m.created_at)) as avg_time
-                FROM conversations c
-                INNER JOIN messages m ON m.conversation_id = c.id
-                WHERE c.agent_id = ?
-                AND m.sender_type = 'agent'
-                AND m.sender_id = ?
-                AND c.created_at >= ?
-                AND c.created_at <= ?
-                AND m.created_at = (
-                    SELECT MIN(m2.created_at) 
-                    FROM messages m2 
-                    WHERE m2.conversation_id = c.id 
-                    AND m2.sender_type = 'agent'
-                    AND m2.sender_id = ?
-                )";
+        // Tempo médio entre: primeira mensagem do cliente APÓS atribuição -> primeira resposta do agente humano
+        // Isso garante que mensagens anteriores (incluindo de IA) não sejam contabilizadas
+        $sql = "SELECT AVG(response_time) as avg_time
+                FROM (
+                    SELECT 
+                        c.id as conversation_id,
+                        TIMESTAMPDIFF(MINUTE, 
+                            -- Primeira mensagem do cliente APÓS a primeira resposta do agente (ou atribuição)
+                            -- Usamos a primeira mensagem do cliente como referência
+                            (SELECT MIN(m_cliente.created_at) 
+                             FROM messages m_cliente 
+                             WHERE m_cliente.conversation_id = c.id 
+                             AND m_cliente.sender_type = 'contact'
+                             AND m_cliente.created_at >= COALESCE(
+                                 -- Se existe mensagem de IA antes, considerar a partir de quando a IA parou
+                                 (SELECT MAX(m_ia.created_at) 
+                                  FROM messages m_ia 
+                                  WHERE m_ia.conversation_id = c.id 
+                                  AND m_ia.ai_agent_id IS NOT NULL),
+                                 c.created_at
+                             )),
+                            -- Primeira resposta do agente HUMANO (exclui IA)
+                            (SELECT MIN(m_agente.created_at) 
+                             FROM messages m_agente 
+                             WHERE m_agente.conversation_id = c.id 
+                             AND m_agente.sender_type = 'agent'
+                             AND m_agente.sender_id = c.agent_id
+                             AND m_agente.ai_agent_id IS NULL)
+                        ) as response_time
+                    FROM conversations c
+                    WHERE c.agent_id = ?
+                    AND c.created_at >= ?
+                    AND c.created_at <= ?
+                    AND EXISTS (
+                        SELECT 1 FROM messages m 
+                        WHERE m.conversation_id = c.id 
+                        AND m.sender_type = 'agent'
+                        AND m.sender_id = c.agent_id
+                        AND m.ai_agent_id IS NULL
+                    )
+                ) as response_times
+                WHERE response_time IS NOT NULL AND response_time >= 0";
         
-        $result = \App\Helpers\Database::fetch($sql, [$agentId, $agentId, $dateFrom, $dateTo, $agentId]);
+        $result = \App\Helpers\Database::fetch($sql, [$agentId, $dateFrom, $dateTo]);
         return $result && $result['avg_time'] !== null ? round((float)$result['avg_time'], 2) : null;
     }
 
@@ -218,7 +248,8 @@ class AgentPerformanceService
     }
 
     /**
-     * Obter ranking de agentes por performance
+     * Obter ranking de agentes HUMANOS por performance
+     * Exclui mensagens de IA das métricas
      */
     public static function getAgentsRanking(?string $dateFrom = null, ?string $dateTo = null, int $limit = 10): array
     {
@@ -241,6 +272,7 @@ class AgentPerformanceService
                     AND c.created_at <= ?
                 LEFT JOIN messages m ON u.id = m.sender_id 
                     AND m.sender_type = 'agent'
+                    AND m.ai_agent_id IS NULL
                     AND m.created_at >= ? 
                     AND m.created_at <= ?
                 WHERE u.role IN ('agent', 'admin', 'supervisor')
@@ -252,7 +284,7 @@ class AgentPerformanceService
         
         $agents = \App\Helpers\Database::fetchAll($sql, [$dateFrom, $dateTo, $dateFrom, $dateTo, $limit]);
         
-        // Calcular taxa de resolução para cada agente
+        // Calcular taxa de resolução e tempo médio de resposta para cada agente
         foreach ($agents as &$agent) {
             $agent['resolution_rate'] = $agent['total_conversations'] > 0
                 ? round(($agent['closed_conversations'] / $agent['total_conversations']) * 100, 2)
@@ -260,6 +292,13 @@ class AgentPerformanceService
             $agent['avg_resolution_time'] = $agent['avg_resolution_time'] 
                 ? round((float)$agent['avg_resolution_time'], 2) 
                 : null;
+            
+            // Calcular tempo médio de resposta individual (excluindo IA)
+            $agent['avg_response_time'] = self::getAverageFirstResponseTime(
+                $agent['id'], 
+                $dateFrom, 
+                $dateTo
+            );
         }
         
         return $agents;

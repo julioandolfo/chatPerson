@@ -95,6 +95,61 @@ class DashboardController
     }
 
     /**
+     * Dashboard específico para Inteligência Artificial
+     */
+    public function aiDashboard(): void
+    {
+        $dateFrom = \App\Helpers\Request::get('date_from', date('Y-m-01'));
+        $dateTo = \App\Helpers\Request::get('date_to', date('Y-m-d'));
+        
+        // Garantir que dateTo inclui o dia inteiro
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
+        
+        try {
+            // Estatísticas gerais (inclui métricas separadas)
+            $generalStats = \App\Services\DashboardService::getGeneralStats(null, $dateFrom, $dateTo);
+            
+            // Métricas de IA extraídas do generalStats
+            $aiMetrics = $generalStats['ai_metrics'] ?? [];
+            
+            // Ranking de agentes de IA
+            $aiAgentsRanking = \App\Services\AIAgentPerformanceService::getAIAgentsRanking($dateFrom, $dateTo, 10);
+            
+            // Comparação IA vs Humanos
+            $comparison = \App\Services\AIAgentPerformanceService::getComparisonStats($dateFrom, $dateTo);
+            
+            // Taxa de cumprimento de SLA separada
+            $slaCompliance = \App\Services\SLAMonitoringService::getSLAComplianceRates($dateFrom, $dateTo);
+            
+            Response::view('dashboard/ai-dashboard', [
+                'stats' => $generalStats,
+                'aiMetrics' => $aiMetrics,
+                'aiAgentsRanking' => $aiAgentsRanking,
+                'comparison' => $comparison,
+                'slaCompliance' => $slaCompliance,
+                'dateFrom' => $dateFrom,
+                'dateTo' => $dateTo
+            ]);
+        } catch (\Exception $e) {
+            self::logDash("ERRO CRÍTICO AI Dashboard: " . $e->getMessage());
+            self::logDash("Stack trace: " . $e->getTraceAsString());
+            
+            // Fallback com dados vazios
+            Response::view('dashboard/ai-dashboard', [
+                'stats' => ['metrics' => [], 'ai_metrics' => []],
+                'aiMetrics' => [],
+                'aiAgentsRanking' => [],
+                'comparison' => ['ai' => [], 'human' => []],
+                'slaCompliance' => ['general' => [], 'ai' => [], 'human' => []],
+                'dateFrom' => $dateFrom,
+                'dateTo' => $dateTo
+            ]);
+        }
+    }
+
+    /**
      * Obter dados de gráficos (AJAX)
      */
     public function getChartData(): void

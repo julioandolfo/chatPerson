@@ -125,7 +125,7 @@ ob_start();
     <div class="col-xl-3">
         <div class="card h-100">
             <div class="card-header border-0 pt-5">
-                <h3 class="card-title fw-bold">Tempo 1ª Resposta</h3>
+                <h3 class="card-title fw-bold">Tempo 1ª Resposta (Geral)</h3>
             </div>
             <div class="card-body pt-3">
                 <div class="d-flex align-items-center">
@@ -141,7 +141,6 @@ ob_start();
                                 if (class_exists('\App\Services\AgentPerformanceService')) {
                                     echo \App\Services\AgentPerformanceService::formatTime($avgFirstResponse);
                                 } else {
-                                    // Fallback manual
                                     if ($avgFirstResponse < 60) {
                                         echo number_format($avgFirstResponse, 0) . ' min';
                                     } else {
@@ -153,7 +152,7 @@ ob_start();
                             }
                             ?>
                         </div>
-                        <div class="text-muted fs-6">Média primeira resposta</div>
+                        <div class="text-muted fs-6">Média (IA + Humanos)</div>
                     </div>
                 </div>
             </div>
@@ -165,7 +164,7 @@ ob_start();
     <div class="col-xl-3">
         <div class="card h-100">
             <div class="card-header border-0 pt-5">
-                <h3 class="card-title fw-bold">Tempo de Resposta</h3>
+                <h3 class="card-title fw-bold">Tempo de Resposta (Geral)</h3>
             </div>
             <div class="card-body pt-3">
                 <div class="d-flex align-items-center">
@@ -182,7 +181,6 @@ ob_start();
                                 if (class_exists('\App\Services\AgentPerformanceService')) {
                                     echo \App\Services\AgentPerformanceService::formatTime($avgResponse);
                                 } else {
-                                    // Fallback manual
                                     if ($avgResponse < 60) {
                                         echo number_format($avgResponse, 0) . ' min';
                                     } else {
@@ -194,7 +192,7 @@ ob_start();
                             }
                             ?>
                         </div>
-                        <div class="text-muted fs-6">Média geral de resposta</div>
+                        <div class="text-muted fs-6">Média (IA + Humanos)</div>
                     </div>
                 </div>
             </div>
@@ -226,6 +224,170 @@ ob_start();
     </div>
     <!--end::Col-->
 </div>
+<!--end::Row-->
+
+<!--begin::Row - Métricas Separadas (Humanos vs IA)-->
+<div class="row g-5 mb-5">
+    <!--begin::Col - Tempo Humanos-->
+    <div class="col-xl-6">
+        <div class="card h-100 bg-light-info">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title fw-bold">
+                    <i class="ki-duotone ki-profile-user fs-2 text-info me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    🧑 Tempo de Atendimento - HUMANOS
+                </h3>
+            </div>
+            <div class="card-body pt-3">
+                <div class="row">
+                    <div class="col-6">
+                        <div class="d-flex flex-column">
+                            <span class="fw-semibold text-gray-600 fs-7">1ª Resposta</span>
+                            <span class="fw-bold text-gray-800 fs-2">
+                                <?php
+                                $avgFirstResponseHuman = $stats['metrics']['avg_first_response_time_human'] ?? null;
+                                if ($avgFirstResponseHuman !== null && $avgFirstResponseHuman > 0) {
+                                    echo \App\Services\AgentPerformanceService::formatTime($avgFirstResponseHuman);
+                                } else {
+                                    echo '-';
+                                }
+                                ?>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex flex-column">
+                            <span class="fw-semibold text-gray-600 fs-7">Resposta Média</span>
+                            <span class="fw-bold text-gray-800 fs-2">
+                                <?php
+                                $avgResponseHuman = $stats['metrics']['avg_response_time_human'] ?? null;
+                                if ($avgResponseHuman !== null && $avgResponseHuman > 0) {
+                                    echo \App\Services\AgentPerformanceService::formatTime($avgResponseHuman);
+                                } else {
+                                    echo '-';
+                                }
+                                ?>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!--end::Col-->
+    
+    <!--begin::Col - Tempo IA-->
+    <div class="col-xl-6">
+        <div class="card h-100 bg-light-primary">
+            <div class="card-header border-0 pt-5 d-flex justify-content-between align-items-center">
+                <h3 class="card-title fw-bold mb-0">
+                    <i class="ki-duotone ki-robot fs-2 text-primary me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    🤖 Tempo de Atendimento - IA
+                </h3>
+                <a href="<?= \App\Helpers\Url::to('/dashboard/ai') ?>" class="btn btn-sm btn-light-primary">
+                    Ver Dashboard IA
+                </a>
+            </div>
+            <div class="card-body pt-3">
+                <div class="row">
+                    <div class="col-6">
+                        <div class="d-flex flex-column">
+                            <span class="fw-semibold text-gray-600 fs-7">1ª Resposta</span>
+                            <span class="fw-bold text-gray-800 fs-2">
+                                <?php
+                                $avgFirstResponseAI = $stats['metrics']['avg_first_response_time_ai'] ?? null;
+                                if ($avgFirstResponseAI !== null && $avgFirstResponseAI > 0) {
+                                    if ($avgFirstResponseAI < 60) {
+                                        echo number_format($avgFirstResponseAI, 0) . 's';
+                                    } else {
+                                        echo number_format($avgFirstResponseAI / 60, 1) . 'min';
+                                    }
+                                } else {
+                                    echo '-';
+                                }
+                                ?>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex flex-column">
+                            <span class="fw-semibold text-gray-600 fs-7">Resposta Média</span>
+                            <span class="fw-bold text-gray-800 fs-2">
+                                <?php
+                                $avgResponseAI = $stats['metrics']['avg_response_time_ai'] ?? null;
+                                if ($avgResponseAI !== null && $avgResponseAI > 0) {
+                                    if ($avgResponseAI < 60) {
+                                        echo number_format($avgResponseAI, 0) . 's';
+                                    } else {
+                                        echo number_format($avgResponseAI / 60, 1) . 'min';
+                                    }
+                                } else {
+                                    echo '-';
+                                }
+                                ?>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!--end::Col-->
+</div>
+<!--end::Row-->
+
+<!--begin::Row - Resumo IA (se houver dados)-->
+<?php if (!empty($stats['ai_metrics']) && ($stats['ai_metrics']['total_ai_conversations'] ?? 0) > 0): ?>
+<div class="row g-5 mb-5">
+    <div class="col-xl-12">
+        <div class="card bg-light-success">
+            <div class="card-body py-4">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-4">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="symbol symbol-50px">
+                            <div class="symbol-label fs-2x bg-success text-white">🤖</div>
+                        </div>
+                        <div>
+                            <h4 class="fw-bold mb-0">Resumo de IA no Período</h4>
+                            <span class="text-muted fs-7">Métricas consolidadas de Agentes de IA</span>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-5">
+                        <div class="d-flex flex-column align-items-center">
+                            <span class="fw-bold text-gray-800 fs-3"><?= number_format($stats['ai_metrics']['total_ai_conversations'] ?? 0) ?></span>
+                            <span class="text-muted fs-7">Conversas IA</span>
+                        </div>
+                        <div class="d-flex flex-column align-items-center">
+                            <span class="fw-bold text-success fs-3"><?= number_format($stats['ai_metrics']['ai_resolution_rate'] ?? 0, 1) ?>%</span>
+                            <span class="text-muted fs-7">Taxa Resolução</span>
+                        </div>
+                        <div class="d-flex flex-column align-items-center">
+                            <span class="fw-bold text-warning fs-3"><?= number_format($stats['ai_metrics']['ai_escalation_rate'] ?? 0, 1) ?>%</span>
+                            <span class="text-muted fs-7">Escalonadas</span>
+                        </div>
+                        <div class="d-flex flex-column align-items-center">
+                            <span class="fw-bold text-gray-800 fs-3">$<?= number_format($stats['ai_metrics']['total_cost'] ?? 0, 2) ?></span>
+                            <span class="text-muted fs-7">Custo Total</span>
+                        </div>
+                    </div>
+                    <a href="<?= \App\Helpers\Url::to('/dashboard/ai') ?>" class="btn btn-success">
+                        <i class="ki-duotone ki-chart-simple fs-2 me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Ver Dashboard Completo
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 <!--end::Row-->
 
 <!--begin::Row - Estatísticas Detalhadas-->

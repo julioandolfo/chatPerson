@@ -95,16 +95,33 @@ class DashboardService
             ? round(($closedConversations / $totalConversations) * 100, 2) 
             : 0;
         
-        // Tempo médio de primeira resposta
+        // Tempo médio de primeira resposta (GERAL - inclui IA e Humanos)
         $avgFirstResponseTime = self::getAverageFirstResponseTime($dateFrom, $dateTo);
         
-        // Tempo médio geral de resposta
+        // Tempo médio geral de resposta (GERAL - inclui IA e Humanos)
         $avgResponseTime = self::getAverageResponseTime($dateFrom, $dateTo);
+        
+        // Tempo médio de primeira resposta (APENAS HUMANOS - exclui IA)
+        $avgFirstResponseTimeHuman = self::getAverageFirstResponseTimeHuman($dateFrom, $dateTo);
+        
+        // Tempo médio geral de resposta (APENAS HUMANOS - exclui IA)
+        $avgResponseTimeHuman = self::getAverageResponseTimeHuman($dateFrom, $dateTo);
+        
+        // Tempo médio de primeira resposta (APENAS IA)
+        $avgFirstResponseTimeAI = self::getAverageFirstResponseTimeAI($dateFrom, $dateTo);
+        
+        // Tempo médio geral de resposta (APENAS IA)
+        $avgResponseTimeAI = self::getAverageResponseTimeAI($dateFrom, $dateTo);
         
         // Conversas sem atribuição
         $unassignedConversations = self::getUnassignedConversations();
         self::logDash("unassignedConversations={$unassignedConversations}");
         self::logDash("avgFirstResponseTime={$avgFirstResponseTime}, avgResponseTime={$avgResponseTime}");
+        self::logDash("avgFirstResponseTimeHuman={$avgFirstResponseTimeHuman}, avgResponseTimeHuman={$avgResponseTimeHuman}");
+        self::logDash("avgFirstResponseTimeAI={$avgFirstResponseTimeAI}, avgResponseTimeAI={$avgResponseTimeAI}");
+        
+        // Métricas específicas de IA
+        $aiMetrics = self::getAIMetrics($dateFrom, $dateTo);
         
         return [
             'conversations' => [
@@ -129,11 +146,21 @@ class DashboardService
                 'total' => $totalMessages
             ],
             'metrics' => [
+                // Métricas GERAIS (inclui IA + Humanos)
                 'resolution_rate' => $resolutionRate,
                 'avg_first_response_time' => $avgFirstResponseTime,
                 'avg_response_time' => $avgResponseTime,
-                'avg_resolution_time' => $avgResolutionTime
+                'avg_resolution_time' => $avgResolutionTime,
+                
+                // Métricas HUMANOS (exclui respostas de IA)
+                'avg_first_response_time_human' => $avgFirstResponseTimeHuman,
+                'avg_response_time_human' => $avgResponseTimeHuman,
+                
+                // Métricas IA (apenas respostas de IA)
+                'avg_first_response_time_ai' => $avgFirstResponseTimeAI,
+                'avg_response_time_ai' => $avgResponseTimeAI,
             ],
+            'ai_metrics' => $aiMetrics,
             'period' => [
                 'from' => $dateFrom,
                 'to' => $dateTo
@@ -436,6 +463,221 @@ class DashboardService
         
         $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
         return $result && $result['avg_time'] !== null ? round((float)$result['avg_time'], 2) : null;
+    }
+
+    /**
+     * Obter tempo médio de primeira resposta APENAS HUMANOS (exclui IA)
+     * Considera apenas mensagens onde ai_agent_id IS NULL
+     */
+    private static function getAverageFirstResponseTimeHuman(string $dateFrom, string $dateTo): ?float
+    {
+        $sql = "SELECT AVG(TIMESTAMPDIFF(MINUTE, 
+                    (SELECT MIN(m1.created_at) 
+                     FROM messages m1 
+                     WHERE m1.conversation_id = c.id 
+                     AND m1.sender_type = 'contact'),
+                    (SELECT MIN(m2.created_at) 
+                     FROM messages m2 
+                     WHERE m2.conversation_id = c.id 
+                     AND m2.sender_type = 'agent'
+                     AND m2.ai_agent_id IS NULL)
+                )) as avg_time
+                FROM conversations c
+                WHERE c.created_at >= ?
+                AND c.created_at <= ?
+                AND EXISTS (
+                    SELECT 1 FROM messages m3 
+                    WHERE m3.conversation_id = c.id 
+                    AND m3.sender_type = 'agent'
+                    AND m3.ai_agent_id IS NULL
+                )";
+        
+        $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
+        return $result && $result['avg_time'] !== null ? round((float)$result['avg_time'], 2) : null;
+    }
+
+    /**
+     * Obter tempo médio geral de resposta APENAS HUMANOS (exclui IA)
+     * Considera apenas mensagens onde ai_agent_id IS NULL
+     */
+    private static function getAverageResponseTimeHuman(string $dateFrom, string $dateTo): ?float
+    {
+        $sql = "SELECT AVG(response_time_minutes) as avg_time
+                FROM (
+                    SELECT 
+                        m1.conversation_id,
+                        AVG(TIMESTAMPDIFF(MINUTE, m1.created_at, m2.created_at)) as response_time_minutes
+                    FROM messages m1
+                    INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
+                        AND m2.sender_type = 'agent'
+                        AND m2.ai_agent_id IS NULL
+                        AND m2.created_at > m1.created_at
+                        AND m2.created_at = (
+                            SELECT MIN(m3.created_at)
+                            FROM messages m3
+                            WHERE m3.conversation_id = m1.conversation_id
+                            AND m3.sender_type = 'agent'
+                            AND m3.ai_agent_id IS NULL
+                            AND m3.created_at > m1.created_at
+                        )
+                    INNER JOIN conversations c ON c.id = m1.conversation_id
+                    WHERE m1.sender_type = 'contact'
+                    AND c.created_at >= ?
+                    AND c.created_at <= ?
+                    GROUP BY m1.conversation_id
+                ) as response_times";
+        
+        $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
+        return $result && $result['avg_time'] !== null ? round((float)$result['avg_time'], 2) : null;
+    }
+
+    /**
+     * Obter tempo médio de primeira resposta APENAS IA
+     * Considera apenas mensagens onde ai_agent_id IS NOT NULL
+     */
+    private static function getAverageFirstResponseTimeAI(string $dateFrom, string $dateTo): ?float
+    {
+        $sql = "SELECT AVG(TIMESTAMPDIFF(SECOND, 
+                    (SELECT MIN(m1.created_at) 
+                     FROM messages m1 
+                     WHERE m1.conversation_id = c.id 
+                     AND m1.sender_type = 'contact'),
+                    (SELECT MIN(m2.created_at) 
+                     FROM messages m2 
+                     WHERE m2.conversation_id = c.id 
+                     AND m2.sender_type = 'agent'
+                     AND m2.ai_agent_id IS NOT NULL)
+                )) as avg_time_seconds
+                FROM conversations c
+                WHERE c.created_at >= ?
+                AND c.created_at <= ?
+                AND EXISTS (
+                    SELECT 1 FROM messages m3 
+                    WHERE m3.conversation_id = c.id 
+                    AND m3.sender_type = 'agent'
+                    AND m3.ai_agent_id IS NOT NULL
+                )";
+        
+        $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
+        // Retorna em segundos para IA (pois geralmente é muito rápido)
+        return $result && $result['avg_time_seconds'] !== null ? round((float)$result['avg_time_seconds'], 2) : null;
+    }
+
+    /**
+     * Obter tempo médio geral de resposta APENAS IA
+     * Considera apenas mensagens onde ai_agent_id IS NOT NULL
+     */
+    private static function getAverageResponseTimeAI(string $dateFrom, string $dateTo): ?float
+    {
+        $sql = "SELECT AVG(response_time_seconds) as avg_time_seconds
+                FROM (
+                    SELECT 
+                        m1.conversation_id,
+                        AVG(TIMESTAMPDIFF(SECOND, m1.created_at, m2.created_at)) as response_time_seconds
+                    FROM messages m1
+                    INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
+                        AND m2.sender_type = 'agent'
+                        AND m2.ai_agent_id IS NOT NULL
+                        AND m2.created_at > m1.created_at
+                        AND m2.created_at = (
+                            SELECT MIN(m3.created_at)
+                            FROM messages m3
+                            WHERE m3.conversation_id = m1.conversation_id
+                            AND m3.sender_type = 'agent'
+                            AND m3.ai_agent_id IS NOT NULL
+                            AND m3.created_at > m1.created_at
+                        )
+                    INNER JOIN conversations c ON c.id = m1.conversation_id
+                    WHERE m1.sender_type = 'contact'
+                    AND c.created_at >= ?
+                    AND c.created_at <= ?
+                    GROUP BY m1.conversation_id
+                ) as response_times";
+        
+        $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
+        // Retorna em segundos para IA
+        return $result && $result['avg_time_seconds'] !== null ? round((float)$result['avg_time_seconds'], 2) : null;
+    }
+
+    /**
+     * Obter métricas consolidadas de IA
+     */
+    private static function getAIMetrics(string $dateFrom, string $dateTo): array
+    {
+        // Total de conversas que tiveram atendimento de IA
+        $sqlAIConversations = "SELECT COUNT(DISTINCT ac.conversation_id) as total
+                              FROM ai_conversations ac
+                              INNER JOIN conversations c ON c.id = ac.conversation_id
+                              WHERE c.created_at >= ? AND c.created_at <= ?";
+        $aiConversationsResult = \App\Helpers\Database::fetch($sqlAIConversations, [$dateFrom, $dateTo]);
+        $totalAIConversations = (int)($aiConversationsResult['total'] ?? 0);
+        
+        // Total de mensagens enviadas por IA
+        $sqlAIMessages = "SELECT COUNT(*) as total
+                         FROM messages m
+                         INNER JOIN conversations c ON c.id = m.conversation_id
+                         WHERE m.ai_agent_id IS NOT NULL
+                         AND m.sender_type = 'agent'
+                         AND c.created_at >= ? AND c.created_at <= ?";
+        $aiMessagesResult = \App\Helpers\Database::fetch($sqlAIMessages, [$dateFrom, $dateTo]);
+        $totalAIMessages = (int)($aiMessagesResult['total'] ?? 0);
+        
+        // Total de tokens e custo
+        $sqlTokensCost = "SELECT 
+                            COALESCE(SUM(ac.tokens_used), 0) as total_tokens,
+                            COALESCE(SUM(ac.cost), 0) as total_cost
+                         FROM ai_conversations ac
+                         INNER JOIN conversations c ON c.id = ac.conversation_id
+                         WHERE c.created_at >= ? AND c.created_at <= ?";
+        $tokensCostResult = \App\Helpers\Database::fetch($sqlTokensCost, [$dateFrom, $dateTo]);
+        $totalTokens = (int)($tokensCostResult['total_tokens'] ?? 0);
+        $totalCost = round((float)($tokensCostResult['total_cost'] ?? 0), 4);
+        
+        // Conversas resolvidas pela IA (sem escalonar para humano)
+        $sqlResolved = "SELECT COUNT(DISTINCT ac.conversation_id) as total
+                       FROM ai_conversations ac
+                       INNER JOIN conversations c ON c.id = ac.conversation_id
+                       WHERE c.created_at >= ? AND c.created_at <= ?
+                       AND c.status IN ('resolved', 'closed')
+                       AND ac.status = 'completed'";
+        $resolvedResult = \App\Helpers\Database::fetch($sqlResolved, [$dateFrom, $dateTo]);
+        $aiResolvedConversations = (int)($resolvedResult['total'] ?? 0);
+        
+        // Conversas escalonadas (IA iniciou mas foi para humano)
+        $sqlEscalated = "SELECT COUNT(DISTINCT ac.conversation_id) as total
+                        FROM ai_conversations ac
+                        INNER JOIN conversations c ON c.id = ac.conversation_id
+                        WHERE c.created_at >= ? AND c.created_at <= ?
+                        AND ac.status IN ('escalated', 'removed')";
+        $escalatedResult = \App\Helpers\Database::fetch($sqlEscalated, [$dateFrom, $dateTo]);
+        $aiEscalatedConversations = (int)($escalatedResult['total'] ?? 0);
+        
+        // Agentes de IA ativos
+        $sqlActiveAI = "SELECT COUNT(*) as total FROM ai_agents WHERE enabled = 1";
+        $activeAIResult = \App\Helpers\Database::fetch($sqlActiveAI);
+        $totalActiveAIAgents = (int)($activeAIResult['total'] ?? 0);
+        
+        // Taxa de resolução pela IA
+        $aiResolutionRate = $totalAIConversations > 0 
+            ? round(($aiResolvedConversations / $totalAIConversations) * 100, 2) 
+            : 0;
+        
+        // Taxa de escalonamento
+        $aiEscalationRate = $totalAIConversations > 0 
+            ? round(($aiEscalatedConversations / $totalAIConversations) * 100, 2) 
+            : 0;
+        
+        return [
+            'total_ai_conversations' => $totalAIConversations,
+            'total_ai_messages' => $totalAIMessages,
+            'total_tokens' => $totalTokens,
+            'total_cost' => $totalCost,
+            'resolved_by_ai' => $aiResolvedConversations,
+            'escalated_to_human' => $aiEscalatedConversations,
+            'ai_resolution_rate' => $aiResolutionRate,
+            'ai_escalation_rate' => $aiEscalationRate,
+            'active_ai_agents' => $totalActiveAIAgents
+        ];
     }
 
     private static function getUnassignedConversations(): int

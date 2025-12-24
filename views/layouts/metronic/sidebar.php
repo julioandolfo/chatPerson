@@ -49,14 +49,35 @@
                 }
                 ?>
                 
-                <!--begin:Menu item-->
-                <div class="menu-item">
-                    <a class="menu-link <?= isActive('/dashboard', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/dashboard') ?>" data-title="Dashboard">
+                <!--begin:Menu item - Dashboard Accordion-->
+                <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= (isActive('/dashboard', $currentUri) && !isActive('/dashboard/ai', $currentUri)) || isActive('/dashboard/ai', $currentUri) ? 'here show' : '' ?>">
+                    <span class="menu-link <?= isActive('/dashboard', $currentUri) ? 'active' : '' ?>" data-title="Dashboard">
                         <span class="menu-icon">
                             <i class="ki-duotone ki-home fs-2 text-gray-600"></i>
                         </span>
                         <span class="menu-title">Dashboard</span>
-                    </a>
+                        <span class="menu-arrow"></span>
+                    </span>
+                    <!--begin:Menu sub-->
+                    <div class="menu-sub menu-sub-accordion">
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/dashboard', $currentUri) && !isActive('/dashboard/ai', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/dashboard') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Geral</span>
+                            </a>
+                        </div>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/dashboard/ai', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/dashboard/ai') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">🤖 Inteligência Artificial</span>
+                            </a>
+                        </div>
+                    </div>
+                    <!--end:Menu sub-->
                 </div>
                 <!--end:Menu item-->
                 

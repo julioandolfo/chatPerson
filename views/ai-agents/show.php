@@ -205,49 +205,234 @@ ob_start();
             </div>
             
             <div class="col-lg-4">
-                <!--begin::Estatísticas-->
-                <div class="card mb-5">
-                    <div class="card-header">
-                        <h3 class="card-title">Estatísticas</h3>
-                    </div>
-                    <div class="card-body">
-                        <?php if (!empty($agent['stats'])): ?>
-                            <div class="d-flex flex-column gap-5">
-                                <div>
-                                    <div class="text-gray-600 fs-7 mb-1">Total de Conversas</div>
-                                    <div class="text-gray-900 fw-bold fs-2"><?= $agent['stats']['total_conversations'] ?? 0 ?></div>
-                                </div>
-                                <div>
-                                    <div class="text-gray-600 fs-7 mb-1">Tokens Utilizados</div>
-                                    <div class="text-gray-900 fw-bold fs-2"><?= number_format($agent['stats']['total_tokens'] ?? 0, 0, ',', '.') ?></div>
-                                </div>
-                                <div>
-                                    <div class="text-gray-600 fs-7 mb-1">Custo Total</div>
-                                    <div class="text-gray-900 fw-bold fs-2">$<?= number_format($agent['stats']['total_cost'] ?? 0, 4, ',', '.') ?></div>
-                                    <?php 
-                                    // Taxa de conversão USD para BRL (pode ser atualizada via API futuramente)
-                                    $usdToBrl = 5.20; // Taxa aproximada
-                                    $costBrl = ($agent['stats']['total_cost'] ?? 0) * $usdToBrl;
-                                    ?>
-                                    <div class="text-gray-500 fs-6 mt-1">R$ <?= number_format($costBrl, 2, ',', '.') ?></div>
-                                </div>
-                                <div>
-                                    <div class="text-gray-600 fs-7 mb-1">Conversas Completadas</div>
-                                    <div class="text-gray-900 fw-bold fs-2"><?= $agent['stats']['completed_conversations'] ?? 0 ?></div>
-                                </div>
-                                <div>
-                                    <div class="text-gray-600 fs-7 mb-1">Escaladas</div>
-                                    <div class="text-gray-900 fw-bold fs-2"><?= $agent['stats']['escalated_conversations'] ?? 0 ?></div>
-                                </div>
+                <!--begin::Performance Detalhada-->
+                <?php 
+                // Buscar métricas detalhadas do agente
+                $performanceStats = null;
+                if (!empty($agent['id'])) {
+                    try {
+                        $performanceStats = \App\Services\AIAgentPerformanceService::getPerformanceStats($agent['id']);
+                    } catch (\Exception $e) {
+                        error_log("Erro ao buscar métricas do agente IA: " . $e->getMessage());
+                    }
+                }
+                ?>
+                
+                <!--begin::Card - Resumo Principal-->
+                <div class="card mb-5 bg-light-primary">
+                    <div class="card-body py-4">
+                        <div class="d-flex align-items-center gap-3 mb-4">
+                            <div class="symbol symbol-45px">
+                                <div class="symbol-label fs-2x bg-primary text-white">🤖</div>
                             </div>
-                        <?php else: ?>
-                            <div class="text-center py-10">
-                                <p class="text-muted">Nenhuma estatística disponível ainda.</p>
+                            <div>
+                                <h4 class="fw-bold mb-0">Performance</h4>
+                                <span class="text-muted fs-7">Últimos 30 dias</span>
                             </div>
-                        <?php endif; ?>
+                        </div>
+                        <div class="d-flex flex-wrap gap-3">
+                            <div class="border rounded p-3 flex-fill text-center bg-white">
+                                <span class="fw-bold fs-3 text-gray-800 d-block"><?= number_format($performanceStats['total_conversations'] ?? $agent['stats']['total_conversations'] ?? 0) ?></span>
+                                <span class="text-muted fs-7">Conversas</span>
+                            </div>
+                            <div class="border rounded p-3 flex-fill text-center bg-white">
+                                <span class="fw-bold fs-3 text-success d-block"><?= number_format($performanceStats['resolution_rate'] ?? 0, 0) ?>%</span>
+                                <span class="text-muted fs-7">Resolução</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <!--end::Estatísticas-->
+                <!--end::Card-->
+                
+                <!--begin::Estatísticas Detalhadas-->
+                <div class="card mb-5">
+                    <div class="card-header">
+                        <h3 class="card-title">📊 Estatísticas Detalhadas</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex flex-column gap-4">
+                            <!--begin::Conversas-->
+                            <div class="d-flex justify-content-between align-items-center p-3 bg-light rounded">
+                                <div class="d-flex align-items-center">
+                                    <i class="ki-duotone ki-message-programming fs-2 text-primary me-3">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    <span class="fw-semibold text-gray-700">Total de Conversas</span>
+                                </div>
+                                <span class="fw-bold text-gray-900 fs-4"><?= number_format($performanceStats['total_conversations'] ?? $agent['stats']['total_conversations'] ?? 0) ?></span>
+                            </div>
+                            <!--end::Conversas-->
+                            
+                            <!--begin::Ativas-->
+                            <div class="d-flex justify-content-between align-items-center p-3 bg-light rounded">
+                                <div class="d-flex align-items-center">
+                                    <i class="ki-duotone ki-timer fs-2 text-warning me-3">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    <span class="fw-semibold text-gray-700">Conversas Ativas</span>
+                                </div>
+                                <span class="badge badge-light-warning fs-6"><?= number_format($performanceStats['active_conversations'] ?? $agent['current_conversations'] ?? 0) ?></span>
+                            </div>
+                            <!--end::Ativas-->
+                            
+                            <!--begin::Resolvidas-->
+                            <div class="d-flex justify-content-between align-items-center p-3 bg-light rounded">
+                                <div class="d-flex align-items-center">
+                                    <i class="ki-duotone ki-check-circle fs-2 text-success me-3">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    <span class="fw-semibold text-gray-700">Resolvidas (sem escalar)</span>
+                                </div>
+                                <span class="badge badge-light-success fs-6"><?= number_format($performanceStats['resolved_conversations'] ?? $agent['stats']['completed_conversations'] ?? 0) ?></span>
+                            </div>
+                            <!--end::Resolvidas-->
+                            
+                            <!--begin::Escalonadas-->
+                            <div class="d-flex justify-content-between align-items-center p-3 bg-light rounded">
+                                <div class="d-flex align-items-center">
+                                    <i class="ki-duotone ki-arrow-up-right fs-2 text-danger me-3">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    <span class="fw-semibold text-gray-700">Escalonadas p/ Humano</span>
+                                </div>
+                                <span class="badge badge-light-danger fs-6"><?= number_format($performanceStats['escalated_conversations'] ?? $agent['stats']['escalated_conversations'] ?? 0) ?></span>
+                            </div>
+                            <!--end::Escalonadas-->
+                            
+                            <!--begin::Mensagens-->
+                            <div class="d-flex justify-content-between align-items-center p-3 bg-light rounded">
+                                <div class="d-flex align-items-center">
+                                    <i class="ki-duotone ki-message-text-2 fs-2 text-info me-3">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    <span class="fw-semibold text-gray-700">Mensagens Enviadas</span>
+                                </div>
+                                <span class="fw-bold text-gray-900 fs-4"><?= number_format($performanceStats['total_messages'] ?? 0) ?></span>
+                            </div>
+                            <!--end::Mensagens-->
+                            
+                            <!--begin::Tempo Resposta-->
+                            <div class="d-flex justify-content-between align-items-center p-3 bg-light-success rounded">
+                                <div class="d-flex align-items-center">
+                                    <i class="ki-duotone ki-time fs-2 text-success me-3">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    <span class="fw-semibold text-gray-700">Tempo Médio Resposta</span>
+                                </div>
+                                <span class="fw-bold text-success fs-5"><?= htmlspecialchars($performanceStats['avg_response_time_formatted'] ?? '-') ?></span>
+                            </div>
+                            <!--end::Tempo Resposta-->
+                        </div>
+                    </div>
+                </div>
+                <!--end::Estatísticas Detalhadas-->
+                
+                <!--begin::Custos e Tokens-->
+                <div class="card mb-5">
+                    <div class="card-header">
+                        <h3 class="card-title">💰 Custos e Tokens</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex flex-column gap-4">
+                            <!--begin::Tokens Total-->
+                            <div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="fw-semibold text-gray-700">Total de Tokens</span>
+                                    <span class="fw-bold text-gray-900">
+                                        <?php
+                                        $totalTokens = $performanceStats['total_tokens'] ?? $agent['stats']['total_tokens'] ?? 0;
+                                        if ($totalTokens >= 1000000) {
+                                            echo number_format($totalTokens / 1000000, 2) . 'M';
+                                        } elseif ($totalTokens >= 1000) {
+                                            echo number_format($totalTokens / 1000, 1) . 'K';
+                                        } else {
+                                            echo number_format($totalTokens);
+                                        }
+                                        ?>
+                                    </span>
+                                </div>
+                                <div class="progress h-8px">
+                                    <div class="progress-bar bg-primary" style="width: 100%"></div>
+                                </div>
+                                <div class="d-flex justify-content-between text-muted fs-7 mt-1">
+                                    <span>Prompt: <?= number_format($performanceStats['tokens_prompt'] ?? 0) ?></span>
+                                    <span>Completion: <?= number_format($performanceStats['tokens_completion'] ?? 0) ?></span>
+                                </div>
+                            </div>
+                            <!--end::Tokens Total-->
+                            
+                            <!--begin::Custo Total-->
+                            <div class="border-top pt-4">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="fw-semibold text-gray-700">Custo Total (USD)</span>
+                                    <span class="fw-bold text-gray-900 fs-3">
+                                        $<?= number_format($performanceStats['total_cost'] ?? $agent['stats']['total_cost'] ?? 0, 4) ?>
+                                    </span>
+                                </div>
+                                <?php 
+                                $usdToBrl = 5.20;
+                                $costBrl = ($performanceStats['total_cost'] ?? $agent['stats']['total_cost'] ?? 0) * $usdToBrl;
+                                ?>
+                                <div class="text-muted fs-7 text-end">
+                                    ≈ R$ <?= number_format($costBrl, 2, ',', '.') ?>
+                                </div>
+                            </div>
+                            <!--end::Custo Total-->
+                            
+                            <!--begin::Custo Médio-->
+                            <div class="d-flex justify-content-between align-items-center p-3 bg-light rounded">
+                                <span class="fw-semibold text-gray-700">Custo Médio/Conversa</span>
+                                <span class="fw-bold text-gray-900">
+                                    $<?= number_format($performanceStats['avg_cost_per_conversation'] ?? 0, 4) ?>
+                                </span>
+                            </div>
+                            <!--end::Custo Médio-->
+                        </div>
+                    </div>
+                </div>
+                <!--end::Custos e Tokens-->
+                
+                <!--begin::Tools Utilizadas-->
+                <?php if (!empty($performanceStats['tools_used'])): ?>
+                <div class="card mb-5">
+                    <div class="card-header">
+                        <h3 class="card-title">🔧 Tools Mais Utilizadas</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex flex-column gap-3">
+                            <?php 
+                            $toolsUsed = $performanceStats['tools_used'];
+                            $maxUsage = max($toolsUsed) ?: 1;
+                            $count = 0;
+                            foreach ($toolsUsed as $toolName => $usage): 
+                                if ($count >= 5) break; // Mostrar apenas top 5
+                                $percentage = ($usage / $maxUsage) * 100;
+                            ?>
+                            <div>
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="text-gray-700"><?= htmlspecialchars($toolName) ?></span>
+                                    <span class="fw-bold text-gray-800"><?= number_format($usage) ?>x</span>
+                                </div>
+                                <div class="progress h-6px">
+                                    <div class="progress-bar bg-info" style="width: <?= $percentage ?>%"></div>
+                                </div>
+                            </div>
+                            <?php 
+                                $count++;
+                            endforeach; 
+                            ?>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
+                <!--end::Tools Utilizadas-->
                 
                 <!--begin::Conversas-->
                 <div class="card mb-5">

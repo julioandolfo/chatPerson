@@ -46,6 +46,7 @@ Router::get('/logout', [AuthController::class, 'logout']);
 
 // Rotas protegidas (requerem autenticação)
 Router::get('/dashboard', [DashboardController::class, 'index'], ['Authentication']);
+Router::get('/dashboard/ai', [DashboardController::class, 'aiDashboard'], ['Authentication']);
 Router::get('/dashboard/chart-data', [DashboardController::class, 'getChartData'], ['Authentication']);
 Router::get('/dashboard/export', [DashboardController::class, 'exportReport'], ['Authentication']);
 Router::get('/conversations', [ConversationController::class, 'index'], ['Authentication']);

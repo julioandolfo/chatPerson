@@ -473,8 +473,8 @@ class Api4ComService
         $apiUrl = rtrim($account['api_url'], '/');
         $token = $account['api_token'];
         
-        // Endpoint: GET /extensions (pode variar conforme API)
-        $url = $apiUrl . '/extensions';
+        // Endpoint: GET /api/v1/extensions (conforme documentação Api4Com)
+        $url = $apiUrl . '/api/v1/extensions';
         
         $ch = curl_init($url);
         curl_setopt_array($ch, [
@@ -563,10 +563,18 @@ class Api4ComService
         
         foreach ($extensions as $ext) {
             try {
-                // Normalizar dados do ramal
+                // Normalizar dados do ramal conforme documentação Api4Com:
+                // { "id": 123, "ramal": "1001", "first_name": "Silvio", "last_name": "Fernandes", "email_address": "...", "bina": "..." }
                 $extensionId = $ext['id'] ?? $ext['extension_id'] ?? null;
-                $extensionNumber = $ext['number'] ?? $ext['extension'] ?? $ext['extension_number'] ?? null;
-                $name = $ext['name'] ?? $ext['description'] ?? "Ramal {$extensionNumber}";
+                $extensionNumber = $ext['ramal'] ?? $ext['number'] ?? $ext['extension'] ?? $ext['extension_number'] ?? null;
+                
+                // Nome: first_name + last_name ou fallback
+                $firstName = $ext['first_name'] ?? '';
+                $lastName = $ext['last_name'] ?? '';
+                $name = trim("{$firstName} {$lastName}");
+                if (empty($name)) {
+                    $name = $ext['name'] ?? $ext['description'] ?? "Ramal {$extensionNumber}";
+                }
                 
                 if (!$extensionId && !$extensionNumber) {
                     continue;
@@ -579,10 +587,13 @@ class Api4ComService
                     'api4com_account_id' => $accountId,
                     'extension_id' => $extensionId,
                     'extension_number' => $extensionNumber,
-                    'sip_username' => $ext['sip_username'] ?? $ext['username'] ?? null,
-                    'status' => $ext['status'] ?? 'active',
+                    'sip_username' => $ext['email_address'] ?? $ext['sip_username'] ?? $ext['username'] ?? null,
+                    'status' => 'active', // API não retorna status, assumir ativo
                     'metadata' => json_encode([
                         'name' => $name,
+                        'bina' => $ext['bina'] ?? null,
+                        'domain' => $ext['domain'] ?? null,
+                        'gravar_audio' => $ext['gravar_audio'] ?? 0,
                         'synced_at' => date('Y-m-d H:i:s'),
                         'original_data' => $ext
                     ])

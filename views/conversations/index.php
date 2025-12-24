@@ -6605,16 +6605,44 @@ async function loadMoreMessages() {
             }
         });
         
-        // Garantir que a resposta é JSON (evita erro de parser com HTML/404)
-        const contentType = response.headers.get('content-type') || '';
-        if (!contentType.includes('application/json')) {
-            const text = await response.text();
-            console.warn('loadMoreMessages: resposta não-JSON (provável 404 ou erro). Encerrando paginação.', text.substring(0, 200));
+        // Ler resposta como texto primeiro para verificar se é JSON
+        const responseText = await response.text();
+        
+        // Verificar se a resposta foi bem-sucedida
+        if (!response.ok) {
+            console.error('loadMoreMessages: Erro HTTP', response.status, responseText.substring(0, 200));
             hasMoreMessages = false;
+            isLoadingMessages = false;
+            loadingIndicator.remove();
             return;
         }
         
-        const data = await response.json();
+        // Verificar content-type ou tentar fazer parse do JSON
+        const contentType = response.headers.get('content-type') || '';
+        let data;
+        
+        if (!contentType.includes('application/json')) {
+            // Se não for JSON, verificar se o texto começa com HTML
+            if (responseText.trim().startsWith('<')) {
+                console.warn('loadMoreMessages: resposta HTML (provável erro PHP). Encerrando paginação.', responseText.substring(0, 200));
+                hasMoreMessages = false;
+                isLoadingMessages = false;
+                loadingIndicator.remove();
+                return;
+            }
+        }
+        
+        // Tentar fazer parse do JSON
+        try {
+            data = JSON.parse(responseText);
+        } catch (e) {
+            console.error('loadMoreMessages: Erro ao fazer parse do JSON:', e);
+            console.error('Resposta recebida:', responseText.substring(0, 500));
+            hasMoreMessages = false;
+            isLoadingMessages = false;
+            loadingIndicator.remove();
+            return;
+        }
         
         if (data.success && data.messages && data.messages.length > 0) {
             // Adicionar mensagens no início do chat

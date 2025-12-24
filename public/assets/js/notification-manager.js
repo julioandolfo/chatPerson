@@ -418,22 +418,43 @@
                     flex-shrink: 0;
                 }
                 
-                /* Dark mode */
-                [data-bs-theme="dark"] .notification-toast {
-                    background: var(--bs-gray-800, #1E1E2D);
-                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+                /* Dark mode - usando html[data-bs-theme="dark"] para maior especificidade */
+                html[data-bs-theme="dark"] .notification-toast {
+                    background: #1E1E2D !important;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
                 }
                 
-                [data-bs-theme="dark"] .notification-title {
-                    color: var(--bs-gray-100, #F5F8FA);
+                html[data-bs-theme="dark"] .notification-title {
+                    color: #FFFFFF !important;
                 }
                 
-                [data-bs-theme="dark"] .notification-message {
-                    color: var(--bs-gray-400, #B5B5C3);
+                html[data-bs-theme="dark"] .notification-title .notification-time {
+                    color: #9A9CAE !important;
                 }
                 
-                [data-bs-theme="dark"] .notification-close:hover {
-                    background: var(--bs-gray-700, #2B2B40);
+                html[data-bs-theme="dark"] .notification-time {
+                    color: #9A9CAE !important;
+                }
+                
+                html[data-bs-theme="dark"] .notification-message {
+                    color: #CDCFDA !important;
+                }
+                
+                html[data-bs-theme="dark"] .notification-sender {
+                    color: #FFFFFF !important;
+                }
+                
+                html[data-bs-theme="dark"] .notification-close {
+                    color: #9A9CAE !important;
+                }
+                
+                html[data-bs-theme="dark"] .notification-close:hover {
+                    background: #2B2B40 !important;
+                    color: #FFFFFF !important;
+                }
+                
+                html[data-bs-theme="dark"] .notification-icon {
+                    background: rgba(255, 255, 255, 0.1) !important;
                 }
                 
                 /* Responsivo */

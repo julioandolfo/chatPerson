@@ -20,10 +20,8 @@ class Api4ComExtension extends Model
      */
     public static function findByUserAndAccount(int $userId, int $accountId): ?array
     {
-        return self::whereFirst([
-            ['user_id', '=', $userId],
-            ['api4com_account_id', '=', $accountId]
-        ]);
+        $sql = "SELECT * FROM api4com_extensions WHERE user_id = ? AND api4com_account_id = ? AND status = 'active' LIMIT 1";
+        return \App\Helpers\Database::fetch($sql, [$userId, $accountId]);
     }
 
     /**

@@ -280,6 +280,7 @@
                                 <span class="menu-title">Chamadas Api4Com</span>
                             </a>
                         </div>
+                        <?php endif; ?>
                         <div class="menu-item">
                             <a class="menu-link" href="<?= \App\Helpers\Url::to('/integrations') ?>">
                                 <span class="menu-bullet">

@@ -106,11 +106,27 @@ class Api4ComController
             $updateData = [];
             if (isset($data['name'])) $updateData['name'] = $data['name'];
             if (isset($data['api_url'])) $updateData['api_url'] = rtrim($data['api_url'], '/');
-            if (isset($data['api_token'])) $updateData['api_token'] = $data['api_token'];
+            if (!empty($data['api_token'])) $updateData['api_token'] = $data['api_token'];
             if (isset($data['domain'])) $updateData['domain'] = $data['domain'];
             if (isset($data['enabled'])) $updateData['enabled'] = (int)$data['enabled'];
             if (isset($data['webhook_url'])) $updateData['webhook_url'] = $data['webhook_url'];
-            if (isset($data['config'])) $updateData['config'] = json_encode($data['config']);
+            
+            // Processar configurações avançadas
+            $config = [];
+            if (!empty($data['config_dialer_endpoint'])) {
+                $config['dialer_endpoint'] = $data['config_dialer_endpoint'];
+            }
+            if (!empty($data['config_extension_field'])) {
+                $config['extension_field'] = $data['config_extension_field'];
+            }
+            if (!empty($data['config_phone_field'])) {
+                $config['phone_field'] = $data['config_phone_field'];
+            }
+            if (!empty($config)) {
+                $updateData['config'] = json_encode($config);
+            } elseif (isset($data['config'])) {
+                $updateData['config'] = is_string($data['config']) ? $data['config'] : json_encode($data['config']);
+            }
 
             if (Api4ComAccount::update($id, $updateData)) {
                 Response::json([

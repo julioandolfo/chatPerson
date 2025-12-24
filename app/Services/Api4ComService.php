@@ -136,21 +136,28 @@ class Api4ComService
         $token = $account['api_token'];
         $extensionId = $extension['extension_id'] ?? $extension['extension_number'];
         
-        // Endpoint: POST /dialer
-        $url = $apiUrl . '/dialer';
+        // Configurações da conta (podem customizar endpoint e campos)
+        $config = !empty($account['config']) ? json_decode($account['config'], true) : [];
+        
+        // Endpoint configurável (padrão: /api/v1/dialer conforme documentação Api4Com)
+        $dialerEndpoint = $config['dialer_endpoint'] ?? '/api/v1/dialer';
+        $url = $apiUrl . $dialerEndpoint;
+        
+        // Campos configuráveis
+        $extensionField = $config['extension_field'] ?? 'extension';
+        $phoneField = $config['phone_field'] ?? 'phone';
         
         $payload = [
-            'extension' => $extensionId,
-            'phone' => $toNumber
+            $extensionField => $extensionId,
+            $phoneField => $toNumber
         ];
         
-        // Adicionar metadata se houver dados da chamada
-        if (!empty($extension['metadata'])) {
-            $metadata = json_decode($extension['metadata'], true);
-            if (is_array($metadata)) {
-                $payload['metadata'] = $metadata;
-            }
+        // Campos adicionais configuráveis
+        if (!empty($config['extra_fields']) && is_array($config['extra_fields'])) {
+            $payload = array_merge($payload, $config['extra_fields']);
         }
+        
+        Logger::info("Api4ComService::initiateApi4ComCall - URL: {$url}, Extension: {$extensionId}, Phone: {$toNumber}, Payload: " . json_encode($payload));
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [
@@ -390,12 +397,31 @@ class Api4ComService
     }
 
     /**
-     * Normalizar número de telefone
+     * Normalizar número de telefone para formato internacional
+     * Formato esperado pela Api4Com: +5548999999999
      */
     private static function normalizePhoneNumber(string $phone): string
     {
-        // Remover caracteres especiais
-        $phone = preg_replace('/[^0-9]/', '', $phone);
+        // Remover caracteres especiais exceto +
+        $phone = preg_replace('/[^0-9+]/', '', $phone);
+        
+        // Se já começa com +, manter
+        if (strpos($phone, '+') === 0) {
+            return $phone;
+        }
+        
+        // Remover qualquer + restante
+        $phone = str_replace('+', '', $phone);
+        
+        // Se tem 10-11 dígitos, provavelmente é BR sem código do país
+        // Adicionar +55 (Brasil)
+        if (strlen($phone) >= 10 && strlen($phone) <= 11) {
+            $phone = '+55' . $phone;
+        } elseif (strlen($phone) > 11) {
+            // Se já tem código do país, apenas adicionar +
+            $phone = '+' . $phone;
+        }
+        
         return $phone;
     }
 

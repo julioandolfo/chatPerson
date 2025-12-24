@@ -237,6 +237,44 @@ ob_start();
                             </label>
                         </div>
                     </div>
+                    
+                    <!--begin::Configurações Avançadas-->
+                    <div class="separator separator-dashed my-5"></div>
+                    <div class="mb-3">
+                        <a class="fw-bold text-primary" data-bs-toggle="collapse" href="#editAdvancedSettings" role="button" aria-expanded="false">
+                            <i class="ki-duotone ki-setting-2 fs-5 me-1"><span class="path1"></span><span class="path2"></span></i>
+                            Configurações Avançadas da API
+                        </a>
+                    </div>
+                    <div class="collapse" id="editAdvancedSettings">
+                        <div class="card card-flush bg-light-warning">
+                            <div class="card-body py-4">
+                                <div class="text-warning fs-7 mb-4">
+                                    <i class="ki-duotone ki-information-5 fs-5 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                    Altere somente se a API retornar erro. Consulte a documentação da Api4Com.
+                                </div>
+                                <div class="row g-4">
+                                    <div class="col-md-6">
+                                        <label class="fw-semibold fs-7 mb-2">Endpoint do Discador</label>
+                                        <input type="text" name="config_dialer_endpoint" id="edit_config_dialer_endpoint" 
+                                               class="form-control form-control-sm" placeholder="/api/v1/dialer" />
+                                        <div class="form-text fs-8">Padrão: /api/v1/dialer</div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="fw-semibold fs-7 mb-2">Campo Ramal</label>
+                                        <input type="text" name="config_extension_field" id="edit_config_extension_field" 
+                                               class="form-control form-control-sm" placeholder="extension" />
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="fw-semibold fs-7 mb-2">Campo Telefone</label>
+                                        <input type="text" name="config_phone_field" id="edit_config_phone_field" 
+                                               class="form-control form-control-sm" placeholder="phone" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!--end::Configurações Avançadas-->
                 </div>
                 <div class="modal-footer flex-center">
                     <button type="reset" data-bs-dismiss="modal" class="btn btn-light me-3">Cancelar</button>
@@ -466,6 +504,15 @@ function editAccount(id) {
             document.getElementById("edit_domain").value = account.domain || "";
             document.getElementById("edit_webhook_url").value = account.webhook_url || "' . \App\Helpers\Url::fullUrl('/api4com-calls/webhook') . '";
             document.getElementById("edit_enabled").checked = account.enabled == 1;
+            
+            // Configurações avançadas
+            let config = {};
+            try {
+                config = account.config ? JSON.parse(account.config) : {};
+            } catch(e) {}
+            document.getElementById("edit_config_dialer_endpoint").value = config.dialer_endpoint || "";
+            document.getElementById("edit_config_extension_field").value = config.extension_field || "";
+            document.getElementById("edit_config_phone_field").value = config.phone_field || "";
             
             const modal = new bootstrap.Modal(document.getElementById("kt_modal_edit_api4com"));
             modal.show();

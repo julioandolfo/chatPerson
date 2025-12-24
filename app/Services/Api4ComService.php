@@ -134,6 +134,7 @@ class Api4ComService
     {
         $apiUrl = rtrim($account['api_url'], '/');
         $token = $account['api_token'];
+        $authHeader = self::formatAuthHeader($token);
         $extensionId = $extension['extension_id'] ?? $extension['extension_number'];
         
         // Configurações da conta (podem customizar endpoint e campos)
@@ -166,7 +167,7 @@ class Api4ComService
             CURLOPT_POSTFIELDS => json_encode($payload),
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/json',
-                'Authorization: Bearer ' . $token
+                $authHeader
             ],
             CURLOPT_TIMEOUT => 30
         ]);
@@ -174,9 +175,11 @@ class Api4ComService
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
+        $curlInfo = curl_getinfo($ch);
         curl_close($ch);
 
         if ($error) {
+            Logger::error("Api4ComService::initiateApi4ComCall - Curl error: {$error}");
             return [
                 'success' => false,
                 'error' => 'Erro de conexão: ' . $error
@@ -186,6 +189,9 @@ class Api4ComService
         $data = json_decode($response, true);
         
         Logger::info("Api4ComService::initiateApi4ComCall - HTTP {$httpCode}, Response: " . substr($response, 0, 500));
+        if ($httpCode >= 500) {
+            Logger::error("Api4ComService::initiateApi4ComCall - HTTP {$httpCode}, URL: {$url}, Payload: " . json_encode($payload) . ", Info: " . json_encode($curlInfo));
+        }
 
         if ($httpCode >= 200 && $httpCode < 300) {
             return [
@@ -380,6 +386,7 @@ class Api4ComService
     {
         $apiUrl = rtrim($account['api_url'], '/');
         $url = $apiUrl . '/calls/' . $api4comCallId . '/hangup';
+        $authHeader = self::formatAuthHeader($account['api_token']);
         
         $ch = curl_init($url);
         curl_setopt_array($ch, [
@@ -387,13 +394,28 @@ class Api4ComService
             CURLOPT_POST => true,
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/json',
-                'Authorization: Bearer ' . $account['api_token']
+                $authHeader
             ],
             CURLOPT_TIMEOUT => 10
         ]);
 
         curl_exec($ch);
         curl_close($ch);
+    }
+
+    /**
+     * Monta header de autorização respeitando token informado
+     * Doc Api4Com usa "Authorization: <token>" (sem Bearer)
+     */
+    private static function formatAuthHeader(string $token): string
+    {
+        $trimmed = trim($token);
+        // Se já vier com "Bearer ", apenas retorna
+        if (stripos($trimmed, 'bearer ') === 0) {
+            return 'Authorization: ' . $trimmed;
+        }
+        // Caso contrário, envia token cru (padrão da documentação)
+        return 'Authorization: ' . $trimmed;
     }
 
     /**
@@ -473,6 +495,7 @@ class Api4ComService
 
         $apiUrl = rtrim($account['api_url'], '/');
         $token = $account['api_token'];
+        $authHeader = self::formatAuthHeader($token);
         
         // Endpoint: GET /api/v1/users/me (conforme documentação de autenticação)
         $url = $apiUrl . '/api/v1/users/me';
@@ -482,7 +505,7 @@ class Api4ComService
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/json',
-                'Authorization: ' . $token
+                $authHeader
             ],
             CURLOPT_TIMEOUT => 15
         ]);
@@ -557,6 +580,7 @@ class Api4ComService
 
         $apiUrl = rtrim($account['api_url'], '/');
         $token = $account['api_token'];
+        $authHeader = self::formatAuthHeader($token);
         
         // Endpoint: GET /api/v1/extensions (conforme documentação Api4Com)
         $url = $apiUrl . '/api/v1/extensions';
@@ -566,7 +590,7 @@ class Api4ComService
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/json',
-                'Authorization: Bearer ' . $token
+                $authHeader
             ],
             CURLOPT_TIMEOUT => 30
         ]);
@@ -574,6 +598,7 @@ class Api4ComService
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
+        $curlInfo = curl_getinfo($ch);
         curl_close($ch);
 
         if ($error) {
@@ -584,6 +609,9 @@ class Api4ComService
         $data = json_decode($response, true);
 
         Logger::info("Api4ComService::fetchExtensionsFromApi - HTTP {$httpCode}, Response: " . substr($response, 0, 500));
+        if ($httpCode >= 500) {
+            Logger::error("Api4ComService::fetchExtensionsFromApi - HTTP {$httpCode}, URL: {$url}, Info: " . json_encode($curlInfo));
+        }
 
         if ($httpCode >= 200 && $httpCode < 300) {
             // Normalizar resposta (pode ser array direto ou dentro de data/extensions)

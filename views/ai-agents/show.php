@@ -741,7 +741,8 @@ document.addEventListener("DOMContentLoaded", function() {
                             const statusText = conv.status === "completed" ? "Completa" : 
                                               conv.status === "escalated" ? "Escalada" : 
                                               conv.status === "active" ? "Ativa" : "Desconhecido";
-                            const costBrl = (conv.cost || 0) * usdToBrl;
+                            const cost = parseFloat(conv.cost || 0);
+                            const costBrl = cost * usdToBrl;
                             const date = new Date(conv.created_at);
                             const dateStr = date.toLocaleDateString("pt-BR") + " " + date.toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"});
                             
@@ -757,11 +758,11 @@ document.addEventListener("DOMContentLoaded", function() {
                                         <span class="badge badge-light-${statusClass}">${statusText}</span>
                                     </td>
                                     <td>
-                                        <span class="text-gray-800">${(conv.tokens_used || 0).toLocaleString("pt-BR")}</span>
+                                        <span class="text-gray-800">${parseInt(conv.tokens_used || 0).toLocaleString("pt-BR")}</span>
                                     </td>
                                     <td>
                                         <div class="d-flex flex-column">
-                                            <span class="text-gray-800">$${(conv.cost || 0).toFixed(4)}</span>
+                                            <span class="text-gray-800">$${cost.toFixed(4)}</span>
                                             <span class="text-muted fs-7">R$ ${costBrl.toFixed(2)}</span>
                                         </div>
                                     </td>
@@ -876,6 +877,8 @@ document.addEventListener("DOMContentLoaded", function() {
     function renderConversationHistory(history) {
         const content = document.getElementById("conversation_history_content");
         const usdToBrl = 5.20;
+        const cost = parseFloat(history.cost || 0);
+        const costBrl = cost * usdToBrl;
         
         let html = `
             <div class="mb-7">
@@ -908,14 +911,14 @@ document.addEventListener("DOMContentLoaded", function() {
                     <div class="col-md-3">
                         <div class="mb-3">
                             <span class="text-gray-600 fs-7">Tokens Utilizados:</span>
-                            <div class="text-gray-800 fw-bold">${(history.tokens_used || 0).toLocaleString("pt-BR")}</div>
+                            <div class="text-gray-800 fw-bold">${parseInt(history.tokens_used || 0).toLocaleString("pt-BR")}</div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="mb-3">
                             <span class="text-gray-600 fs-7">Custo:</span>
-                            <div class="text-gray-800 fw-bold">$${(history.cost || 0).toFixed(4)}</div>
-                            <div class="text-muted fs-7">R$ ${((history.cost || 0) * usdToBrl).toFixed(2)}</div>
+                            <div class="text-gray-800 fw-bold">$${cost.toFixed(4)}</div>
+                            <div class="text-muted fs-7">R$ ${costBrl.toFixed(2)}</div>
                         </div>
                     </div>
                     <div class="col-md-3">

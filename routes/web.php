@@ -89,6 +89,17 @@ Router::get('/conversations/{id}/messages', [ConversationController::class, 'get
 Router::get('/conversations/{id}/participants', [ConversationController::class, 'getParticipants'], ['Authentication']);
 Router::post('/conversations/{id}/participants', [ConversationController::class, 'addParticipant'], ['Authentication']);
 Router::delete('/conversations/{id}/participants/{userId}', [ConversationController::class, 'removeParticipant'], ['Authentication']);
+
+// Rotas de menções/convites de agentes
+Router::post('/conversations/{id}/mention', [ConversationController::class, 'mention'], ['Authentication']);
+Router::get('/conversations/{id}/mentions', [ConversationController::class, 'getMentions'], ['Authentication']);
+Router::get('/conversations/{id}/available-agents', [ConversationController::class, 'getAvailableAgents'], ['Authentication']);
+Router::get('/conversations/invites', [ConversationController::class, 'getInvites'], ['Authentication']);
+Router::get('/conversations/invites/count', [ConversationController::class, 'countInvites'], ['Authentication']);
+Router::get('/conversations/invites/history', [ConversationController::class, 'getInviteHistory'], ['Authentication']);
+Router::post('/conversations/invites/{mentionId}/accept', [ConversationController::class, 'acceptInvite'], ['Authentication']);
+Router::post('/conversations/invites/{mentionId}/decline', [ConversationController::class, 'declineInvite'], ['Authentication']);
+
 // Rotas de ações de conversa
 Router::post('/conversations/{id}/mark-read', [ConversationController::class, 'markRead'], ['Authentication']);
 Router::post('/conversations/{id}/mark-unread', [ConversationController::class, 'markUnread'], ['Authentication']);

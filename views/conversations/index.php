@@ -1686,6 +1686,18 @@ body.dark-mode .swal2-content {
                             </i>
                     <input type="text" id="kt_conversations_search" class="form-control form-control-solid ps-10" placeholder="Buscar conversas e mensagens..." value="<?= htmlspecialchars($filters['search'] ?? '') ?>">
                 </div>
+                <!-- Botão de Convites Pendentes -->
+                <button type="button" class="btn btn-sm btn-icon btn-light-warning position-relative" id="btn_pending_invites" title="Convites pendentes" onclick="showPendingInvitesModal()">
+                    <i class="ki-duotone ki-notification-on fs-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                        <span class="path4"></span>
+                        <span class="path5"></span>
+                    </i>
+                    <span id="headerPendingInvitesBadge" class="position-absolute top-0 start-100 translate-middle badge badge-circle badge-sm badge-danger d-none">0</span>
+                </button>
+                
                 <button type="button" class="btn btn-sm btn-icon btn-primary" id="btn_new_conversation" title="Nova conversa" onclick="if(typeof showNewConversationModal === 'function') { showNewConversationModal(); } else { console.error('showNewConversationModal não está definida'); }">
                     <i class="ki-duotone ki-plus fs-2">
                         <span class="path1"></span>
@@ -2134,6 +2146,15 @@ body.dark-mode .swal2-content {
                         </i>
                     </button>
                 </div>
+                
+                <!-- Botão para mencionar/convidar agente -->
+                <button class="btn btn-sm btn-icon btn-light-warning" onclick="showMentionAgentModal()" title="Mencionar agente">
+                    <i class="ki-duotone ki-user-tick fs-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                </button>
                 
                 <button class="btn btn-sm btn-icon btn-light-primary" onclick="toggleConversationSidebar()" title="Detalhes da conversa">
                     <i class="ki-duotone ki-burger-menu fs-2">
@@ -3874,9 +3895,554 @@ body.dark-mode .swal2-content {
     </div>
 </div>
 
+<!-- MODAL: Mencionar/Convidar Agente -->
+<div class="modal fade" id="kt_modal_mention_agent" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-500px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">
+                    <i class="ki-duotone ki-user-tick fs-2 text-warning me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    Convidar Agente
+                </h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="mb-5">
+                    <label class="form-label fw-semibold required">Selecione o Agente:</label>
+                    <select id="mentionAgentSelect" class="form-select form-select-solid">
+                        <option value="">Carregando agentes...</option>
+                    </select>
+                    <div class="form-text">O agente receberá um convite para participar desta conversa</div>
+                </div>
+                <div class="mb-5">
+                    <label class="form-label fw-semibold">Nota/Contexto (opcional):</label>
+                    <textarea id="mentionAgentNote" class="form-control form-control-solid" rows="3" 
+                              placeholder="Ex: Preciso de ajuda técnica com esta solicitação..."></textarea>
+                    <div class="form-text">Esta nota será enviada junto com o convite</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" onclick="sendMentionInvite()">
+                    <i class="ki-duotone ki-send fs-5 me-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Enviar Convite
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Convites Pendentes -->
+<div class="modal fade" id="kt_modal_pending_invites" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-650px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">
+                    <i class="ki-duotone ki-notification-on fs-2 text-primary me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                        <span class="path4"></span>
+                        <span class="path5"></span>
+                    </i>
+                    Convites Pendentes
+                    <span id="pendingInvitesCountBadge" class="badge badge-circle badge-primary ms-2 d-none">0</span>
+                </h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+                <div id="pendingInvitesList">
+                    <div class="text-center py-10">
+                        <span class="spinner-border spinner-border-sm text-primary"></span>
+                        <span class="ms-2 text-muted">Carregando convites...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 // ============================================
 // FUNÇÕES GLOBAIS - DEFINIR PRIMEIRO
+// ============================================
+
+// ============================================
+// SISTEMA DE MENÇÕES/CONVITES DE AGENTES
+// ============================================
+
+/**
+ * Mostrar modal para mencionar/convidar agente
+ */
+function showMentionAgentModal() {
+    const conversationId = window.currentConversationId;
+    if (!conversationId) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Atenção',
+            text: 'Selecione uma conversa primeiro'
+        });
+        return;
+    }
+    
+    const modal = document.getElementById('kt_modal_mention_agent');
+    if (!modal) {
+        console.error('Modal de menção não encontrado');
+        return;
+    }
+    
+    // Limpar campos
+    document.getElementById('mentionAgentSelect').innerHTML = '<option value="">Carregando agentes...</option>';
+    document.getElementById('mentionAgentNote').value = '';
+    
+    // Carregar agentes disponíveis
+    fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/available-agents`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        const select = document.getElementById('mentionAgentSelect');
+        if (data.success && data.agents && data.agents.length > 0) {
+            let options = '<option value="">Selecione um agente...</option>';
+            data.agents.forEach(agent => {
+                options += `<option value="${agent.id}">${escapeHtml(agent.name)} ${agent.email ? '(' + escapeHtml(agent.email) + ')' : ''}</option>`;
+            });
+            select.innerHTML = options;
+        } else {
+            select.innerHTML = '<option value="">Nenhum agente disponível</option>';
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao carregar agentes:', error);
+        document.getElementById('mentionAgentSelect').innerHTML = '<option value="">Erro ao carregar agentes</option>';
+    });
+    
+    // Abrir modal
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+}
+
+/**
+ * Enviar convite de menção
+ */
+function sendMentionInvite() {
+    const conversationId = window.currentConversationId;
+    const agentId = document.getElementById('mentionAgentSelect').value;
+    const note = document.getElementById('mentionAgentNote').value.trim();
+    
+    if (!agentId) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Atenção',
+            text: 'Selecione um agente para convidar'
+        });
+        return;
+    }
+    
+    // Mostrar loading
+    Swal.fire({
+        title: 'Enviando convite...',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+    });
+    
+    fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/mention`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            user_id: parseInt(agentId),
+            note: note || null
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Convite Enviado!',
+                text: 'O agente receberá uma notificação para participar da conversa.',
+                timer: 3000,
+                showConfirmButton: false
+            });
+            
+            // Fechar modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_mention_agent'));
+            if (modal) modal.hide();
+            
+            // Atualizar sidebar se estiver aberto (para mostrar nova menção)
+            if (typeof loadConversationDetails === 'function') {
+                loadConversationDetails(conversationId);
+            }
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: data.message || 'Erro ao enviar convite'
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro ao enviar convite'
+        });
+    });
+}
+
+/**
+ * Mostrar modal de convites pendentes
+ */
+function showPendingInvitesModal() {
+    const modal = document.getElementById('kt_modal_pending_invites');
+    if (!modal) {
+        console.error('Modal de convites não encontrado');
+        return;
+    }
+    
+    // Carregar convites
+    loadPendingInvites();
+    
+    // Abrir modal
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+}
+
+/**
+ * Carregar convites pendentes
+ */
+function loadPendingInvites() {
+    const container = document.getElementById('pendingInvitesList');
+    container.innerHTML = `
+        <div class="text-center py-10">
+            <span class="spinner-border spinner-border-sm text-primary"></span>
+            <span class="ms-2 text-muted">Carregando convites...</span>
+        </div>
+    `;
+    
+    fetch('<?= \App\Helpers\Url::to('/conversations/invites') ?>', {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            renderPendingInvites(data.invites || []);
+            updatePendingInvitesCount(data.count || 0);
+        } else {
+            container.innerHTML = '<div class="text-center py-10 text-muted">Erro ao carregar convites</div>';
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        container.innerHTML = '<div class="text-center py-10 text-muted">Erro ao carregar convites</div>';
+    });
+}
+
+/**
+ * Renderizar lista de convites pendentes
+ */
+function renderPendingInvites(invites) {
+    const container = document.getElementById('pendingInvitesList');
+    
+    if (invites.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-10">
+                <i class="ki-duotone ki-check-circle fs-3x text-success mb-3">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                <h5 class="text-muted">Nenhum convite pendente</h5>
+                <p class="text-gray-500 fs-7">Você não tem convites para participar de conversas</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    invites.forEach(invite => {
+        const channelIcon = invite.channel === 'whatsapp' 
+            ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>'
+            : invite.channel === 'email' ? '✉️' : '💬';
+        
+        const timeAgo = formatTime(invite.created_at);
+        const initials = getInitials(invite.contact_name || 'NN');
+        
+        html += `
+            <div class="d-flex align-items-start gap-3 p-4 border rounded mb-3 bg-light-warning">
+                <div class="symbol symbol-45px symbol-circle">
+                    ${invite.contact_avatar 
+                        ? `<img src="${escapeHtml(invite.contact_avatar)}" alt="${escapeHtml(invite.contact_name || '')}">`
+                        : `<div class="symbol-label bg-light-primary text-primary fw-bold">${initials}</div>`
+                    }
+                </div>
+                <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <h6 class="mb-0">${escapeHtml(invite.contact_name || 'Sem nome')}</h6>
+                            <span class="text-muted fs-7">${channelIcon} ${escapeHtml(invite.channel || 'chat')}</span>
+                        </div>
+                        <span class="badge badge-light-warning fs-8">${timeAgo}</span>
+                    </div>
+                    <p class="text-muted fs-7 mb-2">
+                        <strong>${escapeHtml(invite.mentioned_by_name || 'Alguém')}</strong> convidou você para esta conversa
+                    </p>
+                    ${invite.note ? `<div class="bg-white rounded p-2 mb-2 fs-7"><em>"${escapeHtml(invite.note)}"</em></div>` : ''}
+                    ${invite.last_message ? `<div class="text-gray-600 fs-7 mb-2">Última mensagem: ${escapeHtml(invite.last_message.substring(0, 50))}${invite.last_message.length > 50 ? '...' : ''}</div>` : ''}
+                    <div class="d-flex gap-2 mt-3">
+                        <button class="btn btn-sm btn-success" onclick="acceptInvite(${invite.id}, ${invite.conversation_id})">
+                            <i class="ki-duotone ki-check fs-6 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Aceitar
+                        </button>
+                        <button class="btn btn-sm btn-light-danger" onclick="declineInvite(${invite.id})">
+                            <i class="ki-duotone ki-cross fs-6 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Recusar
+                        </button>
+                        <button class="btn btn-sm btn-light-primary" onclick="viewConversationFromInvite(${invite.conversation_id})">
+                            <i class="ki-duotone ki-eye fs-6 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            Ver
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+/**
+ * Aceitar convite
+ */
+function acceptInvite(mentionId, conversationId) {
+    Swal.fire({
+        title: 'Aceitar convite?',
+        text: 'Você será adicionado como participante desta conversa.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, aceitar',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            Swal.fire({
+                title: 'Aceitando...',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+            
+            fetch(`<?= \App\Helpers\Url::to('/conversations/invites') ?>/${mentionId}/accept`, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Convite aceito!',
+                        text: 'Você agora é participante da conversa.',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                    
+                    // Recarregar lista de convites
+                    loadPendingInvites();
+                    
+                    // Atualizar contador
+                    loadPendingInvitesCount();
+                    
+                    // Opcional: Abrir a conversa
+                    if (conversationId) {
+                        setTimeout(() => {
+                            if (typeof selectConversation === 'function') {
+                                selectConversation(conversationId);
+                            }
+                            // Fechar modal
+                            const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_pending_invites'));
+                            if (modal) modal.hide();
+                        }, 1500);
+                    }
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: data.message || 'Erro ao aceitar convite'
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: 'Erro ao aceitar convite'
+                });
+            });
+        }
+    });
+}
+
+/**
+ * Recusar convite
+ */
+function declineInvite(mentionId) {
+    Swal.fire({
+        title: 'Recusar convite?',
+        text: 'O convite será marcado como recusado.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, recusar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#dc3545'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch(`<?= \App\Helpers\Url::to('/conversations/invites') ?>/${mentionId}/decline`, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Convite recusado',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                    
+                    // Recarregar lista de convites
+                    loadPendingInvites();
+                    
+                    // Atualizar contador
+                    loadPendingInvitesCount();
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: data.message || 'Erro ao recusar convite'
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: 'Erro ao recusar convite'
+                });
+            });
+        }
+    });
+}
+
+/**
+ * Ver conversa a partir do convite (preview)
+ */
+function viewConversationFromInvite(conversationId) {
+    if (typeof selectConversation === 'function') {
+        selectConversation(conversationId);
+        
+        // Fechar modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_pending_invites'));
+        if (modal) modal.hide();
+    }
+}
+
+/**
+ * Atualizar contador de convites pendentes
+ */
+function updatePendingInvitesCount(count) {
+    const badge = document.getElementById('pendingInvitesCountBadge');
+    const headerBadge = document.getElementById('headerPendingInvitesBadge');
+    
+    if (badge) {
+        if (count > 0) {
+            badge.textContent = count;
+            badge.classList.remove('d-none');
+        } else {
+            badge.classList.add('d-none');
+        }
+    }
+    
+    if (headerBadge) {
+        if (count > 0) {
+            headerBadge.textContent = count;
+            headerBadge.classList.remove('d-none');
+        } else {
+            headerBadge.classList.add('d-none');
+        }
+    }
+}
+
+/**
+ * Carregar contagem de convites pendentes
+ */
+function loadPendingInvitesCount() {
+    fetch('<?= \App\Helpers\Url::to('/conversations/invites/count') ?>', {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updatePendingInvitesCount(data.count || 0);
+        }
+    })
+    .catch(error => console.error('Erro ao carregar contagem de convites:', error));
+}
+
+// Carregar contagem de convites ao iniciar
+document.addEventListener('DOMContentLoaded', function() {
+    loadPendingInvitesCount();
+    
+    // Atualizar a cada 30 segundos
+    setInterval(loadPendingInvitesCount, 30000);
+});
+
+// ============================================
+// FIM SISTEMA DE MENÇÕES/CONVITES
 // ============================================
 
 // Mostrar modal de nova conversa (definir IMEDIATAMENTE para estar disponível globalmente)

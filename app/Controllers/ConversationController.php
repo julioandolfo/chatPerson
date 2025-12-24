@@ -2185,5 +2185,195 @@ class ConversationController
             $this->restoreAfterJsonResponse($config);
         }
     }
+
+    // ========================================================================
+    // MENÇÕES / CONVITES DE AGENTES
+    // ========================================================================
+
+    /**
+     * Mencionar/convidar um agente para uma conversa
+     * POST /conversations/{id}/mention
+     */
+    public function mention(int $id): void
+    {
+        Permission::abortIfCannot('conversations.edit.own');
+        
+        try {
+            $userId = \App\Helpers\Auth::id();
+            $data = \App\Helpers\Request::json();
+            
+            $mentionedUserId = $data['user_id'] ?? null;
+            $note = $data['note'] ?? null;
+            
+            if (!$mentionedUserId) {
+                Response::json(['success' => false, 'message' => 'ID do usuário é obrigatório'], 400);
+                return;
+            }
+            
+            $mention = \App\Services\ConversationMentionService::mention(
+                $id,
+                (int) $mentionedUserId,
+                $userId,
+                $note
+            );
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Convite enviado com sucesso',
+                'mention' => $mention
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => 'Erro ao enviar convite: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Obter menções de uma conversa
+     * GET /conversations/{id}/mentions
+     */
+    public function getMentions(int $id): void
+    {
+        Permission::abortIfCannot('conversations.view.own');
+        
+        try {
+            $mentions = \App\Services\ConversationMentionService::getByConversation($id);
+            
+            Response::json([
+                'success' => true,
+                'mentions' => $mentions
+            ]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Obter agentes disponíveis para mencionar
+     * GET /conversations/{id}/available-agents
+     */
+    public function getAvailableAgents(int $id): void
+    {
+        Permission::abortIfCannot('conversations.view.own');
+        
+        try {
+            $userId = \App\Helpers\Auth::id();
+            $agents = \App\Services\ConversationMentionService::getAvailableAgents($id, $userId);
+            
+            Response::json([
+                'success' => true,
+                'agents' => $agents
+            ]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Obter convites pendentes para o usuário logado
+     * GET /conversations/invites
+     */
+    public function getInvites(): void
+    {
+        try {
+            $userId = \App\Helpers\Auth::id();
+            $invites = \App\Services\ConversationMentionService::getPendingInvites($userId);
+            $count = \App\Services\ConversationMentionService::countPending($userId);
+            
+            Response::json([
+                'success' => true,
+                'invites' => $invites,
+                'count' => $count
+            ]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Contar convites pendentes
+     * GET /conversations/invites/count
+     */
+    public function countInvites(): void
+    {
+        try {
+            $userId = \App\Helpers\Auth::id();
+            $count = \App\Services\ConversationMentionService::countPending($userId);
+            
+            Response::json([
+                'success' => true,
+                'count' => $count
+            ]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Aceitar convite de menção
+     * POST /conversations/invites/{mentionId}/accept
+     */
+    public function acceptInvite(int $mentionId): void
+    {
+        try {
+            $userId = \App\Helpers\Auth::id();
+            $mention = \App\Services\ConversationMentionService::accept($mentionId, $userId);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Convite aceito! Você agora é participante da conversa.',
+                'mention' => $mention
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => 'Erro ao aceitar convite: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Recusar convite de menção
+     * POST /conversations/invites/{mentionId}/decline
+     */
+    public function declineInvite(int $mentionId): void
+    {
+        try {
+            $userId = \App\Helpers\Auth::id();
+            $mention = \App\Services\ConversationMentionService::decline($mentionId, $userId);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Convite recusado.',
+                'mention' => $mention
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => 'Erro ao recusar convite: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Obter histórico de convites do usuário
+     * GET /conversations/invites/history
+     */
+    public function getInviteHistory(): void
+    {
+        try {
+            $userId = \App\Helpers\Auth::id();
+            $limit = (int) (\App\Helpers\Request::get('limit') ?? 50);
+            $offset = (int) (\App\Helpers\Request::get('offset') ?? 0);
+            
+            $history = \App\Services\ConversationMentionService::getHistory($userId, $limit, $offset);
+            
+            Response::json([
+                'success' => true,
+                'history' => $history
+            ]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
 }
 

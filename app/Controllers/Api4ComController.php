@@ -180,19 +180,36 @@ class Api4ComController
                 return;
             }
 
-            $result = \App\Services\Api4ComService::syncAllExtensions($id);
-            
-            $message = "Sincronização concluída: {$result['synced']} de {$result['total']} ramais.";
-            if (!empty($result['errors'])) {
-                $message .= " Erros: " . count($result['errors']);
+            // Tentar sincronizar
+            try {
+                $result = \App\Services\Api4ComService::syncAllExtensions($id);
+                
+                $message = "Sincronização concluída: {$result['synced']} de {$result['total']} ramais.";
+                if (!empty($result['errors'])) {
+                    $message .= " Erros: " . count($result['errors']);
+                }
+                
+                Response::json([
+                    'success' => true,
+                    'message' => $message,
+                    'result' => $result
+                ]);
+            } catch (\Exception $apiError) {
+                // Se falhou na API, talvez precise rodar migration
+                // Verificar se é erro de constraint/coluna
+                $errorMsg = $apiError->getMessage();
+                
+                if (strpos($errorMsg, 'Column') !== false || strpos($errorMsg, 'constraint') !== false || strpos($errorMsg, 'user_id') !== false) {
+                    Response::json([
+                        'success' => false,
+                        'message' => 'Erro de banco de dados. Execute a migration: php database/migrate.php'
+                    ], 500);
+                } else {
+                    throw $apiError;
+                }
             }
-            
-            Response::json([
-                'success' => true,
-                'message' => $message,
-                'result' => $result
-            ]);
         } catch (\Exception $e) {
+            \App\Helpers\Logger::error("Api4ComController::syncExtensions - Erro: " . $e->getMessage());
             Response::json([
                 'success' => false,
                 'message' => 'Erro ao sincronizar ramais: ' . $e->getMessage()

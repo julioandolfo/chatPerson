@@ -28,7 +28,7 @@ class Api4ComService
         $errors = Validator::validate($data, [
             'api4com_account_id' => 'required|integer',
             'contact_id' => 'required|integer',
-            'to_number' => 'required|string|max:50',
+            'to_number' => 'required|string',
             'agent_id' => 'nullable|integer',
             'conversation_id' => 'nullable|integer',
             'extension_id' => 'nullable|integer'

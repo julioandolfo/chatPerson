@@ -448,7 +448,7 @@ function editAgent(id) {
             document.getElementById("edit_enabled").checked = agent.enabled == 1 || agent.enabled === true;
             
             // Carregar delay humanizado das settings
-            const settings = agent.settings ? (typeof agent.settings === 'string' ? JSON.parse(agent.settings) : agent.settings) : {};
+            const settings = agent.settings ? (typeof agent.settings === "string" ? JSON.parse(agent.settings) : agent.settings) : {};
             document.getElementById("edit_response_delay_min").value = settings.response_delay_min || 0;
             document.getElementById("edit_response_delay_max").value = settings.response_delay_max || 0;
             

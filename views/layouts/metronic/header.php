@@ -1,3 +1,23 @@
+<!--begin::Header CSS Fix-->
+<style>
+/* Garantir que dropdowns do header fiquem acima de tudo */
+#kt_header {
+    position: relative;
+    z-index: 1100 !important;
+}
+
+#kt_header .menu-sub-dropdown,
+#kt_header [data-kt-menu="true"] {
+    z-index: 1200 !important;
+}
+
+/* Garantir que o menu do usuário e tema fiquem visíveis */
+.header .menu.menu-sub.menu-sub-dropdown {
+    z-index: 1200 !important;
+}
+</style>
+<!--end::Header CSS Fix-->
+
 <!--begin::Header-->
 <div id="kt_header" class="header mt-0 mt-lg-0 pt-lg-0" data-kt-sticky="true" data-kt-sticky-name="header" data-kt-sticky-offset="{lg: '300px'}">
     <!--begin::Container-->
@@ -211,6 +231,21 @@
                             </div>
                         </div>
                         <!--end::Menu sub-->
+                    </div>
+                    <!--end::Menu item-->
+                    
+                    <!--begin::Menu item - Preferências-->
+                    <div class="menu-item px-5">
+                        <a href="<?= \App\Helpers\Url::to('/profile') ?>" class="menu-link px-5">
+                            <span class="menu-icon">
+                                <i class="ki-duotone ki-notification fs-5">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                            </span>
+                            Minhas Notificações
+                        </a>
                     </div>
                     <!--end::Menu item-->
                     

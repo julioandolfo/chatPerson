@@ -32,6 +32,7 @@ use App\Controllers\AIAssistantController;
 use App\Controllers\RealtimeController;
 use App\Controllers\LogController;
 use App\Controllers\SoundSettingsController;
+use App\Controllers\ProfileController;
 use App\Controllers\Api4ComController;
 use App\Controllers\Api4ComCallController;
 
@@ -45,6 +46,16 @@ Router::post('/login', [AuthController::class, 'login']);
 Router::get('/logout', [AuthController::class, 'logout']);
 
 // Rotas protegidas (requerem autenticação)
+
+// Rotas de Perfil do Usuário (acessível a todos os usuários autenticados)
+Router::get('/profile', [ProfileController::class, 'index'], ['Authentication']);
+Router::get('/profile/notifications', [ProfileController::class, 'notifications'], ['Authentication']);
+Router::post('/profile/notifications', [ProfileController::class, 'saveNotifications'], ['Authentication']);
+Router::post('/profile/sounds/upload', [ProfileController::class, 'uploadSound'], ['Authentication']);
+Router::delete('/profile/sounds/{id}', [ProfileController::class, 'deleteSound'], ['Authentication']);
+Router::get('/profile/sounds/available', [ProfileController::class, 'getAvailableSounds'], ['Authentication']);
+Router::get('/profile/sounds/custom', [ProfileController::class, 'getCustomSounds'], ['Authentication']);
+
 Router::get('/dashboard', [DashboardController::class, 'index'], ['Authentication']);
 Router::get('/dashboard/ai', [DashboardController::class, 'aiDashboard'], ['Authentication']);
 Router::get('/dashboard/chart-data', [DashboardController::class, 'getChartData'], ['Authentication']);

@@ -237,7 +237,7 @@ document.addEventListener('DOMContentLoaded', function() {
     display: flex;
     flex-direction: column;
     position: relative;
-    z-index: 1000;
+    z-index: 100; /* Reduzido para não sobrepor dropdowns do header */
     flex-shrink: 0;
 }
 

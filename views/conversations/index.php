@@ -268,6 +268,13 @@ ob_start();
 ?>
 
 <style>
+/* Garantir que dropdowns do header fiquem acima do layout de conversas */
+#kt_header .menu-sub-dropdown,
+#kt_header [data-kt-menu="true"],
+.header .menu.menu-sub.menu-sub-dropdown {
+    z-index: 1200 !important;
+}
+
 /* Layout Principal - 3 Colunas */
 .conversations-layout {
     display: flex;
@@ -277,6 +284,7 @@ ob_start();
     margin: 20px 0 0 0; /* Margem superior apenas */
     padding: 0 20px 0 0; /* Padding à direita para respiro */
     position: relative;
+    z-index: 1; /* Z-index baixo para não sobrepor o header */
     width: 100%; /* 100% da largura disponível */
     box-sizing: border-box; /* Inclui padding na largura */
 }

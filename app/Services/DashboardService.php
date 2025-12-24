@@ -409,6 +409,20 @@ class DashboardService
      */
     private static function getAverageFirstResponseTime(string $dateFrom, string $dateTo): ?float
     {
+        // Verificar se existem conversas com mensagens de agent no período
+        $checkSql = "SELECT COUNT(DISTINCT c.id) as total_conversations,
+                     COUNT(DISTINCT CASE WHEN EXISTS (
+                         SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'agent'
+                     ) THEN c.id END) as with_agent,
+                     COUNT(DISTINCT CASE WHEN EXISTS (
+                         SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact'
+                     ) THEN c.id END) as with_contact
+                     FROM conversations c
+                     WHERE c.created_at >= ? AND c.created_at <= ?";
+        $checkResult = \App\Helpers\Database::fetch($checkSql, [$dateFrom, $dateTo]);
+        
+        self::logDash("getAverageFirstResponseTime check: " . json_encode($checkResult));
+        
         $sql = "SELECT AVG(TIMESTAMPDIFF(MINUTE, 
                     (SELECT MIN(m1.created_at) 
                      FROM messages m1 
@@ -426,9 +440,17 @@ class DashboardService
                     SELECT 1 FROM messages m3 
                     WHERE m3.conversation_id = c.id 
                     AND m3.sender_type = 'agent'
+                )
+                AND EXISTS (
+                    SELECT 1 FROM messages m4 
+                    WHERE m4.conversation_id = c.id 
+                    AND m4.sender_type = 'contact'
                 )";
         
         $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
+        
+        self::logDash("getAverageFirstResponseTime result: " . json_encode($result));
+        
         return $result && $result['avg_time'] !== null ? round((float)$result['avg_time'], 2) : null;
     }
     
@@ -462,6 +484,9 @@ class DashboardService
                 ) as response_times";
         
         $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
+        
+        self::logDash("getAverageResponseTime result: " . json_encode($result));
+        
         return $result && $result['avg_time'] !== null ? round((float)$result['avg_time'], 2) : null;
     }
 

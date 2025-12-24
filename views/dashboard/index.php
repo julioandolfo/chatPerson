@@ -137,18 +137,18 @@ ob_start();
                         <div class="fs-2x fw-bold text-gray-800">
                             <?php
                             $avgFirstResponse = $stats['metrics']['avg_first_response_time'] ?? null;
+                            // Debug: verificar se existe algum dado
+                            // error_log("DEBUG avg_first_response_time: " . var_export($avgFirstResponse, true));
                             if ($avgFirstResponse !== null && $avgFirstResponse > 0) {
-                                if (class_exists('\App\Services\AgentPerformanceService')) {
-                                    echo \App\Services\AgentPerformanceService::formatTime($avgFirstResponse);
-                                } else {
-                                    if ($avgFirstResponse < 60) {
-                                        echo number_format($avgFirstResponse, 0) . ' min';
-                                    } else {
-                                        echo number_format($avgFirstResponse / 60, 1) . 'h';
-                                    }
-                                }
+                                echo \App\Services\AgentPerformanceService::formatTime($avgFirstResponse);
                             } else {
-                                echo '-';
+                                // Verificar se há mensagens no período
+                                $hasMessages = ($stats['messages']['total'] ?? 0) > 0;
+                                if (!$hasMessages) {
+                                    echo '<span class="fs-6 text-muted" title="Nenhuma mensagem no período">Sem dados</span>';
+                                } else {
+                                    echo '<span class="fs-6 text-muted" title="Nenhuma resposta de agente registrada">-</span>';
+                                }
                             }
                             ?>
                         </div>
@@ -178,17 +178,11 @@ ob_start();
                             <?php
                             $avgResponse = $stats['metrics']['avg_response_time'] ?? null;
                             if ($avgResponse !== null && $avgResponse > 0) {
-                                if (class_exists('\App\Services\AgentPerformanceService')) {
-                                    echo \App\Services\AgentPerformanceService::formatTime($avgResponse);
-                                } else {
-                                    if ($avgResponse < 60) {
-                                        echo number_format($avgResponse, 0) . ' min';
-                                    } else {
-                                        echo number_format($avgResponse / 60, 1) . 'h';
-                                    }
-                                }
+                                echo \App\Services\AgentPerformanceService::formatTime($avgResponse);
+                            } elseif (($stats['messages']['total'] ?? 0) == 0) {
+                                echo '<span class="fs-6 text-muted" title="Nenhuma mensagem no período">Sem dados</span>';
                             } else {
-                                echo '-';
+                                echo '<span class="fs-6 text-muted" title="Nenhum par mensagem cliente/agente encontrado">-</span>';
                             }
                             ?>
                         </div>
@@ -610,14 +604,18 @@ ob_start();
 <?php endif; ?>
 
 <!--begin::Row - Cards Individuais de Agentes-->
-<?php if (!empty($allAgentsMetrics)): ?>
+<?php if (!empty($allAgentsMetrics)): 
+    // Buscar configurações de SLA dinâmicas
+    $slaSettings = \App\Services\ConversationSettingsService::getSettings()['sla'] ?? [];
+    $slaFirstResponse = $slaSettings['first_response_time'] ?? 15; // minutos
+?>
 <div class="row g-5 mb-5">
     <div class="col-12">
         <div class="card">
             <div class="card-header border-0 pt-5">
                 <h3 class="card-title align-items-start flex-column">
                     <span class="card-label fw-bold fs-3 mb-1">Métricas Individuais dos Agentes</span>
-                    <span class="text-muted mt-1 fw-semibold fs-7">Desempenho detalhado de cada agente</span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">Desempenho detalhado de cada agente (SLA: <?= $slaFirstResponse ?> min)</span>
                 </h3>
             </div>
             <div class="card-body pt-3">
@@ -751,20 +749,38 @@ ob_start();
                                 
                                 <div class="separator separator-dashed my-4"></div>
                                 
-                                <!-- SLA -->
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span class="text-muted fs-7">SLA 5min</span>
-                                    <span class="badge badge-light-<?= ($agent['sla_5min_rate'] ?? 0) >= 80 ? 'success' : (($agent['sla_5min_rate'] ?? 0) >= 50 ? 'warning' : 'danger') ?>">
-                                        <?= number_format($agent['sla_5min_rate'] ?? 0, 1) ?>%
+                                <!-- SLA Dinâmico -->
+                                <?php
+                                // Calcular se está dentro do SLA configurado
+                                $avgFirstResponseMinutes = $agent['avg_first_response_minutes'] ?? 0;
+                                $withinSLA = $avgFirstResponseMinutes > 0 && $avgFirstResponseMinutes <= $slaFirstResponse;
+                                $slaStatus = $avgFirstResponseMinutes == 0 ? 'secondary' : ($withinSLA ? 'success' : 'danger');
+                                $slaText = $avgFirstResponseMinutes == 0 ? 'N/A' : ($withinSLA ? 'Dentro do SLA' : 'Fora do SLA');
+                                ?>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="text-muted fs-7">SLA (<?= $slaFirstResponse ?>min)</span>
+                                    <span class="badge badge-light-<?= $slaStatus ?>">
+                                        <?= $slaText ?>
                                     </span>
                                 </div>
                                 
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span class="text-muted fs-7">SLA 15min</span>
-                                    <span class="badge badge-light-<?= ($agent['sla_15min_rate'] ?? 0) >= 80 ? 'success' : (($agent['sla_15min_rate'] ?? 0) >= 50 ? 'warning' : 'danger') ?>">
-                                        <?= number_format($agent['sla_15min_rate'] ?? 0, 1) ?>%
-                                    </span>
+                                <?php if ($agent['total_conversations'] > 0): ?>
+                                <div class="mt-3">
+                                    <div class="progress h-8px">
+                                        <?php 
+                                        // Calcular percentual baseado em quanto do SLA foi usado
+                                        $slaPercentUsed = $avgFirstResponseMinutes > 0 ? min(100, ($avgFirstResponseMinutes / $slaFirstResponse) * 100) : 0;
+                                        $progressColor = $slaPercentUsed <= 50 ? 'success' : ($slaPercentUsed <= 100 ? 'warning' : 'danger');
+                                        ?>
+                                        <div class="progress-bar bg-<?= $progressColor ?>" role="progressbar" 
+                                             style="width: <?= min(100, $slaPercentUsed) ?>%" 
+                                             title="<?= number_format($avgFirstResponseMinutes, 0) ?> min de <?= $slaFirstResponse ?> min"></div>
+                                    </div>
+                                    <div class="text-muted fs-8 mt-1 text-center">
+                                        <?= number_format(min(100, $slaPercentUsed), 0) ?>% do SLA
+                                    </div>
                                 </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>

@@ -47,6 +47,12 @@
         // Tempo para limpar cache (5 minutos)
         cacheTimeout: 5 * 60 * 1000,
         
+        // Última notificação mostrada (para debounce)
+        lastNotificationTime: 0,
+        
+        // Intervalo mínimo entre notificações do mesmo tipo (ms)
+        debounceInterval: 500,
+        
         // Tipos de notificação com ícones e cores
         types: {
             new_conversation: {
@@ -130,6 +136,9 @@
             // Injetar estilos CSS
             this.injectStyles();
             
+            // Pré-popular cache com conversas já visíveis (evita notificar conversas existentes)
+            this.prePopulateCache();
+            
             // Configurar listeners de eventos
             this.setupEventListeners();
             
@@ -138,6 +147,31 @@
             
             this.initialized = true;
             console.log('[NotificationManager] ✅ Inicializado com sucesso');
+        },
+        
+        /**
+         * Pré-popular cache com conversas já visíveis na lista
+         * Isso evita notificar conversas que já estavam na tela quando o usuário acessou
+         */
+        prePopulateCache: function() {
+            // Aguardar um momento para a lista carregar
+            setTimeout(() => {
+                // Buscar conversas já visíveis na lista
+                const conversationItems = document.querySelectorAll('[data-conversation-id]');
+                conversationItems.forEach(item => {
+                    const conversationId = item.dataset.conversationId;
+                    if (conversationId) {
+                        this.shownNotifications.conversations.add(String(conversationId));
+                    }
+                });
+                
+                // Também verificar se há IDs na URL ou em variáveis globais
+                if (window.currentConversationId) {
+                    this.shownNotifications.conversations.add(String(window.currentConversationId));
+                }
+                
+                console.log('[NotificationManager] Cache pré-populado com', this.shownNotifications.conversations.size, 'conversas existentes');
+            }, 500);
         },
 
         /**
@@ -513,6 +547,18 @@
                 }, this.cacheTimeout);
             }
         },
+        
+        /**
+         * Verificar debounce - evita notificações muito rápidas
+         */
+        shouldDebounce: function() {
+            const now = Date.now();
+            if (now - this.lastNotificationTime < this.debounceInterval) {
+                return true;
+            }
+            this.lastNotificationTime = now;
+            return false;
+        },
 
         /**
          * Configurar event listeners
@@ -586,7 +632,8 @@
             
             document.addEventListener('realtime:new_mention', (e) => {
                 const data = e.detail || {};
-                const mentionKey = `mention_${data.id || data.conversation_id}_${Date.now()}`;
+                const mentionId = data.id || data.mention_id || data.message_id;
+                const mentionKey = `mention_invite_${mentionId}_${data.conversation_id}`;
                 if (!this.hasShownNotification('assignments', mentionKey)) {
                     this.markAsShown('assignments', mentionKey);
                     this.showMentionNotification(data, 'invite_received');
@@ -595,7 +642,8 @@
             
             document.addEventListener('realtime:mention_received', (e) => {
                 const data = e.detail || {};
-                const mentionKey = `mention_${data.id || data.conversation_id}_${Date.now()}`;
+                const mentionId = data.id || data.mention_id || data.message_id;
+                const mentionKey = `mention_${mentionId}_${data.conversation_id}`;
                 if (!this.hasShownNotification('assignments', mentionKey)) {
                     this.markAsShown('assignments', mentionKey);
                     this.showMentionNotification(data, 'mention_received');

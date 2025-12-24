@@ -457,62 +457,62 @@ document.addEventListener("DOMContentLoaded", function() {
     }
     
     // ✅ NOVO: Funcionalidade de deletar automação
-    document.querySelectorAll('.delete-automation-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const automationId = this.getAttribute('data-id');
-            const automationName = this.getAttribute('data-name');
+    document.querySelectorAll(".delete-automation-btn").forEach(btn => {
+        btn.addEventListener("click", function() {
+            const automationId = this.getAttribute("data-id");
+            const automationName = this.getAttribute("data-name");
             
-            if (!confirm(`Tem certeza que deseja deletar a automação "${automationName}"?\n\nEsta ação não pode ser desfeita e todos os nós serão removidos.`)) {
+            if (!confirm("Tem certeza que deseja deletar a automação \"" + automationName + "\"?\n\nEsta ação não pode ser desfeita e todos os nós serão removidos.")) {
                 return;
             }
             
             // Desabilitar botão durante requisição
             this.disabled = true;
             const originalHtml = this.innerHTML;
-            this.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Deletando...';
+            this.innerHTML = "<span class=\"spinner-border spinner-border-sm me-2\"></span>Deletando...";
             
-            fetch(`<?= \App\Helpers\Url::to('/automations') ?>/${automationId}`, {
-                method: 'DELETE',
+            fetch("' . \App\Helpers\Url::to('/automations') . '/" + automationId, {
+                method: "DELETE",
                 headers: {
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "XMLHttpRequest"
                 },
-                credentials: 'same-origin'
+                credentials: "same-origin"
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
                     // Remover linha da tabela
-                    const row = this.closest('tr');
-                    row.style.transition = 'opacity 0.3s';
-                    row.style.opacity = '0';
+                    const row = this.closest("tr");
+                    row.style.transition = "opacity 0.3s";
+                    row.style.opacity = "0";
                     setTimeout(() => {
                         row.remove();
                         
                         // Verificar se não há mais automações
-                        const tbody = document.querySelector('table tbody');
+                        const tbody = document.querySelector("table tbody");
                         if (tbody && tbody.children.length === 0) {
                             location.reload(); // Recarregar para mostrar mensagem de "nenhuma automação"
                         }
                     }, 300);
                     
                     // Mostrar notificação de sucesso (se disponível)
-                    if (typeof toastr !== 'undefined') {
-                        toastr.success('Automação deletada com sucesso!');
+                    if (typeof toastr !== "undefined") {
+                        toastr.success("Automação deletada com sucesso!");
                     } else {
-                        alert('Automação deletada com sucesso!');
+                        alert("Automação deletada com sucesso!");
                     }
                 } else {
                     this.disabled = false;
                     this.innerHTML = originalHtml;
-                    alert('Erro: ' + (data.message || 'Erro ao deletar automação'));
+                    alert("Erro: " + (data.message || "Erro ao deletar automação"));
                 }
             })
             .catch(error => {
                 this.disabled = false;
                 this.innerHTML = originalHtml;
-                console.error('Erro:', error);
-                alert('Erro ao deletar automação. Verifique o console para mais detalhes.');
+                console.error("Erro:", error);
+                alert("Erro ao deletar automação. Verifique o console para mais detalhes.");
             });
         });
     });

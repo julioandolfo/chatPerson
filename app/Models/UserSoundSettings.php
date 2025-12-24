@@ -171,7 +171,11 @@ class UserSoundSettings extends Model
             'sla_warning_enabled', 'sla_warning_sound',
             'sla_breached_enabled', 'sla_breached_sound',
             'mention_received_enabled', 'mention_received_sound',
-            'quiet_hours_enabled', 'quiet_hours_start', 'quiet_hours_end'
+            'quiet_hours_enabled', 'quiet_hours_start', 'quiet_hours_end',
+            // Campos de notificações visuais
+            'visual_notifications_enabled', 'browser_notifications_enabled',
+            'notification_position', 'notification_duration',
+            'show_notification_preview', 'max_visible_notifications'
         ];
         
         foreach ($data as $key => $value) {

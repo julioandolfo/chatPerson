@@ -36,6 +36,12 @@
             SLA_BREACHED: 'sla_breached',
             MENTION_RECEIVED: 'mention_received'
         },
+        
+        // Cache para evitar tocar o mesmo evento várias vezes em sequência
+        lastPlayedEvent: {},
+        
+        // Intervalo mínimo entre sons do mesmo evento (ms)
+        eventDebounceMs: 1000,
 
         /**
          * Inicializar o Sound Manager
@@ -304,6 +310,15 @@
          */
         play: function(eventName) {
             console.log('[SoundManager] Tentando tocar som:', eventName);
+            
+            // Debounce: evitar tocar o mesmo evento várias vezes em sequência
+            const now = Date.now();
+            const lastPlayed = this.lastPlayedEvent[eventName] || 0;
+            if (now - lastPlayed < this.eventDebounceMs) {
+                console.log('[SoundManager] Debounce ativo para:', eventName);
+                return false;
+            }
+            this.lastPlayedEvent[eventName] = now;
             
             // Verificar se está habilitado
             if (!this.isEventEnabled(eventName)) {

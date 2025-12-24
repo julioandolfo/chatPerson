@@ -260,9 +260,13 @@ class RealtimeController
                                 // Se for verificação recente, considerar nova se criada nos últimos 30s
                                 if ($shouldCheckRecent && $createdAt > $checkRecentThreshold) {
                                     $isNewConversation = true;
-                                } elseif ($createdAt > ($lastUpdateTime / 1000)) {
+                                } elseif ($lastUpdateTime > 0 && $createdAt > ($lastUpdateTime / 1000)) {
+                                    // Só considerar nova se lastUpdateTime > 0 (não é primeira requisição)
+                                    // E se a conversa foi criada depois do último update
                                     $isNewConversation = true;
                                 }
+                                // Se lastUpdateTime = 0 (primeira requisição), não considerar como nova
+                                // para evitar notificar conversas que já existiam quando o usuário entrou
                             }
                         }
 

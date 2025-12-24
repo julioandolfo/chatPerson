@@ -527,8 +527,8 @@ function testVisualNotification() {
 let availableSoundsCache = [];
 
 // Carregar sons disponíveis
-function loadAvailableSounds() {
-    if (availableSoundsCache.length > 0) {
+function loadAvailableSounds(forceReload = false) {
+    if (availableSoundsCache.length > 0 && !forceReload) {
         return Promise.resolve(availableSoundsCache);
     }
     
@@ -549,6 +549,40 @@ function loadAvailableSounds() {
     .catch(error => {
         console.error('Erro ao carregar sons:', error);
         return [];
+    });
+}
+
+// Atualizar todos os dropdowns de som com os sons disponíveis
+function updateAllSoundDropdowns() {
+    loadAvailableSounds(true).then(sounds => {
+        if (!sounds || sounds.length === 0) return;
+        
+        // Lista de eventos de som
+        const soundEvents = <?= json_encode(array_keys(UserSoundSettings::SOUND_EVENTS)) ?>;
+        
+        soundEvents.forEach(eventKey => {
+            const select = document.getElementById(eventKey + '_sound');
+            if (!select) return;
+            
+            // Salvar valor atual
+            const currentValue = select.value;
+            
+            // Limpar opções
+            select.innerHTML = '';
+            
+            // Adicionar todas as opções
+            sounds.forEach(sound => {
+                const option = document.createElement('option');
+                option.value = sound.filename;
+                option.textContent = sound.name;
+                if (sound.filename === currentValue) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+        });
+        
+        console.log('[Sounds] Dropdowns atualizados com', sounds.length, 'sons');
     });
 }
 
@@ -609,12 +643,22 @@ function saveSoundSettings() {
         data[cb.name] = cb.checked ? 1 : 0;
     });
     
-    // Processar outros campos
+    // Processar outros campos (selects, inputs, etc)
     formData.forEach((value, key) => {
         if (!key.includes('_enabled')) {
             data[key] = value;
         }
     });
+    
+    // Também processar selects diretamente (garantia extra)
+    const selects = form.querySelectorAll('select');
+    selects.forEach(select => {
+        if (select.name && select.value) {
+            data[select.name] = select.value;
+        }
+    });
+    
+    console.log('[SoundSettings] Salvando configurações:', data);
     
     const btn = document.getElementById('saveSoundsBtn');
     btn.disabled = true;
@@ -750,6 +794,27 @@ function applySoundToEvent(soundFilename, eventKey) {
     
     const select = document.getElementById(eventKey + '_sound');
     if (select) {
+        // Verificar se a opção já existe no dropdown
+        let optionExists = false;
+        for (let i = 0; i < select.options.length; i++) {
+            if (select.options[i].value === soundFilename) {
+                optionExists = true;
+                break;
+            }
+        }
+        
+        // Se não existe, adicionar a opção dinamicamente
+        if (!optionExists) {
+            // Buscar o nome do som no cache
+            const soundInfo = availableSoundsCache.find(s => s.filename === soundFilename);
+            const soundName = soundInfo ? soundInfo.name : soundFilename;
+            
+            const newOption = document.createElement('option');
+            newOption.value = soundFilename;
+            newOption.textContent = soundName;
+            select.appendChild(newOption);
+        }
+        
         select.value = soundFilename;
         
         // Habilitar o evento se estiver desabilitado
@@ -769,7 +834,7 @@ function applySoundToEvent(soundFilename, eventKey) {
             timer: 2000
         });
         
-        // Resetar o select
+        // Resetar o select do card do som customizado
         const customSoundRow = event.target.closest('.d-flex.flex-column');
         if (customSoundRow) {
             const selectInRow = customSoundRow.querySelector('select');
@@ -843,11 +908,11 @@ function uploadCustomSound() {
                 </div>
             `;
             
-            // Recarregar lista
+            // Recarregar lista de sons customizados
             loadCustomSounds();
             
-            // Recarregar página para atualizar selects
-            setTimeout(() => location.reload(), 1000);
+            // Atualizar os dropdowns de todos os eventos
+            updateAllSoundDropdowns();
         } else {
             Swal.fire({
                 icon: 'error',

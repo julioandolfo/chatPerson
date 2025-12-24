@@ -308,7 +308,7 @@ ob_start();
 
 <?php 
 // Buscar usuários para associar aos ramais
-$users = \App\Helpers\Database::fetchAll("SELECT id, name, email FROM users WHERE deleted_at IS NULL ORDER BY name ASC");
+$users = \App\Helpers\Database::fetchAll("SELECT id, name, email FROM users WHERE status = 'active' ORDER BY name ASC");
 ?>
 
 <?php 

@@ -161,6 +161,18 @@ class ConversationMention extends Model
     }
 
     /**
+     * Cancelar convite (quem enviou pode cancelar)
+     */
+    public static function cancel(int $mentionId): bool
+    {
+        $sql = "UPDATE conversation_mentions 
+                SET status = 'cancelled', responded_at = NOW(), updated_at = NOW()
+                WHERE id = ? AND status = 'pending'";
+        
+        return Database::query($sql, [$mentionId]) !== false;
+    }
+
+    /**
      * Verificar se usuário já foi mencionado em uma conversa (pendente)
      */
     public static function hasPendingMention(int $conversationId, int $userId): bool

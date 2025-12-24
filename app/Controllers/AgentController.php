@@ -25,7 +25,7 @@ class AgentController
             try {
                 $sql = "SELECT u.id, u.name, u.email, u.status 
                         FROM users u
-                        WHERE u.role IN ('agent', 'admin', 'supervisor')
+                        WHERE u.role IN ('super_admin', 'admin', 'supervisor', 'senior_agent', 'agent', 'junior_agent')
                         ORDER BY u.name ASC";
                 $agents = \App\Helpers\Database::fetchAll($sql);
                 Response::json([
@@ -57,7 +57,7 @@ class AgentController
         });
 
         try {
-            // Buscar apenas agentes (role = agent, admin, supervisor)
+            // Buscar apenas agentes (todos os níveis)
             $sql = "SELECT u.*, 
                            GROUP_CONCAT(DISTINCT r.name) as roles_names,
                            GROUP_CONCAT(DISTINCT d.name) as departments_names,
@@ -68,7 +68,7 @@ class AgentController
                     LEFT JOIN agent_departments ad ON u.id = ad.user_id
                     LEFT JOIN departments d ON ad.department_id = d.id
                     LEFT JOIN conversations c ON u.id = c.agent_id AND c.status IN ('open', 'pending')
-                    WHERE u.role IN ('agent', 'admin', 'supervisor')";
+                    WHERE u.role IN ('super_admin', 'admin', 'supervisor', 'senior_agent', 'agent', 'junior_agent')";
             
             $params = [];
 

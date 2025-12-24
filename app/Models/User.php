@@ -38,13 +38,13 @@ class User extends Model
     }
 
     /**
-     * Buscar agentes ativos
+     * Buscar agentes ativos (todos os níveis de agentes)
      */
     public static function getActiveAgents(): array
     {
         $instance = new static();
         $sql = "SELECT id, name, email, avatar, role, status FROM {$instance->table} 
-                WHERE status = 'active' AND role IN ('agent', 'admin') 
+                WHERE status = 'active' AND role IN ('super_admin', 'admin', 'supervisor', 'senior_agent', 'agent', 'junior_agent') 
                 ORDER BY name ASC";
         return \App\Helpers\Database::fetchAll($sql);
     }

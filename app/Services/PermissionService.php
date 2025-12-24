@@ -299,11 +299,36 @@ class PermissionService
             return false;
         }
 
-        // Verificar permissões específicas de envio
+        // Verificar se é o agente responsável
         if (isset($conversation['agent_id']) && $conversation['agent_id'] == $userId) {
             return self::hasPermission($userId, 'messages.send.own');
         }
 
+        // ✅ Verificar se é PARTICIPANTE da conversa - participantes podem enviar mensagens
+        if (isset($conversation['id'])) {
+            // Verificar via participants_data (otimizado)
+            if (isset($conversation['participants_data']) && !empty($conversation['participants_data'])) {
+                $participants = explode('|||', $conversation['participants_data']);
+                foreach ($participants as $participant) {
+                    if (!empty($participant)) {
+                        $parts = explode(':', $participant);
+                        if (isset($parts[0]) && (int)$parts[0] === $userId) {
+                            // Participante pode enviar mensagens
+                            return self::hasPermission($userId, 'messages.send.own');
+                        }
+                    }
+                }
+            }
+            
+            // Fallback: verificar na tabela de participantes
+            if (class_exists('\App\Models\ConversationParticipant')) {
+                if (\App\Models\ConversationParticipant::isParticipant($conversation['id'], $userId)) {
+                    return self::hasPermission($userId, 'messages.send.own');
+                }
+            }
+        }
+
+        // Verificar se é do mesmo departamento
         if (isset($conversation['department_id'])) {
             $userDepartments = User::getDepartments($userId);
             foreach ($userDepartments as $dept) {

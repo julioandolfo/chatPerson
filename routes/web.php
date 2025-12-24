@@ -99,6 +99,7 @@ Router::get('/conversations/invites/count', [ConversationController::class, 'cou
 Router::get('/conversations/invites/history', [ConversationController::class, 'getInviteHistory'], ['Authentication']);
 Router::post('/conversations/invites/{mentionId}/accept', [ConversationController::class, 'acceptInvite'], ['Authentication']);
 Router::post('/conversations/invites/{mentionId}/decline', [ConversationController::class, 'declineInvite'], ['Authentication']);
+Router::post('/conversations/invites/{mentionId}/cancel', [ConversationController::class, 'cancelInvite'], ['Authentication']);
 
 // Rotas de ações de conversa
 Router::post('/conversations/{id}/mark-read', [ConversationController::class, 'markRead'], ['Authentication']);

@@ -71,6 +71,8 @@ class ConversationController
             'tag_ids' => isset($_GET['tag_ids']) && is_array($_GET['tag_ids']) ? array_map('intval', $_GET['tag_ids']) : (!empty($_GET['tag_id']) ? [(int)$_GET['tag_id']] : null),
             'whatsapp_account_id' => $_GET['whatsapp_account_id'] ?? null,
             'whatsapp_account_ids' => isset($_GET['whatsapp_account_ids']) && is_array($_GET['whatsapp_account_ids']) ? array_map('intval', $_GET['whatsapp_account_ids']) : (!empty($_GET['whatsapp_account_id']) ? [(int)$_GET['whatsapp_account_id']] : null),
+            'funnel_id' => !empty($_GET['funnel_id']) ? (int) $_GET['funnel_id'] : null,
+            'funnel_stage_id' => !empty($_GET['funnel_stage_id']) ? (int) $_GET['funnel_stage_id'] : null,
             'unanswered' => isset($_GET['unanswered']) && $_GET['unanswered'] === '1' ? true : null,
             'answered' => isset($_GET['answered']) && $_GET['answered'] === '1' ? true : null,
             'is_spam' => isset($_GET['status']) && $_GET['status'] === 'spam' ? true : null, // Filtro de spam
@@ -2351,6 +2353,28 @@ class ConversationController
             Response::json(['success' => false, 'message' => $e->getMessage()], 400);
         } catch (\Exception $e) {
             Response::json(['success' => false, 'message' => 'Erro ao recusar convite: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Cancelar convite de menção (quem enviou pode cancelar)
+     * POST /conversations/invites/{mentionId}/cancel
+     */
+    public function cancelInvite(int $mentionId): void
+    {
+        try {
+            $userId = \App\Helpers\Auth::id();
+            $result = \App\Services\ConversationMentionService::cancel($mentionId, $userId);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Convite cancelado.',
+                'mention' => $result
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => 'Erro ao cancelar convite: ' . $e->getMessage()], 500);
         }
     }
 

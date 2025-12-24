@@ -168,6 +168,39 @@ class ConversationMentionService
     }
 
     /**
+     * Cancelar convite de menção (quem enviou pode cancelar)
+     */
+    public static function cancel(int $mentionId, int $userId): array
+    {
+        // Buscar menção
+        $mention = ConversationMention::findWithDetails($mentionId);
+        if (!$mention) {
+            throw new \InvalidArgumentException('Convite não encontrado');
+        }
+        
+        // Verificar se é quem enviou o convite
+        if ($mention['mentioned_by'] != $userId) {
+            throw new \InvalidArgumentException('Você não pode cancelar este convite');
+        }
+        
+        // Verificar se está pendente
+        if ($mention['status'] !== 'pending') {
+            throw new \InvalidArgumentException('Este convite já foi respondido');
+        }
+        
+        // Cancelar menção (usando decline internamente)
+        ConversationMention::cancel($mentionId);
+        
+        // Buscar dados atualizados
+        $updatedMention = ConversationMention::findWithDetails($mentionId);
+        
+        // Notificar via WebSocket
+        self::notifyWebSocket($updatedMention, 'mention_cancelled');
+        
+        return $updatedMention;
+    }
+
+    /**
      * Obter convites pendentes para um usuário
      */
     public static function getPendingInvites(int $userId): array

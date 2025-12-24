@@ -3447,14 +3447,41 @@ body.dark-mode .swal2-content {
                                                         </div>
                 <div class="separator my-5"></div>
                 <div class="mb-5">
-                    <label class="form-label fw-semibold mb-2">Adicionar Participante:</label>
+                    <label class="form-label fw-semibold mb-2">Convidar Agente:</label>
                     <div class="d-flex gap-2">
                         <select id="participantUserSelect" class="form-select form-select-solid flex-grow-1">
-                            <option value="">Selecione um usuário...</option>
+                            <option value="">Selecione um agente...</option>
                         </select>
-                        <button type="button" class="btn btn-primary" id="addParticipantBtn" onclick="addParticipant()">Adicionar</button>
-                                                </div>
-                                            </div>
+                        <button type="button" class="btn btn-primary" id="addParticipantBtn" onclick="sendParticipantInvite()">
+                            <i class="ki-duotone ki-send fs-5 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Convidar
+                        </button>
+                    </div>
+                    <div class="form-text text-muted mt-2">
+                        <i class="ki-duotone ki-information-3 fs-7 me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        O agente receberá um convite e poderá aceitar ou recusar.
+                    </div>
+                </div>
+                
+                <!-- Convites Pendentes -->
+                <div class="mb-5" id="pendingInvitesSection" style="display: none;">
+                    <label class="form-label fw-semibold mb-2 text-warning">
+                        <i class="ki-duotone ki-timer fs-6 me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        Convites Pendentes:
+                    </label>
+                    <div id="pendingInvitesList"></div>
+                </div>
                 <div class="d-flex justify-content-end">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
                 </div>
@@ -4437,9 +4464,131 @@ function loadPendingInvitesCount() {
 document.addEventListener('DOMContentLoaded', function() {
     loadPendingInvitesCount();
     
-    // Atualizar a cada 30 segundos
+    // Atualizar a cada 30 segundos (fallback caso WebSocket não funcione)
     setInterval(loadPendingInvitesCount, 30000);
+    
+    // Configurar listeners WebSocket para convites em tempo real
+    setupInviteWebSocketListeners();
 });
+
+/**
+ * Configurar listeners WebSocket para notificações de convites em tempo real
+ */
+function setupInviteWebSocketListeners() {
+    // Verificar se o cliente WebSocket está disponível
+    if (typeof window.realtimeClient === 'undefined' && typeof window.websocketClient === 'undefined') {
+        console.warn('[Convites] Cliente WebSocket não encontrado, usando apenas polling');
+        return;
+    }
+    
+    const client = window.realtimeClient || window.websocketClient;
+    
+    // Listener para novo convite recebido
+    client.on('new_mention', (data) => {
+        console.log('[Convites] 🔔 Novo convite recebido:', data);
+        
+        // Atualizar contador do sino
+        loadPendingInvitesCount();
+        
+        // Mostrar notificação toast
+        if (typeof Swal !== 'undefined') {
+            const mentionData = data.mention || data;
+            Swal.fire({
+                icon: 'info',
+                title: 'Novo Convite!',
+                html: `<strong>${escapeHtml(mentionData.mentioned_by_name || 'Um agente')}</strong> convidou você para participar de uma conversa.`,
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: true,
+                confirmButtonText: 'Ver',
+                showCancelButton: true,
+                cancelButtonText: 'Fechar',
+                timer: 10000,
+                timerProgressBar: true
+            }).then(result => {
+                if (result.isConfirmed) {
+                    showPendingInvitesModal();
+                }
+            });
+        }
+        
+        // Tocar som de notificação se disponível
+        if (typeof playNotificationSound === 'function') {
+            playNotificationSound();
+        }
+    });
+    
+    // Listener para convite aceito (quem enviou o convite recebe)
+    client.on('mention_accepted', (data) => {
+        console.log('[Convites] ✅ Convite aceito:', data);
+        
+        const mentionData = data.mention || data;
+        
+        // Mostrar notificação
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                icon: 'success',
+                title: 'Convite Aceito!',
+                html: `<strong>${escapeHtml(mentionData.mentioned_user_name || 'O agente')}</strong> aceitou participar da conversa.`,
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 5000,
+                timerProgressBar: true
+            });
+        }
+        
+        // Atualizar lista de participantes se o modal estiver aberto
+        if (mentionData.conversation_id && window.currentConversationId == mentionData.conversation_id) {
+            loadParticipantsForConversation(mentionData.conversation_id);
+            
+            // Atualizar sidebar
+            if (typeof loadConversationDetails === 'function') {
+                loadConversationDetails(mentionData.conversation_id);
+            }
+        }
+    });
+    
+    // Listener para convite recusado (quem enviou o convite recebe)
+    client.on('mention_declined', (data) => {
+        console.log('[Convites] ❌ Convite recusado:', data);
+        
+        const mentionData = data.mention || data;
+        
+        // Mostrar notificação
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Convite Recusado',
+                html: `<strong>${escapeHtml(mentionData.mentioned_user_name || 'O agente')}</strong> recusou participar da conversa.`,
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 5000,
+                timerProgressBar: true
+            });
+        }
+        
+        // Atualizar lista de convites pendentes se o modal estiver aberto
+        if (mentionData.conversation_id) {
+            loadPendingInvitesForConversation(mentionData.conversation_id);
+        }
+    });
+    
+    // Listener para atualização de conversa (quando alguém é adicionado como participante)
+    client.on('conversation_updated', (data) => {
+        // Se o update inclui mudança de participantes, atualizar
+        if (data && data.type && data.type.includes('mention')) {
+            console.log('[Convites] 📝 Conversa atualizada (menção):', data);
+            
+            if (data.conversation_id && window.currentConversationId == data.conversation_id) {
+                loadParticipantsForConversation(data.conversation_id);
+            }
+        }
+    });
+    
+    console.log('[Convites] ✅ Listeners WebSocket configurados para convites em tempo real');
+}
 
 // ============================================
 // FIM SISTEMA DE MENÇÕES/CONVITES
@@ -7818,6 +7967,15 @@ function applyFilters() {
     if (funnel) params.append('funnel_id', funnel);
     if (stage) params.append('funnel_stage_id', stage);
     
+    console.log('📋 Filtros aplicados:', {funnel, stage, search, status, channel, department, tag, agent});
+    
+    // Resetar cache para forçar novo carregamento
+    window.lastConversationListSignature = null;
+    const conversationsList = document.querySelector('.conversations-list-items');
+    if (conversationsList) {
+        conversationsList.dataset.loaded = '0';
+    }
+    
     // Tratar filtro de agente
     if (agent === 'unassigned') {
         // Para "Não atribuídas", enviar agent_id=0 ou null (será tratado no backend)
@@ -7836,9 +7994,9 @@ function applyFilters() {
         });
     });
     
-    // Preservar filtros avançados simples (não preservar unanswered pois já foi tratado acima)
-    ['answered', 'date_from', 'date_to', 'pinned', 'order_by', 'order_dir', 'funnel_id', 'funnel_stage_id'].forEach(key => {
-        if (urlParams.has(key)) {
+    // Preservar filtros avançados simples (não preservar unanswered, funnel_id, funnel_stage_id pois já foram tratados acima)
+    ['answered', 'date_from', 'date_to', 'pinned', 'order_by', 'order_dir'].forEach(key => {
+        if (urlParams.has(key) && !params.has(key)) {
             params.append(key, urlParams.get(key));
         }
     });
@@ -12882,6 +13040,11 @@ function loadParticipantsForConversation(conversationIdParam = null) {
 
     console.log('loadParticipantsForConversation: conversationId =', conversationId);
     
+    // Também carregar convites pendentes
+    if (typeof loadPendingInvitesForConversation === 'function') {
+        loadPendingInvitesForConversation(conversationId);
+    }
+    
     // Carregar participantes atuais
     fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/participants`, {
         headers: {
@@ -13060,110 +13223,209 @@ function removeParticipant(conversationId, userId) {
     });
 }
 
-function addParticipant() {
+/**
+ * Enviar convite para participar da conversa (usa sistema de menções)
+ */
+function sendParticipantInvite() {
     const modalElement = document.getElementById('kt_modal_participants');
     const conversationId = modalElement.dataset.conversationId || window.currentConversationId;
     const userId = document.getElementById('participantUserSelect').value;
     
     if (!conversationId || conversationId === 'undefined' || conversationId === 'null') {
-        alert('ID da conversa não encontrado');
+        Swal.fire({
+            icon: 'warning',
+            title: 'Atenção',
+            text: 'ID da conversa não encontrado'
+        });
         return;
     }
     
     if (!userId) {
-        alert('Por favor, selecione um usuário');
+        Swal.fire({
+            icon: 'warning',
+            title: 'Atenção',
+            text: 'Por favor, selecione um agente'
+        });
         return;
     }
     
     const btn = document.getElementById('addParticipantBtn');
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Adicionando...';
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Enviando...';
     
-    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/participants`, {
+    // Usar endpoint de menção/convite
+    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/mention`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
             'Accept': 'application/json'
         },
-        body: JSON.stringify({ user_id: userId })
+        body: JSON.stringify({ 
+            user_id: parseInt(userId),
+            note: null // Pode adicionar nota opcional
+        })
     })
-    .then(response => {
-        // Primeiro, pegar o texto da resposta
-        return response.text().then(text => {
-            console.log('=== RESPOSTA BRUTA (addParticipant) ===');
-            console.log('Status:', response.status);
-            console.log('Content-Type:', response.headers.get('Content-Type'));
-            console.log('Primeiros 500 chars:', text.substring(0, 500));
-            
-            if (!response.ok) {
-                console.error('❌ Resposta com erro:', text);
-                throw new Error(`HTTP ${response.status}: ${text.substring(0, 100)}`);
-            }
-            
-            // Tentar fazer parse do JSON
-            try {
-                return JSON.parse(text);
-            } catch (e) {
-                console.error('❌ Erro ao fazer parse do JSON:', e);
-                console.error('Texto completo da resposta:', text);
-                throw new Error('Resposta não é JSON válido: ' + text.substring(0, 200));
-            }
-        });
-    })
+    .then(response => response.json())
     .then(data => {
         if (data.success) {
             // Limpar select
             document.getElementById('participantUserSelect').value = '';
+            
+            // Atualizar lista de convites pendentes no modal
+            loadPendingInvitesForConversation(conversationId);
+            
             // Recarregar participantes
             loadParticipantsForConversation(conversationId);
-            // Recarregar a conversa inteira para atualizar sidebar
-            if (window.currentConversationId == conversationId) {
-                if (typeof loadConversationDetails === 'function') {
-                    loadConversationDetails(conversationId);
-                } else if (typeof loadConversation === 'function') {
-                    loadConversation(conversationId);
-                }
-            }
-            // Atualizar apenas a seção de participantes do sidebar, se existir (sempre tenta)
-            if (typeof updateConversationSidebar === 'function') {
-                updateConversationSidebar({ id: conversationId }, []);
-            }
-            // Sucesso visual
-            if (typeof Swal !== 'undefined') {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Participante adicionado',
-                    timer: 1400,
-                    showConfirmButton: false
-                });
-            } else {
-                alert('Participante adicionado com sucesso');
-            }
             
-            // Toast de sucesso
-            if (typeof Swal !== 'undefined') {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Participante adicionado!',
-                    toast: true,
-                    position: 'top-end',
-                    showConfirmButton: false,
-                    timer: 2000
-                });
-            }
+            Swal.fire({
+                icon: 'success',
+                title: 'Convite Enviado!',
+                text: 'O agente receberá uma notificação e poderá aceitar ou recusar.',
+                timer: 3000,
+                showConfirmButton: false
+            });
         } else {
-            alert('Erro ao adicionar participante: ' + (data.message || 'Erro desconhecido'));
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: data.message || 'Erro ao enviar convite'
+            });
         }
     })
     .catch(error => {
-        console.error('Erro ao adicionar participante:', error);
-        alert('Erro ao adicionar participante: ' + error.message);
+        console.error('Erro ao enviar convite:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro ao enviar convite: ' + error.message
+        });
     })
     .finally(() => {
         btn.disabled = false;
-        btn.innerHTML = 'Adicionar';
+        btn.innerHTML = '<i class="ki-duotone ki-send fs-5 me-1"><span class="path1"></span><span class="path2"></span></i> Convidar';
     });
+}
+
+/**
+ * Carregar convites pendentes de uma conversa específica
+ */
+function loadPendingInvitesForConversation(conversationId) {
+    const section = document.getElementById('pendingInvitesSection');
+    const list = document.getElementById('pendingInvitesList');
+    
+    if (!section || !list) return;
+    
+    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/mentions`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.mentions && data.mentions.length > 0) {
+            // Filtrar apenas pendentes
+            const pending = data.mentions.filter(m => m.status === 'pending');
+            
+            if (pending.length > 0) {
+                section.style.display = 'block';
+                list.innerHTML = pending.map(m => `
+                    <div class="d-flex align-items-center gap-2 p-2 border border-warning rounded mb-2" style="background: rgba(255, 193, 7, 0.1);">
+                        <div class="symbol symbol-30px symbol-circle">
+                            <div class="symbol-label bg-light-warning text-warning fw-bold fs-7">
+                                ${(m.mentioned_user_name || 'U').charAt(0).toUpperCase()}
+                            </div>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold fs-7">${escapeHtml(m.mentioned_user_name || 'Agente')}</div>
+                            <div class="text-muted fs-8">
+                                <i class="ki-duotone ki-timer fs-8 me-1">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                Aguardando resposta...
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-icon btn-light-danger p-0" 
+                                onclick="cancelInvite(${m.id}, ${conversationId})" 
+                                title="Cancelar convite">
+                            <i class="ki-duotone ki-cross fs-7">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                        </button>
+                    </div>
+                `).join('');
+            } else {
+                section.style.display = 'none';
+                list.innerHTML = '';
+            }
+        } else {
+            section.style.display = 'none';
+            list.innerHTML = '';
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao carregar convites pendentes:', error);
+        section.style.display = 'none';
+    });
+}
+
+/**
+ * Cancelar um convite pendente
+ */
+function cancelInvite(mentionId, conversationId) {
+    Swal.fire({
+        title: 'Cancelar Convite?',
+        text: 'O agente não receberá mais este convite.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, cancelar',
+        cancelButtonText: 'Não'
+    }).then(result => {
+        if (result.isConfirmed) {
+            fetch(`<?= \App\Helpers\Url::to("/conversations/invites") ?>/${mentionId}/cancel`, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadPendingInvitesForConversation(conversationId);
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Convite cancelado',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: data.message || 'Erro ao cancelar convite'
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao cancelar convite:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: 'Erro ao cancelar convite'
+                });
+            });
+        }
+    });
+}
+
+// Função legada para compatibilidade (redireciona para convite)
+function addParticipant() {
+    sendParticipantInvite();
 }
 
 // Upload de arquivo

@@ -1,4 +1,27 @@
 <!-- Sidebar Direita - Detalhes da Conversa -->
+<script>
+// Stubs imediatos para evitar ReferenceError em onclick inline
+(function() {
+    const stub = (name) => function(...args) {
+        console.warn(`[stub] ${name} chamado antes da definição real`, args);
+    };
+    window.moveConversationStage = window.moveConversationStage || stub('moveConversationStage');
+    window.markAsSpam = window.markAsSpam || stub('markAsSpam');
+    window.editContact = window.editContact || stub('editContact');
+    window.manageContactAgents = window.manageContactAgents || stub('manageContactAgents');
+    window.showAIHistory = window.showAIHistory || stub('showAIHistory');
+    window.removeAIAgent = window.removeAIAgent || stub('removeAIAgent');
+    window.showAddAIAgentModal = window.showAddAIAgentModal || stub('showAddAIAgentModal');
+    window.showAddParticipantModal = window.showAddParticipantModal || stub('showAddParticipantModal');
+    window.manageTags = window.manageTags || stub('manageTags');
+    window.escalateFromAI = window.escalateFromAI || stub('escalateFromAI');
+    window.assignConversation = window.assignConversation || stub('assignConversation');
+    window.changeDepartment = window.changeDepartment || stub('changeDepartment');
+    window.closeConversation = window.closeConversation || stub('closeConversation');
+    window.reopenConversation = window.reopenConversation || stub('reopenConversation');
+    window.addNote = window.addNote || stub('addNote');
+})();
+</script>
 <style>
 .conversation-sidebar {
     width: 0;

@@ -415,11 +415,7 @@ function loadAvailableSounds() {
 
 // Obter URL correta de um som pelo filename
 function getSoundUrl(filename) {
-    const sound = availableSoundsCache.find(s => s.filename === filename);
-    if (sound && sound.url) {
-        return sound.url;
-    }
-    // Fallback: assumir que é som do sistema
+    // Todos os sons agora ficam em /assets/sounds/
     return '/assets/sounds/' + filename;
 }
 

@@ -19,9 +19,9 @@ class SoundNotificationService
     public const SOUNDS_DIR = 'public/assets/sounds';
     
     /**
-     * Diretório de sons personalizados
+     * Diretório de sons personalizados (mesmo diretório dos sons do sistema para acesso direto)
      */
-    public const CUSTOM_SOUNDS_DIR = 'storage/sounds';
+    public const CUSTOM_SOUNDS_DIR = 'public/assets/sounds';
     
     /**
      * Extensões permitidas
@@ -176,9 +176,7 @@ class SoundNotificationService
                 'category' => $sound['category'],
                 'is_system' => (bool)$sound['is_system'],
                 'is_custom' => !$sound['is_system'],
-                'url' => $sound['is_system'] 
-                    ? '/assets/sounds/' . $sound['filename']
-                    : '/storage/sounds/' . $sound['filename']
+                'url' => '/assets/sounds/' . $sound['filename'] // Todos os sons agora ficam em assets/sounds
             ];
         }
         
@@ -244,7 +242,7 @@ class SoundNotificationService
             'id' => $id,
             'filename' => $filename,
             'name' => $name,
-            'url' => '/storage/sounds/' . $filename
+            'url' => '/assets/sounds/' . $filename
         ];
     }
 
@@ -297,9 +295,7 @@ class SoundNotificationService
      */
     public static function getSoundUrl(string $filename): string
     {
-        if (self::isCustomSound($filename)) {
-            return '/storage/sounds/' . $filename;
-        }
+        // Todos os sons agora ficam em /assets/sounds/ (sistema e customizados)
         return '/assets/sounds/' . $filename;
     }
 

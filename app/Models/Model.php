@@ -133,6 +133,18 @@ abstract class Model
         $instance = new static();
         // Escapar nome do campo com backticks para evitar problemas com palavras reservadas
         $fieldEscaped = "`{$field}`";
+        
+        // Tratar operador IN com arrays
+        if (strtoupper($operator) === 'IN' && is_array($value)) {
+            if (empty($value)) {
+                // Se o array estiver vazio, retornar array vazio (não há resultados)
+                return [];
+            }
+            $placeholders = implode(',', array_fill(0, count($value), '?'));
+            $sql = "SELECT * FROM `{$instance->table}` WHERE {$fieldEscaped} IN ({$placeholders})";
+            return Database::fetchAll($sql, $value);
+        }
+        
         $sql = "SELECT * FROM `{$instance->table}` WHERE {$fieldEscaped} {$operator} ?";
         return Database::fetchAll($sql, [$value]);
     }

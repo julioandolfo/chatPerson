@@ -256,9 +256,6 @@ Router::post('/settings/conversations', [SettingsController::class, 'saveConvers
 Router::get('/api/settings/sla', [SettingsController::class, 'getSLAConfig'], ['Authentication']); // API para obter config de SLA
 
 // Rotas de Configurações de Som
-// Rota para servir arquivos de som do storage (deve vir antes das outras rotas de sounds)
-Router::get('/storage/sounds/{filename}', [SoundSettingsController::class, 'serveSound'], ['Authentication']);
-
 Router::get('/settings/sounds', [SoundSettingsController::class, 'getUserSettings'], ['Authentication']);
 Router::post('/settings/sounds', [SoundSettingsController::class, 'updateUserSettings'], ['Authentication']);
 Router::get('/settings/sounds/system', [SoundSettingsController::class, 'getSystemSettings'], ['Authentication']);

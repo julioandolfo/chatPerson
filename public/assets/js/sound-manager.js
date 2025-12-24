@@ -23,11 +23,8 @@
         // Flag para indicar se está inicializado
         initialized: false,
         
-        // URL base para sons do sistema
+        // URL base para todos os sons (sistema e customizados)
         soundsBaseUrl: '/assets/sounds/',
-        
-        // URL base para sons customizados
-        customSoundsBaseUrl: '/storage/sounds/',
         
         // Eventos disponíveis
         events: {
@@ -290,13 +287,7 @@
         getSoundUrl: function(filename) {
             if (!filename) return null;
             
-            // Buscar na lista de sons disponíveis
-            const sound = this.availableSounds.find(s => s.filename === filename);
-            if (sound && sound.url) {
-                return sound.url;
-            }
-            
-            // Fallback: assumir que é som do sistema
+            // Todos os sons agora ficam em /assets/sounds/
             return this.soundsBaseUrl + filename;
         },
 

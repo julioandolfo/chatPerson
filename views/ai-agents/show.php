@@ -656,7 +656,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
     
     // Carregar conversas do agente
-    const agentId = <?= $agent['id'] ?>;
+    const agentId = ' . (int)($agent['id'] ?? 0) . ';
     let currentPage = 1;
     const limit = 20;
     

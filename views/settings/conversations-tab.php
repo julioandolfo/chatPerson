@@ -814,27 +814,33 @@ $tts = $cs['text_to_speech'] ?? [];
                         <div class="fv-row mb-7">
                             <label class="fw-semibold fs-6 mb-2">Estabilidade</label>
                             <input type="number" name="text_to_speech_stability" class="form-control form-control-solid" 
-                                   value="<?= $tts['stability'] ?? 0.5 ?>" min="0" max="1" step="0.1" 
-                                   data-provider="elevenlabs" />
-                            <div class="form-text">0.0 = mais variável, 1.0 = mais estável</div>
+                                   value="<?= $tts['stability'] ?? 0.5 ?>" min="0" max="1" step="0.01" 
+                                   lang="en"
+                                   data-provider="elevenlabs" 
+                                   placeholder="0.50" />
+                            <div class="form-text">⚠️ Use ponto (.), não vírgula. Ex: <strong>0.50</strong> (0.0 = variável, 1.0 = estável)</div>
                         </div>
                     </div>
                     <div class="col-lg-4">
                         <div class="fv-row mb-7">
                             <label class="fw-semibold fs-6 mb-2">Similaridade</label>
                             <input type="number" name="text_to_speech_similarity_boost" class="form-control form-control-solid" 
-                                   value="<?= $tts['similarity_boost'] ?? 0.75 ?>" min="0" max="1" step="0.1" 
-                                   data-provider="elevenlabs" />
-                            <div class="form-text">Quão similar à voz original (0.0 a 1.0)</div>
+                                   value="<?= $tts['similarity_boost'] ?? 0.75 ?>" min="0" max="1" step="0.01" 
+                                   lang="en"
+                                   data-provider="elevenlabs" 
+                                   placeholder="0.75" />
+                            <div class="form-text">⚠️ Use ponto (.), não vírgula. Ex: <strong>0.75</strong> (quão similar à voz original)</div>
                         </div>
                     </div>
                     <div class="col-lg-4">
                         <div class="fv-row mb-7">
                             <label class="fw-semibold fs-6 mb-2">Velocidade</label>
                             <input type="number" name="text_to_speech_speed" class="form-control form-control-solid" 
-                                   value="<?= $tts['speed'] ?? 1.0 ?>" min="0.25" max="4.0" step="0.1" 
-                                   data-provider="elevenlabs" />
-                            <div class="form-text">Velocidade de fala (0.25 a 4.0)</div>
+                                   value="<?= $tts['speed'] ?? 1.0 ?>" min="0.25" max="4.0" step="0.01" 
+                                   lang="en"
+                                   data-provider="elevenlabs" 
+                                   placeholder="1.00" />
+                            <div class="form-text">⚠️ Use ponto (.), não vírgula. Ex: <strong>1.00</strong> (0.25 a 4.0)</div>
                         </div>
                     </div>
                 </div>

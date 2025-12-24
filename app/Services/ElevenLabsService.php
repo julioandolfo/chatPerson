@@ -38,9 +38,13 @@ class ElevenLabsService
     {
         $startTime = microtime(true);
         
+        Logger::info("🔊 ElevenLabsService::generateAudio - INÍCIO (textLen=" . strlen($text) . ")");
+        Logger::info("🔊 ElevenLabsService - Settings: " . json_encode($settings));
+        
         // Obter API Key
         $apiKey = self::getApiKey();
         if (empty($apiKey)) {
+            Logger::error("🔊 ElevenLabsService - ❌ ERRO: API Key não configurada!");
             return [
                 'success' => false,
                 'audio_path' => null,
@@ -50,6 +54,8 @@ class ElevenLabsService
                 'duration' => 0.0
             ];
         }
+        
+        Logger::info("🔊 ElevenLabsService - ✅ API Key encontrada: " . substr($apiKey, 0, 8) . "...");
 
         // Configurações
         $voiceId = $settings['voice_id'] ?? '21m00Tcm4TlvDq8ikWAM'; // Voz padrão (Rachel)
@@ -58,6 +64,8 @@ class ElevenLabsService
         $similarityBoost = isset($settings['similarity_boost']) ? (float)$settings['similarity_boost'] : 0.75;
         $speed = isset($settings['speed']) ? (float)$settings['speed'] : 1.0;
         $speed = max(0.25, min(4.0, $speed)); // Limitar entre 0.25 e 4.0
+
+        Logger::info("🔊 ElevenLabsService - voiceId={$voiceId}, model={$model}, stability={$stability}, similarity={$similarityBoost}, speed={$speed}");
 
         // Preparar payload
         $payload = [
@@ -78,6 +86,9 @@ class ElevenLabsService
 
         // URL da API
         $url = self::API_URL . '/text-to-speech/' . urlencode($voiceId);
+        
+        Logger::info("🔊 ElevenLabsService - URL: {$url}");
+        Logger::info("🔊 ElevenLabsService - Payload: " . json_encode($payload, JSON_UNESCAPED_UNICODE));
 
         // Fazer requisição com retry
         $attempt = 0;
@@ -106,19 +117,26 @@ class ElevenLabsService
                 $audioData = curl_exec($ch);
                 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 $curlError = curl_error($ch);
+                $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
                 curl_close($ch);
 
+                Logger::info("🔊 ElevenLabsService - HTTP Code: {$httpCode}, Content-Type: {$contentType}, Data size: " . strlen($audioData ?? ''));
+
                 if ($curlError) {
+                    Logger::error("🔊 ElevenLabsService - ❌ cURL Error: {$curlError}");
                     throw new \Exception("Erro cURL: {$curlError}");
                 }
 
                 if ($httpCode !== 200) {
                     $errorData = json_decode($audioData, true);
-                    $errorMessage = $errorData['detail']['message'] ?? $errorData['detail']['msg'] ?? "HTTP {$httpCode}";
+                    $errorMessage = $errorData['detail']['message'] ?? $errorData['detail']['msg'] ?? $errorData['message'] ?? "HTTP {$httpCode}";
+                    Logger::error("🔊 ElevenLabsService - ❌ API Error: HTTP {$httpCode} - {$errorMessage}");
+                    Logger::error("🔊 ElevenLabsService - ❌ Response: " . substr($audioData ?? '', 0, 500));
                     throw new \Exception("Erro da API: {$errorMessage}");
                 }
 
                 // Sucesso
+                Logger::info("🔊 ElevenLabsService - ✅ Requisição bem-sucedida!");
                 break;
 
             } catch (\Exception $e) {
@@ -145,23 +163,47 @@ class ElevenLabsService
         // Salvar arquivo
         $tempDir = __DIR__ . '/../../public/assets/media/tts/';
         if (!is_dir($tempDir)) {
+            Logger::info("🔊 ElevenLabsService - Criando diretório: {$tempDir}");
             mkdir($tempDir, 0755, true);
         }
 
         $filename = 'tts_elevenlabs_' . uniqid() . '_' . time() . '.mp3';
         $filePath = $tempDir . $filename;
+        
+        Logger::info("🔊 ElevenLabsService - Salvando arquivo: {$filePath}");
         file_put_contents($filePath, $audioData);
+        
+        if (!file_exists($filePath)) {
+            Logger::error("🔊 ElevenLabsService - ❌ ERRO: Arquivo não foi salvo!");
+            return [
+                'success' => false,
+                'audio_path' => null,
+                'audio_url' => null,
+                'error' => 'Falha ao salvar arquivo de áudio',
+                'cost' => 0.0,
+                'duration' => 0.0
+            ];
+        }
+        
+        Logger::info("🔊 ElevenLabsService - ✅ Arquivo salvo: " . filesize($filePath) . " bytes");
 
         // Converter para formato WhatsApp se necessário
         $finalPath = $filePath;
         $finalUrl = '/assets/media/tts/' . $filename;
         
         if (!empty($settings['convert_to_whatsapp_format'])) {
+            Logger::info("🔊 ElevenLabsService - Convertendo para formato WhatsApp...");
             $converted = \App\Services\TTSService::convertToWhatsAppFormat($filePath, $tempDir);
+            
+            Logger::info("🔊 ElevenLabsService - Conversão: success=" . ($converted['success'] ? 'YES' : 'NO'));
+            
             if ($converted['success']) {
                 $finalPath = $converted['path'];
                 $finalUrl = $converted['url'];
                 @unlink($filePath);
+                Logger::info("🔊 ElevenLabsService - ✅ Convertido para: {$finalPath}");
+            } else {
+                Logger::error("🔊 ElevenLabsService - ⚠️ Falha na conversão, usando MP3 original");
             }
         }
 

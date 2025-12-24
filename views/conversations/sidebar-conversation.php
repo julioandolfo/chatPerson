@@ -136,15 +136,15 @@
                 
                 <!-- Funil e Etapa -->
                 <div class="sidebar-section" id="sidebar-funnel-stage-section" style="display: none;">
-                    <div class="sidebar-section-title d-flex justify-content-between align-items-center">
-                        <span>🎯 Funil e Etapa</span>
-                        <button class="btn btn-sm btn-icon btn-light-primary p-0" id="sidebar-move-stage-btn" onclick="if(typeof window.moveConversationStage === 'function') { window.moveConversationStage(); } else { console.error('moveConversationStage não definida'); }" title="Mover conversa">
-                            <i class="ki-duotone ki-arrows-circle fs-6">
-                                <span class="path1"></span>
-                                <span class="path2"></span>
-                            </i>
-                        </button>
-                    </div>
+                <div class="sidebar-section-title d-flex justify-content-between align-items-center">
+                    <span>🎯 Funil e Etapa</span>
+                    <button class="btn btn-sm btn-icon btn-light-primary p-0" id="sidebar-move-stage-btn" title="Mover conversa">
+                        <i class="ki-duotone ki-arrows-circle fs-6">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                    </button>
+                </div>
                     
                     <!-- Card com cor da etapa -->
                     <div class="card border border-gray-300 mb-3" id="sidebar-funnel-card">

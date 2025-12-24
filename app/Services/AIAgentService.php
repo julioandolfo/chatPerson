@@ -347,19 +347,28 @@ class AIAgentService
             $audioAttachment = null;
             $ttsSettings = \App\Services\TTSService::getSettings();
             
+            \App\Helpers\Logger::info("AIAgentService::processMessage - ⚙️ TTS Settings: enabled=" . ($ttsSettings['enabled'] ? 'YES' : 'NO') . ", auto=" . ($ttsSettings['auto_generate_audio'] ? 'YES' : 'NO') . ", provider=" . ($ttsSettings['provider'] ?? 'none'));
+            
             if (!empty($ttsSettings['enabled']) && !empty($ttsSettings['auto_generate_audio'])) {
                 try {
-                    \App\Helpers\Logger::info("AIAgentService::processMessage - Gerando áudio com TTS (provider=" . ($ttsSettings['provider'] ?? 'openai') . ", len=" . strlen($response['content']) . ")");
+                    \App\Helpers\Logger::info("AIAgentService::processMessage - 🎤 Gerando áudio com TTS (provider=" . ($ttsSettings['provider'] ?? 'openai') . ", len=" . strlen($response['content']) . ")");
+                    \App\Helpers\Logger::info("AIAgentService::processMessage - 🎤 TTS Options: voice=" . ($ttsSettings['voice_id'] ?? 'null') . ", model=" . ($ttsSettings['model'] ?? 'null') . ", lang=" . ($ttsSettings['language'] ?? 'null') . ", speed=" . ($ttsSettings['speed'] ?? 'null'));
                     
                     $ttsResult = \App\Services\TTSService::generateAudio($response['content'], [
                         'voice_id' => $ttsSettings['voice_id'] ?? null,
                         'model' => $ttsSettings['model'] ?? null,
                         'language' => $ttsSettings['language'] ?? 'pt',
                         'speed' => $ttsSettings['speed'] ?? 1.0,
+                        'stability' => $ttsSettings['stability'] ?? 0.5,
+                        'similarity_boost' => $ttsSettings['similarity_boost'] ?? 0.75,
                         'convert_to_whatsapp_format' => $ttsSettings['convert_to_whatsapp_format'] ?? true
                     ]);
                     
+                    \App\Helpers\Logger::info("AIAgentService::processMessage - 🎤 TTS Result: success=" . ($ttsResult['success'] ? 'YES' : 'NO') . ", error=" . ($ttsResult['error'] ?? 'none'));
+                    
                     if ($ttsResult['success'] && !empty($ttsResult['audio_path'])) {
+                        \App\Helpers\Logger::info("AIAgentService::processMessage - 🎤 Audio file exists: " . (file_exists($ttsResult['audio_path']) ? 'YES' : 'NO') . ", size=" . (file_exists($ttsResult['audio_path']) ? filesize($ttsResult['audio_path']) : '0'));
+                        
                         // Criar attachment para o áudio
                         // ✅ CORRIGIDO: Usar caminho relativo correto e adicionar URL
                         $audioAttachment = [
@@ -377,10 +386,12 @@ class AIAgentService
                         
                         \App\Helpers\Logger::info("AIAgentService::processMessage - ✅ Áudio gerado: " . $ttsResult['audio_path'] . " (cost=$" . $ttsResult['cost'] . ", url=" . $ttsResult['audio_url'] . ")");
                     } else {
-                        \App\Helpers\Logger::error("AIAgentService::processMessage - ❌ Falha ao gerar áudio: " . ($ttsResult['error'] ?? 'Erro desconhecido'));
+                        \App\Helpers\Logger::error("AIAgentService::processMessage - ❌ FALHA ao gerar áudio!");
+                        \App\Helpers\Logger::error("AIAgentService::processMessage - ❌ Error details: " . json_encode($ttsResult));
                     }
                 } catch (\Exception $e) {
-                    \App\Helpers\Logger::error("AIAgentService::processMessage - Erro ao gerar áudio: " . $e->getMessage());
+                    \App\Helpers\Logger::error("AIAgentService::processMessage - ❌ EXCEPTION ao gerar áudio: " . $e->getMessage());
+                    \App\Helpers\Logger::error("AIAgentService::processMessage - ❌ Stack trace: " . $e->getTraceAsString());
                     // Continuar mesmo se falhar
                 }
             }

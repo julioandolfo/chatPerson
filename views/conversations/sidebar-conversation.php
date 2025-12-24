@@ -138,7 +138,10 @@
                 <div class="sidebar-section" id="sidebar-funnel-stage-section" style="display: none;">
                 <div class="sidebar-section-title d-flex justify-content-between align-items-center">
                     <span>🎯 Funil e Etapa</span>
-                    <button class="btn btn-sm btn-icon btn-light-primary p-0" id="sidebar-move-stage-btn" title="Mover conversa">
+                    <button class="btn btn-sm btn-icon btn-light-primary p-0" 
+                            id="sidebar-move-stage-btn" 
+                            title="Mover conversa"
+                            onclick="console.log('🖱️ Click inline detectado'); if (typeof window.moveConversationStage === 'function') { window.moveConversationStage(); } else { console.error('Função não existe:', typeof window.moveConversationStage); }">
                         <i class="ki-duotone ki-arrows-circle fs-6">
                             <span class="path1"></span>
                             <span class="path2"></span>
@@ -497,24 +500,58 @@
 console.log('📋 sidebar-conversation.php carregado');
 
 // Adicionar listener ao botão de mover estágio (fallback)
-document.addEventListener('DOMContentLoaded', function() {
+function initMoveStageButton() {
+    console.log('🔍 Procurando botão sidebar-move-stage-btn...');
     const moveStageBtn = document.getElementById('sidebar-move-stage-btn');
+    console.log('🔍 Botão encontrado:', moveStageBtn);
+    
     if (moveStageBtn) {
         console.log('🔧 Adicionando listener ao botão de mover estágio');
-        moveStageBtn.addEventListener('click', function(e) {
+        
+        // Remover listener antigo se existir
+        moveStageBtn.replaceWith(moveStageBtn.cloneNode(true));
+        const newBtn = document.getElementById('sidebar-move-stage-btn');
+        
+        newBtn.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
             console.log('🖱️ Botão de mover estágio clicado (via listener)');
+            console.log('🔍 Verificando window.moveConversationStage:', typeof window.moveConversationStage);
+            
             if (typeof window.moveConversationStage === 'function') {
+                console.log('✅ Chamando moveConversationStage...');
                 window.moveConversationStage();
             } else {
                 console.error('❌ moveConversationStage não está definida!');
             }
         });
+        console.log('✅ Listener adicionado com sucesso!');
     } else {
-        console.warn('⚠️ Botão sidebar-move-stage-btn não encontrado');
+        console.warn('⚠️ Botão sidebar-move-stage-btn não encontrado no DOM');
     }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('📋 DOMContentLoaded disparado em sidebar-conversation.php');
+    initMoveStageButton();
 });
+
+// Também tentar inicializar depois de um pequeno delay (caso o sidebar seja carregado dinamicamente)
+setTimeout(function() {
+    console.log('⏰ Tentando inicializar botão após delay...');
+    initMoveStageButton();
+}, 1000);
+
+// Expor função globalmente para debug e uso direto
+window.debugMoveStage = function() {
+    console.log('🐛 DEBUG: Verificando estado do botão e função');
+    console.log('Botão existe:', !!document.getElementById('sidebar-move-stage-btn'));
+    console.log('Função existe:', typeof window.moveConversationStage);
+    console.log('currentConversationId:', window.currentConversationId);
+    if (typeof window.moveConversationStage === 'function') {
+        window.moveConversationStage();
+    }
+};
 
 // Funções de ação do sidebar
 window.editContact = function(contactId) {
@@ -777,10 +814,11 @@ window.addNote = function(conversationId) {
 // Função para mover conversa de funil/etapa
 console.log('🔧 Definindo window.moveConversationStage...');
 
-// Definir a função de forma global e garantida
-if (typeof window.moveConversationStage !== 'function') {
+// Definir a função de forma global e garantida (IIFE para evitar conflitos)
+(function() {
     window.moveConversationStage = function() {
         console.log('✅ moveConversationStage chamada!');
+        console.log('📊 currentConversationId:', window.currentConversationId);
     const conversationId = window.currentConversationId || 0;
     if (!conversationId) {
         Swal.fire({
@@ -926,10 +964,10 @@ if (typeof window.moveConversationStage !== 'function') {
         });
     });
     };
+    
     console.log('✅ window.moveConversationStage definida com sucesso!');
-} else {
-    console.warn('⚠️ window.moveConversationStage já estava definida');
-}
+    console.log('🔍 Tipo de moveConversationStage:', typeof window.moveConversationStage);
+})();
 
 // ============================================================================
 // FUNÇÕES DE GERENCIAMENTO DE AGENTES DE IA

@@ -4852,25 +4852,45 @@ function applySlaVisualState(conversationItem, conv) {
 }
 
 function sortConversationList() {
-    const list = document.querySelector('.conversations-list-items');
-    if (!list) return;
-    const items = Array.from(list.children);
-    // Ordenar: pinned primeiro, depois updatedAt desc, depois ID desc (critério de desempate)
-    items.sort((a, b) => {
-        const pinnedA = a.classList.contains('pinned') ? 1 : 0;
-        const pinnedB = b.classList.contains('pinned') ? 1 : 0;
-        if (pinnedA !== pinnedB) return pinnedB - pinnedA;
+    try {
+        const list = document.querySelector('.conversations-list-items');
+        if (!list) {
+            console.log('🔍 sortConversationList: lista não encontrada');
+            return;
+        }
         
-        const dateA = Date.parse(a.dataset.updatedAt || '') || 0;
-        const dateB = Date.parse(b.dataset.updatedAt || '') || 0;
-        if (dateA !== dateB) return dateB - dateA;
+        const items = Array.from(list.children);
+        if (items.length === 0) {
+            console.log('🔍 sortConversationList: nenhum item para ordenar');
+            return;
+        }
         
-        // Critério de desempate: ID da conversa (maior primeiro = mais recente)
-        const idA = parseInt(a.dataset.conversationId) || 0;
-        const idB = parseInt(b.dataset.conversationId) || 0;
-        return idB - idA;
-    });
-    items.forEach(item => list.appendChild(item));
+        // Ordenar: pinned primeiro, depois updatedAt desc, depois ID desc (critério de desempate)
+        items.sort((a, b) => {
+            const pinnedA = a.classList?.contains('pinned') ? 1 : 0;
+            const pinnedB = b.classList?.contains('pinned') ? 1 : 0;
+            if (pinnedA !== pinnedB) return pinnedB - pinnedA;
+            
+            const dateA = Date.parse(a.dataset?.updatedAt || '') || 0;
+            const dateB = Date.parse(b.dataset?.updatedAt || '') || 0;
+            if (dateA !== dateB) return dateB - dateA;
+            
+            // Critério de desempate: ID da conversa (maior primeiro = mais recente)
+            const idA = parseInt(a.dataset?.conversationId) || 0;
+            const idB = parseInt(b.dataset?.conversationId) || 0;
+            return idB - idA;
+        });
+        
+        items.forEach(item => {
+            if (item && list) {
+                list.appendChild(item);
+            }
+        });
+        
+        console.log('✅ sortConversationList: lista ordenada com sucesso');
+    } catch (error) {
+        console.error('❌ Erro em sortConversationList:', error);
+    }
 }
 
 // Atualizar preview/tempo/badge de um item de conversa com dados recebidos

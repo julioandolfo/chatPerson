@@ -22,6 +22,210 @@
     window.addNote = window.addNote || stub('addNote');
 })();
 </script>
+
+<script>
+// Definições reais carregadas cedo (substituem os stubs)
+document.addEventListener('DOMContentLoaded', function() {
+    // Mover conversa (funil/etapa)
+    window.moveConversationStage = function() {
+        const conversationId = window.currentConversationId || 0;
+        if (!conversationId) {
+            Swal.fire({ icon: 'warning', title: 'Atenção', text: 'Selecione uma conversa primeiro' });
+            return;
+        }
+        fetch('<?= \App\Helpers\Url::to("/funnels") ?>', {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success || !data.funnels || data.funnels.length === 0) throw new Error('Nenhum funil disponível');
+            const funnels = data.funnels;
+            const funnelOptions = funnels.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+            Swal.fire({
+                title: 'Mover Conversa',
+                html: `
+                    <div class="mb-4">
+                        <label class="form-label">Selecione o Funil:</label>
+                        <select id="swal-funnel-select" class="form-select">
+                            <option value="">Selecione...</option>
+                            ${funnelOptions}
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label">Selecione a Etapa:</label>
+                        <select id="swal-stage-select" class="form-select" disabled>
+                            <option value="">Selecione um funil primeiro</option>
+                        </select>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Mover',
+                cancelButtonText: 'Cancelar',
+                didOpen: () => {
+                    const funnelSelect = document.getElementById('swal-funnel-select');
+                    const stageSelect = document.getElementById('swal-stage-select');
+                    funnelSelect.addEventListener('change', (e) => {
+                        const funnelId = e.target.value;
+                        if (!funnelId) {
+                            stageSelect.disabled = true;
+                            stageSelect.innerHTML = '<option value="">Selecione um funil primeiro</option>';
+                            return;
+                        }
+                        fetch(`<?= \App\Helpers\Url::to("/funnels") ?>/${funnelId}/stages/json`, {
+                            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.success && data.stages) {
+                                const stageOptions = data.stages.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+                                stageSelect.innerHTML = `<option value="">Selecione...</option>${stageOptions}`;
+                                stageSelect.disabled = false;
+                            }
+                        })
+                        .catch(() => {
+                            stageSelect.innerHTML = '<option value="">Erro ao carregar etapas</option>';
+                        });
+                    });
+                },
+                preConfirm: () => {
+                    const funnelId = document.getElementById('swal-funnel-select').value;
+                    const stageId = document.getElementById('swal-stage-select').value;
+                    if (!funnelId || !stageId) {
+                        Swal.showValidationMessage('Selecione um funil e uma etapa');
+                        return false;
+                    }
+                    return { funnelId, stageId };
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const { stageId } = result.value;
+                    const formData = new FormData();
+                    formData.append('stage_id', stageId);
+                    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/move-stage`, {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            Swal.fire({ icon: 'success', title: 'Sucesso!', text: 'Conversa movida com sucesso', timer: 2000, showConfirmButton: false });
+                            if (typeof selectConversation === 'function') selectConversation(conversationId);
+                        } else {
+                            throw new Error(data.message || 'Erro ao mover conversa');
+                        }
+                    })
+                    .catch(error => {
+                        Swal.fire({ icon: 'error', title: 'Erro', text: error.message });
+                    });
+                }
+            });
+        })
+        .catch(error => {
+            Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao carregar funis: ' + error.message });
+        });
+    };
+
+    // Marcar como spam
+    window.markAsSpam = function(conversationId) {
+        const convId = conversationId || window.currentConversationId || 0;
+        if (!convId) { alert('Nenhuma conversa selecionada'); return; }
+        if (!confirm('Deseja realmente marcar esta conversa como spam? Esta ação não pode ser desfeita e a conversa será fechada automaticamente.')) return;
+        fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${convId}/spam`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                Swal.fire({ icon: 'success', title: 'Sucesso!', text: 'Conversa marcada como spam', timer: 2000, showConfirmButton: false })
+                    .then(() => window.location.reload());
+            } else {
+                Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao marcar como spam: ' + (data.message || 'Erro desconhecido') });
+            }
+        })
+        .catch(() => {
+            Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao marcar como spam' });
+        });
+    };
+
+    // Editar contato
+    window.editContact = function(contactId) {
+        const contactIdValue = contactId || window.currentConversation?.contact_id || 0;
+        if (!contactIdValue) {
+            Swal.fire({ icon: 'warning', title: 'Atenção', text: 'Contato não encontrado' });
+            return;
+        }
+        fetch(`<?= \App\Helpers\Url::to('/contacts') ?>/${contactIdValue}`, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+        })
+        .then(r => {
+            if (!r.ok) throw new Error('Erro ao carregar contato');
+            return r.json();
+        })
+        .then(data => {
+            if (!data.success || !data.contact) throw new Error('Erro ao carregar dados do contato');
+            const contact = data.contact;
+            document.getElementById('editContactId').value = contact.id;
+            document.getElementById('editContactName').value = contact.name || '';
+            document.getElementById('editContactLastName').value = contact.last_name || '';
+            document.getElementById('editContactEmail').value = contact.email || '';
+            document.getElementById('editContactPhone').value = contact.phone || '';
+            document.getElementById('editContactCity').value = contact.city || '';
+            document.getElementById('editContactCountry').value = contact.country || '';
+            document.getElementById('editContactCompany').value = contact.company || '';
+            document.getElementById('editContactBio').value = contact.bio || '';
+            const modal = new bootstrap.Modal(document.getElementById('kt_modal_edit_contact'));
+            modal.show();
+        })
+        .catch(error => {
+            Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao carregar dados do contato: ' + error.message });
+        });
+    };
+
+    // Trocar departamento
+    window.changeDepartment = function(conversationId) {
+        const modal = new bootstrap.Modal(document.getElementById('kt_modal_change_department'));
+        const conversationIdValue = conversationId || window.currentConversationId || 0;
+        document.getElementById('changeDepartmentConversationId').value = conversationIdValue;
+        const departmentNameEl = document.querySelector('[data-field="department_name"]');
+        const currentDepartmentId = departmentNameEl?.dataset.departmentId || '';
+        const selectEl = document.getElementById('changeDepartmentSelect');
+        if (selectEl) selectEl.value = currentDepartmentId || '';
+        modal.show();
+    };
+
+    // Fechar conversa
+    window.closeConversation = function(conversationId) {
+        if (!confirm('Deseja realmente encerrar esta conversa?')) return;
+        fetch(`/conversations/${conversationId}/close`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) window.location.reload();
+            else alert('Erro ao encerrar conversa: ' + (data.message || 'Erro desconhecido'));
+        })
+        .catch(() => alert('Erro ao encerrar conversa'));
+    };
+
+    // Reabrir conversa
+    window.reopenConversation = function(conversationId) {
+        if (!confirm('Deseja realmente reabrir esta conversa?')) return;
+        fetch(`/conversations/${conversationId}/reopen`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) window.location.reload();
+            else alert('Erro ao reabrir conversa: ' + (data.message || 'Erro desconhecido'));
+        })
+        .catch(() => alert('Erro ao reabrir conversa'));
+    };
+});
+</script>
 <style>
 .conversation-sidebar {
     width: 0;

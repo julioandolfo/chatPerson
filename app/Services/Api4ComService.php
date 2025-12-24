@@ -454,15 +454,50 @@ class Api4ComService
 
         $data = json_decode($response, true);
 
+        Logger::info("Api4ComService::fetchExtensionsFromApi - HTTP {$httpCode}, Response: " . substr($response, 0, 500));
+
         if ($httpCode >= 200 && $httpCode < 300) {
             // Normalizar resposta (pode ser array direto ou dentro de data/extensions)
             $extensions = $data['data'] ?? $data['extensions'] ?? $data ?? [];
+            
+            // Se não é array indexado, pode ser que a resposta veio em outro formato
+            if (!is_array($extensions) || (is_array($extensions) && !isset($extensions[0]) && !empty($extensions))) {
+                // Pode ser um objeto único ou formato diferente
+                Logger::info("Api4ComService::fetchExtensionsFromApi - Formato diferente, tentando normalizar");
+                if (isset($extensions['extensions'])) {
+                    $extensions = $extensions['extensions'];
+                } elseif (isset($extensions['items'])) {
+                    $extensions = $extensions['items'];
+                } elseif (isset($extensions['results'])) {
+                    $extensions = $extensions['results'];
+                }
+            }
+            
+            // Garantir que é array
+            if (!is_array($extensions)) {
+                $extensions = [];
+            }
             
             Logger::info("Api4ComService::fetchExtensionsFromApi - Encontrados " . count($extensions) . " ramais");
             
             return $extensions;
         } else {
-            $errorMsg = $data['error'] ?? $data['message'] ?? "HTTP {$httpCode}";
+            // Melhorar tratamento de erro
+            $errorMsg = "HTTP {$httpCode}";
+            if (is_array($data)) {
+                if (isset($data['error'])) {
+                    $errorMsg = is_array($data['error']) ? json_encode($data['error']) : $data['error'];
+                } elseif (isset($data['message'])) {
+                    $errorMsg = is_array($data['message']) ? json_encode($data['message']) : $data['message'];
+                } elseif (isset($data['msg'])) {
+                    $errorMsg = $data['msg'];
+                } else {
+                    $errorMsg = "HTTP {$httpCode}: " . json_encode($data);
+                }
+            } elseif (!empty($response)) {
+                $errorMsg = "HTTP {$httpCode}: " . substr($response, 0, 200);
+            }
+            
             Logger::error("Api4ComService::fetchExtensionsFromApi - Erro API: " . $errorMsg);
             throw new \Exception('Erro na API: ' . $errorMsg);
         }

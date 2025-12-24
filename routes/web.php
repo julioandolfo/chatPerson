@@ -221,6 +221,8 @@ Router::delete('/integrations/api4com/{id}', [Api4ComController::class, 'delete'
 Router::post('/integrations/api4com/{id}/sync-extensions', [Api4ComController::class, 'syncExtensions'], ['Authentication']);
 Router::get('/integrations/api4com/{id}/extensions', [Api4ComController::class, 'extensions'], ['Authentication']);
 Router::post('/integrations/api4com/{accountId}/extensions/{extensionId}/assign', [Api4ComController::class, 'assignExtension'], ['Authentication']);
+Router::post('/integrations/api4com/{accountId}/extensions', [Api4ComController::class, 'createExtension'], ['Authentication']);
+Router::delete('/integrations/api4com/{accountId}/extensions/{extensionId}', [Api4ComController::class, 'deleteExtension'], ['Authentication']);
 Router::get('/integrations/api4com/{id}/show', [Api4ComController::class, 'show'], ['Authentication']);
 
 // Rotas de Chamadas Api4Com

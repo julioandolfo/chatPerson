@@ -256,7 +256,7 @@ ob_start();
 <!--begin::Modal - Gerenciar Ramais-->
 <?php if (\App\Helpers\Permission::can('api4com.view')): ?>
 <div class="modal fade" id="kt_modal_extensions" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered mw-800px">
+    <div class="modal-dialog modal-dialog-centered mw-900px">
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="fw-bold">Gerenciar Ramais - <span id="extensions_account_name"></span></h2>
@@ -270,8 +270,53 @@ ob_start();
             <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
                 <input type="hidden" id="extensions_account_id" />
                 
+                <?php if (\App\Helpers\Permission::can('api4com.edit')): ?>
+                <!--begin::Adicionar Ramal-->
+                <div class="card card-flush bg-light-primary mb-5">
+                    <div class="card-header min-h-50px">
+                        <h3 class="card-title fw-bold text-primary">
+                            <i class="ki-duotone ki-plus-circle fs-2 me-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            Adicionar Ramal Manualmente
+                        </h3>
+                        <div class="card-toolbar">
+                            <button type="button" class="btn btn-sm btn-icon btn-light" data-bs-toggle="collapse" data-bs-target="#collapseAddExtension">
+                                <i class="ki-duotone ki-arrow-down fs-3"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="collapse" id="collapseAddExtension">
+                        <div class="card-body pt-0">
+                            <form id="form_add_extension" class="row g-3">
+                                <div class="col-md-3">
+                                    <label class="required form-label fs-7">Número do Ramal</label>
+                                    <input type="text" name="extension_number" class="form-control form-control-sm" placeholder="Ex: 1001" required />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label fs-7">ID na API (opcional)</label>
+                                    <input type="text" name="extension_id" class="form-control form-control-sm" placeholder="ID do ramal" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fs-7">Usuário SIP (opcional)</label>
+                                    <input type="text" name="sip_username" class="form-control form-control-sm" placeholder="Username SIP" />
+                                </div>
+                                <div class="col-md-2 d-flex align-items-end">
+                                    <button type="submit" class="btn btn-sm btn-primary w-100">
+                                        <i class="ki-duotone ki-plus fs-4"></i> Adicionar
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <!--end::Adicionar Ramal-->
+                <?php endif; ?>
+                
                 <div class="d-flex justify-content-between align-items-center mb-5">
-                    <div class="text-muted">
+                    <div class="text-muted fs-7">
                         <i class="ki-duotone ki-information-5 fs-4 me-1">
                             <span class="path1"></span>
                             <span class="path2"></span>
@@ -280,7 +325,7 @@ ob_start();
                         Associe ramais aos usuários para que possam fazer chamadas.
                     </div>
                     <?php if (\App\Helpers\Permission::can('api4com.edit')): ?>
-                    <button type="button" class="btn btn-sm btn-light-success" onclick="syncExtensionsFromModal()">
+                    <button type="button" class="btn btn-sm btn-light-success" onclick="syncExtensionsFromModal()" title="Buscar ramais automaticamente da API Api4Com">
                         <i class="ki-duotone ki-arrows-loop fs-4">
                             <span class="path1"></span>
                             <span class="path2"></span>
@@ -528,7 +573,7 @@ function renderExtensions(extensions, accountId) {
     const listDiv = document.getElementById("extensions_list");
     
     if (!extensions || extensions.length === 0) {
-        listDiv.innerHTML = \'<div class="alert alert-info"><i class="ki-duotone ki-information-5 fs-4 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>Nenhum ramal encontrado. Clique em "Sincronizar da API" para buscar os ramais.</div>\';
+        listDiv.innerHTML = \'<div class="alert alert-info"><i class="ki-duotone ki-information-5 fs-4 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>Nenhum ramal encontrado. Adicione ramais manualmente acima ou clique em "Sincronizar da API".</div>\';
         return;
     }
     
@@ -537,7 +582,10 @@ function renderExtensions(extensions, accountId) {
     html += \'<tbody>\';
     
     extensions.forEach(function(ext) {
-        const metadata = ext.metadata ? JSON.parse(ext.metadata) : {};
+        let metadata = {};
+        try {
+            metadata = ext.metadata ? JSON.parse(ext.metadata) : {};
+        } catch(e) {}
         const name = metadata.name || ext.extension_number || "Ramal";
         const statusClass = ext.status === "active" ? "success" : "warning";
         const statusText = ext.status === "active" ? "Ativo" : "Inativo";
@@ -560,7 +608,7 @@ function renderExtensions(extensions, accountId) {
         }
         html += \'</td>\';
         html += \'<td class="text-center"><span class="badge badge-light-\' + statusClass + \'">\' + statusText + \'</span></td>\';
-        html += \'<td class="text-end">-</td>\';
+        html += \'<td class="text-end"><button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="deleteExtension(\' + accountId + \', \' + ext.id + \')" title="Deletar ramal"><i class="ki-duotone ki-trash fs-5"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i></button></td>\';
         html += \'</tr>\';
     });
     
@@ -614,13 +662,80 @@ function syncExtensionsFromModal() {
             alert(data.message);
             loadExtensions(accountId);
         } else {
-            alert("Erro: " + (data.message || "Erro ao sincronizar ramais"));
+            alert("Erro: " + (data.message || "Erro ao sincronizar ramais") + "\\n\\nDica: Você pode adicionar ramais manualmente usando o formulário acima.");
         }
     })
     .catch(error => {
         btn.disabled = false;
         btn.innerHTML = originalHtml;
-        alert("Erro ao sincronizar ramais");
+        alert("Erro ao sincronizar ramais. Você pode adicionar ramais manualmente.");
+    });
+}
+
+// Criar ramal manualmente
+document.addEventListener("DOMContentLoaded", function() {
+    const formAddExtension = document.getElementById("form_add_extension");
+    if (formAddExtension) {
+        formAddExtension.addEventListener("submit", function(e) {
+            e.preventDefault();
+            
+            const accountId = document.getElementById("extensions_account_id").value;
+            const formData = new FormData(formAddExtension);
+            
+            const submitBtn = formAddExtension.querySelector("button[type=submit]");
+            const originalHtml = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = \'<span class="spinner-border spinner-border-sm"></span>\';
+            
+            fetch("' . \App\Helpers\Url::to('/integrations/api4com') . '/" + accountId + "/extensions", {
+                method: "POST",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalHtml;
+                
+                if (data.success) {
+                    formAddExtension.reset();
+                    loadExtensions(accountId);
+                } else {
+                    alert("Erro: " + (data.message || "Erro ao criar ramal"));
+                }
+            })
+            .catch(error => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalHtml;
+                alert("Erro ao criar ramal");
+            });
+        });
+    }
+});
+
+function deleteExtension(accountId, extensionId) {
+    if (!confirm("Tem certeza que deseja deletar este ramal?")) {
+        return;
+    }
+    
+    fetch("' . \App\Helpers\Url::to('/integrations/api4com') . '/" + accountId + "/extensions/" + extensionId, {
+        method: "DELETE",
+        headers: {
+            "X-Requested-With": "XMLHttpRequest"
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            loadExtensions(accountId);
+        } else {
+            alert("Erro: " + (data.message || "Erro ao deletar ramal"));
+        }
+    })
+    .catch(error => {
+        alert("Erro ao deletar ramal");
     });
 }
 </script>';

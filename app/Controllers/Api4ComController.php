@@ -306,5 +306,108 @@ class Api4ComController
             ], 500);
         }
     }
+
+    /**
+     * Criar ramal manualmente
+     */
+    public function createExtension(int $accountId): void
+    {
+        Permission::abortIfCannot('api4com.edit');
+        
+        try {
+            $account = Api4ComAccount::find($accountId);
+            if (!$account) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Conta não encontrada'
+                ], 404);
+                return;
+            }
+
+            $data = Request::post();
+            
+            $errors = Validator::validate($data, [
+                'extension_id' => 'nullable|string|max:255',
+                'extension_number' => 'required|string|max:50',
+                'sip_username' => 'nullable|string|max:255',
+                'user_id' => 'nullable|integer'
+            ]);
+
+            if (!empty($errors)) {
+                throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));
+            }
+
+            // Verificar se já existe
+            $existing = \App\Models\Api4ComExtension::findByExtensionId($data['extension_id'] ?? $data['extension_number'], $accountId);
+            
+            if ($existing) {
+                throw new \InvalidArgumentException('Já existe um ramal com este ID/número nesta conta');
+            }
+
+            $extensionData = [
+                'api4com_account_id' => $accountId,
+                'extension_id' => $data['extension_id'] ?? $data['extension_number'],
+                'extension_number' => $data['extension_number'],
+                'sip_username' => $data['sip_username'] ?? null,
+                'user_id' => !empty($data['user_id']) ? (int)$data['user_id'] : null,
+                'status' => 'active',
+                'metadata' => json_encode([
+                    'name' => $data['name'] ?? "Ramal {$data['extension_number']}",
+                    'created_manually' => true,
+                    'created_at' => date('Y-m-d H:i:s')
+                ])
+            ];
+
+            $extensionId = \App\Models\Api4ComExtension::create($extensionData);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Ramal criado com sucesso!',
+                'extension_id' => $extensionId
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error("Api4ComController::createExtension - Erro: " . $e->getMessage());
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao criar ramal: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Deletar ramal
+     */
+    public function deleteExtension(int $accountId, int $extensionId): void
+    {
+        Permission::abortIfCannot('api4com.delete');
+        
+        try {
+            $extension = \App\Models\Api4ComExtension::find($extensionId);
+            if (!$extension || $extension['api4com_account_id'] != $accountId) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Ramal não encontrado'
+                ], 404);
+                return;
+            }
+
+            \App\Models\Api4ComExtension::delete($extensionId);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Ramal deletado com sucesso!'
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao deletar ramal: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
 

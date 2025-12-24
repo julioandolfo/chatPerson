@@ -327,9 +327,9 @@ class Api4ComController
             $data = Request::post();
             
             $errors = Validator::validate($data, [
-                'extension_id' => 'nullable|string|max:255',
-                'extension_number' => 'required|string|max:50',
-                'sip_username' => 'nullable|string|max:255',
+                'extension_id' => 'nullable|string',
+                'extension_number' => 'required|string',
+                'sip_username' => 'nullable|string',
                 'user_id' => 'nullable|integer'
             ]);
 

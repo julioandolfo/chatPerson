@@ -127,6 +127,7 @@ ob_start();
                     <div class="fv-row mb-7">
                         <label class="required fw-semibold fs-6 mb-2">API URL</label>
                         <input type="url" name="api_url" class="form-control form-control-solid" 
+                               value="https://api.api4com.com" 
                                placeholder="https://api.api4com.com" required />
                         <div class="form-text">URL base da API Api4Com</div>
                     </div>

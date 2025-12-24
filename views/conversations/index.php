@@ -1558,15 +1558,13 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
         z-index: 1;
     }
     
-    /* View ativa - sempre visível */
+    /* View ativa */
     .conversations-list.mobile-active,
     .chat-area.mobile-active,
     .conversation-sidebar.mobile-active {
         z-index: 10;
-        transform: translateX(0) !important;
-        opacity: 1 !important;
-        pointer-events: all !important;
-        display: flex !important;
+        transform: translateX(0);
+        opacity: 1;
     }
     
     /* Views inativas - escondidas à esquerda ou direita */
@@ -1755,24 +1753,8 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
 
 /* Tablet: Layout híbrido */
 @media (min-width: 768px) and (max-width: 991px) {
-    /* Remover restrições mobile */
-    .conversations-list,
-    .chat-area {
-        position: relative !important;
-        transform: none !important;
-        opacity: 1 !important;
-        pointer-events: all !important;
-        width: auto !important;
-        height: auto !important;
-        top: auto !important;
-        left: auto !important;
-        right: auto !important;
-        bottom: auto !important;
-    }
-    
     .conversations-layout {
         height: calc(100vh - 80px);
-        flex-direction: row !important;
     }
     
     .conversations-list {
@@ -1786,7 +1768,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     
     /* Sidebar como drawer lateral */
     .conversation-sidebar {
-        position: fixed !important;
+        position: fixed;
         right: 0;
         top: 0;
         bottom: 0;
@@ -1822,47 +1804,6 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
 
 /* Desktop: Manter layout original */
 @media (min-width: 992px) {
-    /* Garantir que todas as views sejam visíveis em desktop */
-    .conversations-list,
-    .chat-area {
-        position: relative !important;
-        transform: none !important;
-        opacity: 1 !important;
-        pointer-events: all !important;
-        width: auto !important;
-        height: auto !important;
-        top: auto !important;
-        left: auto !important;
-        right: auto !important;
-        bottom: auto !important;
-    }
-    
-    .conversations-list {
-        width: 380px;
-        flex-shrink: 0;
-    }
-    
-    .chat-area {
-        flex: 1;
-    }
-    
-    .conversation-sidebar {
-        position: relative !important;
-        width: 0 !important;
-        max-width: 400px !important;
-        transform: none !important;
-        opacity: 1 !important;
-        pointer-events: all !important;
-        top: auto !important;
-        left: auto !important;
-        right: auto !important;
-        bottom: auto !important;
-    }
-    
-    .conversation-sidebar.open {
-        width: 400px !important;
-    }
-    
     .chat-header-back-btn,
     .sidebar-back-btn {
         display: none !important;
@@ -1870,13 +1811,6 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     
     .sidebar-overlay {
         display: none !important;
-    }
-    
-    /* Remover classes mobile-active em desktop */
-    .conversations-list.mobile-active,
-    .chat-area.mobile-active {
-        position: relative !important;
-        transform: none !important;
     }
 }
 /* Animações para Assistente IA */

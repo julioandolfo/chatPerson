@@ -227,6 +227,9 @@
     <!-- Sound Manager -->
     <script src="<?= \App\Helpers\Url::asset('js/sound-manager.js') ?>"></script>
     
+    <!-- Notification Manager (Push/Toast Notifications) -->
+    <script src="<?= \App\Helpers\Url::asset('js/notification-manager.js') ?>"></script>
+    
     <!--begin::Sidebar Toggle Script-->
     <script>
         // Função para toggle do sidebar esquerdo

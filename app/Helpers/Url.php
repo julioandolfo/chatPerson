@@ -72,12 +72,25 @@ class Url
 
     /**
      * Gerar URL completa com protocolo e domínio
+     * Sempre usa HTTPS, exceto em localhost (desenvolvimento)
      */
     public static function fullUrl(string $path = ''): string
     {
-        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
         $relativePath = self::to($path);
+        
+        // Sempre usar HTTPS, exceto em localhost (desenvolvimento)
+        $isLocalhost = in_array($host, ['localhost', '127.0.0.1', '::1']) || 
+                       strpos($host, 'localhost') !== false ||
+                       strpos($host, '.local') !== false;
+        
+        // Se não for localhost, sempre usar HTTPS
+        // Se for localhost, verificar se já está usando HTTPS, senão usar HTTP
+        if ($isLocalhost) {
+            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        } else {
+            $protocol = 'https';
+        }
         
         return $protocol . '://' . $host . $relativePath;
     }

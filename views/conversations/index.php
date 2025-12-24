@@ -7741,6 +7741,55 @@ document.querySelectorAll('#filter_status, #filter_channel, #filter_department, 
     }
 });
 
+// Carregar funis para o filtro ao iniciar a página
+function loadFunnelsFilter() {
+    const funnelSelect = document.getElementById('filter_funnel');
+    if (!funnelSelect) return;
+    
+    // Helper local para escape HTML (caso escapeHtml global não esteja disponível ainda)
+    const safeEscape = (text) => {
+        if (typeof escapeHtml === 'function') return escapeHtml(text);
+        const div = document.createElement('div');
+        div.textContent = text || '';
+        return div.innerHTML;
+    };
+    
+    fetch('<?= \App\Helpers\Url::to("/funnels") ?>', {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.funnels && data.funnels.length > 0) {
+            let options = '<option value="">Funil</option>';
+            data.funnels.forEach(funnel => {
+                options += `<option value="${funnel.id}">${safeEscape(funnel.name)}</option>`;
+            });
+            funnelSelect.innerHTML = options;
+            console.log('✅ Funis carregados:', data.funnels.length);
+        } else {
+            funnelSelect.innerHTML = '<option value="">Nenhum funil</option>';
+            console.log('⚠️ Nenhum funil encontrado');
+        }
+    })
+    .catch(error => {
+        console.error('❌ Erro ao carregar funis:', error);
+        funnelSelect.innerHTML = '<option value="">Erro ao carregar</option>';
+    });
+}
+
+// Carregar funis quando a página carregar
+document.addEventListener('DOMContentLoaded', function() {
+    loadFunnelsFilter();
+});
+
+// Também carregar imediatamente se DOM já estiver pronto
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    setTimeout(loadFunnelsFilter, 100);
+}
+
 function applyFilters() {
     const search = document.getElementById('kt_conversations_search')?.value || '';
     const status = document.getElementById('filter_status')?.value || '';

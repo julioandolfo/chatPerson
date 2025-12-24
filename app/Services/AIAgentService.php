@@ -339,7 +339,7 @@ class AIAgentService
             
             if ($minDelay > 0 && $maxDelay >= $minDelay) {
                 $delay = rand($minDelay, $maxDelay);
-                \App\Helpers\ConversationDebug::log($conversationId, "Delay humanizado: {$delay}s (min: {$minDelay}, max: {$maxDelay})");
+                \App\Helpers\ConversationDebug::log($conversationId, 'delay', "Delay humanizado: {$delay}s (min: {$minDelay}, max: {$maxDelay})");
                 sleep($delay);
             }
 

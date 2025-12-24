@@ -47,5 +47,27 @@ class Api4ComExtension extends Model
     {
         return self::where('status', '=', 'active');
     }
+
+    /**
+     * Buscar ramal pelo extension_id da API
+     */
+    public static function findByExtensionId($extensionId, int $accountId): ?array
+    {
+        $sql = "SELECT * FROM api4com_extensions WHERE extension_id = ? AND api4com_account_id = ? LIMIT 1";
+        return \App\Helpers\Database::fetch($sql, [$extensionId, $accountId]);
+    }
+
+    /**
+     * Buscar ramais com dados do usuário
+     */
+    public static function getByAccountWithUser(int $accountId): array
+    {
+        $sql = "SELECT e.*, u.name as user_name, u.email as user_email 
+                FROM api4com_extensions e
+                LEFT JOIN users u ON e.user_id = u.id
+                WHERE e.api4com_account_id = ?
+                ORDER BY e.extension_number ASC";
+        return \App\Helpers\Database::fetchAll($sql, [$accountId]);
+    }
 }
 

@@ -414,6 +414,156 @@ class Api4ComService
     }
 
     /**
+     * Buscar ramais da API Api4Com
+     * 
+     * @param int $accountId ID da conta
+     * @return array Lista de ramais
+     */
+    public static function fetchExtensionsFromApi(int $accountId): array
+    {
+        $account = Api4ComAccount::find($accountId);
+        if (!$account) {
+            throw new \InvalidArgumentException('Conta Api4Com não encontrada');
+        }
+
+        $apiUrl = rtrim($account['api_url'], '/');
+        $token = $account['api_token'];
+        
+        // Endpoint: GET /extensions (pode variar conforme API)
+        $url = $apiUrl . '/extensions';
+        
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $token
+            ],
+            CURLOPT_TIMEOUT => 30
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($error) {
+            Logger::error("Api4ComService::fetchExtensionsFromApi - Erro: " . $error);
+            throw new \Exception('Erro de conexão: ' . $error);
+        }
+
+        $data = json_decode($response, true);
+
+        if ($httpCode >= 200 && $httpCode < 300) {
+            // Normalizar resposta (pode ser array direto ou dentro de data/extensions)
+            $extensions = $data['data'] ?? $data['extensions'] ?? $data ?? [];
+            
+            Logger::info("Api4ComService::fetchExtensionsFromApi - Encontrados " . count($extensions) . " ramais");
+            
+            return $extensions;
+        } else {
+            $errorMsg = $data['error'] ?? $data['message'] ?? "HTTP {$httpCode}";
+            Logger::error("Api4ComService::fetchExtensionsFromApi - Erro API: " . $errorMsg);
+            throw new \Exception('Erro na API: ' . $errorMsg);
+        }
+    }
+
+    /**
+     * Sincronizar todos os ramais de uma conta
+     * Busca da API e salva no banco
+     * 
+     * @param int $accountId ID da conta
+     * @return array Resultado da sincronização
+     */
+    public static function syncAllExtensions(int $accountId): array
+    {
+        $extensions = self::fetchExtensionsFromApi($accountId);
+        
+        $synced = 0;
+        $errors = [];
+        
+        foreach ($extensions as $ext) {
+            try {
+                // Normalizar dados do ramal
+                $extensionId = $ext['id'] ?? $ext['extension_id'] ?? null;
+                $extensionNumber = $ext['number'] ?? $ext['extension'] ?? $ext['extension_number'] ?? null;
+                $name = $ext['name'] ?? $ext['description'] ?? "Ramal {$extensionNumber}";
+                
+                if (!$extensionId && !$extensionNumber) {
+                    continue;
+                }
+                
+                // Verificar se já existe
+                $existing = Api4ComExtension::findByExtensionId($extensionId, $accountId);
+                
+                $data = [
+                    'api4com_account_id' => $accountId,
+                    'extension_id' => $extensionId,
+                    'extension_number' => $extensionNumber,
+                    'sip_username' => $ext['sip_username'] ?? $ext['username'] ?? null,
+                    'status' => $ext['status'] ?? 'active',
+                    'metadata' => json_encode([
+                        'name' => $name,
+                        'synced_at' => date('Y-m-d H:i:s'),
+                        'original_data' => $ext
+                    ])
+                ];
+                
+                if ($existing) {
+                    // Manter user_id e sip_password existentes
+                    unset($data['user_id']);
+                    unset($data['sip_password']);
+                    Api4ComExtension::update($existing['id'], $data);
+                } else {
+                    Api4ComExtension::create($data);
+                }
+                
+                $synced++;
+            } catch (\Exception $e) {
+                $errors[] = "Ramal {$extensionNumber}: " . $e->getMessage();
+            }
+        }
+        
+        return [
+            'synced' => $synced,
+            'total' => count($extensions),
+            'errors' => $errors
+        ];
+    }
+
+    /**
+     * Listar ramais de uma conta
+     */
+    public static function getExtensions(int $accountId): array
+    {
+        return Api4ComExtension::where('api4com_account_id', '=', $accountId);
+    }
+
+    /**
+     * Associar ramal a usuário
+     */
+    public static function assignExtensionToUser(int $extensionId, ?int $userId): bool
+    {
+        $extension = Api4ComExtension::find($extensionId);
+        if (!$extension) {
+            throw new \InvalidArgumentException('Ramal não encontrado');
+        }
+
+        // Se já tem usuário associado e está atribuindo a outro, desassociar primeiro
+        if ($userId) {
+            // Desassociar outros ramais deste usuário na mesma conta
+            $existingExtensions = Api4ComExtension::where('user_id', '=', $userId);
+            foreach ($existingExtensions as $ext) {
+                if ($ext['api4com_account_id'] == $extension['api4com_account_id'] && $ext['id'] != $extensionId) {
+                    Api4ComExtension::update($ext['id'], ['user_id' => null]);
+                }
+            }
+        }
+
+        return Api4ComExtension::update($extensionId, ['user_id' => $userId]) !== false;
+    }
+
+    /**
      * Obter estatísticas de chamadas
      */
     public static function getStatistics(?int $agentId = null, ?int $contactId = null, ?string $dateFrom = null, ?string $dateTo = null): array

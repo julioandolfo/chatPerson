@@ -67,16 +67,33 @@ ob_start();
                                     </div>
                                     <?php endif; ?>
                                 </div>
-                                <div class="d-flex gap-2">
+                                <div class="d-flex flex-wrap gap-2">
                                     <?php if (\App\Helpers\Permission::can('api4com.edit')): ?>
-                                    <button type="button" class="btn btn-light-primary btn-sm flex-grow-1" 
-                                            onclick="editAccount(<?= $account['id'] ?>, <?= htmlspecialchars(json_encode($account), ENT_QUOTES) ?>)"
+                                    <button type="button" class="btn btn-light-primary btn-sm" 
+                                            onclick="editAccount(<?= $account['id'] ?>)"
                                             title="Editar">
                                         <i class="ki-duotone ki-notepad-edit fs-4">
                                             <span class="path1"></span>
                                             <span class="path2"></span>
                                         </i>
                                         Editar
+                                    </button>
+                                    <button type="button" class="btn btn-light-info btn-sm" 
+                                            onclick="manageExtensions(<?= $account['id'] ?>, '<?= htmlspecialchars($account['name'], ENT_QUOTES) ?>')"
+                                            title="Gerenciar Ramais">
+                                        <i class="ki-duotone ki-phone fs-4">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        Ramais
+                                    </button>
+                                    <button type="button" class="btn btn-light-success btn-sm" 
+                                            onclick="syncExtensions(<?= $account['id'] ?>)"
+                                            title="Sincronizar Ramais da API">
+                                        <i class="ki-duotone ki-arrows-loop fs-4">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
                                     </button>
                                     <?php endif; ?>
                                     <?php if (\App\Helpers\Permission::can('api4com.delete')): ?>
@@ -174,11 +191,135 @@ ob_start();
 <?php endif; ?>
 <!--end::Modal - Nova Conta Api4Com-->
 
+<!--begin::Modal - Editar Conta Api4Com-->
+<?php if (\App\Helpers\Permission::can('api4com.edit')): ?>
+<div class="modal fade" id="kt_modal_edit_api4com" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-650px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Editar Conta Api4Com</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <form id="kt_modal_edit_api4com_form" class="form">
+                <input type="hidden" name="account_id" id="edit_account_id" />
+                <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                    <div class="fv-row mb-7">
+                        <label class="required fw-semibold fs-6 mb-2">Nome da Conta</label>
+                        <input type="text" name="name" id="edit_name" class="form-control form-control-solid" required />
+                    </div>
+                    <div class="fv-row mb-7">
+                        <label class="required fw-semibold fs-6 mb-2">API URL</label>
+                        <input type="url" name="api_url" id="edit_api_url" class="form-control form-control-solid" required />
+                    </div>
+                    <div class="fv-row mb-7">
+                        <label class="required fw-semibold fs-6 mb-2">Token de Autenticação</label>
+                        <input type="text" name="api_token" id="edit_api_token" class="form-control form-control-solid" required />
+                        <div class="form-text">Deixe em branco para manter o token atual</div>
+                    </div>
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Domínio</label>
+                        <input type="text" name="domain" id="edit_domain" class="form-control form-control-solid" />
+                    </div>
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Webhook URL</label>
+                        <input type="url" name="webhook_url" id="edit_webhook_url" class="form-control form-control-solid" readonly />
+                    </div>
+                    <div class="fv-row mb-7">
+                        <div class="form-check form-switch form-check-custom form-check-solid">
+                            <input class="form-check-input" type="checkbox" name="enabled" id="edit_enabled" value="1" />
+                            <label class="form-check-label" for="edit_enabled">
+                                <span class="fw-semibold">Habilitar conta</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer flex-center">
+                    <button type="reset" data-bs-dismiss="modal" class="btn btn-light me-3">Cancelar</button>
+                    <button type="submit" id="kt_modal_edit_api4com_submit" class="btn btn-primary">
+                        <span class="indicator-label">Salvar</span>
+                        <span class="indicator-progress">Aguarde...
+                        <span class="spinner-border spinner-border-sm align-middle ms-2"></span></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+<!--end::Modal - Editar Conta Api4Com-->
+
+<!--begin::Modal - Gerenciar Ramais-->
+<?php if (\App\Helpers\Permission::can('api4com.view')): ?>
+<div class="modal fade" id="kt_modal_extensions" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-800px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Gerenciar Ramais - <span id="extensions_account_name"></span></h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                <input type="hidden" id="extensions_account_id" />
+                
+                <div class="d-flex justify-content-between align-items-center mb-5">
+                    <div class="text-muted">
+                        <i class="ki-duotone ki-information-5 fs-4 me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        Associe ramais aos usuários para que possam fazer chamadas.
+                    </div>
+                    <?php if (\App\Helpers\Permission::can('api4com.edit')): ?>
+                    <button type="button" class="btn btn-sm btn-light-success" onclick="syncExtensionsFromModal()">
+                        <i class="ki-duotone ki-arrows-loop fs-4">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Sincronizar da API
+                    </button>
+                    <?php endif; ?>
+                </div>
+                
+                <div id="extensions_list" class="table-responsive">
+                    <div class="text-center py-10">
+                        <span class="spinner-border text-primary"></span>
+                        <p class="mt-3">Carregando ramais...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" data-bs-dismiss="modal" class="btn btn-light">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+<!--end::Modal - Gerenciar Ramais-->
+
+<?php 
+// Buscar usuários para associar aos ramais
+$users = \App\Helpers\Database::fetchAll("SELECT id, name, email FROM users WHERE deleted_at IS NULL ORDER BY name ASC");
+?>
+
 <?php 
 $content = ob_get_clean();
+$usersJson = json_encode($users);
 $scripts = '
 <script>
+const api4comUsers = ' . $usersJson . ';
+
 document.addEventListener("DOMContentLoaded", function() {
+    // Form de criação
     const form = document.getElementById("kt_modal_new_api4com_form");
     if (form) {
         form.addEventListener("submit", function(e) {
@@ -217,11 +358,79 @@ document.addEventListener("DOMContentLoaded", function() {
             });
         });
     }
+    
+    // Form de edição
+    const editForm = document.getElementById("kt_modal_edit_api4com_form");
+    if (editForm) {
+        editForm.addEventListener("submit", function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById("kt_modal_edit_api4com_submit");
+            submitBtn.setAttribute("data-kt-indicator", "on");
+            submitBtn.disabled = true;
+            
+            const accountId = document.getElementById("edit_account_id").value;
+            const formData = new FormData(editForm);
+            
+            fetch("' . \App\Helpers\Url::to('/integrations/api4com') . '/" + accountId, {
+                method: "POST",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                submitBtn.removeAttribute("data-kt-indicator");
+                submitBtn.disabled = false;
+                
+                if (data.success) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_edit_api4com"));
+                    modal.hide();
+                    location.reload();
+                } else {
+                    alert("Erro: " + (data.message || "Erro ao atualizar conta"));
+                }
+            })
+            .catch(error => {
+                submitBtn.removeAttribute("data-kt-indicator");
+                submitBtn.disabled = false;
+                alert("Erro ao atualizar conta");
+            });
+        });
+    }
 });
 
-function editAccount(id, account) {
-    // Implementar edição se necessário
-    alert("Edição de conta em desenvolvimento");
+function editAccount(id) {
+    // Buscar dados da conta
+    fetch("' . \App\Helpers\Url::to('/integrations/api4com') . '/" + id + "/show", {
+        method: "GET",
+        headers: {
+            "X-Requested-With": "XMLHttpRequest"
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.account) {
+            const account = data.account;
+            document.getElementById("edit_account_id").value = account.id;
+            document.getElementById("edit_name").value = account.name || "";
+            document.getElementById("edit_api_url").value = account.api_url || "";
+            document.getElementById("edit_api_token").value = ""; // Não mostrar token atual
+            document.getElementById("edit_api_token").placeholder = "Deixe em branco para manter o atual";
+            document.getElementById("edit_domain").value = account.domain || "";
+            document.getElementById("edit_webhook_url").value = account.webhook_url || "' . \App\Helpers\Url::fullUrl('/api4com-calls/webhook') . '";
+            document.getElementById("edit_enabled").checked = account.enabled == 1;
+            
+            const modal = new bootstrap.Modal(document.getElementById("kt_modal_edit_api4com"));
+            modal.show();
+        } else {
+            alert("Erro ao carregar dados da conta");
+        }
+    })
+    .catch(error => {
+        alert("Erro ao carregar dados da conta");
+    });
 }
 
 function deleteAccount(id, name) {
@@ -245,6 +454,173 @@ function deleteAccount(id, name) {
     })
     .catch(error => {
         alert("Erro ao deletar conta");
+    });
+}
+
+function syncExtensions(accountId) {
+    if (!confirm("Sincronizar ramais da API Api4Com?\\n\\nIsto irá buscar os ramais da sua conta Api4Com e salvá-los no sistema.")) {
+        return;
+    }
+    
+    const btn = event.target.closest("button");
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = \'<span class="spinner-border spinner-border-sm"></span>\';
+    
+    fetch("' . \App\Helpers\Url::to('/integrations/api4com') . '/" + accountId + "/sync-extensions", {
+        method: "POST",
+        headers: {
+            "X-Requested-With": "XMLHttpRequest"
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        
+        if (data.success) {
+            alert(data.message);
+        } else {
+            alert("Erro: " + (data.message || "Erro ao sincronizar ramais"));
+        }
+    })
+    .catch(error => {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        alert("Erro ao sincronizar ramais");
+    });
+}
+
+function manageExtensions(accountId, accountName) {
+    document.getElementById("extensions_account_id").value = accountId;
+    document.getElementById("extensions_account_name").textContent = accountName;
+    
+    const modal = new bootstrap.Modal(document.getElementById("kt_modal_extensions"));
+    modal.show();
+    
+    loadExtensions(accountId);
+}
+
+function loadExtensions(accountId) {
+    const listDiv = document.getElementById("extensions_list");
+    listDiv.innerHTML = \'<div class="text-center py-10"><span class="spinner-border text-primary"></span><p class="mt-3">Carregando ramais...</p></div>\';
+    
+    fetch("' . \App\Helpers\Url::to('/integrations/api4com') . '/" + accountId + "/extensions", {
+        method: "GET",
+        headers: {
+            "X-Requested-With": "XMLHttpRequest"
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            renderExtensions(data.extensions, accountId);
+        } else {
+            listDiv.innerHTML = \'<div class="alert alert-danger">Erro ao carregar ramais: \' + (data.message || "Erro desconhecido") + \'</div>\';
+        }
+    })
+    .catch(error => {
+        listDiv.innerHTML = \'<div class="alert alert-danger">Erro ao carregar ramais</div>\';
+    });
+}
+
+function renderExtensions(extensions, accountId) {
+    const listDiv = document.getElementById("extensions_list");
+    
+    if (!extensions || extensions.length === 0) {
+        listDiv.innerHTML = \'<div class="alert alert-info"><i class="ki-duotone ki-information-5 fs-4 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>Nenhum ramal encontrado. Clique em "Sincronizar da API" para buscar os ramais.</div>\';
+        return;
+    }
+    
+    let html = \'<table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">\';
+    html += \'<thead><tr class="fw-bold text-muted"><th>Ramal</th><th>ID API</th><th>Usuário Associado</th><th class="text-center">Status</th><th class="text-end">Ações</th></tr></thead>\';
+    html += \'<tbody>\';
+    
+    extensions.forEach(function(ext) {
+        const metadata = ext.metadata ? JSON.parse(ext.metadata) : {};
+        const name = metadata.name || ext.extension_number || "Ramal";
+        const statusClass = ext.status === "active" ? "success" : "warning";
+        const statusText = ext.status === "active" ? "Ativo" : "Inativo";
+        
+        html += \'<tr>\';
+        html += \'<td><span class="fw-bold">\' + name + \'</span><br><small class="text-muted">\' + (ext.extension_number || "-") + \'</small></td>\';
+        html += \'<td><code>\' + (ext.extension_id || "-") + \'</code></td>\';
+        html += \'<td>\';
+        html += \'<select class="form-select form-select-sm" onchange="assignExtension(\' + accountId + \', \' + ext.id + \', this.value)">\';
+        html += \'<option value="">-- Selecione --</option>\';
+        
+        api4comUsers.forEach(function(user) {
+            const selected = ext.user_id == user.id ? "selected" : "";
+            html += \'<option value="\' + user.id + \'" \' + selected + \'>\' + user.name + \'</option>\';
+        });
+        
+        html += \'</select>\';
+        if (ext.user_name) {
+            html += \'<small class="text-muted d-block">Atual: \' + ext.user_name + \'</small>\';
+        }
+        html += \'</td>\';
+        html += \'<td class="text-center"><span class="badge badge-light-\' + statusClass + \'">\' + statusText + \'</span></td>\';
+        html += \'<td class="text-end">-</td>\';
+        html += \'</tr>\';
+    });
+    
+    html += \'</tbody></table>\';
+    listDiv.innerHTML = html;
+}
+
+function assignExtension(accountId, extensionId, userId) {
+    fetch("' . \App\Helpers\Url::to('/integrations/api4com') . '/" + accountId + "/extensions/" + extensionId + "/assign", {
+        method: "POST",
+        headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ user_id: userId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Opcional: recarregar lista
+            loadExtensions(accountId);
+        } else {
+            alert("Erro: " + (data.message || "Erro ao associar ramal"));
+        }
+    })
+    .catch(error => {
+        alert("Erro ao associar ramal");
+    });
+}
+
+function syncExtensionsFromModal() {
+    const accountId = document.getElementById("extensions_account_id").value;
+    
+    const btn = event.target.closest("button");
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = \'<span class="spinner-border spinner-border-sm"></span> Sincronizando...\';
+    
+    fetch("' . \App\Helpers\Url::to('/integrations/api4com') . '/" + accountId + "/sync-extensions", {
+        method: "POST",
+        headers: {
+            "X-Requested-With": "XMLHttpRequest"
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        
+        if (data.success) {
+            alert(data.message);
+            loadExtensions(accountId);
+        } else {
+            alert("Erro: " + (data.message || "Erro ao sincronizar ramais"));
+        }
+    })
+    .catch(error => {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        alert("Erro ao sincronizar ramais");
     });
 }
 </script>';

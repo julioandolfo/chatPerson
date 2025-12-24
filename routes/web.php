@@ -203,7 +203,6 @@ Router::post('/users/update-availability', [UserController::class, 'updateAvaila
 // Rotas de Integrações
 Router::get('/integrations', [IntegrationController::class, 'index'], ['Authentication']);
 Router::get('/integrations/whatsapp', [IntegrationController::class, 'whatsapp'], ['Authentication']);
-Router::get('/integrations/api4com', [IntegrationController::class, 'api4com'], ['Authentication']);
 Router::post('/integrations/whatsapp', [IntegrationController::class, 'createWhatsAppAccount'], ['Authentication']);
 Router::post('/integrations/whatsapp/{id}/settings', [IntegrationController::class, 'updateWhatsAppAccountSettings'], ['Authentication']); // Atualizar funil/etapa padrão
 Router::post('/integrations/whatsapp/{id}', [IntegrationController::class, 'updateWhatsAppAccount'], ['Authentication']);
@@ -220,6 +219,9 @@ Router::post('/integrations/api4com', [Api4ComController::class, 'create'], ['Au
 Router::post('/integrations/api4com/{id}', [Api4ComController::class, 'update'], ['Authentication']);
 Router::delete('/integrations/api4com/{id}', [Api4ComController::class, 'delete'], ['Authentication']);
 Router::post('/integrations/api4com/{id}/sync-extensions', [Api4ComController::class, 'syncExtensions'], ['Authentication']);
+Router::get('/integrations/api4com/{id}/extensions', [Api4ComController::class, 'extensions'], ['Authentication']);
+Router::post('/integrations/api4com/{accountId}/extensions/{extensionId}/assign', [Api4ComController::class, 'assignExtension'], ['Authentication']);
+Router::get('/integrations/api4com/{id}/show', [Api4ComController::class, 'show'], ['Authentication']);
 
 // Rotas de Chamadas Api4Com
 Router::get('/api4com-calls', [Api4ComCallController::class, 'index'], ['Authentication']);

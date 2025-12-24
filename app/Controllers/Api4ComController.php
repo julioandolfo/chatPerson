@@ -164,7 +164,7 @@ class Api4ComController
     }
 
     /**
-     * Sincronizar ramais
+     * Sincronizar ramais da API Api4Com
      */
     public function syncExtensions(int $id): void
     {
@@ -180,20 +180,73 @@ class Api4ComController
                 return;
             }
 
-            $data = Request::post();
-            $userId = $data['user_id'] ?? null;
-            $extensionData = $data['extension_data'] ?? [];
-
-            if (!$userId) {
-                throw new \InvalidArgumentException('user_id é obrigatório');
+            $result = \App\Services\Api4ComService::syncAllExtensions($id);
+            
+            $message = "Sincronização concluída: {$result['synced']} de {$result['total']} ramais.";
+            if (!empty($result['errors'])) {
+                $message .= " Erros: " . count($result['errors']);
             }
-
-            $extensionId = \App\Services\Api4ComService::syncExtension($userId, $id, $extensionData);
             
             Response::json([
                 'success' => true,
-                'message' => 'Ramal sincronizado com sucesso!',
-                'extension_id' => $extensionId
+                'message' => $message,
+                'result' => $result
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao sincronizar ramais: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Listar ramais de uma conta
+     */
+    public function extensions(int $id): void
+    {
+        Permission::abortIfCannot('api4com.view');
+        
+        try {
+            $account = Api4ComAccount::find($id);
+            if (!$account) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Conta não encontrada'
+                ], 404);
+                return;
+            }
+
+            $extensions = \App\Models\Api4ComExtension::getByAccountWithUser($id);
+            
+            Response::json([
+                'success' => true,
+                'extensions' => $extensions
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao listar ramais: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Associar ramal a usuário
+     */
+    public function assignExtension(int $accountId, int $extensionId): void
+    {
+        Permission::abortIfCannot('api4com.edit');
+        
+        try {
+            $data = Request::post();
+            $userId = isset($data['user_id']) && $data['user_id'] !== '' ? (int)$data['user_id'] : null;
+            
+            \App\Services\Api4ComService::assignExtensionToUser($extensionId, $userId);
+            
+            Response::json([
+                'success' => true,
+                'message' => $userId ? 'Ramal associado ao usuário com sucesso!' : 'Ramal desassociado com sucesso!'
             ]);
         } catch (\InvalidArgumentException $e) {
             Response::json([
@@ -203,7 +256,36 @@ class Api4ComController
         } catch (\Exception $e) {
             Response::json([
                 'success' => false,
-                'message' => 'Erro ao sincronizar ramal: ' . $e->getMessage()
+                'message' => 'Erro ao associar ramal: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Obter conta por ID (API)
+     */
+    public function show(int $id): void
+    {
+        Permission::abortIfCannot('api4com.view');
+        
+        try {
+            $account = Api4ComAccount::find($id);
+            if (!$account) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Conta não encontrada'
+                ], 404);
+                return;
+            }
+
+            Response::json([
+                'success' => true,
+                'account' => $account
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao buscar conta: ' . $e->getMessage()
             ], 500);
         }
     }

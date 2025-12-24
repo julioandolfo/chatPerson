@@ -37,6 +37,16 @@
         // Contador de IDs
         notificationId: 0,
         
+        // Cache de notificações já mostradas (para evitar duplicatas)
+        shownNotifications: {
+            conversations: new Set(),
+            messages: new Set(),
+            assignments: new Set()
+        },
+        
+        // Tempo para limpar cache (5 minutos)
+        cacheTimeout: 5 * 60 * 1000,
+        
         // Tipos de notificação com ícones e cores
         types: {
             new_conversation: {
@@ -480,6 +490,31 @@
         },
 
         /**
+         * Verificar se já mostrou notificação para este item
+         */
+        hasShownNotification: function(type, id) {
+            if (!id) return false;
+            const cache = this.shownNotifications[type];
+            return cache ? cache.has(String(id)) : false;
+        },
+
+        /**
+         * Marcar notificação como mostrada
+         */
+        markAsShown: function(type, id) {
+            if (!id) return;
+            const cache = this.shownNotifications[type];
+            if (cache) {
+                cache.add(String(id));
+                
+                // Limpar após timeout
+                setTimeout(() => {
+                    cache.delete(String(id));
+                }, this.cacheTimeout);
+            }
+        },
+
+        /**
          * Configurar event listeners
          */
         setupEventListeners: function() {
@@ -488,6 +523,13 @@
                 // Os dados podem vir como { conversation_id, message } ou diretamente
                 const data = e.detail || {};
                 const message = data.message || data;
+                const messageId = message.id || message.message?.id;
+                
+                // Evitar duplicatas
+                if (this.hasShownNotification('messages', messageId)) {
+                    console.log('[NotificationManager] Mensagem já notificada:', messageId);
+                    return;
+                }
                 
                 // Verificar se é mensagem incoming (do contato)
                 const isIncoming = message.direction === 'incoming' || 
@@ -495,6 +537,7 @@
                                    (message.message && message.message.direction === 'incoming');
                 
                 if (isIncoming) {
+                    this.markAsShown('messages', messageId);
                     this.showMessageNotification({
                         conversation_id: data.conversation_id || message.conversation_id,
                         content: message.content || message.message?.content || 'Nova mensagem recebida',
@@ -507,9 +550,17 @@
             document.addEventListener('realtime:new_conversation', (e) => {
                 const data = e.detail || {};
                 const conversation = data.conversation || data;
+                const conversationId = conversation.id || data.conversation_id;
                 
+                // Evitar duplicatas
+                if (this.hasShownNotification('conversations', conversationId)) {
+                    console.log('[NotificationManager] Conversa já notificada:', conversationId);
+                    return;
+                }
+                
+                this.markAsShown('conversations', conversationId);
                 this.showConversationNotification({
-                    conversation_id: conversation.id || data.conversation_id,
+                    conversation_id: conversationId,
                     contact_name: conversation.contact_name || conversation.contact?.name,
                     channel: conversation.channel || 'WhatsApp'
                 });
@@ -517,26 +568,56 @@
             
             document.addEventListener('realtime:conversation_assigned', (e) => {
                 const data = e.detail || {};
+                const conversationId = data.conversation_id || data.id;
+                const assignmentKey = `assign_${conversationId}`;
+                
+                // Evitar duplicatas
+                if (this.hasShownNotification('assignments', assignmentKey)) {
+                    console.log('[NotificationManager] Atribuição já notificada:', assignmentKey);
+                    return;
+                }
+                
+                this.markAsShown('assignments', assignmentKey);
                 this.showAssignmentNotification({
-                    conversation_id: data.conversation_id || data.id,
+                    conversation_id: conversationId,
                     contact_name: data.contact_name || 'Contato'
                 });
             });
             
             document.addEventListener('realtime:new_mention', (e) => {
-                this.showMentionNotification(e.detail, 'invite_received');
+                const data = e.detail || {};
+                const mentionKey = `mention_${data.id || data.conversation_id}_${Date.now()}`;
+                if (!this.hasShownNotification('assignments', mentionKey)) {
+                    this.markAsShown('assignments', mentionKey);
+                    this.showMentionNotification(data, 'invite_received');
+                }
             });
             
             document.addEventListener('realtime:mention_received', (e) => {
-                this.showMentionNotification(e.detail, 'mention_received');
+                const data = e.detail || {};
+                const mentionKey = `mention_${data.id || data.conversation_id}_${Date.now()}`;
+                if (!this.hasShownNotification('assignments', mentionKey)) {
+                    this.markAsShown('assignments', mentionKey);
+                    this.showMentionNotification(data, 'mention_received');
+                }
             });
             
             document.addEventListener('realtime:sla_warning', (e) => {
-                this.showSLANotification(e.detail, 'sla_warning');
+                const data = e.detail || {};
+                const slaKey = `sla_warning_${data.conversation_id}`;
+                if (!this.hasShownNotification('assignments', slaKey)) {
+                    this.markAsShown('assignments', slaKey);
+                    this.showSLANotification(data, 'sla_warning');
+                }
             });
             
             document.addEventListener('realtime:sla_breached', (e) => {
-                this.showSLANotification(e.detail, 'sla_breached');
+                const data = e.detail || {};
+                const slaKey = `sla_breached_${data.conversation_id}`;
+                if (!this.hasShownNotification('assignments', slaKey)) {
+                    this.markAsShown('assignments', slaKey);
+                    this.showSLANotification(data, 'sla_breached');
+                }
             });
             
             // Listener para selecionar conversa quando clicado na notificação

@@ -87,13 +87,26 @@ function renderAttachment($attachment) {
         $html .= 'Seu navegador não suporta áudio.';
         $html .= '</audio>';
         
-        // ✅ NOVO: Exibir transcrição se disponível e configurado
-        $transcription = $attachment['transcription'] ?? null;
-        if ($transcription && !empty($transcription['text'])) {
-            $settings = \App\Services\ConversationSettingsService::getSettings();
-            $showTranscription = $settings['audio_transcription']['show_transcription_in_chat'] ?? true;
+        // ✅ NOVO: Exibir transcrição/texto original se disponível e configurado
+        $settings = \App\Services\ConversationSettingsService::getSettings();
+        $showTranscription = $settings['audio_transcription']['show_transcription_in_chat'] ?? true;
+        
+        if ($showTranscription) {
+            // Verificar se é áudio TTS (tem texto original) ou áudio transcrito
+            $ttsOriginalText = $attachment['tts_original_text'] ?? null;
+            $transcription = $attachment['transcription'] ?? null;
             
-            if ($showTranscription) {
+            if ($ttsOriginalText) {
+                // Áudio gerado pela IA - exibir texto original
+                $html .= '<div class="audio-transcription mt-2" style="padding: 8px; background: rgba(52, 211, 153, 0.1); border-radius: 6px; border-left: 3px solid #34d399;">';
+                $html .= '<div class="d-flex align-items-center gap-1 mb-1">';
+                $html .= '<i class="ki-duotone ki-message-text-2 fs-7 text-success"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>';
+                $html .= '<span class="text-success fs-8 fw-semibold">Conteúdo do áudio:</span>';
+                $html .= '</div>';
+                $html .= '<div class="fs-7" style="color: rgba(0,0,0,0.7);">' . nl2br(htmlspecialchars($ttsOriginalText)) . '</div>';
+                $html .= '</div>';
+            } elseif ($transcription && !empty($transcription['text'])) {
+                // Áudio do cliente - exibir transcrição
                 $html .= '<div class="audio-transcription mt-2" style="padding: 8px; background: rgba(0,0,0,0.05); border-radius: 6px; border-left: 3px solid #3b82f6;">';
                 $html .= '<div class="d-flex align-items-center gap-1 mb-1">';
                 $html .= '<i class="ki-duotone ki-text fs-7 text-muted"><span class="path1"></span><span class="path2"></span></i>';
@@ -12714,14 +12727,30 @@ function renderAttachmentHtml(attachment) {
             }
         }
         
-        // ✅ NOVO: Verificar se há transcrição
+        // ✅ NOVO: Verificar se há transcrição ou texto original (TTS)
         let transcriptionHtml = '';
-        if (attachment.transcription && attachment.transcription.text) {
-            // Verificar configuração (assumir true se não estiver definido)
-            const showTranscription = <?= json_encode(\App\Services\ConversationSettingsService::getSettings()['audio_transcription']['show_transcription_in_chat'] ?? true) ?>;
+        const showTranscription = <?= json_encode(\App\Services\ConversationSettingsService::getSettings()['audio_transcription']['show_transcription_in_chat'] ?? true) ?>;
+        
+        if (showTranscription) {
+            // Verificar se é áudio TTS (tem texto original) ou áudio transcrito
+            const ttsOriginalText = attachment.tts_original_text;
+            const transcription = attachment.transcription;
             
-            if (showTranscription) {
-                const transcriptionText = escapeHtml(attachment.transcription.text);
+            if (ttsOriginalText) {
+                // Áudio gerado pela IA - exibir texto original
+                const textContent = escapeHtml(ttsOriginalText);
+                transcriptionHtml = `
+                    <div class="audio-transcription mt-2" style="padding: 8px; background: rgba(52, 211, 153, 0.1); border-radius: 6px; border-left: 3px solid #34d399;">
+                        <div class="d-flex align-items-center gap-1 mb-1">
+                            <i class="ki-duotone ki-message-text-2 fs-7 text-success"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                            <span class="text-success fs-8 fw-semibold">Conteúdo do áudio:</span>
+                        </div>
+                        <div class="fs-7" style="color: rgba(0,0,0,0.7);">${nl2br(textContent)}</div>
+                    </div>
+                `;
+            } else if (transcription && transcription.text) {
+                // Áudio do cliente - exibir transcrição
+                const transcriptionText = escapeHtml(transcription.text);
                 transcriptionHtml = `
                     <div class="audio-transcription mt-2" style="padding: 8px; background: rgba(0,0,0,0.05); border-radius: 6px; border-left: 3px solid #3b82f6;">
                         <div class="d-flex align-items-center gap-1 mb-1">

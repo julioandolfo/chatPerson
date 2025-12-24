@@ -370,7 +370,9 @@ class AIAgentService
                             'mimetype' => 'audio/ogg; codecs=opus', // Compatibilidade
                             'filename' => basename($ttsResult['audio_path']),
                             'size' => filesize($ttsResult['audio_path']),
-                            'extension' => 'ogg'
+                            'extension' => 'ogg',
+                            // ✅ NOVO: Adicionar texto original para exibir como "transcrição"
+                            'tts_original_text' => $response['content']
                         ];
                         
                         \App\Helpers\Logger::info("AIAgentService::processMessage - ✅ Áudio gerado: " . $ttsResult['audio_path'] . " (cost=$" . $ttsResult['cost'] . ", url=" . $ttsResult['audio_url'] . ")");
@@ -394,6 +396,19 @@ class AIAgentService
             // Se modo é 'intelligent', decidir automaticamente
             if ($sendMode === 'intelligent' && $audioAttachment) {
                 $intelligentRules = $ttsSettings['intelligent_rules'] ?? [];
+                
+                // ✅ CORREÇÃO: Adicionar first_message_always_text às regras se estiver definido no nível superior
+                if (isset($ttsSettings['first_message_always_text'])) {
+                    $intelligentRules['first_message_always_text'] = $ttsSettings['first_message_always_text'];
+                }
+                
+                // ✅ CORREÇÃO: Adicionar custom_behavior_prompt às regras se estiver definido
+                if (!empty($ttsSettings['custom_behavior_prompt'])) {
+                    $intelligentRules['custom_behavior_prompt'] = $ttsSettings['custom_behavior_prompt'];
+                }
+                
+                \App\Helpers\Logger::info("AIAgentService::processMessage - Regras inteligentes: first_msg_text=" . ($intelligentRules['first_message_always_text'] ?? 'false'));
+                
                 $sendMode = \App\Services\TTSIntelligentService::decideSendMode(
                     $response['content'],
                     $conversationId,

@@ -760,19 +760,54 @@ $tts = $cs['text_to_speech'] ?? [];
             
             <!-- Configurações ElevenLabs -->
             <div id="tts_elevenlabs_settings" style="display: <?= ($tts['provider'] ?? '') === 'elevenlabs' ? 'block' : 'none' ?>;">
-                <div class="fv-row mb-7">
-                    <label class="fw-semibold fs-6 mb-2">Voice ID</label>
-                    <input type="text" name="text_to_speech_voice_id_elevenlabs" class="form-control form-control-solid" 
-                           value="<?= htmlspecialchars($tts['voice_id'] ?? '21m00Tcm4TlvDq8ikWAM') ?>" 
-                           placeholder="21m00Tcm4TlvDq8ikWAM" />
-                    <div class="form-text">ID da voz do ElevenLabs. Use "21m00Tcm4TlvDq8ikWAM" (Rachel) como padrão ou configure uma voz customizada.</div>
-                    <button type="button" class="btn btn-sm btn-light-primary mt-2" id="load_elevenlabs_voices">
-                        <i class="ki-duotone ki-arrows-circle fs-5 me-1">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                        </i>
-                        Carregar Vozes Disponíveis
-                    </button>
+                <div class="row">
+                    <div class="col-lg-6">
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">Modelo</label>
+                            <select name="text_to_speech_model_elevenlabs" class="form-select form-select-solid" data-provider="elevenlabs">
+                                <option value="eleven_multilingual_v2" <?= ($tts['model'] ?? 'eleven_multilingual_v2') === 'eleven_multilingual_v2' ? 'selected' : '' ?>>Multilingual v2 (Recomendado)</option>
+                                <option value="eleven_turbo_v2" <?= ($tts['model'] ?? '') === 'eleven_turbo_v2' ? 'selected' : '' ?>>Turbo v2 (Mais Rápido)</option>
+                                <option value="eleven_turbo_v2_5" <?= ($tts['model'] ?? '') === 'eleven_turbo_v2_5' ? 'selected' : '' ?>>Turbo v2.5 (Mais Rápido + Qualidade)</option>
+                                <option value="eleven_monolingual_v1" <?= ($tts['model'] ?? '') === 'eleven_monolingual_v1' ? 'selected' : '' ?>>Monolingual v1 (Inglês apenas)</option>
+                            </select>
+                            <div class="form-text">
+                                <strong>Multilingual v2:</strong> Melhor para português e outros idiomas<br>
+                                <strong>Turbo v2/v2.5:</strong> Mais rápido e econômico, boa qualidade
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">Voice ID</label>
+                            <div class="input-group">
+                                <input type="text" name="text_to_speech_voice_id_elevenlabs" class="form-control form-control-solid" 
+                                       id="elevenlabs_voice_id_input"
+                                       value="<?= htmlspecialchars($tts['voice_id'] ?? '21m00Tcm4TlvDq8ikWAM') ?>" 
+                                       placeholder="21m00Tcm4TlvDq8ikWAM" 
+                                       data-provider="elevenlabs" />
+                                <button type="button" class="btn btn-light-primary" id="load_elevenlabs_voices">
+                                    <i class="ki-duotone ki-arrows-circle fs-5">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    Buscar Vozes
+                                </button>
+                            </div>
+                            <div class="form-text">ID da voz do ElevenLabs. Clique em "Buscar Vozes" para ver as disponíveis.</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Modal/Container para exibir vozes disponíveis -->
+                <div id="elevenlabs_voices_container" class="mb-7" style="display: none;">
+                    <div class="card bg-light">
+                        <div class="card-body p-4">
+                            <h5 class="fw-bold mb-4">🎤 Vozes Disponíveis:</h5>
+                            <div id="elevenlabs_voices_list" class="row g-3">
+                                <!-- Será preenchido dinamicamente via JavaScript -->
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="row">
                     <div class="col-lg-4">
@@ -1052,6 +1087,93 @@ document.addEventListener("DOMContentLoaded", function() {
     
     // Atualizar na inicialização
     updatePercentageRulesHidden();
+    
+    // ✅ NOVO: Carregar vozes disponíveis do ElevenLabs
+    const loadVoicesBtn = document.getElementById("load_elevenlabs_voices");
+    if (loadVoicesBtn) {
+        loadVoicesBtn.addEventListener("click", function() {
+            const btn = this;
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Carregando...';
+            
+            fetch("<?= \App\Helpers\Url::to('/api/elevenlabs/voices') ?>", {
+                method: "GET",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest"
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+                
+                if (data.success && data.voices && data.voices.length > 0) {
+                    const container = document.getElementById("elevenlabs_voices_container");
+                    const list = document.getElementById("elevenlabs_voices_list");
+                    const input = document.getElementById("elevenlabs_voice_id_input");
+                    
+                    // Limpar lista
+                    list.innerHTML = '';
+                    
+                    // Renderizar vozes
+                    data.voices.forEach(function(voice) {
+                        const genderIcon = voice.gender === 'male' ? '👨' : voice.gender === 'female' ? '👩' : '🎤';
+                        const voiceHtml = `
+                            <div class="col-lg-6">
+                                <div class="card card-bordered card-flush h-100 voice-card" style="cursor: pointer;" data-voice-id="${voice.id}">
+                                    <div class="card-body p-4">
+                                        <div class="d-flex align-items-center justify-content-between mb-2">
+                                            <h6 class="fw-bold mb-0">${genderIcon} ${voice.name}</h6>
+                                            <span class="badge badge-light-primary">${voice.id.substring(0, 8)}...</span>
+                                        </div>
+                                        <p class="text-muted fs-7 mb-2">${voice.description || 'Sem descrição'}</p>
+                                        ${voice.preview_url ? `<audio controls style="width: 100%; height: 32px;" class="mt-2" onclick="event.stopPropagation();"><source src="${voice.preview_url}" type="audio/mpeg">Seu navegador não suporta áudio.</audio>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        list.insertAdjacentHTML('beforeend', voiceHtml);
+                    });
+                    
+                    // Mostrar container
+                    container.style.display = 'block';
+                    
+                    // Adicionar evento de clique para selecionar voz
+                    list.querySelectorAll('.voice-card').forEach(function(card) {
+                        card.addEventListener('click', function() {
+                            const voiceId = this.dataset.voiceId;
+                            input.value = voiceId;
+                            
+                            // Destacar card selecionado
+                            list.querySelectorAll('.voice-card').forEach(c => c.classList.remove('border-primary'));
+                            this.classList.add('border-primary');
+                            
+                            // Scroll suave para o input
+                            input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            input.focus();
+                        });
+                    });
+                    
+                    // Destacar voz atual se já estiver selecionada
+                    const currentVoiceId = input.value;
+                    if (currentVoiceId) {
+                        const currentCard = list.querySelector(`[data-voice-id="${currentVoiceId}"]`);
+                        if (currentCard) {
+                            currentCard.classList.add('border-primary');
+                        }
+                    }
+                } else {
+                    alert(data.message || 'Nenhuma voz encontrada. Verifique se a API Key do ElevenLabs está configurada.');
+                }
+            })
+            .catch(error => {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+                alert('Erro ao carregar vozes: ' + error.message);
+            });
+        });
+    }
     
     function submitConversationsForm(form) {
         // Atualizar regras de porcentagem antes de enviar

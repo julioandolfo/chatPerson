@@ -122,6 +122,20 @@ function seed_roles_and_permissions() {
         ['name' => 'Editar tools de IA', 'slug' => 'ai_tools.edit', 'description' => 'Editar tools de IA', 'module' => 'ai_tools'],
         ['name' => 'Deletar tools de IA', 'slug' => 'ai_tools.delete', 'description' => 'Deletar tools de IA', 'module' => 'ai_tools'],
         
+        // Chamadas de Voz (WavoIP)
+        ['name' => 'Ver chamadas de voz', 'slug' => 'voice_calls.view', 'description' => 'Ver chamadas de voz', 'module' => 'voice_calls'],
+        ['name' => 'Criar chamadas de voz', 'slug' => 'voice_calls.create', 'description' => 'Iniciar chamadas de voz', 'module' => 'voice_calls'],
+        ['name' => 'Encerrar chamadas de voz', 'slug' => 'voice_calls.end', 'description' => 'Encerrar chamadas de voz', 'module' => 'voice_calls'],
+        
+        // WhatsApp
+        ['name' => 'Ver contas WhatsApp', 'slug' => 'whatsapp.view', 'description' => 'Ver contas WhatsApp', 'module' => 'whatsapp'],
+        ['name' => 'Criar contas WhatsApp', 'slug' => 'whatsapp.create', 'description' => 'Criar contas WhatsApp', 'module' => 'whatsapp'],
+        ['name' => 'Editar contas WhatsApp', 'slug' => 'whatsapp.edit', 'description' => 'Editar contas WhatsApp', 'module' => 'whatsapp'],
+        ['name' => 'Deletar contas WhatsApp', 'slug' => 'whatsapp.delete', 'description' => 'Deletar contas WhatsApp', 'module' => 'whatsapp'],
+        
+        // Integrações
+        ['name' => 'Ver integrações', 'slug' => 'integrations.view', 'description' => 'Ver integrações', 'module' => 'integrations'],
+        
         // Administração
         ['name' => 'Ver logs do sistema', 'slug' => 'admin.logs', 'description' => 'Visualizar logs do sistema', 'module' => 'admin'],
     ];
@@ -170,6 +184,9 @@ function seed_roles_and_permissions() {
         'funnels.view',        // Ver funis
         'automations.view',    // Ver automações
         'ai_assistant.use',    // Agentes podem usar o Assistente IA
+        'voice_calls.view',    // Ver chamadas de voz
+        'voice_calls.create',  // Criar chamadas de voz
+        'voice_calls.end',     // Encerrar chamadas de voz
     ];
     foreach ($agentPermissions as $slug) {
         if (isset($permissionIds[$slug])) {

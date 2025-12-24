@@ -82,7 +82,7 @@ class TTSIntelligentService
         // ✅ NOVO: Modo Adaptativo - Espelhar comportamento do cliente
         if (!empty($rules['adaptive_mode'])) {
             Logger::info("TTSIntelligentService::decideSendMode - 🔄 Modo ADAPTATIVO ativado");
-            return self::decideAdaptiveMode($conversationId, $textLower);
+            return self::decideAdaptiveMode($conversationId, $textLower, $clientMessage);
         }
         
         // ✅ NOVO: Verificar se é primeira mensagem da IA
@@ -309,12 +309,12 @@ class TTSIntelligentService
      * - Cliente enviou texto? IA envia texto
      * - Cliente pediu para parar áudios? IA respeita
      */
-    private static function decideAdaptiveMode(int $conversationId, string $textLower): string
+    private static function decideAdaptiveMode(int $conversationId, string $textLower, ?string $clientMessage = null): string
     {
         Logger::info("TTSIntelligentService - 🔄 Modo Adaptativo: Analisando comportamento do cliente...");
         
         try {
-            // 0️⃣ PRIMEIRO: Verificar se cliente PEDIU explicitamente um áudio
+            // 0️⃣ PRIMEIRO: Verificar se cliente PEDIU explicitamente um áudio na mensagem atual OU na última mensagem
             $audioRequestKeywords = [
                 'manda um áudio', 'manda um audio', 'envia um áudio', 'envia um audio',
                 'manda áudio', 'manda audio', 'envia áudio', 'envia audio',
@@ -323,18 +323,48 @@ class TTSIntelligentService
                 'não estou conseguindo ler', 'não consigo ler', 'não consigo ler o texto',
                 'prefiro áudio', 'prefiro audio', 'gostaria de áudio', 'gostaria de audio',
                 'pode mandar áudio', 'pode mandar audio', 'pode enviar áudio', 'pode enviar audio',
-                'me manda um áudio', 'me manda um audio', 'me envia um áudio', 'me envia um audio'
+                'me manda um áudio', 'me manda um audio', 'me envia um áudio', 'me envia um audio',
+                'mande um áudio', 'mande um audio', 'mande áudio', 'mande audio' // ✅ NOVO: variações com "mande"
             ];
             
-            foreach ($audioRequestKeywords as $keyword) {
-                if (stripos($textLower, $keyword) !== false) {
-                    Logger::info("TTSIntelligentService - 🎤 Cliente PEDIU explicitamente um áudio! Forçando audio_only");
-                    
-                    // Salvar preferência na metadata da conversa
-                    self::saveClientPreference($conversationId, 'prefer_audio');
-                    
-                    return 'audio_only';
+            // Verificar na mensagem do cliente fornecida (se houver)
+            if ($clientMessage !== null) {
+                $clientMessageLower = mb_strtolower($clientMessage);
+                foreach ($audioRequestKeywords as $keyword) {
+                    if (stripos($clientMessageLower, $keyword) !== false) {
+                        Logger::info("TTSIntelligentService - 🎤 Cliente PEDIU explicitamente um áudio na mensagem! Forçando audio_only");
+                        
+                        // Salvar preferência na metadata da conversa
+                        self::saveClientPreference($conversationId, 'prefer_audio');
+                        
+                        return 'audio_only';
+                    }
                 }
+            }
+            
+            // Verificar na última mensagem do cliente (se não foi fornecida)
+            try {
+                $sql = "SELECT content FROM messages 
+                        WHERE conversation_id = ? AND sender_type = 'contact'
+                        ORDER BY created_at DESC 
+                        LIMIT 1";
+                $lastClientMessage = \App\Helpers\Database::fetch($sql, [$conversationId]);
+                
+                if ($lastClientMessage && !empty($lastClientMessage['content'])) {
+                    $lastClientMessageLower = mb_strtolower($lastClientMessage['content']);
+                    foreach ($audioRequestKeywords as $keyword) {
+                        if (stripos($lastClientMessageLower, $keyword) !== false) {
+                            Logger::info("TTSIntelligentService - 🎤 Cliente PEDIU explicitamente um áudio na última mensagem! Forçando audio_only");
+                            
+                            // Salvar preferência na metadata da conversa
+                            self::saveClientPreference($conversationId, 'prefer_audio');
+                            
+                            return 'audio_only';
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                Logger::error("TTSIntelligentService - Erro ao verificar última mensagem do cliente: " . $e->getMessage());
             }
             
             // 1️⃣ Verificar se cliente pediu para NÃO enviar áudios

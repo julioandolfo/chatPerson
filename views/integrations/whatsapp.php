@@ -106,6 +106,16 @@ ob_start();
                                         <span class="fs-8">Usando funil/etapa padrão do sistema</span>
                                     </div>
                                     <?php endif; ?>
+                                    <?php if (!empty($account['wavoip_enabled'])): ?>
+                                    <div class="separator separator-dashed my-3"></div>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="ki-duotone ki-phone fs-5 text-success me-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        <span class="badge badge-light-success">WavoIP Habilitado</span>
+                                    </div>
+                                    <?php endif; ?>
                                 </div>
                                 <div class="d-flex gap-2">
                                     <?php if (\App\Helpers\Permission::can('whatsapp.view')): ?>
@@ -130,6 +140,14 @@ ob_start();
                                             onclick="editAccountSettings(<?= $account['id'] ?>, <?= htmlspecialchars(json_encode($account['name']), ENT_QUOTES) ?>, <?= $account['default_funnel_id'] ?? 'null' ?>, <?= $account['default_stage_id'] ?? 'null' ?>)"
                                             title="Configurar Funil/Etapa">
                                         <i class="ki-duotone ki-setting-2 fs-4">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                    </button>
+                                    <button type="button" class="btn btn-light-primary btn-sm" 
+                                            onclick="configureWavoip(<?= $account['id'] ?>, <?= htmlspecialchars(json_encode($account['name']), ENT_QUOTES) ?>, <?= $account['wavoip_enabled'] ?? 0 ?>, <?= htmlspecialchars(json_encode($account['wavoip_token'] ?? ''), ENT_QUOTES) ?>)"
+                                            title="Configurar WavoIP">
+                                        <i class="ki-duotone ki-phone fs-4">
                                             <span class="path1"></span>
                                             <span class="path2"></span>
                                         </i>
@@ -388,6 +406,70 @@ ob_start();
 <?php endif; ?>
 <!--end::Modal - Editar Configurações da Conta-->
 
+<!--begin::Modal - Configurar WavoIP-->
+<?php if (\App\Helpers\Permission::can('whatsapp.edit')): ?>
+<div class="modal fade" id="kt_modal_wavoip" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-650px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Configurar WavoIP</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <form id="kt_modal_wavoip_form" class="form">
+                <input type="hidden" name="account_id" id="kt_wavoip_account_id">
+                <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                    <div class="mb-5">
+                        <h4 class="fw-bold" id="kt_wavoip_account_name"></h4>
+                    </div>
+                    
+                    <div class="alert alert-info d-flex align-items-center p-5 mb-7">
+                        <i class="ki-duotone ki-information fs-2x text-info me-4">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div class="d-flex flex-column">
+                            <span class="fs-7">Configure o token WavoIP para habilitar chamadas de voz via WhatsApp. Obtenha seu token em <a href="https://app.wavoip.com" target="_blank">app.wavoip.com</a></span>
+                        </div>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Token WavoIP</label>
+                        <input type="text" name="wavoip_token" id="kt_wavoip_token" class="form-control form-control-solid" 
+                               placeholder="Seu token WavoIP" />
+                        <div class="form-text">Token de autenticação obtido no painel WavoIP</div>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <div class="form-check form-switch form-check-custom form-check-solid">
+                            <input class="form-check-input" type="checkbox" name="wavoip_enabled" id="kt_wavoip_enabled" value="1" />
+                            <label class="form-check-label" for="kt_wavoip_enabled">
+                                <span class="fw-semibold">Habilitar chamadas de voz</span>
+                            </label>
+                        </div>
+                        <div class="form-text">Ative para permitir chamadas de voz através desta conta WhatsApp</div>
+                    </div>
+                </div>
+                <div class="modal-footer flex-center">
+                    <button type="reset" data-bs-dismiss="modal" class="btn btn-light me-3">Cancelar</button>
+                    <button type="submit" id="kt_modal_wavoip_submit" class="btn btn-primary">
+                        <span class="indicator-label">Salvar</span>
+                        <span class="indicator-progress">Aguarde...
+                        <span class="spinner-border spinner-border-sm align-middle ms-2"></span></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+<!--end::Modal - Configurar WavoIP-->
+
 <?php 
 $content = ob_get_clean(); 
 $scripts = '
@@ -505,6 +587,47 @@ document.addEventListener("DOMContentLoaded", function() {
                 submitBtn.removeAttribute("data-kt-indicator");
                 submitBtn.disabled = false;
                 alert("Erro ao criar conta");
+            });
+        });
+    }
+    
+    // Handler do formulário de configuração WavoIP
+    const wavoipForm = document.getElementById("kt_modal_wavoip_form");
+    if (wavoipForm) {
+        wavoipForm.addEventListener("submit", function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById("kt_modal_wavoip_submit");
+            submitBtn.setAttribute("data-kt-indicator", "on");
+            submitBtn.disabled = true;
+            
+            const accountId = document.getElementById("kt_wavoip_account_id").value;
+            const formData = new FormData(wavoipForm);
+            
+            fetch("' . \App\Helpers\Url::to('/integrations/whatsapp') . '/" + accountId + "/wavoip", {
+                method: "POST",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                submitBtn.removeAttribute("data-kt-indicator");
+                submitBtn.disabled = false;
+                
+                if (data.success) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_wavoip"));
+                    modal.hide();
+                    location.reload();
+                } else {
+                    alert("Erro: " + (data.message || "Erro ao atualizar configuração WavoIP"));
+                }
+            })
+            .catch(error => {
+                submitBtn.removeAttribute("data-kt-indicator");
+                submitBtn.disabled = false;
+                alert("Erro ao atualizar configuração WavoIP");
             });
         });
     }
@@ -786,6 +909,16 @@ function deleteAccount(accountId, accountName) {
     .catch(error => {
         alert("Erro ao deletar conta");
     });
+}
+
+function configureWavoip(accountId, accountName, enabled, token) {
+    document.getElementById("kt_wavoip_account_id").value = accountId;
+    document.getElementById("kt_wavoip_account_name").textContent = accountName;
+    document.getElementById("kt_wavoip_token").value = token || "";
+    document.getElementById("kt_wavoip_enabled").checked = enabled == 1;
+    
+    const modal = new bootstrap.Modal(document.getElementById("kt_modal_wavoip"));
+    modal.show();
 }
 </script>';
 ?>

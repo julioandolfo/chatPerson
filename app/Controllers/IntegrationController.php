@@ -388,4 +388,62 @@ class IntegrationController
             ], 400);
         }
     }
+
+    /**
+     * Configurar WavoIP para conta WhatsApp
+     */
+    public function configureWavoip(int $id): void
+    {
+        Permission::abortIfCannot('whatsapp.edit');
+        
+        try {
+            $data = Request::post();
+            
+            // Validar dados
+            $errors = \App\Helpers\Validator::validate($data, [
+                'wavoip_token' => 'nullable|string|max:255',
+                'wavoip_enabled' => 'nullable|boolean'
+            ]);
+
+            if (!empty($errors)) {
+                throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));
+            }
+            
+            $updateData = [];
+            
+            if (isset($data['wavoip_token'])) {
+                $updateData['wavoip_token'] = $data['wavoip_token'] ?: null;
+            }
+            
+            if (isset($data['wavoip_enabled'])) {
+                $updateData['wavoip_enabled'] = $data['wavoip_enabled'] ? 1 : 0;
+            }
+            
+            if (empty($updateData)) {
+                throw new \InvalidArgumentException('Nenhum dado para atualizar');
+            }
+
+            if (WhatsAppAccount::update($id, $updateData)) {
+                Response::json([
+                    'success' => true,
+                    'message' => 'Configuração WavoIP atualizada com sucesso!'
+                ]);
+            } else {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Falha ao atualizar configuração'
+                ], 404);
+            }
+        } catch (\InvalidArgumentException $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao atualizar configuração: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

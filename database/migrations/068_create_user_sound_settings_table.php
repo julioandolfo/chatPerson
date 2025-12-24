@@ -134,7 +134,8 @@ function up_create_user_sound_settings_table() {
             ]
         ], JSON_UNESCAPED_UNICODE);
         
-        $stmt = $pdo->prepare("INSERT INTO settings (`key`, `value`, `type`, `category`, `description`) 
+        // Usar a estrutura correta da tabela settings (coluna 'group' em vez de 'category')
+        $stmt = $pdo->prepare("INSERT INTO settings (`key`, `value`, `type`, `group`, `description`) 
                                VALUES (?, ?, 'json', 'notifications', 'Configurações padrão de sons do sistema')
                                ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)");
         $stmt->execute(['system_sound_settings', $defaultSoundSettings]);

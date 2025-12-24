@@ -150,11 +150,28 @@ class ElevenLabsService
         }
 
         if (!$audioData || empty($audioData)) {
+            Logger::error("🔊 ElevenLabsService - ❌ Nenhum dado de áudio retornado após {$attempt} tentativas");
             return [
                 'success' => false,
                 'audio_path' => null,
                 'audio_url' => null,
                 'error' => $lastError ?? 'Erro desconhecido na geração de áudio',
+                'cost' => 0.0,
+                'duration' => 0.0
+            ];
+        }
+        
+        // ✅ NOVO: Verificar se o retorno é JSON de erro ao invés de áudio
+        $possibleJson = @json_decode($audioData, true);
+        if ($possibleJson && isset($possibleJson['detail'])) {
+            // É um erro JSON, não áudio!
+            $errorMsg = $possibleJson['detail']['message'] ?? $possibleJson['detail']['msg'] ?? json_encode($possibleJson['detail']);
+            Logger::error("🔊 ElevenLabsService - ❌ API retornou erro JSON: {$errorMsg}");
+            return [
+                'success' => false,
+                'audio_path' => null,
+                'audio_url' => null,
+                'error' => $errorMsg,
                 'cost' => 0.0,
                 'duration' => 0.0
             ];

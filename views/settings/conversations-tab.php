@@ -585,24 +585,32 @@ $tts = $cs['text_to_speech'] ?? [];
             <div class="fv-row mb-7">
                 <label class="fw-semibold fs-6 mb-2">Modo de Envio</label>
                 <select name="text_to_speech_send_mode" class="form-select form-select-solid" id="tts_send_mode_select">
-                    <option value="intelligent" <?= ($tts['send_mode'] ?? 'intelligent') === 'intelligent' ? 'selected' : '' ?>>🤖 Inteligente (Recomendado)</option>
+                    <option value="intelligent" <?= ($tts['send_mode'] ?? 'intelligent') === 'intelligent' ? 'selected' : '' ?>>🤖 Inteligente (Baseado em Regras)</option>
+                    <option value="adaptive" <?= ($tts['send_mode'] ?? '') === 'adaptive' ? 'selected' : '' ?>>🔄 Adaptativo (Espelha Cliente) ⭐ NOVO</option>
                     <option value="audio_only" <?= ($tts['send_mode'] ?? '') === 'audio_only' ? 'selected' : '' ?>>🎤 Somente Áudio</option>
                     <option value="text_only" <?= ($tts['send_mode'] ?? '') === 'text_only' ? 'selected' : '' ?>>📝 Somente Texto</option>
                     <option value="both" <?= ($tts['send_mode'] ?? '') === 'both' ? 'selected' : '' ?>>🎤📝 Áudio + Texto como Legenda</option>
                 </select>
                 <div class="form-text">
                     <strong>⚠️ IMPORTANTE:</strong> O sistema sempre envia UMA ÚNICA mensagem. Não envia duas mensagens separadas.<br><br>
-                    <strong>🤖 Inteligente:</strong> Decide automaticamente baseado em regras configuráveis (tamanho, URLs, código, etc).<br>
-                    <strong>🎤 Somente Áudio:</strong> Envia apenas o áudio (sem texto). Cliente ouve a mensagem.<br>
-                    <strong>📝 Somente Texto:</strong> Envia apenas o texto (sem áudio). Cliente lê a mensagem.<br>
-                    <strong>🎤📝 Áudio + Texto:</strong> Envia uma mensagem com áudio e texto aparece como legenda/caption no WhatsApp.
+                    <strong>🤖 Inteligente:</strong> Decide baseado em regras (tamanho, URLs, código, primeira mensagem, etc).<br>
+                    <strong>🔄 Adaptativo:</strong> <span class="badge badge-success">NOVO!</span> Espelha o comportamento do cliente:
+                    <ul class="mt-2 mb-0" style="margin-left: 20px;">
+                        <li>Cliente enviou áudio? → IA envia áudio</li>
+                        <li>Cliente enviou texto? → IA envia texto</li>
+                        <li>Cliente pediu "não envie áudio"? → IA respeita e só envia texto</li>
+                        <li>Primeira mensagem SEMPRE em texto (seguro)</li>
+                    </ul>
+                    <strong>🎤 Somente Áudio:</strong> Sempre envia áudio (sem texto).<br>
+                    <strong>📝 Somente Texto:</strong> Sempre envia texto (sem áudio).<br>
+                    <strong>🎤📝 Áudio + Texto:</strong> Envia uma mensagem com áudio e texto como legenda/caption no WhatsApp.
                 </div>
             </div>
             
-            <!-- Configurações do Modo Inteligente -->
-            <div id="tts_intelligent_settings" style="display: <?= ($tts['send_mode'] ?? 'intelligent') === 'intelligent' ? 'block' : 'none' ?>;">
+            <!-- Configurações do Modo Inteligente / Adaptativo -->
+            <div id="tts_intelligent_settings" style="display: <?= in_array(($tts['send_mode'] ?? 'intelligent'), ['intelligent', 'adaptive']) ? 'block' : 'none' ?>;">
                 <div class="separator separator-dashed my-5"></div>
-                <h5 class="fw-bold mb-4">⚙️ Configurações do Modo Inteligente</h5>
+                <h5 class="fw-bold mb-4">⚙️ Configurações do Modo Inteligente / Adaptativo</h5>
                 
                 <!-- ✅ NOVO: Primeira mensagem sempre texto -->
                 <div class="fv-row mb-7">
@@ -986,7 +994,8 @@ document.addEventListener("DOMContentLoaded", function() {
     const intelligentSettings = document.getElementById("tts_intelligent_settings");
     if (ttsSendModeSelect && intelligentSettings) {
         ttsSendModeSelect.addEventListener("change", function() {
-            intelligentSettings.style.display = (this.value === "intelligent") ? "block" : "none";
+            // Mostrar configurações para modo inteligente ou adaptativo
+            intelligentSettings.style.display = (this.value === "intelligent" || this.value === "adaptive") ? "block" : "none";
         });
     }
     

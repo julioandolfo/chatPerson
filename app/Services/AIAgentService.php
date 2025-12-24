@@ -404,21 +404,15 @@ class AIAgentService
             
             \App\Helpers\Logger::info("AIAgentService::processMessage - ANTES de decidir envio (audio=" . (!empty($audioAttachment) ? 'SIM' : 'NÃO') . ", mode={$sendMode}, contentLen=" . strlen($messageContent) . ")");
             
-            // Se modo é 'intelligent', decidir automaticamente
-            if ($sendMode === 'intelligent' && $audioAttachment) {
+            // Se modo é 'intelligent' ou 'adaptive', decidir automaticamente
+            if (in_array($sendMode, ['intelligent', 'adaptive']) && $audioAttachment) {
                 $intelligentRules = $ttsSettings['intelligent_rules'] ?? [];
                 
-                // ✅ CORREÇÃO: Adicionar first_message_always_text às regras se estiver definido no nível superior
-                if (isset($ttsSettings['first_message_always_text'])) {
-                    $intelligentRules['first_message_always_text'] = $ttsSettings['first_message_always_text'];
-                }
-                
-                // ✅ CORREÇÃO: Adicionar custom_behavior_prompt às regras se estiver definido
-                if (!empty($ttsSettings['custom_behavior_prompt'])) {
-                    $intelligentRules['custom_behavior_prompt'] = $ttsSettings['custom_behavior_prompt'];
-                }
-                
-                \App\Helpers\Logger::info("AIAgentService::processMessage - Regras inteligentes: first_msg_text=" . ($intelligentRules['first_message_always_text'] ?? 'false'));
+                // ✅ CORREÇÃO: As regras já estão dentro de intelligent_rules, não precisa mover
+                \App\Helpers\Logger::info("AIAgentService::processMessage - Regras inteligentes: " . json_encode([
+                    'first_msg_text' => ($intelligentRules['first_message_always_text'] ?? false),
+                    'mode' => $sendMode
+                ]));
                 
                 $sendMode = \App\Services\TTSIntelligentService::decideSendMode(
                     $response['content'],

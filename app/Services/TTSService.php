@@ -72,17 +72,74 @@ class TTSService
         }
 
         $settings = self::getSettings();
-        $provider = $options['provider'] ?? $settings['provider'] ?? self::PROVIDER_OPENAI;
+        $primaryProvider = $options['provider'] ?? $settings['provider'] ?? self::PROVIDER_OPENAI;
+        $mergedSettings = array_merge($settings, $options);
 
-        Logger::info("TTSService::generateAudio - Iniciando (provider={$provider}, len=" . strlen($text) . ")");
+        Logger::info("TTSService::generateAudio - 🎤 Iniciando (provider={$primaryProvider}, len=" . strlen($text) . ")");
 
+        // ✅ NOVO: Tentar com provider primário
+        $result = self::tryGenerateWithProvider($primaryProvider, $text, $mergedSettings);
+        
+        if ($result['success']) {
+            Logger::info("TTSService::generateAudio - ✅ Sucesso com provider primário: {$primaryProvider}");
+            return $result;
+        }
+
+        // ❌ Falhou com provider primário, tentar fallback
+        $primaryError = $result['error'] ?? 'Erro desconhecido';
+        Logger::error("TTSService::generateAudio - ❌ Falha com {$primaryProvider}: {$primaryError}");
+        
+        // Determinar provider de fallback
+        $fallbackProvider = ($primaryProvider === self::PROVIDER_OPENAI) 
+            ? self::PROVIDER_ELEVENLABS 
+            : self::PROVIDER_OPENAI;
+        
+        // Verificar se fallback está configurado
+        if (!self::isProviderConfigured($fallbackProvider)) {
+            Logger::error("TTSService::generateAudio - ⚠️ Fallback {$fallbackProvider} não está configurado. Retornando erro original.");
+            return $result; // Retornar erro original
+        }
+        
+        // ✅ Tentar com fallback
+        Logger::info("TTSService::generateAudio - 🔄 Tentando fallback: {$fallbackProvider}");
+        $fallbackResult = self::tryGenerateWithProvider($fallbackProvider, $text, $mergedSettings);
+        
+        if ($fallbackResult['success']) {
+            Logger::info("TTSService::generateAudio - ✅ SUCESSO com fallback {$fallbackProvider}!");
+            $fallbackResult['used_fallback'] = true;
+            $fallbackResult['primary_provider'] = $primaryProvider;
+            $fallbackResult['primary_error'] = $primaryError;
+            return $fallbackResult;
+        }
+        
+        // ❌ Ambos falharam
+        $fallbackError = $fallbackResult['error'] ?? 'Erro desconhecido';
+        Logger::error("TTSService::generateAudio - ❌ FALHA TOTAL! Primary ({$primaryProvider}): {$primaryError}, Fallback ({$fallbackProvider}): {$fallbackError}");
+        
+        return [
+            'success' => false,
+            'audio_path' => null,
+            'audio_url' => null,
+            'error' => "Falha em ambos providers. {$primaryProvider}: {$primaryError} | {$fallbackProvider}: {$fallbackError}",
+            'cost' => 0.0,
+            'duration' => 0.0,
+            'primary_error' => $primaryError,
+            'fallback_error' => $fallbackError
+        ];
+    }
+    
+    /**
+     * 🆕 Tentar gerar áudio com um provider específico
+     */
+    private static function tryGenerateWithProvider(string $provider, string $text, array $settings): array
+    {
         try {
             switch ($provider) {
                 case self::PROVIDER_OPENAI:
-                    return self::generateWithOpenAI($text, array_merge($settings, $options));
+                    return self::generateWithOpenAI($text, $settings);
                 
                 case self::PROVIDER_ELEVENLABS:
-                    return self::generateWithElevenLabs($text, array_merge($settings, $options));
+                    return self::generateWithElevenLabs($text, $settings);
                 
                 default:
                     return [
@@ -95,7 +152,7 @@ class TTSService
                     ];
             }
         } catch (\Exception $e) {
-            Logger::error("TTSService::generateAudio - Erro: " . $e->getMessage());
+            Logger::error("TTSService::tryGenerateWithProvider - Exceção com {$provider}: " . $e->getMessage());
             return [
                 'success' => false,
                 'audio_path' => null,
@@ -104,6 +161,25 @@ class TTSService
                 'cost' => 0.0,
                 'duration' => 0.0
             ];
+        }
+    }
+    
+    /**
+     * 🆕 Verificar se um provider está configurado (tem API key)
+     */
+    private static function isProviderConfigured(string $provider): bool
+    {
+        switch ($provider) {
+            case self::PROVIDER_OPENAI:
+                $apiKey = Setting::get('openai_api_key') ?: getenv('OPENAI_API_KEY');
+                return !empty($apiKey);
+            
+            case self::PROVIDER_ELEVENLABS:
+                $apiKey = Setting::get('elevenlabs_api_key') ?: getenv('ELEVENLABS_API_KEY');
+                return !empty($apiKey);
+            
+            default:
+                return false;
         }
     }
 

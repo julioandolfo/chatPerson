@@ -575,6 +575,11 @@ class SettingsController
                     'convert_to_whatsapp_format' => isset($data['text_to_speech_convert_to_whatsapp_format']),
                     'cost_limit_per_day' => isset($data['text_to_speech_cost_limit_per_day']) ? (float)$data['text_to_speech_cost_limit_per_day'] : 5.00,
                     'intelligent_rules' => [
+                        // ✅ NOVO: Modo Adaptativo e Primeira Mensagem
+                        'adaptive_mode' => ($data['text_to_speech_send_mode'] ?? '') === 'adaptive',
+                        'first_message_always_text' => isset($data['tts_intelligent_first_message_always_text']),
+                        'custom_behavior_prompt' => $data['tts_intelligent_custom_behavior_prompt'] ?? '',
+                        
                         'use_text_length' => isset($data['tts_intelligent_use_text_length']),
                         'max_chars_for_audio' => isset($data['tts_intelligent_max_chars_for_audio']) ? (int)$data['tts_intelligent_max_chars_for_audio'] : 500,
                         'min_chars_for_text' => isset($data['tts_intelligent_min_chars_for_text']) ? (int)$data['tts_intelligent_min_chars_for_text'] : 1000,

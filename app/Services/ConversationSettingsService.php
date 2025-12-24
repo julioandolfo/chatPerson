@@ -188,7 +188,7 @@ class ConversationSettingsService
                 'provider' => 'openai', // 'openai' ou 'elevenlabs'
                 'auto_generate_audio' => false, // Gerar áudio automaticamente para respostas da IA
                 'only_for_ai_agents' => true, // Só gerar áudio se for resposta de agente de IA
-                'send_mode' => 'intelligent', // 'text_only', 'audio_only', 'both', 'intelligent' - Modo de envio
+                'send_mode' => 'intelligent', // 'text_only', 'audio_only', 'both', 'intelligent', 'adaptive' - Modo de envio
                 'voice_id' => null, // ID da voz (específico por provider)
                 'model' => null, // Modelo (específico por provider, null = usar padrão)
                 'language' => 'pt', // Idioma
@@ -199,9 +199,11 @@ class ConversationSettingsService
                 'convert_to_whatsapp_format' => true, // Converter para formato compatível com WhatsApp
                 'cost_limit_per_day' => 5.00, // Limite de custo diário em USD
                 
-                // Regras Inteligentes (modo 'intelligent')
+                // Regras Inteligentes (modo 'intelligent' ou 'adaptive')
                 'intelligent_rules' => [
+                    'adaptive_mode' => false, // ✅ NOVO: Modo adaptativo (espelha cliente)
                     'first_message_always_text' => true, // ✅ NOVO: Primeira mensagem sempre em texto
+                    'custom_behavior_prompt' => '', // ✅ NOVO: Prompt customizado
                     
                     'use_text_length' => true, // Considerar tamanho do texto
                     'max_chars_for_audio' => 500, // Máximo de caracteres para enviar como áudio

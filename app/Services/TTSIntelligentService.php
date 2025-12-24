@@ -25,6 +25,12 @@ class TTSIntelligentService
         
         Logger::info("TTSIntelligentService::decideSendMode - Analisando (conv={$conversationId}, len={$textLength})");
         
+        // ✅ NOVO: Modo Adaptativo - Espelhar comportamento do cliente
+        if (!empty($rules['adaptive_mode'])) {
+            Logger::info("TTSIntelligentService::decideSendMode - 🔄 Modo ADAPTATIVO ativado");
+            return self::decideAdaptiveMode($conversationId, $textLower);
+        }
+        
         // ✅ NOVO: Verificar se é primeira mensagem da IA
         Logger::info("TTSIntelligentService::decideSendMode - first_message_always_text configurado: " . (!empty($rules['first_message_always_text']) ? 'SIM' : 'NÃO'));
         
@@ -32,7 +38,7 @@ class TTSIntelligentService
             try {
                 // Buscar se já existe alguma mensagem da IA nesta conversa
                 $sql = "SELECT COUNT(*) as count FROM messages 
-                        WHERE conversation_id = ? AND sender_type = 'agent'";
+                        WHERE conversation_id = ? AND sender_type = 'agent' AND message_type != 'system'";
                 $result = \App\Helpers\Database::fetch($sql, [$conversationId]);
                 $aiMessageCount = $result['count'] ?? 0;
                 
@@ -241,6 +247,128 @@ class TTSIntelligentService
         }
         
         return $stats;
+    }
+    
+    /**
+     * 🆕 Modo Adaptativo: Espelha comportamento do cliente
+     * - Cliente enviou áudio? IA envia áudio
+     * - Cliente enviou texto? IA envia texto
+     * - Cliente pediu para parar áudios? IA respeita
+     */
+    private static function decideAdaptiveMode(int $conversationId, string $textLower): string
+    {
+        Logger::info("TTSIntelligentService - 🔄 Modo Adaptativo: Analisando comportamento do cliente...");
+        
+        try {
+            // 1️⃣ Verificar se cliente pediu para NÃO enviar áudios
+            $negativeKeywords = [
+                'não envie áudio', 'não mande áudio', 'sem áudio', 'apenas texto',
+                'só texto', 'somente texto', 'prefiro texto', 'não gosto de áudio',
+                'pare de enviar áudio', 'não quero áudio'
+            ];
+            
+            foreach ($negativeKeywords as $keyword) {
+                if (stripos($textLower, $keyword) !== false) {
+                    Logger::info("TTSIntelligentService - ⚠️ Cliente pediu para NÃO enviar áudios! Usando text_only");
+                    
+                    // Salvar preferência na metadata da conversa
+                    self::saveClientPreference($conversationId, 'no_audio');
+                    
+                    return 'text_only';
+                }
+            }
+            
+            // 2️⃣ Verificar se há preferência salva
+            $savedPreference = self::getClientPreference($conversationId);
+            if ($savedPreference === 'no_audio') {
+                Logger::info("TTSIntelligentService - ⚠️ Cliente tem preferência salva: NO_AUDIO");
+                return 'text_only';
+            }
+            
+            // 3️⃣ Verificar últimas 3 mensagens do cliente
+            $sql = "SELECT message_type, content 
+                    FROM messages 
+                    WHERE conversation_id = ? AND sender_type = 'contact'
+                    ORDER BY created_at DESC 
+                    LIMIT 3";
+            $recentMessages = \App\Helpers\Database::fetchAll($sql, [$conversationId]);
+            
+            if (empty($recentMessages)) {
+                Logger::info("TTSIntelligentService - ℹ️ Nenhuma mensagem do cliente ainda. Usando text_only (seguro)");
+                return 'text_only';
+            }
+            
+            // Contar quantos áudios vs textos
+            $audioCount = 0;
+            $textCount = 0;
+            
+            foreach ($recentMessages as $msg) {
+                if ($msg['message_type'] === 'audio') {
+                    $audioCount++;
+                } else {
+                    $textCount++;
+                }
+            }
+            
+            Logger::info("TTSIntelligentService - 📊 Últimas 3 mensagens: {$audioCount} áudios, {$textCount} textos");
+            
+            // 4️⃣ Decisão baseada no comportamento do cliente
+            if ($audioCount > 0 && $audioCount >= $textCount) {
+                // Cliente usa áudio (metade ou mais)
+                Logger::info("TTSIntelligentService - ✅ Cliente usa áudio! Enviando audio_only");
+                return 'audio_only';
+            } else {
+                // Cliente prefere texto
+                Logger::info("TTSIntelligentService - ✅ Cliente prefere texto! Enviando text_only");
+                return 'text_only';
+            }
+            
+        } catch (\Exception $e) {
+            Logger::error("TTSIntelligentService - Erro no modo adaptativo: " . $e->getMessage());
+            // Fallback seguro: texto
+            return 'text_only';
+        }
+    }
+    
+    /**
+     * 🆕 Salvar preferência do cliente na metadata da conversa
+     */
+    private static function saveClientPreference(int $conversationId, string $preference): void
+    {
+        try {
+            $conversation = \App\Models\Conversation::find($conversationId);
+            if ($conversation) {
+                $metadata = json_decode($conversation['metadata'] ?? '{}', true);
+                $metadata['tts_client_preference'] = $preference;
+                $metadata['tts_preference_updated_at'] = date('Y-m-d H:i:s');
+                
+                \App\Models\Conversation::update($conversationId, [
+                    'metadata' => json_encode($metadata)
+                ]);
+                
+                Logger::info("TTSIntelligentService - ✅ Preferência do cliente salva: {$preference}");
+            }
+        } catch (\Exception $e) {
+            Logger::error("TTSIntelligentService - Erro ao salvar preferência: " . $e->getMessage());
+        }
+    }
+    
+    /**
+     * 🆕 Obter preferência salva do cliente
+     */
+    private static function getClientPreference(int $conversationId): ?string
+    {
+        try {
+            $conversation = \App\Models\Conversation::find($conversationId);
+            if ($conversation) {
+                $metadata = json_decode($conversation['metadata'] ?? '{}', true);
+                return $metadata['tts_client_preference'] ?? null;
+            }
+        } catch (\Exception $e) {
+            Logger::error("TTSIntelligentService - Erro ao obter preferência: " . $e->getMessage());
+        }
+        
+        return null;
     }
 }
 

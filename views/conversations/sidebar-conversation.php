@@ -499,48 +499,235 @@
 <script>
 console.log('📋 sidebar-conversation.php carregado');
 
-// Adicionar listener ao botão de mover estágio (fallback)
-function initMoveStageButton() {
-    console.log('🔍 Procurando botão sidebar-move-stage-btn...');
-    const moveStageBtn = document.getElementById('sidebar-move-stage-btn');
-    console.log('🔍 Botão encontrado:', moveStageBtn);
+// ============================================================================
+// DEFINIR FUNÇÃO moveConversationStage IMEDIATAMENTE (antes de tudo)
+// ============================================================================
+window.moveConversationStage = function() {
+    console.log('✅ moveConversationStage chamada!');
+    console.log('📊 currentConversationId:', window.currentConversationId);
     
-    if (moveStageBtn) {
-        console.log('🔧 Adicionando listener ao botão de mover estágio');
+    const conversationId = window.currentConversationId || 0;
+    if (!conversationId) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Atenção',
+            text: 'Selecione uma conversa primeiro'
+        });
+        return;
+    }
+    
+    // Carregar funis e etapas
+    fetch('<?= \App\Helpers\Url::to("/funnels") ?>', {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success || !data.funnels || data.funnels.length === 0) {
+            throw new Error('Nenhum funil disponível');
+        }
         
-        // Remover listener antigo se existir
-        moveStageBtn.replaceWith(moveStageBtn.cloneNode(true));
-        const newBtn = document.getElementById('sidebar-move-stage-btn');
+        const funnels = data.funnels;
+        const funnelOptions = funnels.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
         
-        newBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('🖱️ Botão de mover estágio clicado (via listener)');
-            console.log('🔍 Verificando window.moveConversationStage:', typeof window.moveConversationStage);
-            
-            if (typeof window.moveConversationStage === 'function') {
-                console.log('✅ Chamando moveConversationStage...');
-                window.moveConversationStage();
-            } else {
-                console.error('❌ moveConversationStage não está definida!');
+        Swal.fire({
+            title: 'Mover Conversa',
+            html: `
+                <div class="mb-4">
+                    <label class="form-label">Selecione o Funil:</label>
+                    <select id="swal-funnel-select" class="form-select">
+                        <option value="">Selecione...</option>
+                        ${funnelOptions}
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">Selecione a Etapa:</label>
+                    <select id="swal-stage-select" class="form-select" disabled>
+                        <option value="">Selecione um funil primeiro</option>
+                    </select>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Mover',
+            cancelButtonText: 'Cancelar',
+            didOpen: () => {
+                const funnelSelect = document.getElementById('swal-funnel-select');
+                const stageSelect = document.getElementById('swal-stage-select');
+                
+                funnelSelect.addEventListener('change', (e) => {
+                    const funnelId = e.target.value;
+                    if (!funnelId) {
+                        stageSelect.disabled = true;
+                        stageSelect.innerHTML = '<option value="">Selecione um funil primeiro</option>';
+                        return;
+                    }
+                    
+                    // Carregar etapas do funil
+                    fetch(`<?= \App\Helpers\Url::to("/funnels") ?>/${funnelId}/stages/json`, {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.stages) {
+                            const stageOptions = data.stages.map(s => 
+                                `<option value="${s.id}">${s.name}</option>`
+                            ).join('');
+                            stageSelect.innerHTML = `<option value="">Selecione...</option>${stageOptions}`;
+                            stageSelect.disabled = false;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro ao carregar etapas:', error);
+                        stageSelect.innerHTML = '<option value="">Erro ao carregar etapas</option>';
+                    });
+                });
+            },
+            preConfirm: () => {
+                const funnelId = document.getElementById('swal-funnel-select').value;
+                const stageId = document.getElementById('swal-stage-select').value;
+                
+                if (!funnelId || !stageId) {
+                    Swal.showValidationMessage('Selecione um funil e uma etapa');
+                    return false;
+                }
+                
+                return { funnelId, stageId };
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const { funnelId, stageId } = result.value;
+                
+                // Fazer requisição para mover conversa
+                const formData = new FormData();
+                formData.append('stage_id', stageId);
+                
+                fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/move-stage`, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sucesso!',
+                            text: 'Conversa movida com sucesso',
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+                        
+                        // Recarregar conversa
+                        if (typeof selectConversation === 'function') {
+                            selectConversation(conversationId);
+                        }
+                    } else {
+                        throw new Error(data.message || 'Erro ao mover conversa');
+                    }
+                })
+                .catch(error => {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: error.message
+                    });
+                });
             }
         });
-        console.log('✅ Listener adicionado com sucesso!');
-    } else {
-        console.warn('⚠️ Botão sidebar-move-stage-btn não encontrado no DOM');
+    })
+    .catch(error => {
+        console.error('Erro ao carregar funis:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro ao carregar funis: ' + error.message
+        });
+    });
+};
+
+console.log('✅ window.moveConversationStage definida IMEDIATAMENTE!');
+console.log('🔍 Tipo:', typeof window.moveConversationStage);
+
+// ============================================================================
+// DEFINIR FUNÇÃO markAsSpam IMEDIATAMENTE (antes de tudo)
+// ============================================================================
+window.markAsSpam = function(conversationId) {
+    console.log('🚫 markAsSpam chamada! conversationId:', conversationId);
+    
+    const convId = conversationId || window.currentConversationId || 0;
+    if (!convId) {
+        alert('Nenhuma conversa selecionada');
+        return;
     }
-}
+    
+    if (!confirm('Deseja realmente marcar esta conversa como spam? Esta ação não pode ser desfeita e a conversa será fechada automaticamente.')) {
+        return;
+    }
+    
+    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${convId}/spam`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso!',
+                text: 'Conversa marcada como spam',
+                timer: 2000,
+                showConfirmButton: false
+            }).then(() => {
+                window.location.reload();
+            });
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Erro ao marcar como spam: ' + (data.message || 'Erro desconhecido')
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro ao marcar como spam'
+        });
+    });
+};
 
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('📋 DOMContentLoaded disparado em sidebar-conversation.php');
-    initMoveStageButton();
-});
+console.log('✅ window.markAsSpam definida IMEDIATAMENTE!');
 
-// Também tentar inicializar depois de um pequeno delay (caso o sidebar seja carregado dinamicamente)
-setTimeout(function() {
-    console.log('⏰ Tentando inicializar botão após delay...');
-    initMoveStageButton();
-}, 1000);
+// ============================================================================
+// DEFINIR STUBS DE TODAS AS FUNÇÕES DO SIDEBAR (serão sobrescritas depois)
+// ============================================================================
+window.editContact = window.editContact || function(id) { console.log('editContact:', id); };
+window.manageContactAgents = window.manageContactAgents || function(id) { console.log('manageContactAgents:', id); };
+window.showAIHistory = window.showAIHistory || function() { console.log('showAIHistory'); };
+window.removeAIAgent = window.removeAIAgent || function() { console.log('removeAIAgent'); };
+window.showAddAIAgentModal = window.showAddAIAgentModal || function() { console.log('showAddAIAgentModal'); };
+window.showAddParticipantModal = window.showAddParticipantModal || function() { console.log('showAddParticipantModal'); };
+window.manageTags = window.manageTags || function(id) { console.log('manageTags:', id); };
+window.escalateFromAI = window.escalateFromAI || function(id) { console.log('escalateFromAI:', id); };
+window.assignConversation = window.assignConversation || function(id) { console.log('assignConversation:', id); };
+window.changeDepartment = window.changeDepartment || function(id) { console.log('changeDepartment:', id); };
+window.closeConversation = window.closeConversation || function(id) { console.log('closeConversation:', id); };
+window.reopenConversation = window.reopenConversation || function(id) { console.log('reopenConversation:', id); };
+window.addNote = window.addNote || function(id) { console.log('addNote:', id); };
+
+console.log('✅ Stubs de funções do sidebar definidos!');
 
 // Expor função globalmente para debug e uso direto
 window.debugMoveStage = function() {
@@ -697,32 +884,6 @@ window.reopenConversation = function(conversationId) {
     });
 };
 
-window.markAsSpam = function(conversationId) {
-    if (!confirm('Deseja realmente marcar esta conversa como spam? Esta ação não pode ser desfeita e a conversa será fechada automaticamente.')) {
-        return;
-    }
-    
-    fetch(`/conversations/${conversationId}/spam`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Recarregar a página para atualizar o estado
-            window.location.reload();
-        } else {
-            alert('Erro ao marcar como spam: ' + (data.message || 'Erro desconhecido'));
-        }
-    })
-    .catch(error => {
-        console.error('Erro:', error);
-        alert('Erro ao marcar como spam');
-    });
-};
-
 window.addNote = function(conversationId) {
     const noteText = document.getElementById('newNoteText');
     const content = noteText?.value.trim() || '';
@@ -810,164 +971,6 @@ window.addNote = function(conversationId) {
         }
     });
 };
-
-// Função para mover conversa de funil/etapa
-console.log('🔧 Definindo window.moveConversationStage...');
-
-// Definir a função de forma global e garantida (IIFE para evitar conflitos)
-(function() {
-    window.moveConversationStage = function() {
-        console.log('✅ moveConversationStage chamada!');
-        console.log('📊 currentConversationId:', window.currentConversationId);
-    const conversationId = window.currentConversationId || 0;
-    if (!conversationId) {
-        Swal.fire({
-            icon: 'warning',
-            title: 'Atenção',
-            text: 'Selecione uma conversa primeiro'
-        });
-        return;
-    }
-    
-    // Carregar funis e etapas
-    fetch('<?= \App\Helpers\Url::to("/funnels") ?>', {
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-            'Accept': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (!data.success || !data.funnels || data.funnels.length === 0) {
-            throw new Error('Nenhum funil disponível');
-        }
-        
-        const funnels = data.funnels;
-        const funnelOptions = funnels.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
-        
-        Swal.fire({
-            title: 'Mover Conversa',
-            html: `
-                <div class="mb-4">
-                    <label class="form-label">Selecione o Funil:</label>
-                    <select id="swal-funnel-select" class="form-select">
-                        <option value="">Selecione...</option>
-                        ${funnelOptions}
-                    </select>
-                </div>
-                <div class="mb-4">
-                    <label class="form-label">Selecione a Etapa:</label>
-                    <select id="swal-stage-select" class="form-select" disabled>
-                        <option value="">Selecione um funil primeiro</option>
-                    </select>
-                </div>
-            `,
-            showCancelButton: true,
-            confirmButtonText: 'Mover',
-            cancelButtonText: 'Cancelar',
-            didOpen: () => {
-                const funnelSelect = document.getElementById('swal-funnel-select');
-                const stageSelect = document.getElementById('swal-stage-select');
-                
-                funnelSelect.addEventListener('change', (e) => {
-                    const funnelId = e.target.value;
-                    if (!funnelId) {
-                        stageSelect.disabled = true;
-                        stageSelect.innerHTML = '<option value="">Selecione um funil primeiro</option>';
-                        return;
-                    }
-                    
-                    // Carregar etapas do funil
-                    fetch(`<?= \App\Helpers\Url::to("/funnels") ?>/${funnelId}/stages/json`, {
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'Accept': 'application/json'
-                        }
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success && data.stages) {
-                            const stageOptions = data.stages.map(s => 
-                                `<option value="${s.id}">${s.name}</option>`
-                            ).join('');
-                            stageSelect.innerHTML = `<option value="">Selecione...</option>${stageOptions}`;
-                            stageSelect.disabled = false;
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Erro ao carregar etapas:', error);
-                        stageSelect.innerHTML = '<option value="">Erro ao carregar etapas</option>';
-                    });
-                });
-            },
-            preConfirm: () => {
-                const funnelId = document.getElementById('swal-funnel-select').value;
-                const stageId = document.getElementById('swal-stage-select').value;
-                
-                if (!funnelId || !stageId) {
-                    Swal.showValidationMessage('Selecione um funil e uma etapa');
-                    return false;
-                }
-                
-                return { funnelId, stageId };
-            }
-        }).then((result) => {
-            if (result.isConfirmed) {
-                const { funnelId, stageId } = result.value;
-                
-                // Fazer requisição para mover conversa
-                const formData = new FormData();
-                formData.append('stage_id', stageId);
-                
-                fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/move-stage`, {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Sucesso!',
-                            text: 'Conversa movida com sucesso',
-                            timer: 2000,
-                            showConfirmButton: false
-                        });
-                        
-                        // Recarregar conversa
-                        if (typeof selectConversation === 'function') {
-                            selectConversation(conversationId);
-                        }
-                    } else {
-                        throw new Error(data.message || 'Erro ao mover conversa');
-                    }
-                })
-                .catch(error => {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Erro',
-                        text: error.message
-                    });
-                });
-            }
-        });
-    })
-    .catch(error => {
-        console.error('Erro ao carregar funis:', error);
-        Swal.fire({
-            icon: 'error',
-            title: 'Erro',
-            text: 'Erro ao carregar funis: ' + error.message
-        });
-    });
-    };
-    
-    console.log('✅ window.moveConversationStage definida com sucesso!');
-    console.log('🔍 Tipo de moveConversationStage:', typeof window.moveConversationStage);
-})();
 
 // ============================================================================
 // FUNÇÕES DE GERENCIAMENTO DE AGENTES DE IA

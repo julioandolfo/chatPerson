@@ -15,10 +15,20 @@
         // Fila de notificações
         queue: [],
         
-        // Máximo de notificações visíveis simultaneamente
+        // Configurações carregadas do servidor
+        settings: {
+            enabled: true,
+            browserNotificationsEnabled: true,
+            position: 'bottom-right',
+            duration: 8000,
+            showPreview: true,
+            maxVisible: 5
+        },
+        
+        // Máximo de notificações visíveis simultaneamente (legado, usa settings.maxVisible)
         maxVisible: 5,
         
-        // Tempo padrão de exibição (ms)
+        // Tempo padrão de exibição (ms) (legado, usa settings.duration)
         defaultDuration: 8000,
         
         // Flag de inicialização
@@ -101,6 +111,9 @@
             
             console.log('[NotificationManager] Inicializando...');
             
+            // Carregar configurações do servidor
+            this.loadSettings();
+            
             // Criar container
             this.createContainer();
             
@@ -115,6 +128,75 @@
             
             this.initialized = true;
             console.log('[NotificationManager] ✅ Inicializado com sucesso');
+        },
+
+        /**
+         * Carregar configurações do servidor
+         */
+        loadSettings: function() {
+            fetch('/settings/sounds', {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.settings) {
+                    this.settings = {
+                        enabled: data.settings.visual_notifications_enabled !== 0,
+                        browserNotificationsEnabled: data.settings.browser_notifications_enabled !== 0,
+                        position: data.settings.notification_position || 'bottom-right',
+                        duration: parseInt(data.settings.notification_duration) || 8000,
+                        showPreview: data.settings.show_notification_preview !== 0,
+                        maxVisible: parseInt(data.settings.max_visible_notifications) || 5
+                    };
+                    
+                    // Atualizar valores legados
+                    this.maxVisible = this.settings.maxVisible;
+                    this.defaultDuration = this.settings.duration;
+                    
+                    // Atualizar posição do container
+                    this.updateContainerPosition();
+                    
+                    console.log('[NotificationManager] ✅ Configurações carregadas:', this.settings);
+                }
+            })
+            .catch(error => {
+                console.error('[NotificationManager] ❌ Erro ao carregar configurações:', error);
+            });
+        },
+
+        /**
+         * Recarregar configurações
+         */
+        reloadSettings: function() {
+            this.loadSettings();
+        },
+
+        /**
+         * Atualizar configurações (para testes)
+         */
+        updateSettings: function(newSettings) {
+            this.settings = { ...this.settings, ...newSettings };
+            this.maxVisible = this.settings.maxVisible || this.maxVisible;
+            this.defaultDuration = this.settings.duration || this.defaultDuration;
+            this.updateContainerPosition();
+        },
+
+        /**
+         * Atualizar posição do container
+         */
+        updateContainerPosition: function() {
+            if (!this.container) return;
+            
+            // Remover classes de posição existentes
+            this.container.classList.remove('position-bottom-right', 'position-bottom-left', 
+                                           'position-top-right', 'position-top-left');
+            
+            // Adicionar nova classe de posição
+            this.container.classList.add('position-' + this.settings.position);
         },
 
         /**
@@ -134,15 +216,38 @@
             const styles = `
                 .notification-container {
                     position: fixed;
-                    bottom: 20px;
-                    right: 20px;
                     z-index: 9999;
                     display: flex;
-                    flex-direction: column-reverse;
                     gap: 10px;
                     max-height: calc(100vh - 40px);
                     overflow: hidden;
                     pointer-events: none;
+                }
+                
+                /* Posições do container */
+                .notification-container.position-bottom-right,
+                .notification-container:not([class*="position-"]) {
+                    bottom: 20px;
+                    right: 20px;
+                    flex-direction: column-reverse;
+                }
+                
+                .notification-container.position-bottom-left {
+                    bottom: 20px;
+                    left: 20px;
+                    flex-direction: column-reverse;
+                }
+                
+                .notification-container.position-top-right {
+                    top: 20px;
+                    right: 20px;
+                    flex-direction: column;
+                }
+                
+                .notification-container.position-top-left {
+                    top: 20px;
+                    left: 20px;
+                    flex-direction: column;
                 }
                 
                 .notification-toast {
@@ -157,7 +262,6 @@
                     max-width: 420px;
                     cursor: pointer;
                     pointer-events: auto;
-                    transform: translateX(120%);
                     opacity: 0;
                     transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
                     border-left: 4px solid transparent;
@@ -165,13 +269,31 @@
                     overflow: hidden;
                 }
                 
+                /* Animações baseadas na posição */
+                .position-bottom-right .notification-toast,
+                .position-top-right .notification-toast {
+                    transform: translateX(120%);
+                }
+                
+                .position-bottom-left .notification-toast,
+                .position-top-left .notification-toast {
+                    transform: translateX(-120%);
+                }
+                
                 .notification-toast.show {
                     transform: translateX(0);
                     opacity: 1;
                 }
                 
-                .notification-toast.hide {
+                .position-bottom-right .notification-toast.hide,
+                .position-top-right .notification-toast.hide {
                     transform: translateX(120%);
+                    opacity: 0;
+                }
+                
+                .position-bottom-left .notification-toast.hide,
+                .position-top-left .notification-toast.hide {
+                    transform: translateX(-120%);
                     opacity: 0;
                 }
                 
@@ -417,6 +539,12 @@
          * Mostrar notificação
          */
         show: function(options) {
+            // Verificar se notificações estão habilitadas
+            if (!this.settings.enabled) {
+                console.log('[NotificationManager] Notificações visuais desabilitadas');
+                return null;
+            }
+            
             const {
                 type = 'info',
                 title = null,
@@ -424,10 +552,13 @@
                 sender = null,
                 avatar = null,
                 conversationId = null,
-                duration = this.defaultDuration,
+                duration = this.settings.duration || this.defaultDuration,
                 playSound = true,
                 onClick = null
             } = options;
+            
+            // Respeitar configuração de preview
+            const displayMessage = this.settings.showPreview ? message : '';
             
             const typeConfig = this.types[type] || this.types.info;
             const id = ++this.notificationId;
@@ -455,10 +586,14 @@
             
             // Sender e mensagem
             let messageHtml = '';
-            if (sender) {
-                messageHtml = `<span class="notification-sender">${this.escapeHtml(sender)}:</span> ${this.escapeHtml(message)}`;
-            } else {
-                messageHtml = this.escapeHtml(message);
+            if (displayMessage) {
+                if (sender) {
+                    messageHtml = `<span class="notification-sender">${this.escapeHtml(sender)}:</span> ${this.escapeHtml(displayMessage)}`;
+                } else {
+                    messageHtml = this.escapeHtml(displayMessage);
+                }
+            } else if (sender) {
+                messageHtml = `<span class="notification-sender">${this.escapeHtml(sender)}</span> enviou uma mensagem`;
             }
             
             toast.innerHTML = `
@@ -522,9 +657,9 @@
             
             toast.dataset.timeoutId = timeoutId;
             
-            // Notificação do navegador (se permitido e aba não está focada)
-            if (!document.hasFocus()) {
-                this.showBrowserNotification(title || typeConfig.title, message, conversationId);
+            // Notificação do navegador (se permitido, habilitado e aba não está focada)
+            if (!document.hasFocus() && this.settings.browserNotificationsEnabled) {
+                this.showBrowserNotification(title || typeConfig.title, displayMessage, conversationId);
             }
             
             return id;

@@ -33,7 +33,24 @@ class UserSoundSettings extends Model
         'mention_received_sound',
         'quiet_hours_enabled',
         'quiet_hours_start',
-        'quiet_hours_end'
+        'quiet_hours_end',
+        // Configurações de notificações visuais
+        'visual_notifications_enabled',
+        'browser_notifications_enabled',
+        'notification_position',
+        'notification_duration',
+        'show_notification_preview',
+        'max_visible_notifications'
+    ];
+    
+    /**
+     * Posições disponíveis para notificações
+     */
+    public const NOTIFICATION_POSITIONS = [
+        'bottom-right' => 'Canto inferior direito',
+        'bottom-left' => 'Canto inferior esquerdo',
+        'top-right' => 'Canto superior direito',
+        'top-left' => 'Canto superior esquerdo'
     ];
     protected bool $timestamps = true;
 

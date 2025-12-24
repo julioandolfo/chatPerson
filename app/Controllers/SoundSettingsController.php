@@ -59,7 +59,11 @@ class SoundSettingsController
                 'sla_warning_enabled',
                 'sla_breached_enabled',
                 'mention_received_enabled',
-                'quiet_hours_enabled'
+                'quiet_hours_enabled',
+                // Novos campos de notificações visuais
+                'visual_notifications_enabled',
+                'browser_notifications_enabled',
+                'show_notification_preview'
             ];
             
             foreach ($boolFields as $field) {
@@ -71,6 +75,24 @@ class SoundSettingsController
             // Validar volume
             if (isset($data['volume'])) {
                 $data['volume'] = max(0, min(100, (int)$data['volume']));
+            }
+            
+            // Validar duração das notificações
+            if (isset($data['notification_duration'])) {
+                $data['notification_duration'] = max(3000, min(60000, (int)$data['notification_duration']));
+            }
+            
+            // Validar máximo de notificações visíveis
+            if (isset($data['max_visible_notifications'])) {
+                $data['max_visible_notifications'] = max(1, min(10, (int)$data['max_visible_notifications']));
+            }
+            
+            // Validar posição
+            if (isset($data['notification_position'])) {
+                $validPositions = ['bottom-right', 'bottom-left', 'top-right', 'top-left'];
+                if (!in_array($data['notification_position'], $validPositions)) {
+                    $data['notification_position'] = 'bottom-right';
+                }
             }
             
             $success = SoundNotificationService::updateUserSettings($userId, $data);

@@ -146,6 +146,108 @@ $availableSounds = SoundNotificationService::getAvailableSounds($userId);
 
                         <div class="separator my-7"></div>
 
+                        <!-- Notificações Visuais -->
+                        <div class="mb-5">
+                            <h5 class="fw-bold mb-4">
+                                <i class="ki-duotone ki-notification fs-5 me-2 text-primary">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                Notificações Visuais (Push)
+                            </h5>
+                            
+                            <!-- Habilitar notificações visuais -->
+                            <div class="d-flex align-items-center justify-content-between p-4 bg-light-info rounded mb-4">
+                                <div>
+                                    <div class="fw-semibold">Notificações na Tela</div>
+                                    <div class="text-muted fs-7">Mostrar alertas visuais no canto da tela</div>
+                                </div>
+                                <div class="form-check form-switch form-check-custom form-check-solid">
+                                    <input type="checkbox" class="form-check-input h-20px w-35px" 
+                                           id="visual_notifications_enabled" name="visual_notifications_enabled"
+                                           <?= ($userSettings['visual_notifications_enabled'] ?? 1) ? 'checked' : '' ?>
+                                           onchange="toggleVisualNotifications(this.checked)">
+                                </div>
+                            </div>
+                            
+                            <div id="visualNotificationsConfig" style="<?= !($userSettings['visual_notifications_enabled'] ?? 1) ? 'display:none' : '' ?>">
+                                <!-- Notificações do navegador -->
+                                <div class="d-flex align-items-center justify-content-between p-4 border rounded mb-3">
+                                    <div>
+                                        <div class="fw-semibold">Notificações do Navegador</div>
+                                        <div class="text-muted fs-7">Mostrar também quando a aba não está focada</div>
+                                    </div>
+                                    <div class="form-check form-switch form-check-custom form-check-solid">
+                                        <input type="checkbox" class="form-check-input h-20px w-35px" 
+                                               id="browser_notifications_enabled" name="browser_notifications_enabled"
+                                               <?= ($userSettings['browser_notifications_enabled'] ?? 1) ? 'checked' : '' ?>>
+                                    </div>
+                                </div>
+                                
+                                <!-- Preview da mensagem -->
+                                <div class="d-flex align-items-center justify-content-between p-4 border rounded mb-3">
+                                    <div>
+                                        <div class="fw-semibold">Mostrar Prévia</div>
+                                        <div class="text-muted fs-7">Exibir conteúdo da mensagem na notificação</div>
+                                    </div>
+                                    <div class="form-check form-switch form-check-custom form-check-solid">
+                                        <input type="checkbox" class="form-check-input h-20px w-35px" 
+                                               id="show_notification_preview" name="show_notification_preview"
+                                               <?= ($userSettings['show_notification_preview'] ?? 1) ? 'checked' : '' ?>>
+                                    </div>
+                                </div>
+                                
+                                <div class="row g-3 mb-3">
+                                    <!-- Posição -->
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">Posição na Tela</label>
+                                        <select class="form-select form-select-solid" id="notification_position" name="notification_position">
+                                            <?php foreach (UserSoundSettings::NOTIFICATION_POSITIONS as $value => $label): ?>
+                                            <option value="<?= $value ?>" <?= ($userSettings['notification_position'] ?? 'bottom-right') === $value ? 'selected' : '' ?>>
+                                                <?= $label ?>
+                                            </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Duração -->
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">Duração (segundos)</label>
+                                        <select class="form-select form-select-solid" id="notification_duration" name="notification_duration">
+                                            <option value="5000" <?= ($userSettings['notification_duration'] ?? 8000) == 5000 ? 'selected' : '' ?>>5 segundos</option>
+                                            <option value="8000" <?= ($userSettings['notification_duration'] ?? 8000) == 8000 ? 'selected' : '' ?>>8 segundos</option>
+                                            <option value="10000" <?= ($userSettings['notification_duration'] ?? 8000) == 10000 ? 'selected' : '' ?>>10 segundos</option>
+                                            <option value="15000" <?= ($userSettings['notification_duration'] ?? 8000) == 15000 ? 'selected' : '' ?>>15 segundos</option>
+                                            <option value="30000" <?= ($userSettings['notification_duration'] ?? 8000) == 30000 ? 'selected' : '' ?>>30 segundos</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <!-- Máximo de notificações -->
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">
+                                        Máximo de notificações visíveis: <span id="maxNotificationsValue"><?= $userSettings['max_visible_notifications'] ?? 5 ?></span>
+                                    </label>
+                                    <input type="range" class="form-range" id="max_visible_notifications" name="max_visible_notifications" 
+                                           min="1" max="10" value="<?= $userSettings['max_visible_notifications'] ?? 5 ?>"
+                                           oninput="document.getElementById('maxNotificationsValue').textContent = this.value">
+                                </div>
+                                
+                                <!-- Botão testar -->
+                                <button type="button" class="btn btn-sm btn-light-primary" onclick="testVisualNotification()">
+                                    <i class="ki-duotone ki-notification-on fs-5 me-1">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    Testar Notificação
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="separator my-7"></div>
+
                         <!-- Horário Silencioso -->
                         <div class="mb-5">
                             <h5 class="fw-bold mb-4">
@@ -381,6 +483,43 @@ function toggleQuietHours(enabled) {
     const config = document.getElementById('quietHoursConfig');
     if (config) {
         config.style.display = enabled ? 'flex' : 'none';
+    }
+}
+
+function toggleVisualNotifications(enabled) {
+    const config = document.getElementById('visualNotificationsConfig');
+    if (config) {
+        config.style.display = enabled ? 'block' : 'none';
+    }
+}
+
+function testVisualNotification() {
+    if (typeof NotificationManager !== 'undefined') {
+        const position = document.getElementById('notification_position').value;
+        const duration = parseInt(document.getElementById('notification_duration').value);
+        const showPreview = document.getElementById('show_notification_preview').checked;
+        
+        // Atualizar configurações temporariamente para o teste
+        NotificationManager.updateSettings({
+            position: position,
+            duration: duration,
+            showPreview: showPreview
+        });
+        
+        NotificationManager.show({
+            type: 'new_message',
+            title: 'Teste de Notificação',
+            message: showPreview ? 'Esta é uma prévia de como suas notificações aparecerão!' : '',
+            sender: 'Sistema',
+            playSound: true,
+            duration: duration
+        });
+    } else {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Não disponível',
+            text: 'NotificationManager não está carregado'
+        });
     }
 }
 

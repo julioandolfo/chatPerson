@@ -224,6 +224,9 @@
     <!-- WebSocket Client -->
     <script src="<?= \App\Helpers\Url::asset('js/realtime-client.js') ?>"></script>
     
+    <!-- Sound Manager -->
+    <script src="<?= \App\Helpers\Url::asset('js/sound-manager.js') ?>"></script>
+    
     <!--begin::Sidebar Toggle Script-->
     <script>
         // Função para toggle do sidebar esquerdo

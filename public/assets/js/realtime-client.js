@@ -489,6 +489,7 @@ class RealtimeClient {
      * Emitir evento
      */
     emit(event, data = null) {
+        // Emitir para handlers registrados via on()
         if (this.eventHandlers[event]) {
             this.eventHandlers[event].forEach(handler => {
                 try {
@@ -497,6 +498,17 @@ class RealtimeClient {
                     console.error(`Erro no handler do evento ${event}:`, e);
                 }
             });
+        }
+        
+        // Também disparar evento DOM global para listeners externos (SoundManager, etc)
+        try {
+            const domEvent = new CustomEvent('realtime:' + event, { 
+                detail: data,
+                bubbles: true 
+            });
+            document.dispatchEvent(domEvent);
+        } catch (e) {
+            console.warn(`Erro ao disparar evento DOM realtime:${event}:`, e);
         }
     }
 

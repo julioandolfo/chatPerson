@@ -31,6 +31,7 @@ use App\Controllers\TestController;
 use App\Controllers\AIAssistantController;
 use App\Controllers\RealtimeController;
 use App\Controllers\LogController;
+use App\Controllers\SoundSettingsController;
 
 // Rotas públicas
 Router::get('/', function() {
@@ -230,6 +231,17 @@ Router::post('/settings/security', [SettingsController::class, 'saveSecurity'], 
 Router::post('/settings/websocket', [SettingsController::class, 'saveWebSocket'], ['Authentication']);
 Router::post('/settings/conversations', [SettingsController::class, 'saveConversations'], ['Authentication']);
 Router::get('/api/settings/sla', [SettingsController::class, 'getSLAConfig'], ['Authentication']); // API para obter config de SLA
+
+// Rotas de Configurações de Som
+Router::get('/settings/sounds', [SoundSettingsController::class, 'getUserSettings'], ['Authentication']);
+Router::post('/settings/sounds', [SoundSettingsController::class, 'updateUserSettings'], ['Authentication']);
+Router::get('/settings/sounds/system', [SoundSettingsController::class, 'getSystemSettings'], ['Authentication']);
+Router::post('/settings/sounds/system', [SoundSettingsController::class, 'updateSystemSettings'], ['Authentication']);
+Router::get('/settings/sounds/available', [SoundSettingsController::class, 'getAvailableSounds'], ['Authentication']);
+Router::post('/settings/sounds/upload', [SoundSettingsController::class, 'uploadSound'], ['Authentication']);
+Router::delete('/settings/sounds/{id}', [SoundSettingsController::class, 'deleteSound'], ['Authentication']);
+Router::post('/settings/sounds/test', [SoundSettingsController::class, 'testSound'], ['Authentication']);
+Router::get('/settings/sounds/event/{event}', [SoundSettingsController::class, 'getSoundForEvent'], ['Authentication']);
 Router::get('/api/elevenlabs/voices', [SettingsController::class, 'getElevenLabsVoices'], ['Authentication']); // API para obter vozes do ElevenLabs
 
 // Rotas de Agentes de IA

@@ -89,6 +89,19 @@ ob_start();
                     Tempo Real
                 </a>
             </li>
+            <li class="nav-item mt-2">
+                <a class="nav-link text-active-primary me-10 <?= $activeTab === 'sounds' ? 'active' : '' ?>" 
+                   href="<?= \App\Helpers\Url::to('/settings?tab=sounds') ?>">
+                    <i class="ki-duotone ki-notification-on fs-2 me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                        <span class="path4"></span>
+                        <span class="path5"></span>
+                    </i>
+                    Sons
+                </a>
+            </li>
         </ul>
         <!--end::Tabs-->
         
@@ -499,6 +512,14 @@ ob_start();
             include __DIR__ . '/websocket-tab.php';
             ?>
             <!--end::Form Tempo Real-->
+        <?php endif; ?>
+        
+        <?php if ($activeTab === 'sounds'): ?>
+            <!--begin::Form Sons de Notificação-->
+            <?php
+            include __DIR__ . '/sounds-tab.php';
+            ?>
+            <!--end::Form Sons de Notificação-->
         <?php endif; ?>
         <!--end::Tab Content-->
     </div>

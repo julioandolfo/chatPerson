@@ -343,13 +343,41 @@ class AIAgentService
                 sleep($delay);
             }
 
-            // ✅ NOVO: Gerar áudio se TTS estiver habilitado
+            // ✅ NOVO: Verificar se cliente pediu áudio explicitamente
+            $clientMessageLower = mb_strtolower($message);
+            $audioRequestKeywords = [
+                'manda um áudio', 'manda um audio', 'envia um áudio', 'envia um audio',
+                'manda áudio', 'manda audio', 'envia áudio', 'envia audio',
+                'quero áudio', 'quero audio', 'preciso de áudio', 'preciso de audio',
+                'manda em áudio', 'manda em audio', 'envia em áudio', 'envia em audio',
+                'não estou conseguindo ler', 'não consigo ler', 'não consigo ler o texto',
+                'prefiro áudio', 'prefiro audio', 'gostaria de áudio', 'gostaria de audio',
+                'pode mandar áudio', 'pode mandar audio', 'pode enviar áudio', 'pode enviar audio',
+                'me manda um áudio', 'me manda um audio', 'me envia um áudio', 'me envia um audio'
+            ];
+            
+            $clientRequestedAudio = false;
+            foreach ($audioRequestKeywords as $keyword) {
+                if (stripos($clientMessageLower, $keyword) !== false) {
+                    $clientRequestedAudio = true;
+                    \App\Helpers\Logger::info("AIAgentService::processMessage - 🎤 Cliente PEDIU explicitamente um áudio!");
+                    break;
+                }
+            }
+            
+            // ✅ NOVO: Gerar áudio se TTS estiver habilitado E (auto_generate_audio OU cliente pediu)
             $audioAttachment = null;
             $ttsSettings = \App\Services\TTSService::getSettings();
             
-            \App\Helpers\Logger::info("AIAgentService::processMessage - ⚙️ TTS Settings: enabled=" . ($ttsSettings['enabled'] ? 'YES' : 'NO') . ", auto=" . ($ttsSettings['auto_generate_audio'] ? 'YES' : 'NO') . ", provider=" . ($ttsSettings['provider'] ?? 'none'));
+            \App\Helpers\Logger::info("AIAgentService::processMessage - ⚙️ TTS Settings: enabled=" . ($ttsSettings['enabled'] ? 'YES' : 'NO') . ", auto=" . ($ttsSettings['auto_generate_audio'] ? 'YES' : 'NO') . ", provider=" . ($ttsSettings['provider'] ?? 'none') . ", clientRequested=" . ($clientRequestedAudio ? 'YES' : 'NO'));
             
-            if (!empty($ttsSettings['enabled']) && !empty($ttsSettings['auto_generate_audio'])) {
+            // Gerar áudio se: (TTS habilitado E auto_generate) OU (TTS habilitado E cliente pediu)
+            $shouldGenerateAudio = !empty($ttsSettings['enabled']) && (
+                !empty($ttsSettings['auto_generate_audio']) || 
+                $clientRequestedAudio
+            );
+            
+            if ($shouldGenerateAudio) {
                 try {
                     \App\Helpers\Logger::info("AIAgentService::processMessage - 🎤 Gerando áudio com TTS (provider=" . ($ttsSettings['provider'] ?? 'openai') . ", len=" . strlen($response['content']) . ")");
                     \App\Helpers\Logger::info("AIAgentService::processMessage - 🎤 TTS Options: voice=" . ($ttsSettings['voice_id'] ?? 'null') . ", model=" . ($ttsSettings['model'] ?? 'null') . ", lang=" . ($ttsSettings['language'] ?? 'null') . ", speed=" . ($ttsSettings['speed'] ?? 'null'));
@@ -414,10 +442,12 @@ class AIAgentService
                     'mode' => $sendMode
                 ]));
                 
+                // ✅ NOVO: Passar também a mensagem do cliente para detectar solicitações
                 $sendMode = \App\Services\TTSIntelligentService::decideSendMode(
                     $response['content'],
                     $conversationId,
-                    $intelligentRules
+                    $intelligentRules,
+                    $message // Passar mensagem do cliente para detecção
                 );
                 
                 \App\Helpers\Logger::info("AIAgentService::processMessage - Modo inteligente escolheu: {$sendMode}");

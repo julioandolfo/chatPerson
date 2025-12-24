@@ -719,6 +719,11 @@ ob_start();
 <?php 
 $content = ob_get_clean(); 
 
+// Definir URLs antes da string JavaScript
+$chartDataUrl = \App\Helpers\Url::to('/dashboard/chart-data');
+$dashboardUrl = \App\Helpers\Url::to('/dashboard');
+$exportUrl = \App\Helpers\Url::to('/dashboard/export');
+
 // Adicionar Chart.js via CDN
 $scripts = '
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -735,7 +740,7 @@ function loadChartData(chartType, canvasId, configCallback) {
     const dateTo = document.getElementById("kt_dashboard_date_to").value;
     const groupBy = document.querySelector("input[name=\"chart_group_by\"]:checked")?.value || "day";
     
-    const url = new URL(\'' . \App\Helpers\Url::to('/dashboard/chart-data') . '\', window.location.origin);
+    const url = new URL(' . json_encode($chartDataUrl) . ', window.location.origin);
     url.searchParams.append("type", chartType);
     url.searchParams.append("date_from", dateFrom);
     url.searchParams.append("date_to", dateTo);
@@ -990,7 +995,7 @@ function loadDashboard() {
     const dateFrom = document.getElementById("kt_dashboard_date_from").value;
     const dateTo = document.getElementById("kt_dashboard_date_to").value;
     
-    window.location.href = \'' . \App\Helpers\Url::to('/dashboard') . '?date_from=\' + dateFrom + \'&date_to=\' + dateTo;
+    window.location.href = ' . json_encode($dashboardUrl) . ' + \'?date_from=\' + dateFrom + \'&date_to=\' + dateTo;
 }
 
 // Função para exportar relatório
@@ -998,7 +1003,7 @@ function exportReport(format) {
     const dateFrom = document.getElementById("kt_dashboard_date_from").value;
     const dateTo = document.getElementById("kt_dashboard_date_to").value;
     
-    const url = new URL(\'' . \App\Helpers\Url::to('/dashboard/export') . '\', window.location.origin);
+    const url = new URL(' . json_encode($exportUrl) . ', window.location.origin);
     url.searchParams.append("format", format);
     url.searchParams.append("date_from", dateFrom);
     url.searchParams.append("date_to", dateTo);

@@ -177,6 +177,8 @@ class Api4ComService
         }
 
         $data = json_decode($response, true);
+        
+        Logger::info("Api4ComService::initiateApi4ComCall - HTTP {$httpCode}, Response: " . substr($response, 0, 500));
 
         if ($httpCode >= 200 && $httpCode < 300) {
             return [
@@ -185,9 +187,25 @@ class Api4ComService
                 'data' => $data
             ];
         } else {
+            // Tratar erro corretamente (pode ser array ou string)
+            $errorMsg = "HTTP {$httpCode}";
+            if (is_array($data)) {
+                if (isset($data['error'])) {
+                    $errorMsg = is_array($data['error']) ? json_encode($data['error']) : $data['error'];
+                } elseif (isset($data['message'])) {
+                    $errorMsg = is_array($data['message']) ? json_encode($data['message']) : $data['message'];
+                } elseif (isset($data['msg'])) {
+                    $errorMsg = $data['msg'];
+                } else {
+                    $errorMsg = "HTTP {$httpCode}: " . json_encode($data);
+                }
+            } elseif (!empty($response)) {
+                $errorMsg = "HTTP {$httpCode}: " . substr($response, 0, 200);
+            }
+            
             return [
                 'success' => false,
-                'error' => $data['error'] ?? $data['message'] ?? "HTTP {$httpCode}: {$response}"
+                'error' => $errorMsg
             ];
         }
     }

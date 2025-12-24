@@ -2438,27 +2438,29 @@ body.dark-mode .swal2-content {
                     </i>
                 </button>
                 
-                <?php if (!empty($selectedConversation) && !empty($selectedConversation['contact_phone'])): ?>
-                    <?php
-                    // Verificar se há conta Api4Com habilitada
-                    $api4comAccount = \App\Models\Api4ComAccount::getFirstEnabled();
-                    $hasApi4Com = !empty($api4comAccount);
-                    $currentUserId = \App\Helpers\Auth::id();
-                    $hasExtension = false;
-                    if ($hasApi4Com && $currentUserId) {
-                        $extension = \App\Models\Api4ComExtension::findByUserAndAccount($currentUserId, $api4comAccount['id']);
-                        $hasExtension = !empty($extension) && $extension['status'] === 'active';
-                    }
-                    ?>
-                    <?php if ($hasApi4Com && $hasExtension && \App\Helpers\Permission::can('api4com_calls.create')): ?>
-                    <button class="btn btn-sm btn-icon btn-light-success" onclick="startApi4ComCall(<?= $selectedConversation['id'] ?>)" title="Ligar via Api4Com" id="btnApi4ComCall">
-                        <i class="ki-duotone ki-phone fs-2">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                        </i>
-                    </button>
-                    <?php endif; ?>
-                <?php endif; ?>
+                <?php
+                // Verificar se há conta Api4Com habilitada e ramal do usuário
+                $api4comAccount = \App\Models\Api4ComAccount::getFirstEnabled();
+                $hasApi4Com = !empty($api4comAccount);
+                $currentUserId = \App\Helpers\Auth::id();
+                $hasExtension = false;
+                if ($hasApi4Com && $currentUserId) {
+                    $extension = \App\Models\Api4ComExtension::findByUserAndAccount($currentUserId, $api4comAccount['id']);
+                    $hasExtension = !empty($extension) && $extension['status'] === 'active';
+                }
+                $canMakeCalls = $hasApi4Com && $hasExtension && \App\Helpers\Permission::can('api4com_calls.create');
+                $showCallButton = $canMakeCalls && !empty($selectedConversation) && !empty($selectedConversation['contact_phone']);
+                ?>
+                <button class="btn btn-sm btn-icon btn-light-success" onclick="startApi4ComCall(currentConversationId)" title="Ligar via Api4Com" id="btnApi4ComCall" style="<?= $showCallButton ? '' : 'display:none;' ?>">
+                    <i class="ki-duotone ki-phone fs-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </button>
+                <script>
+                    // Disponibilizar informação de capacidade Api4Com para JavaScript
+                    window.api4comCanMakeCalls = <?= $canMakeCalls ? 'true' : 'false' ?>;
+                </script>
                 
                 <button class="btn btn-sm btn-icon btn-light-primary" onclick="toggleConversationSidebar()" title="Detalhes da conversa">
                     <i class="ki-duotone ki-burger-menu fs-2">
@@ -6490,6 +6492,18 @@ function updateChatHeader(conversation) {
     const subtitleElement = header.querySelector('.chat-header-subtitle');
     if (subtitleElement) {
         subtitleElement.innerHTML = `${channelIcon} • <span class="badge badge-sm badge-light-${statusClass}">${statusText}</span>`;
+    }
+    
+    // Atualizar botão de chamada Api4Com
+    const callBtn = document.getElementById('btnApi4ComCall');
+    if (callBtn) {
+        // Mostrar botão se usuário pode fazer chamadas E contato tem telefone
+        const contactPhone = conversation.contact_phone || '';
+        if (window.api4comCanMakeCalls && contactPhone) {
+            callBtn.style.display = '';
+        } else {
+            callBtn.style.display = 'none';
+        }
     }
 }
 

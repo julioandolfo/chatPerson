@@ -162,10 +162,37 @@ class AIToolController
         Permission::abortIfCannot('ai_tools.delete');
         
         try {
+            $tool = \App\Models\AITool::find($id);
+            if (!$tool) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Tool não encontrada'
+                ], 404);
+                return;
+            }
+            
+            // ✅ NOVO: Verificar quantos agentes estão usando esta tool
+            $sql = "SELECT COUNT(*) as count, GROUP_CONCAT(DISTINCT a.name SEPARATOR ', ') as agent_names
+                    FROM ai_agent_tools at
+                    INNER JOIN ai_agents a ON at.ai_agent_id = a.id
+                    WHERE at.ai_tool_id = ?";
+            $usage = \App\Helpers\Database::fetch($sql, [$id]);
+            $agentCount = (int)($usage['count'] ?? 0);
+            $agentNames = $usage['agent_names'] ?? '';
+            
+            // Deletar tool (CASCADE remove automaticamente os relacionamentos em ai_agent_tools)
             if (\App\Models\AITool::delete($id)) {
+                $message = 'Tool excluída com sucesso!';
+                if ($agentCount > 0) {
+                    $message .= " {$agentCount} agente(s) tinha(m) esta tool configurada e foi(ram) atualizado(s) automaticamente.";
+                }
+                
+                \App\Helpers\Logger::info("AI Tool deletada: ID {$id}, Nome: {$tool['name']}, Agentes afetados: {$agentCount}");
+                
                 Response::json([
                     'success' => true,
-                    'message' => 'Tool excluída com sucesso!'
+                    'message' => $message,
+                    'affected_agents' => $agentCount
                 ]);
             } else {
                 Response::json([
@@ -176,8 +203,8 @@ class AIToolController
         } catch (\Exception $e) {
             Response::json([
                 'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
+                'message' => 'Erro ao excluir tool: ' . $e->getMessage()
+            ], 500);
         }
     }
 

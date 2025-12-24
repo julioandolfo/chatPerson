@@ -580,4 +580,141 @@ class AutomationController
             ], 500);
         }
     }
+    
+    /**
+     * Deletar automação
+     */
+    public function delete(int $id): void
+    {
+        Permission::abortIfCannot('automations.edit');
+        
+        try {
+            $automation = Automation::find($id);
+            if (!$automation) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Automação não encontrada'
+                ], 404);
+                return;
+            }
+            
+            // ✅ NOVO: Limpar metadata de conversas que referenciam esta automação
+            $affectedConversations = self::cleanupConversationMetadata($id);
+            
+            // ✅ NOVO: Cancelar delays pendentes (CASCADE já faz, mas garantimos)
+            self::cancelPendingDelays($id);
+            
+            // Deletar nós relacionados primeiro (cascade pode não estar configurado)
+            $nodes = Automation::getNodes($id);
+            foreach ($nodes as $node) {
+                AutomationNode::delete($node['id']);
+            }
+            
+            // Deletar automação
+            if (Automation::delete($id)) {
+                \App\Helpers\Logger::automation("Automação deletada: ID {$id}, Nome: {$automation['name']}, Conversas afetadas: {$affectedConversations}");
+                
+                $message = 'Automação deletada com sucesso!';
+                if ($affectedConversations > 0) {
+                    $message .= " {$affectedConversations} conversa(s) foram atualizadas (ramificação de IA desativada).";
+                }
+                
+                Response::json([
+                    'success' => true,
+                    'message' => $message,
+                    'affected_conversations' => $affectedConversations
+                ]);
+            } else {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Falha ao deletar automação'
+                ], 500);
+            }
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao deletar automação: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * 🆕 Limpar metadata de conversas que referenciam a automação deletada
+     */
+    private static function cleanupConversationMetadata(int $automationId): int
+    {
+        try {
+            // Buscar conversas que podem ter esta automação no metadata
+            // Usar LIKE para busca inicial (mais rápido que buscar todas)
+            $sql = "SELECT id, metadata FROM conversations 
+                    WHERE metadata IS NOT NULL 
+                    AND metadata != '' 
+                    AND (metadata LIKE ? OR metadata LIKE ?)
+                    LIMIT 1000";
+            
+            $searchPattern1 = '%"ai_branching_automation_id":' . $automationId . '%';
+            $searchPattern2 = '%"ai_branching_automation_id": ' . $automationId . '%';
+            
+            $conversations = \App\Helpers\Database::fetchAll($sql, [$searchPattern1, $searchPattern2]);
+            
+            $updatedCount = 0;
+            
+            foreach ($conversations as $conversation) {
+                $metadata = json_decode($conversation['metadata'] ?? '{}', true);
+                if (!is_array($metadata)) {
+                    continue; // Metadata inválido, pular
+                }
+                
+                // Verificar se realmente referencia esta automação
+                $branchingAutomationId = $metadata['ai_branching_automation_id'] ?? null;
+                if ($branchingAutomationId == $automationId) {
+                    // Limpar metadata de ramificação de IA
+                    $metadata['ai_branching_active'] = false;
+                    unset($metadata['ai_branching_automation_id']); // Remover completamente
+                    $metadata['ai_interaction_count'] = 0;
+                    $metadata['ai_intents'] = [];
+                    if (isset($metadata['ai_fallback_node_id'])) {
+                        unset($metadata['ai_fallback_node_id']);
+                    }
+                    
+                    // Atualizar conversa
+                    \App\Models\Conversation::update($conversation['id'], [
+                        'metadata' => json_encode($metadata)
+                    ]);
+                    
+                    $updatedCount++;
+                    
+                    \App\Helpers\Logger::automation("Conversa {$conversation['id']}: Metadata de ramificação IA limpo (automação {$automationId} deletada)");
+                }
+            }
+            
+            return $updatedCount;
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::automation("Erro ao limpar metadata de conversas: " . $e->getMessage());
+            error_log("Erro ao limpar metadata de conversas para automação {$automationId}: " . $e->getMessage());
+            return 0;
+        }
+    }
+    
+    /**
+     * 🆕 Cancelar delays pendentes (CASCADE já faz, mas garantimos)
+     */
+    private static function cancelPendingDelays(int $automationId): void
+    {
+        try {
+            $sql = "UPDATE automation_delays 
+                    SET status = 'cancelled', 
+                        error_message = 'Automação foi deletada',
+                        updated_at = NOW()
+                    WHERE automation_id = ? AND status IN ('pending', 'executing')";
+            
+            $affected = \App\Helpers\Database::execute($sql, [$automationId]);
+            
+            if ($affected > 0) {
+                \App\Helpers\Logger::automation("{$affected} delay(s) pendente(s) cancelado(s) para automação {$automationId}");
+            }
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::automation("Erro ao cancelar delays: " . $e->getMessage());
+        }
+    }
 }

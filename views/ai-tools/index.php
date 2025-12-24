@@ -70,9 +70,26 @@ ob_start();
                                     <?php endif; ?>
                                 </td>
                                 <td class="text-end">
-                                    <a href="<?= \App\Helpers\Url::to('/ai-tools/' . $tool['id']) ?>" class="btn btn-sm btn-light-primary">
-                                        Ver
-                                    </a>
+                                    <div class="d-flex justify-content-end gap-2">
+                                        <a href="<?= \App\Helpers\Url::to('/ai-tools/' . $tool['id']) ?>" class="btn btn-sm btn-light btn-active-light-primary">
+                                            Ver
+                                        </a>
+                                        <?php if (\App\Helpers\Permission::can('ai_tools.delete')): ?>
+                                        <button type="button" 
+                                                class="btn btn-sm btn-light btn-active-light-danger delete-ai-tool-btn" 
+                                                data-id="<?= $tool['id'] ?>"
+                                                data-name="<?= htmlspecialchars($tool['name']) ?>">
+                                            <i class="ki-duotone ki-trash fs-5">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                                <span class="path3"></span>
+                                                <span class="path4"></span>
+                                                <span class="path5"></span>
+                                            </i>
+                                            Deletar
+                                        </button>
+                                        <?php endif; ?>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -988,6 +1005,67 @@ document.addEventListener("DOMContentLoaded", function() {
             });
         });
     }
+    
+    // ✅ NOVO: Funcionalidade de deletar AI Tool
+    document.querySelectorAll('.delete-ai-tool-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const toolId = this.getAttribute('data-id');
+            const toolName = this.getAttribute('data-name');
+            
+            if (!confirm(`Tem certeza que deseja deletar a tool "${toolName}"?\n\nEsta ação não pode ser desfeita.`)) {
+                return;
+            }
+            
+            // Desabilitar botão durante requisição
+            this.disabled = true;
+            const originalHtml = this.innerHTML;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Deletando...';
+            
+            fetch(`<?= \App\Helpers\Url::to('/ai-tools') ?>/${toolId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remover linha da tabela
+                    const row = this.closest('tr');
+                    row.style.transition = 'opacity 0.3s';
+                    row.style.opacity = '0';
+                    setTimeout(() => {
+                        row.remove();
+                        
+                        // Verificar se não há mais tools
+                        const tbody = document.querySelector('table tbody');
+                        if (tbody && tbody.children.length === 0) {
+                            location.reload(); // Recarregar para mostrar mensagem de "nenhuma tool"
+                        }
+                    }, 300);
+                    
+                    // Mostrar notificação de sucesso (se disponível)
+                    if (typeof toastr !== 'undefined') {
+                        toastr.success('Tool deletada com sucesso!');
+                    } else {
+                        alert('Tool deletada com sucesso!');
+                    }
+                } else {
+                    this.disabled = false;
+                    this.innerHTML = originalHtml;
+                    alert('Erro: ' + (data.message || 'Erro ao deletar tool'));
+                }
+            })
+            .catch(error => {
+                this.disabled = false;
+                this.innerHTML = originalHtml;
+                console.error('Erro:', error);
+                alert('Erro ao deletar tool. Verifique o console para mais detalhes.');
+            });
+        });
+    });
 });
 </script>
 <?php 

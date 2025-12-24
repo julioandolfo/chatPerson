@@ -1844,6 +1844,14 @@ body.dark-mode .swal2-content {
                     <?php endif; ?>
                 </select>
                 <?php endif; ?>
+
+                <!-- Filtros de Funil/Etapa (carregados via JS) -->
+                <select id="filter_funnel" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 140px;">
+                    <option value="">Funil</option>
+                </select>
+                <select id="filter_stage" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 160px;" disabled>
+                    <option value="">Etapa</option>
+                </select>
                 
                 <button type="button" class="btn btn-sm btn-light-primary" onclick="openAdvancedFilters()" title="Filtros Avançados">
                     <i class="ki-duotone ki-filter fs-6 me-1">
@@ -7115,6 +7123,40 @@ document.getElementById('filter_channel')?.addEventListener('change', applyFilte
 document.getElementById('filter_department')?.addEventListener('change', applyFilters);
 document.getElementById('filter_tag')?.addEventListener('change', applyFilters);
 document.getElementById('filter_agent')?.addEventListener('change', applyFilters);
+document.getElementById('filter_funnel')?.addEventListener('change', () => {
+    const funnelId = document.getElementById('filter_funnel')?.value || '';
+    const stageSelect = document.getElementById('filter_stage');
+    if (stageSelect) {
+        stageSelect.innerHTML = '<option value="">Etapa</option>';
+        stageSelect.disabled = true;
+    }
+    if (funnelId) {
+        fetch(`<?= \App\Helpers\Url::to("/funnels") ?>/${funnelId}/stages/json`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.stages && stageSelect) {
+                const options = ['<option value="">Etapa</option>'].concat(
+                    data.stages.map(s => `<option value="${s.id}">${s.name}</option>`)
+                );
+                stageSelect.innerHTML = options.join('');
+                stageSelect.disabled = false;
+            }
+        })
+        .catch(() => {
+            if (stageSelect) {
+                stageSelect.innerHTML = '<option value="">Erro ao carregar etapas</option>';
+                stageSelect.disabled = false;
+            }
+        });
+    }
+    applyFilters();
+});
+document.getElementById('filter_stage')?.addEventListener('change', applyFilters);
 
 document.getElementById('kt_conversations_search')?.addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
@@ -7140,6 +7182,8 @@ function applyFilters() {
     const department = document.getElementById('filter_department')?.value || '';
     const tag = document.getElementById('filter_tag')?.value || '';
     const agent = document.getElementById('filter_agent')?.value || '';
+    const funnel = document.getElementById('filter_funnel')?.value || '';
+    const stage = document.getElementById('filter_stage')?.value || '';
     
     const params = new URLSearchParams();
     if (search) params.append('search', search);
@@ -7156,6 +7200,8 @@ function applyFilters() {
     if (channel) params.append('channel', channel);
     if (department) params.append('department_id', department);
     if (tag) params.append('tag_id', tag);
+    if (funnel) params.append('funnel_id', funnel);
+    if (stage) params.append('funnel_stage_id', stage);
     
     // Tratar filtro de agente
     if (agent === 'unassigned') {
@@ -7176,7 +7222,7 @@ function applyFilters() {
     });
     
     // Preservar filtros avançados simples (não preservar unanswered pois já foi tratado acima)
-    ['answered', 'date_from', 'date_to', 'pinned', 'order_by', 'order_dir'].forEach(key => {
+    ['answered', 'date_from', 'date_to', 'pinned', 'order_by', 'order_dir', 'funnel_id', 'funnel_stage_id'].forEach(key => {
         if (urlParams.has(key)) {
             params.append(key, urlParams.get(key));
         }
@@ -7209,7 +7255,7 @@ function refreshConversationList(params = null) {
         params = new URLSearchParams(window.location.search);
     }
     
-    // Evitar flicker: só mostra spinner no primeiro carregamento OU quando há filtros aplicados
+    // Evitar flicker: só mostra spinner no primeiro carregamento OU quando há filtros aplicados E ainda não renderizou
     const isFirstLoad = conversationsList.dataset.loaded !== '1';
     
     // Verificar se há filtros aplicados (não é apenas polling)
@@ -7227,11 +7273,15 @@ function refreshConversationList(params = null) {
         params.has('answered') ||
         params.has('date_from') ||
         params.has('date_to') ||
-        params.has('pinned')
+        params.has('pinned') ||
+        params.has('funnel_id') ||
+        params.has('funnel_stage_id')
     );
     
-    // Mostrar loading apenas no primeiro carregamento OU quando há filtros aplicados (não durante polling)
-    if (isFirstLoad || hasFilters) {
+    const shouldShowSpinner = isFirstLoad || (hasFilters && conversationsList.dataset.loaded !== '1');
+    
+    // Mostrar loading apenas no primeiro carregamento OU quando filtros aplicados e ainda não renderizado
+    if (shouldShowSpinner) {
         conversationsList.innerHTML = `
             <div class="d-flex align-items-center justify-content-center py-10">
                 <div class="text-center">
@@ -7240,6 +7290,7 @@ function refreshConversationList(params = null) {
                 </div>
             </div>
         `;
+        conversationsList.dataset.rendering = '1';
     }
     
     // Construir URL preservando TODOS os filtros
@@ -7310,6 +7361,9 @@ function refreshConversationList(params = null) {
             c.tags_data ? JSON.stringify(c.tags_data) : null
         ]));
         if (window.lastConversationListSignature === signature) {
+            // Se a lista já estava renderizada, evita ficar preso no spinner
+            conversationsList.dataset.rendering = '0';
+            conversationsList.dataset.loaded = conversationsList.dataset.loaded || '1';
             return;
         }
         window.lastConversationListSignature = signature;
@@ -7496,6 +7550,7 @@ function refreshConversationList(params = null) {
         
         conversationsList.innerHTML = html;
         conversationsList.dataset.loaded = '1';
+        conversationsList.dataset.rendering = '0';
     })
     .catch(error => {
         console.error('Erro ao buscar conversas:', error);

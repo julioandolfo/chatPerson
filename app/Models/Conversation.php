@@ -184,6 +184,17 @@ class Conversation extends Model
             $sql .= " AND c.whatsapp_account_id = ?";
             $params[] = $filters['whatsapp_account_id'];
         }
+
+        // Filtro por funil
+        if (!empty($filters['funnel_id'])) {
+            $sql .= " AND c.funnel_id = ?";
+            $params[] = $filters['funnel_id'];
+        }
+        // Filtro por etapa do funil
+        if (!empty($filters['funnel_stage_id'])) {
+            $sql .= " AND c.funnel_stage_id = ?";
+            $params[] = $filters['funnel_stage_id'];
+        }
         
         // Busca avançada (nome, telefone, email, mensagens, tags, participantes)
         $searchTerm = null;

@@ -157,6 +157,7 @@ Router::post('/automations/preview-variables', [AutomationController::class, 'pr
 // Rotas com parâmetros dinâmicos {id}
 Router::get('/automations/{id}', [AutomationController::class, 'show'], ['Authentication']);
 Router::post('/automations/{id}', [AutomationController::class, 'update'], ['Authentication']);
+Router::delete('/automations/{id}', [AutomationController::class, 'delete'], ['Authentication']);
 Router::post('/automations/{id}/nodes', [AutomationController::class, 'createNode'], ['Authentication']);
 Router::post('/automations/{id}/nodes/{nodeId}', [AutomationController::class, 'updateNode'], ['Authentication']);
 Router::delete('/automations/{id}/nodes/{nodeId}', [AutomationController::class, 'deleteNode'], ['Authentication']);

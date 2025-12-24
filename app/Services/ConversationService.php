@@ -1491,7 +1491,10 @@ class ConversationService
             }
             
             $aiConversation = \App\Models\AIConversation::getByConversationId($conversationId);
+            \App\Helpers\Logger::info("ConversationService::sendMessage - Verificando AIConversation: conv={$conversationId}, aiConversation=" . ($aiConversation ? 'EXISTS' : 'NULL') . ", status=" . ($aiConversation['status'] ?? 'N/A'));
+            
             if ($aiConversation && $aiConversation['status'] === 'active') {
+                \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ AIConversation ativa encontrada! Processando com IA (agentId=" . ($aiConversation['ai_agent_id'] ?? 'NULL') . ")");
                 try {
                     // ✅ NOVO: Verificar intent na mensagem do CLIENTE antes de chamar IA
                     $conversation = \App\Models\Conversation::find($conversationId);
@@ -1519,15 +1522,19 @@ class ConversationService
                     
                     // Se não detectou intent, processar com IA normalmente
                     if (!$intentDetected) {
+                        \App\Helpers\Logger::info("ConversationService::sendMessage - Chamando AIAgentService::processMessage (conv={$conversationId}, agent={$aiConversation['ai_agent_id']}, msgLen=" . strlen($processedContent) . ")");
                         $aiResponse = \App\Services\AIAgentService::processMessage(
                             $conversationId,
                             $aiConversation['ai_agent_id'],
                             $processedContent // Usar conteúdo processado (transcrito se disponível)
                         );
                         
+                        \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ AIAgentService::processMessage retornou com sucesso");
                         // A resposta já foi enviada pelo processMessage
                     }
                 } catch (\Exception $e) {
+                    \App\Helpers\Logger::error("ConversationService::sendMessage - ❌ ERRO ao processar mensagem com agente de IA: " . $e->getMessage());
+                    \App\Helpers\Logger::error("ConversationService::sendMessage - ❌ Stack trace: " . $e->getTraceAsString());
                     error_log("Erro ao processar mensagem com agente de IA: " . $e->getMessage());
                     // Continuar normalmente mesmo se falhar
                 }

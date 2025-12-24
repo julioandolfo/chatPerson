@@ -10,6 +10,7 @@ use App\Helpers\Response;
 use App\Helpers\Request;
 use App\Helpers\Permission;
 use App\Services\AIAgentService;
+use App\Models\AIAgent;
 use App\Models\AITool;
 
 class AIAgentController

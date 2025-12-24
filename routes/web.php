@@ -276,13 +276,15 @@ Router::get('/api/elevenlabs/voices', [SettingsController::class, 'getElevenLabs
 // IMPORTANTE: Rotas específicas DEVEM vir ANTES de rotas com parâmetros dinâmicos
 Router::get('/ai-agents/available', [ConversationController::class, 'getAvailableAIAgents'], ['Authentication']);
 Router::get('/ai-agents', [AIAgentController::class, 'index'], ['Authentication']);
+Router::get('/ai-agents/{id}/conversations', [AIAgentController::class, 'getConversations'], ['Authentication']);
+Router::get('/ai-agents/{id}/conversations/{conversationId}/history', [AIAgentController::class, 'getConversationHistory'], ['Authentication']);
+Router::get('/ai-agents/{id}/stats', [AIAgentController::class, 'getStats'], ['Authentication']);
 Router::get('/ai-agents/{id}', [AIAgentController::class, 'show'], ['Authentication']);
 Router::post('/ai-agents', [AIAgentController::class, 'store'], ['Authentication']);
 Router::post('/ai-agents/{id}', [AIAgentController::class, 'update'], ['Authentication']);
 Router::delete('/ai-agents/{id}', [AIAgentController::class, 'destroy'], ['Authentication']);
 Router::post('/ai-agents/{id}/tools', [AIAgentController::class, 'addTool'], ['Authentication']);
 Router::delete('/ai-agents/{id}/tools/{toolId}', [AIAgentController::class, 'removeTool'], ['Authentication']);
-Router::get('/ai-agents/{id}/stats', [AIAgentController::class, 'getStats'], ['Authentication']);
 
 // Rotas do Assistente IA (Chat)
 Router::get('/ai-assistant/features', [AIAssistantController::class, 'getFeatures'], ['Authentication']);

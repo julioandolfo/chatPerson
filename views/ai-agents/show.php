@@ -224,6 +224,12 @@ ob_start();
                                 <div>
                                     <div class="text-gray-600 fs-7 mb-1">Custo Total</div>
                                     <div class="text-gray-900 fw-bold fs-2">$<?= number_format($agent['stats']['total_cost'] ?? 0, 4, ',', '.') ?></div>
+                                    <?php 
+                                    // Taxa de conversão USD para BRL (pode ser atualizada via API futuramente)
+                                    $usdToBrl = 5.20; // Taxa aproximada
+                                    $costBrl = ($agent['stats']['total_cost'] ?? 0) * $usdToBrl;
+                                    ?>
+                                    <div class="text-gray-500 fs-6 mt-1">R$ <?= number_format($costBrl, 2, ',', '.') ?></div>
                                 </div>
                                 <div>
                                     <div class="text-gray-600 fs-7 mb-1">Conversas Completadas</div>
@@ -242,6 +248,44 @@ ob_start();
                     </div>
                 </div>
                 <!--end::Estatísticas-->
+                
+                <!--begin::Conversas-->
+                <div class="card mb-5">
+                    <div class="card-header">
+                        <h3 class="card-title">Conversas Atendidas pela IA</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="ai_conversations_container">
+                            <div class="text-center py-10">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Carregando...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="ai_conversations_pagination" class="d-flex justify-content-between align-items-center mt-5" style="display: none !important;">
+                            <div class="text-muted fs-7">
+                                <span id="pagination_info">Carregando...</span>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-light" id="prev_page_btn" disabled>
+                                    <i class="ki-duotone ki-arrow-left fs-5">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    Anterior
+                                </button>
+                                <button type="button" class="btn btn-sm btn-light" id="next_page_btn" disabled>
+                                    Próxima
+                                    <i class="ki-duotone ki-arrow-right fs-5">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!--end::Conversas-->
             </div>
         </div>
     </div>
@@ -420,6 +464,36 @@ foreach ($allTools as $tool) {
 </div>
 <!--end::Modal - Editar Agente de IA-->
 
+<!--begin::Modal - Histórico da Conversa-->
+<div class="modal fade" id="kt_modal_conversation_history" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-900px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Histórico da Conversa</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                <div id="conversation_history_content">
+                    <div class="text-center py-10">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer flex-center">
+                <button type="button" data-bs-dismiss="modal" class="btn btn-light">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!--end::Modal - Histórico da Conversa-->
+
 <?php 
 $content = ob_get_clean(); 
 $scripts = '
@@ -580,6 +654,368 @@ document.addEventListener("DOMContentLoaded", function() {
             });
         });
     }
+    
+    // Carregar conversas do agente
+    const agentId = <?= $agent['id'] ?>;
+    let currentPage = 1;
+    const limit = 20;
+    
+    function loadConversations(page = 1) {
+        const container = document.getElementById("ai_conversations_container");
+        const paginationDiv = document.getElementById("ai_conversations_pagination");
+        
+        container.innerHTML = `
+            <div class="text-center py-10">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+            </div>
+        `;
+        
+        fetch("' . \App\Helpers\Url::to('/ai-agents') . '/" + agentId + "/conversations?page=" + page + "&limit=" + limit, {
+            headers: {
+                "X-Requested-With": "XMLHttpRequest"
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                currentPage = page;
+                renderConversations(data.conversations, data.pagination);
+                updatePagination(data.pagination);
+            } else {
+                container.innerHTML = `
+                    <div class="text-center py-10">
+                        <p class="text-muted">Erro ao carregar conversas: ${data.message || "Erro desconhecido"}</p>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error("Erro:", error);
+            container.innerHTML = `
+                <div class="text-center py-10">
+                    <p class="text-muted">Erro ao carregar conversas. Tente novamente.</p>
+                </div>
+            `;
+        });
+    }
+    
+    function renderConversations(conversations, pagination) {
+        const container = document.getElementById("ai_conversations_container");
+        
+        if (!conversations || conversations.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-10">
+                    <i class="ki-duotone ki-chat fs-3x text-gray-400 mb-5">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    <h3 class="text-gray-800 fw-bold mb-2">Nenhuma conversa encontrada</h3>
+                    <div class="text-gray-500 fs-6">Este agente ainda não atendeu nenhuma conversa.</div>
+                </div>
+            `;
+            return;
+        }
+        
+        const usdToBrl = 5.20; // Taxa de conversão
+        
+        container.innerHTML = `
+            <div class="table-responsive">
+                <table class="table align-middle table-row-dashed fs-6 gy-5">
+                    <thead>
+                        <tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">
+                            <th class="min-w-150px">Contato</th>
+                            <th class="min-w-100px">Status</th>
+                            <th class="min-w-100px">Tokens</th>
+                            <th class="min-w-100px">Custo</th>
+                            <th class="min-w-150px">Data</th>
+                            <th class="text-end min-w-70px">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${conversations.map(conv => {
+                            const statusClass = conv.status === "completed" ? "success" : 
+                                               conv.status === "escalated" ? "warning" : 
+                                               conv.status === "active" ? "primary" : "secondary";
+                            const statusText = conv.status === "completed" ? "Completa" : 
+                                              conv.status === "escalated" ? "Escalada" : 
+                                              conv.status === "active" ? "Ativa" : "Desconhecido";
+                            const costBrl = (conv.cost || 0) * usdToBrl;
+                            const date = new Date(conv.created_at);
+                            const dateStr = date.toLocaleDateString("pt-BR") + " " + date.toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"});
+                            
+                            return `
+                                <tr>
+                                    <td>
+                                        <div class="d-flex flex-column">
+                                            <span class="text-gray-800 fw-bold">${escapeHtml(conv.contact_name || "Sem nome")}</span>
+                                            ${conv.contact_phone ? `<span class="text-muted fs-7">${escapeHtml(conv.contact_phone)}</span>` : ""}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-light-${statusClass}">${statusText}</span>
+                                    </td>
+                                    <td>
+                                        <span class="text-gray-800">${(conv.tokens_used || 0).toLocaleString("pt-BR")}</span>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex flex-column">
+                                            <span class="text-gray-800">$${(conv.cost || 0).toFixed(4)}</span>
+                                            <span class="text-muted fs-7">R$ ${costBrl.toFixed(2)}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="text-gray-600">${dateStr}</span>
+                                    </td>
+                                    <td class="text-end">
+                                        <button type="button" class="btn btn-sm btn-light btn-active-light-primary view-history-btn" data-id="${conv.id}">
+                                            Ver Histórico
+                                        </button>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join("")}
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+        // Adicionar event listeners aos botões
+        document.querySelectorAll(".view-history-btn").forEach(btn => {
+            btn.addEventListener("click", function() {
+                const conversationId = this.getAttribute("data-id");
+                loadConversationHistory(conversationId);
+            });
+        });
+    }
+    
+    function updatePagination(pagination) {
+        const paginationDiv = document.getElementById("ai_conversations_pagination");
+        const prevBtn = document.getElementById("prev_page_btn");
+        const nextBtn = document.getElementById("next_page_btn");
+        const infoSpan = document.getElementById("pagination_info");
+        
+        if (pagination.total === 0) {
+            paginationDiv.style.display = "none";
+            return;
+        }
+        
+        paginationDiv.style.display = "flex";
+        
+        const start = ((pagination.page - 1) * pagination.limit) + 1;
+        const end = Math.min(pagination.page * pagination.limit, pagination.total);
+        
+        infoSpan.textContent = `Mostrando ${start} a ${end} de ${pagination.total} conversas`;
+        
+        prevBtn.disabled = pagination.page <= 1;
+        nextBtn.disabled = pagination.page >= pagination.total_pages;
+        
+        prevBtn.onclick = () => {
+            if (pagination.page > 1) {
+                loadConversations(pagination.page - 1);
+            }
+        };
+        
+        nextBtn.onclick = () => {
+            if (pagination.page < pagination.total_pages) {
+                loadConversations(pagination.page + 1);
+            }
+        };
+    }
+    
+    function loadConversationHistory(conversationId) {
+        const modal = new bootstrap.Modal(document.getElementById("kt_modal_conversation_history"));
+        const content = document.getElementById("conversation_history_content");
+        
+        content.innerHTML = `
+            <div class="text-center py-10">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+            </div>
+        `;
+        
+        modal.show();
+        
+        fetch("' . \App\Helpers\Url::to('/ai-agents') . '/" + agentId + "/conversations/" + conversationId + "/history", {
+            headers: {
+                "X-Requested-With": "XMLHttpRequest"
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.history) {
+                renderConversationHistory(data.history);
+            } else {
+                content.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="ki-duotone ki-information-5 fs-2 me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Erro ao carregar histórico: ${data.message || "Erro desconhecido"}
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error("Erro:", error);
+            content.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="ki-duotone ki-information-5 fs-2 me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Erro ao carregar histórico. Tente novamente.
+                </div>
+            `;
+        });
+    }
+    
+    function renderConversationHistory(history) {
+        const content = document.getElementById("conversation_history_content");
+        const usdToBrl = 5.20;
+        
+        let html = `
+            <div class="mb-7">
+                <h4 class="fw-bold mb-5">Informações da Conversa</h4>
+                <div class="row mb-5">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <span class="text-gray-600 fs-7">Contato:</span>
+                            <div class="text-gray-800 fw-semibold">${escapeHtml(history.contact_name || "Sem nome")}</div>
+                            ${history.contact_phone ? `<div class="text-muted fs-7">${escapeHtml(history.contact_phone)}</div>` : ""}
+                            ${history.contact_email ? `<div class="text-muted fs-7">${escapeHtml(history.contact_email)}</div>` : ""}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <span class="text-gray-600 fs-7">Status:</span>
+                            <div>
+                                <span class="badge badge-light-${history.status === "completed" ? "success" : history.status === "escalated" ? "warning" : "primary"}">
+                                    ${history.status === "completed" ? "Completa" : history.status === "escalated" ? "Escalada" : "Ativa"}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <span class="text-gray-600 fs-7">Canal:</span>
+                            <div class="text-gray-800">${escapeHtml(history.channel || "N/A")}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mb-5">
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <span class="text-gray-600 fs-7">Tokens Utilizados:</span>
+                            <div class="text-gray-800 fw-bold">${(history.tokens_used || 0).toLocaleString("pt-BR")}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <span class="text-gray-600 fs-7">Custo:</span>
+                            <div class="text-gray-800 fw-bold">$${(history.cost || 0).toFixed(4)}</div>
+                            <div class="text-muted fs-7">R$ ${((history.cost || 0) * usdToBrl).toFixed(2)}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <span class="text-gray-600 fs-7">Criada em:</span>
+                            <div class="text-gray-800">${new Date(history.created_at).toLocaleString("pt-BR")}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <span class="text-gray-600 fs-7">Atualizada em:</span>
+                            <div class="text-gray-800">${new Date(history.updated_at).toLocaleString("pt-BR")}</div>
+                        </div>
+                    </div>
+                </div>
+                ${history.escalated_to_name ? `
+                    <div class="alert alert-warning">
+                        <i class="ki-duotone ki-information-5 fs-2 me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Escalada para: ${escapeHtml(history.escalated_to_name)}
+                    </div>
+                ` : ""}
+            </div>
+        `;
+        
+        // Tools utilizadas
+        if (history.tools_used && Array.isArray(history.tools_used) && history.tools_used.length > 0) {
+            html += `
+                <div class="mb-7">
+                    <h4 class="fw-bold mb-5">Tools Utilizadas</h4>
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Tool</th>
+                                    <th>Timestamp</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${history.tools_used.map(tool => `
+                                    <tr>
+                                        <td><code>${escapeHtml(tool.tool || "N/A")}</code></td>
+                                        <td>${escapeHtml(tool.timestamp || "N/A")}</td>
+                                    </tr>
+                                `).join("")}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Mensagens da conversa
+        if (history.conversation_messages && history.conversation_messages.length > 0) {
+            html += `
+                <div class="mb-7">
+                    <h4 class="fw-bold mb-5">Mensagens da Conversa</h4>
+                    <div class="timeline">
+                        ${history.conversation_messages.map(msg => {
+                            const isAI = msg.ai_agent_id !== null;
+                            const isContact = msg.sender_type === "contact";
+                            const senderName = msg.sender_name || (isAI ? "IA" : isContact ? "Cliente" : "Agente");
+                            const bgClass = isAI ? "bg-light-primary" : isContact ? "bg-light-info" : "bg-light-success";
+                            
+                            return `
+                                <div class="timeline-item mb-5">
+                                    <div class="timeline-line w-40px"></div>
+                                    <div class="timeline-icon symbol symbol-circle symbol-40px ${bgClass}">
+                                        <i class="ki-duotone ki-message-text-2 fs-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                    </div>
+                                    <div class="timeline-content mb-0">
+                                        <div class="fw-bold mb-1">${escapeHtml(senderName)}</div>
+                                        <div class="text-gray-600 mb-2">${escapeHtml(msg.content || "")}</div>
+                                        <div class="text-muted fs-7">${new Date(msg.created_at).toLocaleString("pt-BR")}</div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join("")}
+                    </div>
+                </div>
+            `;
+        }
+        
+        content.innerHTML = html;
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // Carregar conversas ao carregar a página
+    loadConversations(1);
 });
 </script>
 ';

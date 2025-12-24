@@ -149,5 +149,73 @@ class AIConversation extends Model
         
         return Database::fetch($sql, $params) ?? [];
     }
+
+    /**
+     * Contar total de conversas de um agente
+     */
+    public static function countByAgent(int $agentId): int
+    {
+        $sql = "SELECT COUNT(*) as total
+                FROM ai_conversations ac
+                INNER JOIN conversations c ON ac.conversation_id = c.id
+                WHERE ac.ai_agent_id = ?";
+        $result = Database::fetch($sql, [$agentId]);
+        return (int)($result['total'] ?? 0);
+    }
+
+    /**
+     * Obter histórico completo de uma conversa de IA
+     */
+    public static function getHistory(int $id): ?array
+    {
+        $sql = "SELECT ac.*, 
+                       c.status as conversation_status, 
+                       c.channel,
+                       ct.name as contact_name, 
+                       ct.phone as contact_phone,
+                       ct.email as contact_email,
+                       u.name as escalated_to_name
+                FROM ai_conversations ac
+                INNER JOIN conversations c ON ac.conversation_id = c.id
+                LEFT JOIN contacts ct ON c.contact_id = ct.id
+                LEFT JOIN users u ON ac.escalated_to_user_id = u.id
+                WHERE ac.id = ?";
+        
+        $conversation = Database::fetch($sql, [$id]);
+        
+        if (!$conversation) {
+            return null;
+        }
+        
+        // Decodificar JSON fields
+        if (is_string($conversation['messages'])) {
+            $conversation['messages'] = json_decode($conversation['messages'], true) ?? [];
+        }
+        if (is_string($conversation['tools_used'])) {
+            $conversation['tools_used'] = json_decode($conversation['tools_used'], true) ?? [];
+        }
+        if (is_string($conversation['metadata'])) {
+            $conversation['metadata'] = json_decode($conversation['metadata'], true) ?? [];
+        }
+        
+        // Buscar mensagens da conversa relacionada
+        $messagesSql = "SELECT m.*, 
+                               CASE 
+                                   WHEN m.sender_type = 'contact' THEN ct.name
+                                   WHEN m.sender_type = 'agent' AND m.user_id IS NOT NULL THEN u.name
+                                   WHEN m.sender_type = 'agent' AND m.ai_agent_id IS NOT NULL THEN aia.name
+                                   ELSE 'Sistema'
+                               END as sender_name
+                        FROM messages m
+                        LEFT JOIN contacts ct ON m.contact_id = ct.id
+                        LEFT JOIN users u ON m.user_id = u.id
+                        LEFT JOIN ai_agents aia ON m.ai_agent_id = aia.id
+                        WHERE m.conversation_id = ?
+                        ORDER BY m.created_at ASC";
+        
+        $conversation['conversation_messages'] = Database::fetchAll($messagesSql, [$conversation['conversation_id']]);
+        
+        return $conversation;
+    }
 }
 

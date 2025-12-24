@@ -361,5 +361,78 @@ class AIAgentController
             ], 500);
         }
     }
+
+    /**
+     * Listar conversas do agente (paginado)
+     */
+    public function getConversations(int $id): void
+    {
+        Permission::abortIfCannot('ai_agents.view');
+        
+        try {
+            $page = (int)(Request::get('page') ?? 1);
+            $limit = (int)(Request::get('limit') ?? 20);
+            $offset = ($page - 1) * $limit;
+            
+            $conversations = \App\Models\AIConversation::getByAgent($id, $limit, $offset);
+            $total = \App\Models\AIConversation::countByAgent($id);
+            $totalPages = ceil($total / $limit);
+            
+            Response::json([
+                'success' => true,
+                'conversations' => $conversations,
+                'pagination' => [
+                    'page' => $page,
+                    'limit' => $limit,
+                    'total' => $total,
+                    'total_pages' => $totalPages
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Obter histórico completo de uma conversa de IA
+     */
+    public function getConversationHistory(int $id, int $conversationId): void
+    {
+        Permission::abortIfCannot('ai_agents.view');
+        
+        try {
+            $history = \App\Models\AIConversation::getHistory($conversationId);
+            
+            if (!$history) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Conversa não encontrada'
+                ], 404);
+                return;
+            }
+            
+            // Verificar se a conversa pertence ao agente
+            if ($history['ai_agent_id'] != $id) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Conversa não pertence a este agente'
+                ], 403);
+                return;
+            }
+            
+            Response::json([
+                'success' => true,
+                'history' => $history
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
 

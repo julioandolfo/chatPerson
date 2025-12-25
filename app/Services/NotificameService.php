@@ -147,6 +147,9 @@ class NotificameService
         
         if ($httpCode >= 400) {
             $errorMsg = $responseData['message'] ?? $responseData['error'] ?? $responseData['detail'] ?? "Erro HTTP {$httpCode}";
+            if (is_array($errorMsg)) {
+                $errorMsg = json_encode($errorMsg);
+            }
             Logger::error("Notificame API error: {$errorMsg}");
             throw new \Exception("Erro na API Notificame: {$errorMsg}");
         }

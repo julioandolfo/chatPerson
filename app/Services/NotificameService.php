@@ -82,7 +82,7 @@ class NotificameService
     /**
      * Fazer requisição à API Notificame
      */
-    private static function makeRequest(string $endpoint, string $method = 'GET', array $data = [], string $token): array
+    private static function makeRequest(string $endpoint, string $token, string $method = 'GET', array $data = []): array
     {
         $url = self::BASE_URL . ltrim($endpoint, '/');
         
@@ -272,7 +272,7 @@ class NotificameService
         $token = self::getAccountToken($accountId);
         
         try {
-            $result = self::makeRequest('health', 'GET', [], $token);
+            $result = self::makeRequest('health', $token);
             
             IntegrationAccount::update($accountId, [
                 'status' => 'active',
@@ -319,7 +319,7 @@ class NotificameService
         
         try {
             $token = $account['api_token'];
-            $result = self::makeRequest('health', 'GET', [], $token);
+            $result = self::makeRequest('health', $token);
             
             return [
                 'status' => 'ok',
@@ -369,7 +369,7 @@ class NotificameService
         $endpoint = "{$channel}/send";
         
         try {
-            $result = self::makeRequest($endpoint, 'POST', $payload, $token);
+            $result = self::makeRequest($endpoint, $token, 'POST', $payload);
             
             return [
                 'success' => true,
@@ -416,7 +416,7 @@ class NotificameService
         $endpoint = "{$channel}/template";
         
         try {
-            $result = self::makeRequest($endpoint, 'POST', $payload, $token);
+            $result = self::makeRequest($endpoint, $token, 'POST', $payload);
             
             return [
                 'success' => true,
@@ -450,7 +450,7 @@ class NotificameService
         $endpoint = "{$channel}/interactive";
         
         try {
-            $result = self::makeRequest($endpoint, 'POST', $payload, $token);
+            $result = self::makeRequest($endpoint, $token, 'POST', $payload);
             
             return [
                 'success' => true,
@@ -484,7 +484,7 @@ class NotificameService
         $endpoint = "{$channel}/webhook";
         
         try {
-            self::makeRequest($endpoint, 'POST', $payload, $token);
+            self::makeRequest($endpoint, $token, 'POST', $payload);
             
             // Salvar webhook URL na conta
             IntegrationAccount::update($accountId, [
@@ -706,7 +706,7 @@ class NotificameService
         $endpoint = "{$channel}/templates";
         
         try {
-            $result = self::makeRequest($endpoint, 'GET', [], $token);
+            $result = self::makeRequest($endpoint, $token);
             return $result['templates'] ?? $result['data'] ?? [];
         } catch (\Exception $e) {
             Logger::error("Erro ao listar templates Notificame: " . $e->getMessage());

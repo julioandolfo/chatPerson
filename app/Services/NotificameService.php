@@ -425,28 +425,53 @@ class NotificameService
         $channel = $account['channel'];
         $token = $account['api_token'];
         $apiUrl = $account['api_url'] ?? null;
-        $apiUrl = $account['api_url'] ?? null;
+        $channelId = $account['account_id'] ?? null; // usado como "from" para Instagram
         
-        // Preparar payload baseado no canal
+        $endpoint = "{$channel}/send"; // default genérico
         $payload = [
             'to' => $to,
             'message' => $message
         ];
         
-        // Adicionar opções específicas
-        if (!empty($options['media_url'])) {
-            $payload['media'] = [
-                'url' => $options['media_url'],
-                'type' => $options['media_type'] ?? 'image'
+        if ($channel === 'instagram') {
+            if (empty($channelId)) {
+                throw new \Exception("Para Instagram, é obrigatório preencher o ID do canal (account_id) que vai em 'from'.");
+            }
+            // Endpoint e payload conforme docs: https://api.notificame.com.br/v1/channels/instagram/messages
+            $endpoint = 'channels/instagram/messages';
+            $payload = [
+                'from' => $channelId,
+                'to' => $to,
+                'contents' => [
+                    [
+                        'type' => 'text',
+                        'text' => $message
+                    ]
+                ]
             ];
+            // Suporte simples a mídia se fornecido
+            if (!empty($options['media_url'])) {
+                $payload['contents'] = [
+                    [
+                        'type' => 'file',
+                        'fileMimeType' => $options['media_type'] ?? 'image',
+                        'fileUrl' => $options['media_url'],
+                        'fileCaption' => $options['caption'] ?? ''
+                    ]
+                ];
+            }
+        } else {
+            // Genérico: mantém compatibilidade
+            if (!empty($options['media_url'])) {
+                $payload['media'] = [
+                    'url' => $options['media_url'],
+                    'type' => $options['media_type'] ?? 'image'
+                ];
+            }
+            if (!empty($options['caption'])) {
+                $payload['caption'] = $options['caption'];
+            }
         }
-        
-        if (!empty($options['caption'])) {
-            $payload['caption'] = $options['caption'];
-        }
-        
-        // Endpoint específico por canal
-        $endpoint = "{$channel}/send";
         
         try {
             Logger::info("Notificame sendMessage endpoint={$endpoint} channel={$channel} to={$to}");

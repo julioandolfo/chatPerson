@@ -91,13 +91,61 @@ class ContactService
         $params = [];
 
         if (!empty($filters['search'])) {
-            $sql .= " AND (name LIKE ? OR last_name LIKE ? OR email LIKE ? OR phone LIKE ? OR company LIKE ?)";
-            $search = "%{$filters['search']}%";
-            $params[] = $search;
-            $params[] = $search;
-            $params[] = $search;
-            $params[] = $search;
-            $params[] = $search;
+            $search = trim($filters['search']);
+            
+            // Verificar se é uma busca por número (contém apenas dígitos e caracteres comuns de telefone)
+            $isPhoneSearch = preg_match('/^[\d\s\+\-\(\)\.]+$/', $search);
+            
+            if ($isPhoneSearch) {
+                // Normalizar o número de busca
+                $normalizedSearch = Contact::normalizePhoneNumber($search);
+                
+                if (!empty($normalizedSearch)) {
+                    // Gerar variantes do número de busca (com/sem 9º dígito, com/sem código do país)
+                    $searchVariants = self::generatePhoneVariants($normalizedSearch);
+                    
+                    // Buscar por nome, email, empresa normalmente
+                    $sql .= " AND (name LIKE ? OR last_name LIKE ? OR email LIKE ? OR company LIKE ?";
+                    
+                    // Adicionar busca por telefone com todas as variantes
+                    $phoneConditions = [];
+                    foreach ($searchVariants as $variant) {
+                        $phoneConditions[] = "phone LIKE ?";
+                        $params[] = "%{$variant}%";
+                    }
+                    
+                    if (!empty($phoneConditions)) {
+                        $sql .= " OR (" . implode(" OR ", $phoneConditions) . ")";
+                    }
+                    
+                    $sql .= ")";
+                    
+                    // Adicionar parâmetros para busca de texto
+                    $textSearch = "%{$search}%";
+                    $params[] = $textSearch;
+                    $params[] = $textSearch;
+                    $params[] = $textSearch;
+                    $params[] = $textSearch;
+                } else {
+                    // Se não conseguiu normalizar, busca simples
+                    $sql .= " AND (name LIKE ? OR last_name LIKE ? OR email LIKE ? OR phone LIKE ? OR company LIKE ?)";
+                    $textSearch = "%{$search}%";
+                    $params[] = $textSearch;
+                    $params[] = $textSearch;
+                    $params[] = $textSearch;
+                    $params[] = $textSearch;
+                    $params[] = $textSearch;
+                }
+            } else {
+                // Busca de texto normal
+                $sql .= " AND (name LIKE ? OR last_name LIKE ? OR email LIKE ? OR phone LIKE ? OR company LIKE ?)";
+                $textSearch = "%{$search}%";
+                $params[] = $textSearch;
+                $params[] = $textSearch;
+                $params[] = $textSearch;
+                $params[] = $textSearch;
+                $params[] = $textSearch;
+            }
         }
 
         $sql .= " ORDER BY name ASC";
@@ -110,6 +158,64 @@ class ContactService
         }
 
         return \App\Helpers\Database::fetchAll($sql, $params);
+    }
+
+    /**
+     * Gerar variantes de número de telefone para busca flexível
+     * Considera variações com/sem 9º dígito e com/sem código do país
+     */
+    private static function generatePhoneVariants(string $normalizedPhone): array
+    {
+        $variants = [];
+        
+        // Sempre incluir o número normalizado
+        $variants[] = $normalizedPhone;
+        
+        // Se o número está vazio ou muito curto, retornar apenas ele mesmo
+        if (strlen($normalizedPhone) < 8) {
+            return $variants;
+        }
+        
+        // Remover código do país para trabalhar com DDD + número
+        $national = $normalizedPhone;
+        $hasCountryCode = false;
+        if (strpos($normalizedPhone, '55') === 0 && strlen($normalizedPhone) >= 10) {
+            $national = substr($normalizedPhone, 2);
+            $hasCountryCode = true;
+        }
+        
+        // Se tem 10 dígitos (possivelmente sem o 9º dígito do celular), gerar variante com 9
+        if (strlen($national) === 10 && strlen($national) >= 3) {
+            $ddd = substr($national, 0, 2);
+            $number = substr($national, 2);
+            $with9 = '55' . $ddd . '9' . $number;
+            $variants[] = $with9;
+            // Também adicionar sem código do país
+            $variants[] = $ddd . '9' . $number;
+        }
+        
+        // Se tem 11 dígitos e tem 9 no início do número (após DDD), gerar variante sem o 9
+        if (strlen($national) === 11 && strlen($national) >= 4 && substr($national, 2, 1) === '9') {
+            $ddd = substr($national, 0, 2);
+            $numberWithout9 = substr($national, 3);
+            $without9 = '55' . $ddd . $numberWithout9;
+            $variants[] = $without9;
+            // Também adicionar sem código do país
+            $variants[] = $ddd . $numberWithout9;
+        }
+        
+        // Se o número normalizado tem código do país, adicionar variante sem código
+        if ($hasCountryCode && strlen($national) >= 8) {
+            $variants[] = $national;
+        }
+        
+        // Se o número normalizado não tem código do país e tem pelo menos 10 dígitos, adicionar variante com código
+        if (!$hasCountryCode && strlen($normalizedPhone) >= 10) {
+            $variants[] = '55' . $normalizedPhone;
+        }
+        
+        // Remover duplicatas e retornar
+        return array_values(array_unique($variants));
     }
 
     /**

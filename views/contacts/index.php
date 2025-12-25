@@ -9,12 +9,21 @@ ob_start();
 <div class="card">
     <div class="card-header border-0 pt-6">
         <div class="card-title">
-            <div class="d-flex align-items-center position-relative my-1">
-                <i class="ki-duotone ki-magnifier fs-3 position-absolute ms-5">
-                    <span class="path1"></span>
-                    <span class="path2"></span>
-                </i>
-                <input type="text" id="kt_contacts_search" class="form-control form-control-solid w-250px ps-13" placeholder="Buscar contatos..." />
+            <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center position-relative my-1">
+                    <i class="ki-duotone ki-magnifier fs-3 position-absolute ms-5">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    <input type="text" id="kt_contacts_search" class="form-control form-control-solid w-250px ps-13" placeholder="Buscar contatos..." value="<?= htmlspecialchars($filters['search'] ?? '') ?>" />
+                </div>
+                <button type="button" id="kt_contacts_search_btn" class="btn btn-primary">
+                    <i class="ki-duotone ki-magnifier fs-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Buscar
+                </button>
             </div>
         </div>
         <div class="card-toolbar">
@@ -326,16 +335,29 @@ ob_start();
 <!--end::Modal - Novo Contato-->
 
 <script>
-// Busca de contatos
+// Função para executar busca
+function performSearch() {
+    const searchInput = document.getElementById('kt_contacts_search');
+    const search = searchInput?.value.trim() || '';
+    if (search) {
+        window.location.href = '<?= \App\Helpers\Url::to('/contacts') ?>?search=' + encodeURIComponent(search);
+    } else {
+        window.location.href = '<?= \App\Helpers\Url::to('/contacts') ?>';
+    }
+}
+
+// Busca de contatos - Enter no input
 document.getElementById('kt_contacts_search')?.addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
-        const search = this.value;
-        if (search) {
-            window.location.href = '<?= \App\Helpers\Url::to('/contacts') ?>?search=' + encodeURIComponent(search);
-        } else {
-            window.location.href = '<?= \App\Helpers\Url::to('/contacts') ?>';
-        }
+        e.preventDefault();
+        performSearch();
     }
+});
+
+// Busca de contatos - Botão de buscar
+document.getElementById('kt_contacts_search_btn')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    performSearch();
 });
 
 function previewNewAvatar(input) {

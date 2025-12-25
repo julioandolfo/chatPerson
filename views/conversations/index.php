@@ -6669,6 +6669,14 @@ function selectConversation(id) {
         return response.json();
     })
     .then(data => {
+        // 🔍 DEBUG: Log para verificar resposta do servidor
+        console.log('🔍 [selectConversation] Resposta recebida:', {
+            success: data.success,
+            access_restricted: data.access_restricted,
+            has_conversation: !!data.conversation,
+            access_info: data.access_info
+        });
+        
     if (data.success && data.conversation) {
             // Atualizar URL sem recarregar
             const newUrl = `<?= \App\Helpers\Url::to('/conversations') ?>?id=${id}`;
@@ -6678,6 +6686,7 @@ function selectConversation(id) {
             // VERIFICAR SE ACESSO É RESTRITO
             // ============================================
             if (data.access_restricted === true) {
+                console.log('🔒 [selectConversation] Acesso restrito detectado, chamando showRestrictedAccessView');
                 showRestrictedAccessView(id, data.conversation, data.access_info);
                 return;
             }

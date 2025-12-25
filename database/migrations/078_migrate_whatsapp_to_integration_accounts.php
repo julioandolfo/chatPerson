@@ -47,6 +47,7 @@ function up_migrate_whatsapp_to_integration_accounts() {
     
     // Construir lista de colunas para SELECT e INSERT dinamicamente
     // Nota: integration_accounts usa 'api_token', não 'api_key'
+    // Nota: integration_accounts usa 'account_id', não 'instance_id'
     $selectFields = ['name', 'provider', "'whatsapp' as channel", 'phone_number'];
     $insertFields = ['name', 'provider', 'channel', 'phone_number'];
     
@@ -62,10 +63,11 @@ function up_migrate_whatsapp_to_integration_accounts() {
         $insertFields[] = 'api_token';
     }
     
-    // instance_id (se existir)
+    // instance_id -> account_id (se existir)
+    // integration_accounts usa 'account_id' em vez de 'instance_id'
     if ($hasInstanceId) {
-        $selectFields[] = 'instance_id';
-        $insertFields[] = 'instance_id';
+        $selectFields[] = 'instance_id as account_id'; // Mapear instance_id para account_id
+        $insertFields[] = 'account_id';
     }
     
     // status (sempre existe)
@@ -73,6 +75,7 @@ function up_migrate_whatsapp_to_integration_accounts() {
     $insertFields[] = 'status';
     
     // Construir JSON_OBJECT para config dinamicamente
+    // Nota: instance_id já foi mapeado para account_id acima, então não precisa estar no config
     $configFields = [];
     if ($hasQuepasaUser) {
         $configFields[] = "'quepasa_user', COALESCE(quepasa_user, '')";
@@ -92,6 +95,8 @@ function up_migrate_whatsapp_to_integration_accounts() {
     if ($hasWavoipEnabled) {
         $configFields[] = "'wavoip_enabled', COALESCE(wavoip_enabled, 0)";
     }
+    // Se instance_id existe mas não foi mapeado para account_id (fallback), incluir no config
+    // Mas como já mapeamos acima, não precisamos incluir aqui
     
     $configJson = !empty($configFields) 
         ? "JSON_OBJECT(" . implode(', ', $configFields) . ")" 

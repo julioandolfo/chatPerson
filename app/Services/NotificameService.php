@@ -142,11 +142,16 @@ class NotificameService
         $jsonError = json_last_error();
         
         if ($jsonError !== JSON_ERROR_NONE) {
-            // Se não for JSON, pode ser HTML de erro
+            // Se não for JSON, pode ser HTML ou texto simples (ex: "200")
             $responsePreview = substr(strip_tags($response), 0, 300);
             Logger::error("Notificame API resposta não-JSON: {$responsePreview}");
             
-            throw new \Exception("A API retornou HTML em vez de JSON (HTTP {$httpCode}). Verifique se a URL está correta: {$url}. Preview: " . substr($responsePreview, 0, 100));
+            throw new \Exception("A API retornou resposta não-JSON (HTTP {$httpCode}). URL: {$url}. Preview: " . substr($responsePreview, 0, 100));
+        }
+        
+        // Garantir retorno array
+        if (!is_array($responseData)) {
+            $responseData = ['data' => $responseData];
         }
         
         if ($httpCode >= 400) {

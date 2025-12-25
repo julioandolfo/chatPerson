@@ -965,7 +965,14 @@ document.getElementById('kt_form_webhook_notificame').addEventListener('submit',
             'X-Requested-With': 'XMLHttpRequest'
         }
     })
-    .then(response => response.json())
+    .then(async response => {
+        const text = await response.text();
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            throw new Error(text.substring(0, 200) || 'Resposta inválida da API (não-JSON)');
+        }
+    })
     .then(data => {
         submitBtn.removeAttribute('data-kt-indicator');
         submitBtn.disabled = false;

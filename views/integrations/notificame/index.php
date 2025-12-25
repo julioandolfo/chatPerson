@@ -356,7 +356,13 @@ ob_start();
                     </div>
                     <div class="mb-5">
                         <label class="fw-semibold fs-6 mb-2">ID da Conta</label>
-                        <input type="text" name="account_id" id="kt_edit_account_id_field" class="form-control form-control-solid">
+                        <div class="input-group">
+                            <input type="text" name="account_id" id="kt_edit_account_id_field" class="form-control form-control-solid" placeholder="Ex: canal_123">
+                            <button type="button" class="btn btn-light-primary" id="kt_btn_fetch_subaccounts">
+                                <i class="ki-duotone ki-magnifier fs-3"></i> Buscar subcontas
+                            </button>
+                        </div>
+                        <div class="form-text">Para Instagram, use o ID do canal como "from".</div>
                     </div>
                     <div class="mb-5">
                         <label class="fw-semibold fs-6 mb-2">Funil Padrão</label>
@@ -674,6 +680,77 @@ function editAccount(id, account, funnels) {
         setTimeout(() => {
             document.getElementById('kt_edit_default_stage_id').value = account.default_stage_id || '';
         }, 500);
+    }
+    
+    // Bind buscar subcontas
+    const fetchBtn = document.getElementById('kt_btn_fetch_subaccounts');
+    if (fetchBtn) {
+        fetchBtn.onclick = function() {
+            fetch(`/integrations/notificame/accounts/${id}/subaccounts`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) {
+                    Swal.fire({
+                        text: data.message || 'Erro ao buscar subcontas',
+                        icon: 'error',
+                        buttonsStyling: false,
+                        confirmButtonText: 'OK',
+                        customClass: { confirmButton: 'btn btn-primary' }
+                    });
+                    return;
+                }
+                const list = Array.isArray(data.data) ? data.data : [];
+                if (!list.length) {
+                    Swal.fire({
+                        text: 'Nenhuma subconta retornada pela API',
+                        icon: 'info',
+                        buttonsStyling: false,
+                        confirmButtonText: 'OK',
+                        customClass: { confirmButton: 'btn btn-primary' }
+                    });
+                    return;
+                }
+                // Montar select no modal
+                let html = '<div class="mb-3"><label class="fw-semibold">Selecione a subconta (account_id)</label><select id="kt_subaccounts_select" class="form-select form-select-solid">';
+                list.forEach(item => {
+                    const accId = item.acccount_id || item.account_id || '';
+                    const name = item.name || accId || 'Subconta';
+                    html += `<option value="${accId}">${name} (${accId})</option>`;
+                });
+                html += '</select></div>';
+                Swal.fire({
+                    title: 'Subcontas',
+                    html,
+                    icon: 'info',
+                    showCancelButton: true,
+                    confirmButtonText: 'Usar este ID',
+                    cancelButtonText: 'Cancelar',
+                    buttonsStyling: false,
+                    customClass: {
+                        confirmButton: 'btn btn-primary',
+                        cancelButton: 'btn btn-light'
+                    }
+                }).then(res => {
+                    if (res.isConfirmed) {
+                        const select = document.getElementById('kt_subaccounts_select');
+                        if (select) {
+                            document.getElementById('kt_edit_account_id_field').value = select.value || '';
+                        }
+                    }
+                });
+            })
+            .catch(err => {
+                Swal.fire({
+                    text: 'Erro ao buscar subcontas: ' + err.message,
+                    icon: 'error',
+                    buttonsStyling: false,
+                    confirmButtonText: 'OK',
+                    customClass: { confirmButton: 'btn btn-primary' }
+                });
+            });
+        };
     }
     
     new bootstrap.Modal(document.getElementById('kt_modal_edit_notificame')).show();

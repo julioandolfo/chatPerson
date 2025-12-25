@@ -645,6 +645,28 @@ class IntegrationController
     }
 
     /**
+     * Listar subcontas Notificame (resale)
+     */
+    public function listNotificameSubaccounts(int $id): void
+    {
+        Permission::abortIfCannot('notificame.view');
+
+        try {
+            $data = NotificameService::listSubaccounts($id);
+
+            Response::json([
+                'success' => true,
+                'data' => $data
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
      * Enviar mensagem de teste Notificame
      */
     public function sendNotificameTestMessage(int $id): void

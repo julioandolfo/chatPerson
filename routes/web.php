@@ -249,6 +249,7 @@ Router::post('/integrations/notificame/accounts', [IntegrationController::class,
 Router::put('/integrations/notificame/accounts/{id}', [IntegrationController::class, 'updateNotificameAccount'], ['Authentication', 'Permission:notificame.edit']);
 Router::delete('/integrations/notificame/accounts/{id}', [IntegrationController::class, 'deleteNotificameAccount'], ['Authentication', 'Permission:notificame.delete']);
 Router::get('/integrations/notificame/accounts/{id}/status', [IntegrationController::class, 'checkNotificameStatus'], ['Authentication']);
+Router::get('/integrations/notificame/accounts/{id}/subaccounts', [IntegrationController::class, 'listNotificameSubaccounts'], ['Authentication']);
 Router::post('/integrations/notificame/accounts/{id}/test', [IntegrationController::class, 'sendNotificameTestMessage'], ['Authentication', 'Permission:notificame.send']);
 Router::post('/integrations/notificame/accounts/{id}/webhook', [IntegrationController::class, 'configureNotificameWebhook'], ['Authentication', 'Permission:notificame.edit']);
 Router::get('/integrations/notificame/accounts/{id}/templates', [IntegrationController::class, 'listNotificameTemplates'], ['Authentication']);

@@ -487,6 +487,23 @@ class NotificameService
             throw $e;
         }
     }
+
+    /**
+     * Listar subcontas (resale)
+     * Endpoint: GET /resale/
+     */
+    public static function listSubaccounts(int $accountId): array
+    {
+        $account = IntegrationAccount::find($accountId);
+        if (!$account || $account['provider'] !== 'notificame') {
+            throw new \Exception("Conta Notificame não encontrada: {$accountId}");
+        }
+        $token = $account['api_token'];
+        $apiUrl = $account['api_url'] ?? null;
+
+        // Chama /resale/ para obter lista
+        return self::makeRequest('resale/', $token, 'GET', [], $apiUrl);
+    }
     
     /**
      * Enviar mídia

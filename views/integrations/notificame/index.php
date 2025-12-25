@@ -258,7 +258,7 @@ ob_start();
                     </div>
                     <div class="mb-5">
                         <label class="fw-semibold fs-6 mb-2">URL da API</label>
-                        <input type="text" name="api_url" class="form-control form-control-solid" value="https://app.notificame.com.br/api/v1/" placeholder="URL base da API">
+                        <input type="text" name="api_url" class="form-control form-control-solid" value="https://api.notificame.com.br/v1/" placeholder="URL base da API">
                     </div>
                     <div class="mb-5" id="kt_field_phone_number" style="display: none;">
                         <label class="fw-semibold fs-6 mb-2">Número de Telefone</label>
@@ -351,8 +351,8 @@ ob_start();
                     </div>
                     <div class="mb-5">
                         <label class="fw-semibold fs-6 mb-2">URL da API</label>
-                        <input type="url" name="api_url" id="kt_edit_api_url" class="form-control form-control-solid" placeholder="https://app.notificame.com.br/api/v1/">
-                        <div class="form-text">Use a URL base da API. Padrão: https://app.notificame.com.br/api/v1/</div>
+                        <input type="url" name="api_url" id="kt_edit_api_url" class="form-control form-control-solid" placeholder="https://api.notificame.com.br/v1/">
+                        <div class="form-text">Use a URL base da API. Padrão: https://api.notificame.com.br/v1/</div>
                     </div>
                     <div class="mb-5">
                         <label class="fw-semibold fs-6 mb-2">ID da Conta</label>
@@ -665,7 +665,7 @@ function editAccount(id, account, funnels) {
     document.getElementById('kt_edit_account_id').value = id;
     document.getElementById('kt_edit_name').value = account.name || '';
     document.getElementById('kt_edit_api_token').value = '';
-    document.getElementById('kt_edit_api_url').value = account.api_url || 'https://app.notificame.com.br/api/v1/';
+    document.getElementById('kt_edit_api_url').value = account.api_url || 'https://api.notificame.com.br/v1/';
     document.getElementById('kt_edit_account_id_field').value = account.account_id || '';
     document.getElementById('kt_edit_default_funnel_id').value = account.default_funnel_id || '';
     
@@ -815,6 +815,10 @@ document.getElementById('kt_form_edit_notificame').addEventListener('submit', fu
     e.preventDefault();
     const formData = new FormData(this);
     const id = formData.get('id');
+    // Garantir que api_url vá na requisição (caso o browser não envie se vazio)
+    if (!formData.has('api_url')) {
+        formData.append('api_url', document.getElementById('kt_edit_api_url').value || '');
+    }
     const submitBtn = document.getElementById('kt_submit_edit_notificame');
     submitBtn.setAttribute('data-kt-indicator', 'on');
     submitBtn.disabled = true;

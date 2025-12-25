@@ -16,7 +16,8 @@ use App\Helpers\Validator;
 
 class NotificameService
 {
-    const BASE_URL = 'https://app.notificame.com.br/api/v1/';
+    // URL base padrão da API Notificame
+    const BASE_URL = 'https://api.notificame.com.br/v1/';
     
     const CHANNELS = [
         'whatsapp', 'instagram', 'facebook', 'telegram', 

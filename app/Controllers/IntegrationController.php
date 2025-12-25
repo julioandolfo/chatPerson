@@ -638,7 +638,7 @@ class IntegrationController
                     'status' => 'error',
                     'connected' => false,
                     'message' => 'Erro ao conectar com a API: ' . $e->getMessage(),
-                    'help' => 'Verifique se a URL da API e o Token estão corretos. URL padrão: https://app.notificame.com.br/api/v1/'
+                    'help' => 'Verifique se a URL da API e o Token estão corretos. URL padrão: https://api.notificame.com.br/v1/'
                 ]
             ], 200); // Retornar 200 para não dar erro no frontend
         }

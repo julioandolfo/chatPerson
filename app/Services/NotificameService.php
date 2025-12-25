@@ -605,16 +605,30 @@ class NotificameService
         
         $channel = $account['channel'];
         $token = $account['api_token'];
+        $accountChannelId = $account['account_id'] ?? null; // id do canal, obrigatório para subscriptions
         
+        if (empty($accountChannelId)) {
+            throw new \Exception("Para configurar webhook no Notificame, o ID do canal (account_id) é obrigatório.");
+        }
+        
+        // Conforme doc: POST /subscriptions/ com criteria.channel = token_do_canal
         $payload = [
-            'url' => $webhookUrl,
-            'events' => !empty($events) ? $events : ['message', 'status']
+            'criteria' => [
+                'channel' => $accountChannelId
+            ],
+            'webhook' => [
+                'url' => $webhookUrl
+            ]
         ];
+        // Se quiser eventos específicos, o Notificame não documenta aqui; manter compat.
+        if (!empty($events)) {
+            $payload['events'] = $events;
+        }
         
-        $endpoint = "{$channel}/webhook";
+        $endpoint = "subscriptions/";
         
         try {
-            Logger::info("Notificame configureWebhook endpoint={$endpoint} channel={$channel} url={$webhookUrl}");
+            Logger::info("Notificame configureWebhook endpoint={$endpoint} channel={$channel} url={$webhookUrl} channelId={$accountChannelId}");
             self::makeRequest($endpoint, $token, 'POST', $payload, $apiUrl);
             
             // Salvar webhook URL na conta
@@ -753,6 +767,17 @@ class NotificameService
                 return $account;
             }
         }
+
+        // Tentar por subscriptionId (vem no webhook do Notificame e é o id do canal)
+        if (isset($payload['subscriptionId'])) {
+            $account = IntegrationAccount::where('provider', '=', 'notificame')
+                ->where('channel', '=', $channel)
+                ->where('account_id', '=', $payload['subscriptionId'])
+                ->first();
+            if ($account) {
+                return $account;
+            }
+        }
         
         // Tentar encontrar por phone_number (WhatsApp)
         if ($channel === 'whatsapp' && isset($payload['from'])) {
@@ -787,15 +812,31 @@ class NotificameService
             'metadata' => []
         ];
         
-        // Estrutura padrão Notificame
+        // Estrutura padrão Notificame (exemplo: { message: { from, to, contents: [...] } })
         if (isset($payload['message'])) {
             $msg = $payload['message'];
             $data['from'] = $msg['from'] ?? $msg['sender'] ?? null;
-            $data['content'] = $msg['text'] ?? $msg['content'] ?? '';
-            $data['type'] = $msg['type'] ?? 'text';
             $data['external_id'] = $msg['id'] ?? $msg['message_id'] ?? null;
-            $data['name'] = $msg['name'] ?? $msg['sender_name'] ?? null;
-            $data['metadata'] = $msg['metadata'] ?? [];
+            $data['name'] = $msg['visitor']['name'] ?? $msg['visitor']['firstName'] ?? $msg['sender_name'] ?? null;
+            $data['metadata'] = $msg['metadata'] ?? $msg;
+
+            // Conteúdo: se houver contents[], usar o primeiro item
+            if (!empty($msg['contents']) && is_array($msg['contents'])) {
+                $contentItem = $msg['contents'][0];
+                $data['type'] = $contentItem['type'] ?? 'text';
+                if (($contentItem['type'] ?? '') === 'text') {
+                    $data['content'] = $contentItem['text'] ?? '';
+                } elseif (($contentItem['type'] ?? '') === 'file') {
+                    $data['content'] = $contentItem['fileUrl'] ?? ($contentItem['fileCaption'] ?? '');
+                    $data['metadata']['file'] = $contentItem;
+                } else {
+                    $data['content'] = $contentItem['text'] ?? $contentItem['fileUrl'] ?? '';
+                }
+            } else {
+                // fallback texto simples
+                $data['content'] = $msg['text'] ?? $msg['content'] ?? '';
+                $data['type'] = $msg['type'] ?? 'text';
+            }
         } else {
             // Fallback: usar payload direto
             $data['from'] = $payload['from'] ?? $payload['sender'] ?? null;

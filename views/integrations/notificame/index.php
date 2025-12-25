@@ -773,7 +773,11 @@ function testMessage(id, channel) {
         toLabel.textContent = 'Número de Telefone';
         toInput.placeholder = '5511999999999';
         toHelp.textContent = 'Número completo com código do país';
-    } else if (['instagram', 'telegram', 'facebook'].includes(channel)) {
+    } else if (channel === 'instagram') {
+        toLabel.textContent = 'ID do Destinatário (Instagram)';
+        toInput.placeholder = '123456789012345';
+        toHelp.textContent = 'Use o ID do perfil (recipient id), não o username';
+    } else if (['telegram', 'facebook'].includes(channel)) {
         toLabel.textContent = 'Username';
         toInput.placeholder = '@username';
         toHelp.textContent = 'Username sem @';

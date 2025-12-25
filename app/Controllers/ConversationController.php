@@ -2678,7 +2678,14 @@ class ConversationController
      */
     public function requestParticipation(int $id): void
     {
-        $oldConfig = $this->prepareJsonResponse();
+        // Garantir que não há output antes
+        @ini_set('display_errors', '0');
+        @error_reporting(0);
+        
+        // Limpar todos os buffers
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
         
         try {
             $userId = \App\Helpers\Auth::id();
@@ -2702,12 +2709,22 @@ class ConversationController
             ]);
         } catch (\InvalidArgumentException $e) {
             \App\Helpers\Log::error("[requestParticipation] InvalidArgumentException: " . $e->getMessage(), 'conversas.log');
+            
+            // Limpar buffers novamente
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            
             Response::json(['success' => false, 'message' => $e->getMessage()], 400);
         } catch (\Exception $e) {
             \App\Helpers\Log::error("[requestParticipation] Exception: " . $e->getMessage(), 'conversas.log');
+            
+            // Limpar buffers novamente
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            
             Response::json(['success' => false, 'message' => 'Erro ao solicitar participação: ' . $e->getMessage()], 500);
-        } finally {
-            $this->restoreAfterJsonResponse($oldConfig);
         }
     }
 
@@ -2717,7 +2734,14 @@ class ConversationController
      */
     public function approveRequest(int $requestId): void
     {
-        $oldConfig = $this->prepareJsonResponse();
+        // Garantir que não há output antes
+        @ini_set('display_errors', '0');
+        @error_reporting(0);
+        
+        // Limpar todos os buffers
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
         
         try {
             $userId = \App\Helpers\Auth::id();
@@ -2732,12 +2756,22 @@ class ConversationController
             ]);
         } catch (\InvalidArgumentException $e) {
             \App\Helpers\Log::error("[approveRequest] InvalidArgumentException: " . $e->getMessage(), 'conversas.log');
+            
+            // Limpar buffers novamente
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            
             Response::json(['success' => false, 'message' => $e->getMessage()], 400);
         } catch (\Exception $e) {
             \App\Helpers\Log::error("[approveRequest] Exception: " . $e->getMessage(), 'conversas.log');
+            
+            // Limpar buffers novamente
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            
             Response::json(['success' => false, 'message' => 'Erro ao aprovar solicitação: ' . $e->getMessage()], 500);
-        } finally {
-            $this->restoreAfterJsonResponse($oldConfig);
         }
     }
 
@@ -2747,7 +2781,14 @@ class ConversationController
      */
     public function rejectRequest(int $requestId): void
     {
-        $oldConfig = $this->prepareJsonResponse();
+        // Garantir que não há output antes
+        @ini_set('display_errors', '0');
+        @error_reporting(0);
+        
+        // Limpar todos os buffers
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
         
         try {
             $userId = \App\Helpers\Auth::id();
@@ -2762,12 +2803,22 @@ class ConversationController
             ]);
         } catch (\InvalidArgumentException $e) {
             \App\Helpers\Log::error("[rejectRequest] InvalidArgumentException: " . $e->getMessage(), 'conversas.log');
+            
+            // Limpar buffers novamente
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            
             Response::json(['success' => false, 'message' => $e->getMessage()], 400);
         } catch (\Exception $e) {
             \App\Helpers\Log::error("[rejectRequest] Exception: " . $e->getMessage(), 'conversas.log');
+            
+            // Limpar buffers novamente
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            
             Response::json(['success' => false, 'message' => 'Erro ao recusar solicitação: ' . $e->getMessage()], 500);
-        } finally {
-            $this->restoreAfterJsonResponse($oldConfig);
         }
     }
 
@@ -2777,7 +2828,14 @@ class ConversationController
      */
     public function getPendingRequests(): void
     {
-        $oldConfig = $this->prepareJsonResponse();
+        // Garantir que não há output antes
+        @ini_set('display_errors', '0');
+        @error_reporting(0);
+        
+        // Limpar todos os buffers
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
         
         try {
             $userId = \App\Helpers\Auth::id();
@@ -2791,9 +2849,13 @@ class ConversationController
             ]);
         } catch (\Exception $e) {
             \App\Helpers\Log::error("[getPendingRequests] Exception: " . $e->getMessage(), 'conversas.log');
+            
+            // Limpar buffers novamente
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
-        } finally {
-            $this->restoreAfterJsonResponse($oldConfig);
         }
     }
 
@@ -2803,7 +2865,14 @@ class ConversationController
      */
     public function getInviteCounts(): void
     {
-        $oldConfig = $this->prepareJsonResponse();
+        // Garantir que não há output antes
+        @ini_set('display_errors', '0');
+        @error_reporting(0);
+        
+        // Limpar todos os buffers
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
         
         try {
             $userId = \App\Helpers\Auth::id();
@@ -2822,9 +2891,13 @@ class ConversationController
             ]);
         } catch (\Exception $e) {
             \App\Helpers\Log::error("[getInviteCounts] Exception: " . $e->getMessage(), 'conversas.log');
+            
+            // Limpar buffers novamente
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
-        } finally {
-            $this->restoreAfterJsonResponse($oldConfig);
         }
     }
 

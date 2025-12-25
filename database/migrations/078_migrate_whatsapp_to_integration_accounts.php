@@ -17,7 +17,14 @@ function up_migrate_whatsapp_to_integration_accounts() {
     }
     
     // Verificar quais colunas existem na tabela whatsapp_accounts
-    $columns = $db->query("SHOW COLUMNS FROM whatsapp_accounts")->fetchAll(PDO::FETCH_COLUMN);
+    $columnsResult = $db->query("SHOW COLUMNS FROM whatsapp_accounts")->fetchAll(PDO::FETCH_ASSOC);
+    $columns = array_map(function($col) {
+        return strtolower($col['Field']); // Normalizar para lowercase
+    }, $columnsResult);
+    
+    // Debug: mostrar colunas encontradas
+    echo "📋 Colunas encontradas em whatsapp_accounts: " . implode(', ', $columns) . "\n";
+    
     $hasApiKey = in_array('api_key', $columns);
     $hasInstanceId = in_array('instance_id', $columns);
     $hasQuepasaUser = in_array('quepasa_user', $columns);
@@ -28,6 +35,15 @@ function up_migrate_whatsapp_to_integration_accounts() {
     $hasWavoipEnabled = in_array('wavoip_enabled', $columns);
     $hasDefaultFunnelId = in_array('default_funnel_id', $columns);
     $hasDefaultStageId = in_array('default_stage_id', $columns);
+    
+    // Debug: mostrar quais campos serão incluídos
+    echo "📋 Campos que serão migrados:\n";
+    echo "   - api_key: " . ($hasApiKey ? 'SIM' : 'NÃO') . "\n";
+    echo "   - instance_id: " . ($hasInstanceId ? 'SIM' : 'NÃO') . "\n";
+    echo "   - quepasa_user: " . ($hasQuepasaUser ? 'SIM' : 'NÃO') . "\n";
+    echo "   - quepasa_token: " . ($hasQuepasaToken ? 'SIM' : 'NÃO') . "\n";
+    echo "   - default_funnel_id: " . ($hasDefaultFunnelId ? 'SIM' : 'NÃO') . "\n";
+    echo "   - default_stage_id: " . ($hasDefaultStageId ? 'SIM' : 'NÃO') . "\n";
     
     // Construir lista de colunas para SELECT e INSERT dinamicamente
     // Nota: integration_accounts usa 'api_token', não 'api_key'
@@ -109,8 +125,22 @@ function up_migrate_whatsapp_to_integration_accounts() {
         FROM whatsapp_accounts
     ";
     
-    $db->exec($sql);
-    echo "✅ Dados de whatsapp_accounts migrados para integration_accounts!\n";
+    // Debug: mostrar SQL gerado (apenas estrutura, não dados)
+    echo "📋 SQL gerado (estrutura):\n";
+    echo "   INSERT INTO integration_accounts (" . implode(', ', $insertFields) . ")\n";
+    echo "   SELECT " . implode(', ', array_map(function($f) {
+        return preg_replace('/\s+as\s+\w+/i', '', $f); // Remover aliases para debug
+    }, $selectFields)) . "\n";
+    echo "   FROM whatsapp_accounts\n";
+    
+    try {
+        $db->exec($sql);
+        echo "✅ Dados de whatsapp_accounts migrados para integration_accounts!\n";
+    } catch (\Exception $e) {
+        echo "❌ Erro ao migrar dados: " . $e->getMessage() . "\n";
+        echo "📋 SQL completo:\n" . $sql . "\n";
+        throw $e;
+    }
     
     // Atualizar conversations para usar integration_account_id
     // Buscar correspondência por phone_number e provider

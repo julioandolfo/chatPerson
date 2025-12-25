@@ -2525,6 +2525,14 @@ class ConversationController
         // Garantir que não há output antes
         @ini_set('display_errors', '0');
         @error_reporting(0);
+
+        // Log rápido para confirmar se a rota foi executada
+        try {
+            $logPath = __DIR__ . '/../../storage/logs/conversas.log';
+            @file_put_contents($logPath, date('c') . " [getInvites] start\n", FILE_APPEND);
+        } catch (\Throwable $e) {
+            // Ignorar erros de log para não quebrar a resposta
+        }
         
         // Limpar todos os buffers
         while (ob_get_level() > 0) {
@@ -2831,6 +2839,14 @@ class ConversationController
         // Garantir que não há output antes
         @ini_set('display_errors', '0');
         @error_reporting(0);
+
+        // Log rápido para confirmar se a rota foi executada
+        try {
+            $logPath = __DIR__ . '/../../storage/logs/conversas.log';
+            @file_put_contents($logPath, date('c') . " [getPendingRequests] start\n", FILE_APPEND);
+        } catch (\Throwable $e) {
+            // Ignorar erros de log
+        }
         
         // Limpar todos os buffers
         while (ob_get_level() > 0) {

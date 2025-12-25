@@ -4948,7 +4948,15 @@ function loadPendingInvites() {
             'Accept': 'application/json'
         }
     })
-    .then(response => response.json())
+    .then(response => response.text())
+    .then(text => {
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            console.error('Resposta /conversations/invites:', text);
+            throw e;
+        }
+    })
     .then(data => {
         if (data.success) {
             renderPendingInvites(data.invites || []);
@@ -5004,7 +5012,15 @@ function loadPendingRequestsModal() {
             'Accept': 'application/json'
         }
     })
-    .then(response => response.json())
+    .then(response => response.text())
+    .then(text => {
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            console.error('Resposta /conversations/requests/pending:', text);
+            throw e;
+        }
+    })
     .then(data => {
         if (data.success) {
             renderPendingRequestsModal(data.requests || []);

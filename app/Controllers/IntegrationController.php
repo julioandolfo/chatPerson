@@ -549,6 +549,19 @@ class IntegrationController
         try {
             $data = Request::post();
             
+            // Validar dados
+            $errors = \App\Helpers\Validator::validate($data, [
+                'name' => 'nullable|string|max:255',
+                'api_token' => 'nullable|string',
+                'account_id' => 'nullable|string|max:255',
+                'default_funnel_id' => 'nullable|integer',
+                'default_stage_id' => 'nullable|integer'
+            ]);
+            
+            if (!empty($errors)) {
+                throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));
+            }
+            
             if (NotificameService::updateAccount($id, $data)) {
                 Response::json([
                     'success' => true,
@@ -560,11 +573,16 @@ class IntegrationController
                     'message' => 'Falha ao atualizar conta'
                 ], 404);
             }
-        } catch (\Exception $e) {
+        } catch (\InvalidArgumentException $e) {
             Response::json([
                 'success' => false,
                 'message' => $e->getMessage()
             ], 400);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao atualizar conta: ' . $e->getMessage()
+            ], 500);
         }
     }
 
@@ -610,9 +628,14 @@ class IntegrationController
                 'status' => $status
             ]);
         } catch (\Exception $e) {
+            \App\Helpers\Logger::error("Erro ao verificar status Notificame: " . $e->getMessage());
             Response::json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'status' => [
+                    'status' => 'error',
+                    'connected' => false,
+                    'message' => $e->getMessage()
+                ]
             ], 400);
         }
     }
@@ -631,6 +654,10 @@ class IntegrationController
             if (!$to) {
                 throw new \InvalidArgumentException('Destinatário é obrigatório');
             }
+            
+            if (empty(trim($message))) {
+                throw new \InvalidArgumentException('Mensagem não pode estar vazia');
+            }
 
             $result = NotificameService::sendMessage($id, $to, $message);
             
@@ -639,11 +666,17 @@ class IntegrationController
                 'message' => 'Mensagem enviada com sucesso!',
                 'data' => $result
             ]);
-        } catch (\Exception $e) {
+        } catch (\InvalidArgumentException $e) {
             Response::json([
                 'success' => false,
                 'message' => $e->getMessage()
             ], 400);
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error("Erro ao enviar mensagem de teste Notificame: " . $e->getMessage());
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao enviar mensagem: ' . $e->getMessage()
+            ], 500);
         }
     }
 
@@ -658,11 +691,16 @@ class IntegrationController
             $webhookUrl = Request::post('webhook_url');
             $events = Request::post('events', []);
             
-            if (!$webhookUrl) {
+            if (!$webhookUrl || empty(trim($webhookUrl))) {
                 // Gerar URL do webhook automaticamente
                 $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
                 $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
                 $webhookUrl = "{$protocol}://{$host}/webhooks/notificame";
+            }
+            
+            // Validar URL
+            if (!filter_var($webhookUrl, FILTER_VALIDATE_URL)) {
+                throw new \InvalidArgumentException('URL do webhook inválida');
             }
             
             if (NotificameService::configureWebhook($id, $webhookUrl, $events)) {
@@ -677,11 +715,17 @@ class IntegrationController
                     'message' => 'Falha ao configurar webhook'
                 ], 500);
             }
-        } catch (\Exception $e) {
+        } catch (\InvalidArgumentException $e) {
             Response::json([
                 'success' => false,
                 'message' => $e->getMessage()
             ], 400);
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error("Erro ao configurar webhook Notificame: " . $e->getMessage());
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao configurar webhook: ' . $e->getMessage()
+            ], 500);
         }
     }
 

@@ -6882,10 +6882,14 @@ function selectConversation(id) {
             // VERIFICAR SE ACESSO É RESTRITO
             // ============================================
             if (data.access_restricted === true) {
-                console.log('🔒 [selectConversation] Acesso restrito detectado, chamando showRestrictedAccessView');
                 showRestrictedAccessView(id, data.conversation, data.access_info);
                 return;
             }
+            
+            // ============================================
+            // RESETAR ESTADO DE ACESSO RESTRITO (se estava restrito antes)
+            // ============================================
+            resetRestrictedAccessState();
             
             // Remover badge de não lidas da conversa atual na lista
             if (conversationItem) {
@@ -7076,6 +7080,40 @@ function updateChatHeader(conversation) {
 // ============================================
 // SISTEMA DE ACESSO RESTRITO / SOLICITAÇÃO DE PARTICIPAÇÃO
 // ============================================
+
+/**
+ * Resetar estado de acesso restrito (quando muda para uma conversa permitida)
+ */
+function resetRestrictedAccessState() {
+    // Remover classe de acesso restrito do chat
+    const chatMessages = document.getElementById('chatMessages');
+    if (chatMessages) {
+        chatMessages.classList.remove('access-restricted');
+    }
+    
+    // Mostrar input de mensagem
+    const chatInput = document.getElementById('chatInput');
+    if (chatInput) {
+        chatInput.style.display = '';
+    }
+    
+    // Resetar sidebar - remover overlay de acesso restrito
+    const sidebar = document.getElementById('conversationSidebar');
+    if (sidebar) {
+        // Verificar se é a sidebar ofuscada (tem overlay de acesso restrito)
+        const restrictedOverlay = sidebar.querySelector('.restricted-overlay, [style*="filter: blur"]');
+        if (restrictedOverlay || sidebar.querySelector('[style*="Acesso Restrito"]')) {
+            // Recarregar a sidebar via include dinâmico não é possível, 
+            // mas podemos esconder o overlay
+            sidebar.innerHTML = `
+                <div class="text-center p-5">
+                    <span class="spinner-border spinner-border-sm text-primary"></span>
+                    <span class="ms-2 text-muted">Carregando...</span>
+                </div>
+            `;
+        }
+    }
+}
 
 /**
  * Mostrar view de acesso restrito (chat ofuscado com botão de solicitar)

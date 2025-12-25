@@ -2490,6 +2490,11 @@ class ConversationController
      */
     public function getInvites(): void
     {
+        // Limpar qualquer output buffer
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
         try {
             $userId = \App\Helpers\Auth::id();
             $invites = \App\Services\ConversationMentionService::getPendingInvites($userId);
@@ -2501,6 +2506,7 @@ class ConversationController
                 'count' => $count
             ]);
         } catch (\Exception $e) {
+            \App\Helpers\Log::error("[getInvites] Exception: " . $e->getMessage(), 'conversas.log');
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
@@ -2622,10 +2628,17 @@ class ConversationController
      */
     public function requestParticipation(int $id): void
     {
+        // Limpar qualquer output buffer
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
         try {
             $userId = \App\Helpers\Auth::id();
             $data = \App\Helpers\Request::json();
             $note = $data['note'] ?? null;
+            
+            \App\Helpers\Log::debug("🔍 [requestParticipation] conversationId={$id}, userId={$userId}", 'conversas.log');
             
             $request = \App\Services\ConversationMentionService::requestParticipation(
                 $id,
@@ -2633,14 +2646,18 @@ class ConversationController
                 $note
             );
             
+            \App\Helpers\Log::debug("🔍 [requestParticipation] Sucesso - request criada", 'conversas.log');
+            
             Response::json([
                 'success' => true,
                 'message' => 'Solicitação enviada com sucesso! Aguarde aprovação.',
                 'request' => $request
             ]);
         } catch (\InvalidArgumentException $e) {
+            \App\Helpers\Log::error("[requestParticipation] InvalidArgumentException: " . $e->getMessage(), 'conversas.log');
             Response::json(['success' => false, 'message' => $e->getMessage()], 400);
         } catch (\Exception $e) {
+            \App\Helpers\Log::error("[requestParticipation] Exception: " . $e->getMessage(), 'conversas.log');
             Response::json(['success' => false, 'message' => 'Erro ao solicitar participação: ' . $e->getMessage()], 500);
         }
     }
@@ -2695,6 +2712,11 @@ class ConversationController
      */
     public function getPendingRequests(): void
     {
+        // Limpar qualquer output buffer
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
         try {
             $userId = \App\Helpers\Auth::id();
             $requests = \App\Models\ConversationMention::getPendingRequestsToApprove($userId);
@@ -2706,6 +2728,7 @@ class ConversationController
                 'count' => $count
             ]);
         } catch (\Exception $e) {
+            \App\Helpers\Log::error("[getPendingRequests] Exception: " . $e->getMessage(), 'conversas.log');
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
@@ -2716,6 +2739,11 @@ class ConversationController
      */
     public function getInviteCounts(): void
     {
+        // Limpar qualquer output buffer
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
         try {
             $userId = \App\Helpers\Auth::id();
             
@@ -2732,6 +2760,7 @@ class ConversationController
                 'total_count' => $invitesCount + $requestsCount
             ]);
         } catch (\Exception $e) {
+            \App\Helpers\Log::error("[getInviteCounts] Exception: " . $e->getMessage(), 'conversas.log');
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }

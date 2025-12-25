@@ -282,7 +282,8 @@ class ConversationMention extends Model
                   AND status = 'pending'
                 LIMIT 1";
         
-        return Database::fetch($sql, [$conversationId, $userId]) !== false;
+        $result = Database::fetch($sql, [$conversationId, $userId]);
+        return $result !== null && $result !== false;
     }
 
     /**

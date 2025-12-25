@@ -198,9 +198,10 @@ class ConversationController
                                 \App\Helpers\Log::debug("🔍 [index] ❌ Acesso restrito para usuário {$userId}", 'conversas.log');
                                 
                                 // Limpar mensagens da conversa para não expor
-                                if (isset($selectedConversation['messages'])) {
-                                    $selectedConversation['messages'] = [];
-                                }
+                                $msgCount = count($selectedConversation['messages'] ?? []);
+                                \App\Helpers\Log::debug("🔍 [index] Mensagens antes de limpar: {$msgCount}", 'conversas.log');
+                                $selectedConversation['messages'] = [];
+                                \App\Helpers\Log::debug("🔍 [index] Mensagens após limpar: " . count($selectedConversation['messages']), 'conversas.log');
                             } else {
                                 // Admin/Supervisor pode ver - marcar mensagens como lidas
                                 try {

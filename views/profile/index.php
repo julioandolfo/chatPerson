@@ -3,6 +3,9 @@
  * Página de Perfil / Preferências do Usuário
  */
 
+$layout = 'layouts.metronic.app';
+$title = $pageTitle ?? 'Meu Perfil';
+
 use App\Helpers\Url;
 use App\Models\UserSoundSettings;
 
@@ -10,9 +13,10 @@ $activeTab = $activeTab ?? 'notifications';
 $user = $user ?? [];
 $soundSettings = $soundSettings ?? [];
 $availableSounds = $availableSounds ?? [];
-?>
 
-<?php $this->layout('layouts/metronic/main', ['pageTitle' => $pageTitle ?? 'Meu Perfil']) ?>
+// Content
+ob_start();
+?>
 
 <div class="d-flex flex-column flex-column-fluid">
     <!--begin::Toolbar-->
@@ -74,3 +78,8 @@ $availableSounds = $availableSounds ?? [];
     <!--end::Content-->
 </div>
 
+<?php 
+$content = ob_get_clean(); 
+?>
+
+<?php include __DIR__ . '/../layouts/metronic/app.php'; ?>

@@ -678,6 +678,21 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     max-width: 100%;
 }
 
+/* Quando acesso é restrito, bloquear scroll completamente */
+.chat-messages.access-restricted {
+    overflow: hidden !important;
+}
+
+.chat-messages.access-restricted .restricted-access-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    overflow: hidden;
+}
+
 /* Indicador de carregamento de mensagens antigas */
 .messages-loading {
     text-align: center;
@@ -2605,7 +2620,7 @@ body.dark-mode .swal2-content {
         </div>
         
         <!-- Mensagens (sempre presente) -->
-        <div class="chat-messages" id="chatMessages">
+        <div class="chat-messages <?= !empty($accessRestricted) ? 'access-restricted' : '' ?>" id="chatMessages">
             <?php if (!empty($selectedConversation) && !empty($accessRestricted)): ?>
                 <!-- ======================================== -->
                 <!-- ACESSO RESTRITO - TELA OFUSCADA -->
@@ -9097,11 +9112,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const selectedConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     const selectedConversation = parsePhpJson('<?= json_encode($selectedConversation ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     
+    // Verificar se acesso é restrito (passado pelo PHP)
+    const accessRestricted = <?= !empty($accessRestricted) ? 'true' : 'false' ?>;
+    
     if (selectedConversationId) {
         // IMPORTANTE: Definir currentConversationId para que funcionalidades como Assistente IA funcionem
         currentConversationId = parseInt(selectedConversationId);
         window.currentConversationId = currentConversationId; // Garantir que window também é atualizado
-        console.log('🔄 [DOMContentLoaded] currentConversationId definido:', currentConversationId);
         
         // Marcar conversa como ativa na lista
         document.querySelectorAll('.conversation-item').forEach(item => {
@@ -9110,6 +9127,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const conversationItem = document.querySelector(`[data-conversation-id="${selectedConversationId}"]`);
         if (conversationItem) {
             conversationItem.classList.add('active');
+        }
+        
+        // Se acesso é restrito, não carregar dados adicionais
+        if (accessRestricted) {
+            console.log('🔒 Acesso restrito - não carregando dados adicionais');
+            return; // Não fazer mais nada
         }
         
         // Se já temos dados da conversa do PHP, usar diretamente

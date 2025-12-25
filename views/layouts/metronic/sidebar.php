@@ -264,7 +264,7 @@
                 
                 <!--begin:Menu item-->
                 <div data-kt-menu-trigger="click" class="menu-item menu-accordion">
-                    <span class="menu-link <?= isActive('/integrations', $currentUri) || isActive('/whatsapp', $currentUri) ? 'active' : '' ?>" data-title="Integrações">
+                    <span class="menu-link <?= isActive('/integrations', $currentUri) || isActive('/whatsapp', $currentUri) || isActive('/integrations/notificame', $currentUri) || isActive('/integrations/whatsapp-official', $currentUri) ? 'active' : '' ?>" data-title="Integrações">
                         <span class="menu-icon">
                             <i class="ki-duotone ki-sms fs-2">
                                 <span class="path1"></span>
@@ -284,6 +284,26 @@
                                 <span class="menu-title">WhatsApp</span>
                             </a>
                         </div>
+                        <?php if (\App\Helpers\Permission::can('notificame.view')): ?>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/integrations/notificame', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/integrations/notificame') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Notificame</span>
+                            </a>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (\App\Helpers\Permission::can('whatsapp_official.view')): ?>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/integrations/whatsapp-official', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/integrations/whatsapp-official') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">WhatsApp Official</span>
+                            </a>
+                        </div>
+                        <?php endif; ?>
                         <div data-kt-menu-trigger="click" class="menu-item menu-accordion">
                             <a class="menu-link <?= isActive('/integrations/api4com', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/integrations/api4com') ?>">
                                 <span class="menu-bullet">

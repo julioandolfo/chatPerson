@@ -233,6 +233,19 @@ Router::post('/integrations/whatsapp/{id}/disconnect', [IntegrationController::c
 Router::post('/integrations/whatsapp/{id}/test', [IntegrationController::class, 'sendTestMessage'], ['Authentication']);
 Router::post('/integrations/whatsapp/{id}/webhook', [IntegrationController::class, 'configureWebhook'], ['Authentication']);
 
+// Rotas de Integrações Notificame
+Router::get('/integrations/notificame', [IntegrationController::class, 'notificame'], ['Authentication']);
+Router::post('/integrations/notificame/accounts', [IntegrationController::class, 'createNotificameAccount'], ['Authentication', 'Permission:notificame.create']);
+Router::put('/integrations/notificame/accounts/{id}', [IntegrationController::class, 'updateNotificameAccount'], ['Authentication', 'Permission:notificame.edit']);
+Router::delete('/integrations/notificame/accounts/{id}', [IntegrationController::class, 'deleteNotificameAccount'], ['Authentication', 'Permission:notificame.delete']);
+Router::get('/integrations/notificame/accounts/{id}/status', [IntegrationController::class, 'checkNotificameStatus'], ['Authentication']);
+Router::post('/integrations/notificame/accounts/{id}/test', [IntegrationController::class, 'sendNotificameTestMessage'], ['Authentication', 'Permission:notificame.send']);
+Router::post('/integrations/notificame/accounts/{id}/webhook', [IntegrationController::class, 'configureNotificameWebhook'], ['Authentication', 'Permission:notificame.edit']);
+Router::get('/integrations/notificame/accounts/{id}/templates', [IntegrationController::class, 'listNotificameTemplates'], ['Authentication']);
+
+// Webhook Notificame
+Router::post('/webhooks/notificame', 'notificame-webhook.php');
+
 // Rotas de Integrações Api4Com
 Router::get('/integrations/api4com', [Api4ComController::class, 'index'], ['Authentication']);
 Router::post('/integrations/api4com', [Api4ComController::class, 'create'], ['Authentication']);

@@ -133,6 +133,20 @@ function seed_roles_and_permissions() {
         ['name' => 'Editar contas WhatsApp', 'slug' => 'whatsapp.edit', 'description' => 'Editar contas WhatsApp', 'module' => 'whatsapp'],
         ['name' => 'Deletar contas WhatsApp', 'slug' => 'whatsapp.delete', 'description' => 'Deletar contas WhatsApp', 'module' => 'whatsapp'],
         
+        // Notificame
+        ['name' => 'Ver integrações Notificame', 'slug' => 'notificame.view', 'description' => 'Ver contas Notificame', 'module' => 'integrations'],
+        ['name' => 'Criar contas Notificame', 'slug' => 'notificame.create', 'description' => 'Criar contas Notificame', 'module' => 'integrations'],
+        ['name' => 'Editar contas Notificame', 'slug' => 'notificame.edit', 'description' => 'Editar contas Notificame', 'module' => 'integrations'],
+        ['name' => 'Deletar contas Notificame', 'slug' => 'notificame.delete', 'description' => 'Deletar contas Notificame', 'module' => 'integrations'],
+        ['name' => 'Enviar mensagens Notificame', 'slug' => 'notificame.send', 'description' => 'Enviar mensagens via Notificame', 'module' => 'integrations'],
+        
+        // WhatsApp Official
+        ['name' => 'Ver integrações WhatsApp Official', 'slug' => 'whatsapp_official.view', 'description' => 'Ver contas WhatsApp Official', 'module' => 'integrations'],
+        ['name' => 'Criar contas WhatsApp Official', 'slug' => 'whatsapp_official.create', 'description' => 'Criar contas WhatsApp Official', 'module' => 'integrations'],
+        ['name' => 'Editar contas WhatsApp Official', 'slug' => 'whatsapp_official.edit', 'description' => 'Editar contas WhatsApp Official', 'module' => 'integrations'],
+        ['name' => 'Deletar contas WhatsApp Official', 'slug' => 'whatsapp_official.delete', 'description' => 'Deletar contas WhatsApp Official', 'module' => 'integrations'],
+        ['name' => 'Enviar mensagens WhatsApp Official', 'slug' => 'whatsapp_official.send', 'description' => 'Enviar mensagens via WhatsApp Official', 'module' => 'integrations'],
+        
         // Api4Com
         ['name' => 'Ver contas Api4Com', 'slug' => 'api4com.view', 'description' => 'Ver contas Api4Com', 'module' => 'api4com'],
         ['name' => 'Criar contas Api4Com', 'slug' => 'api4com.create', 'description' => 'Criar contas Api4Com', 'module' => 'api4com'],

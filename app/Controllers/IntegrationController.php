@@ -784,7 +784,7 @@ class IntegrationController
     {
         Permission::abortIfCannot('notificame.view');
 
-        $logPath = storage_path('logs/laravel.log');
+        $logPath = __DIR__ . '/../../storage/logs/laravel.log';
         $lines = [];
         if (file_exists($logPath)) {
             $fileLines = @file($logPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);

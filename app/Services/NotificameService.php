@@ -605,6 +605,7 @@ class NotificameService
         
         $channel = $account['channel'];
         $token = $account['api_token'];
+        $apiUrl = $account['api_url'] ?? null;
         $accountChannelId = $account['account_id'] ?? null; // id do canal, obrigatório para subscriptions
         
         if (empty($accountChannelId)) {

@@ -246,13 +246,22 @@ class NotificameService
      */
     public static function listAccounts(string $channel = null): array
     {
-        $query = IntegrationAccount::where('provider', '=', 'notificame');
+        $accounts = IntegrationAccount::where('provider', '=', 'notificame');
         
+        // Filtrar por canal se especificado
         if ($channel) {
-            $query = $query->where('channel', '=', $channel);
+            $accounts = array_filter($accounts, function($account) use ($channel) {
+                return $account['channel'] === $channel;
+            });
+            $accounts = array_values($accounts); // Reindexar array
         }
         
-        return $query->orderBy('name')->get();
+        // Ordenar por nome
+        usort($accounts, function($a, $b) {
+            return strcmp($a['name'] ?? '', $b['name'] ?? '');
+        });
+        
+        return $accounts;
     }
     
     /**

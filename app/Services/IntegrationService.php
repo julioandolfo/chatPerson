@@ -103,10 +103,14 @@ class IntegrationService
     public static function getActiveAccount(string $channel, string $provider = null): ?array
     {
         if ($provider) {
-            return IntegrationAccount::where('channel', '=', $channel)
-                ->where('provider', '=', $provider)
-                ->where('status', '=', 'active')
-                ->first();
+            // Buscar todas as contas ativas do canal e filtrar por provider
+            $accounts = IntegrationAccount::getActive($channel);
+            foreach ($accounts as $account) {
+                if ($account['provider'] === $provider) {
+                    return $account;
+                }
+            }
+            return null;
         }
 
         return IntegrationAccount::getFirstActive($channel);
@@ -117,17 +121,31 @@ class IntegrationService
      */
     public static function listAccounts(string $provider = null, string $channel = null): array
     {
-        $query = IntegrationAccount::query();
+        // Buscar todas as contas
+        $accounts = IntegrationAccount::all();
         
+        // Filtrar por provider se especificado
         if ($provider) {
-            $query = $query->where('provider', '=', $provider);
+            $accounts = array_filter($accounts, function($account) use ($provider) {
+                return $account['provider'] === $provider;
+            });
+            $accounts = array_values($accounts);
         }
         
+        // Filtrar por channel se especificado
         if ($channel) {
-            $query = $query->where('channel', '=', $channel);
+            $accounts = array_filter($accounts, function($account) use ($channel) {
+                return $account['channel'] === $channel;
+            });
+            $accounts = array_values($accounts);
         }
         
-        return $query->orderBy('name')->get();
+        // Ordenar por nome
+        usort($accounts, function($a, $b) {
+            return strcmp($a['name'] ?? '', $b['name'] ?? '');
+        });
+        
+        return $accounts;
     }
 }
 

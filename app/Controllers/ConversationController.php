@@ -2522,12 +2522,26 @@ class ConversationController
      */
     public function getInvites(): void
     {
-        $oldConfig = $this->prepareJsonResponse();
+        // Garantir que não há output antes
+        @ini_set('display_errors', '0');
+        @error_reporting(0);
+        
+        // Limpar todos os buffers
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
         
         try {
+            \App\Helpers\Log::debug("[getInvites] Iniciando...", 'conversas.log');
+            
             $userId = \App\Helpers\Auth::id();
+            \App\Helpers\Log::debug("[getInvites] userId={$userId}", 'conversas.log');
+            
             $invites = \App\Services\ConversationMentionService::getPendingInvites($userId);
+            \App\Helpers\Log::debug("[getInvites] Invites: " . count($invites), 'conversas.log');
+            
             $count = \App\Services\ConversationMentionService::countPending($userId);
+            \App\Helpers\Log::debug("[getInvites] Count: {$count}", 'conversas.log');
             
             Response::json([
                 'success' => true,
@@ -2536,9 +2550,14 @@ class ConversationController
             ]);
         } catch (\Exception $e) {
             \App\Helpers\Log::error("[getInvites] Exception: " . $e->getMessage(), 'conversas.log');
+            \App\Helpers\Log::error("[getInvites] Trace: " . $e->getTraceAsString(), 'conversas.log');
+            
+            // Limpar buffers novamente antes de enviar erro
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
-        } finally {
-            $this->restoreAfterJsonResponse($oldConfig);
         }
     }
 

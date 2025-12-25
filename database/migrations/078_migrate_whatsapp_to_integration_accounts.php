@@ -19,6 +19,7 @@ function up_migrate_whatsapp_to_integration_accounts() {
     // Verificar quais colunas existem na tabela whatsapp_accounts
     $columns = $db->query("SHOW COLUMNS FROM whatsapp_accounts")->fetchAll(PDO::FETCH_COLUMN);
     $hasApiKey = in_array('api_key', $columns);
+    $hasInstanceId = in_array('instance_id', $columns);
     $hasQuepasaUser = in_array('quepasa_user', $columns);
     $hasQuepasaToken = in_array('quepasa_token', $columns);
     $hasQuepasaTrackid = in_array('quepasa_trackid', $columns);
@@ -30,17 +31,28 @@ function up_migrate_whatsapp_to_integration_accounts() {
     
     // Construir lista de colunas para SELECT e INSERT dinamicamente
     // Nota: integration_accounts usa 'api_token', não 'api_key'
-    $selectFields = ['name', 'provider', "'whatsapp' as channel", 'phone_number', 'api_url'];
-    $insertFields = ['name', 'provider', 'channel', 'phone_number', 'api_url'];
+    $selectFields = ['name', 'provider', "'whatsapp' as channel", 'phone_number'];
+    $insertFields = ['name', 'provider', 'channel', 'phone_number'];
     
+    // api_url (sempre existe)
+    if (in_array('api_url', $columns)) {
+        $selectFields[] = 'api_url';
+        $insertFields[] = 'api_url';
+    }
+    
+    // api_key -> api_token (se existir)
     if ($hasApiKey) {
         $selectFields[] = 'api_key as api_token'; // Mapear api_key para api_token
         $insertFields[] = 'api_token';
     }
     
-    $selectFields[] = 'instance_id';
-    $insertFields[] = 'instance_id';
+    // instance_id (se existir)
+    if ($hasInstanceId) {
+        $selectFields[] = 'instance_id';
+        $insertFields[] = 'instance_id';
+    }
     
+    // status (sempre existe)
     $selectFields[] = 'status';
     $insertFields[] = 'status';
     

@@ -424,6 +424,8 @@ class NotificameService
         
         $channel = $account['channel'];
         $token = $account['api_token'];
+        $apiUrl = $account['api_url'] ?? null;
+        $apiUrl = $account['api_url'] ?? null;
         
         // Preparar payload baseado no canal
         $payload = [
@@ -447,7 +449,8 @@ class NotificameService
         $endpoint = "{$channel}/send";
         
         try {
-            $result = self::makeRequest($endpoint, $token, 'POST', $payload);
+            Logger::info("Notificame sendMessage endpoint={$endpoint} channel={$channel} to={$to}");
+            $result = self::makeRequest($endpoint, $token, 'POST', $payload, $apiUrl);
             
             return [
                 'success' => true,
@@ -484,6 +487,7 @@ class NotificameService
         
         $channel = $account['channel'];
         $token = $account['api_token'];
+        $apiUrl = $account['api_url'] ?? null;
         
         $payload = [
             'to' => $to,
@@ -494,7 +498,8 @@ class NotificameService
         $endpoint = "{$channel}/template";
         
         try {
-            $result = self::makeRequest($endpoint, $token, 'POST', $payload);
+            Logger::info("Notificame sendTemplate endpoint={$endpoint} channel={$channel} to={$to} template={$templateName}");
+            $result = self::makeRequest($endpoint, $token, 'POST', $payload, $apiUrl);
             
             return [
                 'success' => true,
@@ -519,6 +524,7 @@ class NotificameService
         
         $channel = $account['channel'];
         $token = $account['api_token'];
+        $apiUrl = $account['api_url'] ?? null;
         
         $payload = [
             'to' => $to,
@@ -528,7 +534,8 @@ class NotificameService
         $endpoint = "{$channel}/interactive";
         
         try {
-            $result = self::makeRequest($endpoint, $token, 'POST', $payload);
+            Logger::info("Notificame sendInteractive endpoint={$endpoint} channel={$channel} to={$to}");
+            $result = self::makeRequest($endpoint, $token, 'POST', $payload, $apiUrl);
             
             return [
                 'success' => true,
@@ -562,7 +569,8 @@ class NotificameService
         $endpoint = "{$channel}/webhook";
         
         try {
-            self::makeRequest($endpoint, $token, 'POST', $payload);
+            Logger::info("Notificame configureWebhook endpoint={$endpoint} channel={$channel} url={$webhookUrl}");
+            self::makeRequest($endpoint, $token, 'POST', $payload, $apiUrl);
             
             // Salvar webhook URL na conta
             IntegrationAccount::update($accountId, [

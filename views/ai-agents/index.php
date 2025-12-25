@@ -354,6 +354,20 @@ ob_start();
                     </div>
                     <!--end::Delay Humanizado-->
                     
+                    <!--begin::Timer de Contexto (Edição)-->
+                    <div class="fv-row mb-7">
+                        <label class="required fw-semibold fs-6 mb-2">
+                            <i class="ki-duotone ki-clock fs-4 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                            Timer de Contexto (segundos)
+                        </label>
+                        <input type="number" name="context_timer_seconds" id="edit_context_timer_seconds" class="form-control form-control-solid" placeholder="5" min="0" max="30" value="5" />
+                        <div class="form-text text-info mt-2">
+                            <i class="ki-duotone ki-information-5 fs-7 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                            Tempo para agrupar múltiplas mensagens rápidas do cliente antes de responder. Se o cliente enviar 2-3 mensagens em sequência, aguarda este tempo e responde uma única vez. Padrão: 5 segundos. Use 0 para desabilitar.
+                        </div>
+                    </div>
+                    <!--end::Timer de Contexto (Edição)-->
+                    
                     <div class="fv-row mb-7">
                         <label class="d-flex align-items-center">
                             <input type="checkbox" name="enabled" id="edit_enabled" class="form-check-input me-2" />
@@ -451,6 +465,7 @@ function editAgent(id) {
             const settings = agent.settings ? (typeof agent.settings === "string" ? JSON.parse(agent.settings) : agent.settings) : {};
             document.getElementById("edit_response_delay_min").value = settings.response_delay_min || 0;
             document.getElementById("edit_response_delay_max").value = settings.response_delay_max || 0;
+            document.getElementById("edit_context_timer_seconds").value = settings.context_timer_seconds || 5;
             
             // Carregar tools do agente
             if (agent.tools && agent.tools.length > 0) {

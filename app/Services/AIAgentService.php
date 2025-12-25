@@ -13,6 +13,17 @@ use App\Helpers\Validator;
 class AIAgentService
 {
     /**
+     * Buffer de mensagens por conversa (para timer de contexto)
+     * Estrutura: [conversation_id => ['messages' => [...], 'timer_start' => timestamp, 'agent_id' => X, 'scheduled' => bool]]
+     */
+    private static array $messageBuffers = [];
+    
+    /**
+     * Locks por conversa (para evitar processamento duplicado)
+     */
+    private static array $processingLocks = [];
+    
+    /**
      * Criar agente de IA
      */
     public static function create(array $data): int
@@ -52,6 +63,12 @@ class AIAgentService
         if (isset($data['response_delay_max'])) {
             $settings['response_delay_max'] = (int)$data['response_delay_max'];
             unset($data['response_delay_max']);
+        }
+        
+        // ✅ NOVO: Adicionar timer de contexto às settings
+        if (isset($data['context_timer_seconds'])) {
+            $settings['context_timer_seconds'] = (int)$data['context_timer_seconds'];
+            unset($data['context_timer_seconds']);
         }
         
         if (!empty($settings)) {
@@ -521,6 +538,240 @@ class AIAgentService
             );
             
             throw $e;
+        }
+    }
+    
+    /**
+     * 🆕 Adicionar mensagem ao buffer e agendar processamento (timer de contexto)
+     * 
+     * @param int $conversationId ID da conversa
+     * @param int $agentId ID do agente de IA
+     * @param string $message Conteúdo da mensagem
+     * @return void
+     */
+    public static function bufferMessage(int $conversationId, int $agentId, string $message): void
+    {
+        \App\Helpers\Logger::info("AIAgentService::bufferMessage - Adicionando mensagem ao buffer (conv={$conversationId}, agent={$agentId}, msgLen=" . strlen($message) . ")");
+        
+        // Verificar se há buffer antigo que precisa ser processado primeiro
+        self::checkAndProcessOldBuffers($conversationId);
+        
+        // Obter configurações do agente
+        $agent = AIAgent::find($agentId);
+        if (!$agent) {
+            \App\Helpers\Logger::error("AIAgentService::bufferMessage - Agente não encontrado: {$agentId}");
+            // Fallback: processar imediatamente
+            self::processMessage($conversationId, $agentId, $message);
+            return;
+        }
+        
+        $settings = is_string($agent['settings'] ?? null) 
+            ? json_decode($agent['settings'], true) 
+            : ($agent['settings'] ?? []);
+        
+        $contextTimer = (int)($settings['context_timer_seconds'] ?? 5); // Padrão: 5 segundos
+        
+        // Se timer for 0, processar imediatamente (sem buffer)
+        if ($contextTimer <= 0) {
+            \App\Helpers\Logger::info("AIAgentService::bufferMessage - Timer desabilitado (0), processando imediatamente");
+            self::processMessage($conversationId, $agentId, $message);
+            return;
+        }
+        
+        $now = time();
+        $wasScheduled = false;
+        
+        // Verificar se já existe buffer
+        if (isset(self::$messageBuffers[$conversationId])) {
+            $wasScheduled = self::$messageBuffers[$conversationId]['scheduled'];
+        }
+        
+        // Inicializar buffer se não existir
+        if (!isset(self::$messageBuffers[$conversationId])) {
+            self::$messageBuffers[$conversationId] = [
+                'messages' => [],
+                'timer_start' => $now,
+                'agent_id' => $agentId,
+                'timer_seconds' => $contextTimer,
+                'scheduled' => false
+            ];
+        }
+        
+        // Adicionar mensagem ao buffer
+        self::$messageBuffers[$conversationId]['messages'][] = [
+            'content' => $message,
+            'timestamp' => $now
+        ];
+        
+        // Reiniciar timer (última mensagem recebida)
+        self::$messageBuffers[$conversationId]['timer_start'] = $now;
+        
+        \App\Helpers\Logger::info("AIAgentService::bufferMessage - Mensagem adicionada ao buffer (total: " . count(self::$messageBuffers[$conversationId]['messages']) . ", timer: {$contextTimer}s)");
+        
+        // Se já há um timer agendado, não criar outro (apenas reiniciar timer)
+        if ($wasScheduled) {
+            \App\Helpers\Logger::info("AIAgentService::bufferMessage - Timer já agendado, apenas reiniciado");
+            return;
+        }
+        
+        // Marcar como agendado
+        self::$messageBuffers[$conversationId]['scheduled'] = true;
+        
+        // Agendar processamento após timer (usar execução assíncrona)
+        self::scheduleProcessing($conversationId, $contextTimer);
+    }
+    
+    /**
+     * 🆕 Agendar processamento após timer de contexto
+     * Usa execução em background não-bloqueante
+     * 
+     * @param int $conversationId ID da conversa
+     * @param int $timerSeconds Segundos para aguardar
+     * @return void
+     */
+    private static function scheduleProcessing(int $conversationId, int $timerSeconds): void
+    {
+        \App\Helpers\Logger::info("AIAgentService::scheduleProcessing - Agendando processamento (conv={$conversationId}, timer={$timerSeconds}s)");
+        
+        // Criar script PHP temporário que aguarda e processa
+        $tempScript = sys_get_temp_dir() . '/ai_buffer_' . $conversationId . '_' . time() . '.php';
+        
+        // Obter caminho base do projeto
+        $basePath = dirname(__DIR__, 2); // Volta 2 níveis de app/Services para raiz
+        
+        $phpCode = "<?php\n";
+        $phpCode .= "// Auto-delete após execução\n";
+        $phpCode .= "\$scriptPath = __FILE__;\n";
+        $phpCode .= "register_shutdown_function(function() use (\$scriptPath) {\n";
+        $phpCode .= "    if (file_exists(\$scriptPath)) {\n";
+        $phpCode .= "        @unlink(\$scriptPath);\n";
+        $phpCode .= "    }\n";
+        $phpCode .= "});\n\n";
+        $phpCode .= "\$basePath = " . var_export($basePath, true) . ";\n";
+        $phpCode .= "require_once \$basePath . '/vendor/autoload.php';\n";
+        $phpCode .= "require_once \$basePath . '/app/Helpers/Database.php';\n";
+        $phpCode .= "require_once \$basePath . '/app/Services/AIAgentService.php';\n\n";
+        $phpCode .= "sleep({$timerSeconds});\n\n";
+        $phpCode .= "try {\n";
+        $phpCode .= "    \\App\\Services\\AIAgentService::processBufferedMessages({$conversationId});\n";
+        $phpCode .= "} catch (\\Exception \$e) {\n";
+        $phpCode .= "    error_log('Erro ao processar buffer: ' . \$e->getMessage());\n";
+        $phpCode .= "}\n";
+        
+        file_put_contents($tempScript, $phpCode);
+        
+        // Executar em background (não-bloqueante)
+        $phpExecutable = PHP_BINARY;
+        $command = escapeshellarg($phpExecutable) . ' ' . escapeshellarg($tempScript);
+        
+        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+            // Windows: usar start /B para background
+            $command = "start /B {$command} > NUL 2>&1";
+            pclose(popen($command, 'r'));
+        } else {
+            // Linux/Unix: usar & para background
+            $command .= ' > /dev/null 2>&1 &';
+            exec($command);
+        }
+        
+        \App\Helpers\Logger::info("AIAgentService::scheduleProcessing - Processamento agendado em background (script: {$tempScript})");
+    }
+    
+    /**
+     * 🆕 Processar mensagens do buffer (chamado após timer expirar)
+     * 
+     * @param int $conversationId ID da conversa
+     * @return void
+     */
+    public static function processBufferedMessages(int $conversationId): void
+    {
+        \App\Helpers\Logger::info("AIAgentService::processBufferedMessages - INÍCIO (conv={$conversationId})");
+        
+        // Verificar se há lock (evitar processamento duplicado)
+        if (isset(self::$processingLocks[$conversationId])) {
+            \App\Helpers\Logger::info("AIAgentService::processBufferedMessages - Já está processando, ignorando");
+            return;
+        }
+        
+        // Verificar se há buffer
+        if (!isset(self::$messageBuffers[$conversationId])) {
+            \App\Helpers\Logger::info("AIAgentService::processBufferedMessages - Buffer não encontrado, ignorando");
+            return;
+        }
+        
+        $buffer = self::$messageBuffers[$conversationId];
+        
+        // Verificar se timer realmente expirou (pode ter sido reiniciado)
+        $elapsed = time() - $buffer['timer_start'];
+        if ($elapsed < $buffer['timer_seconds']) {
+            \App\Helpers\Logger::info("AIAgentService::processBufferedMessages - Timer ainda não expirou ({$elapsed}s < {$buffer['timer_seconds']}s), reagendando...");
+            // Reagendar para o tempo restante
+            $remaining = $buffer['timer_seconds'] - $elapsed;
+            self::$messageBuffers[$conversationId]['scheduled'] = false;
+            self::scheduleProcessing($conversationId, $remaining);
+            return;
+        }
+        
+        // Adicionar lock
+        self::$processingLocks[$conversationId] = true;
+        
+        try {
+            // Verificar se há mensagens no buffer
+            if (empty($buffer['messages'])) {
+                \App\Helpers\Logger::info("AIAgentService::processBufferedMessages - Buffer vazio, ignorando");
+                unset(self::$messageBuffers[$conversationId]);
+                return;
+            }
+            
+            // Agrupar mensagens em uma única string
+            $messages = array_map(function($msg) {
+                return $msg['content'];
+            }, $buffer['messages']);
+            
+            $groupedMessage = implode("\n\n", $messages);
+            
+            \App\Helpers\Logger::info("AIAgentService::processBufferedMessages - Processando " . count($buffer['messages']) . " mensagens agrupadas (totalLen=" . strlen($groupedMessage) . ")");
+            
+            // Limpar buffer ANTES de processar (evitar reprocessamento)
+            $agentId = $buffer['agent_id'];
+            unset(self::$messageBuffers[$conversationId]);
+            
+            // Processar mensagem agrupada
+            self::processMessage($conversationId, $agentId, $groupedMessage);
+            
+            \App\Helpers\Logger::info("AIAgentService::processBufferedMessages - ✅ SUCESSO");
+            
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error("AIAgentService::processBufferedMessages - ❌ ERRO: " . $e->getMessage());
+            \App\Helpers\Logger::error("AIAgentService::processBufferedMessages - Stack trace: " . $e->getTraceAsString());
+            // Limpar buffer mesmo em caso de erro
+            unset(self::$messageBuffers[$conversationId]);
+        } finally {
+            // Remover lock
+            unset(self::$processingLocks[$conversationId]);
+        }
+    }
+    
+    /**
+     * 🆕 Verificar e processar buffers pendentes (chamado quando nova mensagem chega)
+     * Verifica se há buffer antigo que precisa ser processado
+     * 
+     * @param int $conversationId ID da conversa
+     * @return void
+     */
+    public static function checkAndProcessOldBuffers(int $conversationId): void
+    {
+        if (!isset(self::$messageBuffers[$conversationId])) {
+            return;
+        }
+        
+        $buffer = self::$messageBuffers[$conversationId];
+        $elapsed = time() - $buffer['timer_start'];
+        
+        // Se timer expirou e não está agendado, processar imediatamente
+        if ($elapsed >= $buffer['timer_seconds'] && !$buffer['scheduled']) {
+            \App\Helpers\Logger::info("AIAgentService::checkAndProcessOldBuffers - Buffer expirado encontrado, processando imediatamente");
+            self::processBufferedMessages($conversationId);
         }
     }
 }

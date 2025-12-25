@@ -901,7 +901,7 @@ document.getElementById('kt_form_edit_notificame').addEventListener('submit', fu
     submitBtn.disabled = true;
     
     fetch(`/integrations/notificame/accounts/${id}`, {
-        method: 'PUT',
+        method: 'POST', // rota aceita POST para atualização
         body: formData,
         headers: {
             'X-Requested-With': 'XMLHttpRequest'

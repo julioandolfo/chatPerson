@@ -247,6 +247,8 @@ Router::post('/integrations/whatsapp/{id}/webhook', [IntegrationController::clas
 Router::get('/integrations/notificame', [IntegrationController::class, 'notificame'], ['Authentication']);
 Router::post('/integrations/notificame/accounts', [IntegrationController::class, 'createNotificameAccount'], ['Authentication', 'Permission:notificame.create']);
 Router::put('/integrations/notificame/accounts/{id}', [IntegrationController::class, 'updateNotificameAccount'], ['Authentication', 'Permission:notificame.edit']);
+// Suporte a POST para atualização (compatibilidade)
+Router::post('/integrations/notificame/accounts/{id}', [IntegrationController::class, 'updateNotificameAccount'], ['Authentication', 'Permission:notificame.edit']);
 Router::delete('/integrations/notificame/accounts/{id}', [IntegrationController::class, 'deleteNotificameAccount'], ['Authentication', 'Permission:notificame.delete']);
 Router::get('/integrations/notificame/accounts/{id}/status', [IntegrationController::class, 'checkNotificameStatus'], ['Authentication']);
 Router::get('/integrations/notificame/accounts/{id}/subaccounts', [IntegrationController::class, 'listNotificameSubaccounts'], ['Authentication']);

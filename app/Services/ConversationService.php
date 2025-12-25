@@ -1579,15 +1579,17 @@ class ConversationService
                     
                     // Se não detectou intent, processar com IA normalmente
                     if (!$intentDetected) {
-                        \App\Helpers\Logger::info("ConversationService::sendMessage - Chamando AIAgentService::processMessage (conv={$conversationId}, agent={$aiConversation['ai_agent_id']}, msgLen=" . strlen($processedContent) . ")");
-                        $aiResponse = \App\Services\AIAgentService::processMessage(
+                        \App\Helpers\Logger::info("ConversationService::sendMessage - Adicionando mensagem ao buffer (conv={$conversationId}, agent={$aiConversation['ai_agent_id']}, msgLen=" . strlen($processedContent) . ")");
+                        
+                        // ✅ NOVO: Usar buffer de mensagens com timer de contexto
+                        \App\Services\AIAgentService::bufferMessage(
                             $conversationId,
                             $aiConversation['ai_agent_id'],
                             $processedContent // Usar conteúdo processado (transcrito se disponível)
                         );
                         
-                        \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ AIAgentService::processMessage retornou com sucesso");
-                        // A resposta já foi enviada pelo processMessage
+                        \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Mensagem adicionada ao buffer com sucesso");
+                        // A resposta será enviada após o timer de contexto expirar
                     }
                 } catch (\Exception $e) {
                     \App\Helpers\Logger::error("ConversationService::sendMessage - ❌ ERRO ao processar mensagem com agente de IA: " . $e->getMessage());

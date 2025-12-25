@@ -2522,7 +2522,81 @@ body.dark-mode .swal2-content {
         
         <!-- Mensagens (sempre presente) -->
         <div class="chat-messages" id="chatMessages">
-            <?php if (!empty($selectedConversation)): ?>
+            <?php if (!empty($selectedConversation) && !empty($accessRestricted)): ?>
+                <!-- ======================================== -->
+                <!-- ACESSO RESTRITO - TELA OFUSCADA -->
+                <!-- ======================================== -->
+                <div class="restricted-access-container" style="position: relative; height: 100%; overflow: hidden;">
+                    <!-- Mensagens fake ofuscadas (blur) -->
+                    <div class="blurred-messages" style="filter: blur(8px); opacity: 0.5; pointer-events: none; height: 100%; padding: 20px;">
+                        <div class="message message-received mb-3" style="max-width: 70%; background: var(--bs-gray-200); padding: 12px 16px; border-radius: 12px;">
+                            <div style="height: 14px; background: var(--bs-gray-400); border-radius: 4px; width: 80%;"></div>
+                            <div style="height: 14px; background: var(--bs-gray-400); border-radius: 4px; width: 60%; margin-top: 8px;"></div>
+                        </div>
+                        <div class="message message-sent mb-3" style="max-width: 70%; background: var(--bs-primary); padding: 12px 16px; border-radius: 12px; margin-left: auto;">
+                            <div style="height: 14px; background: rgba(255,255,255,0.5); border-radius: 4px; width: 90%;"></div>
+                        </div>
+                        <div class="message message-received mb-3" style="max-width: 70%; background: var(--bs-gray-200); padding: 12px 16px; border-radius: 12px;">
+                            <div style="height: 14px; background: var(--bs-gray-400); border-radius: 4px; width: 70%;"></div>
+                            <div style="height: 14px; background: var(--bs-gray-400); border-radius: 4px; width: 85%; margin-top: 8px;"></div>
+                            <div style="height: 14px; background: var(--bs-gray-400); border-radius: 4px; width: 50%; margin-top: 8px;"></div>
+                        </div>
+                        <div class="message message-sent mb-3" style="max-width: 70%; background: var(--bs-primary); padding: 12px 16px; border-radius: 12px; margin-left: auto;">
+                            <div style="height: 14px; background: rgba(255,255,255,0.5); border-radius: 4px; width: 75%;"></div>
+                            <div style="height: 14px; background: rgba(255,255,255,0.5); border-radius: 4px; width: 60%; margin-top: 8px;"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Overlay com botão de solicitar -->
+                    <div class="restricted-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(var(--bs-body-bg-rgb, 255, 255, 255), 0.85); z-index: 10;">
+                        <div class="text-center p-5">
+                            <div class="mb-4">
+                                <i class="ki-duotone ki-shield-cross fs-4x text-warning">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                            </div>
+                            
+                            <h3 class="fw-bold mb-3">Acesso Restrito</h3>
+                            <p class="text-muted mb-4">
+                                Você não está atribuído nem é participante desta conversa.<br>
+                                Solicite participação para ter acesso completo.
+                            </p>
+                            
+                            <?php if (!empty($accessInfo['has_pending_request'])): ?>
+                                <!-- Já tem solicitação pendente -->
+                                <div class="alert alert-warning d-inline-flex align-items-center mb-4" role="alert">
+                                    <i class="ki-duotone ki-timer fs-2 me-2 text-warning">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    <div class="text-start">
+                                        <div class="fw-bold">Solicitação Pendente</div>
+                                        <div class="fs-7">Aguarde aprovação de um agente.</div>
+                                    </div>
+                                </div>
+                            <?php else: ?>
+                                <!-- Botão para solicitar participação -->
+                                <button class="btn btn-primary btn-lg" onclick="requestParticipation(<?= (int)$selectedConversationId ?>)">
+                                    <i class="ki-duotone ki-entrance-right fs-2 me-2">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    Solicitar Participação
+                                </button>
+                            <?php endif; ?>
+                            
+                            <div class="mt-4">
+                                <small class="text-muted">
+                                    Conversa atribuída a: <strong><?= htmlspecialchars($selectedConversation['agent_name'] ?? 'Não atribuída') ?></strong>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <?php elseif (!empty($selectedConversation)): ?>
                 <?php if (!empty($selectedConversation['messages'])): ?>
                     <?php 
                     $lastDate = null;
@@ -2746,7 +2820,7 @@ body.dark-mode .swal2-content {
         </div>
         
         <!-- Campo de Envio (sempre presente, mas pode estar oculto) -->
-        <div class="chat-input" id="chatInput" style="<?= empty($selectedConversation) ? 'display: none;' : '' ?>">
+        <div class="chat-input" id="chatInput" style="<?= (empty($selectedConversation) || !empty($accessRestricted)) ? 'display: none;' : '' ?>">
                 <!-- Preview de Reply -->
                 <div id="replyPreview" class="reply-preview d-none">
                     <div class="reply-preview-content">

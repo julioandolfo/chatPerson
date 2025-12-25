@@ -168,23 +168,59 @@ class ConversationController
             // Se houver ID de conversa na URL, carregar para exibir no chat
             $selectedConversationId = $_GET['id'] ?? null;
             $selectedConversation = null;
+            $accessRestricted = false;
+            $accessInfo = null;
             
             if ($selectedConversationId) {
-                // Marcar mensagens como lidas quando a conversa é aberta (mesmo via URL direta)
                 $userId = \App\Helpers\Auth::id();
-                if ($userId) {
-                    try {
-                        \App\Models\Message::markAsRead((int)$selectedConversationId, $userId);
-                    } catch (\Exception $e) {
-                        error_log("Erro ao marcar mensagens como lidas na conversa {$selectedConversationId}: " . $e->getMessage());
-                    }
-                }
                 
                 try {
-                    // Recarregar conversa para obter unread_count atualizado após marcar como lidas
+                    // Carregar conversa
                     $selectedConversation = ConversationService::getConversation((int)$selectedConversationId);
+                    
+                    if ($selectedConversation && $userId) {
+                        // 🔍 Verificar se usuário tem acesso à conversa
+                        $accessInfo = \App\Services\ConversationMentionService::checkUserAccess((int)$selectedConversationId, $userId);
+                        
+                        \App\Helpers\Log::debug("🔍 [index] Verificando acesso via URL - conversationId={$selectedConversationId}, userId={$userId}", 'conversas.log');
+                        \App\Helpers\Log::debug("🔍 [index] accessInfo=" . json_encode($accessInfo), 'conversas.log');
+                        
+                        if (!$accessInfo['can_view']) {
+                            // Verificar se é admin/supervisor
+                            $userLevel = \App\Models\User::getMaxLevel($userId);
+                            $isAdminOrSupervisor = $userLevel <= 2;
+                            
+                            \App\Helpers\Log::debug("🔍 [index] Acesso negado - userLevel={$userLevel}, isAdminOrSupervisor=" . ($isAdminOrSupervisor ? 'true' : 'false'), 'conversas.log');
+                            
+                            if (!$isAdminOrSupervisor) {
+                                // Usuário não tem acesso - marcar como restrito
+                                $accessRestricted = true;
+                                \App\Helpers\Log::debug("🔍 [index] ❌ Acesso restrito para usuário {$userId}", 'conversas.log');
+                                
+                                // Limpar mensagens da conversa para não expor
+                                if (isset($selectedConversation['messages'])) {
+                                    $selectedConversation['messages'] = [];
+                                }
+                            } else {
+                                // Admin/Supervisor pode ver - marcar mensagens como lidas
+                                try {
+                                    \App\Models\Message::markAsRead((int)$selectedConversationId, $userId);
+                                } catch (\Exception $e) {
+                                    // Ignorar
+                                }
+                            }
+                        } else {
+                            // Usuário tem acesso - marcar mensagens como lidas
+                            try {
+                                \App\Models\Message::markAsRead((int)$selectedConversationId, $userId);
+                            } catch (\Exception $e) {
+                                error_log("Erro ao marcar mensagens como lidas na conversa {$selectedConversationId}: " . $e->getMessage());
+                            }
+                        }
+                    }
                 } catch (\Exception $e) {
                     // Ignorar erro se conversa não encontrada
+                    \App\Helpers\Log::error("Erro ao carregar conversa {$selectedConversationId}: " . $e->getMessage(), 'conversas.log');
                 }
             }
             
@@ -196,7 +232,9 @@ class ConversationController
                 'whatsappAccounts' => $whatsappAccounts ?? [],
                 'filters' => $filters,
                 'selectedConversation' => $selectedConversation,
-                'selectedConversationId' => $selectedConversationId
+                'selectedConversationId' => $selectedConversationId,
+                'accessRestricted' => $accessRestricted,
+                'accessInfo' => $accessInfo
             ]);
         } catch (\Exception $e) {
             // Log do erro para debug
@@ -1852,7 +1890,35 @@ class ConversationController
                 return;
             }
             
-            Permission::abortIfCannot('conversations.view');
+            // Verificar permissão (conversations.view.own ou conversations.view.all)
+            if (!Permission::can('conversations.view.own') && !Permission::can('conversations.view.all')) {
+                ob_end_clean();
+                Response::json([
+                    'success' => false,
+                    'message' => 'Sem permissão para visualizar sentimentos de conversas'
+                ], 403);
+                return;
+            }
+            
+            // Verificar se o usuário tem acesso à conversa específica
+            $conversation = \App\Models\Conversation::find($conversationId);
+            if (!$conversation) {
+                ob_end_clean();
+                Response::json(['success' => false, 'message' => 'Conversa não encontrada'], 404);
+                return;
+            }
+            
+            // Se não tem permissão para ver todas, verificar se tem acesso à conversa específica
+            if (!Permission::can('conversations.view.all')) {
+                if (!Permission::canViewConversation($conversation)) {
+                    ob_end_clean();
+                    Response::json([
+                        'success' => false,
+                        'message' => 'Você não tem permissão para ver esta conversa'
+                    ], 403);
+                    return;
+                }
+            }
             
             $sentiment = \App\Services\SentimentAnalysisService::getCurrentSentiment($conversationId);
             

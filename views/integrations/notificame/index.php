@@ -350,6 +350,11 @@ ob_start();
                         <input type="text" name="api_token" id="kt_edit_api_token" class="form-control form-control-solid" placeholder="Deixe vazio para não alterar">
                     </div>
                     <div class="mb-5">
+                        <label class="fw-semibold fs-6 mb-2">URL da API</label>
+                        <input type="url" name="api_url" id="kt_edit_api_url" class="form-control form-control-solid" placeholder="https://app.notificame.com.br/api/v1/">
+                        <div class="form-text">Use a URL base da API. Padrão: https://app.notificame.com.br/api/v1/</div>
+                    </div>
+                    <div class="mb-5">
                         <label class="fw-semibold fs-6 mb-2">ID da Conta</label>
                         <input type="text" name="account_id" id="kt_edit_account_id_field" class="form-control form-control-solid">
                     </div>
@@ -595,6 +600,15 @@ function checkStatus(id) {
                 const statusClass = status.connected ? 'success' : 'danger';
                 const statusIcon = status.connected ? 'check-circle' : 'cross-circle';
                 
+                let detailsHtml = '';
+                if (status.details) {
+                    detailsHtml = '<div class="mt-4"><h5 class="fw-bold fs-7 mb-3">Detalhes:</h5><ul class="list-unstyled mb-0">';
+                    Object.keys(status.details).forEach(key => {
+                        detailsHtml += `<li class="mb-1"><span class="fw-semibold">${key}</span>: <span class="text-muted">${status.details[key]}</span></li>`;
+                    });
+                    detailsHtml += '</ul></div>';
+                }
+                
                 content.innerHTML = `
                     <div class="text-center mb-7">
                         <i class="ki-duotone ki-${statusIcon} fs-3x text-${statusClass}">
@@ -611,14 +625,25 @@ function checkStatus(id) {
                             <span class="fw-semibold">Conectado:</span>
                             <span>${status.connected ? 'Sim' : 'Não'}</span>
                         </div>
-                        <div class="d-flex justify-content-between">
-                            <span class="fw-semibold">Mensagem:</span>
+                        <div class="mb-2">
+                            <span class="fw-semibold d-block mb-1">Mensagem:</span>
                             <span class="text-muted">${status.message || '-'}</span>
+                        </div>
+                        ${detailsHtml}
+                        <div class="mt-4">
+                            <span class="fw-semibold d-block">Endpoint usado:</span>
+                            <span class="text-muted">${status.endpoint_used || '-'}</span>
+                        </div>
+                        <div class="mt-2">
+                            <span class="fw-semibold d-block">API URL:</span>
+                            <span class="text-muted">${status.api_url || '-'}</span>
                         </div>
                     </div>
                 `;
             } else {
-                content.innerHTML = '<div class="alert alert-danger">Erro ao verificar status: ' + (data.message || 'Erro desconhecido') + '</div>';
+                const status = data.status || {};
+                const details = status.details ? JSON.stringify(status.details) : '';
+                content.innerHTML = '<div class="alert alert-danger">Erro ao verificar status: ' + (status.message || data.message || 'Erro desconhecido') + (details ? '<br><small>' + details + '</small>' : '') + '</div>';
             }
         })
         .catch(error => {
@@ -631,6 +656,7 @@ function editAccount(id, account, funnels) {
     document.getElementById('kt_edit_account_id').value = id;
     document.getElementById('kt_edit_name').value = account.name || '';
     document.getElementById('kt_edit_api_token').value = '';
+    document.getElementById('kt_edit_api_url').value = account.api_url || 'https://app.notificame.com.br/api/v1/';
     document.getElementById('kt_edit_account_id_field').value = account.account_id || '';
     document.getElementById('kt_edit_default_funnel_id').value = account.default_funnel_id || '';
     

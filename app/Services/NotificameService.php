@@ -224,6 +224,9 @@ class NotificameService
         if (isset($data['account_id'])) {
             $updateData['account_id'] = $data['account_id'];
         }
+        if (isset($data['api_url'])) {
+            $updateData['api_url'] = $data['api_url'];
+        }
         if (isset($data['phone_number'])) {
             $updateData['phone_number'] = $data['phone_number'];
         }

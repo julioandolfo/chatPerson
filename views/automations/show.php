@@ -872,16 +872,12 @@ $funnelsUrl = json_encode(\App\Helpers\Url::to('/funnels'));
 $layoutUrl = json_encode(\App\Helpers\Url::to('/automations/' . $automation['id'] . '/layout'));
 $logsUrl = json_encode(\App\Helpers\Url::to('/automations/' . $automation['id'] . '/logs'));
 
-// Preparar opções HTML para contas WhatsApp (legacy)
-$whatsappOptions = '';
-if (!empty($whatsappAccounts)) {
-    foreach ($whatsappAccounts as $acc) {
-        $whatsappOptions .= '<option value="whatsapp_' . htmlspecialchars($acc['id']) . '">' . htmlspecialchars($acc['name'] . ' (' . $acc['phone_number'] . ')') . '</option>';
-    }
-}
-
-// Preparar opções HTML para contas de integração (novo sistema)
+// Preparar opções HTML para contas de integração (novo sistema unificado)
+// Priorizar integration_accounts, usar whatsapp_accounts apenas se não houver migração
 $integrationAccountsOptions = [];
+$usedPhoneNumbers = []; // Para evitar duplicatas
+
+// Primeiro, adicionar contas de integração
 if (!empty($integrationAccounts)) {
     foreach ($integrationAccounts as $acc) {
         $channel = $acc['channel'] ?? 'whatsapp';
@@ -890,6 +886,30 @@ if (!empty($integrationAccounts)) {
         }
         $identifier = $acc['phone_number'] ?? $acc['username'] ?? $acc['account_id'] ?? 'N/A';
         $integrationAccountsOptions[$channel] .= '<option value="integration_' . htmlspecialchars($acc['id']) . '">' . htmlspecialchars($acc['name'] . ' (' . $identifier . ')') . '</option>';
+        
+        // Marcar número como usado para evitar duplicata
+        if (!empty($acc['phone_number'])) {
+            $usedPhoneNumbers[] = $acc['phone_number'];
+        }
+    }
+}
+
+// Depois, adicionar contas WhatsApp legacy apenas se não foram migradas
+$whatsappOptions = '';
+if (!empty($whatsappAccounts)) {
+    foreach ($whatsappAccounts as $acc) {
+        // Pular se já foi migrada para integration_accounts
+        if (in_array($acc['phone_number'], $usedPhoneNumbers)) {
+            continue;
+        }
+        
+        $whatsappOptions .= '<option value="whatsapp_' . htmlspecialchars($acc['id']) . '">' . htmlspecialchars($acc['name'] . ' (' . $acc['phone_number'] . ') [Legacy]') . '</option>';
+        
+        // Adicionar também às opções de WhatsApp
+        if (!isset($integrationAccountsOptions['whatsapp'])) {
+            $integrationAccountsOptions['whatsapp'] = '';
+        }
+        $integrationAccountsOptions['whatsapp'] .= '<option value="whatsapp_' . htmlspecialchars($acc['id']) . '">' . htmlspecialchars($acc['name'] . ' (' . $acc['phone_number'] . ') [Legacy]') . '</option>';
     }
 }
 
@@ -967,7 +987,6 @@ const automationStageId = <?= $stageIdJson ?>;
 const funnelsBaseUrl = <?= $funnelsUrl ?>;
 const layoutSaveUrl = <?= $layoutUrl ?>;
 const logsEndpoint = <?= $logsUrl ?>;
-const whatsappOptionsHtml = <?= json_encode($whatsappOptions, JSON_UNESCAPED_UNICODE) ?>;
 const integrationAccountsByChannel = <?= json_encode($integrationAccountsOptions ?? [], JSON_UNESCAPED_UNICODE) ?>;
 
 // Função para atualizar opções de contas baseado no canal selecionado
@@ -977,12 +996,7 @@ function updateAccountOptions(channel) {
     
     let options = '<option value="">Todas as Contas</option>';
     
-    // Adicionar contas WhatsApp (legacy)
-    if (channel === '' || channel === 'whatsapp') {
-        options += whatsappOptionsHtml || '';
-    }
-    
-    // Adicionar contas de integração do canal selecionado
+    // Adicionar contas de integração do canal selecionado (já inclui legacy sem duplicatas)
     if (channel && integrationAccountsByChannel[channel]) {
         options += integrationAccountsByChannel[channel];
     } else if (!channel) {

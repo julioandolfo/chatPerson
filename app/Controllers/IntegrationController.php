@@ -554,6 +554,7 @@ class IntegrationController
                 'name' => 'nullable|string|max:255',
                 'api_token' => 'nullable|string',
                 'account_id' => 'nullable|string|max:255',
+                'api_url' => 'nullable|url|max:255',
                 'default_funnel_id' => 'nullable|integer',
                 'default_stage_id' => 'nullable|integer'
             ]);

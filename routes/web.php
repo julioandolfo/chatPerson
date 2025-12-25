@@ -67,6 +67,16 @@ Router::post('/conversations', [ConversationController::class, 'store'], ['Authe
 Router::post('/conversations/new', [ConversationController::class, 'newConversation'], ['Authentication']);
 Router::get('/conversations/for-forwarding', [ConversationController::class, 'listForForwarding'], ['Authentication']);
 // Rotas com parâmetros dinâmicos {id}
+// Rotas específicas devem vir antes das rotas dinâmicas
+Router::get('/conversations/invites', [ConversationController::class, 'getInvites'], ['Authentication']);
+Router::get('/conversations/invites/count', [ConversationController::class, 'countInvites'], ['Authentication']);
+Router::get('/conversations/invites/history', [ConversationController::class, 'getInviteHistory'], ['Authentication']);
+Router::get('/conversations/requests/pending', [ConversationController::class, 'getPendingRequests'], ['Authentication']);
+Router::get('/conversations/invites/counts', [ConversationController::class, 'getInviteCounts'], ['Authentication']);
+Router::post('/conversations/{id}/request-participation', [ConversationController::class, 'requestParticipation'], ['Authentication']);
+Router::post('/conversations/requests/{requestId}/approve', [ConversationController::class, 'approveRequest'], ['Authentication']);
+Router::post('/conversations/requests/{requestId}/reject', [ConversationController::class, 'rejectRequest'], ['Authentication']);
+
 Router::get('/conversations/{id}', [ConversationController::class, 'show'], ['Authentication']);
 Router::delete('/conversations/{id}', [ConversationController::class, 'destroy'], ['Authentication']);
 // Rota alternativa para exibir conversa na lista (usado no layout Chatwoot)

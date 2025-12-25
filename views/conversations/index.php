@@ -2013,6 +2013,14 @@ body.dark-mode .swal2-content {
         const form = modal.querySelector('#newConversationForm');
         if (form) form.reset();
         
+        // Resetar canal para WhatsApp (padrão)
+        const channelSelect = modal.querySelector('#new_conversation_channel');
+        if (channelSelect) {
+            channelSelect.value = 'whatsapp';
+            // Disparar evento change para atualizar visibilidade do campo WhatsApp
+            channelSelect.dispatchEvent(new Event('change'));
+        }
+        
         // Abrir modal
         const bsModal = new bootstrap.Modal(modal);
         bsModal.show();
@@ -2172,97 +2180,115 @@ body.dark-mode .swal2-content {
             </div>
         </div>
         
-        <!-- Filtros -->
+        <!-- Filtros (Acordeon) -->
         <div class="conversations-list-filters">
-            <div class="d-flex flex-wrap align-items-center gap-2 py-2">
-                <select id="filter_status" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 120px;">
-                    <option value="">Todas</option>
-                    <option value="open" <?= ($filters['status'] ?? 'open') === 'open' ? 'selected' : '' ?>>Abertas</option>
-                    <option value="resolved" <?= ($filters['status'] ?? 'open') === 'resolved' ? 'selected' : '' ?>>Resolvidas</option>
-                    <option value="closed" <?= ($filters['status'] ?? 'open') === 'closed' ? 'selected' : '' ?>>Fechadas</option>
-                    <option value="spam" <?= !empty($filters['is_spam']) ? 'selected' : '' ?>>🚫 Spam</option>
-                    <option value="unanswered" <?= !empty($filters['unanswered']) ? 'selected' : '' ?>>🔴 Não respondidas</option>
-                </select>
-                
-                <select id="filter_channel" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 120px;">
-                    <option value="">Canais</option>
-                    <option value="whatsapp" <?= ($filters['channel'] ?? '') === 'whatsapp' ? 'selected' : '' ?>>📱 WhatsApp</option>
-                    <option value="email" <?= ($filters['channel'] ?? '') === 'email' ? 'selected' : '' ?>>✉️ Email</option>
-                    <option value="chat" <?= ($filters['channel'] ?? '') === 'chat' ? 'selected' : '' ?>>💬 Chat</option>
-                </select>
-                
-                <?php if (!empty($departments)): ?>
-                <select id="filter_department" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 140px;">
-                    <option value="">Setores</option>
-                    <?php foreach ($departments as $dept): ?>
-                        <option value="<?= $dept['id'] ?>" <?= ($filters['department_id'] ?? '') == $dept['id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($dept['name']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <?php endif; ?>
-                
-                <?php if (!empty($tags)): ?>
-                <select id="filter_tag" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 140px;">
-                    <option value="">Tags</option>
-                    <?php foreach ($tags as $tag): ?>
-                        <option value="<?= $tag['id'] ?>" <?= ($filters['tag_id'] ?? '') == $tag['id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($tag['name']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <?php endif; ?>
-                
-                <?php 
-                $canViewAllConversations = \App\Helpers\Permission::can('conversations.view.all');
-                $currentUserId = \App\Helpers\Auth::id();
-                ?>
-                <?php if ($canViewAllConversations || !empty($agents)): ?>
-                <select id="filter_agent" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 160px;">
-                    <option value="">Agentes</option>
-                    <option value="unassigned" <?= ($filters['agent_id'] ?? '') === 'unassigned' ? 'selected' : '' ?>>🔴 Não atribuídas</option>
-                    <?php if ($canViewAllConversations && !empty($agents)): ?>
-                        <?php foreach ($agents as $agent): ?>
-                            <option value="<?= $agent['id'] ?>" <?= ($filters['agent_id'] ?? '') == $agent['id'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($agent['name']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    <?php elseif (!$canViewAllConversations && $currentUserId): ?>
-                        <?php 
-                        $currentUser = \App\Models\User::find($currentUserId);
-                        if ($currentUser): ?>
-                            <option value="<?= $currentUser['id'] ?>" <?= ($filters['agent_id'] ?? '') == $currentUser['id'] ? 'selected' : '' ?>>
-                                Minhas conversas
-                            </option>
-                        <?php endif; ?>
-                    <?php endif; ?>
-                </select>
-                <?php endif; ?>
+            <div class="accordion accordion-flush" id="filtersAccordion">
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="filtersHeading">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#filtersCollapse" aria-expanded="false" aria-controls="filtersCollapse" style="padding: 8px 16px; font-size: 0.875rem;">
+                            <i class="ki-duotone ki-filter fs-6 me-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <span class="fw-semibold">Filtros</span>
+                            <span class="badge badge-light-primary ms-2" id="activeFiltersCount" style="display: none;">0</span>
+                        </button>
+                    </h2>
+                    <div id="filtersCollapse" class="accordion-collapse collapse" aria-labelledby="filtersHeading" data-bs-parent="#filtersAccordion">
+                        <div class="accordion-body" style="padding: 12px;">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <select id="filter_status" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 120px;">
+                                    <option value="">Todas</option>
+                                    <option value="open" <?= ($filters['status'] ?? 'open') === 'open' ? 'selected' : '' ?>>Abertas</option>
+                                    <option value="resolved" <?= ($filters['status'] ?? 'open') === 'resolved' ? 'selected' : '' ?>>Resolvidas</option>
+                                    <option value="closed" <?= ($filters['status'] ?? 'open') === 'closed' ? 'selected' : '' ?>>Fechadas</option>
+                                    <option value="spam" <?= !empty($filters['is_spam']) ? 'selected' : '' ?>>🚫 Spam</option>
+                                    <option value="unanswered" <?= !empty($filters['unanswered']) ? 'selected' : '' ?>>🔴 Não respondidas</option>
+                                </select>
+                                
+                                <select id="filter_channel" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 120px;">
+                                    <option value="">Canais</option>
+                                    <option value="whatsapp" <?= ($filters['channel'] ?? '') === 'whatsapp' ? 'selected' : '' ?>>📱 WhatsApp</option>
+                                    <option value="email" <?= ($filters['channel'] ?? '') === 'email' ? 'selected' : '' ?>>✉️ Email</option>
+                                    <option value="chat" <?= ($filters['channel'] ?? '') === 'chat' ? 'selected' : '' ?>>💬 Chat</option>
+                                </select>
+                                
+                                <?php if (!empty($departments)): ?>
+                                <select id="filter_department" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 140px;">
+                                    <option value="">Setores</option>
+                                    <?php foreach ($departments as $dept): ?>
+                                        <option value="<?= $dept['id'] ?>" <?= ($filters['department_id'] ?? '') == $dept['id'] ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($dept['name']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <?php endif; ?>
+                                
+                                <?php if (!empty($tags)): ?>
+                                <select id="filter_tag" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 140px;">
+                                    <option value="">Tags</option>
+                                    <?php foreach ($tags as $tag): ?>
+                                        <option value="<?= $tag['id'] ?>" <?= ($filters['tag_id'] ?? '') == $tag['id'] ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($tag['name']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <?php endif; ?>
+                                
+                                <?php 
+                                $canViewAllConversations = \App\Helpers\Permission::can('conversations.view.all');
+                                $currentUserId = \App\Helpers\Auth::id();
+                                ?>
+                                <?php if ($canViewAllConversations || !empty($agents)): ?>
+                                <select id="filter_agent" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 160px;">
+                                    <option value="">Agentes</option>
+                                    <option value="unassigned" <?= ($filters['agent_id'] ?? '') === 'unassigned' ? 'selected' : '' ?>>🔴 Não atribuídas</option>
+                                    <?php if ($canViewAllConversations && !empty($agents)): ?>
+                                        <?php foreach ($agents as $agent): ?>
+                                            <option value="<?= $agent['id'] ?>" <?= ($filters['agent_id'] ?? '') == $agent['id'] ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($agent['name']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    <?php elseif (!$canViewAllConversations && $currentUserId): ?>
+                                        <?php 
+                                        $currentUser = \App\Models\User::find($currentUserId);
+                                        if ($currentUser): ?>
+                                            <option value="<?= $currentUser['id'] ?>" <?= ($filters['agent_id'] ?? '') == $currentUser['id'] ? 'selected' : '' ?>>
+                                                Minhas conversas
+                                            </option>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                </select>
+                                <?php endif; ?>
 
-                <!-- Filtros de Funil/Etapa (carregados via JS) -->
-                <select id="filter_funnel" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 140px;">
-                    <option value="">Funil</option>
-                </select>
-                <select id="filter_stage" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 160px;" disabled>
-                    <option value="">Etapa</option>
-                </select>
-                
-                <button type="button" class="btn btn-sm btn-light-primary" onclick="openAdvancedFilters()" title="Filtros Avançados">
-                    <i class="ki-duotone ki-filter fs-6 me-1">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                    </i>
-                    Filtros
-                </button>
-                
-                <?php if (!empty($filters['unanswered']) || !empty($filters['answered']) || !empty($filters['date_from']) || !empty($filters['date_to']) || isset($filters['pinned'])): ?>
-                <button type="button" class="btn btn-sm btn-light-danger" onclick="clearAllFilters()" title="Limpar Filtros">
-                    <i class="ki-duotone ki-cross fs-6">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                    </i>
-                </button>
-                <?php endif; ?>
+                                <!-- Filtros de Funil/Etapa (carregados via JS) -->
+                                <select id="filter_funnel" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 140px;">
+                                    <option value="">Funil</option>
+                                </select>
+                                <select id="filter_stage" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 160px;" disabled>
+                                    <option value="">Etapa</option>
+                                </select>
+                                
+                                <button type="button" class="btn btn-sm btn-light-primary" onclick="openAdvancedFilters()" title="Filtros Avançados">
+                                    <i class="ki-duotone ki-setting-2 fs-6 me-1">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    Avançados
+                                </button>
+                                
+                                <?php if (!empty($filters['unanswered']) || !empty($filters['answered']) || !empty($filters['date_from']) || !empty($filters['date_to']) || isset($filters['pinned'])): ?>
+                                <button type="button" class="btn btn-sm btn-light-danger" onclick="clearAllFilters()" title="Limpar Filtros">
+                                    <i class="ki-duotone ki-cross fs-6">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                </button>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -4173,6 +4199,37 @@ body.dark-mode .swal2-content {
             <div class="modal-body">
                 <form id="newConversationForm">
                     <div class="mb-5">
+                        <label class="form-label fw-semibold mb-2">Canal:</label>
+                        <select class="form-select form-select-solid" id="new_conversation_channel" name="channel" required>
+                            <option value="">Selecione um canal...</option>
+                            <option value="whatsapp" selected>📱 WhatsApp</option>
+                            <option value="email">✉️ Email</option>
+                            <option value="chat">💬 Chat</option>
+                        </select>
+                        <div class="form-text">Selecione o canal para envio da mensagem</div>
+                    </div>
+                    
+                    <div class="mb-5" id="new_conversation_whatsapp_account_container">
+                        <label class="form-label fw-semibold mb-2">Integração WhatsApp:</label>
+                        <select class="form-select form-select-solid" id="new_conversation_whatsapp_account" name="whatsapp_account_id">
+                            <option value="">Selecione uma integração...</option>
+                            <?php 
+                            $whatsappAccounts = $whatsappAccounts ?? \App\Models\WhatsAppAccount::getActive();
+                            if (empty($whatsappAccounts)): ?>
+                                <option value="" disabled>Nenhuma integração WhatsApp ativa encontrada</option>
+                            <?php else: ?>
+                                <?php foreach ($whatsappAccounts as $account): ?>
+                                    <option value="<?= $account['id'] ?>">
+                                        <?= htmlspecialchars($account['name']) ?> 
+                                        (<?= htmlspecialchars($account['phone_number']) ?>)
+                                    </option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </select>
+                        <div class="form-text">Selecione qual conta WhatsApp utilizar para envio</div>
+                    </div>
+                    
+                    <div class="mb-5">
                         <label class="form-label fw-semibold mb-2">Nome do Contato:</label>
                         <input type="text" class="form-control form-control-solid" id="new_contact_name" name="name" placeholder="Nome completo" required>
                     </div>
@@ -4349,6 +4406,107 @@ body.dark-mode .swal2-content {
                             <?php endif; ?>
                         </div>
                         <div class="form-text">Selecione um ou mais agentes</div>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <!-- Funis (Multi-select) -->
+                    <?php 
+                    $allFunnels = \App\Models\Funnel::whereActive();
+                    $selectedFunnels = [];
+                    if (isset($filters['funnel_ids']) && is_array($filters['funnel_ids'])) {
+                        $selectedFunnels = array_map('intval', $filters['funnel_ids']);
+                    } elseif (!empty($filters['funnel_id'])) {
+                        $selectedFunnels = [(int)$filters['funnel_id']];
+                    }
+                    ?>
+                    <?php if (!empty($allFunnels)): ?>
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold mb-2">Funis:</label>
+                        <div class="border rounded p-3" style="max-height: 200px; overflow-y: auto; background: var(--bs-gray-100);">
+                            <?php foreach ($allFunnels as $funnel): ?>
+                                <label class="form-check form-check-custom form-check-solid mb-2">
+                                    <input class="form-check-input" type="checkbox" name="funnel_ids[]" value="<?= $funnel['id'] ?>" id="filter_funnel_<?= $funnel['id'] ?>" <?= in_array($funnel['id'], $selectedFunnels) ? 'checked' : '' ?>>
+                                    <span class="form-check-label">
+                                        <?= htmlspecialchars($funnel['name']) ?>
+                                        <?php if (!empty($funnel['description'])): ?>
+                                            <span class="text-muted fs-7">(<?= htmlspecialchars($funnel['description']) ?>)</span>
+                                        <?php endif; ?>
+                                    </span>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
+                        <div class="form-text">Selecione um ou mais funis</div>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <!-- Etapas (Multi-select) -->
+                    <?php 
+                    $allStages = [];
+                    if (!empty($selectedFunnels)) {
+                        // Carregar etapas dos funis selecionados
+                        foreach ($selectedFunnels as $funnelId) {
+                            $stages = \App\Models\Funnel::getStages($funnelId);
+                            foreach ($stages as $stage) {
+                                $allStages[] = $stage;
+                            }
+                        }
+                    } else {
+                        // Se nenhum funil selecionado, carregar todas as etapas de todos os funis ativos
+                        foreach ($allFunnels as $funnel) {
+                            $stages = \App\Models\Funnel::getStages($funnel['id']);
+                            foreach ($stages as $stage) {
+                                $allStages[] = $stage;
+                            }
+                        }
+                    }
+                    
+                    $selectedStages = [];
+                    if (isset($filters['funnel_stage_ids']) && is_array($filters['funnel_stage_ids'])) {
+                        $selectedStages = array_map('intval', $filters['funnel_stage_ids']);
+                    } elseif (!empty($filters['funnel_stage_id'])) {
+                        $selectedStages = [(int)$filters['funnel_stage_id']];
+                    }
+                    ?>
+                    <?php if (!empty($allStages)): ?>
+                    <div class="mb-5" id="stages_filter_container">
+                        <label class="form-label fw-semibold mb-2">Etapas:</label>
+                        <div class="border rounded p-3" style="max-height: 200px; overflow-y: auto; background: var(--bs-gray-100);">
+                            <?php 
+                            // Agrupar etapas por funil para melhor organização
+                            $stagesByFunnel = [];
+                            foreach ($allStages as $stage) {
+                                $funnelId = $stage['funnel_id'];
+                                if (!isset($stagesByFunnel[$funnelId])) {
+                                    $funnel = \App\Models\Funnel::find($funnelId);
+                                    $stagesByFunnel[$funnelId] = [
+                                        'funnel_name' => $funnel ? $funnel['name'] : 'Funil #' . $funnelId,
+                                        'stages' => []
+                                    ];
+                                }
+                                $stagesByFunnel[$funnelId]['stages'][] = $stage;
+                            }
+                            
+                            foreach ($stagesByFunnel as $funnelId => $funnelData): ?>
+                                <div class="mb-3">
+                                    <div class="fw-semibold fs-7 text-muted mb-1"><?= htmlspecialchars($funnelData['funnel_name']) ?>:</div>
+                                    <?php foreach ($funnelData['stages'] as $stage): ?>
+                                        <label class="form-check form-check-custom form-check-solid mb-2 ms-3">
+                                            <input class="form-check-input" type="checkbox" name="funnel_stage_ids[]" value="<?= $stage['id'] ?>" id="filter_stage_<?= $stage['id'] ?>" <?= in_array($stage['id'], $selectedStages) ? 'checked' : '' ?>>
+                                            <span class="form-check-label">
+                                                <?php if (!empty($stage['color'])): ?>
+                                                    <span class="badge badge-sm" style="background-color: <?= htmlspecialchars($stage['color']) ?>20; color: <?= htmlspecialchars($stage['color']) ?>;">
+                                                        <?= htmlspecialchars($stage['name']) ?>
+                                                    </span>
+                                                <?php else: ?>
+                                                    <?= htmlspecialchars($stage['name']) ?>
+                                                <?php endif; ?>
+                                            </span>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <div class="form-text">Selecione uma ou mais etapas</div>
                     </div>
                     <?php endif; ?>
                     
@@ -5617,6 +5775,14 @@ function showNewConversationModal() {
     // Limpar formulário
     const form = modal.querySelector('#newConversationForm');
     if (form) form.reset();
+    
+    // Resetar canal para WhatsApp (padrão)
+    const channelSelect = modal.querySelector('#new_conversation_channel');
+    if (channelSelect) {
+        channelSelect.value = 'whatsapp';
+        // Disparar evento change para atualizar visibilidade do campo WhatsApp
+        channelSelect.dispatchEvent(new Event('change'));
+    }
     
     // Abrir modal
     const bsModal = new bootstrap.Modal(modal);
@@ -7409,7 +7575,15 @@ function approveParticipationRequest(requestId) {
             'X-Requested-With': 'XMLHttpRequest'
         }
     })
-    .then(response => response.json())
+    .then(async response => {
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error('Resposta não é JSON:', text.substring(0, 500));
+            throw new Error('Resposta do servidor não é JSON válido');
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             Swal.fire({
@@ -7486,7 +7660,15 @@ function rejectParticipationRequest(requestId) {
                     'X-Requested-With': 'XMLHttpRequest'
                 }
             })
-            .then(response => response.json())
+            .then(async response => {
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    console.error('Resposta não é JSON:', text.substring(0, 500));
+                    throw new Error('Resposta do servidor não é JSON válido');
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.success) {
                     Swal.fire({
@@ -9319,7 +9501,10 @@ document.getElementById('filter_funnel')?.addEventListener('change', () => {
     }
     applyFilters();
 });
-document.getElementById('filter_stage')?.addEventListener('change', applyFilters);
+document.getElementById('filter_stage')?.addEventListener('change', function() {
+    applyFilters();
+    updateActiveFiltersCount();
+});
 
 document.getElementById('kt_conversations_search')?.addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
@@ -9380,11 +9565,15 @@ function loadFunnelsFilter() {
 // Carregar funis quando a página carregar
 document.addEventListener('DOMContentLoaded', function() {
     loadFunnelsFilter();
+    updateActiveFiltersCount(); // Atualizar contador inicial
 });
 
 // Também carregar imediatamente se DOM já estiver pronto
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    setTimeout(loadFunnelsFilter, 100);
+    setTimeout(() => {
+        loadFunnelsFilter();
+        updateActiveFiltersCount(); // Atualizar contador inicial
+    }, 100);
 }
 
 function applyFilters() {
@@ -9814,6 +10003,94 @@ function openAdvancedFilters() {
     
     // Verificar se WhatsApp está selecionado e mostrar/ocultar filtro de integrações
     updateWhatsAppAccountsFilter();
+    
+    // Atualizar etapas baseado nos funis selecionados
+    updateStagesFilter();
+    
+    // Adicionar listeners para atualizar etapas quando funis mudarem
+    const funnelCheckboxes = document.querySelectorAll('input[name="funnel_ids[]"]');
+    funnelCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateStagesFilter);
+    });
+}
+
+// Atualizar filtro de etapas baseado nos funis selecionados
+function updateStagesFilter() {
+    const funnelCheckboxes = document.querySelectorAll('input[name="funnel_ids[]"]:checked');
+    const stagesContainer = document.getElementById('stages_filter_container');
+    
+    if (!stagesContainer) return;
+    
+    const selectedFunnelIds = Array.from(funnelCheckboxes).map(cb => parseInt(cb.value));
+    
+    if (selectedFunnelIds.length === 0) {
+        // Se nenhum funil selecionado, mostrar todas as etapas de todos os funis
+        stagesContainer.style.display = 'block';
+        return;
+    }
+    
+    // Carregar etapas dos funis selecionados
+    Promise.all(selectedFunnelIds.map(funnelId => {
+        return fetch(`<?= \App\Helpers\Url::to("/funnels") ?>/${funnelId}/stages/json`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.stages) {
+                // Buscar nome do funil do checkbox
+                const funnelCheckbox = document.querySelector(`input[name="funnel_ids[]"][value="${funnelId}"]`);
+                const funnelName = funnelCheckbox ? funnelCheckbox.closest('label').querySelector('.form-check-label').textContent.trim() : `Funil #${funnelId}`;
+                return { funnelId, stages: data.stages, funnelName };
+            }
+            return null;
+        })
+        .catch(error => {
+            console.error(`Erro ao carregar etapas do funil ${funnelId}:`, error);
+            return null;
+        });
+    }))
+    .then(results => {
+        const validResults = results.filter(r => r !== null);
+        if (validResults.length === 0) {
+            stagesContainer.style.display = 'none';
+            return;
+        }
+        
+        // Obter etapas já selecionadas
+        const selectedStageIds = Array.from(document.querySelectorAll('input[name="funnel_stage_ids[]"]:checked'))
+            .map(cb => parseInt(cb.value));
+        
+        // Construir HTML das etapas
+        let stagesHtml = '';
+        validResults.forEach(({ funnelId, stages, funnelName }) => {
+            stagesHtml += `<div class="mb-3">`;
+            stagesHtml += `<div class="fw-semibold fs-7 text-muted mb-1">${escapeHtml(funnelName)}:</div>`;
+            stages.forEach(stage => {
+                const isChecked = selectedStageIds.includes(stage.id);
+                const colorStyle = stage.color ? `style="background-color: ${stage.color}20; color: ${stage.color};"` : '';
+                const badgeHtml = stage.color 
+                    ? `<span class="badge badge-sm" ${colorStyle}>${escapeHtml(stage.name)}</span>`
+                    : escapeHtml(stage.name);
+                stagesHtml += `
+                    <label class="form-check form-check-custom form-check-solid mb-2 ms-3">
+                        <input class="form-check-input" type="checkbox" name="funnel_stage_ids[]" value="${stage.id}" id="filter_stage_${stage.id}" ${isChecked ? 'checked' : ''}>
+                        <span class="form-check-label">${badgeHtml}</span>
+                    </label>
+                `;
+            });
+            stagesHtml += `</div>`;
+        });
+        
+        const stagesList = stagesContainer.querySelector('.border.rounded.p-3');
+        if (stagesList) {
+            stagesList.innerHTML = stagesHtml;
+        }
+        
+        stagesContainer.style.display = 'block';
+    });
 }
 
 // Atualizar visibilidade do filtro de integrações WhatsApp
@@ -9889,6 +10166,18 @@ function applyAdvancedFilters() {
     const whatsappAccountIds = formData.getAll('whatsapp_account_ids[]');
     if (whatsappAccountIds.length > 0) {
         whatsappAccountIds.forEach(accId => params.append('whatsapp_account_ids[]', accId));
+    }
+    
+    // Funis (multi-select)
+    const funnelIds = formData.getAll('funnel_ids[]');
+    if (funnelIds.length > 0) {
+        funnelIds.forEach(funnelId => params.append('funnel_ids[]', funnelId));
+    }
+    
+    // Etapas (multi-select)
+    const funnelStageIds = formData.getAll('funnel_stage_ids[]');
+    if (funnelStageIds.length > 0) {
+        funnelStageIds.forEach(stageId => params.append('funnel_stage_ids[]', stageId));
     }
     
     // Filtros avançados
@@ -17395,6 +17684,44 @@ document.addEventListener('DOMContentLoaded', function() {
     // Inicializar seletor rápido de templates
     initTemplateQuickSelect();
     
+    // Controlar visibilidade do campo de integração WhatsApp baseado no canal selecionado
+    const channelSelect = document.getElementById('new_conversation_channel');
+    const whatsappAccountContainer = document.getElementById('new_conversation_whatsapp_account_container');
+    const whatsappAccountSelect = document.getElementById('new_conversation_whatsapp_account');
+    
+    if (channelSelect && whatsappAccountContainer) {
+        // Função para atualizar visibilidade
+        function updateWhatsAppAccountVisibility() {
+            const channel = channelSelect.value;
+            if (channel === 'whatsapp') {
+                whatsappAccountContainer.style.display = 'block';
+                if (whatsappAccountSelect) {
+                    whatsappAccountSelect.setAttribute('required', 'required');
+                }
+            } else {
+                whatsappAccountContainer.style.display = 'none';
+                if (whatsappAccountSelect) {
+                    whatsappAccountSelect.removeAttribute('required');
+                    whatsappAccountSelect.value = '';
+                }
+            }
+        }
+        
+        // Atualizar ao mudar canal
+        channelSelect.addEventListener('change', updateWhatsAppAccountVisibility);
+        
+        // Atualizar ao abrir modal
+        const modal = document.getElementById('kt_modal_new_conversation');
+        if (modal) {
+            modal.addEventListener('show.bs.modal', function() {
+                setTimeout(updateWhatsAppAccountVisibility, 100);
+            });
+        }
+        
+        // Atualizar inicialmente
+        updateWhatsAppAccountVisibility();
+    }
+    
     // Formulário de nova conversa
     const newConversationForm = document.getElementById('newConversationForm');
     if (newConversationForm) {
@@ -17403,14 +17730,22 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             console.log('📝 Formulário de nova conversa submetido');
             
+            const channel = document.getElementById('new_conversation_channel').value.trim();
+            const whatsappAccountId = document.getElementById('new_conversation_whatsapp_account')?.value.trim() || null;
             const name = document.getElementById('new_contact_name').value.trim();
             const phone = document.getElementById('new_contact_phone').value.trim();
             const message = document.getElementById('new_conversation_message').value.trim();
             
-            console.log('📋 Dados do formulário:', { name, phone, message });
+            console.log('📋 Dados do formulário:', { channel, whatsappAccountId, name, phone, message });
             
-            if (!name || !phone || !message) {
-                alert('Preencha todos os campos');
+            if (!channel || !name || !phone || !message) {
+                alert('Preencha todos os campos obrigatórios');
+                return;
+            }
+            
+            // Se canal for WhatsApp, validar integração
+            if (channel === 'whatsapp' && !whatsappAccountId) {
+                alert('Selecione uma integração WhatsApp');
                 return;
             }
             
@@ -17437,6 +17772,18 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 Enviando requisição para criar nova conversa...');
             
             try {
+                const requestData = {
+                    channel: channel,
+                    name: name,
+                    phone: fullPhone,
+                    message: message
+                };
+                
+                // Adicionar whatsapp_account_id apenas se canal for WhatsApp
+                if (channel === 'whatsapp' && whatsappAccountId) {
+                    requestData.whatsapp_account_id = parseInt(whatsappAccountId);
+                }
+                
                 const response = await fetch('<?= \App\Helpers\Url::to("/conversations/new") ?>', {
                     method: 'POST',
                     headers: {
@@ -17444,11 +17791,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         'X-Requested-With': 'XMLHttpRequest',
                         'Accept': 'application/json'
                     },
-                    body: JSON.stringify({
-                        name: name,
-                        phone: fullPhone,
-                        message: message
-                    })
+                    body: JSON.stringify(requestData)
                 });
                 
                 console.log('📡 Resposta HTTP:', response.status, response.statusText);

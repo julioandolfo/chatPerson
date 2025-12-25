@@ -185,13 +185,21 @@ class Conversation extends Model
             $params[] = $filters['whatsapp_account_id'];
         }
 
-        // Filtro por funil
-        if (!empty($filters['funnel_id'])) {
+        // Filtro por funil (suporta array para multi-select)
+        if (!empty($filters['funnel_ids']) && is_array($filters['funnel_ids'])) {
+            $placeholders = implode(',', array_fill(0, count($filters['funnel_ids']), '?'));
+            $sql .= " AND c.funnel_id IN ($placeholders)";
+            $params = array_merge($params, $filters['funnel_ids']);
+        } elseif (!empty($filters['funnel_id'])) {
             $sql .= " AND c.funnel_id = ?";
             $params[] = $filters['funnel_id'];
         }
-        // Filtro por etapa do funil
-        if (!empty($filters['funnel_stage_id'])) {
+        // Filtro por etapa do funil (suporta array para multi-select)
+        if (!empty($filters['funnel_stage_ids']) && is_array($filters['funnel_stage_ids'])) {
+            $placeholders = implode(',', array_fill(0, count($filters['funnel_stage_ids']), '?'));
+            $sql .= " AND c.funnel_stage_id IN ($placeholders)";
+            $params = array_merge($params, $filters['funnel_stage_ids']);
+        } elseif (!empty($filters['funnel_stage_id'])) {
             $sql .= " AND c.funnel_stage_id = ?";
             $params[] = $filters['funnel_stage_id'];
         }

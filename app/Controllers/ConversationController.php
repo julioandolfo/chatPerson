@@ -74,7 +74,9 @@ class ConversationController
             'whatsapp_account_id' => $_GET['whatsapp_account_id'] ?? null,
             'whatsapp_account_ids' => isset($_GET['whatsapp_account_ids']) && is_array($_GET['whatsapp_account_ids']) ? array_map('intval', $_GET['whatsapp_account_ids']) : (!empty($_GET['whatsapp_account_id']) ? [(int)$_GET['whatsapp_account_id']] : null),
             'funnel_id' => !empty($_GET['funnel_id']) ? (int) $_GET['funnel_id'] : null,
+            'funnel_ids' => isset($_GET['funnel_ids']) && is_array($_GET['funnel_ids']) ? array_map('intval', $_GET['funnel_ids']) : (!empty($_GET['funnel_id']) ? [(int)$_GET['funnel_id']] : null),
             'funnel_stage_id' => !empty($_GET['funnel_stage_id']) ? (int) $_GET['funnel_stage_id'] : null,
+            'funnel_stage_ids' => isset($_GET['funnel_stage_ids']) && is_array($_GET['funnel_stage_ids']) ? array_map('intval', $_GET['funnel_stage_ids']) : (!empty($_GET['funnel_stage_id']) ? [(int)$_GET['funnel_stage_id']] : null),
             'unanswered' => isset($_GET['unanswered']) && $_GET['unanswered'] === '1' ? true : null,
             'answered' => isset($_GET['answered']) && $_GET['answered'] === '1' ? true : null,
             'is_spam' => isset($_GET['status']) && $_GET['status'] === 'spam' ? true : null, // Filtro de spam
@@ -546,13 +548,37 @@ class ConversationController
             // Aceitar tanto JSON quanto form-data (Request::post já trata JSON)
             $data = \App\Helpers\Request::post();
             
+            $channel = trim($data['channel'] ?? 'whatsapp'); // Padrão: whatsapp
+            $whatsappAccountId = !empty($data['whatsapp_account_id']) ? (int)$data['whatsapp_account_id'] : null;
             $name = trim($data['name'] ?? '');
             $phone = trim($data['phone'] ?? '');
             $message = trim($data['message'] ?? '');
             
-            if (empty($name) || empty($phone) || empty($message)) {
-                Response::json(['success' => false, 'message' => 'Preencha todos os campos'], 400);
+            if (empty($channel) || empty($name) || empty($phone) || empty($message)) {
+                Response::json(['success' => false, 'message' => 'Preencha todos os campos obrigatórios'], 400);
                 return;
+            }
+            
+            // Validar canal
+            $validChannels = ['whatsapp', 'email', 'chat'];
+            if (!in_array($channel, $validChannels)) {
+                Response::json(['success' => false, 'message' => 'Canal inválido'], 400);
+                return;
+            }
+            
+            // Se canal for WhatsApp, validar integração
+            if ($channel === 'whatsapp') {
+                if (!$whatsappAccountId) {
+                    Response::json(['success' => false, 'message' => 'Selecione uma integração WhatsApp'], 400);
+                    return;
+                }
+                
+                // Verificar se a conta WhatsApp existe e está ativa
+                $whatsappAccount = \App\Models\WhatsAppAccount::find($whatsappAccountId);
+                if (!$whatsappAccount || ($whatsappAccount['status'] ?? '') !== 'active') {
+                    Response::json(['success' => false, 'message' => 'Integração WhatsApp inválida ou inativa'], 400);
+                    return;
+                }
             }
             
             // Normalizar telefone (remover +55 se presente, garantir formato correto)
@@ -568,31 +594,31 @@ class ConversationController
             $fullPhone = '55' . $phone;
             
             // Criar ou encontrar contato
-            $contact = \App\Services\ContactService::createOrUpdate([
+            $contactData = [
                 'name' => $name,
-                'phone' => $fullPhone,
-                'whatsapp_id' => $fullPhone . '@s.whatsapp.net'
-            ]);
+                'phone' => $fullPhone
+            ];
+            
+            // Adicionar whatsapp_id apenas se canal for WhatsApp
+            if ($channel === 'whatsapp') {
+                $contactData['whatsapp_id'] = $fullPhone . '@s.whatsapp.net';
+            }
+            
+            $contact = \App\Services\ContactService::createOrUpdate($contactData);
             
             if (!$contact || !isset($contact['id'])) {
                 Response::json(['success' => false, 'message' => 'Erro ao criar contato'], 500);
                 return;
             }
             
-            // Buscar conta WhatsApp padrão ou primeira disponível
-            $whatsappAccount = \App\Models\WhatsAppAccount::getFirstActive();
-            if (!$whatsappAccount) {
-                Response::json(['success' => false, 'message' => 'Nenhuma conta WhatsApp ativa encontrada'], 400);
-                return;
-            }
-            
             $currentUserId = \App\Helpers\Auth::id();
             
             // Verificar se já existe conversa com esse contato e canal
+            $whatsappAccountIdForSearch = ($channel === 'whatsapp') ? $whatsappAccountId : null;
             $existingConversation = \App\Models\Conversation::findByContactAndChannel(
                 $contact['id'], 
-                'whatsapp', 
-                $whatsappAccount['id']
+                $channel, 
+                $whatsappAccountIdForSearch
             );
             
             // Se existe conversa, verificar se está atribuída a outro agente humano
@@ -629,12 +655,18 @@ class ConversationController
                 $conversationId = $existingConversation['id'];
             } else {
                 // Criar nova conversa
-                $conversation = \App\Services\ConversationService::create([
+                $conversationData = [
                     'contact_id' => $contact['id'],
-                    'channel' => 'whatsapp',
-                    'whatsapp_account_id' => $whatsappAccount['id'],
+                    'channel' => $channel,
                     'agent_id' => $currentUserId
-                ]);
+                ];
+                
+                // Adicionar whatsapp_account_id apenas se canal for WhatsApp
+                if ($channel === 'whatsapp' && $whatsappAccountId) {
+                    $conversationData['whatsapp_account_id'] = $whatsappAccountId;
+                }
+                
+                $conversation = \App\Services\ConversationService::create($conversationData);
                 
                 $conversationId = $conversation['id'];
             }
@@ -2490,10 +2522,7 @@ class ConversationController
      */
     public function getInvites(): void
     {
-        // Limpar qualquer output buffer
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
+        $oldConfig = $this->prepareJsonResponse();
         
         try {
             $userId = \App\Helpers\Auth::id();
@@ -2508,6 +2537,8 @@ class ConversationController
         } catch (\Exception $e) {
             \App\Helpers\Log::error("[getInvites] Exception: " . $e->getMessage(), 'conversas.log');
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        } finally {
+            $this->restoreConfig($oldConfig);
         }
     }
 
@@ -2628,10 +2659,7 @@ class ConversationController
      */
     public function requestParticipation(int $id): void
     {
-        // Limpar qualquer output buffer
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
+        $oldConfig = $this->prepareJsonResponse();
         
         try {
             $userId = \App\Helpers\Auth::id();
@@ -2659,6 +2687,8 @@ class ConversationController
         } catch (\Exception $e) {
             \App\Helpers\Log::error("[requestParticipation] Exception: " . $e->getMessage(), 'conversas.log');
             Response::json(['success' => false, 'message' => 'Erro ao solicitar participação: ' . $e->getMessage()], 500);
+        } finally {
+            $this->restoreConfig($oldConfig);
         }
     }
 
@@ -2668,8 +2698,12 @@ class ConversationController
      */
     public function approveRequest(int $requestId): void
     {
+        $oldConfig = $this->prepareJsonResponse();
+        
         try {
             $userId = \App\Helpers\Auth::id();
+            \App\Helpers\Log::debug("[approveRequest] requestId={$requestId}, userId={$userId}", 'conversas.log');
+            
             $request = \App\Services\ConversationMentionService::approveRequest($requestId, $userId);
             
             Response::json([
@@ -2678,9 +2712,13 @@ class ConversationController
                 'request' => $request
             ]);
         } catch (\InvalidArgumentException $e) {
+            \App\Helpers\Log::error("[approveRequest] InvalidArgumentException: " . $e->getMessage(), 'conversas.log');
             Response::json(['success' => false, 'message' => $e->getMessage()], 400);
         } catch (\Exception $e) {
+            \App\Helpers\Log::error("[approveRequest] Exception: " . $e->getMessage(), 'conversas.log');
             Response::json(['success' => false, 'message' => 'Erro ao aprovar solicitação: ' . $e->getMessage()], 500);
+        } finally {
+            $this->restoreConfig($oldConfig);
         }
     }
 
@@ -2690,8 +2728,12 @@ class ConversationController
      */
     public function rejectRequest(int $requestId): void
     {
+        $oldConfig = $this->prepareJsonResponse();
+        
         try {
             $userId = \App\Helpers\Auth::id();
+            \App\Helpers\Log::debug("[rejectRequest] requestId={$requestId}, userId={$userId}", 'conversas.log');
+            
             $request = \App\Services\ConversationMentionService::rejectRequest($requestId, $userId);
             
             Response::json([
@@ -2700,9 +2742,13 @@ class ConversationController
                 'request' => $request
             ]);
         } catch (\InvalidArgumentException $e) {
+            \App\Helpers\Log::error("[rejectRequest] InvalidArgumentException: " . $e->getMessage(), 'conversas.log');
             Response::json(['success' => false, 'message' => $e->getMessage()], 400);
         } catch (\Exception $e) {
+            \App\Helpers\Log::error("[rejectRequest] Exception: " . $e->getMessage(), 'conversas.log');
             Response::json(['success' => false, 'message' => 'Erro ao recusar solicitação: ' . $e->getMessage()], 500);
+        } finally {
+            $this->restoreConfig($oldConfig);
         }
     }
 
@@ -2712,10 +2758,7 @@ class ConversationController
      */
     public function getPendingRequests(): void
     {
-        // Limpar qualquer output buffer
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
+        $oldConfig = $this->prepareJsonResponse();
         
         try {
             $userId = \App\Helpers\Auth::id();
@@ -2730,6 +2773,8 @@ class ConversationController
         } catch (\Exception $e) {
             \App\Helpers\Log::error("[getPendingRequests] Exception: " . $e->getMessage(), 'conversas.log');
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        } finally {
+            $this->restoreConfig($oldConfig);
         }
     }
 
@@ -2739,10 +2784,7 @@ class ConversationController
      */
     public function getInviteCounts(): void
     {
-        // Limpar qualquer output buffer
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
+        $oldConfig = $this->prepareJsonResponse();
         
         try {
             $userId = \App\Helpers\Auth::id();
@@ -2762,6 +2804,8 @@ class ConversationController
         } catch (\Exception $e) {
             \App\Helpers\Log::error("[getInviteCounts] Exception: " . $e->getMessage(), 'conversas.log');
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        } finally {
+            $this->restoreConfig($oldConfig);
         }
     }
 

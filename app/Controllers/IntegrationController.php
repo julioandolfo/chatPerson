@@ -624,19 +624,22 @@ class IntegrationController
             $status = NotificameService::checkConnection($id);
             
             Response::json([
-                'success' => true,
+                'success' => $status['connected'] ?? false,
                 'status' => $status
             ]);
         } catch (\Exception $e) {
             \App\Helpers\Logger::error("Erro ao verificar status Notificame: " . $e->getMessage());
+            \App\Helpers\Logger::error("Stack trace: " . $e->getTraceAsString());
+            
             Response::json([
                 'success' => false,
                 'status' => [
                     'status' => 'error',
                     'connected' => false,
-                    'message' => $e->getMessage()
+                    'message' => 'Erro ao conectar com a API: ' . $e->getMessage(),
+                    'help' => 'Verifique se a URL da API e o Token estão corretos. URL padrão: https://app.notificame.com.br/api/v1/'
                 ]
-            ], 400);
+            ], 200); // Retornar 200 para não dar erro no frontend
         }
     }
 

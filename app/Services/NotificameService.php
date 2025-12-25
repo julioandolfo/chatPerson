@@ -88,10 +88,14 @@ class NotificameService
         $baseUrl = $apiUrl ? rtrim($apiUrl, '/') . '/' : self::BASE_URL;
         $url = $baseUrl . ltrim($endpoint, '/');
         
+        // Log da requisição
+        Logger::info("Notificame API Request: {$method} {$url}");
+        
         $ch = curl_init();
         
         $headers = [
             'Content-Type: application/json',
+            'Accept: application/json',
             'X-Api-Token: ' . $token
         ];
         
@@ -101,7 +105,8 @@ class NotificameService
             CURLOPT_CUSTOMREQUEST => $method,
             CURLOPT_HTTPHEADER => $headers,
             CURLOPT_TIMEOUT => 30,
-            CURLOPT_SSL_VERIFYPEER => true
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_FOLLOWLOCATION => true
         ]);
         
         if (in_array($method, ['POST', 'PUT', 'PATCH']) && !empty($data)) {
@@ -110,16 +115,21 @@ class NotificameService
         
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
         $error = curl_error($ch);
         curl_close($ch);
         
+        // Log da resposta
+        Logger::info("Notificame API Response: HTTP {$httpCode}, Content-Type: {$contentType}");
+        
         if ($error) {
+            Logger::error("Notificame API cURL error: {$error}");
             throw new \Exception("Erro na requisição Notificame: {$error}");
         }
         
         // Verificar se a resposta é vazia
         if (empty($response)) {
-            throw new \Exception("Resposta vazia da API Notificame (HTTP {$httpCode})");
+            throw new \Exception("Resposta vazia da API Notificame (HTTP {$httpCode}). URL: {$url}");
         }
         
         // Verificar se é JSON válido
@@ -128,12 +138,15 @@ class NotificameService
         
         if ($jsonError !== JSON_ERROR_NONE) {
             // Se não for JSON, pode ser HTML de erro
-            $responsePreview = substr(strip_tags($response), 0, 200);
-            throw new \Exception("Resposta inválida da API Notificame (HTTP {$httpCode}): " . ($responsePreview ?: "Resposta não é JSON válido"));
+            $responsePreview = substr(strip_tags($response), 0, 300);
+            Logger::error("Notificame API resposta não-JSON: {$responsePreview}");
+            
+            throw new \Exception("A API retornou HTML em vez de JSON (HTTP {$httpCode}). Verifique se a URL está correta: {$url}. Preview: " . substr($responsePreview, 0, 100));
         }
         
         if ($httpCode >= 400) {
             $errorMsg = $responseData['message'] ?? $responseData['error'] ?? $responseData['detail'] ?? "Erro HTTP {$httpCode}";
+            Logger::error("Notificame API error: {$errorMsg}");
             throw new \Exception("Erro na API Notificame: {$errorMsg}");
         }
         
@@ -297,12 +310,16 @@ class NotificameService
         // Obter URL da API da conta se configurada
         $apiUrl = $account['api_url'] ?? null;
         
+        Logger::info("Verificando conexão Notificame - Account ID: {$accountId}, API URL: " . ($apiUrl ?: self::BASE_URL));
+        
         // Tentar diferentes endpoints para verificar status
-        $endpoints = ['health', 'status', 'ping', 'me', 'account'];
+        $endpoints = ['health', 'status', 'ping', 'me', 'account', 'user'];
         $lastError = null;
+        $errorMessages = [];
         
         foreach ($endpoints as $endpoint) {
             try {
+                Logger::info("Tentando endpoint: {$endpoint}");
                 $result = self::makeRequest($endpoint, $token, 'GET', [], $apiUrl);
                 
                 IntegrationAccount::update($accountId, [
@@ -311,30 +328,44 @@ class NotificameService
                     'last_sync_at' => date('Y-m-d H:i:s')
                 ]);
                 
+                Logger::info("Conexão OK usando endpoint: {$endpoint}");
+                
                 return [
                     'status' => 'active',
                     'connected' => true,
                     'message' => 'Conexão OK',
                     'data' => $result,
-                    'endpoint_used' => $endpoint
+                    'endpoint_used' => $endpoint,
+                    'api_url' => $apiUrl ?: self::BASE_URL
                 ];
             } catch (\Exception $e) {
+                $errorMessages[$endpoint] = $e->getMessage();
+                Logger::warning("Endpoint {$endpoint} falhou: " . $e->getMessage());
                 $lastError = $e;
                 // Continuar tentando outros endpoints
                 continue;
             }
         }
         
-        // Se nenhum endpoint funcionou, retornar erro
+        // Se nenhum endpoint funcionou, retornar erro detalhado
+        $errorDetail = "Nenhum endpoint respondeu. Tentativas:\n";
+        foreach ($errorMessages as $ep => $msg) {
+            $errorDetail .= "- {$ep}: " . substr($msg, 0, 100) . "\n";
+        }
+        
+        Logger::error("Falha ao conectar Notificame: " . $errorDetail);
+        
         IntegrationAccount::update($accountId, [
             'status' => 'error',
-            'error_message' => $lastError ? $lastError->getMessage() : 'Não foi possível verificar conexão'
+            'error_message' => 'API URL inválida ou token incorreto'
         ]);
         
         return [
             'status' => 'error',
             'connected' => false,
-            'message' => $lastError ? $lastError->getMessage() : 'Não foi possível verificar conexão com a API Notificame'
+            'message' => 'Não foi possível conectar. Verifique se a URL da API e o Token estão corretos.',
+            'details' => $errorMessages,
+            'api_url' => $apiUrl ?: self::BASE_URL
         ];
     }
     

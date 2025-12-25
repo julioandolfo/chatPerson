@@ -82,9 +82,11 @@ class NotificameService
     /**
      * Fazer requisição à API Notificame
      */
-    private static function makeRequest(string $endpoint, string $token, string $method = 'GET', array $data = []): array
+    private static function makeRequest(string $endpoint, string $token, string $method = 'GET', array $data = [], ?string $apiUrl = null): array
     {
-        $url = self::BASE_URL . ltrim($endpoint, '/');
+        // Usar URL da conta se fornecida, senão usar URL base padrão
+        $baseUrl = $apiUrl ? rtrim($apiUrl, '/') . '/' : self::BASE_URL;
+        $url = $baseUrl . ltrim($endpoint, '/');
         
         $ch = curl_init();
         
@@ -115,10 +117,23 @@ class NotificameService
             throw new \Exception("Erro na requisição Notificame: {$error}");
         }
         
+        // Verificar se a resposta é vazia
+        if (empty($response)) {
+            throw new \Exception("Resposta vazia da API Notificame (HTTP {$httpCode})");
+        }
+        
+        // Verificar se é JSON válido
         $responseData = json_decode($response, true);
+        $jsonError = json_last_error();
+        
+        if ($jsonError !== JSON_ERROR_NONE) {
+            // Se não for JSON, pode ser HTML de erro
+            $responsePreview = substr(strip_tags($response), 0, 200);
+            throw new \Exception("Resposta inválida da API Notificame (HTTP {$httpCode}): " . ($responsePreview ?: "Resposta não é JSON válido"));
+        }
         
         if ($httpCode >= 400) {
-            $errorMsg = $responseData['message'] ?? $responseData['error'] ?? "Erro HTTP {$httpCode}";
+            $errorMsg = $responseData['message'] ?? $responseData['error'] ?? $responseData['detail'] ?? "Erro HTTP {$httpCode}";
             throw new \Exception("Erro na API Notificame: {$errorMsg}");
         }
         
@@ -269,35 +284,58 @@ class NotificameService
      */
     public static function checkConnection(int $accountId): array
     {
-        $token = self::getAccountToken($accountId);
-        
-        try {
-            $result = self::makeRequest('health', $token);
-            
-            IntegrationAccount::update($accountId, [
-                'status' => 'active',
-                'error_message' => null,
-                'last_sync_at' => date('Y-m-d H:i:s')
-            ]);
-            
-            return [
-                'status' => 'active',
-                'connected' => true,
-                'message' => 'Conexão OK',
-                'data' => $result
-            ];
-        } catch (\Exception $e) {
-            IntegrationAccount::update($accountId, [
-                'status' => 'error',
-                'error_message' => $e->getMessage()
-            ]);
-            
-            return [
-                'status' => 'error',
-                'connected' => false,
-                'message' => $e->getMessage()
-            ];
+        $account = IntegrationAccount::find($accountId);
+        if (!$account || $account['provider'] !== 'notificame') {
+            throw new \Exception("Conta Notificame não encontrada: {$accountId}");
         }
+        
+        $token = self::getAccountToken($accountId);
+        if (empty($token)) {
+            throw new \Exception("Token da API não configurado para esta conta");
+        }
+        
+        // Obter URL da API da conta se configurada
+        $apiUrl = $account['api_url'] ?? null;
+        
+        // Tentar diferentes endpoints para verificar status
+        $endpoints = ['health', 'status', 'ping', 'me', 'account'];
+        $lastError = null;
+        
+        foreach ($endpoints as $endpoint) {
+            try {
+                $result = self::makeRequest($endpoint, $token, 'GET', [], $apiUrl);
+                
+                IntegrationAccount::update($accountId, [
+                    'status' => 'active',
+                    'error_message' => null,
+                    'last_sync_at' => date('Y-m-d H:i:s')
+                ]);
+                
+                return [
+                    'status' => 'active',
+                    'connected' => true,
+                    'message' => 'Conexão OK',
+                    'data' => $result,
+                    'endpoint_used' => $endpoint
+                ];
+            } catch (\Exception $e) {
+                $lastError = $e;
+                // Continuar tentando outros endpoints
+                continue;
+            }
+        }
+        
+        // Se nenhum endpoint funcionou, retornar erro
+        IntegrationAccount::update($accountId, [
+            'status' => 'error',
+            'error_message' => $lastError ? $lastError->getMessage() : 'Não foi possível verificar conexão'
+        ]);
+        
+        return [
+            'status' => 'error',
+            'connected' => false,
+            'message' => $lastError ? $lastError->getMessage() : 'Não foi possível verificar conexão com a API Notificame'
+        ];
     }
     
     /**

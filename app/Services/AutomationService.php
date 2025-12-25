@@ -181,7 +181,8 @@ class AutomationService
         // Buscar automações ativas para new_conversation
         $triggerData = [
             'channel' => $conversation['channel'] ?? null,
-            'whatsapp_account_id' => $conversation['whatsapp_account_id'] ?? null
+            'whatsapp_account_id' => $conversation['whatsapp_account_id'] ?? null,
+            'integration_account_id' => $conversation['integration_account_id'] ?? null
         ];
 
         // Filtrar por funil/estágio se a conversa já estiver em um
@@ -350,6 +351,7 @@ class AutomationService
         $triggerData = [
             'channel' => $conversation['channel'] ?? null,
             'whatsapp_account_id' => $conversation['whatsapp_account_id'] ?? null,
+            'integration_account_id' => $conversation['integration_account_id'] ?? null,
             'contact_id' => $conversation['contact_id'] ?? null
         ];
 
@@ -381,7 +383,8 @@ class AutomationService
         // Buscar automações ativas para conversation_updated
         $triggerData = [
             'channel' => $conversation['channel'] ?? null,
-            'whatsapp_account_id' => $conversation['whatsapp_account_id'] ?? null
+            'whatsapp_account_id' => $conversation['whatsapp_account_id'] ?? null,
+            'integration_account_id' => $conversation['integration_account_id'] ?? null
         ];
 
         $automations = Automation::getActiveByTrigger('conversation_updated', $triggerData);

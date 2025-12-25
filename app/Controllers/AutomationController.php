@@ -12,6 +12,7 @@ use App\Services\AutomationService;
 use App\Models\Automation;
 use App\Models\AutomationNode;
 use App\Models\WhatsAppAccount;
+use App\Models\IntegrationAccount;
 use App\Models\Funnel;
 use App\Models\User;
 
@@ -56,7 +57,22 @@ class AutomationController
                 return;
             }
             
+            // Buscar contas WhatsApp (legacy)
             $whatsappAccounts = WhatsAppAccount::getActive();
+            
+            // Buscar todas as contas de integração (novo sistema unificado)
+            $integrationAccounts = IntegrationAccount::all();
+            
+            // Agrupar contas por canal para facilitar uso na view
+            $accountsByChannel = [];
+            foreach ($integrationAccounts as $account) {
+                $channel = $account['channel'] ?? 'whatsapp';
+                if (!isset($accountsByChannel[$channel])) {
+                    $accountsByChannel[$channel] = [];
+                }
+                $accountsByChannel[$channel][] = $account;
+            }
+            
             $allFunnels = Funnel::whereActive();
             $agents = User::getActiveAgents();
             $nodeTypes = AutomationNode::getNodeTypes();
@@ -77,9 +93,19 @@ class AutomationController
                 $automation['stage_name'] = $stage['name'] ?? null;
             }
             
+            // Lista de todos os canais disponíveis
+            $allChannels = [
+                'whatsapp', 'instagram', 'facebook', 'telegram', 
+                'mercadolivre', 'webchat', 'email', 'olx', 
+                'linkedin', 'google_business', 'youtube', 'tiktok', 'chat'
+            ];
+            
             Response::view('automations/show', [
                 'automation' => $automation,
                 'whatsappAccounts' => $whatsappAccounts,
+                'integrationAccounts' => $integrationAccounts,
+                'accountsByChannel' => $accountsByChannel,
+                'allChannels' => $allChannels,
                 'funnels' => $allFunnels,
                 'stages' => $stages,
                 'agents' => $agents,

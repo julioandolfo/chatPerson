@@ -154,8 +154,44 @@ class Automation extends Model
         }
         
         foreach ($config as $key => $value) {
-            if (!isset($data[$key]) || $data[$key] != $value) {
+            // Se o filtro é por canal e está vazio, aceitar qualquer canal
+            if ($key === 'channel' && empty($value)) {
+                continue;
+            }
+            
+            // Se o filtro é por conta e está vazio, aceitar qualquer conta
+            if (in_array($key, ['whatsapp_account_id', 'integration_account_id']) && empty($value)) {
+                continue;
+            }
+            
+            // Verificar correspondência exata
+            if (!isset($data[$key])) {
+                // Se a chave não existe nos dados, verificar se é opcional
+                if (in_array($key, ['whatsapp_account_id', 'integration_account_id'])) {
+                    // Se está filtrando por conta específica mas não há conta nos dados, não corresponde
+                    if (!empty($value)) {
+                        return false;
+                    }
+                    continue;
+                }
                 return false;
+            }
+            
+            // Comparação flexível para contas: aceitar se qualquer uma corresponder
+            if (in_array($key, ['whatsapp_account_id', 'integration_account_id']) && !empty($value)) {
+                // Se está filtrando por conta específica, verificar se corresponde
+                if ($data[$key] != $value) {
+                    // Verificar se há outra conta que corresponda (para compatibilidade)
+                    $otherKey = $key === 'whatsapp_account_id' ? 'integration_account_id' : 'whatsapp_account_id';
+                    if (!isset($data[$otherKey]) || $data[$otherKey] != $value) {
+                        return false;
+                    }
+                }
+            } else {
+                // Comparação normal
+                if ($data[$key] != $value) {
+                    return false;
+                }
             }
         }
         

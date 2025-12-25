@@ -872,11 +872,24 @@ $funnelsUrl = json_encode(\App\Helpers\Url::to('/funnels'));
 $layoutUrl = json_encode(\App\Helpers\Url::to('/automations/' . $automation['id'] . '/layout'));
 $logsUrl = json_encode(\App\Helpers\Url::to('/automations/' . $automation['id'] . '/logs'));
 
-// Preparar opções HTML
+// Preparar opções HTML para contas WhatsApp (legacy)
 $whatsappOptions = '';
 if (!empty($whatsappAccounts)) {
     foreach ($whatsappAccounts as $acc) {
-        $whatsappOptions .= '<option value="' . htmlspecialchars($acc['id']) . '">' . htmlspecialchars($acc['name'] . ' (' . $acc['phone_number'] . ')') . '</option>';
+        $whatsappOptions .= '<option value="whatsapp_' . htmlspecialchars($acc['id']) . '">' . htmlspecialchars($acc['name'] . ' (' . $acc['phone_number'] . ')') . '</option>';
+    }
+}
+
+// Preparar opções HTML para contas de integração (novo sistema)
+$integrationAccountsOptions = [];
+if (!empty($integrationAccounts)) {
+    foreach ($integrationAccounts as $acc) {
+        $channel = $acc['channel'] ?? 'whatsapp';
+        if (!isset($integrationAccountsOptions[$channel])) {
+            $integrationAccountsOptions[$channel] = '';
+        }
+        $identifier = $acc['phone_number'] ?? $acc['username'] ?? $acc['account_id'] ?? 'N/A';
+        $integrationAccountsOptions[$channel] .= '<option value="integration_' . htmlspecialchars($acc['id']) . '">' . htmlspecialchars($acc['name'] . ' (' . $identifier . ')') . '</option>';
     }
 }
 
@@ -955,6 +968,32 @@ const funnelsBaseUrl = <?= $funnelsUrl ?>;
 const layoutSaveUrl = <?= $layoutUrl ?>;
 const logsEndpoint = <?= $logsUrl ?>;
 const whatsappOptionsHtml = <?= json_encode($whatsappOptions, JSON_UNESCAPED_UNICODE) ?>;
+const integrationAccountsByChannel = <?= json_encode($integrationAccountsOptions ?? [], JSON_UNESCAPED_UNICODE) ?>;
+
+// Função para atualizar opções de contas baseado no canal selecionado
+function updateAccountOptions(channel) {
+    const select = document.getElementById('kt_trigger_integration_account');
+    if (!select) return;
+    
+    let options = '<option value="">Todas as Contas</option>';
+    
+    // Adicionar contas WhatsApp (legacy)
+    if (channel === '' || channel === 'whatsapp') {
+        options += whatsappOptionsHtml || '';
+    }
+    
+    // Adicionar contas de integração do canal selecionado
+    if (channel && integrationAccountsByChannel[channel]) {
+        options += integrationAccountsByChannel[channel];
+    } else if (!channel) {
+        // Se nenhum canal selecionado, mostrar todas as contas
+        Object.keys(integrationAccountsByChannel).forEach(ch => {
+            options += integrationAccountsByChannel[ch];
+        });
+    }
+    
+    select.innerHTML = options;
+}
 const stageOptionsHtml = <?= json_encode($stageOptions, JSON_UNESCAPED_UNICODE) ?>;
 const agentOptionsHtml = <?= json_encode($agentOptions, JSON_UNESCAPED_UNICODE) ?>;
 const funnelOptionsHtml = <?= json_encode($funnelOptions, JSON_UNESCAPED_UNICODE) ?>;
@@ -1467,21 +1506,66 @@ function openNodeConfig(nodeId) {
     switch(node.node_type) {
         case "trigger":
             const triggerType = automationTriggerType;
+            // Construir opções de canais
+            const channelOptions = `
+                <option value="">Todos os Canais</option>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="instagram">Instagram</option>
+                <option value="facebook">Facebook</option>
+                <option value="telegram">Telegram</option>
+                <option value="mercadolivre">Mercado Livre</option>
+                <option value="webchat">WebChat</option>
+                <option value="email">Email</option>
+                <option value="olx">OLX</option>
+                <option value="linkedin">LinkedIn</option>
+                <option value="google_business">Google Business</option>
+                <option value="youtube">Youtube</option>
+                <option value="tiktok">TikTok</option>
+                <option value="chat">Chat</option>
+            `;
+            
+            // Construir opções de contas (legacy WhatsApp + novas integrações)
+            let accountOptions = '<option value="">Todas as Contas</option>';
+            accountOptions += whatsappOptionsHtml || '';
+            
+            // Adicionar contas de integração
+            const integrationAccountsByChannel = <?= json_encode($integrationAccountsOptions ?? [], JSON_UNESCAPED_UNICODE) ?>;
+            Object.keys(integrationAccountsByChannel).forEach(channel => {
+                accountOptions += integrationAccountsByChannel[channel];
+            });
+            
+            // Obter valores existentes do node
+            const existingChannel = node.node_data.channel || '';
+            const existingIntegrationAccountId = node.node_data.integration_account_id || '';
+            const existingWhatsappAccountId = node.node_data.whatsapp_account_id || '';
+            
+            // Determinar valor do select de conta
+            let selectedAccountValue = '';
+            if (existingIntegrationAccountId) {
+                selectedAccountValue = 'integration_' + existingIntegrationAccountId;
+            } else if (existingWhatsappAccountId) {
+                selectedAccountValue = 'whatsapp_' + existingWhatsappAccountId;
+            }
+            
             formContent = `
                 <div class="fv-row mb-7">
                     <label class="fw-semibold fs-6 mb-2">Canal</label>
-                    <select name="channel" class="form-select form-select-solid">
-                        <option value="">Todos os Canais</option>
-                        <option value="whatsapp">WhatsApp</option>
-                        <option value="email">Email</option>
-                        <option value="chat">Chat</option>
+                    <select name="channel" id="kt_trigger_channel" class="form-select form-select-solid" onchange="updateAccountOptions(this.value)" value="${existingChannel}">
+                        ${channelOptions.replace(`value="${existingChannel}"`, `value="${existingChannel}" selected`)}
                     </select>
                 </div>
                 <div class="fv-row mb-7">
-                    <label class="fw-semibold fs-6 mb-2">Conta WhatsApp</label>
-                    <select name="whatsapp_account_id" class="form-select form-select-solid">
+                    <label class="fw-semibold fs-6 mb-2">Conta de Integração</label>
+                    <select name="integration_account_id" id="kt_trigger_integration_account" class="form-select form-select-solid">
+                        ${accountOptions.replace(`value="${selectedAccountValue}"`, `value="${selectedAccountValue}" selected`)}
+                    </select>
+                    <div class="form-text">Selecione uma conta específica ou deixe "Todas as Contas" para qualquer conta do canal</div>
+                </div>
+                <div class="fv-row mb-7" style="display: none;">
+                    <label class="fw-semibold fs-6 mb-2">Conta WhatsApp (Legacy)</label>
+                    <select name="whatsapp_account_id" id="kt_trigger_whatsapp_account" class="form-select form-select-solid">
                         <option value="">Todas as Contas</option>
-                        ${whatsappOptionsHtml}
+                        ${whatsappOptionsHtml || ''}
                     </select>
                 </div>
             `;
@@ -2206,9 +2290,18 @@ function openNodeConfig(nodeId) {
                     <label class="required fw-semibold fs-6 mb-2">Canal</label>
                     <select name="channel" class="form-select form-select-solid" required>
                         <option value="whatsapp">WhatsApp</option>
-                        <option value="email">Email</option>
-                        <option value="chat">Chat</option>
+                        <option value="instagram">Instagram</option>
+                        <option value="facebook">Facebook</option>
                         <option value="telegram">Telegram</option>
+                        <option value="mercadolivre">Mercado Livre</option>
+                        <option value="webchat">WebChat</option>
+                        <option value="email">Email</option>
+                        <option value="olx">OLX</option>
+                        <option value="linkedin">LinkedIn</option>
+                        <option value="google_business">Google Business</option>
+                        <option value="youtube">Youtube</option>
+                        <option value="tiktok">TikTok</option>
+                        <option value="chat">Chat</option>
                     </select>
                 </div>
                 <div class="fv-row mb-7">
@@ -2555,6 +2648,28 @@ function openNodeConfig(nodeId) {
             }
         }
     }, 150); // Aumentado timeout para garantir que o DOM está pronto
+    
+    // Preencher campos do trigger após inserir HTML
+    if (node.node_type === 'trigger' && node.node_data) {
+        setTimeout(() => {
+            const channelSelect = document.getElementById('kt_trigger_channel');
+            if (channelSelect && node.node_data.channel) {
+                channelSelect.value = node.node_data.channel;
+                updateAccountOptions(node.node_data.channel);
+                
+                setTimeout(() => {
+                    const accountSelect = document.getElementById('kt_trigger_integration_account');
+                    if (accountSelect) {
+                        if (node.node_data.integration_account_id) {
+                            accountSelect.value = 'integration_' + node.node_data.integration_account_id;
+                        } else if (node.node_data.whatsapp_account_id) {
+                            accountSelect.value = 'whatsapp_' + node.node_data.whatsapp_account_id;
+                        }
+                    }
+                }, 200);
+            }
+        }, 200);
+    }
     
     console.log('✅ Abrindo modal de configuração...');
     const modalElement = document.getElementById("kt_modal_node_config");
@@ -3209,6 +3324,28 @@ document.addEventListener("DOMContentLoaded", function() {
                     nodeData[baseKey].push(value);
                 } else {
                     nodeData[key] = value;
+                }
+            }
+            
+            // Processar integration_account_id e whatsapp_account_id do trigger
+            if (node.node_type === "trigger") {
+                const integrationAccountId = nodeData.integration_account_id || '';
+                const whatsappAccountId = nodeData.whatsapp_account_id || '';
+                
+                // Se integration_account_id começa com "integration_", extrair o ID
+                if (integrationAccountId && integrationAccountId.startsWith('integration_')) {
+                    nodeData.integration_account_id = integrationAccountId.replace('integration_', '');
+                } else if (integrationAccountId && integrationAccountId.startsWith('whatsapp_')) {
+                    // Se selecionou conta WhatsApp legacy, converter para whatsapp_account_id
+                    nodeData.whatsapp_account_id = integrationAccountId.replace('whatsapp_', '');
+                    nodeData.integration_account_id = null;
+                } else if (!integrationAccountId && whatsappAccountId) {
+                    // Manter compatibilidade com whatsapp_account_id legacy
+                    nodeData.whatsapp_account_id = whatsappAccountId;
+                } else if (!integrationAccountId) {
+                    // Se não selecionou nenhuma conta, limpar ambos
+                    nodeData.integration_account_id = null;
+                    nodeData.whatsapp_account_id = null;
                 }
             }
             

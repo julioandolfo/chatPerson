@@ -226,13 +226,13 @@ class NotificameService
         if (isset($data['name'])) {
             $updateData['name'] = $data['name'];
         }
-        if (isset($data['api_token'])) {
+        if (isset($data['api_token']) && trim((string)$data['api_token']) !== '') {
             $updateData['api_token'] = $data['api_token'];
         }
-        if (isset($data['account_id'])) {
+        if (isset($data['account_id']) && trim((string)$data['account_id']) !== '') {
             $updateData['account_id'] = $data['account_id'];
         }
-        if (isset($data['api_url'])) {
+        if (isset($data['api_url']) && trim((string)$data['api_url']) !== '') {
             $updateData['api_url'] = $data['api_url'];
         }
         if (isset($data['phone_number'])) {

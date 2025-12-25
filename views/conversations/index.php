@@ -9462,12 +9462,49 @@ document.getElementById('kt_conversations_search')?.addEventListener('input', fu
     }, 500);
 });
 
+// Função para atualizar contador de filtros ativos (definir ANTES de usar)
+function updateActiveFiltersCount() {
+    const countBadge = document.getElementById('activeFiltersCount');
+    if (!countBadge) return;
+    
+    let count = 0;
+    
+    // Contar filtros ativos
+    const status = document.getElementById('filter_status')?.value;
+    if (status && status !== 'open') count++;
+    
+    if (document.getElementById('filter_channel')?.value) count++;
+    if (document.getElementById('filter_department')?.value) count++;
+    if (document.getElementById('filter_tag')?.value) count++;
+    if (document.getElementById('filter_agent')?.value) count++;
+    if (document.getElementById('filter_funnel')?.value) count++;
+    if (document.getElementById('filter_stage')?.value) count++;
+    
+    if (count > 0) {
+        countBadge.textContent = count;
+        countBadge.style.display = 'inline-block';
+    } else {
+        countBadge.style.display = 'none';
+    }
+}
+
 // Event listeners para filtros dropdown
-document.getElementById('filter_status')?.addEventListener('change', applyFilters);
-document.getElementById('filter_channel')?.addEventListener('change', applyFilters);
-document.getElementById('filter_department')?.addEventListener('change', applyFilters);
-document.getElementById('filter_tag')?.addEventListener('change', applyFilters);
-document.getElementById('filter_agent')?.addEventListener('change', applyFilters);
+document.getElementById('filter_status')?.addEventListener('change', function() {
+    applyFilters();
+    updateActiveFiltersCount();
+});
+document.getElementById('filter_channel')?.addEventListener('change', function() {
+    applyFilters();
+    updateActiveFiltersCount();
+});
+document.getElementById('filter_department')?.addEventListener('change', function() {
+    applyFilters();
+    updateActiveFiltersCount();
+});
+document.getElementById('filter_tag')?.addEventListener('change', function() {
+    applyFilters();
+    updateActiveFiltersCount();
+});
 document.getElementById('filter_funnel')?.addEventListener('change', () => {
     const funnelId = document.getElementById('filter_funnel')?.value || '';
     const stageSelect = document.getElementById('filter_stage');
@@ -9500,6 +9537,7 @@ document.getElementById('filter_funnel')?.addEventListener('change', () => {
         });
     }
     applyFilters();
+    updateActiveFiltersCount();
 });
 document.getElementById('filter_stage')?.addEventListener('change', function() {
     applyFilters();
@@ -9519,7 +9557,10 @@ document.getElementById('kt_conversations_search')?.addEventListener('keypress',
 // Filtros
 document.querySelectorAll('#filter_status, #filter_channel, #filter_department, #filter_tag').forEach(select => {
     if (select) {
-        select.addEventListener('change', applyFilters);
+        select.addEventListener('change', function() {
+            applyFilters();
+            updateActiveFiltersCount();
+        });
     }
 });
 

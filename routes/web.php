@@ -255,6 +255,7 @@ Router::get('/integrations/notificame/accounts/{id}/subaccounts', [IntegrationCo
 Router::post('/integrations/notificame/accounts/{id}/test', [IntegrationController::class, 'sendNotificameTestMessage'], ['Authentication', 'Permission:notificame.send']);
 Router::post('/integrations/notificame/accounts/{id}/webhook', [IntegrationController::class, 'configureNotificameWebhook'], ['Authentication', 'Permission:notificame.edit']);
 Router::get('/integrations/notificame/accounts/{id}/templates', [IntegrationController::class, 'listNotificameTemplates'], ['Authentication']);
+Router::get('/integrations/notificame/logs', [IntegrationController::class, 'notificameLogs'], ['Authentication']);
 
 // Webhook Notificame
 Router::post('/webhooks/notificame', 'notificame-webhook.php');

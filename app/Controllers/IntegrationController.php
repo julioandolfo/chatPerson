@@ -776,4 +776,28 @@ class IntegrationController
             ], 400);
         }
     }
+
+    /**
+     * Visualizar logs do Notificame (últimas 300 linhas contendo 'Notificame')
+     */
+    public function notificameLogs(): void
+    {
+        Permission::abortIfCannot('notificame.view');
+
+        $logPath = storage_path('logs/laravel.log');
+        $lines = [];
+        if (file_exists($logPath)) {
+            $fileLines = @file($logPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            if ($fileLines !== false) {
+                $filtered = array_values(array_filter($fileLines, function ($line) {
+                    return stripos($line, 'Notificame') !== false;
+                }));
+                $lines = array_slice($filtered, -300);
+            }
+        }
+
+        Response::view('integrations/notificame/logs', [
+            'lines' => $lines
+        ]);
+    }
 }

@@ -4285,7 +4285,7 @@ body.dark-mode .swal2-content {
     </div>
 </div>
 
-<!-- MODAL: Convites Pendentes -->
+<!-- MODAL: Convites e Solicitações Pendentes -->
 <div class="modal fade" id="kt_modal_pending_invites" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered mw-650px">
         <div class="modal-content">
@@ -4298,7 +4298,7 @@ body.dark-mode .swal2-content {
                         <span class="path4"></span>
                         <span class="path5"></span>
                     </i>
-                    Convites Pendentes
+                    Convites e Solicitações
                     <span id="pendingInvitesCountBadge" class="badge badge-circle badge-primary ms-2 d-none">0</span>
                 </h2>
                 <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
@@ -4308,11 +4308,50 @@ body.dark-mode .swal2-content {
                     </i>
                 </div>
             </div>
-            <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
-                <div id="pendingInvitesList">
-                    <div class="text-center py-10">
-                        <span class="spinner-border spinner-border-sm text-primary"></span>
-                        <span class="ms-2 text-muted">Carregando convites...</span>
+            <div class="modal-body p-0">
+                <!-- Tabs para separar convites de solicitações -->
+                <ul class="nav nav-tabs nav-line-tabs nav-line-tabs-2x border-transparent fs-6 fw-semibold mb-0 px-5 pt-3" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link active" data-bs-toggle="tab" href="#tab_invites" role="tab">
+                            <i class="ki-duotone ki-entrance-left fs-4 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Convites para Você
+                            <span id="invitesTabCount" class="badge badge-sm badge-primary ms-2 d-none">0</span>
+                        </a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" data-bs-toggle="tab" href="#tab_requests" role="tab">
+                            <i class="ki-duotone ki-entrance-right fs-4 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Solicitações de Participação
+                            <span id="requestsTabCount" class="badge badge-sm badge-warning ms-2 d-none">0</span>
+                        </a>
+                    </li>
+                </ul>
+                
+                <div class="tab-content" style="max-height: 60vh; overflow-y: auto;">
+                    <!-- Tab: Convites para Você -->
+                    <div class="tab-pane fade show active p-5" id="tab_invites" role="tabpanel">
+                        <div id="pendingInvitesList">
+                            <div class="text-center py-10">
+                                <span class="spinner-border spinner-border-sm text-primary"></span>
+                                <span class="ms-2 text-muted">Carregando convites...</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tab: Solicitações de Participação -->
+                    <div class="tab-pane fade p-5" id="tab_requests" role="tabpanel">
+                        <div id="pendingRequestsList">
+                            <div class="text-center py-10">
+                                <span class="spinner-border spinner-border-sm text-primary"></span>
+                                <span class="ms-2 text-muted">Carregando solicitações...</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -4559,7 +4598,8 @@ function loadPendingInvites() {
     .then(data => {
         if (data.success) {
             renderPendingInvites(data.invites || []);
-            updatePendingInvitesCount(data.count || 0);
+            const invitesCount = data.count || 0;
+            updateInvitesTabCount(invitesCount);
         } else {
             container.innerHTML = '<div class="text-center py-10 text-muted">Erro ao carregar convites</div>';
         }
@@ -4568,6 +4608,303 @@ function loadPendingInvites() {
         console.error('Erro:', error);
         container.innerHTML = '<div class="text-center py-10 text-muted">Erro ao carregar convites</div>';
     });
+    
+    // Também carregar solicitações de participação
+    loadPendingRequestsModal();
+}
+
+/**
+ * Atualizar contador de convites na tab
+ */
+function updateInvitesTabCount(count) {
+    const badge = document.getElementById('invitesTabCount');
+    if (badge) {
+        if (count > 0) {
+            badge.textContent = count;
+            badge.classList.remove('d-none');
+        } else {
+            badge.classList.add('d-none');
+        }
+    }
+    // Atualizar contador geral também
+    updatePendingInvitesCount(count);
+}
+
+/**
+ * Carregar solicitações de participação pendentes (no modal)
+ */
+function loadPendingRequestsModal() {
+    const container = document.getElementById('pendingRequestsList');
+    if (!container) return;
+    
+    container.innerHTML = `
+        <div class="text-center py-10">
+            <span class="spinner-border spinner-border-sm text-primary"></span>
+            <span class="ms-2 text-muted">Carregando solicitações...</span>
+        </div>
+    `;
+    
+    fetch('<?= \App\Helpers\Url::to('/conversations/requests/pending') ?>', {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            renderPendingRequestsModal(data.requests || []);
+            updateRequestsTabCount(data.count || 0);
+        } else {
+            container.innerHTML = '<div class="text-center py-10 text-muted">Erro ao carregar solicitações</div>';
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        container.innerHTML = '<div class="text-center py-10 text-muted">Erro ao carregar solicitações</div>';
+    });
+}
+
+/**
+ * Atualizar contador de solicitações na tab
+ */
+function updateRequestsTabCount(count) {
+    const badge = document.getElementById('requestsTabCount');
+    if (badge) {
+        if (count > 0) {
+            badge.textContent = count;
+            badge.classList.remove('d-none');
+        } else {
+            badge.classList.add('d-none');
+        }
+    }
+}
+
+/**
+ * Renderizar lista de solicitações de participação no modal
+ */
+function renderPendingRequestsModal(requests) {
+    const container = document.getElementById('pendingRequestsList');
+    if (!container) return;
+    
+    if (requests.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-10">
+                <i class="ki-duotone ki-check-circle fs-3x text-success mb-3">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                <h5 class="text-muted">Nenhuma solicitação pendente</h5>
+                <p class="text-gray-500 fs-7">Não há agentes solicitando participar das suas conversas</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    requests.forEach(req => {
+        const channelIcon = req.channel === 'whatsapp' 
+            ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>'
+            : req.channel === 'email' ? '✉️' : '💬';
+        
+        const timeAgo = formatTime(req.created_at);
+        const requesterInitials = getInitials(req.requester_name || 'A');
+        const contactInitials = getInitials(req.contact_name || 'C');
+        
+        html += `
+            <div class="d-flex align-items-start gap-3 p-4 border rounded mb-3 bg-light-primary">
+                <!-- Avatar do solicitante -->
+                <div class="symbol symbol-45px symbol-circle">
+                    ${req.requester_avatar 
+                        ? `<img src="${escapeHtml(req.requester_avatar)}" alt="${escapeHtml(req.requester_name || '')}">`
+                        : `<div class="symbol-label bg-light-warning text-warning fw-bold">${requesterInitials}</div>`
+                    }
+                </div>
+                <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <h6 class="mb-0">${escapeHtml(req.requester_name || 'Agente')}</h6>
+                            <span class="text-muted fs-7">quer participar da conversa</span>
+                        </div>
+                        <span class="badge badge-light-primary fs-8">${timeAgo}</span>
+                    </div>
+                    
+                    <!-- Info da conversa -->
+                    <div class="bg-white rounded p-2 mb-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="symbol symbol-25px symbol-circle">
+                                ${req.contact_avatar 
+                                    ? `<img src="${escapeHtml(req.contact_avatar)}" alt="">`
+                                    : `<span class="symbol-label bg-light-info text-info fs-8">${contactInitials}</span>`
+                                }
+                            </div>
+                            <div>
+                                <span class="fw-semibold fs-7">${escapeHtml(req.contact_name || 'Contato')}</span>
+                                <span class="text-muted fs-8 ms-1">${channelIcon}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${req.note ? `<div class="text-muted fs-7 mb-2 fst-italic">"${escapeHtml(req.note)}"</div>` : ''}
+                    
+                    <div class="d-flex gap-2 mt-3">
+                        <button class="btn btn-sm btn-success" onclick="approveRequestFromModal(${req.id})">
+                            <i class="ki-duotone ki-check fs-6 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Aprovar
+                        </button>
+                        <button class="btn btn-sm btn-light-danger" onclick="rejectRequestFromModal(${req.id})">
+                            <i class="ki-duotone ki-cross fs-6 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Recusar
+                        </button>
+                        <button class="btn btn-sm btn-light-primary" onclick="viewConversationFromRequest(${req.conversation_id})">
+                            <i class="ki-duotone ki-eye fs-6 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            Ver Conversa
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+/**
+ * Aprovar solicitação a partir do modal
+ */
+function approveRequestFromModal(requestId) {
+    Swal.fire({
+        title: 'Aprovar solicitação?',
+        text: 'Este agente será adicionado como participante da conversa.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, aprovar',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            Swal.fire({
+                title: 'Aprovando...',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+            
+            fetch(`<?= \App\Helpers\Url::to('/conversations/requests') ?>/${requestId}/approve`, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Aprovado!',
+                        text: 'O agente agora é participante da conversa.',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                    
+                    // Recarregar lista de solicitações
+                    loadPendingRequestsModal();
+                    loadPendingInvitesCount();
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: data.message || 'Erro ao aprovar solicitação'
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: 'Erro ao aprovar solicitação'
+                });
+            });
+        }
+    });
+}
+
+/**
+ * Recusar solicitação a partir do modal
+ */
+function rejectRequestFromModal(requestId) {
+    Swal.fire({
+        title: 'Recusar solicitação?',
+        text: 'Esta ação não poderá ser desfeita.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, recusar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#d33'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch(`<?= \App\Helpers\Url::to('/conversations/requests') ?>/${requestId}/reject`, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Recusada',
+                        text: 'Solicitação recusada.',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                    
+                    // Recarregar lista de solicitações
+                    loadPendingRequestsModal();
+                    loadPendingInvitesCount();
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: data.message || 'Erro ao recusar solicitação'
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: 'Erro ao recusar solicitação'
+                });
+            });
+        }
+    });
+}
+
+/**
+ * Ver conversa a partir de solicitação no modal
+ */
+function viewConversationFromRequest(conversationId) {
+    if (typeof selectConversation === 'function') {
+        selectConversation(conversationId);
+        
+        // Fechar modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_pending_invites'));
+        if (modal) modal.hide();
+    }
 }
 
 /**
@@ -4823,7 +5160,8 @@ function updatePendingInvitesCount(count) {
  * Carregar contagem de convites pendentes
  */
 function loadPendingInvitesCount() {
-    fetch('<?= \App\Helpers\Url::to('/conversations/invites/count') ?>', {
+    // Usar novo endpoint que retorna ambos os contadores
+    fetch('<?= \App\Helpers\Url::to('/conversations/invites/counts') ?>', {
         headers: {
             'X-Requested-With': 'XMLHttpRequest',
             'Accept': 'application/json'
@@ -4832,10 +5170,15 @@ function loadPendingInvitesCount() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            updatePendingInvitesCount(data.count || 0);
+            // Atualizar contador total (convites + solicitações)
+            updatePendingInvitesCount(data.total_count || 0);
+            
+            // Atualizar contadores das tabs
+            updateInvitesTabCount(data.invites_count || 0);
+            updateRequestsTabCount(data.requests_count || 0);
         }
     })
-    .catch(error => console.error('Erro ao carregar contagem de convites:', error));
+    .catch(error => console.error('Erro ao carregar contagem de convites/solicitações:', error));
 }
 
 // Carregar contagem de convites ao iniciar
@@ -4965,7 +5308,115 @@ function setupInviteWebSocketListeners() {
         }
     });
     
-    console.log('[Convites] ✅ Listeners WebSocket configurados para convites em tempo real');
+    // ============================================
+    // LISTENERS PARA SOLICITAÇÕES DE PARTICIPAÇÃO
+    // ============================================
+    
+    // Listener para nova solicitação de participação
+    client.on('new_participation_request', (data) => {
+        console.log('[Solicitações] 🔔 Nova solicitação recebida:', data);
+        
+        // Atualizar contador do sino
+        loadPendingInvitesCount();
+        
+        // Mostrar notificação toast
+        if (typeof Swal !== 'undefined') {
+            const requestData = data.mention || data;
+            Swal.fire({
+                icon: 'info',
+                title: 'Nova Solicitação!',
+                html: `<strong>${escapeHtml(requestData.mentioned_by_name || 'Um agente')}</strong> está solicitando participar de uma conversa.`,
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: true,
+                confirmButtonText: 'Ver',
+                showCancelButton: true,
+                cancelButtonText: 'Fechar',
+                timer: 10000,
+                timerProgressBar: true
+            }).then(result => {
+                if (result.isConfirmed) {
+                    showPendingInvitesModal();
+                    // Ir para aba de solicitações
+                    const requestsTab = document.querySelector('a[href="#tab_requests"]');
+                    if (requestsTab) {
+                        const tab = new bootstrap.Tab(requestsTab);
+                        tab.show();
+                    }
+                }
+            });
+        }
+        
+        // Se estiver na conversa que recebeu a solicitação, mostrar banner
+        if (data.mention && data.mention.conversation_id == window.currentConversationId) {
+            // Recarregar conversa para mostrar o banner
+            selectConversation(window.currentConversationId);
+        }
+        
+        // Tocar som de notificação se disponível
+        if (typeof playNotificationSound === 'function') {
+            playNotificationSound();
+        }
+    });
+    
+    // Listener para solicitação aprovada (quem solicitou recebe)
+    client.on('request_approved', (data) => {
+        console.log('[Solicitações] ✅ Solicitação aprovada:', data);
+        
+        const requestData = data.mention || data;
+        
+        // Mostrar notificação
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                icon: 'success',
+                title: 'Solicitação Aprovada!',
+                html: `Você agora é participante da conversa.`,
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: true,
+                confirmButtonText: 'Ver Conversa',
+                timer: 8000,
+                timerProgressBar: true
+            }).then(result => {
+                if (result.isConfirmed && requestData.conversation_id) {
+                    selectConversation(requestData.conversation_id);
+                }
+            });
+        }
+        
+        // Recarregar lista de conversas
+        if (typeof loadConversations === 'function') {
+            loadConversations();
+        }
+        
+        // Se estiver vendo a conversa que foi aprovada, recarregar
+        if (requestData.conversation_id == window.currentConversationId) {
+            selectConversation(window.currentConversationId);
+        }
+    });
+    
+    // Listener para solicitação recusada (quem solicitou recebe)
+    client.on('request_rejected', (data) => {
+        console.log('[Solicitações] ❌ Solicitação recusada:', data);
+        
+        const requestData = data.mention || data;
+        
+        // Mostrar notificação
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Solicitação Recusada',
+                html: `Sua solicitação de participação foi recusada.`,
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 5000,
+                timerProgressBar: true
+            });
+        }
+    });
+    
+    console.log('[Convites] ✅ Listeners WebSocket configurados para convites e solicitações em tempo real');
 }
 
 // ============================================
@@ -6326,6 +6777,15 @@ function selectConversation(id) {
             const newUrl = `<?= \App\Helpers\Url::to('/conversations') ?>?id=${id}`;
             window.history.pushState({ conversationId: id }, '', newUrl);
             
+            // ============================================
+            // VERIFICAR SE ACESSO É RESTRITO
+            // ============================================
+            if (data.access_restricted === true) {
+                console.log('🔒 Acesso restrito à conversa', id, data.access_info);
+                showRestrictedAccessView(id, data.conversation, data.access_info);
+                return;
+            }
+            
             // Remover badge de não lidas da conversa atual na lista
             if (conversationItem) {
                 const badge = conversationItem.querySelector('.conversation-item-badge');
@@ -6385,6 +6845,13 @@ function selectConversation(id) {
             
             // Atualizar timeline quando conversa é selecionada
             updateConversationTimeline(data.conversation.id);
+            
+            // Exibir solicitações de participação pendentes (se houver)
+            if (data.pending_requests && data.pending_requests.length > 0) {
+                showPendingRequestsBanner(data.pending_requests);
+            } else {
+                hidePendingRequestsBanner();
+            }
             
             // Scroll para última mensagem
             setTimeout(() => {
@@ -6514,6 +6981,432 @@ function updateChatHeader(conversation) {
         }
     }
 }
+
+// ============================================
+// SISTEMA DE ACESSO RESTRITO / SOLICITAÇÃO DE PARTICIPAÇÃO
+// ============================================
+
+/**
+ * Mostrar view de acesso restrito (chat ofuscado com botão de solicitar)
+ */
+function showRestrictedAccessView(conversationId, conversation, accessInfo) {
+    const chatMessages = document.getElementById('chatMessages');
+    const chatInput = document.getElementById('chatInput');
+    const chatHeader = document.getElementById('chatHeader');
+    
+    if (!chatMessages) return;
+    
+    // Atualizar header com info básica
+    if (chatHeader) {
+        const contactName = conversation.contact_name || 'Contato';
+        const initials = getInitials(contactName);
+        const channel = conversation.channel || 'whatsapp';
+        
+        const channelIcon = {
+            'whatsapp': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>',
+            'email': '✉️',
+            'chat': '💬'
+        }[channel] || '💬';
+        
+        const avatarLabel = chatHeader.querySelector('.symbol-label');
+        if (avatarLabel) {
+            if (conversation.contact_avatar) {
+                avatarLabel.innerHTML = `<img src="${escapeHtml(conversation.contact_avatar)}" alt="${escapeHtml(contactName)}" class="h-45px w-45px rounded" style="object-fit: cover;">`;
+            } else {
+                avatarLabel.textContent = initials;
+            }
+        }
+        
+        const nameEl = chatHeader.querySelector('.fw-bold');
+        if (nameEl) nameEl.textContent = contactName;
+        
+        const channelEl = chatHeader.querySelector('.fs-7.text-muted');
+        if (channelEl) channelEl.innerHTML = channelIcon + ' ' + (channel === 'whatsapp' ? 'WhatsApp' : channel);
+    }
+    
+    // Ocultar input de mensagem
+    if (chatInput) {
+        chatInput.style.display = 'none';
+    }
+    
+    // Determinar texto do botão baseado no status da solicitação
+    let actionButton = '';
+    let statusMessage = '';
+    
+    if (accessInfo.has_pending_request) {
+        statusMessage = `
+            <div class="alert alert-warning d-flex align-items-center mb-4" role="alert">
+                <i class="ki-duotone ki-timer fs-2 me-3 text-warning">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                    <span class="path3"></span>
+                </i>
+                <div>
+                    <div class="fw-bold">Solicitação Pendente</div>
+                    <div class="fs-7">Você já enviou uma solicitação para participar desta conversa. Aguarde aprovação.</div>
+                </div>
+            </div>
+        `;
+    } else {
+        actionButton = `
+            <button class="btn btn-primary btn-lg" onclick="requestParticipation(${conversationId})">
+                <i class="ki-duotone ki-entrance-right fs-2 me-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                Solicitar Participação
+            </button>
+        `;
+    }
+    
+    // Mostrar mensagens ofuscadas com overlay
+    chatMessages.innerHTML = `
+        <div class="restricted-access-container" style="position: relative; height: 100%; overflow: hidden;">
+            <!-- Mensagens fake ofuscadas (blur) -->
+            <div class="blurred-messages" style="filter: blur(8px); opacity: 0.5; pointer-events: none; height: 100%; padding: 20px;">
+                <div class="message message-received mb-3" style="max-width: 70%; background: var(--bs-gray-200); padding: 12px 16px; border-radius: 12px;">
+                    <div style="height: 14px; background: var(--bs-gray-400); border-radius: 4px; width: 80%;"></div>
+                    <div style="height: 14px; background: var(--bs-gray-400); border-radius: 4px; width: 60%; margin-top: 8px;"></div>
+                </div>
+                <div class="message message-sent mb-3" style="max-width: 70%; background: var(--bs-primary); padding: 12px 16px; border-radius: 12px; margin-left: auto;">
+                    <div style="height: 14px; background: rgba(255,255,255,0.5); border-radius: 4px; width: 90%;"></div>
+                </div>
+                <div class="message message-received mb-3" style="max-width: 70%; background: var(--bs-gray-200); padding: 12px 16px; border-radius: 12px;">
+                    <div style="height: 14px; background: var(--bs-gray-400); border-radius: 4px; width: 70%;"></div>
+                    <div style="height: 14px; background: var(--bs-gray-400); border-radius: 4px; width: 40%; margin-top: 8px;"></div>
+                </div>
+                <div class="message message-sent mb-3" style="max-width: 70%; background: var(--bs-primary); padding: 12px 16px; border-radius: 12px; margin-left: auto;">
+                    <div style="height: 14px; background: rgba(255,255,255,0.5); border-radius: 4px; width: 70%;"></div>
+                    <div style="height: 14px; background: rgba(255,255,255,0.5); border-radius: 4px; width: 50%; margin-top: 8px;"></div>
+                </div>
+                <div class="message message-received mb-3" style="max-width: 70%; background: var(--bs-gray-200); padding: 12px 16px; border-radius: 12px;">
+                    <div style="height: 14px; background: var(--bs-gray-400); border-radius: 4px; width: 85%;"></div>
+                </div>
+            </div>
+            
+            <!-- Overlay com informações e botão -->
+            <div class="access-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; background: rgba(var(--bs-body-bg-rgb), 0.85);">
+                <div class="text-center p-5" style="max-width: 450px;">
+                    <div class="mb-4">
+                        <i class="ki-duotone ki-lock-2 fs-4x text-warning">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                            <span class="path4"></span>
+                            <span class="path5"></span>
+                        </i>
+                    </div>
+                    
+                    <h3 class="fw-bold mb-3">Acesso Restrito</h3>
+                    
+                    <p class="text-muted mb-4">
+                        Esta conversa está atribuída a outro agente. 
+                        Para visualizar as mensagens e participar, você precisa solicitar participação.
+                    </p>
+                    
+                    ${statusMessage}
+                    
+                    <div class="d-flex flex-column gap-3 align-items-center">
+                        ${actionButton}
+                        
+                        <div class="text-muted fs-7 mt-3">
+                            <i class="ki-duotone ki-information-3 fs-6 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            ${conversation.agent_name ? 'Atribuída a: ' + escapeHtml(conversation.agent_name) : 'Conversa atribuída'}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Ocultar sidebar de detalhes
+    const sidebar = document.getElementById('conversationSidebar');
+    if (sidebar) {
+        sidebar.classList.remove('open');
+    }
+}
+
+/**
+ * Solicitar participação em uma conversa
+ */
+function requestParticipation(conversationId) {
+    Swal.fire({
+        title: 'Solicitar Participação',
+        html: `
+            <div class="text-start">
+                <p class="text-muted mb-3">
+                    Você está solicitando participar desta conversa. 
+                    O agente responsável ou outros participantes precisarão aprovar sua solicitação.
+                </p>
+                
+                <div class="mb-3">
+                    <label class="form-label">Motivo (opcional):</label>
+                    <textarea id="swal-request-note" class="form-control" rows="3" 
+                              placeholder="Explique por que deseja participar desta conversa..."></textarea>
+                </div>
+            </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Enviar Solicitação',
+        cancelButtonText: 'Cancelar',
+        showLoaderOnConfirm: true,
+        preConfirm: () => {
+            const note = document.getElementById('swal-request-note').value.trim();
+            
+            return fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/request-participation`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ note: note || null })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.message || 'Erro ao enviar solicitação');
+                }
+                return data;
+            })
+            .catch(error => {
+                Swal.showValidationMessage(error.message);
+            });
+        },
+        allowOutsideClick: () => !Swal.isLoading()
+    }).then((result) => {
+        if (result.isConfirmed) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Solicitação Enviada!',
+                text: 'Aguarde a aprovação do agente responsável.',
+                timer: 3000,
+                showConfirmButton: false
+            });
+            
+            // Recarregar para mostrar status atualizado
+            setTimeout(() => {
+                selectConversation(conversationId);
+            }, 1000);
+        }
+    });
+}
+
+/**
+ * Mostrar banner de solicitações de participação pendentes
+ */
+function showPendingRequestsBanner(requests) {
+    // Remover banner existente
+    hidePendingRequestsBanner();
+    
+    if (!requests || requests.length === 0) return;
+    
+    const chatArea = document.querySelector('.chat-area');
+    if (!chatArea) return;
+    
+    const requestsHtml = requests.map(req => `
+        <div class="d-flex align-items-center justify-content-between py-2 px-3 border-bottom" data-request-id="${req.id}">
+            <div class="d-flex align-items-center gap-2">
+                <div class="symbol symbol-35px symbol-circle">
+                    ${req.requester_avatar 
+                        ? `<img src="${escapeHtml(req.requester_avatar)}" alt="">`
+                        : `<span class="symbol-label bg-light-primary text-primary">${getInitials(req.requester_name || 'A')}</span>`
+                    }
+                </div>
+                <div>
+                    <div class="fw-semibold fs-7">${escapeHtml(req.requester_name || 'Agente')}</div>
+                    <div class="text-muted fs-8">solicitou participar</div>
+                </div>
+            </div>
+            <div class="d-flex gap-1">
+                <button class="btn btn-sm btn-icon btn-light-success" title="Aprovar" onclick="approveParticipationRequest(${req.id})">
+                    <i class="ki-duotone ki-check fs-4"><span class="path1"></span><span class="path2"></span></i>
+                </button>
+                <button class="btn btn-sm btn-icon btn-light-danger" title="Recusar" onclick="rejectParticipationRequest(${req.id})">
+                    <i class="ki-duotone ki-cross fs-4"><span class="path1"></span><span class="path2"></span></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+    
+    const bannerHtml = `
+        <div id="pendingRequestsBanner" class="pending-requests-banner bg-light-warning border-bottom" style="flex-shrink: 0;">
+            <div class="d-flex align-items-center justify-content-between py-2 px-3 bg-warning bg-opacity-10">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="ki-duotone ki-entrance-right fs-4 text-warning">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    <span class="fw-semibold text-warning">${requests.length} solicitação(ões) de participação</span>
+                </div>
+                <button class="btn btn-sm btn-icon btn-light" onclick="hidePendingRequestsBanner()">
+                    <i class="ki-duotone ki-cross fs-6"><span class="path1"></span><span class="path2"></span></i>
+                </button>
+            </div>
+            <div class="pending-requests-list" style="max-height: 150px; overflow-y: auto;">
+                ${requestsHtml}
+            </div>
+        </div>
+    `;
+    
+    // Inserir após o header
+    const chatHeader = document.getElementById('chatHeader');
+    if (chatHeader) {
+        chatHeader.insertAdjacentHTML('afterend', bannerHtml);
+    }
+}
+
+/**
+ * Ocultar banner de solicitações pendentes
+ */
+function hidePendingRequestsBanner() {
+    const banner = document.getElementById('pendingRequestsBanner');
+    if (banner) {
+        banner.remove();
+    }
+}
+
+/**
+ * Aprovar solicitação de participação
+ */
+function approveParticipationRequest(requestId) {
+    fetch(`<?= \App\Helpers\Url::to('/conversations/requests') ?>/${requestId}/approve`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Aprovado!',
+                text: data.message || 'Solicitação aprovada com sucesso.',
+                toast: true,
+                position: 'top-end',
+                timer: 3000,
+                showConfirmButton: false
+            });
+            
+            // Remover item do banner
+            const requestItem = document.querySelector(`[data-request-id="${requestId}"]`);
+            if (requestItem) {
+                requestItem.remove();
+            }
+            
+            // Verificar se ainda há solicitações
+            const banner = document.getElementById('pendingRequestsBanner');
+            if (banner) {
+                const remainingRequests = banner.querySelectorAll('[data-request-id]');
+                if (remainingRequests.length === 0) {
+                    hidePendingRequestsBanner();
+                } else {
+                    // Atualizar contador
+                    const counter = banner.querySelector('.fw-semibold.text-warning');
+                    if (counter) {
+                        counter.textContent = `${remainingRequests.length} solicitação(ões) de participação`;
+                    }
+                }
+            }
+            
+            // Recarregar conversa para atualizar participantes
+            if (window.currentConversationId) {
+                selectConversation(window.currentConversationId);
+            }
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: data.message || 'Erro ao aprovar solicitação'
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro ao aprovar solicitação'
+        });
+    });
+}
+
+/**
+ * Recusar solicitação de participação
+ */
+function rejectParticipationRequest(requestId) {
+    Swal.fire({
+        title: 'Recusar Solicitação',
+        text: 'Tem certeza que deseja recusar esta solicitação de participação?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, Recusar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#d33'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch(`<?= \App\Helpers\Url::to('/conversations/requests') ?>/${requestId}/reject`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Recusada',
+                        text: 'Solicitação recusada.',
+                        toast: true,
+                        position: 'top-end',
+                        timer: 3000,
+                        showConfirmButton: false
+                    });
+                    
+                    // Remover item do banner
+                    const requestItem = document.querySelector(`[data-request-id="${requestId}"]`);
+                    if (requestItem) {
+                        requestItem.remove();
+                    }
+                    
+                    // Verificar se ainda há solicitações
+                    const banner = document.getElementById('pendingRequestsBanner');
+                    if (banner) {
+                        const remainingRequests = banner.querySelectorAll('[data-request-id]');
+                        if (remainingRequests.length === 0) {
+                            hidePendingRequestsBanner();
+                        }
+                    }
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: data.message || 'Erro ao recusar solicitação'
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: 'Erro ao recusar solicitação'
+                });
+            });
+        }
+    });
+}
+
+// ============================================
+// FIM SISTEMA DE ACESSO RESTRITO
+// ============================================
 
 // Atualizar mensagens do chat
 function updateChatMessages(messages, isInitialLoad = false) {

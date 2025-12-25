@@ -308,12 +308,11 @@ class ConversationController
                 return;
             }
 
-            // Verificar permissão
-            if (!Permission::canViewConversation($conversation)) {
-                Response::forbidden('Você não tem permissão para ver esta conversa.');
-                return;
-            }
-
+            $userId = \App\Helpers\Auth::id();
+            
+            // Verificar tipo de acesso do usuário
+            $accessInfo = \App\Services\ConversationMentionService::checkUserAccess($id, $userId);
+            
             // Se for requisição AJAX, retornar JSON
             if (\App\Helpers\Request::isAjax() || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
                 // Limpar qualquer output buffer antes de retornar JSON
@@ -321,8 +320,45 @@ class ConversationController
                     ob_end_clean();
                 }
                 
+                // Se não tem acesso direto (não é atribuído nem participante)
+                if (!$accessInfo['can_view']) {
+                    // Verificar se tem permissão geral de admin/supervisor
+                    $userLevel = \App\Models\User::getMaxLevel($userId);
+                    $isAdminOrSupervisor = $userLevel <= 2; // 0=SuperAdmin, 1=Admin, 2=Supervisor
+                    
+                    if ($isAdminOrSupervisor) {
+                        // Admin/Supervisor pode ver normalmente
+                        $accessInfo['can_view'] = true;
+                        $accessInfo['is_admin'] = true;
+                    } else {
+                        // Retornar dados parciais para exibição ofuscada
+                        Response::json([
+                            'success' => true,
+                            'access_restricted' => true,
+                            'access_info' => [
+                                'can_view' => false,
+                                'is_participant' => $accessInfo['is_participant'],
+                                'is_assigned' => $accessInfo['is_assigned'],
+                                'has_pending_request' => $accessInfo['has_pending_request']
+                            ],
+                            'conversation' => [
+                                'id' => $conversation['id'],
+                                'contact_name' => $conversation['contact_name'] ?? 'Contato',
+                                'contact_avatar' => $conversation['contact_avatar'] ?? null,
+                                'channel' => $conversation['channel'] ?? 'whatsapp',
+                                'status' => $conversation['status'] ?? 'open',
+                                'agent_id' => $conversation['agent_id'] ?? null,
+                                'agent_name' => $conversation['agent_name'] ?? null,
+                                'created_at' => $conversation['created_at'] ?? null
+                            ],
+                            'messages' => [], // Não enviar mensagens
+                            'tags' => []
+                        ]);
+                        return;
+                    }
+                }
+                
                 // Marcar mensagens como lidas quando a conversa é aberta
-                $userId = \App\Helpers\Auth::id();
                 if ($userId) {
                     try {
                         $marked = \App\Models\Message::markAsRead($id, $userId);
@@ -368,12 +404,26 @@ class ConversationController
                     error_log("Erro ao notificar WebSocket: " . $e->getMessage());
                 }
                 
+                // Obter solicitações pendentes para esta conversa (se for agente atribuído ou participante)
+                $pendingRequests = [];
+                if ($accessInfo['is_assigned'] || $accessInfo['is_participant']) {
+                    $pendingRequests = \App\Services\ConversationMentionService::getPendingRequestsForConversation($id);
+                }
+                
                 Response::json([
                     'success' => true,
+                    'access_restricted' => false,
                     'conversation' => $conversation,
                     'messages' => $messages,
-                    'tags' => $tags
+                    'tags' => $tags,
+                    'pending_requests' => $pendingRequests
                 ]);
+                return;
+            }
+
+            // Para requisições não-AJAX, verificar permissão tradicional
+            if (!Permission::canViewConversation($conversation)) {
+                Response::forbidden('Você não tem permissão para ver esta conversa.');
                 return;
             }
 
@@ -2473,6 +2523,130 @@ class ConversationController
             Response::json([
                 'success' => true,
                 'history' => $history
+            ]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    // ============================================
+    // SISTEMA DE SOLICITAÇÃO DE PARTICIPAÇÃO
+    // ============================================
+
+    /**
+     * Solicitar participação em uma conversa
+     * POST /conversations/{id}/request-participation
+     */
+    public function requestParticipation(int $id): void
+    {
+        try {
+            $userId = \App\Helpers\Auth::id();
+            $data = \App\Helpers\Request::json();
+            $note = $data['note'] ?? null;
+            
+            $request = \App\Services\ConversationMentionService::requestParticipation(
+                $id,
+                $userId,
+                $note
+            );
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Solicitação enviada com sucesso! Aguarde aprovação.',
+                'request' => $request
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => 'Erro ao solicitar participação: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Aprovar solicitação de participação
+     * POST /conversations/requests/{requestId}/approve
+     */
+    public function approveRequest(int $requestId): void
+    {
+        try {
+            $userId = \App\Helpers\Auth::id();
+            $request = \App\Services\ConversationMentionService::approveRequest($requestId, $userId);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Solicitação aprovada! O agente agora é participante da conversa.',
+                'request' => $request
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => 'Erro ao aprovar solicitação: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Recusar solicitação de participação
+     * POST /conversations/requests/{requestId}/reject
+     */
+    public function rejectRequest(int $requestId): void
+    {
+        try {
+            $userId = \App\Helpers\Auth::id();
+            $request = \App\Services\ConversationMentionService::rejectRequest($requestId, $userId);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Solicitação recusada.',
+                'request' => $request
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => 'Erro ao recusar solicitação: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Obter solicitações de participação pendentes que o usuário pode aprovar
+     * GET /conversations/requests/pending
+     */
+    public function getPendingRequests(): void
+    {
+        try {
+            $userId = \App\Helpers\Auth::id();
+            $requests = \App\Models\ConversationMention::getPendingRequestsToApprove($userId);
+            $count = \App\Models\ConversationMention::countPendingRequestsToApprove($userId);
+            
+            Response::json([
+                'success' => true,
+                'requests' => $requests,
+                'count' => $count
+            ]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Obter contadores de convites e solicitações pendentes
+     * GET /conversations/invites/counts
+     */
+    public function getInviteCounts(): void
+    {
+        try {
+            $userId = \App\Helpers\Auth::id();
+            
+            // Convites pendentes (onde o usuário foi convidado)
+            $invitesCount = \App\Models\ConversationMention::countPendingForUser($userId);
+            
+            // Solicitações pendentes (que o usuário pode aprovar)
+            $requestsCount = \App\Models\ConversationMention::countPendingRequestsToApprove($userId);
+            
+            Response::json([
+                'success' => true,
+                'invites_count' => $invitesCount,
+                'requests_count' => $requestsCount,
+                'total_count' => $invitesCount + $requestsCount
             ]);
         } catch (\Exception $e) {
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);

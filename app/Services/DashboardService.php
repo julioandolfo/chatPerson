@@ -96,10 +96,14 @@ class DashboardService
             : 0;
         
         // Tempo médio de primeira resposta (GERAL - inclui IA e Humanos)
-        $avgFirstResponseTime = self::getAverageFirstResponseTime($dateFrom, $dateTo);
+        $avgFirstResponseTimeData = self::getAverageFirstResponseTime($dateFrom, $dateTo);
+        $avgFirstResponseTimeSeconds = $avgFirstResponseTimeData['seconds'] ?? 0;
+        $avgFirstResponseTimeMinutes = $avgFirstResponseTimeData['minutes'] ?? 0;
         
         // Tempo médio geral de resposta (GERAL - inclui IA e Humanos)
-        $avgResponseTime = self::getAverageResponseTime($dateFrom, $dateTo);
+        $avgResponseTimeData = self::getAverageResponseTime($dateFrom, $dateTo);
+        $avgResponseTimeSeconds = $avgResponseTimeData['seconds'] ?? 0;
+        $avgResponseTimeMinutes = $avgResponseTimeData['minutes'] ?? 0;
         
         // Tempo médio de primeira resposta (APENAS HUMANOS - exclui IA)
         $avgFirstResponseTimeHuman = self::getAverageFirstResponseTimeHuman($dateFrom, $dateTo);
@@ -116,7 +120,8 @@ class DashboardService
         // Conversas sem atribuição
         $unassignedConversations = self::getUnassignedConversations();
         self::logDash("unassignedConversations={$unassignedConversations}");
-        self::logDash("avgFirstResponseTime={$avgFirstResponseTime}, avgResponseTime={$avgResponseTime}");
+        self::logDash("avgFirstResponseTime: {$avgFirstResponseTimeSeconds}s / {$avgFirstResponseTimeMinutes}min");
+        self::logDash("avgResponseTime: {$avgResponseTimeSeconds}s / {$avgResponseTimeMinutes}min");
         self::logDash("avgFirstResponseTimeHuman={$avgFirstResponseTimeHuman}, avgResponseTimeHuman={$avgResponseTimeHuman}");
         self::logDash("avgFirstResponseTimeAI={$avgFirstResponseTimeAI}, avgResponseTimeAI={$avgResponseTimeAI}");
         
@@ -148,8 +153,10 @@ class DashboardService
             'metrics' => [
                 // Métricas GERAIS (inclui IA + Humanos)
                 'resolution_rate' => $resolutionRate,
-                'avg_first_response_time' => $avgFirstResponseTime,
-                'avg_response_time' => $avgResponseTime,
+                'avg_first_response_time_seconds' => $avgFirstResponseTimeSeconds,
+                'avg_first_response_time_minutes' => $avgFirstResponseTimeMinutes,
+                'avg_response_time_seconds' => $avgResponseTimeSeconds,
+                'avg_response_time_minutes' => $avgResponseTimeMinutes,
                 'avg_resolution_time' => $avgResolutionTime,
                 
                 // Métricas HUMANOS (exclui respostas de IA)
@@ -406,65 +413,54 @@ class DashboardService
     /**
      * Obter tempo médio de primeira resposta (em minutos)
      * Calcula o tempo entre a primeira mensagem do cliente e a primeira resposta do agente
+     * NOTA: Usa SEGUNDOS internamente e converte para minutos para maior precisão (IA responde em segundos)
      */
-    private static function getAverageFirstResponseTime(string $dateFrom, string $dateTo): ?float
+    private static function getAverageFirstResponseTime(string $dateFrom, string $dateTo): ?array
     {
-        // Verificar se existem conversas com mensagens de agent no período
-        $checkSql = "SELECT COUNT(DISTINCT c.id) as total_conversations,
-                     COUNT(DISTINCT CASE WHEN EXISTS (
-                         SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'agent'
-                     ) THEN c.id END) as with_agent,
-                     COUNT(DISTINCT CASE WHEN EXISTS (
-                         SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact'
-                     ) THEN c.id END) as with_contact
-                     FROM conversations c
-                     WHERE c.created_at >= ? AND c.created_at <= ?";
-        $checkResult = \App\Helpers\Database::fetch($checkSql, [$dateFrom, $dateTo]);
-        
-        self::logDash("getAverageFirstResponseTime check: " . json_encode($checkResult));
-        
-        $sql = "SELECT AVG(TIMESTAMPDIFF(MINUTE, 
-                    (SELECT MIN(m1.created_at) 
-                     FROM messages m1 
-                     WHERE m1.conversation_id = c.id 
-                     AND m1.sender_type = 'contact'),
-                    (SELECT MIN(m2.created_at) 
-                     FROM messages m2 
-                     WHERE m2.conversation_id = c.id 
-                     AND m2.sender_type = 'agent')
-                )) as avg_time
-                FROM conversations c
-                WHERE c.created_at >= ?
-                AND c.created_at <= ?
-                AND EXISTS (
-                    SELECT 1 FROM messages m3 
-                    WHERE m3.conversation_id = c.id 
-                    AND m3.sender_type = 'agent'
-                )
-                AND EXISTS (
-                    SELECT 1 FROM messages m4 
-                    WHERE m4.conversation_id = c.id 
-                    AND m4.sender_type = 'contact'
-                )";
+        // Usar SEGUNDOS para maior precisão (IA responde em segundos, não minutos)
+        $sql = "SELECT AVG(time_diff_seconds) as avg_seconds
+                FROM (
+                    SELECT 
+                        c.id,
+                        TIMESTAMPDIFF(SECOND, 
+                            (SELECT MIN(m1.created_at) FROM messages m1 WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact'),
+                            (SELECT MIN(m2.created_at) FROM messages m2 WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent')
+                        ) as time_diff_seconds
+                    FROM conversations c
+                    WHERE c.created_at >= ?
+                    AND c.created_at <= ?
+                    AND EXISTS (SELECT 1 FROM messages m3 WHERE m3.conversation_id = c.id AND m3.sender_type = 'agent')
+                    AND EXISTS (SELECT 1 FROM messages m4 WHERE m4.conversation_id = c.id AND m4.sender_type = 'contact')
+                    HAVING time_diff_seconds IS NOT NULL AND time_diff_seconds > 0
+                ) as valid_times";
         
         $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
         
         self::logDash("getAverageFirstResponseTime result: " . json_encode($result));
         
-        return $result && $result['avg_time'] !== null ? round((float)$result['avg_time'], 2) : null;
+        // Retornar segundos e minutos
+        if ($result && isset($result['avg_seconds']) && $result['avg_seconds'] !== null) {
+            $seconds = (float)$result['avg_seconds'];
+            $minutes = $seconds / 60;
+            self::logDash("getAverageFirstResponseTime: {$seconds}s = {$minutes}min");
+            return ['seconds' => round($seconds, 2), 'minutes' => round($minutes, 2)];
+        }
+        
+        return ['seconds' => 0, 'minutes' => 0];
     }
     
     /**
      * Obter tempo médio geral de resposta (em minutos)
      * Calcula o tempo médio entre TODAS as mensagens do cliente e as respostas do agente
+     * NOTA: Usa SEGUNDOS internamente e converte para minutos para maior precisão
      */
-    private static function getAverageResponseTime(string $dateFrom, string $dateTo): ?float
+    private static function getAverageResponseTime(string $dateFrom, string $dateTo): ?array
     {
-        $sql = "SELECT AVG(response_time_minutes) as avg_time
+        // Usar SEGUNDOS para maior precisão (IA responde em segundos)
+        $sql = "SELECT AVG(response_time_seconds) as avg_seconds
                 FROM (
                     SELECT 
-                        m1.conversation_id,
-                        AVG(TIMESTAMPDIFF(MINUTE, m1.created_at, m2.created_at)) as response_time_minutes
+                        TIMESTAMPDIFF(SECOND, m1.created_at, m2.created_at) as response_time_seconds
                     FROM messages m1
                     INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
                         AND m2.sender_type = 'agent'
@@ -480,14 +476,22 @@ class DashboardService
                     WHERE m1.sender_type = 'contact'
                     AND c.created_at >= ?
                     AND c.created_at <= ?
-                    GROUP BY m1.conversation_id
+                    HAVING response_time_seconds IS NOT NULL AND response_time_seconds > 0
                 ) as response_times";
         
         $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
         
         self::logDash("getAverageResponseTime result: " . json_encode($result));
         
-        return $result && $result['avg_time'] !== null ? round((float)$result['avg_time'], 2) : null;
+        // Retornar segundos e minutos
+        if ($result && isset($result['avg_seconds']) && $result['avg_seconds'] !== null) {
+            $seconds = (float)$result['avg_seconds'];
+            $minutes = $seconds / 60;
+            self::logDash("getAverageResponseTime: {$seconds}s = {$minutes}min");
+            return ['seconds' => round($seconds, 2), 'minutes' => round($minutes, 2)];
+        }
+        
+        return ['seconds' => 0, 'minutes' => 0];
     }
 
     /**
@@ -759,37 +763,42 @@ class DashboardService
             return [];
         }
         
+        // Buscar SLA configurado
+        $slaSettings = ConversationSettingsService::getSettings()['sla'] ?? [];
+        $slaFirstResponseMinutes = $slaSettings['first_response_time'] ?? 15;
+        $slaResponseMinutes = $slaSettings['ongoing_response_time'] ?? $slaFirstResponseMinutes; // SLA para respostas contínuas
+        
         // Conversas totais recebidas no período
+        // Usar SEGUNDOS para maior precisão (IA responde em segundos)
         $sql = "SELECT 
                     COUNT(DISTINCT c.id) as total_conversations,
                     COUNT(DISTINCT CASE WHEN c.status = 'open' THEN c.id END) as open_conversations,
                     COUNT(DISTINCT CASE WHEN c.status = 'resolved' THEN c.id END) as resolved_conversations,
                     COUNT(DISTINCT CASE WHEN c.status = 'closed' THEN c.id END) as closed_conversations,
                     AVG(TIMESTAMPDIFF(HOUR, c.created_at, COALESCE(c.resolved_at, c.updated_at))) as avg_resolution_hours,
-                    AVG(TIMESTAMPDIFF(MINUTE, 
+                    AVG(TIMESTAMPDIFF(SECOND, 
                         (SELECT MIN(m1.created_at) FROM messages m1 
                          WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact'),
                         (SELECT MIN(m2.created_at) FROM messages m2 
                          WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent')
-                    )) as avg_first_response_minutes,
-                    COUNT(DISTINCT CASE WHEN TIMESTAMPDIFF(MINUTE, 
+                    )) as avg_first_response_seconds,
+                    COUNT(DISTINCT CASE WHEN TIMESTAMPDIFF(SECOND, 
                         (SELECT MIN(m1.created_at) FROM messages m1 
                          WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact'),
                         (SELECT MIN(m2.created_at) FROM messages m2 
                          WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent')
-                    ) <= 5 THEN c.id END) as responded_5min,
-                    COUNT(DISTINCT CASE WHEN TIMESTAMPDIFF(MINUTE, 
-                        (SELECT MIN(m1.created_at) FROM messages m1 
-                         WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact'),
-                        (SELECT MIN(m2.created_at) FROM messages m2 
-                         WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent')
-                    ) <= 15 THEN c.id END) as responded_15min
+                    ) <= ? THEN c.id END) as first_response_within_sla
                 FROM conversations c
                 WHERE c.agent_id = ?
                 AND (c.created_at >= ? OR c.updated_at >= ?)
                 AND (c.created_at <= ? OR c.updated_at <= ?)";
         
+        // SLA em segundos
+        $slaFirstResponseSeconds = $slaFirstResponseMinutes * 60;
+        $slaResponseSeconds = $slaResponseMinutes * 60;
+        
         $metrics = \App\Helpers\Database::fetch($sql, [
+            $slaFirstResponseSeconds,
             $agentId,
             $dateFrom, $dateFrom,
             $dateTo, $dateTo
@@ -804,12 +813,19 @@ class DashboardService
         $resolved = (int)($metrics['resolved_conversations'] ?? 0);
         $closed = (int)($metrics['closed_conversations'] ?? 0);
         
-        // Calcular tempo médio de resposta geral (todas as trocas de mensagens)
-        $sqlAvgResponse = "SELECT AVG(response_time_minutes) as avg_time
+        // Converter segundos para minutos
+        $avgFirstResponseSeconds = (float)($metrics['avg_first_response_seconds'] ?? 0);
+        $avgFirstResponseMinutes = $avgFirstResponseSeconds > 0 ? round($avgFirstResponseSeconds / 60, 2) : 0;
+        
+        // Calcular tempo médio de resposta geral (todas as trocas de mensagens) - em SEGUNDOS
+        // E também contar quantas respostas estão dentro do SLA de respostas
+        $sqlAvgResponse = "SELECT 
+                    AVG(response_time_seconds) as avg_time_seconds,
+                    COUNT(*) as total_responses,
+                    SUM(CASE WHEN response_time_seconds <= ? THEN 1 ELSE 0 END) as responses_within_sla
                 FROM (
                     SELECT 
-                        m1.conversation_id,
-                        AVG(TIMESTAMPDIFF(MINUTE, m1.created_at, m2.created_at)) as response_time_minutes
+                        TIMESTAMPDIFF(SECOND, m1.created_at, m2.created_at) as response_time_seconds
                     FROM messages m1
                     INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
                         AND m2.sender_type = 'agent'
@@ -826,13 +842,21 @@ class DashboardService
                     AND c.agent_id = ?
                     AND c.created_at >= ?
                     AND c.created_at <= ?
-                    GROUP BY m1.conversation_id
                 ) as response_times";
         
-        $avgResponseResult = \App\Helpers\Database::fetch($sqlAvgResponse, [$agentId, $dateFrom, $dateTo]);
-        $avgResponseMinutes = $avgResponseResult && $avgResponseResult['avg_time'] !== null 
-            ? round((float)$avgResponseResult['avg_time'], 2) 
+        $avgResponseResult = \App\Helpers\Database::fetch($sqlAvgResponse, [$slaResponseSeconds, $agentId, $dateFrom, $dateTo]);
+        $avgResponseSeconds = $avgResponseResult && $avgResponseResult['avg_time_seconds'] !== null 
+            ? (float)$avgResponseResult['avg_time_seconds']
             : 0;
+        $avgResponseMinutes = $avgResponseSeconds > 0 ? round($avgResponseSeconds / 60, 2) : 0;
+        $totalResponses = (int)($avgResponseResult['total_responses'] ?? 0);
+        $responsesWithinSla = (int)($avgResponseResult['responses_within_sla'] ?? 0);
+        
+        // Calcular taxa de SLA de primeira resposta
+        $slaFirstResponseRate = $total > 0 ? round((($metrics['first_response_within_sla'] ?? 0) / $total) * 100, 2) : 0;
+        
+        // Calcular taxa de SLA de respostas
+        $slaResponseRate = $totalResponses > 0 ? round(($responsesWithinSla / $totalResponses) * 100, 2) : 0;
         
         return [
             'agent_id' => $agentId,
@@ -844,10 +868,26 @@ class DashboardService
             'resolved_conversations' => $resolved,
             'closed_conversations' => $closed,
             'avg_resolution_hours' => round((float)($metrics['avg_resolution_hours'] ?? 0), 2),
-            'avg_first_response_minutes' => round((float)($metrics['avg_first_response_minutes'] ?? 0), 2),
+            
+            // Tempo de primeira resposta
+            'avg_first_response_minutes' => $avgFirstResponseMinutes,
+            'avg_first_response_seconds' => round($avgFirstResponseSeconds, 2),
+            
+            // Tempo médio de respostas
             'avg_response_minutes' => $avgResponseMinutes,
-            'sla_5min_rate' => $total > 0 ? round((($metrics['responded_5min'] ?? 0) / $total) * 100, 2) : 0,
-            'sla_15min_rate' => $total > 0 ? round((($metrics['responded_15min'] ?? 0) / $total) * 100, 2) : 0,
+            'avg_response_seconds' => round($avgResponseSeconds, 2),
+            
+            // SLA de primeira resposta
+            'sla_first_response_minutes' => $slaFirstResponseMinutes,
+            'sla_first_response_rate' => $slaFirstResponseRate,
+            'first_response_within_sla' => (int)($metrics['first_response_within_sla'] ?? 0),
+            
+            // SLA de respostas
+            'sla_response_minutes' => $slaResponseMinutes,
+            'sla_response_rate' => $slaResponseRate,
+            'total_responses' => $totalResponses,
+            'responses_within_sla' => $responsesWithinSla,
+            
             'resolution_rate' => $total > 0 ? round((($resolved + $closed) / $total) * 100, 2) : 0
         ];
     }

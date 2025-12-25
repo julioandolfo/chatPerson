@@ -40,19 +40,49 @@ class ConversationMention extends Model
         int $mentionedUserId, 
         ?int $messageId = null,
         ?string $note = null,
-        ?string $expiresAt = null
+        ?string $expiresAt = null,
+        string $type = 'invite'
     ): int {
         $sql = "INSERT INTO conversation_mentions 
-                (conversation_id, mentioned_by, mentioned_user_id, message_id, note, expires_at, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())";
+                (conversation_id, mentioned_by, mentioned_user_id, type, message_id, note, expires_at, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
         
         Database::query($sql, [
             $conversationId,
             $mentionedBy,
             $mentionedUserId,
+            $type,
             $messageId,
             $note,
             $expiresAt
+        ]);
+        
+        return (int) Database::lastInsertId();
+    }
+
+    /**
+     * Criar uma solicitação de participação
+     * 
+     * Na solicitação:
+     * - mentioned_by = quem está solicitando
+     * - mentioned_user_id = agente atribuído (0 se não tiver)
+     * - type = 'request'
+     */
+    public static function createRequest(
+        int $conversationId,
+        int $requestingUserId,
+        int $approverId = 0,
+        ?string $note = null
+    ): int {
+        $sql = "INSERT INTO conversation_mentions 
+                (conversation_id, mentioned_by, mentioned_user_id, type, note, created_at, updated_at)
+                VALUES (?, ?, ?, 'request', ?, NOW(), NOW())";
+        
+        Database::query($sql, [
+            $conversationId,
+            $requestingUserId,
+            $approverId,
+            $note
         ]);
         
         return (int) Database::lastInsertId();
@@ -64,7 +94,8 @@ class ConversationMention extends Model
     public static function findWithDetails(int $id): ?array
     {
         $sql = "SELECT m.*,
-                       c.contact_id, ct.name as contact_name, ct.phone as contact_phone,
+                       c.contact_id, c.agent_id as conversation_agent_id,
+                       ct.name as contact_name, ct.phone as contact_phone,
                        mb.name as mentioned_by_name, mb.email as mentioned_by_email, mb.avatar as mentioned_by_avatar,
                        mu.name as mentioned_user_name, mu.email as mentioned_user_email, mu.avatar as mentioned_user_avatar,
                        msg.content as message_content
@@ -77,6 +108,57 @@ class ConversationMention extends Model
                 WHERE m.id = ?";
         
         return Database::fetch($sql, [$id]) ?: null;
+    }
+
+    /**
+     * Obter solicitações de participação pendentes que o usuário pode aprovar
+     * (usuário é agente atribuído ou participante da conversa)
+     */
+    public static function getPendingRequestsToApprove(int $userId): array
+    {
+        $sql = "SELECT m.*,
+                       c.contact_id, c.agent_id,
+                       ct.name as contact_name, ct.phone as contact_phone, ct.avatar as contact_avatar,
+                       c.channel, c.status as conversation_status,
+                       mb.name as requester_name, mb.email as requester_email, mb.avatar as requester_avatar
+                FROM conversation_mentions m
+                LEFT JOIN conversations c ON m.conversation_id = c.id
+                LEFT JOIN contacts ct ON c.contact_id = ct.id
+                LEFT JOIN users mb ON m.mentioned_by = mb.id
+                WHERE m.type = 'request'
+                  AND m.status = 'pending'
+                  AND (
+                      c.agent_id = ?
+                      OR m.conversation_id IN (
+                          SELECT conversation_id FROM conversation_participants 
+                          WHERE user_id = ? AND removed_at IS NULL
+                      )
+                  )
+                ORDER BY m.created_at DESC";
+        
+        return Database::fetchAll($sql, [$userId, $userId]);
+    }
+
+    /**
+     * Contar solicitações de participação pendentes que o usuário pode aprovar
+     */
+    public static function countPendingRequestsToApprove(int $userId): int
+    {
+        $sql = "SELECT COUNT(*) as count
+                FROM conversation_mentions m
+                LEFT JOIN conversations c ON m.conversation_id = c.id
+                WHERE m.type = 'request'
+                  AND m.status = 'pending'
+                  AND (
+                      c.agent_id = ?
+                      OR m.conversation_id IN (
+                          SELECT conversation_id FROM conversation_participants 
+                          WHERE user_id = ? AND removed_at IS NULL
+                      )
+                  )";
+        
+        $result = Database::fetch($sql, [$userId, $userId]);
+        return (int) ($result['count'] ?? 0);
     }
 
     /**
@@ -173,7 +255,7 @@ class ConversationMention extends Model
     }
 
     /**
-     * Verificar se usuário já foi mencionado em uma conversa (pendente)
+     * Verificar se usuário já foi mencionado em uma conversa (pendente) - tipo invite
      */
     public static function hasPendingMention(int $conversationId, int $userId): bool
     {
@@ -181,10 +263,43 @@ class ConversationMention extends Model
                 WHERE conversation_id = ? 
                   AND mentioned_user_id = ? 
                   AND status = 'pending'
+                  AND (type = 'invite' OR type IS NULL)
                   AND (expires_at IS NULL OR expires_at > NOW())
                 LIMIT 1";
         
         return Database::fetch($sql, [$conversationId, $userId]) !== false;
+    }
+
+    /**
+     * Verificar se usuário tem solicitação de participação pendente
+     */
+    public static function hasPendingRequest(int $conversationId, int $userId): bool
+    {
+        $sql = "SELECT id FROM conversation_mentions 
+                WHERE conversation_id = ? 
+                  AND mentioned_by = ? 
+                  AND type = 'request'
+                  AND status = 'pending'
+                LIMIT 1";
+        
+        return Database::fetch($sql, [$conversationId, $userId]) !== false;
+    }
+
+    /**
+     * Obter solicitações de participação pendentes para uma conversa
+     */
+    public static function getPendingRequestsForConversation(int $conversationId): array
+    {
+        $sql = "SELECT m.*,
+                       mb.name as requester_name, mb.email as requester_email, mb.avatar as requester_avatar
+                FROM conversation_mentions m
+                LEFT JOIN users mb ON m.mentioned_by = mb.id
+                WHERE m.conversation_id = ?
+                  AND m.type = 'request'
+                  AND m.status = 'pending'
+                ORDER BY m.created_at DESC";
+        
+        return Database::fetchAll($sql, [$conversationId]);
     }
 
     /**

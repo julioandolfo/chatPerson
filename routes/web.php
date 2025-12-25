@@ -257,8 +257,10 @@ Router::post('/integrations/notificame/accounts/{id}/webhook', [IntegrationContr
 Router::get('/integrations/notificame/accounts/{id}/templates', [IntegrationController::class, 'listNotificameTemplates'], ['Authentication']);
 Router::get('/integrations/notificame/logs', [IntegrationController::class, 'notificameLogs'], ['Authentication']);
 
-// Webhook Notificame
-Router::post('/webhooks/notificame', 'notificame-webhook.php');
+// Webhook Notificame (executa script diretamente)
+Router::post('/webhooks/notificame', function () {
+    require __DIR__ . '/../public/notificame-webhook.php';
+}, []); // nenhuma middleware
 
 // Rotas de Integrações Api4Com
 Router::get('/integrations/api4com', [Api4ComController::class, 'index'], ['Authentication']);

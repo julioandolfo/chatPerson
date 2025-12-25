@@ -2538,7 +2538,7 @@ class ConversationController
             \App\Helpers\Log::error("[getInvites] Exception: " . $e->getMessage(), 'conversas.log');
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
         } finally {
-            $this->restoreConfig($oldConfig);
+            $this->restoreAfterJsonResponse($oldConfig);
         }
     }
 
@@ -2688,7 +2688,7 @@ class ConversationController
             \App\Helpers\Log::error("[requestParticipation] Exception: " . $e->getMessage(), 'conversas.log');
             Response::json(['success' => false, 'message' => 'Erro ao solicitar participação: ' . $e->getMessage()], 500);
         } finally {
-            $this->restoreConfig($oldConfig);
+            $this->restoreAfterJsonResponse($oldConfig);
         }
     }
 
@@ -2718,7 +2718,7 @@ class ConversationController
             \App\Helpers\Log::error("[approveRequest] Exception: " . $e->getMessage(), 'conversas.log');
             Response::json(['success' => false, 'message' => 'Erro ao aprovar solicitação: ' . $e->getMessage()], 500);
         } finally {
-            $this->restoreConfig($oldConfig);
+            $this->restoreAfterJsonResponse($oldConfig);
         }
     }
 
@@ -2748,7 +2748,7 @@ class ConversationController
             \App\Helpers\Log::error("[rejectRequest] Exception: " . $e->getMessage(), 'conversas.log');
             Response::json(['success' => false, 'message' => 'Erro ao recusar solicitação: ' . $e->getMessage()], 500);
         } finally {
-            $this->restoreConfig($oldConfig);
+            $this->restoreAfterJsonResponse($oldConfig);
         }
     }
 
@@ -2774,7 +2774,7 @@ class ConversationController
             \App\Helpers\Log::error("[getPendingRequests] Exception: " . $e->getMessage(), 'conversas.log');
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
         } finally {
-            $this->restoreConfig($oldConfig);
+            $this->restoreAfterJsonResponse($oldConfig);
         }
     }
 
@@ -2805,7 +2805,7 @@ class ConversationController
             \App\Helpers\Log::error("[getInviteCounts] Exception: " . $e->getMessage(), 'conversas.log');
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
         } finally {
-            $this->restoreConfig($oldConfig);
+            $this->restoreAfterJsonResponse($oldConfig);
         }
     }
 

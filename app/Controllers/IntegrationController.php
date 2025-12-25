@@ -9,7 +9,9 @@ use App\Helpers\Response;
 use App\Helpers\Request;
 use App\Helpers\Permission;
 use App\Services\WhatsAppService;
+use App\Services\NotificameService;
 use App\Models\WhatsAppAccount;
+use App\Models\IntegrationAccount;
 
 class IntegrationController
 {
@@ -458,6 +460,250 @@ class IntegrationController
                 'success' => false,
                 'message' => 'Erro ao atualizar configuração: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    // ============================================
+    // MÉTODOS NOTIFICAME
+    // ============================================
+
+    /**
+     * Listar contas Notificame
+     */
+    public function notificame(): void
+    {
+        Permission::abortIfCannot('notificame.view');
+        
+        try {
+            $channel = Request::get('channel');
+            $accounts = NotificameService::listAccounts($channel);
+            
+            // Enriquecer com nomes de funil e etapa
+            foreach ($accounts as &$account) {
+                if (!empty($account['default_funnel_id'])) {
+                    $funnel = \App\Models\Funnel::find($account['default_funnel_id']);
+                    $account['default_funnel_name'] = $funnel['name'] ?? null;
+                }
+                
+                if (!empty($account['default_stage_id'])) {
+                    $stage = \App\Models\FunnelStage::find($account['default_stage_id']);
+                    $account['default_stage_name'] = $stage['name'] ?? null;
+                }
+            }
+            
+            // Buscar funis disponíveis
+            $funnels = \App\Models\Funnel::whereActive();
+            
+            Response::view('integrations/notificame/index', [
+                'accounts' => $accounts,
+                'funnels' => $funnels,
+                'channels' => NotificameService::CHANNELS
+            ]);
+        } catch (\Exception $e) {
+            Response::view('integrations/notificame/index', [
+                'accounts' => [],
+                'funnels' => [],
+                'channels' => NotificameService::CHANNELS,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Criar conta Notificame
+     */
+    public function createNotificameAccount(): void
+    {
+        Permission::abortIfCannot('notificame.create');
+        
+        try {
+            $data = Request::post();
+            
+            $accountId = NotificameService::createAccount($data);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Conta Notificame criada com sucesso!',
+                'id' => $accountId
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao criar conta: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Atualizar conta Notificame
+     */
+    public function updateNotificameAccount(int $id): void
+    {
+        Permission::abortIfCannot('notificame.edit');
+        
+        try {
+            $data = Request::post();
+            
+            if (NotificameService::updateAccount($id, $data)) {
+                Response::json([
+                    'success' => true,
+                    'message' => 'Conta atualizada com sucesso!'
+                ]);
+            } else {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Falha ao atualizar conta'
+                ], 404);
+            }
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Deletar conta Notificame
+     */
+    public function deleteNotificameAccount(int $id): void
+    {
+        Permission::abortIfCannot('notificame.delete');
+        
+        try {
+            if (NotificameService::deleteAccount($id)) {
+                Response::json([
+                    'success' => true,
+                    'message' => 'Conta deletada com sucesso!'
+                ]);
+            } else {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Falha ao deletar conta'
+                ], 404);
+            }
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Verificar status da conexão Notificame
+     */
+    public function checkNotificameStatus(int $id): void
+    {
+        Permission::abortIfCannot('notificame.view');
+        
+        try {
+            $status = NotificameService::checkConnection($id);
+            
+            Response::json([
+                'success' => true,
+                'status' => $status
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Enviar mensagem de teste Notificame
+     */
+    public function sendNotificameTestMessage(int $id): void
+    {
+        Permission::abortIfCannot('notificame.send');
+        
+        try {
+            $to = Request::post('to');
+            $message = Request::post('message', 'Mensagem de teste do sistema');
+            
+            if (!$to) {
+                throw new \InvalidArgumentException('Destinatário é obrigatório');
+            }
+
+            $result = NotificameService::sendMessage($id, $to, $message);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Mensagem enviada com sucesso!',
+                'data' => $result
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Configurar webhook Notificame
+     */
+    public function configureNotificameWebhook(int $id): void
+    {
+        Permission::abortIfCannot('notificame.edit');
+        
+        try {
+            $webhookUrl = Request::post('webhook_url');
+            $events = Request::post('events', []);
+            
+            if (!$webhookUrl) {
+                // Gerar URL do webhook automaticamente
+                $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                $webhookUrl = "{$protocol}://{$host}/webhooks/notificame";
+            }
+            
+            if (NotificameService::configureWebhook($id, $webhookUrl, $events)) {
+                Response::json([
+                    'success' => true,
+                    'message' => 'Webhook configurado com sucesso!',
+                    'webhook_url' => $webhookUrl
+                ]);
+            } else {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Falha ao configurar webhook'
+                ], 500);
+            }
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Listar templates Notificame
+     */
+    public function listNotificameTemplates(int $id): void
+    {
+        Permission::abortIfCannot('notificame.view');
+        
+        try {
+            $templates = NotificameService::listTemplates($id);
+            
+            Response::json([
+                'success' => true,
+                'templates' => $templates
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
         }
     }
 }

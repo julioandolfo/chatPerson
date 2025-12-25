@@ -1,0 +1,732 @@
+<?php
+/**
+ * Service NotificameService
+ * Integração com Notificame API - Suporte a múltiplos canais
+ * Canais: WhatsApp, Instagram, Facebook, Telegram, Mercado Livre, WebChat, Email, OLX, LinkedIn, Google Business, Youtube, TikTok
+ */
+
+namespace App\Services;
+
+use App\Models\IntegrationAccount;
+use App\Models\Contact;
+use App\Models\Conversation;
+use App\Models\Message;
+use App\Helpers\Logger;
+use App\Helpers\Validator;
+
+class NotificameService
+{
+    const BASE_URL = 'https://app.notificame.com.br/api/v1/';
+    
+    const CHANNELS = [
+        'whatsapp', 'instagram', 'facebook', 'telegram', 
+        'mercadolivre', 'webchat', 'email', 'olx', 
+        'linkedin', 'google_business', 'youtube', 'tiktok'
+    ];
+    
+    /**
+     * Validar canal
+     */
+    public static function validateChannel(string $channel): bool
+    {
+        return in_array($channel, self::CHANNELS);
+    }
+    
+    /**
+     * Normalizar número de telefone
+     */
+    public static function normalizePhoneNumber(string $phone): string
+    {
+        if (empty($phone)) {
+            return '';
+        }
+        
+        // Remover caracteres especiais
+        $phone = str_replace(['+', '-', ' ', '(', ')', '.', '_'], '', $phone);
+        
+        // Remover sufixos comuns
+        $phone = str_replace('@s.whatsapp.net', '', $phone);
+        $phone = str_replace('@lid', '', $phone);
+        $phone = str_replace('@c.us', '', $phone);
+        $phone = str_replace('@g.us', '', $phone);
+        
+        // Extrair apenas dígitos (pode ter : para separar device ID)
+        if (strpos($phone, ':') !== false) {
+            $phone = explode(':', $phone)[0];
+        }
+        
+        return ltrim($phone, '+');
+    }
+    
+    /**
+     * Obter token da conta
+     */
+    private static function getAccountToken(int $accountId): string
+    {
+        $account = IntegrationAccount::find($accountId);
+        if (!$account) {
+            throw new \Exception("Conta de integração não encontrada: {$accountId}");
+        }
+        
+        if ($account['provider'] !== 'notificame') {
+            throw new \Exception("Conta não é do provider Notificame: {$accountId}");
+        }
+        
+        if (empty($account['api_token'])) {
+            throw new \Exception("Token da API não configurado para conta: {$accountId}");
+        }
+        
+        return $account['api_token'];
+    }
+    
+    /**
+     * Fazer requisição à API Notificame
+     */
+    private static function makeRequest(string $endpoint, string $method = 'GET', array $data = [], string $token): array
+    {
+        $url = self::BASE_URL . ltrim($endpoint, '/');
+        
+        $ch = curl_init();
+        
+        $headers = [
+            'Content-Type: application/json',
+            'X-Api-Token: ' . $token
+        ];
+        
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CUSTOMREQUEST => $method,
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_SSL_VERIFYPEER => true
+        ]);
+        
+        if (in_array($method, ['POST', 'PUT', 'PATCH']) && !empty($data)) {
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        }
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        
+        if ($error) {
+            throw new \Exception("Erro na requisição Notificame: {$error}");
+        }
+        
+        $responseData = json_decode($response, true);
+        
+        if ($httpCode >= 400) {
+            $errorMsg = $responseData['message'] ?? $responseData['error'] ?? "Erro HTTP {$httpCode}";
+            throw new \Exception("Erro na API Notificame: {$errorMsg}");
+        }
+        
+        return $responseData ?? [];
+    }
+    
+    /**
+     * Criar conta Notificame
+     */
+    public static function createAccount(array $data): int
+    {
+        $errors = Validator::validate($data, [
+            'name' => 'required|string|max:255',
+            'channel' => 'required|string|in:' . implode(',', self::CHANNELS),
+            'api_token' => 'required|string'
+        ]);
+        
+        if (!empty($errors)) {
+            throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));
+        }
+        
+        if (!self::validateChannel($data['channel'])) {
+            throw new \InvalidArgumentException("Canal inválido: {$data['channel']}");
+        }
+        
+        $accountData = [
+            'name' => $data['name'],
+            'provider' => 'notificame',
+            'channel' => $data['channel'],
+            'api_token' => $data['api_token'],
+            'api_url' => $data['api_url'] ?? self::BASE_URL,
+            'account_id' => $data['account_id'] ?? null,
+            'phone_number' => $data['phone_number'] ?? null,
+            'username' => $data['username'] ?? null,
+            'status' => 'active',
+            'config' => json_encode($data['config'] ?? []),
+            'default_funnel_id' => $data['default_funnel_id'] ?? null,
+            'default_stage_id' => $data['default_stage_id'] ?? null
+        ];
+        
+        $accountId = IntegrationAccount::create($accountData);
+        
+        // Verificar conexão
+        try {
+            self::checkConnection($accountId);
+        } catch (\Exception $e) {
+            Logger::error("Erro ao verificar conexão Notificame: " . $e->getMessage());
+            IntegrationAccount::update($accountId, [
+                'status' => 'error',
+                'error_message' => $e->getMessage()
+            ]);
+        }
+        
+        return $accountId;
+    }
+    
+    /**
+     * Atualizar conta Notificame
+     */
+    public static function updateAccount(int $accountId, array $data): bool
+    {
+        $account = IntegrationAccount::find($accountId);
+        if (!$account || $account['provider'] !== 'notificame') {
+            throw new \Exception("Conta Notificame não encontrada: {$accountId}");
+        }
+        
+        $updateData = [];
+        
+        if (isset($data['name'])) {
+            $updateData['name'] = $data['name'];
+        }
+        if (isset($data['api_token'])) {
+            $updateData['api_token'] = $data['api_token'];
+        }
+        if (isset($data['account_id'])) {
+            $updateData['account_id'] = $data['account_id'];
+        }
+        if (isset($data['phone_number'])) {
+            $updateData['phone_number'] = $data['phone_number'];
+        }
+        if (isset($data['username'])) {
+            $updateData['username'] = $data['username'];
+        }
+        if (isset($data['config'])) {
+            $updateData['config'] = json_encode($data['config']);
+        }
+        if (isset($data['default_funnel_id'])) {
+            $updateData['default_funnel_id'] = $data['default_funnel_id'];
+        }
+        if (isset($data['default_stage_id'])) {
+            $updateData['default_stage_id'] = $data['default_stage_id'];
+        }
+        
+        return IntegrationAccount::update($accountId, $updateData);
+    }
+    
+    /**
+     * Deletar conta Notificame
+     */
+    public static function deleteAccount(int $accountId): bool
+    {
+        $account = IntegrationAccount::find($accountId);
+        if (!$account || $account['provider'] !== 'notificame') {
+            throw new \Exception("Conta Notificame não encontrada: {$accountId}");
+        }
+        
+        return IntegrationAccount::delete($accountId);
+    }
+    
+    /**
+     * Obter conta Notificame
+     */
+    public static function getAccount(int $accountId): ?array
+    {
+        $account = IntegrationAccount::find($accountId);
+        if (!$account || $account['provider'] !== 'notificame') {
+            return null;
+        }
+        
+        return $account;
+    }
+    
+    /**
+     * Listar contas Notificame
+     */
+    public static function listAccounts(string $channel = null): array
+    {
+        $query = IntegrationAccount::where('provider', '=', 'notificame');
+        
+        if ($channel) {
+            $query = $query->where('channel', '=', $channel);
+        }
+        
+        return $query->orderBy('name')->get();
+    }
+    
+    /**
+     * Verificar conexão/status
+     */
+    public static function checkConnection(int $accountId): array
+    {
+        $token = self::getAccountToken($accountId);
+        
+        try {
+            $result = self::makeRequest('health', 'GET', [], $token);
+            
+            IntegrationAccount::update($accountId, [
+                'status' => 'active',
+                'error_message' => null,
+                'last_sync_at' => date('Y-m-d H:i:s')
+            ]);
+            
+            return [
+                'status' => 'active',
+                'connected' => true,
+                'message' => 'Conexão OK',
+                'data' => $result
+            ];
+        } catch (\Exception $e) {
+            IntegrationAccount::update($accountId, [
+                'status' => 'error',
+                'error_message' => $e->getMessage()
+            ]);
+            
+            return [
+                'status' => 'error',
+                'connected' => false,
+                'message' => $e->getMessage()
+            ];
+        }
+    }
+    
+    /**
+     * Verificar status de saúde da API
+     */
+    public static function getHealthStatus(): array
+    {
+        // Tentar com primeira conta ativa para verificar API
+        $account = IntegrationAccount::where('provider', '=', 'notificame')
+            ->where('status', '=', 'active')
+            ->first();
+        
+        if (!$account) {
+            return [
+                'status' => 'unknown',
+                'message' => 'Nenhuma conta ativa encontrada'
+            ];
+        }
+        
+        try {
+            $token = $account['api_token'];
+            $result = self::makeRequest('health', 'GET', [], $token);
+            
+            return [
+                'status' => 'ok',
+                'message' => 'API funcionando',
+                'data' => $result
+            ];
+        } catch (\Exception $e) {
+            return [
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ];
+        }
+    }
+    
+    /**
+     * Enviar mensagem de texto
+     */
+    public static function sendMessage(int $accountId, string $to, string $message, array $options = []): array
+    {
+        $account = IntegrationAccount::find($accountId);
+        if (!$account || $account['provider'] !== 'notificame') {
+            throw new \Exception("Conta Notificame não encontrada: {$accountId}");
+        }
+        
+        $channel = $account['channel'];
+        $token = $account['api_token'];
+        
+        // Preparar payload baseado no canal
+        $payload = [
+            'to' => $to,
+            'message' => $message
+        ];
+        
+        // Adicionar opções específicas
+        if (!empty($options['media_url'])) {
+            $payload['media'] = [
+                'url' => $options['media_url'],
+                'type' => $options['media_type'] ?? 'image'
+            ];
+        }
+        
+        if (!empty($options['caption'])) {
+            $payload['caption'] = $options['caption'];
+        }
+        
+        // Endpoint específico por canal
+        $endpoint = "{$channel}/send";
+        
+        try {
+            $result = self::makeRequest($endpoint, 'POST', $payload, $token);
+            
+            return [
+                'success' => true,
+                'message_id' => $result['id'] ?? $result['message_id'] ?? null,
+                'data' => $result
+            ];
+        } catch (\Exception $e) {
+            Logger::error("Erro ao enviar mensagem Notificame: " . $e->getMessage());
+            throw $e;
+        }
+    }
+    
+    /**
+     * Enviar mídia
+     */
+    public static function sendMedia(int $accountId, string $to, string $mediaUrl, string $type, array $options = []): array
+    {
+        return self::sendMessage($accountId, $to, '', [
+            'media_url' => $mediaUrl,
+            'media_type' => $type,
+            'caption' => $options['caption'] ?? ''
+        ]);
+    }
+    
+    /**
+     * Enviar template
+     */
+    public static function sendTemplate(int $accountId, string $to, string $templateName, array $params = []): array
+    {
+        $account = IntegrationAccount::find($accountId);
+        if (!$account || $account['provider'] !== 'notificame') {
+            throw new \Exception("Conta Notificame não encontrada: {$accountId}");
+        }
+        
+        $channel = $account['channel'];
+        $token = $account['api_token'];
+        
+        $payload = [
+            'to' => $to,
+            'template' => $templateName,
+            'params' => $params
+        ];
+        
+        $endpoint = "{$channel}/template";
+        
+        try {
+            $result = self::makeRequest($endpoint, 'POST', $payload, $token);
+            
+            return [
+                'success' => true,
+                'message_id' => $result['id'] ?? $result['message_id'] ?? null,
+                'data' => $result
+            ];
+        } catch (\Exception $e) {
+            Logger::error("Erro ao enviar template Notificame: " . $e->getMessage());
+            throw $e;
+        }
+    }
+    
+    /**
+     * Enviar mensagem interativa (botões, listas)
+     */
+    public static function sendInteractive(int $accountId, string $to, array $interactiveData): array
+    {
+        $account = IntegrationAccount::find($accountId);
+        if (!$account || $account['provider'] !== 'notificame') {
+            throw new \Exception("Conta Notificame não encontrada: {$accountId}");
+        }
+        
+        $channel = $account['channel'];
+        $token = $account['api_token'];
+        
+        $payload = [
+            'to' => $to,
+            'interactive' => $interactiveData
+        ];
+        
+        $endpoint = "{$channel}/interactive";
+        
+        try {
+            $result = self::makeRequest($endpoint, 'POST', $payload, $token);
+            
+            return [
+                'success' => true,
+                'message_id' => $result['id'] ?? $result['message_id'] ?? null,
+                'data' => $result
+            ];
+        } catch (\Exception $e) {
+            Logger::error("Erro ao enviar mensagem interativa Notificame: " . $e->getMessage());
+            throw $e;
+        }
+    }
+    
+    /**
+     * Configurar webhook
+     */
+    public static function configureWebhook(int $accountId, string $webhookUrl, array $events = []): bool
+    {
+        $account = IntegrationAccount::find($accountId);
+        if (!$account || $account['provider'] !== 'notificame') {
+            throw new \Exception("Conta Notificame não encontrada: {$accountId}");
+        }
+        
+        $channel = $account['channel'];
+        $token = $account['api_token'];
+        
+        $payload = [
+            'url' => $webhookUrl,
+            'events' => !empty($events) ? $events : ['message', 'status']
+        ];
+        
+        $endpoint = "{$channel}/webhook";
+        
+        try {
+            self::makeRequest($endpoint, 'POST', $payload, $token);
+            
+            // Salvar webhook URL na conta
+            IntegrationAccount::update($accountId, [
+                'webhook_url' => $webhookUrl
+            ]);
+            
+            return true;
+        } catch (\Exception $e) {
+            Logger::error("Erro ao configurar webhook Notificame: " . $e->getMessage());
+            throw $e;
+        }
+    }
+    
+    /**
+     * Processar webhook Notificame
+     */
+    public static function processWebhook(array $payload, string $channel): void
+    {
+        Logger::info("Notificame webhook recebido - Channel: {$channel}");
+        
+        // Identificar conta pelo webhook URL ou outros dados do payload
+        $account = self::findAccountByWebhook($payload, $channel);
+        
+        if (!$account) {
+            Logger::error("Conta Notificame não encontrada para webhook - Channel: {$channel}");
+            return;
+        }
+        
+        // Extrair dados da mensagem
+        $messageData = self::extractMessageData($payload, $channel);
+        
+        if (!$messageData) {
+            Logger::warning("Não foi possível extrair dados da mensagem do webhook Notificame");
+            return;
+        }
+        
+        // Criar/encontrar contato
+        $contact = null;
+        $contactData = [
+            'name' => $messageData['name'] ?? null
+        ];
+        
+        // Identificar contato baseado no canal
+        if ($channel === 'whatsapp') {
+            $phone = self::normalizePhoneNumber($messageData['from']);
+            $contact = \App\Models\Contact::findByPhoneNormalized($phone);
+            if (!$contact) {
+                $contactId = \App\Models\Contact::create(array_merge($contactData, [
+                    'phone' => $phone,
+                    'whatsapp_id' => $messageData['from']
+                ]));
+                $contact = \App\Models\Contact::find($contactId);
+            }
+        } elseif ($channel === 'email') {
+            $email = $messageData['from'];
+            $contact = \App\Models\Contact::where('email', '=', $email)->first();
+            if (!$contact) {
+                $contactId = \App\Models\Contact::create(array_merge($contactData, [
+                    'email' => $email
+                ]));
+                $contact = \App\Models\Contact::find($contactId);
+            }
+        } else {
+            // Para outros canais, usar identifier genérico
+            $contact = \App\Models\Contact::findOrCreate(array_merge($contactData, [
+                'identifier' => $messageData['from']
+            ]));
+        }
+        
+        if (!$contact) {
+            Logger::error("Não foi possível criar/encontrar contato para Notificame webhook");
+            return;
+        }
+        
+        // Criar/encontrar conversa
+        $conversationData = [
+            'contact_id' => $contact['id'],
+            'channel' => $channel,
+            'integration_account_id' => $account['id']
+        ];
+        
+        // Buscar conversa existente
+        $conversation = \App\Models\Conversation::where('contact_id', '=', $contact['id'])
+            ->where('channel', '=', $channel)
+            ->where('integration_account_id', '=', $account['id'])
+            ->first();
+        
+        if (!$conversation) {
+            // Criar nova conversa
+            $conversation = ConversationService::create($conversationData, false);
+        }
+        
+        // Salvar mensagem
+        Message::create([
+            'conversation_id' => $conversation['id'],
+            'contact_id' => $contact['id'],
+            'content' => $messageData['content'],
+            'type' => $messageData['type'],
+            'external_id' => $messageData['external_id'],
+            'direction' => 'inbound',
+            'metadata' => json_encode($messageData['metadata'] ?? [])
+        ]);
+        
+        // Notificar via WebSocket
+        try {
+            \App\Helpers\WebSocket::notifyNewMessage($conversation['id']);
+        } catch (\Exception $e) {
+            Logger::error("Erro ao notificar WebSocket: " . $e->getMessage());
+        }
+        
+        // Executar automações
+        try {
+            AutomationService::trigger('message.received', [
+                'conversation_id' => $conversation['id'],
+                'channel' => $channel
+            ]);
+        } catch (\Exception $e) {
+            Logger::error("Erro ao executar automações: " . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Encontrar conta por webhook
+     */
+    private static function findAccountByWebhook(array $payload, string $channel): ?array
+    {
+        // Tentar encontrar por account_id no payload
+        if (isset($payload['account_id'])) {
+            $account = IntegrationAccount::where('provider', '=', 'notificame')
+                ->where('channel', '=', $channel)
+                ->where('account_id', '=', $payload['account_id'])
+                ->first();
+            
+            if ($account) {
+                return $account;
+            }
+        }
+        
+        // Tentar encontrar por phone_number (WhatsApp)
+        if ($channel === 'whatsapp' && isset($payload['from'])) {
+            $phone = self::normalizePhoneNumber($payload['from']);
+            $account = IntegrationAccount::findByPhone($phone, 'whatsapp');
+            
+            if ($account && $account['provider'] === 'notificame') {
+                return $account;
+            }
+        }
+        
+        // Tentar encontrar primeira conta ativa do canal
+        $account = IntegrationAccount::where('provider', '=', 'notificame')
+            ->where('channel', '=', $channel)
+            ->where('status', '=', 'active')
+            ->first();
+        
+        return $account;
+    }
+    
+    /**
+     * Extrair dados da mensagem do payload
+     */
+    private static function extractMessageData(array $payload, string $channel): ?array
+    {
+        $data = [
+            'from' => null,
+            'content' => '',
+            'type' => 'text',
+            'external_id' => null,
+            'name' => null,
+            'metadata' => []
+        ];
+        
+        // Estrutura padrão Notificame
+        if (isset($payload['message'])) {
+            $msg = $payload['message'];
+            $data['from'] = $msg['from'] ?? $msg['sender'] ?? null;
+            $data['content'] = $msg['text'] ?? $msg['content'] ?? '';
+            $data['type'] = $msg['type'] ?? 'text';
+            $data['external_id'] = $msg['id'] ?? $msg['message_id'] ?? null;
+            $data['name'] = $msg['name'] ?? $msg['sender_name'] ?? null;
+            $data['metadata'] = $msg['metadata'] ?? [];
+        } else {
+            // Fallback: usar payload direto
+            $data['from'] = $payload['from'] ?? $payload['sender'] ?? null;
+            $data['content'] = $payload['text'] ?? $payload['content'] ?? $payload['message'] ?? '';
+            $data['type'] = $payload['type'] ?? 'text';
+            $data['external_id'] = $payload['id'] ?? $payload['message_id'] ?? null;
+            $data['name'] = $payload['name'] ?? $payload['sender_name'] ?? null;
+            $data['metadata'] = $payload;
+        }
+        
+        // Processar mídia se houver
+        if (isset($payload['media']) || isset($payload['attachment'])) {
+            $media = $payload['media'] ?? $payload['attachment'];
+            $data['type'] = $media['type'] ?? 'image';
+            $data['content'] = $media['url'] ?? $media['caption'] ?? '';
+            $data['metadata']['media'] = $media;
+        }
+        
+        if (!$data['from']) {
+            return null;
+        }
+        
+        return $data;
+    }
+    
+    /**
+     * Listar templates
+     */
+    public static function listTemplates(int $accountId): array
+    {
+        $account = IntegrationAccount::find($accountId);
+        if (!$account || $account['provider'] !== 'notificame') {
+            throw new \Exception("Conta Notificame não encontrada: {$accountId}");
+        }
+        
+        $channel = $account['channel'];
+        $token = $account['api_token'];
+        
+        $endpoint = "{$channel}/templates";
+        
+        try {
+            $result = self::makeRequest($endpoint, 'GET', [], $token);
+            return $result['templates'] ?? $result['data'] ?? [];
+        } catch (\Exception $e) {
+            Logger::error("Erro ao listar templates Notificame: " . $e->getMessage());
+            return [];
+        }
+    }
+    
+    /**
+     * Criar template
+     */
+    public static function createTemplate(int $accountId, array $templateData): array
+    {
+        $account = IntegrationAccount::find($accountId);
+        if (!$account || $account['provider'] !== 'notificame') {
+            throw new \Exception("Conta Notificame não encontrada: {$accountId}");
+        }
+        
+        $channel = $account['channel'];
+        $token = $account['api_token'];
+        
+        $endpoint = "{$channel}/templates";
+        
+        try {
+            $result = self::makeRequest($endpoint, 'POST', $templateData, $token);
+            return $result;
+        } catch (\Exception $e) {
+            Logger::error("Erro ao criar template Notificame: " . $e->getMessage());
+            throw $e;
+        }
+    }
+}
+

@@ -39,7 +39,7 @@ class ConversationService
         // Validar dados
         $errors = Validator::validate($data, [
             'contact_id' => 'required|integer',
-            'channel' => 'required|string|in:whatsapp,email,chat,telegram'
+            'channel' => 'required|string|in:whatsapp,instagram,facebook,telegram,mercadolivre,webchat,email,olx,linkedin,google_business,youtube,tiktok,chat'
         ]);
 
         // Converter erros para array simples
@@ -61,15 +61,15 @@ class ConversationService
         }
 
         // ------------------------------------------------------------------
-        // Resolver funil/etapa padrão (WhatsApp -> integração -> sistema)
+        // Resolver funil/etapa padrão (Integração -> WhatsApp (legacy) -> sistema)
         // ------------------------------------------------------------------
         $funnelId = $data['funnel_id'] ?? null;
         $stageId = $data['stage_id'] ?? null;
 
-        // 1) Defaults da conta WhatsApp, se aplicável (prioridade da integração)
-        if (!empty($data['whatsapp_account_id'])) {
+        // 1) Defaults da conta de integração, se aplicável (prioridade da integração)
+        if (!empty($data['integration_account_id'])) {
             try {
-                $account = WhatsAppAccount::find((int)$data['whatsapp_account_id']);
+                $account = \App\Models\IntegrationAccount::find((int)$data['integration_account_id']);
                 if ($account && !empty($account['default_funnel_id'])) {
                     $funnelId = (int)$account['default_funnel_id'];
                     
@@ -94,10 +94,43 @@ class ConversationService
                         }
                     }
                 } else {
-                    Logger::debug("ConversationService::create - Integração WhatsApp sem configuração de funil/etapa", 'conversas.log');
+                    Logger::debug("ConversationService::create - Integração sem configuração de funil/etapa", 'conversas.log');
                 }
             } catch (\Exception $e) {
-                error_log("Conversas: erro ao aplicar defaults da conta WhatsApp: " . $e->getMessage());
+                error_log("Conversas: erro ao aplicar defaults da conta de integração: " . $e->getMessage());
+            }
+        }
+        
+        // 1.1) Defaults da conta WhatsApp (legacy), se aplicável (compatibilidade)
+        if ((!$funnelId || !$stageId) && !empty($data['whatsapp_account_id'])) {
+            try {
+                $account = WhatsAppAccount::find((int)$data['whatsapp_account_id']);
+                if ($account && !empty($account['default_funnel_id'])) {
+                    $funnelId = $funnelId ?: (int)$account['default_funnel_id'];
+                    
+                    // Se tem etapa específica configurada, usar ela
+                    if (!empty($account['default_stage_id'])) {
+                        $stageId = $stageId ?: (int)$account['default_stage_id'];
+                        Logger::debug("ConversationService::create - WhatsApp (legacy): Funil ID {$funnelId}, Etapa específica ID {$stageId}", 'conversas.log');
+                    } else {
+                        // Se não tem etapa específica, buscar etapa "Entrada" do funil (sistema obrigatório)
+                        Logger::debug("ConversationService::create - WhatsApp (legacy): Funil ID {$funnelId}, sem etapa específica. Buscando 'Entrada'...", 'conversas.log');
+                        $entradaStage = \App\Models\FunnelStage::getSystemStage($funnelId, 'entrada');
+                        if ($entradaStage) {
+                            $stageId = $stageId ?: (int)$entradaStage['id'];
+                            Logger::debug("ConversationService::create - WhatsApp (legacy): Usando etapa 'Entrada' ID {$stageId}", 'conversas.log');
+                        } else {
+                            // Fallback: primeira etapa do funil
+                            $stages = Funnel::getStages($funnelId);
+                            if (!empty($stages)) {
+                                $stageId = $stageId ?: (int)$stages[0]['id'];
+                                Logger::debug("ConversationService::create - WhatsApp (legacy): 'Entrada' não encontrada, usando primeira etapa ID {$stageId}", 'conversas.log');
+                            }
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                error_log("Conversas: erro ao aplicar defaults da conta WhatsApp (legacy): " . $e->getMessage());
             }
         }
 
@@ -208,7 +241,8 @@ class ConversationService
             'department_id' => $data['department_id'] ?? null,
             'funnel_id' => $data['funnel_id'] ?? null,
             'funnel_stage_id' => $data['stage_id'] ?? null,
-            'whatsapp_account_id' => $data['whatsapp_account_id'] ?? null
+            'integration_account_id' => $data['integration_account_id'] ?? null,
+            'whatsapp_account_id' => $data['whatsapp_account_id'] ?? null // Legacy, manter para compatibilidade
         ];
 
         $id = Conversation::create($conversationData);
@@ -1261,10 +1295,13 @@ class ConversationService
             }
         }
 
-        // **ENVIAR PARA WHATSAPP** se a mensagem for do agente e canal for WhatsApp
-        \App\Helpers\Logger::info("ConversationService::sendMessage - Verificando envio WhatsApp (type={$senderType}, channel={$conversation['channel']}, wa_id=" . ($conversation['whatsapp_account_id'] ?? 'NULL') . ")");
+        // **ENVIAR PARA INTEGRAÇÃO** se a mensagem for do agente
+        $integrationAccountId = $conversation['integration_account_id'] ?? null;
+        $whatsappAccountId = $conversation['whatsapp_account_id'] ?? null; // Legacy
         
-        if ($senderType === 'agent' && $conversation['channel'] === 'whatsapp' && !empty($conversation['whatsapp_account_id'])) {
+        \App\Helpers\Logger::info("ConversationService::sendMessage - Verificando envio (type={$senderType}, channel={$conversation['channel']}, integration_id=" . ($integrationAccountId ?? 'NULL') . ", wa_id=" . ($whatsappAccountId ?? 'NULL') . ")");
+        
+        if ($senderType === 'agent' && ($integrationAccountId || ($conversation['channel'] === 'whatsapp' && $whatsappAccountId))) {
             \App\Helpers\Logger::info("ConversationService::sendMessage - Condições para WhatsApp atendidas, processando envio");
             try {
                 // Obter contato para pegar o telefone
@@ -1374,22 +1411,42 @@ class ConversationService
                         }
                     }
                     
-                    // Enviar mensagem via WhatsApp
-                    \App\Helpers\Logger::info("ConversationService::sendMessage - Chamando WhatsAppService::sendMessage (wa_id={$conversation['whatsapp_account_id']}, phone={$contact['phone']}, contentLen=" . strlen($content) . ")");
+                    // Enviar mensagem via integração
+                    $sendResult = null;
                     
-                    $whatsappResult = \App\Services\WhatsAppService::sendMessage(
-                        $conversation['whatsapp_account_id'],
-                        $contact['phone'],
-                        $content,
-                        $options
-                    );
+                    if ($integrationAccountId) {
+                        // Usar IntegrationService para nova estrutura
+                        \App\Helpers\Logger::info("ConversationService::sendMessage - Chamando IntegrationService::sendMessage (integration_id={$integrationAccountId}, phone={$contact['phone']}, contentLen=" . strlen($content) . ")");
+                        
+                        try {
+                            $sendResult = \App\Services\IntegrationService::sendMessage(
+                                $integrationAccountId,
+                                $contact['phone'] ?? $contact['identifier'] ?? '',
+                                $content,
+                                $options
+                            );
+                        } catch (\Exception $e) {
+                            \App\Helpers\Logger::error("ConversationService::sendMessage - Erro IntegrationService: " . $e->getMessage());
+                            throw $e;
+                        }
+                    } elseif ($whatsappAccountId && $conversation['channel'] === 'whatsapp') {
+                        // Legacy: usar WhatsAppService diretamente
+                        \App\Helpers\Logger::info("ConversationService::sendMessage - Chamando WhatsAppService::sendMessage (wa_id={$whatsappAccountId}, phone={$contact['phone']}, contentLen=" . strlen($content) . ")");
+                        
+                        $sendResult = \App\Services\WhatsAppService::sendMessage(
+                            $whatsappAccountId,
+                            $contact['phone'],
+                            $content,
+                            $options
+                        );
+                    }
                     
-                    \App\Helpers\Logger::info("ConversationService::sendMessage - WhatsApp respondeu: success=" . ($whatsappResult['success'] ?? false) . ", msg_id=" . ($whatsappResult['message_id'] ?? 'NULL'));
+                    \App\Helpers\Logger::info("ConversationService::sendMessage - Integração respondeu: success=" . ($sendResult['success'] ?? false) . ", msg_id=" . ($sendResult['message_id'] ?? 'NULL'));
                     
                     // Atualizar status e external_id da mensagem
-                    if ($whatsappResult['success']) {
+                    if ($sendResult && ($sendResult['success'] ?? false)) {
                         Message::update($messageId, [
-                            'external_id' => $whatsappResult['message_id'] ?? null,
+                            'external_id' => $sendResult['message_id'] ?? null,
                             'status' => 'sent'
                         ]);
                     }

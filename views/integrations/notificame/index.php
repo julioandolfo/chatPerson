@@ -593,8 +593,17 @@ function checkStatus(id) {
     modal.show();
     
     fetch(`/integrations/notificame/accounts/${id}/status`)
-        .then(response => response.json())
-        .then(data => {
+        .then(async response => {
+            const text = await response.text();
+            let data = null;
+            try {
+                data = JSON.parse(text);
+            } catch (e) {
+                // resposta não é JSON, mostrar preview
+                content.innerHTML = `<div class="alert alert-danger">A API retornou uma resposta inválida (não-JSON).<br><small>${text.substring(0, 200)}</small></div>`;
+                return;
+            }
+            
             if (data.success && data.status) {
                 const status = data.status;
                 const statusClass = status.connected ? 'success' : 'danger';

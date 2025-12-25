@@ -96,7 +96,8 @@ class NotificameService
         $headers = [
             'Content-Type: application/json',
             'Accept: application/json',
-            'X-Api-Token: ' . $token
+            'X-Api-Token: ' . $token,
+            'Authorization: Bearer ' . $token
         ];
         
         curl_setopt_array($ch, [
@@ -315,8 +316,9 @@ class NotificameService
         
         Logger::info("Verificando conexão Notificame - Account ID: {$accountId}, API URL: " . ($apiUrl ?: self::BASE_URL));
         
-        // Tentar diferentes endpoints para verificar status
-        $endpoints = ['health', 'status', 'ping', 'me', 'account', 'user'];
+        // Tentar diferentes endpoints para verificar status (seguindo docs Notificame)
+        // Referência: https://app.notificame.com.br/docs/#/api
+        $endpoints = ['user', 'me', 'account', 'health', 'status', 'ping'];
         $lastError = null;
         $errorMessages = [];
         

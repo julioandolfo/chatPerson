@@ -85,6 +85,9 @@ class NotificameService
      */
     private static function makeRequest(string $endpoint, string $token, string $method = 'GET', array $data = [], ?string $apiUrl = null): array
     {
+        if (empty($token)) {
+            throw new \Exception("Token da API não informado para a requisição");
+        }
         // Usar URL da conta se fornecida, senão usar URL base padrão
         $baseUrl = $apiUrl ? rtrim($apiUrl, '/') . '/' : self::BASE_URL;
         $url = $baseUrl . ltrim($endpoint, '/');
@@ -94,11 +97,11 @@ class NotificameService
         
         $ch = curl_init();
         
+        // Conforme docs, usar X-Api-Token; remover Authorization para evitar conflito
         $headers = [
             'Content-Type: application/json',
             'Accept: application/json',
-            'X-Api-Token: ' . $token,
-            'Authorization: Bearer ' . $token
+            'X-Api-Token: ' . $token
         ];
         
         curl_setopt_array($ch, [

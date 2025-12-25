@@ -310,11 +310,21 @@ class ConversationController
 
             $userId = \App\Helpers\Auth::id();
             
+            // 🔍 DEBUG: Log de verificação de acesso
+            \App\Helpers\Log::debug("🔍 [show] Verificando acesso - conversationId={$id}, userId={$userId}", 'conversas.log');
+            \App\Helpers\Log::debug("🔍 [show] Conversa agent_id=" . ($conversation['agent_id'] ?? 'NULL'), 'conversas.log');
+            
             // Verificar tipo de acesso do usuário
             $accessInfo = \App\Services\ConversationMentionService::checkUserAccess($id, $userId);
             
+            // 🔍 DEBUG: Log do resultado de checkUserAccess
+            \App\Helpers\Log::debug("🔍 [show] accessInfo=" . json_encode($accessInfo), 'conversas.log');
+            
             // Se for requisição AJAX, retornar JSON
-            if (\App\Helpers\Request::isAjax() || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+            $isAjax = \App\Helpers\Request::isAjax() || !empty($_SERVER['HTTP_X_REQUESTED_WITH']);
+            \App\Helpers\Log::debug("🔍 [show] isAjax={$isAjax}, HTTP_X_REQUESTED_WITH=" . ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? 'NULL'), 'conversas.log');
+            
+            if ($isAjax) {
                 // Limpar qualquer output buffer antes de retornar JSON
                 while (ob_get_level() > 0) {
                     ob_end_clean();
@@ -326,11 +336,15 @@ class ConversationController
                     $userLevel = \App\Models\User::getMaxLevel($userId);
                     $isAdminOrSupervisor = $userLevel <= 2; // 0=SuperAdmin, 1=Admin, 2=Supervisor
                     
+                    \App\Helpers\Log::debug("🔍 [show] Acesso negado - userLevel={$userLevel}, isAdminOrSupervisor={$isAdminOrSupervisor}", 'conversas.log');
+                    
                     if ($isAdminOrSupervisor) {
                         // Admin/Supervisor pode ver normalmente
                         $accessInfo['can_view'] = true;
                         $accessInfo['is_admin'] = true;
+                        \App\Helpers\Log::debug("🔍 [show] Admin/Supervisor - permitindo acesso", 'conversas.log');
                     } else {
+                        \App\Helpers\Log::debug("🔍 [show] ❌ Retornando access_restricted=true", 'conversas.log');
                         // Retornar dados parciais para exibição ofuscada
                         Response::json([
                             'success' => true,
@@ -356,6 +370,8 @@ class ConversationController
                         ]);
                         return;
                     }
+                } else {
+                    \App\Helpers\Log::debug("🔍 [show] ✅ Acesso permitido - can_view=true", 'conversas.log');
                 }
                 
                 // Marcar mensagens como lidas quando a conversa é aberta

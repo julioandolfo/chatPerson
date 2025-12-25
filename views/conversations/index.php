@@ -1950,7 +1950,7 @@ body.dark-mode .swal2-content {
         }, 300);
     };
     
-    console.log('showNewConversationModal definida no escopo global');
+    // showNewConversationModal definida no escopo global
 })();
 </script>
 
@@ -5206,8 +5206,6 @@ function setupInviteWebSocketListeners() {
     
     // Listener para novo convite recebido
     client.on('new_mention', (data) => {
-        console.log('[Convites] 🔔 Novo convite recebido:', data);
-        
         // Atualizar contador do sino
         loadPendingInvitesCount();
         
@@ -5241,8 +5239,6 @@ function setupInviteWebSocketListeners() {
     
     // Listener para convite aceito (quem enviou o convite recebe)
     client.on('mention_accepted', (data) => {
-        console.log('[Convites] ✅ Convite aceito:', data);
-        
         const mentionData = data.mention || data;
         
         // Mostrar notificação
@@ -5272,8 +5268,6 @@ function setupInviteWebSocketListeners() {
     
     // Listener para convite recusado (quem enviou o convite recebe)
     client.on('mention_declined', (data) => {
-        console.log('[Convites] ❌ Convite recusado:', data);
-        
         const mentionData = data.mention || data;
         
         // Mostrar notificação
@@ -5300,8 +5294,6 @@ function setupInviteWebSocketListeners() {
     client.on('conversation_updated', (data) => {
         // Se o update inclui mudança de participantes, atualizar
         if (data && data.type && data.type.includes('mention')) {
-            console.log('[Convites] 📝 Conversa atualizada (menção):', data);
-            
             if (data.conversation_id && window.currentConversationId == data.conversation_id) {
                 loadParticipantsForConversation(data.conversation_id);
             }
@@ -5314,8 +5306,6 @@ function setupInviteWebSocketListeners() {
     
     // Listener para nova solicitação de participação
     client.on('new_participation_request', (data) => {
-        console.log('[Solicitações] 🔔 Nova solicitação recebida:', data);
-        
         // Atualizar contador do sino
         loadPendingInvitesCount();
         
@@ -5361,8 +5351,6 @@ function setupInviteWebSocketListeners() {
     
     // Listener para solicitação aprovada (quem solicitou recebe)
     client.on('request_approved', (data) => {
-        console.log('[Solicitações] ✅ Solicitação aprovada:', data);
-        
         const requestData = data.mention || data;
         
         // Mostrar notificação
@@ -5397,8 +5385,6 @@ function setupInviteWebSocketListeners() {
     
     // Listener para solicitação recusada (quem solicitou recebe)
     client.on('request_rejected', (data) => {
-        console.log('[Solicitações] ❌ Solicitação recusada:', data);
-        
         const requestData = data.mention || data;
         
         // Mostrar notificação
@@ -5458,10 +5444,7 @@ window.showNewConversationModal = showNewConversationModal;
  * Carregar status da IA na conversa
  */
 window.loadAIAgentStatus = function(conversationId) {
-    console.log('loadAIAgentStatus chamado com conversationId:', conversationId);
-    
     if (!conversationId) {
-        console.warn('loadAIAgentStatus: conversationId não fornecido');
         if (typeof window.updateAIAgentSidebar === 'function') {
             window.updateAIAgentSidebar({ has_ai: false });
         }
@@ -5475,7 +5458,6 @@ window.loadAIAgentStatus = function(conversationId) {
     }
     
     const url = `<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/ai-status`;
-    console.log('Fazendo requisição para:', url);
     
     fetch(url, {
         headers: {
@@ -5484,14 +5466,12 @@ window.loadAIAgentStatus = function(conversationId) {
         }
     })
     .then(response => {
-        console.log('Resposta recebida:', response.status, response.statusText);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         return response.json();
     })
     .then(data => {
-        console.log('Dados recebidos:', data);
         if (data.success) {
             if (typeof window.updateAIAgentSidebar === 'function') {
                 window.updateAIAgentSidebar(data.data);
@@ -5524,26 +5504,15 @@ window.loadAIAgentStatus = function(conversationId) {
  * Atualizar sidebar com status da IA
  */
 window.updateAIAgentSidebar = function(status) {
-    console.log('updateAIAgentSidebar chamado com status:', status);
-    
     const section = document.getElementById('sidebar-ai-agent-section');
-    console.log('Elemento sidebar-ai-agent-section encontrado:', !!section);
     
     if (!section) {
-        console.error('Elemento sidebar-ai-agent-section não encontrado!');
         return;
     }
     
     const statusDiv = document.getElementById('sidebar-ai-status');
     const actionsDiv = document.getElementById('sidebar-ai-actions');
     const addSection = document.getElementById('sidebar-ai-add-section');
-    
-    console.log('Elementos encontrados:', {
-        statusDiv: !!statusDiv,
-        actionsDiv: !!actionsDiv,
-        addSection: !!addSection,
-        hasAI: status.has_ai
-    });
     
     if (status.has_ai && status.ai_agent) {
         // Tem IA ativa
@@ -5578,7 +5547,6 @@ window.updateAIAgentSidebar = function(status) {
         
         if (actionsDiv) actionsDiv.style.display = '';
         if (addSection) addSection.style.display = 'none';
-        console.log('Sidebar atualizado: IA ativa');
     } else {
         // Sem IA ativa
         if (statusDiv) {
@@ -5586,7 +5554,6 @@ window.updateAIAgentSidebar = function(status) {
         }
         if (actionsDiv) actionsDiv.style.display = 'none';
         if (addSection) addSection.style.display = 'block';
-        console.log('Sidebar atualizado: Sem IA - HTML inserido');
     }
     
     // Atualizar banner de IA ativa (se a função existir)
@@ -5658,15 +5625,9 @@ if (typeof window.loadAutomationStatus !== 'function') {
  * Mostrar modal de adicionar agente de IA
  */
 window.showAddAIAgentModal = function() {
-    console.log('🤖 showAddAIAgentModal chamado');
-    console.log('🔍 window.currentConversationId:', window.currentConversationId);
-    console.log('🔍 typeof window.currentConversationId:', typeof window.currentConversationId);
-    
     const conversationId = window.currentConversationId || 0;
-    console.log('🔍 conversationId após || 0:', conversationId);
     
     if (!conversationId) {
-        console.warn('⚠️ conversationId vazio ou zero, mostrando alerta');
         Swal.fire({
             icon: 'warning',
             title: 'Atenção',
@@ -5675,11 +5636,8 @@ window.showAddAIAgentModal = function() {
         return;
     }
     
-    console.log('✅ conversationId válido:', conversationId);
-    
     // Carregar agentes disponíveis
     const url = `<?= \App\Helpers\Url::to('/ai-agents/available') ?>`;
-    console.log('🔍 Carregando agentes de IA de:', url);
     
     fetch(url, {
         headers: {
@@ -5688,27 +5646,19 @@ window.showAddAIAgentModal = function() {
         }
     })
     .then(response => {
-        console.log('📥 Resposta recebida:', response.status, response.statusText);
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        // Capturar o texto primeiro para ver se é HTML
         return response.text().then(text => {
-            console.log('📄 Conteúdo da resposta (primeiros 500 chars):', text.substring(0, 500));
             try {
                 return JSON.parse(text);
             } catch (e) {
-                console.error('❌ Erro ao fazer parse do JSON:', e);
-                console.error('📄 Conteúdo completo:', text);
-                throw new Error('Resposta não é um JSON válido. Verifique o console para mais detalhes.');
+                throw new Error('Resposta não é um JSON válido.');
             }
         });
     })
     .then(data => {
-        console.log('📊 Dados recebidos:', data);
-        
         if (!data.success || !data.data || data.data.length === 0) {
-            console.warn('⚠️ Nenhum agente disponível:', data);
             Swal.fire({
                 icon: 'warning',
                 title: 'Atenção',
@@ -5823,24 +5773,19 @@ window.addAIAgentToConversation = function(conversationId, data) {
                 icon: 'success',
                 title: 'Sucesso!',
                 text: result.message || 'Agente de IA adicionado com sucesso',
-                timer: 2000,
-                showConfirmButton: false
-            });
-            
-            // Recarregar status da IA
-            console.log('🔄 Recarregando status da IA após adicionar, conversationId:', conversationId);
-            
-            // Aguardar um pouco para garantir que o banco foi atualizado
-            setTimeout(() => {
-                console.log('🔄 Chamando loadAIAgentStatus após timeout');
-                window.loadAIAgentStatus(conversationId);
-            }, 500);
-            
-            // Recarregar conversa se necessário
-            if (typeof selectConversation === 'function') {
-                console.log('🔄 Chamando selectConversation para recarregar');
-                selectConversation(conversationId);
-            }
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                    
+                    // Recarregar status da IA após atualização do banco
+                    setTimeout(() => {
+                        window.loadAIAgentStatus(conversationId);
+                    }, 500);
+                    
+                    // Recarregar conversa se necessário
+                    if (typeof selectConversation === 'function') {
+                        selectConversation(conversationId);
+                    }
         } else {
             throw new Error(result.message || 'Erro ao adicionar agente de IA');
         }
@@ -6074,21 +6019,9 @@ window.removeAIAgent = function() {
     });
 };
 
-console.log('✅ Funções de IA definidas no escopo global:', {
-    loadAIAgentStatus: typeof window.loadAIAgentStatus,
-    updateAIAgentSidebar: typeof window.updateAIAgentSidebar,
-    showAddAIAgentModal: typeof window.showAddAIAgentModal,
-    addAIAgentToConversation: typeof window.addAIAgentToConversation,
-    showAIHistory: typeof window.showAIHistory,
-    removeAIAgent: typeof window.removeAIAgent
-});
-
 // ============================================
 // VARIÁVEIS E OUTRAS FUNÇÕES
 // ============================================
-
-// Log inicial para saber se o script principal carregou
-console.log('conversations.js iniciado');
 
 // Capturar erros globais para diagnosticar rapidamente
 window.onerror = function(message, source, lineno, colno, error) {
@@ -6166,7 +6099,6 @@ function attachNewConversationButton() {
     if (btnNewConversation) {
         // Verificar se já tem listener (evitar duplicação)
         if (btnNewConversation.dataset.listenerAttached === 'true') {
-            console.log('Listener já está anexado ao botão');
             return;
         }
         
@@ -6174,20 +6106,13 @@ function attachNewConversationButton() {
         btnNewConversation.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            console.log('Botão de nova conversa clicado (event listener)');
             if (typeof showNewConversationModal === 'function') {
                 showNewConversationModal();
-            } else {
-                console.error('showNewConversationModal não está definida');
             }
         }, true); // Usar capture phase para garantir que execute
         
         // Marcar como anexado
         btnNewConversation.dataset.listenerAttached = 'true';
-        
-        console.log('Event listener adicionado ao botão de nova conversa');
-    } else {
-        console.warn('Botão de nova conversa não encontrado');
     }
 }
 
@@ -6406,16 +6331,10 @@ function applySlaVisualState(conversationItem, conv) {
 function sortConversationList() {
     try {
         const list = document.querySelector('.conversations-list-items');
-        if (!list) {
-            console.log('🔍 sortConversationList: lista não encontrada');
-            return;
-        }
+        if (!list) return;
         
         const items = Array.from(list.children);
-        if (items.length === 0) {
-            console.log('🔍 sortConversationList: nenhum item para ordenar');
-            return;
-        }
+        if (items.length === 0) return;
         
         // Ordenar: pinned primeiro, depois updatedAt desc, depois ID desc (critério de desempate)
         items.sort((a, b) => {
@@ -6438,10 +6357,8 @@ function sortConversationList() {
                 list.appendChild(item);
             }
         });
-        
-        console.log('✅ sortConversationList: lista ordenada com sucesso');
     } catch (error) {
-        console.error('❌ Erro em sortConversationList:', error);
+        // Silently fail
     }
 }
 
@@ -6503,11 +6420,8 @@ function applyConversationUpdate(conv) {
     const isManuallyMarkedAsUnread = window.manuallyMarkedAsUnread && window.manuallyMarkedAsUnread.has(conv.id);
     const hasManualBadge = badge && badge.getAttribute('data-manual-unread') === 'true';
     
-    console.log(`applyConversationUpdate: conv=${conv.id}, isManuallyMarked=${isManuallyMarkedAsUnread}, hasManualBadge=${hasManualBadge}, unread_count=${conv.unread_count}`);
-    
     // Se foi marcada manualmente como não lida, não remover o badge
     if (isManuallyMarkedAsUnread || hasManualBadge) {
-        console.log(`Preservando badge manual para conversa ${conv.id}`);
         // Apenas atualizar o número se aumentou
         if (badge && conv.unread_count > 0) {
             badge.textContent = conv.unread_count;
@@ -6553,8 +6467,6 @@ function startPolling(conversationId) {
     pollingInterval = setInterval(() => {
         checkForNewMessages(conversationId);
     }, 3000);
-    
-    console.log('📡 Polling iniciado para conversa ' + conversationId + ' (WebSocket não disponível)');
 }
 
 /**
@@ -6564,7 +6476,6 @@ function stopPolling() {
     if (pollingInterval) {
         clearInterval(pollingInterval);
         pollingInterval = null;
-        console.log('📡 Polling parado');
     }
     currentPollingConversationId = null;
 }
@@ -6596,19 +6507,6 @@ function checkForNewMessages(conversationId) {
     .then(response => response.json())
     .then(data => {
         if (data.success && data.messages && data.messages.length > 0) {
-            console.group('🔍 checkForNewMessages: Polling antigo recebeu mensagens');
-            console.log(`Total de mensagens novas: ${data.messages.length}`);
-            data.messages.forEach((msg, index) => {
-                console.log(`Mensagem ${index + 1}:`, {
-                    id: msg.id,
-                    sender_type: msg.sender_type,
-                    direction: msg.direction,
-                    type: msg.type,
-                    content: msg.content?.substring(0, 30)
-                });
-            });
-            console.groupEnd();
-            
             // Adicionar apenas mensagens novas
             data.messages.forEach(msg => {
                 const existingMsg = chatMessages.querySelector(`[data-message-id="${msg.id}"]`);
@@ -6709,7 +6607,6 @@ function selectConversation(id) {
         // Remover da lista de marcadas manualmente como não lidas
         if (window.manuallyMarkedAsUnread && window.manuallyMarkedAsUnread.has(id)) {
             window.manuallyMarkedAsUnread.delete(id);
-            console.log(`Conversa ${id} removida da lista de marcadas como não lidas`);
         }
         
         // Remover badge de não lidas imediatamente (otimista - antes da resposta do servidor)
@@ -6781,7 +6678,6 @@ function selectConversation(id) {
             // VERIFICAR SE ACESSO É RESTRITO
             // ============================================
             if (data.access_restricted === true) {
-                console.log('🔒 Acesso restrito à conversa', id, data.access_info);
                 showRestrictedAccessView(id, data.conversation, data.access_info);
                 return;
             }
@@ -6800,7 +6696,6 @@ function selectConversation(id) {
             // Resetar paginação
             currentConversationId = parseInt(id);
             window.currentConversationId = currentConversationId; // Garantir que window também é atualizado
-            console.log('🔄 currentConversationId atualizado para:', currentConversationId);
             currentContactAvatar = data.conversation.contact_avatar || null; // Armazenar avatar do contato
             isLoadingMessages = false;
             hasMoreMessages = true;
@@ -6826,21 +6721,12 @@ function selectConversation(id) {
             updateConversationSidebar(data.conversation, data.tags || []);
             
             // Carregar status da IA e atualizar banner
-            console.log('🔍 [selectConversation] Tentando carregar status da IA...', {
-                id: id,
-                loadAIAgentStatusExists: typeof loadAIAgentStatus
-            });
             if (typeof loadAIAgentStatus === 'function') {
-                console.log('✅ [selectConversation] Chamando loadAIAgentStatus para id:', id);
                 loadAIAgentStatus(id);
-            } else {
-                console.warn('❌ [selectConversation] loadAIAgentStatus não está disponível');
             }
             // Carregar status da automação
             if (typeof loadAutomationStatus === 'function') {
                 loadAutomationStatus(id);
-            } else {
-                console.warn('❌ [selectConversation] loadAutomationStatus não está disponível');
             }
             
             // Atualizar timeline quando conversa é selecionada

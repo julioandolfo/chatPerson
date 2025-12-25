@@ -334,15 +334,17 @@ ob_start();
                     <div class="col-xl-4">
                         <div class="d-flex flex-column align-items-center">
                             <div class="fs-6 fw-semibold text-gray-600 mb-3">📊 Geral (IA + Humanos)</div>
-                            <div class="position-relative" style="width: 120px; height: 120px;">
-                                <svg viewBox="0 0 36 36" class="circular-chart">
-                                    <path class="circle-bg" stroke="#e4e6ef" stroke-width="3" fill="none"
+                            <div class="position-relative d-flex align-items-center justify-content-center" style="width: 120px; height: 120px;">
+                                <svg viewBox="0 0 36 36" class="circular-chart" style="width: 100%; height: 100%;">
+                                    <path class="circle-bg" stroke="#3f4254" stroke-width="3" fill="none"
                                           d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
                                     <path class="circle" stroke="#009EF7" stroke-width="3" stroke-linecap="round" fill="none"
                                           stroke-dasharray="<?= $slaCompliance['general']['rate'] ?? 0 ?>, 100"
                                           d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                                    <text x="18" y="20" text-anchor="middle" class="fs-5 fw-bold" fill="#181C32"><?= number_format($slaCompliance['general']['rate'] ?? 0, 0) ?>%</text>
                                 </svg>
+                                <div class="position-absolute text-center" style="font-size: 1.5rem; font-weight: 700; color: #009EF7;">
+                                    <?= number_format($slaCompliance['general']['rate'] ?? 0, 0) ?>%
+                                </div>
                             </div>
                             <div class="text-muted fs-7 mt-2"><?= $slaCompliance['general']['within_sla'] ?? 0 ?> de <?= $slaCompliance['general']['total'] ?? 0 ?></div>
                         </div>
@@ -353,15 +355,17 @@ ob_start();
                     <div class="col-xl-4">
                         <div class="d-flex flex-column align-items-center">
                             <div class="fs-6 fw-semibold text-gray-600 mb-3">🤖 Apenas IA</div>
-                            <div class="position-relative" style="width: 120px; height: 120px;">
-                                <svg viewBox="0 0 36 36" class="circular-chart">
-                                    <path class="circle-bg" stroke="#e4e6ef" stroke-width="3" fill="none"
+                            <div class="position-relative d-flex align-items-center justify-content-center" style="width: 120px; height: 120px;">
+                                <svg viewBox="0 0 36 36" class="circular-chart" style="width: 100%; height: 100%;">
+                                    <path class="circle-bg" stroke="#3f4254" stroke-width="3" fill="none"
                                           d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
                                     <path class="circle" stroke="#50CD89" stroke-width="3" stroke-linecap="round" fill="none"
                                           stroke-dasharray="<?= $slaCompliance['ai']['rate'] ?? 0 ?>, 100"
                                           d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                                    <text x="18" y="20" text-anchor="middle" class="fs-5 fw-bold" fill="#181C32"><?= number_format($slaCompliance['ai']['rate'] ?? 0, 0) ?>%</text>
                                 </svg>
+                                <div class="position-absolute text-center" style="font-size: 1.5rem; font-weight: 700; color: #50CD89;">
+                                    <?= number_format($slaCompliance['ai']['rate'] ?? 0, 0) ?>%
+                                </div>
                             </div>
                             <div class="text-muted fs-7 mt-2"><?= $slaCompliance['ai']['within_sla'] ?? 0 ?> de <?= $slaCompliance['ai']['total'] ?? 0 ?></div>
                         </div>
@@ -372,15 +376,17 @@ ob_start();
                     <div class="col-xl-4">
                         <div class="d-flex flex-column align-items-center">
                             <div class="fs-6 fw-semibold text-gray-600 mb-3">🧑 Apenas Humanos</div>
-                            <div class="position-relative" style="width: 120px; height: 120px;">
-                                <svg viewBox="0 0 36 36" class="circular-chart">
-                                    <path class="circle-bg" stroke="#e4e6ef" stroke-width="3" fill="none"
+                            <div class="position-relative d-flex align-items-center justify-content-center" style="width: 120px; height: 120px;">
+                                <svg viewBox="0 0 36 36" class="circular-chart" style="width: 100%; height: 100%;">
+                                    <path class="circle-bg" stroke="#3f4254" stroke-width="3" fill="none"
                                           d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
                                     <path class="circle" stroke="#7239EA" stroke-width="3" stroke-linecap="round" fill="none"
                                           stroke-dasharray="<?= $slaCompliance['human']['rate'] ?? 0 ?>, 100"
                                           d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                                    <text x="18" y="20" text-anchor="middle" class="fs-5 fw-bold" fill="#181C32"><?= number_format($slaCompliance['human']['rate'] ?? 0, 0) ?>%</text>
                                 </svg>
+                                <div class="position-absolute text-center" style="font-size: 1.5rem; font-weight: 700; color: #7239EA;">
+                                    <?= number_format($slaCompliance['human']['rate'] ?? 0, 0) ?>%
+                                </div>
                             </div>
                             <div class="text-muted fs-7 mt-2"><?= $slaCompliance['human']['within_sla'] ?? 0 ?> de <?= $slaCompliance['human']['total'] ?? 0 ?></div>
                         </div>

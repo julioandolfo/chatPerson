@@ -605,8 +605,11 @@ class ConversationMentionService
      */
     public static function checkUserAccess(int $conversationId, int $userId): array
     {
+        \App\Helpers\Log::debug("🔍 [checkUserAccess] Iniciando - conversationId={$conversationId}, userId={$userId}", 'conversas.log');
+        
         $conversation = Conversation::find($conversationId);
         if (!$conversation) {
+            \App\Helpers\Log::debug("🔍 [checkUserAccess] Conversa não encontrada", 'conversas.log');
             return [
                 'can_view' => false,
                 'is_participant' => false,
@@ -617,16 +620,23 @@ class ConversationMentionService
         }
         
         // Verificar se é o agente atribuído
-        $isAssigned = $conversation['agent_id'] == $userId;
+        $agentId = $conversation['agent_id'];
+        $isAssigned = !empty($agentId) && $agentId == $userId;
+        
+        \App\Helpers\Log::debug("🔍 [checkUserAccess] agent_id={$agentId} (tipo: " . gettype($agentId) . "), userId={$userId} (tipo: " . gettype($userId) . "), isAssigned=" . ($isAssigned ? 'true' : 'false'), 'conversas.log');
         
         // Verificar se é participante
         $isParticipant = ConversationParticipant::isParticipant($conversationId, $userId);
+        \App\Helpers\Log::debug("🔍 [checkUserAccess] isParticipant=" . ($isParticipant ? 'true' : 'false'), 'conversas.log');
         
         // Verificar se tem solicitação pendente
         $hasPendingRequest = ConversationMention::hasPendingRequest($conversationId, $userId);
+        \App\Helpers\Log::debug("🔍 [checkUserAccess] hasPendingRequest=" . ($hasPendingRequest ? 'true' : 'false'), 'conversas.log');
         
         // Usuário pode ver se é atribuído OU participante
         $canView = $isAssigned || $isParticipant;
+        
+        \App\Helpers\Log::debug("🔍 [checkUserAccess] Resultado: canView=" . ($canView ? 'true' : 'false') . ", reason=" . ($canView ? 'authorized' : 'not_authorized'), 'conversas.log');
         
         return [
             'can_view' => $canView,

@@ -275,13 +275,47 @@ ob_start();
     z-index: 1200 !important;
 }
 
+/* Cabeçalho de Métricas */
+.conversations-metrics-header {
+    padding: 15px 20px;
+    background: var(--bs-body-bg);
+    border-bottom: 1px solid var(--bs-border-color);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.conversations-metrics-header h2 {
+    margin: 0;
+    white-space: nowrap;
+}
+
+.conversations-metrics-header #agent-metrics-container {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+.conversations-metrics-header #agent-metrics-container > div {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
 /* Layout Principal - 3 Colunas */
 .conversations-layout {
     display: flex;
     flex-direction: row;
-    height: calc(100vh - 110px); /* Header do Metronic */
+    height: calc(100vh - 180px); /* Ajustado para incluir o cabeçalho de métricas */
     overflow: hidden;
-    margin: 20px 0 0 0; /* Margem superior apenas */
+    margin: 0;
     padding: 0 20px 0 0; /* Padding à direita para respiro */
     position: relative;
     z-index: 1; /* Z-index baixo para não sobrepor o header */
@@ -1594,6 +1628,31 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
         pointer-events: none;
     }
     
+    /* Cabeçalho de métricas - mobile */
+    .conversations-metrics-header {
+        padding: 10px 15px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .conversations-metrics-header h2 {
+        font-size: 1.25rem;
+    }
+    
+    .conversations-metrics-header #agent-metrics-container {
+        margin-left: 0;
+        width: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .conversations-metrics-header #agent-metrics-container > div {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
     /* Lista de conversas - full width em mobile */
     .conversations-list {
         width: 100%;
@@ -1953,6 +2012,31 @@ body.dark-mode .swal2-content {
     // showNewConversationModal definida no escopo global
 })();
 </script>
+
+<!-- Cabeçalho com Métricas de SLA e Tempo de Resposta -->
+<div class="conversations-metrics-header" style="padding: 15px 20px; background: var(--bs-body-bg); border-bottom: 1px solid var(--bs-border-color); display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+    <div class="d-flex align-items-center gap-3">
+        <h2 class="mb-0 fw-bold fs-3">Conversas - Sistema Multiatendimento</h2>
+    </div>
+    <div class="d-flex align-items-center gap-4 flex-wrap" id="agent-metrics-container" style="margin-left: auto;">
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-muted fs-7">Tempo primeira resposta:</span>
+            <span class="fw-bold text-primary" id="metric-first-response">-</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-muted fs-7">Tempo de respostas:</span>
+            <span class="fw-bold text-info" id="metric-response">-</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-muted fs-7">SLA primeira resposta:</span>
+            <span class="fw-bold" id="metric-sla-first-response">-</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-muted fs-7">SLA Respostas:</span>
+            <span class="fw-bold" id="metric-sla-response">-</span>
+        </div>
+    </div>
+</div>
 
 <div class="conversations-layout">
     
@@ -2526,9 +2610,9 @@ body.dark-mode .swal2-content {
                 <!-- ======================================== -->
                 <!-- ACESSO RESTRITO - TELA OFUSCADA -->
                 <!-- ======================================== -->
-                <div class="restricted-access-container" style="position: relative; height: 100%; overflow: hidden;">
+                <div class="restricted-access-container" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; overflow: hidden; z-index: 100;">
                     <!-- Mensagens fake ofuscadas (blur) -->
-                    <div class="blurred-messages" style="filter: blur(8px); opacity: 0.5; pointer-events: none; height: 100%; padding: 20px;">
+                    <div class="blurred-messages" style="filter: blur(8px); opacity: 0.3; pointer-events: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; padding: 20px; overflow: hidden;">
                         <div class="message message-received mb-3" style="max-width: 70%; background: var(--bs-gray-200); padding: 12px 16px; border-radius: 12px;">
                             <div style="height: 14px; background: var(--bs-gray-400); border-radius: 4px; width: 80%;"></div>
                             <div style="height: 14px; background: var(--bs-gray-400); border-radius: 4px; width: 60%; margin-top: 8px;"></div>
@@ -2957,7 +3041,30 @@ body.dark-mode .swal2-content {
         
     </div>
     
-    <?php include __DIR__ . '/sidebar-conversation.php'; ?>
+    <?php if (empty($accessRestricted)): ?>
+        <?php include __DIR__ . '/sidebar-conversation.php'; ?>
+    <?php else: ?>
+        <!-- Sidebar Ofuscada quando acesso restrito -->
+        <div class="conversation-sidebar" id="conversationSidebar" style="position: relative;">
+            <div style="filter: blur(8px); opacity: 0.3; pointer-events: none; height: 100%; padding: 20px;">
+                <div style="height: 80px; background: var(--bs-gray-200); border-radius: 8px; margin-bottom: 20px;"></div>
+                <div style="height: 40px; background: var(--bs-gray-200); border-radius: 8px; margin-bottom: 15px;"></div>
+                <div style="height: 40px; background: var(--bs-gray-200); border-radius: 8px; margin-bottom: 15px;"></div>
+                <div style="height: 100px; background: var(--bs-gray-200); border-radius: 8px; margin-bottom: 15px;"></div>
+                <div style="height: 60px; background: var(--bs-gray-200); border-radius: 8px;"></div>
+            </div>
+            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; background: rgba(var(--bs-body-bg-rgb, 255, 255, 255), 0.7);">
+                <div class="text-center text-muted">
+                    <i class="ki-duotone ki-lock-2 fs-3x mb-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <p class="fs-7">Acesso Restrito</p>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
     
 </div>
 
@@ -18185,6 +18292,105 @@ function updateAIActiveBanner(status, conversationId) {
         banner.style.display = 'none';
     }
 }
+
+// Função para atualizar métricas do agente atual
+function updateAgentMetrics() {
+    fetch('<?= \App\Helpers\Url::to('/conversations/metrics/current-agent') ?>', {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.metrics) {
+            const metrics = data.metrics;
+            
+            // Atualizar tempo primeira resposta
+            const firstResponseEl = document.getElementById('metric-first-response');
+            if (firstResponseEl) {
+                const minutes = metrics.avg_first_response_minutes || 0;
+                if (minutes > 0) {
+                    if (minutes < 1) {
+                        firstResponseEl.textContent = '< 1 min';
+                    } else {
+                        firstResponseEl.textContent = `${minutes.toFixed(1)} min`;
+                    }
+                } else {
+                    firstResponseEl.textContent = '-';
+                }
+            }
+            
+            // Atualizar tempo de respostas
+            const responseEl = document.getElementById('metric-response');
+            if (responseEl) {
+                const minutes = metrics.avg_response_minutes || 0;
+                if (minutes > 0) {
+                    if (minutes < 1) {
+                        responseEl.textContent = '< 1 min';
+                    } else {
+                        responseEl.textContent = `${minutes.toFixed(1)} min`;
+                    }
+                } else {
+                    responseEl.textContent = '-';
+                }
+            }
+            
+            // Atualizar SLA primeira resposta
+            const slaFirstEl = document.getElementById('metric-sla-first-response');
+            if (slaFirstEl) {
+                const rate = metrics.sla_first_response_rate || 0;
+                const slaMinutes = metrics.sla_first_response_minutes || 15;
+                if (rate > 0) {
+                    slaFirstEl.textContent = `${rate.toFixed(1)}% (${slaMinutes} min)`;
+                    // Cor baseada na taxa
+                    if (rate >= 90) {
+                        slaFirstEl.className = 'fw-bold text-success';
+                    } else if (rate >= 70) {
+                        slaFirstEl.className = 'fw-bold text-warning';
+                    } else {
+                        slaFirstEl.className = 'fw-bold text-danger';
+                    }
+                } else {
+                    slaFirstEl.textContent = `- (${slaMinutes} min)`;
+                    slaFirstEl.className = 'fw-bold text-muted';
+                }
+            }
+            
+            // Atualizar SLA Respostas
+            const slaResponseEl = document.getElementById('metric-sla-response');
+            if (slaResponseEl) {
+                const rate = metrics.sla_response_rate || 0;
+                const slaMinutes = metrics.sla_response_minutes || 15;
+                if (rate > 0) {
+                    slaResponseEl.textContent = `${rate.toFixed(1)}% (${slaMinutes} min)`;
+                    // Cor baseada na taxa
+                    if (rate >= 90) {
+                        slaResponseEl.className = 'fw-bold text-success';
+                    } else if (rate >= 70) {
+                        slaResponseEl.className = 'fw-bold text-warning';
+                    } else {
+                        slaResponseEl.className = 'fw-bold text-danger';
+                    }
+                } else {
+                    slaResponseEl.textContent = `- (${slaMinutes} min)`;
+                    slaResponseEl.className = 'fw-bold text-muted';
+                }
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao atualizar métricas:', error);
+    });
+}
+
+// Atualizar métricas ao carregar a página
+document.addEventListener('DOMContentLoaded', function() {
+    updateAgentMetrics();
+    
+    // Atualizar a cada 30 segundos
+    setInterval(updateAgentMetrics, 30000);
+});
 </script>
 
 <!-- SLA Indicator JavaScript -->

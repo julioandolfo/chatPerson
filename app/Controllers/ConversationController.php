@@ -2734,5 +2734,50 @@ class ConversationController
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
+
+    /**
+     * Obter métricas do agente atual (tempo de resposta e SLA)
+     */
+    public function getCurrentAgentMetrics(): void
+    {
+        $config = $this->prepareJsonResponse();
+        
+        try {
+            $userId = \App\Helpers\Auth::id();
+            if (!$userId) {
+                ob_end_clean();
+                Response::json(['success' => false, 'message' => 'Usuário não autenticado'], 401);
+                return;
+            }
+            
+            // Buscar métricas do agente atual (hoje)
+            $dateFrom = date('Y-m-d') . ' 00:00:00';
+            $dateTo = date('Y-m-d H:i:s');
+            
+            $metrics = \App\Services\DashboardService::getAgentMetrics($userId, $dateFrom, $dateTo);
+            
+            // Buscar configurações de SLA
+            $slaSettings = \App\Services\ConversationSettingsService::getSettings()['sla'] ?? [];
+            $slaFirstResponseMinutes = $slaSettings['first_response_time'] ?? 15;
+            $slaResponseMinutes = $slaSettings['ongoing_response_time'] ?? $slaFirstResponseMinutes;
+            
+            $this->restoreAfterJsonResponse($config);
+            
+            Response::json([
+                'success' => true,
+                'metrics' => [
+                    'avg_first_response_minutes' => $metrics['avg_first_response_minutes'] ?? 0,
+                    'avg_response_minutes' => $metrics['avg_response_minutes'] ?? 0,
+                    'sla_first_response_rate' => $metrics['sla_first_response_rate'] ?? 0,
+                    'sla_response_rate' => $metrics['sla_response_rate'] ?? 0,
+                    'sla_first_response_minutes' => $slaFirstResponseMinutes,
+                    'sla_response_minutes' => $slaResponseMinutes
+                ]
+            ]);
+        } catch (\Exception $e) {
+            $this->restoreAfterJsonResponse($config);
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
 }
 

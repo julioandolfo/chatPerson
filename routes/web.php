@@ -61,6 +61,7 @@ Router::get('/dashboard/ai', [DashboardController::class, 'aiDashboard'], ['Auth
 Router::get('/dashboard/chart-data', [DashboardController::class, 'getChartData'], ['Authentication']);
 Router::get('/dashboard/export', [DashboardController::class, 'exportReport'], ['Authentication']);
 Router::get('/conversations', [ConversationController::class, 'index'], ['Authentication']);
+Router::get('/conversations/metrics/current-agent', [ConversationController::class, 'getCurrentAgentMetrics'], ['Authentication']);
 Router::post('/conversations', [ConversationController::class, 'store'], ['Authentication']);
 // Rotas específicas DEVEM vir ANTES das rotas com parâmetros dinâmicos
 Router::post('/conversations/new', [ConversationController::class, 'newConversation'], ['Authentication']);
@@ -116,12 +117,12 @@ Router::post('/conversations/invites/{mentionId}/accept', [ConversationControlle
 Router::post('/conversations/invites/{mentionId}/decline', [ConversationController::class, 'declineInvite'], ['Authentication']);
 Router::post('/conversations/invites/{mentionId}/cancel', [ConversationController::class, 'cancelInvite'], ['Authentication']);
 
-// Rotas de solicitação de participação
+// Rotas de solicitação de participação (rotas estáticas ANTES das dinâmicas)
+Router::get('/conversations/requests/pending', [ConversationController::class, 'getPendingRequests'], ['Authentication']);
+Router::get('/conversations/invites/counts', [ConversationController::class, 'getInviteCounts'], ['Authentication']);
 Router::post('/conversations/{id}/request-participation', [ConversationController::class, 'requestParticipation'], ['Authentication']);
 Router::post('/conversations/requests/{requestId}/approve', [ConversationController::class, 'approveRequest'], ['Authentication']);
 Router::post('/conversations/requests/{requestId}/reject', [ConversationController::class, 'rejectRequest'], ['Authentication']);
-Router::get('/conversations/requests/pending', [ConversationController::class, 'getPendingRequests'], ['Authentication']);
-Router::get('/conversations/invites/counts', [ConversationController::class, 'getInviteCounts'], ['Authentication']);
 
 // Rotas de ações de conversa
 Router::post('/conversations/{id}/mark-read', [ConversationController::class, 'markRead'], ['Authentication']);

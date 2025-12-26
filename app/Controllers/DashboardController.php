@@ -123,12 +123,16 @@ class DashboardController
             // Taxa de cumprimento de SLA separada
             $slaCompliance = \App\Services\SLAMonitoringService::getSLAComplianceRates($dateFrom, $dateTo);
             
+            // Métricas de fallback de IA
+            $fallbackStats = \App\Services\AIFallbackMonitoringService::getFallbackStats($dateFrom, $dateTo);
+            
             Response::view('dashboard/ai-dashboard', [
                 'stats' => $generalStats,
                 'aiMetrics' => $aiMetrics,
                 'aiAgentsRanking' => $aiAgentsRanking,
                 'comparison' => $comparison,
                 'slaCompliance' => $slaCompliance,
+                'fallbackStats' => $fallbackStats,
                 'dateFrom' => $dateFrom,
                 'dateTo' => $dateTo
             ]);

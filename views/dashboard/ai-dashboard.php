@@ -105,6 +105,111 @@ ob_start();
 </div>
 <!--end::Row-->
 
+<!--begin::Row - Métricas de Fallback de IA-->
+<?php if (isset($fallbackStats)): ?>
+<div class="row g-5 mb-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title fw-bold">
+                    <i class="ki-duotone ki-shield-check fs-2x text-warning me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Monitoramento de Fallback de IA
+                </h3>
+                <div class="card-toolbar">
+                    <span class="badge badge-light-warning fs-7">Sistema de Segurança</span>
+                </div>
+            </div>
+            <div class="card-body pt-5">
+                <div class="row g-5">
+                    <!-- Conversas Travadas Detectadas -->
+                    <div class="col-xl-3">
+                        <div class="d-flex align-items-center">
+                            <i class="ki-duotone ki-information-5 fs-3x text-primary me-3">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            <div>
+                                <div class="fs-2x fw-bold text-gray-800"><?= number_format($fallbackStats['total_stuck'] ?? 0) ?></div>
+                                <div class="text-muted fs-6">Conversas Travadas</div>
+                                <div class="text-muted fs-7 mt-1">Total detectado no período</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Reprocessadas -->
+                    <div class="col-xl-3">
+                        <div class="d-flex align-items-center">
+                            <i class="ki-duotone ki-arrows-circle fs-3x text-success me-3">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <div>
+                                <div class="fs-2x fw-bold text-gray-800"><?= number_format($fallbackStats['reprocessed'] ?? 0) ?></div>
+                                <div class="text-muted fs-6">Reprocessadas</div>
+                                <div class="text-muted fs-7 mt-1">
+                                    <?= $fallbackStats['total_stuck'] > 0 ? number_format($fallbackStats['reprocess_rate'] ?? 0, 1) : '0' ?>% de sucesso
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Escaladas -->
+                    <div class="col-xl-3">
+                        <div class="d-flex align-items-center">
+                            <i class="ki-duotone ki-arrow-up-right fs-3x text-warning me-3">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <div>
+                                <div class="fs-2x fw-bold text-gray-800"><?= number_format($fallbackStats['escalated'] ?? 0) ?></div>
+                                <div class="text-muted fs-6">Escaladas</div>
+                                <div class="text-muted fs-7 mt-1">
+                                    <?= $fallbackStats['total_stuck'] > 0 ? number_format($fallbackStats['escalation_rate'] ?? 0, 1) : '0' ?>% escaladas
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Atualmente Travadas -->
+                    <div class="col-xl-3">
+                        <div class="d-flex align-items-center">
+                            <i class="ki-duotone ki-clock fs-3x text-danger me-3">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <div>
+                                <div class="fs-2x fw-bold text-gray-800"><?= number_format($fallbackStats['currently_stuck'] ?? 0) ?></div>
+                                <div class="text-muted fs-6">Atualmente Travadas</div>
+                                <div class="text-muted fs-7 mt-1">Aguardando processamento</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <?php if (($fallbackStats['currently_stuck'] ?? 0) > 0): ?>
+                <div class="alert alert-warning d-flex align-items-center p-5 mt-5">
+                    <i class="ki-duotone ki-information-5 fs-2x text-warning me-4">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div class="d-flex flex-column">
+                        <h4 class="mb-1">Atenção: Conversas Travadas Detectadas</h4>
+                        <span>Há <?= number_format($fallbackStats['currently_stuck']) ?> conversa(s) aguardando resposta da IA. O sistema de fallback está monitorando e tentará reprocessar automaticamente.</span>
+                    </div>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+<!--end::Row - Métricas de Fallback de IA-->
+<?php endif; ?>
+
 <!--begin::Row - Métricas de Custos e Tempo-->
 <div class="row g-5 mb-5">
     <!--begin::Col - Tempo de Resposta IA-->

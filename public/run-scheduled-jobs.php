@@ -16,6 +16,7 @@ use App\Jobs\SLAMonitoringJob;
 use App\Jobs\FollowupJob;
 use App\Jobs\AICostMonitoringJob;
 use App\Jobs\AutomationDelayJob;
+use App\Jobs\AIFallbackMonitoringJob;
 
 try {
     // Executar monitoramento de SLA
@@ -43,6 +44,11 @@ try {
     echo "[" . date('Y-m-d H:i:s') . "] Executando AutomationDelayJob...\n";
     AutomationDelayJob::run();
     echo "[" . date('Y-m-d H:i:s') . "] AutomationDelayJob concluído\n";
+    
+    // Executar monitoramento de fallback de IA (a cada execução, mas respeita intervalo configurado)
+    echo "[" . date('Y-m-d H:i:s') . "] Executando AIFallbackMonitoringJob...\n";
+    AIFallbackMonitoringJob::run();
+    echo "[" . date('Y-m-d H:i:s') . "] AIFallbackMonitoringJob concluído\n";
     
     echo "[" . date('Y-m-d H:i:s') . "] Todos os jobs executados com sucesso\n";
 } catch (\Exception $e) {

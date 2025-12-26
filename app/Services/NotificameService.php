@@ -392,9 +392,14 @@ class NotificameService
     public static function getHealthStatus(): array
     {
         // Tentar com primeira conta ativa para verificar API
-        $account = IntegrationAccount::where('provider', '=', 'notificame')
-            ->where('status', '=', 'active')
-            ->first();
+        $allAccounts = IntegrationAccount::all();
+        $account = null;
+        foreach ($allAccounts as $acc) {
+            if ($acc['provider'] === 'notificame' && $acc['status'] === 'active') {
+                $account = $acc;
+                break;
+            }
+        }
         
         if (!$account) {
             return [
@@ -695,7 +700,15 @@ class NotificameService
             }
         } elseif ($channel === 'email') {
             $email = $messageData['from'];
-            $contact = \App\Models\Contact::where('email', '=', $email)->first();
+            // Buscar contato por email (compativel com Model que retorna array)
+            $allContacts = \App\Models\Contact::all();
+            $contact = null;
+            foreach ($allContacts as $c) {
+                if ($c['email'] === $email) {
+                    $contact = $c;
+                    break;
+                }
+            }
             if (!$contact) {
                 $contactId = \App\Models\Contact::create(array_merge($contactData, [
                     'email' => $email
@@ -722,13 +735,17 @@ class NotificameService
         ];
         
         // Buscar conversa existente (compativel com Model que retorna array)
-        $conversations = \App\Models\Conversation::where('contact_id', '=', $contact['id'])
-            ->where('channel', '=', $channel)
-            ->where('integration_account_id', '=', $account['id'])
-            ->get();
+        $allConversations = \App\Models\Conversation::all();
         $conversation = null;
-        if (!empty($conversations)) {
-            $conversation = $conversations[0];
+        foreach ($allConversations as $conv) {
+            if (
+                $conv['contact_id'] == $contact['id'] && 
+                $conv['channel'] == $channel && 
+                $conv['integration_account_id'] == $account['id']
+            ) {
+                $conversation = $conv;
+                break;
+            }
         }
         
         if (!$conversation) {

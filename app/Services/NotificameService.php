@@ -757,10 +757,14 @@ class NotificameService
         Message::create([
             'conversation_id' => $conversation['id'],
             'contact_id' => $contact['id'],
+            'sender_id' => $contact['id'],
+            'sender_type' => 'contact',
             'content' => $messageData['content'],
+            'message_type' => $messageData['type'],
             'type' => $messageData['type'],
             'external_id' => $messageData['external_id'],
             'direction' => 'inbound',
+            'status' => 'received',
             'metadata' => json_encode($messageData['metadata'] ?? [])
         ]);
         

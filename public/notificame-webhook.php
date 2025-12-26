@@ -5,14 +5,25 @@
  */
 
 // Resolver caminho do bootstrap (raiz do projeto)
-$bootstrapPath = __DIR__ . '/../bootstrap.php';
-if (!file_exists($bootstrapPath)) {
-    // fallback se estrutura estiver diferente
-    $bootstrapPath = dirname(__DIR__) . '/bootstrap.php';
+$possible = [
+    __DIR__ . '/../bootstrap.php',
+    dirname(__DIR__) . '/bootstrap.php',
+    dirname(__DIR__, 2) . '/bootstrap.php',
+    ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/../bootstrap.php',
+    ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/bootstrap.php',
+];
+
+$bootstrapPath = null;
+foreach ($possible as $p) {
+    if ($p && file_exists($p)) {
+        $bootstrapPath = $p;
+        break;
+    }
 }
-if (!file_exists($bootstrapPath)) {
+
+if (!$bootstrapPath) {
     http_response_code(500);
-    echo json_encode(['error' => 'bootstrap.php não encontrado']);
+    echo json_encode(['error' => 'bootstrap.php não encontrado em: ' . implode(', ', $possible)]);
     exit;
 }
 require_once $bootstrapPath;

@@ -4,29 +4,10 @@
  * Recebe eventos de todos os canais do Notificame
  */
 
-// Resolver caminho do bootstrap (raiz do projeto)
-$possible = [
-    __DIR__ . '/../bootstrap.php',
-    dirname(__DIR__) . '/bootstrap.php',
-    dirname(__DIR__, 2) . '/bootstrap.php',
-    ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/../bootstrap.php',
-    ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/bootstrap.php',
-];
-
-$bootstrapPath = null;
-foreach ($possible as $p) {
-    if ($p && file_exists($p)) {
-        $bootstrapPath = $p;
-        break;
-    }
-}
-
-if (!$bootstrapPath) {
-    http_response_code(500);
-    echo json_encode(['error' => 'bootstrap.php não encontrado em: ' . implode(', ', $possible)]);
-    exit;
-}
-require_once $bootstrapPath;
+// Carregar autoload e configs (seguindo padrão whatsapp-webhook)
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../config/app.php';
+require_once __DIR__ . '/../config/database.php';
 
 use App\Services\NotificameService;
 use App\Helpers\Logger;

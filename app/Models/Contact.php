@@ -161,21 +161,45 @@ class Contact extends Model
      */
     public static function findOrCreate(array $data): array
     {
+        \App\Helpers\Logger::notificame("[INFO] Contact::findOrCreate - Iniciando busca/criação de contato");
+        \App\Helpers\Logger::notificame("[INFO] Contact::findOrCreate - Dados recebidos: " . json_encode([
+            'has_identifier' => !empty($data['identifier']),
+            'identifier' => $data['identifier'] ?? 'NULL',
+            'has_phone' => !empty($data['phone']),
+            'has_email' => !empty($data['email']),
+            'has_avatar' => !empty($data['avatar']),
+            'name' => $data['name'] ?? 'NULL'
+        ], JSON_UNESCAPED_UNICODE));
+        
         $contact = null;
         
         // Tentar encontrar por identifier primeiro (Instagram, Facebook, etc)
         if (!empty($data['identifier'])) {
+            \App\Helpers\Logger::notificame("[INFO] Contact::findOrCreate - Buscando por identifier: {$data['identifier']}");
             $contact = self::findByIdentifier($data['identifier']);
+            if ($contact) {
+                \App\Helpers\Logger::notificame("[INFO] Contact::findOrCreate - Contato ENCONTRADO por identifier, ID: {$contact['id']}");
+            } else {
+                \App\Helpers\Logger::notificame("[INFO] Contact::findOrCreate - Nenhum contato encontrado por identifier");
+            }
         }
         
         // Tentar encontrar por telefone
         if (!$contact && !empty($data['phone'])) {
+            \App\Helpers\Logger::notificame("[INFO] Contact::findOrCreate - Buscando por phone: {$data['phone']}");
             $contact = self::findByPhone($data['phone']);
+            if ($contact) {
+                \App\Helpers\Logger::notificame("[INFO] Contact::findOrCreate - Contato ENCONTRADO por phone, ID: {$contact['id']}");
+            }
         }
         
         // Se não encontrou, tentar por email
         if (!$contact && !empty($data['email'])) {
+            \App\Helpers\Logger::notificame("[INFO] Contact::findOrCreate - Buscando por email: {$data['email']}");
             $contact = self::findByEmail($data['email']);
+            if ($contact) {
+                \App\Helpers\Logger::notificame("[INFO] Contact::findOrCreate - Contato ENCONTRADO por email, ID: {$contact['id']}");
+            }
         }
         
         // Se encontrou mas precisa atualizar dados (ex: avatar, identifier)
@@ -187,32 +211,53 @@ class Contact extends Model
             if (!empty($data['identifier']) && empty($contact['identifier'])) {
                 $updateData['identifier'] = $data['identifier'];
                 $needsUpdate = true;
+                \App\Helpers\Logger::notificame("[INFO] Contact::findOrCreate - Adicionando identifier ao contato existente");
             }
             
             // Atualizar avatar se não tinha antes ou se mudou
             if (!empty($data['avatar']) && ($contact['avatar'] !== $data['avatar'])) {
                 $updateData['avatar'] = $data['avatar'];
                 $needsUpdate = true;
+                \App\Helpers\Logger::notificame("[INFO] Contact::findOrCreate - Atualizando avatar do contato existente");
             }
             
             // Atualizar nome se não tinha antes
             if (!empty($data['name']) && empty($contact['name'])) {
                 $updateData['name'] = $data['name'];
                 $needsUpdate = true;
+                \App\Helpers\Logger::notificame("[INFO] Contact::findOrCreate - Atualizando nome do contato existente");
             }
             
             if ($needsUpdate) {
+                \App\Helpers\Logger::notificame("[INFO] Contact::findOrCreate - Atualizando contato ID {$contact['id']} com: " . json_encode($updateData, JSON_UNESCAPED_UNICODE));
                 self::update($contact['id'], $updateData);
                 $contact = self::find($contact['id']); // Recarregar
+                \App\Helpers\Logger::notificame("[INFO] Contact::findOrCreate - Contato atualizado e recarregado");
             }
         }
         
         // Se não encontrou, criar novo
         if (!$contact) {
-            $id = self::create($data);
-            $contact = self::find($id);
+            \App\Helpers\Logger::notificame("[INFO] Contact::findOrCreate - Nenhum contato encontrado, criando NOVO contato");
+            \App\Helpers\Logger::notificame("[INFO] Contact::findOrCreate - Dados para criação: " . json_encode($data, JSON_UNESCAPED_UNICODE));
+            
+            try {
+                $id = self::create($data);
+                \App\Helpers\Logger::notificame("[INFO] Contact::findOrCreate - Contato criado com ID: {$id}");
+                $contact = self::find($id);
+                if ($contact) {
+                    \App\Helpers\Logger::notificame("[INFO] Contact::findOrCreate - Contato criado e encontrado com sucesso");
+                } else {
+                    \App\Helpers\Logger::notificame("[ERROR] Contact::findOrCreate - Contato criado mas não encontrado ao buscar novamente!");
+                }
+            } catch (\Exception $e) {
+                \App\Helpers\Logger::notificame("[ERROR] Contact::findOrCreate - Erro ao criar contato: " . $e->getMessage());
+                \App\Helpers\Logger::notificame("[ERROR] Contact::findOrCreate - Trace: " . $e->getTraceAsString());
+                throw $e;
+            }
         }
         
+        \App\Helpers\Logger::notificame("[INFO] Contact::findOrCreate - Retornando contato ID: " . ($contact['id'] ?? 'NULL'));
         return $contact;
     }
 

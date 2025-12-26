@@ -782,11 +782,21 @@ class NotificameService
                 $contactCreateData['avatar'] = $messageData['avatar'];
             }
             
-            $contact = \App\Models\Contact::findOrCreate($contactCreateData);
+            self::logInfo("Notificame webhook: Dados para findOrCreate: " . json_encode($contactCreateData, JSON_UNESCAPED_UNICODE));
+            
+            try {
+                $contact = \App\Models\Contact::findOrCreate($contactCreateData);
+                self::logInfo("Notificame webhook: findOrCreate retornou: " . ($contact ? 'SUCESSO' : 'NULL'));
+            } catch (\Exception $e) {
+                self::logError("Notificame webhook: Erro em findOrCreate: " . $e->getMessage());
+                self::logError("Notificame webhook: Trace: " . $e->getTraceAsString());
+                self::logInfo("========== Notificame Webhook FIM (Erro: findOrCreate falhou) ==========");
+                return;
+            }
         }
         
         if (!$contact) {
-            self::logError("Notificame webhook: Não foi possível criar/encontrar contato");
+            self::logError("Notificame webhook: Não foi possível criar/encontrar contato (retornou NULL)");
             self::logInfo("========== Notificame Webhook FIM (Erro: Contato inválido) ==========");
             return;
         }
@@ -796,6 +806,7 @@ class NotificameService
         self::logInfo("  - Name: {$contact['name']}");
         self::logInfo("  - Phone: " . ($contact['phone'] ?? 'NULL'));
         self::logInfo("  - Identifier: " . ($contact['identifier'] ?? 'NULL'));
+        self::logInfo("  - Avatar: " . (isset($contact['avatar']) ? (strlen($contact['avatar']) > 50 ? substr($contact['avatar'], 0, 50) . '...' : $contact['avatar']) : 'NULL'));
         self::logInfo("  - Email: " . ($contact['email'] ?? 'NULL'));
         
         // Criar/encontrar conversa
@@ -805,44 +816,72 @@ class NotificameService
             'integration_account_id' => $account['id']
         ];
         
+        self::logInfo("Notificame webhook: Buscando conversa existente...");
+        self::logInfo("  - ContactID: {$contact['id']}");
+        self::logInfo("  - Channel: {$channel}");
+        self::logInfo("  - IntegrationAccountID: {$account['id']}");
+        
         // Buscar conversa existente (compativel com Model que retorna array)
-        $allConversations = \App\Models\Conversation::all();
-        $conversation = null;
-        foreach ($allConversations as $conv) {
-            if (
-                $conv['contact_id'] == $contact['id'] && 
-                $conv['channel'] == $channel && 
-                $conv['integration_account_id'] == $account['id']
-            ) {
-                $conversation = $conv;
-                break;
+        try {
+            $allConversations = \App\Models\Conversation::all();
+            self::logInfo("Notificame webhook: Total de conversas no sistema: " . count($allConversations));
+            
+            $conversation = null;
+            foreach ($allConversations as $conv) {
+                if (
+                    $conv['contact_id'] == $contact['id'] && 
+                    $conv['channel'] == $channel && 
+                    $conv['integration_account_id'] == $account['id']
+                ) {
+                    $conversation = $conv;
+                    break;
+                }
             }
+            
+            if ($conversation) {
+                self::logInfo("Notificame webhook: Conversa EXISTENTE encontrada - ConversationID={$conversation['id']}");
+            } else {
+                self::logInfo("Notificame webhook: Nenhuma conversa existente encontrada, criando NOVA conversa...");
+            }
+        } catch (\Exception $e) {
+            self::logError("Notificame webhook: Erro ao buscar conversas: " . $e->getMessage());
+            self::logInfo("========== Notificame Webhook FIM (Erro: Busca de conversa falhou) ==========");
+            return;
         }
         
         $isNewConversation = false;
         if (!$conversation) {
             // Criar nova conversa
             self::logInfo("Notificame webhook: Criando NOVA conversa - ContactID={$contact['id']}, Channel={$channel}");
-            $conversation = ConversationService::create($conversationData, false);
-            $isNewConversation = true;
-            self::logInfo("Notificame webhook: Nova conversa criada - ConversationID={$conversation['id']}");
+            self::logInfo("Notificame webhook: Dados para criar conversa: " . json_encode($conversationData, JSON_UNESCAPED_UNICODE));
+            
+            try {
+                $conversation = ConversationService::create($conversationData, false);
+                $isNewConversation = true;
+                self::logInfo("Notificame webhook: Nova conversa criada com SUCESSO - ConversationID={$conversation['id']}");
+            } catch (\Exception $e) {
+                self::logError("Notificame webhook: ERRO ao criar conversa: " . $e->getMessage());
+                self::logError("Notificame webhook: Trace: " . $e->getTraceAsString());
+                self::logInfo("========== Notificame Webhook FIM (Erro: Criação de conversa falhou) ==========");
+                return;
+            }
             
             // Notificar nova conversa via WebSocket
             try {
                 $conversationFull = \App\Models\Conversation::find($conversation['id']);
                 if ($conversationFull) {
                     \App\Helpers\WebSocket::notifyNewConversation($conversationFull);
+                    self::logInfo("Notificame webhook: WebSocket notificado sobre nova conversa");
                 }
             } catch (\Exception $e) {
-                self::logError("Erro ao notificar nova conversa via WebSocket: " . $e->getMessage());
+                self::logError("Notificame webhook: Erro ao notificar nova conversa via WebSocket: " . $e->getMessage());
             }
-        } else {
-            self::logInfo("Notificame webhook: Conversa EXISTENTE encontrada - ConversationID={$conversation['id']}");
         }
         
         // Salvar mensagem
         self::logInfo("Notificame webhook: Salvando mensagem - ConversationID={$conversation['id']}, Type={$messageData['type']}");
-        $messageId = Message::create([
+        
+        $messageCreateData = [
             'conversation_id' => $conversation['id'],
             'contact_id' => $contact['id'],
             'sender_id' => $contact['id'],
@@ -854,12 +893,31 @@ class NotificameService
             'direction' => 'inbound',
             'status' => 'received',
             'metadata' => json_encode($messageData['metadata'] ?? [])
-        ]);
-        self::logInfo("Notificame webhook: Mensagem salva - MessageID={$messageId}");
+        ];
+        
+        self::logInfo("Notificame webhook: Dados da mensagem: " . json_encode([
+            'conversation_id' => $conversation['id'],
+            'contact_id' => $contact['id'],
+            'content_length' => strlen($messageData['content']),
+            'type' => $messageData['type']
+        ], JSON_UNESCAPED_UNICODE));
+        
+        try {
+            $messageId = Message::create($messageCreateData);
+            self::logInfo("Notificame webhook: Mensagem salva com SUCESSO - MessageID={$messageId}");
+        } catch (\Exception $e) {
+            self::logError("Notificame webhook: ERRO ao salvar mensagem: " . $e->getMessage());
+            self::logError("Notificame webhook: Trace: " . $e->getTraceAsString());
+            self::logInfo("========== Notificame Webhook FIM (Erro: Salvamento de mensagem falhou) ==========");
+            return;
+        }
         
         // Buscar mensagem criada para notificar
+        self::logInfo("Notificame webhook: Buscando mensagem criada para notificação WebSocket...");
         $message = Message::find($messageId);
+        
         if ($message) {
+            self::logInfo("Notificame webhook: Mensagem encontrada, preparando notificação WebSocket");
             // Adicionar campos necessários para o frontend
             $message['type'] = ($message['message_type'] ?? 'text') === 'note' ? 'note' : 'message';
             $message['direction'] = 'incoming';
@@ -867,26 +925,33 @@ class NotificameService
             // Notificar via WebSocket
             try {
                 \App\Helpers\WebSocket::notifyNewMessage($conversation['id'], $message);
+                self::logInfo("Notificame webhook: WebSocket notificado sobre nova mensagem");
             } catch (\Exception $e) {
-                self::logError("Erro ao notificar WebSocket: " . $e->getMessage());
+                self::logError("Notificame webhook: Erro ao notificar WebSocket de mensagem: " . $e->getMessage());
             }
+        } else {
+            self::logWarning("Notificame webhook: Mensagem não encontrada após criação (MessageID={$messageId})");
         }
         
         // Executar automações
+        self::logInfo("Notificame webhook: Executando automações...");
         try {
             // Se é nova conversa, disparar trigger de conversation.created
             if ($isNewConversation) {
                 self::logInfo("Notificame webhook: Disparando automação de nova conversa - ConversationID={$conversation['id']}");
                 AutomationService::executeForNewConversation($conversation['id']);
+                self::logInfo("Notificame webhook: Automação de nova conversa executada");
             }
             
             // Disparar trigger de message.received
             if (isset($messageId)) {
                 self::logInfo("Notificame webhook: Disparando automação de nova mensagem - MessageID={$messageId}");
                 AutomationService::executeForMessageReceived($messageId);
+                self::logInfo("Notificame webhook: Automação de nova mensagem executada");
             }
         } catch (\Exception $e) {
-            self::logError("Erro ao executar automações: " . $e->getMessage());
+            self::logError("Notificame webhook: Erro ao executar automações: " . $e->getMessage());
+            self::logError("Notificame webhook: Trace: " . $e->getTraceAsString());
         }
         
         self::logInfo("Notificame webhook processado com sucesso!");

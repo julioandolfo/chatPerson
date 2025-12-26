@@ -1428,15 +1428,19 @@ class ConversationService
                         }
                         
                         // Usar IntegrationService para nova estrutura
-                        \App\Helpers\Logger::info("ConversationService::sendMessage - Preparando envio:");
-                        \App\Helpers\Logger::info("  - integration_id: {$integrationAccountId}");
-                        \App\Helpers\Logger::info("  - channel: {$channel}");
-                        \App\Helpers\Logger::info("  - contact_id: {$contact['id']}");
-                        \App\Helpers\Logger::info("  - phone: " . ($contact['phone'] ?? 'NULL'));
-                        \App\Helpers\Logger::info("  - email: " . ($contact['email'] ?? 'NULL'));
-                        \App\Helpers\Logger::info("  - identifier: " . ($contact['identifier'] ?? 'NULL'));
-                        \App\Helpers\Logger::info("  - recipient (usado): {$recipient}");
-                        \App\Helpers\Logger::info("  - contentLen: " . strlen($content));
+                        \App\Helpers\Logger::notificame("[INFO] ========== ConversationService::sendMessage INÍCIO ==========");
+                        \App\Helpers\Logger::notificame("[INFO] ConversationService::sendMessage - Preparando envio:");
+                        \App\Helpers\Logger::notificame("[INFO]   - conversation_id: {$conversationId}");
+                        \App\Helpers\Logger::notificame("[INFO]   - integration_id: {$integrationAccountId}");
+                        \App\Helpers\Logger::notificame("[INFO]   - channel: {$channel}");
+                        \App\Helpers\Logger::notificame("[INFO]   - contact_id: {$contact['id']}");
+                        \App\Helpers\Logger::notificame("[INFO]   - contact_name: {$contact['name']}");
+                        \App\Helpers\Logger::notificame("[INFO]   - phone: " . ($contact['phone'] ?? 'NULL'));
+                        \App\Helpers\Logger::notificame("[INFO]   - email: " . ($contact['email'] ?? 'NULL'));
+                        \App\Helpers\Logger::notificame("[INFO]   - identifier: " . ($contact['identifier'] ?? 'NULL'));
+                        \App\Helpers\Logger::notificame("[INFO]   - recipient (usado): {$recipient}");
+                        \App\Helpers\Logger::notificame("[INFO]   - contentLen: " . strlen($content));
+                        \App\Helpers\Logger::notificame("[INFO]   - messageType: {$messageType}");
                         
                         // Validar se temos um destinatário
                         if (empty($recipient)) {
@@ -1446,14 +1450,22 @@ class ConversationService
                         }
                         
                         try {
+                            \App\Helpers\Logger::notificame("[INFO] ConversationService::sendMessage - Chamando IntegrationService::sendMessage...");
+                            
                             $sendResult = \App\Services\IntegrationService::sendMessage(
                                 $integrationAccountId,
                                 $recipient,
                                 $content,
                                 $options
                             );
+                            
+                            \App\Helpers\Logger::notificame("[INFO] ConversationService::sendMessage - ✅ IntegrationService retornou sucesso!");
+                            \App\Helpers\Logger::notificame("[INFO] ConversationService::sendMessage - SendResult: " . json_encode($sendResult, JSON_UNESCAPED_UNICODE));
+                            \App\Helpers\Logger::notificame("[INFO] ========== ConversationService::sendMessage FIM (Sucesso) ==========");
                         } catch (\Exception $e) {
-                            \App\Helpers\Logger::error("ConversationService::sendMessage - Erro IntegrationService: " . $e->getMessage());
+                            \App\Helpers\Logger::notificame("[ERROR] ConversationService::sendMessage - ❌ Erro IntegrationService: " . $e->getMessage());
+                            \App\Helpers\Logger::notificame("[ERROR] ConversationService::sendMessage - Trace: " . $e->getTraceAsString());
+                            \App\Helpers\Logger::notificame("[ERROR] ========== ConversationService::sendMessage FIM (Erro) ==========");
                             throw $e;
                         }
                     } elseif ($whatsappAccountId && $conversation['channel'] === 'whatsapp') {

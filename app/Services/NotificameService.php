@@ -13,6 +13,7 @@ use App\Models\Conversation;
 use App\Models\Message;
 use App\Helpers\Logger;
 use App\Helpers\Validator;
+use App\Services\AvatarService;
 
 class NotificameService
 {
@@ -503,12 +504,20 @@ class NotificameService
         
         try {
             self::logInfo("========== Notificame sendMessage INÍCIO ==========");
-            self::logInfo("Notificame sendMessage - endpoint={$endpoint}, channel={$channel}, to={$to}, accountId={$accountId}");
-            self::logInfo("Notificame sendMessage - Payload: " . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            self::logInfo("Notificame sendMessage - Account: {$account['name']} (ID: {$accountId})");
+            self::logInfo("Notificame sendMessage - Channel: {$channel}");
+            self::logInfo("Notificame sendMessage - Endpoint: {$endpoint}");
+            self::logInfo("Notificame sendMessage - API URL: " . ($apiUrl ?: self::BASE_URL));
+            self::logInfo("Notificame sendMessage - To (destinatário): {$to}");
+            self::logInfo("Notificame sendMessage - Message length: " . strlen($message));
+            self::logInfo("Notificame sendMessage - Has options: " . (empty($options) ? 'NO' : 'YES (' . implode(', ', array_keys($options)) . ')'));
+            self::logInfo("Notificame sendMessage - Payload completo:");
+            self::logInfo(json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
             
             $result = self::makeRequest($endpoint, $token, 'POST', $payload, $apiUrl);
             
-            self::logInfo("Notificame sendMessage - Resposta API: " . json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            self::logInfo("Notificame sendMessage - ✅ Resposta API (sucesso):");
+            self::logInfo(json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
             self::logInfo("========== Notificame sendMessage FIM (Sucesso) ==========");
             
             return [
@@ -722,9 +731,29 @@ class NotificameService
             'name' => $contactName
         ];
         
-        // Adicionar avatar se disponível
+        // Adicionar avatar se disponível (baixar e salvar localmente)
         if (!empty($messageData['avatar'])) {
-            $contactData['avatar'] = $messageData['avatar'];
+            self::logInfo("Notificame webhook: Avatar detectado, verificando se é URL externa...");
+            
+            if (AvatarService::isExternalUrl($messageData['avatar'])) {
+                self::logInfo("Notificame webhook: Avatar é URL externa, baixando e salvando localmente...");
+                $localAvatar = AvatarService::downloadAndSaveAvatar(
+                    $messageData['avatar'], 
+                    $messageData['from'], 
+                    $channel
+                );
+                
+                if ($localAvatar) {
+                    $contactData['avatar'] = $localAvatar;
+                    self::logInfo("Notificame webhook: Avatar salvo localmente: {$localAvatar}");
+                } else {
+                    self::logWarning("Notificame webhook: Falha ao baixar avatar, usando URL original");
+                    $contactData['avatar'] = $messageData['avatar'];
+                }
+            } else {
+                $contactData['avatar'] = $messageData['avatar'];
+                self::logInfo("Notificame webhook: Avatar já é local: {$messageData['avatar']}");
+            }
         }
         
         // Identificar contato baseado no canal
@@ -741,7 +770,22 @@ class NotificameService
             } else {
                 // Atualizar avatar se disponível e diferente
                 if (!empty($messageData['avatar']) && $contact['avatar'] !== $messageData['avatar']) {
-                    \App\Models\Contact::update($contact['id'], ['avatar' => $messageData['avatar']]);
+                    $avatarToSave = $messageData['avatar'];
+                    
+                    // Se for URL externa, baixar e salvar localmente
+                    if (AvatarService::isExternalUrl($messageData['avatar'])) {
+                        $localAvatar = AvatarService::downloadAndSaveAvatar(
+                            $messageData['avatar'], 
+                            $messageData['from'], 
+                            $channel
+                        );
+                        if ($localAvatar) {
+                            $avatarToSave = $localAvatar;
+                            self::logInfo("Notificame webhook: Avatar WhatsApp atualizado localmente: {$localAvatar}");
+                        }
+                    }
+                    
+                    \App\Models\Contact::update($contact['id'], ['avatar' => $avatarToSave]);
                     $contact = \App\Models\Contact::find($contact['id']);
                 }
             }
@@ -765,7 +809,22 @@ class NotificameService
             } else {
                 // Atualizar avatar se disponível e diferente
                 if (!empty($messageData['avatar']) && $contact['avatar'] !== $messageData['avatar']) {
-                    \App\Models\Contact::update($contact['id'], ['avatar' => $messageData['avatar']]);
+                    $avatarToSave = $messageData['avatar'];
+                    
+                    // Se for URL externa, baixar e salvar localmente
+                    if (AvatarService::isExternalUrl($messageData['avatar'])) {
+                        $localAvatar = AvatarService::downloadAndSaveAvatar(
+                            $messageData['avatar'], 
+                            $messageData['from'], 
+                            $channel
+                        );
+                        if ($localAvatar) {
+                            $avatarToSave = $localAvatar;
+                            self::logInfo("Notificame webhook: Avatar Email atualizado localmente: {$localAvatar}");
+                        }
+                    }
+                    
+                    \App\Models\Contact::update($contact['id'], ['avatar' => $avatarToSave]);
                     $contact = \App\Models\Contact::find($contact['id']);
                 }
             }

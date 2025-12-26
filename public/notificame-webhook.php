@@ -4,7 +4,18 @@
  * Recebe eventos de todos os canais do Notificame
  */
 
-require_once __DIR__ . '/../bootstrap.php';
+// Resolver caminho do bootstrap (raiz do projeto)
+$bootstrapPath = __DIR__ . '/../bootstrap.php';
+if (!file_exists($bootstrapPath)) {
+    // fallback se estrutura estiver diferente
+    $bootstrapPath = dirname(__DIR__) . '/bootstrap.php';
+}
+if (!file_exists($bootstrapPath)) {
+    http_response_code(500);
+    echo json_encode(['error' => 'bootstrap.php não encontrado']);
+    exit;
+}
+require_once $bootstrapPath;
 
 use App\Services\NotificameService;
 use App\Helpers\Logger;

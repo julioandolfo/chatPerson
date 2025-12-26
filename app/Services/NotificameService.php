@@ -721,11 +721,15 @@ class NotificameService
             'integration_account_id' => $account['id']
         ];
         
-        // Buscar conversa existente
-        $conversation = \App\Models\Conversation::where('contact_id', '=', $contact['id'])
+        // Buscar conversa existente (compativel com Model que retorna array)
+        $conversations = \App\Models\Conversation::where('contact_id', '=', $contact['id'])
             ->where('channel', '=', $channel)
             ->where('integration_account_id', '=', $account['id'])
-            ->first();
+            ->get();
+        $conversation = null;
+        if (!empty($conversations)) {
+            $conversation = $conversations[0];
+        }
         
         if (!$conversation) {
             // Criar nova conversa

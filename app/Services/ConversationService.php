@@ -1547,6 +1547,51 @@ class ConversationService
                 }
             }
             
+            // ✅ NOVO: Se mensagem tem reply/quote, incluir contexto da mensagem citada
+            if ($quotedMessageId) {
+                try {
+                    $quotedMessage = Message::find($quotedMessageId);
+                    if ($quotedMessage) {
+                        $quotedContent = trim($quotedMessage['content'] ?? '');
+                        $quotedSenderType = $quotedMessage['sender_type'] ?? 'unknown';
+                        
+                        // Determinar quem enviou a mensagem citada
+                        $quotedSenderLabel = 'Remetente';
+                        if ($quotedSenderType === 'agent') {
+                            $quotedSender = \App\Models\User::find($quotedMessage['sender_id']);
+                            $quotedSenderLabel = $quotedSender['name'] ?? 'Agente';
+                        } else {
+                            $quotedContact = \App\Models\Contact::find($quotedMessage['sender_id']);
+                            $quotedSenderLabel = $quotedContact['name'] ?? 'Cliente';
+                        }
+                        
+                        // Enriquecer conteúdo com contexto do reply
+                        // Formato: "[Respondendo a {remetente}: {mensagem citada}]\n\n{mensagem atual}"
+                        if (!empty($quotedContent)) {
+                            $replyContext = "[Respondendo a {$quotedSenderLabel}: {$quotedContent}]";
+                        } else {
+                            // Se mensagem citada não tem conteúdo (ex: mídia), usar apenas o remetente
+                            $replyContext = "[Respondendo a {$quotedSenderLabel}]";
+                        }
+                        
+                        if (!empty(trim($processedContent))) {
+                            $processedContent = $replyContext . "\n\n" . $processedContent;
+                        } else {
+                            // Se mensagem atual está vazia (só reply), usar apenas o contexto
+                            $processedContent = $replyContext;
+                        }
+                        
+                        \App\Helpers\Logger::info("ConversationService::sendMessage - Mensagem com reply processada (quotedMsgId={$quotedMessageId}, quotedSender={$quotedSenderLabel}, quotedContentLen=" . strlen($quotedContent) . ", processedContentLen=" . strlen($processedContent) . ")");
+                    } else {
+                        \App\Helpers\Logger::warning("ConversationService::sendMessage - Mensagem citada não encontrada (quotedMsgId={$quotedMessageId})");
+                    }
+                } catch (\Exception $e) {
+                    \App\Helpers\Logger::error("ConversationService::sendMessage - Erro ao processar reply: " . $e->getMessage());
+                    \App\Helpers\Logger::error("ConversationService::sendMessage - Stack trace: " . $e->getTraceAsString());
+                    // Continuar mesmo se falhar ao processar reply
+                }
+            }
+            
             $aiConversation = \App\Models\AIConversation::getByConversationId($conversationId);
             \App\Helpers\Logger::info("ConversationService::sendMessage - Verificando AIConversation: conv={$conversationId}, aiConversation=" . ($aiConversation ? 'EXISTS' : 'NULL') . ", status=" . ($aiConversation['status'] ?? 'N/A'));
             
@@ -1579,17 +1624,25 @@ class ConversationService
                     
                     // Se não detectou intent, processar com IA normalmente
                     if (!$intentDetected) {
-                        \App\Helpers\Logger::info("ConversationService::sendMessage - Adicionando mensagem ao buffer (conv={$conversationId}, agent={$aiConversation['ai_agent_id']}, msgLen=" . strlen($processedContent) . ")");
+                        // ✅ NOVO: Garantir que mensagens com reply sejam sempre processadas
+                        // Mesmo que o conteúdo esteja vazio, se há reply, deve processar
+                        $shouldProcess = !empty(trim($processedContent)) || $quotedMessageId !== null;
                         
-                        // ✅ NOVO: Usar buffer de mensagens com timer de contexto
-                        \App\Services\AIAgentService::bufferMessage(
-                            $conversationId,
-                            $aiConversation['ai_agent_id'],
-                            $processedContent // Usar conteúdo processado (transcrito se disponível)
-                        );
-                        
-                        \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Mensagem adicionada ao buffer com sucesso");
-                        // A resposta será enviada após o timer de contexto expirar
+                        if ($shouldProcess) {
+                            \App\Helpers\Logger::info("ConversationService::sendMessage - Adicionando mensagem ao buffer (conv={$conversationId}, agent={$aiConversation['ai_agent_id']}, msgLen=" . strlen($processedContent) . ", hasReply=" . ($quotedMessageId !== null ? 'YES' : 'NO') . ")");
+                            
+                            // ✅ NOVO: Usar buffer de mensagens com timer de contexto
+                            \App\Services\AIAgentService::bufferMessage(
+                                $conversationId,
+                                $aiConversation['ai_agent_id'],
+                                $processedContent // Usar conteúdo processado (transcrito se disponível, com contexto de reply se houver)
+                            );
+                            
+                            \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Mensagem adicionada ao buffer com sucesso");
+                            // A resposta será enviada após o timer de contexto expirar
+                        } else {
+                            \App\Helpers\Logger::info("ConversationService::sendMessage - Mensagem vazia e sem reply, ignorando processamento com IA");
+                        }
                     }
                 } catch (\Exception $e) {
                     \App\Helpers\Logger::error("ConversationService::sendMessage - ❌ ERRO ao processar mensagem com agente de IA: " . $e->getMessage());

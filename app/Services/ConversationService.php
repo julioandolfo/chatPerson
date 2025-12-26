@@ -245,7 +245,20 @@ class ConversationService
             'whatsapp_account_id' => $data['whatsapp_account_id'] ?? null // Legacy, manter para compatibilidade
         ];
 
+        Logger::notificame("[INFO] ConversationService::create - Dados recebidos:");
+        Logger::notificame("[INFO]   - integration_account_id (input): " . ($data['integration_account_id'] ?? 'NULL'));
+        Logger::notificame("[INFO] ConversationService::create - Dados para salvar no banco:");
+        Logger::notificame("[INFO]   - integration_account_id (salvar): " . ($conversationData['integration_account_id'] ?? 'NULL'));
+
         $id = Conversation::create($conversationData);
+        
+        Logger::notificame("[INFO] ConversationService::create - Conversa criada ID: {$id}");
+        
+        // Verificar se foi salvo corretamente
+        $savedConversation = Conversation::find($id);
+        Logger::notificame("[INFO] ConversationService::create - Verificação pós-criação:");
+        Logger::notificame("[INFO]   - integration_account_id (banco): " . ($savedConversation['integration_account_id'] ?? 'NULL'));
+        Logger::notificame("[INFO]   - whatsapp_account_id (banco): " . ($savedConversation['whatsapp_account_id'] ?? 'NULL'));
         
         // Se foi atribuído a agente humano, atualizar contagem
         if ($agentId) {

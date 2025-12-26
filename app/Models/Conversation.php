@@ -19,7 +19,8 @@ class Conversation extends Model
         'status', 
         'funnel_id', 
         'funnel_stage_id', 
-        'whatsapp_account_id', 
+        'whatsapp_account_id',  // Legacy, manter para compatibilidade
+        'integration_account_id', // Novo campo unificado de integração
         'pinned', 
         'pinned_at', 
         'is_spam', 

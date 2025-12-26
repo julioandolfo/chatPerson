@@ -1522,20 +1522,20 @@ function openNodeConfig(nodeId) {
             const triggerType = automationTriggerType;
             // Construir opções de canais
             const channelOptions = `
-                <option value="">Todos os Canais</option>
-                <option value="whatsapp">WhatsApp</option>
+                        <option value="">Todos os Canais</option>
+                        <option value="whatsapp">WhatsApp</option>
                 <option value="instagram">Instagram</option>
                 <option value="facebook">Facebook</option>
                 <option value="telegram">Telegram</option>
                 <option value="mercadolivre">Mercado Livre</option>
                 <option value="webchat">WebChat</option>
-                <option value="email">Email</option>
+                        <option value="email">Email</option>
                 <option value="olx">OLX</option>
                 <option value="linkedin">LinkedIn</option>
                 <option value="google_business">Google Business</option>
                 <option value="youtube">Youtube</option>
                 <option value="tiktok">TikTok</option>
-                <option value="chat">Chat</option>
+                        <option value="chat">Chat</option>
             `;
             
             // Construir opções de contas (legacy WhatsApp + novas integrações)

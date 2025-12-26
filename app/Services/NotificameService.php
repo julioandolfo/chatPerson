@@ -674,8 +674,12 @@ class NotificameService
         
         // Criar/encontrar contato
         $contact = null;
+        $contactName = $messageData['name'] ?? null;
+        if (empty($contactName)) {
+            $contactName = 'Contato Notificame';
+        }
         $contactData = [
-            'name' => $messageData['name'] ?? null
+            'name' => $contactName
         ];
         
         // Identificar contato baseado no canal

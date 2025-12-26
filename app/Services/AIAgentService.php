@@ -449,6 +449,12 @@ class AIAgentService
             
             \App\Helpers\Logger::info("AIAgentService::processMessage - ANTES de decidir envio (audio=" . (!empty($audioAttachment) ? 'SIM' : 'NÃO') . ", mode={$sendMode}, contentLen=" . strlen($messageContent) . ")");
             
+            // ✅ FALLBACK FINAL: Se não há áudio, forçar modo text_only
+            if (empty($audioAttachment) && $shouldGenerateAudio) {
+                \App\Helpers\Logger::warning("AIAgentService::processMessage - ⚠️ TTS estava habilitado mas falhou, forçando text_only");
+                $sendMode = 'text_only';
+            }
+            
             // Se modo é 'intelligent' ou 'adaptive', decidir automaticamente
             if (in_array($sendMode, ['intelligent', 'adaptive']) && $audioAttachment) {
                 $intelligentRules = $ttsSettings['intelligent_rules'] ?? [];
@@ -468,6 +474,12 @@ class AIAgentService
                 );
                 
                 \App\Helpers\Logger::info("AIAgentService::processMessage - Modo inteligente escolheu: {$sendMode}");
+            }
+            
+            // ✅ FALLBACK FINAL: Se não há áudio mas TTS estava habilitado, forçar text_only
+            if (empty($audioAttachment) && $shouldGenerateAudio) {
+                \App\Helpers\Logger::warning("AIAgentService::processMessage - ⚠️ TTS estava habilitado mas falhou (ElevenLabs + OpenAI), forçando text_only");
+                $sendMode = 'text_only';
             }
             
             if ($audioAttachment) {

@@ -207,8 +207,12 @@ class TTSService
             ];
         }
 
-        // Configurações
+        // ✅ CORRIGIDO: Ignorar modelo se for específico da ElevenLabs
         $model = $settings['model'] ?? 'tts-1'; // tts-1 (rápido) ou tts-1-hd (alta qualidade)
+        if (str_contains($model, 'eleven_')) {
+            Logger::info("TTSService::generateWithOpenAI - ⚠️ Modelo ElevenLabs detectado ({$model}), usando modelo padrão OpenAI");
+            $model = 'tts-1';
+        }
         $voice = $settings['voice_id'] ?? 'alloy'; // alloy, echo, fable, onyx, nova, shimmer
         $speed = isset($settings['speed']) ? (float)$settings['speed'] : 1.0;
         $speed = max(0.25, min(4.0, $speed)); // Limitar entre 0.25 e 4.0

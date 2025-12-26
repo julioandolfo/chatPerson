@@ -264,6 +264,117 @@ class AvatarService
     }
     
     /**
+     * Buscar URL da foto de perfil do Instagram usando og:image (scraping leve)
+     * Retorna URL da imagem ou null se falhar
+     */
+    public static function fetchInstagramProfileImageUrl(string $username): ?string
+    {
+        try {
+            Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - Buscando og:image para @{$username}");
+            
+            $profileUrl = "https://www.instagram.com/{$username}/";
+            
+            $ch = curl_init($profileUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_TIMEOUT => 15,
+                CURLOPT_CONNECTTIMEOUT => 10,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                CURLOPT_HTTPHEADER => [
+                    'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language: en-US,en;q=0.9,pt-BR;q=0.8,pt;q=0.7',
+                    'Accept-Encoding: gzip, deflate, br',
+                    'Connection: keep-alive',
+                    'Upgrade-Insecure-Requests: 1',
+                    'Sec-Fetch-Dest: document',
+                    'Sec-Fetch-Mode: navigate',
+                    'Sec-Fetch-Site: none',
+                    'Cache-Control: max-age=0'
+                ],
+                CURLOPT_ENCODING => 'gzip, deflate'
+            ]);
+            
+            $html = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            if ($html === false || $httpCode >= 400) {
+                Logger::notificame("[ERROR] AvatarService::fetchInstagramProfileImageUrl - Falha ao buscar perfil: HTTP {$httpCode}, error: {$error}");
+                return null;
+            }
+            
+            Logger::notificame("[DEBUG] AvatarService::fetchInstagramProfileImageUrl - HTML obtido, tamanho: " . strlen($html) . " bytes");
+            
+            // Tentar encontrar og:image
+            if (preg_match('/property=["\']og:image["\']\s+content=["\']([^"\']+)["\']/i', $html, $matches)) {
+                $imageUrl = html_entity_decode($matches[1], ENT_QUOTES);
+                Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - ✅ og:image encontrado: " . substr($imageUrl, 0, 100) . "...");
+                return $imageUrl;
+            }
+            
+            // Tentar formato alternativo (content primeiro)
+            if (preg_match('/content=["\']([^"\']+)["\']\s+property=["\']og:image["\']/i', $html, $matches)) {
+                $imageUrl = html_entity_decode($matches[1], ENT_QUOTES);
+                Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - ✅ og:image encontrado (formato alt): " . substr($imageUrl, 0, 100) . "...");
+                return $imageUrl;
+            }
+            
+            // Tentar meta name="twitter:image"
+            if (preg_match('/name=["\']twitter:image["\']\s+content=["\']([^"\']+)["\']/i', $html, $matches)) {
+                $imageUrl = html_entity_decode($matches[1], ENT_QUOTES);
+                Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - ✅ twitter:image encontrado: " . substr($imageUrl, 0, 100) . "...");
+                return $imageUrl;
+            }
+            
+            Logger::notificame("[WARNING] AvatarService::fetchInstagramProfileImageUrl - ❌ Nenhuma meta tag de imagem encontrada no HTML");
+            return null;
+            
+        } catch (\Exception $e) {
+            Logger::notificame("[ERROR] AvatarService::fetchInstagramProfileImageUrl - Exceção: " . $e->getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Baixar avatar do Instagram usando scraping do perfil público
+     * Retorna caminho local do avatar ou null se falhar
+     */
+    public static function downloadInstagramAvatar(string $username, string $identifier): ?string
+    {
+        try {
+            Logger::notificame("[INFO] AvatarService::downloadInstagramAvatar - Iniciando para @{$username}");
+            
+            // Passo 1: Buscar URL da imagem via og:image
+            $imageUrl = self::fetchInstagramProfileImageUrl($username);
+            
+            if (!$imageUrl) {
+                Logger::notificame("[WARNING] AvatarService::downloadInstagramAvatar - Não foi possível obter URL da imagem");
+                return null;
+            }
+            
+            // Passo 2: Baixar a imagem
+            Logger::notificame("[INFO] AvatarService::downloadInstagramAvatar - Baixando imagem de: " . substr($imageUrl, 0, 100) . "...");
+            
+            $savedPath = self::downloadAndSaveAvatar($imageUrl, $identifier, 'instagram');
+            
+            if ($savedPath) {
+                Logger::notificame("[INFO] AvatarService::downloadInstagramAvatar - ✅ Avatar do Instagram salvo: {$savedPath}");
+                return $savedPath;
+            }
+            
+            Logger::notificame("[WARNING] AvatarService::downloadInstagramAvatar - ❌ Falha ao baixar/salvar imagem");
+            return null;
+            
+        } catch (\Exception $e) {
+            Logger::notificame("[ERROR] AvatarService::downloadInstagramAvatar - Exceção: " . $e->getMessage());
+            return null;
+        }
+    }
+    
+    /**
      * Gerar avatar com iniciais (fallback quando download falha)
      * Retorna um caminho para imagem SVG com as iniciais
      */

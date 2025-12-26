@@ -865,7 +865,30 @@ class NotificameService
             ]);
             
             // Processar avatar se disponível
-            if (!empty($messageData['avatar'])) {
+            if ($channel === 'instagram' && !empty($contactData['name'])) {
+                // INSTAGRAM: Tentar scraping do perfil público (og:image) ANTES de tentar URL do webhook
+                self::logInfo("Notificame webhook: Instagram - Tentando obter avatar via scraping do perfil @{$contactData['name']}");
+                
+                $instagramAvatar = AvatarService::downloadInstagramAvatar($contactData['name'], $messageData['from']);
+                
+                if ($instagramAvatar) {
+                    $contactCreateData['avatar'] = $instagramAvatar;
+                    self::logInfo("Notificame webhook: ✅ Avatar do Instagram obtido via scraping: {$instagramAvatar}");
+                } else {
+                    // Fallback: Gerar avatar com iniciais
+                    self::logInfo("Notificame webhook: ❌ Scraping falhou, gerando avatar com iniciais...");
+                    $initialsAvatar = AvatarService::generateInitialsAvatar(
+                        $contactData['name'] ?? 'Contato', 
+                        $messageData['from']
+                    );
+                    
+                    if ($initialsAvatar) {
+                        $contactCreateData['avatar'] = $initialsAvatar;
+                        self::logInfo("Notificame webhook: ✅ Avatar com iniciais gerado: {$initialsAvatar}");
+                    }
+                }
+            } elseif (!empty($messageData['avatar'])) {
+                // OUTROS CANAIS: Tentar baixar avatar do webhook normalmente
                 self::logInfo("Notificame webhook: Avatar detectado no payload: " . substr($messageData['avatar'], 0, 100) . "...");
                 
                 // Se for URL externa, baixar e salvar localmente

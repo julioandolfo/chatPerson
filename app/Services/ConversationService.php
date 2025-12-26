@@ -39,7 +39,7 @@ class ConversationService
         // Validar dados
         $errors = Validator::validate($data, [
             'contact_id' => 'required|integer',
-            'channel' => 'required|string|in:whatsapp,instagram,facebook,telegram,mercadolivre,webchat,email,olx,linkedin,google_business,youtube,tiktok,chat'
+            'channel' => 'required|string|in:whatsapp,whatsapp_official,instagram,facebook,telegram,mercadolivre,webchat,email,olx,linkedin,google_business,youtube,tiktok,chat'
         ]);
 
         // Converter erros para array simples

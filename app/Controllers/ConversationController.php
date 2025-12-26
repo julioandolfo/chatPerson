@@ -560,7 +560,11 @@ class ConversationController
             }
             
             // Validar canal
-            $validChannels = ['whatsapp', 'email', 'chat'];
+            $validChannels = [
+                'whatsapp', 'whatsapp_official', 'instagram', 'facebook', 'tiktok', 
+                'telegram', 'email', 'chat', 'mercadolivre', 'webchat', 
+                'olx', 'linkedin', 'google_business', 'youtube'
+            ];
             if (!in_array($channel, $validChannels)) {
                 Response::json(['success' => false, 'message' => 'Canal inválido'], 400);
                 return;

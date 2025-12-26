@@ -659,23 +659,31 @@ class NotificameService
      */
     public static function processWebhook(array $payload, string $channel): void
     {
+        Logger::info("========== Notificame Webhook INÍCIO ==========");
         Logger::info("Notificame webhook recebido - Channel: {$channel}");
+        Logger::info("Notificame webhook payload completo: " . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         
         // Identificar conta pelo webhook URL ou outros dados do payload
         $account = self::findAccountByWebhook($payload, $channel);
         
         if (!$account) {
             Logger::error("Conta Notificame não encontrada para webhook - Channel: {$channel}");
+            Logger::info("========== Notificame Webhook FIM (Erro: Conta não encontrada) ==========");
             return;
         }
+        
+        Logger::info("Notificame conta identificada: ID={$account['id']}, Name={$account['name']}, Channel={$account['channel']}");
         
         // Extrair dados da mensagem
         $messageData = self::extractMessageData($payload, $channel);
         
         if (!$messageData) {
-            Logger::warning("Não foi possível extrair dados da mensagem do webhook Notificame");
+            Logger::warning("Notificame webhook: Não foi possível extrair dados da mensagem");
+            Logger::info("========== Notificame Webhook FIM (Erro: Dados inválidos) ==========");
             return;
         }
+        
+        Logger::info("Notificame webhook: Dados da mensagem extraídos - From={$messageData['from']}, Content=" . substr($messageData['content'], 0, 50) . "...");
         
         // Criar/encontrar contato
         $contact = null;
@@ -723,9 +731,12 @@ class NotificameService
         }
         
         if (!$contact) {
-            Logger::error("Não foi possível criar/encontrar contato para Notificame webhook");
+            Logger::error("Notificame webhook: Não foi possível criar/encontrar contato");
+            Logger::info("========== Notificame Webhook FIM (Erro: Contato inválido) ==========");
             return;
         }
+        
+        Logger::info("Notificame webhook: Contato encontrado/criado - ContactID={$contact['id']}, Name={$contact['name']}");
         
         // Criar/encontrar conversa
         $conversationData = [
@@ -751,8 +762,10 @@ class NotificameService
         $isNewConversation = false;
         if (!$conversation) {
             // Criar nova conversa
+            Logger::info("Notificame webhook: Criando NOVA conversa - ContactID={$contact['id']}, Channel={$channel}");
             $conversation = ConversationService::create($conversationData, false);
             $isNewConversation = true;
+            Logger::info("Notificame webhook: Nova conversa criada - ConversationID={$conversation['id']}");
             
             // Notificar nova conversa via WebSocket
             try {
@@ -763,9 +776,12 @@ class NotificameService
             } catch (\Exception $e) {
                 Logger::error("Erro ao notificar nova conversa via WebSocket: " . $e->getMessage());
             }
+        } else {
+            Logger::info("Notificame webhook: Conversa EXISTENTE encontrada - ConversationID={$conversation['id']}");
         }
         
         // Salvar mensagem
+        Logger::info("Notificame webhook: Salvando mensagem - ConversationID={$conversation['id']}, Type={$messageData['type']}");
         $messageId = Message::create([
             'conversation_id' => $conversation['id'],
             'contact_id' => $contact['id'],
@@ -779,6 +795,7 @@ class NotificameService
             'status' => 'received',
             'metadata' => json_encode($messageData['metadata'] ?? [])
         ]);
+        Logger::info("Notificame webhook: Mensagem salva - MessageID={$messageId}");
         
         // Buscar mensagem criada para notificar
         $message = Message::find($messageId);
@@ -799,16 +816,21 @@ class NotificameService
         try {
             // Se é nova conversa, disparar trigger de conversation.created
             if ($isNewConversation) {
+                Logger::info("Notificame webhook: Disparando automação de nova conversa - ConversationID={$conversation['id']}");
                 AutomationService::executeForNewConversation($conversation['id']);
             }
             
             // Disparar trigger de message.received
             if (isset($messageId)) {
+                Logger::info("Notificame webhook: Disparando automação de nova mensagem - MessageID={$messageId}");
                 AutomationService::executeForMessageReceived($messageId);
             }
         } catch (\Exception $e) {
             Logger::error("Erro ao executar automações: " . $e->getMessage());
         }
+        
+        Logger::info("Notificame webhook processado com sucesso!");
+        Logger::info("========== Notificame Webhook FIM (Sucesso) ==========");
     }
     
     /**

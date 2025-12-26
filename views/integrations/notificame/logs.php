@@ -4,7 +4,7 @@ $title = 'Logs NotificaMe';
 $pageTitle = 'Logs NotificaMe - Webhook';
 
 // Ler últimas linhas do log que contenham "Notificame"
-$logFile = storage_path('logs/laravel.log');
+$logFile = __DIR__ . '/../../../storage/logs/laravel.log';
 $lines = [];
 $totalLines = 0;
 $fileSize = 0;

@@ -487,8 +487,14 @@ class NotificameService
         }
         
         try {
-            Logger::info("Notificame sendMessage endpoint={$endpoint} channel={$channel} to={$to}");
+            Logger::info("========== Notificame sendMessage INÍCIO ==========");
+            Logger::info("Notificame sendMessage - endpoint={$endpoint}, channel={$channel}, to={$to}, accountId={$accountId}");
+            Logger::info("Notificame sendMessage - Payload: " . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            
             $result = self::makeRequest($endpoint, $token, 'POST', $payload, $apiUrl);
+            
+            Logger::info("Notificame sendMessage - Resposta API: " . json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            Logger::info("========== Notificame sendMessage FIM (Sucesso) ==========");
             
             return [
                 'success' => true,
@@ -496,6 +502,7 @@ class NotificameService
                 'data' => $result
             ];
         } catch (\Exception $e) {
+            Logger::error("========== Notificame sendMessage FIM (Erro) ==========");
             Logger::error("Erro ao enviar mensagem Notificame: " . $e->getMessage());
             throw $e;
         }
@@ -683,7 +690,11 @@ class NotificameService
             return;
         }
         
-        Logger::info("Notificame webhook: Dados da mensagem extraídos - From={$messageData['from']}, Content=" . substr($messageData['content'], 0, 50) . "...");
+        Logger::info("Notificame webhook: Dados da mensagem extraídos:");
+        Logger::info("  - From (destinatário para resposta): {$messageData['from']}");
+        Logger::info("  - Name: {$messageData['name']}");
+        Logger::info("  - Content: " . substr($messageData['content'], 0, 100));
+        Logger::info("  - Type: {$messageData['type']}");
         
         // Criar/encontrar contato
         $contact = null;
@@ -724,7 +735,8 @@ class NotificameService
                 $contact = \App\Models\Contact::find($contactId);
             }
         } else {
-            // Para outros canais, usar identifier genérico
+            // Para outros canais (Instagram, Facebook, etc), usar identifier genérico
+            Logger::info("Notificame webhook: Criando/buscando contato com identifier={$messageData['from']} (canal={$channel})");
             $contact = \App\Models\Contact::findOrCreate(array_merge($contactData, [
                 'identifier' => $messageData['from']
             ]));
@@ -736,7 +748,12 @@ class NotificameService
             return;
         }
         
-        Logger::info("Notificame webhook: Contato encontrado/criado - ContactID={$contact['id']}, Name={$contact['name']}");
+        Logger::info("Notificame webhook: Contato encontrado/criado:");
+        Logger::info("  - ContactID: {$contact['id']}");
+        Logger::info("  - Name: {$contact['name']}");
+        Logger::info("  - Phone: " . ($contact['phone'] ?? 'NULL'));
+        Logger::info("  - Identifier: " . ($contact['identifier'] ?? 'NULL'));
+        Logger::info("  - Email: " . ($contact['email'] ?? 'NULL'));
         
         // Criar/encontrar conversa
         $conversationData = [

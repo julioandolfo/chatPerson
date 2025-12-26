@@ -212,6 +212,30 @@ function renderDateSeparator($dateString) {
 }
 
 /**
+ * Obter ícone SVG oficial do canal
+ */
+function getChannelIconSvg($channel, $size = 16) {
+    $icons = [
+        'whatsapp' => '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="#25D366" style="vertical-align: middle;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>',
+        'whatsapp_official' => '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="#25D366" style="vertical-align: middle;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>',
+        'instagram' => '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="url(#instagram-gradient)" style="vertical-align: middle;"><defs><linearGradient id="instagram-gradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#833AB4;stop-opacity:1" /><stop offset="50%" style="stop-color:#FD1D1D;stop-opacity:1" /><stop offset="100%" style="stop-color:#FCAF45;stop-opacity:1" /></linearGradient></defs><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>',
+        'facebook' => '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="#1877F2" style="vertical-align: middle;"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>',
+        'tiktok' => '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="#000000" style="vertical-align: middle;"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg>',
+        'telegram' => '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="#0088cc" style="vertical-align: middle;"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>',
+        'email' => '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>',
+        'chat' => '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>',
+        'mercadolivre' => '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="#FFF159" style="vertical-align: middle;"><path d="M12.5 0C5.596 0 0 5.596 0 12.5S5.596 25 12.5 25 25 19.404 25 12.5 19.404 0 12.5 0zm0 22.5c-5.523 0-10-4.477-10-10S6.977 2.5 12.5 2.5 22.5 6.977 22.5 12.5 18.023 22.5 12.5 22.5z"/><path d="M8.75 7.5h7v9h-7z" fill="#3483FA"/></svg>',
+        'webchat' => '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>',
+        'olx' => '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="#00A859" style="vertical-align: middle;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>',
+        'linkedin' => '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="#0077B5" style="vertical-align: middle;"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>',
+        'google_business' => '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="#4285F4" style="vertical-align: middle;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>',
+        'youtube' => '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="#FF0000" style="vertical-align: middle;"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>'
+    ];
+    
+    return $icons[$channel] ?? '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>';
+}
+
+/**
  * Renderizar status de mensagem
  */
 function renderMessageStatus($msg) {
@@ -2007,21 +2031,74 @@ function getChannelInfo(channel) {
             icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#25D366" style="vertical-align: middle;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>',
             emoji: '📱'
         },
-        'instagram': { name: 'Instagram', icon: '📷', emoji: '📷' },
-        'facebook': { name: 'Facebook', icon: '👤', emoji: '👤' },
-        'telegram': { name: 'Telegram', icon: '✈️', emoji: '✈️' },
-        'mercadolivre': { name: 'Mercado Livre', icon: '🛒', emoji: '🛒' },
-        'webchat': { name: 'WebChat', icon: '💬', emoji: '💬' },
-        'email': { name: 'Email', icon: '✉️', emoji: '✉️' },
-        'olx': { name: 'OLX', icon: '📦', emoji: '📦' },
-        'linkedin': { name: 'LinkedIn', icon: '💼', emoji: '💼' },
-        'google_business': { name: 'Google Business', icon: '🔍', emoji: '🔍' },
-        'youtube': { name: 'YouTube', icon: '▶️', emoji: '▶️' },
-        'tiktok': { name: 'TikTok', icon: '🎵', emoji: '🎵' },
-        'chat': { name: 'Chat', icon: '💬', emoji: '💬' }
+        'whatsapp_official': {
+            name: 'WhatsApp Oficial',
+            icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#25D366" style="vertical-align: middle;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>',
+            emoji: '📱'
+        },
+        'instagram': {
+            name: 'Instagram',
+            icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="url(#instagram-gradient-js)" style="vertical-align: middle;"><defs><linearGradient id="instagram-gradient-js" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#833AB4;stop-opacity:1" /><stop offset="50%" style="stop-color:#FD1D1D;stop-opacity:1" /><stop offset="100%" style="stop-color:#FCAF45;stop-opacity:1" /></linearGradient></defs><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>',
+            emoji: '📷'
+        },
+        'facebook': {
+            name: 'Facebook',
+            icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#1877F2" style="vertical-align: middle;"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>',
+            emoji: '👤'
+        },
+        'tiktok': {
+            name: 'TikTok',
+            icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#000000" style="vertical-align: middle;"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg>',
+            emoji: '🎵'
+        },
+        'telegram': {
+            name: 'Telegram',
+            icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#0088cc" style="vertical-align: middle;"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>',
+            emoji: '✈️'
+        },
+        'email': {
+            name: 'Email',
+            icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>',
+            emoji: '✉️'
+        },
+        'chat': {
+            name: 'Chat',
+            icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>',
+            emoji: '💬'
+        },
+        'mercadolivre': {
+            name: 'Mercado Livre',
+            icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#FFF159" style="vertical-align: middle;"><path d="M12.5 0C5.596 0 0 5.596 0 12.5S5.596 25 12.5 25 25 19.404 25 12.5 19.404 0 12.5 0zm0 22.5c-5.523 0-10-4.477-10-10S6.977 2.5 12.5 2.5 22.5 6.977 22.5 12.5 18.023 22.5 12.5 22.5z"/><path d="M8.75 7.5h7v9h-7z" fill="#3483FA"/></svg>',
+            emoji: '🛒'
+        },
+        'webchat': {
+            name: 'WebChat',
+            icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>',
+            emoji: '💬'
+        },
+        'olx': {
+            name: 'OLX',
+            icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#00A859" style="vertical-align: middle;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>',
+            emoji: '📦'
+        },
+        'linkedin': {
+            name: 'LinkedIn',
+            icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#0077B5" style="vertical-align: middle;"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>',
+            emoji: '💼'
+        },
+        'google_business': {
+            name: 'Google Business',
+            icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#4285F4" style="vertical-align: middle;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>',
+            emoji: '🔍'
+        },
+        'youtube': {
+            name: 'YouTube',
+            icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#FF0000" style="vertical-align: middle;"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>',
+            emoji: '▶️'
+        }
     };
     
-    return channels[channel] || { name: 'Chat', icon: '💬', emoji: '💬' };
+    return channels[channel] || { name: 'Chat', icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>', emoji: '💬' };
 }
 
 // Definir função IMEDIATAMENTE para estar disponível quando o HTML for renderizado
@@ -2233,20 +2310,20 @@ function getChannelInfo(channel) {
                                 
                 <select id="filter_channel" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 120px;">
                     <option value="">Canais</option>
-                    <option value="whatsapp" <?= ($filters['channel'] ?? '') === 'whatsapp' ? 'selected' : '' ?>>📱 WhatsApp</option>
-                    <option value="whatsapp_official" <?= ($filters['channel'] ?? '') === 'whatsapp_official' ? 'selected' : '' ?>>📱 WhatsApp Oficial</option>
-                    <option value="instagram" <?= ($filters['channel'] ?? '') === 'instagram' ? 'selected' : '' ?>>📷 Instagram</option>
-                    <option value="facebook" <?= ($filters['channel'] ?? '') === 'facebook' ? 'selected' : '' ?>>👤 Facebook</option>
-                    <option value="tiktok" <?= ($filters['channel'] ?? '') === 'tiktok' ? 'selected' : '' ?>>🎵 TikTok</option>
-                    <option value="telegram" <?= ($filters['channel'] ?? '') === 'telegram' ? 'selected' : '' ?>>✈️ Telegram</option>
-                    <option value="email" <?= ($filters['channel'] ?? '') === 'email' ? 'selected' : '' ?>>✉️ Email</option>
-                    <option value="chat" <?= ($filters['channel'] ?? '') === 'chat' ? 'selected' : '' ?>>💬 Chat</option>
-                    <option value="mercadolivre" <?= ($filters['channel'] ?? '') === 'mercadolivre' ? 'selected' : '' ?>>🛒 Mercado Livre</option>
-                    <option value="webchat" <?= ($filters['channel'] ?? '') === 'webchat' ? 'selected' : '' ?>>🌐 WebChat</option>
-                    <option value="olx" <?= ($filters['channel'] ?? '') === 'olx' ? 'selected' : '' ?>>🏷️ OLX</option>
-                    <option value="linkedin" <?= ($filters['channel'] ?? '') === 'linkedin' ? 'selected' : '' ?>>💼 LinkedIn</option>
-                    <option value="google_business" <?= ($filters['channel'] ?? '') === 'google_business' ? 'selected' : '' ?>>📍 Google Business</option>
-                    <option value="youtube" <?= ($filters['channel'] ?? '') === 'youtube' ? 'selected' : '' ?>>📺 YouTube</option>
+                    <option value="whatsapp" <?= ($filters['channel'] ?? '') === 'whatsapp' ? 'selected' : '' ?>>WhatsApp</option>
+                    <option value="whatsapp_official" <?= ($filters['channel'] ?? '') === 'whatsapp_official' ? 'selected' : '' ?>>WhatsApp Oficial</option>
+                    <option value="instagram" <?= ($filters['channel'] ?? '') === 'instagram' ? 'selected' : '' ?>>Instagram</option>
+                    <option value="facebook" <?= ($filters['channel'] ?? '') === 'facebook' ? 'selected' : '' ?>>Facebook</option>
+                    <option value="tiktok" <?= ($filters['channel'] ?? '') === 'tiktok' ? 'selected' : '' ?>>TikTok</option>
+                    <option value="telegram" <?= ($filters['channel'] ?? '') === 'telegram' ? 'selected' : '' ?>>Telegram</option>
+                    <option value="email" <?= ($filters['channel'] ?? '') === 'email' ? 'selected' : '' ?>>Email</option>
+                    <option value="chat" <?= ($filters['channel'] ?? '') === 'chat' ? 'selected' : '' ?>>Chat</option>
+                    <option value="mercadolivre" <?= ($filters['channel'] ?? '') === 'mercadolivre' ? 'selected' : '' ?>>Mercado Livre</option>
+                    <option value="webchat" <?= ($filters['channel'] ?? '') === 'webchat' ? 'selected' : '' ?>>WebChat</option>
+                    <option value="olx" <?= ($filters['channel'] ?? '') === 'olx' ? 'selected' : '' ?>>OLX</option>
+                    <option value="linkedin" <?= ($filters['channel'] ?? '') === 'linkedin' ? 'selected' : '' ?>>LinkedIn</option>
+                    <option value="google_business" <?= ($filters['channel'] ?? '') === 'google_business' ? 'selected' : '' ?>>Google Business</option>
+                    <option value="youtube" <?= ($filters['channel'] ?? '') === 'youtube' ? 'selected' : '' ?>>YouTube</option>
                 </select>
                                 
                                 <?php if (!empty($departments)): ?>
@@ -2343,23 +2420,7 @@ function getChannelInfo(channel) {
                 <?php else: ?>
                                 <?php foreach ($conversations as $conv): ?>
                     <?php
-                    $channelIcon = match($conv['channel'] ?? 'chat') {
-                        'whatsapp' => '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#25D366" style="vertical-align: middle;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>',
-                        'whatsapp_official' => '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#25D366" style="vertical-align: middle;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>',
-                        'instagram' => '📷',
-                        'facebook' => '👤',
-                        'tiktok' => '🎵',
-                        'telegram' => '✈️',
-                        'email' => '✉️',
-                        'chat' => '💬',
-                        'mercadolivre' => '🛒',
-                        'webchat' => '🌐',
-                        'olx' => '🏷️',
-                        'linkedin' => '💼',
-                        'google_business' => '📍',
-                        'youtube' => '📺',
-                        default => '💬'
-                    };
+                    $channelIcon = getChannelIconSvg($conv['channel'] ?? 'chat', 16);
                     
                     $channelName = match($conv['channel'] ?? 'chat') {
                         'whatsapp' => 'WhatsApp',
@@ -2571,13 +2632,25 @@ function getChannelInfo(channel) {
                     <div class="chat-header-title"><?= htmlspecialchars($selectedConversation['contact_name'] ?? 'Sem nome') ?></div>
                     <div class="chat-header-subtitle">
                         <?php
-                        $channelIcon = match($selectedConversation['channel'] ?? 'chat') {
-                            'whatsapp' => '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="#25D366" style="vertical-align: middle; margin-right: 4px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg> WhatsApp',
-                            'email' => '✉️ Email',
-                            'chat' => '💬 Chat',
-                            default => '💬 Chat'
+                        $channelIcon = getChannelIconSvg($selectedConversation['channel'] ?? 'chat', 18);
+                        $channelName = match($selectedConversation['channel'] ?? 'chat') {
+                            'whatsapp' => 'WhatsApp',
+                            'whatsapp_official' => 'WhatsApp Oficial',
+                            'instagram' => 'Instagram',
+                            'facebook' => 'Facebook',
+                            'tiktok' => 'TikTok',
+                            'telegram' => 'Telegram',
+                            'email' => 'Email',
+                            'chat' => 'Chat',
+                            'mercadolivre' => 'Mercado Livre',
+                            'webchat' => 'WebChat',
+                            'olx' => 'OLX',
+                            'linkedin' => 'LinkedIn',
+                            'google_business' => 'Google Business',
+                            'youtube' => 'YouTube',
+                            default => 'Chat'
                         };
-                        echo $channelIcon;
+                        echo $channelIcon . ' ' . $channelName;
                         ?>
                         •
                         <?php
@@ -4260,20 +4333,20 @@ function getChannelInfo(channel) {
                         <label class="form-label fw-semibold mb-2">Canal:</label>
                         <select class="form-select form-select-solid" id="new_conversation_channel" name="channel" required>
                             <option value="">Selecione um canal...</option>
-                            <option value="whatsapp" selected>📱 WhatsApp</option>
-                            <option value="whatsapp_official">📱 WhatsApp Oficial</option>
-                            <option value="instagram">📷 Instagram</option>
-                            <option value="facebook">👤 Facebook</option>
-                            <option value="tiktok">🎵 TikTok</option>
-                            <option value="telegram">✈️ Telegram</option>
-                            <option value="email">✉️ Email</option>
-                            <option value="chat">💬 Chat</option>
-                            <option value="mercadolivre">🛒 Mercado Livre</option>
-                            <option value="webchat">🌐 WebChat</option>
-                            <option value="olx">🏷️ OLX</option>
-                            <option value="linkedin">💼 LinkedIn</option>
-                            <option value="google_business">📍 Google Business</option>
-                            <option value="youtube">📺 YouTube</option>
+                            <option value="whatsapp" selected>WhatsApp</option>
+                            <option value="whatsapp_official">WhatsApp Oficial</option>
+                            <option value="instagram">Instagram</option>
+                            <option value="facebook">Facebook</option>
+                            <option value="tiktok">TikTok</option>
+                            <option value="telegram">Telegram</option>
+                            <option value="email">Email</option>
+                            <option value="chat">Chat</option>
+                            <option value="mercadolivre">Mercado Livre</option>
+                            <option value="webchat">WebChat</option>
+                            <option value="olx">OLX</option>
+                            <option value="linkedin">LinkedIn</option>
+                            <option value="google_business">Google Business</option>
+                            <option value="youtube">YouTube</option>
                         </select>
                         <div class="form-text">Selecione o canal para envio da mensagem</div>
                     </div>
@@ -4355,22 +4428,22 @@ function getChannelInfo(channel) {
                             $selectedChannels = is_array($filters['channels'] ?? null) ? $filters['channels'] : [];
                             $legacyChannel = $filters['channel'] ?? '';
                             
-                            // Canais disponíveis com ícones
+                            // Canais disponíveis com ícones SVG oficiais
                             $availableChannels = [
-                                'whatsapp' => ['icon' => '📱', 'name' => 'WhatsApp'],
-                                'whatsapp_official' => ['icon' => '📱', 'name' => 'WhatsApp Oficial'],
-                                'instagram' => ['icon' => '📷', 'name' => 'Instagram'],
-                                'facebook' => ['icon' => '👤', 'name' => 'Facebook'],
-                                'tiktok' => ['icon' => '🎵', 'name' => 'TikTok'],
-                                'telegram' => ['icon' => '✈️', 'name' => 'Telegram'],
-                                'email' => ['icon' => '✉️', 'name' => 'Email'],
-                                'chat' => ['icon' => '💬', 'name' => 'Chat'],
-                                'mercadolivre' => ['icon' => '🛒', 'name' => 'Mercado Livre'],
-                                'webchat' => ['icon' => '🌐', 'name' => 'WebChat'],
-                                'olx' => ['icon' => '🏷️', 'name' => 'OLX'],
-                                'linkedin' => ['icon' => '💼', 'name' => 'LinkedIn'],
-                                'google_business' => ['icon' => '📍', 'name' => 'Google Business'],
-                                'youtube' => ['icon' => '📺', 'name' => 'YouTube']
+                                'whatsapp' => ['icon' => getChannelIconSvg('whatsapp', 18), 'name' => 'WhatsApp'],
+                                'whatsapp_official' => ['icon' => getChannelIconSvg('whatsapp_official', 18), 'name' => 'WhatsApp Oficial'],
+                                'instagram' => ['icon' => getChannelIconSvg('instagram', 18), 'name' => 'Instagram'],
+                                'facebook' => ['icon' => getChannelIconSvg('facebook', 18), 'name' => 'Facebook'],
+                                'tiktok' => ['icon' => getChannelIconSvg('tiktok', 18), 'name' => 'TikTok'],
+                                'telegram' => ['icon' => getChannelIconSvg('telegram', 18), 'name' => 'Telegram'],
+                                'email' => ['icon' => getChannelIconSvg('email', 18), 'name' => 'Email'],
+                                'chat' => ['icon' => getChannelIconSvg('chat', 18), 'name' => 'Chat'],
+                                'mercadolivre' => ['icon' => getChannelIconSvg('mercadolivre', 18), 'name' => 'Mercado Livre'],
+                                'webchat' => ['icon' => getChannelIconSvg('webchat', 18), 'name' => 'WebChat'],
+                                'olx' => ['icon' => getChannelIconSvg('olx', 18), 'name' => 'OLX'],
+                                'linkedin' => ['icon' => getChannelIconSvg('linkedin', 18), 'name' => 'LinkedIn'],
+                                'google_business' => ['icon' => getChannelIconSvg('google_business', 18), 'name' => 'Google Business'],
+                                'youtube' => ['icon' => getChannelIconSvg('youtube', 18), 'name' => 'YouTube']
                             ];
                             
                             foreach ($availableChannels as $channelValue => $channelInfo):

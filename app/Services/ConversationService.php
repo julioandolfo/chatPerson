@@ -1415,13 +1415,22 @@ class ConversationService
                     $sendResult = null;
                     
                     if ($integrationAccountId) {
+                        // Determinar destinatário (phone ou identifier)
+                        $recipient = $contact['phone'] ?? $contact['identifier'] ?? '';
+                        
                         // Usar IntegrationService para nova estrutura
-                        \App\Helpers\Logger::info("ConversationService::sendMessage - Chamando IntegrationService::sendMessage (integration_id={$integrationAccountId}, phone={$contact['phone']}, contentLen=" . strlen($content) . ")");
+                        \App\Helpers\Logger::info("ConversationService::sendMessage - Preparando envio:");
+                        \App\Helpers\Logger::info("  - integration_id: {$integrationAccountId}");
+                        \App\Helpers\Logger::info("  - contact_id: {$contact['id']}");
+                        \App\Helpers\Logger::info("  - phone: " . ($contact['phone'] ?? 'NULL'));
+                        \App\Helpers\Logger::info("  - identifier: " . ($contact['identifier'] ?? 'NULL'));
+                        \App\Helpers\Logger::info("  - recipient (usado): {$recipient}");
+                        \App\Helpers\Logger::info("  - contentLen: " . strlen($content));
                         
                         try {
                             $sendResult = \App\Services\IntegrationService::sendMessage(
                                 $integrationAccountId,
-                                $contact['phone'] ?? $contact['identifier'] ?? '',
+                                $recipient,
                                 $content,
                                 $options
                             );

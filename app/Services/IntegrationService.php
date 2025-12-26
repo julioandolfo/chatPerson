@@ -38,6 +38,8 @@ class IntegrationService
             throw new \Exception("Conta de integração não encontrada: {$accountId}");
         }
 
+        \App\Helpers\Logger::info("IntegrationService::sendMessage - accountId={$accountId}, provider={$account['provider']}, channel={$account['channel']}, to={$to}, messageLen=" . strlen($message));
+
         $service = self::getService($account['provider']);
         
         if (method_exists($service, 'sendMessage')) {

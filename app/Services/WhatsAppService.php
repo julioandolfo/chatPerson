@@ -2375,7 +2375,7 @@ class WhatsAppService
             try {
                 // Passar quoted_message_id para registrar reply corretamente
                 // E passar timestamp original do WhatsApp para preservar ordem correta
-                \App\Helpers\Logger::info("WhatsAppService::processWebhook - CHAMANDO ConversationService::sendMessage (conv={$conversation['id']}, contact={$contact['id']}, msgLen=" . strlen($message) . ", attachments=" . count($attachments) . ")");
+                \App\Helpers\Logger::info("WhatsAppService::processWebhook - CHAMANDO ConversationService::sendMessage (conv={$conversation['id']}, contact={$contact['id']}, msgLen=" . strlen($message) . ", attachments=" . count($attachments) . ", quotedMessageId=" . ($quotedMessageId ?? 'NULL') . ")");
                 
                 $messageId = \App\Services\ConversationService::sendMessage(
                     $conversation['id'],

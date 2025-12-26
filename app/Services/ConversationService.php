@@ -1595,6 +1595,7 @@ class ConversationService
         if ($senderType === 'contact') {
             // ✅ NOVO: Se mensagem tem áudio e transcrição está habilitada, usar texto transcrito
             $processedContent = $content;
+            \App\Helpers\Logger::info("ConversationService::sendMessage - INÍCIO processamento IA: content='" . substr($content, 0, 50) . "', contentLen=" . strlen($content) . ", quotedMessageId=" . ($quotedMessageId ?? 'NULL'));
             if ($messageType === 'audio' && !empty($attachmentsData)) {
                 try {
                     $transcriptionSettings = \App\Services\TranscriptionService::getSettings();
@@ -1614,8 +1615,10 @@ class ConversationService
             
             // ✅ NOVO: Se mensagem tem reply/quote, incluir contexto da mensagem citada
             if ($quotedMessageId) {
+                \App\Helpers\Logger::info("ConversationService::sendMessage - 🔍 Detectado REPLY/QUOTE: quotedMessageId={$quotedMessageId}");
                 try {
                     $quotedMessage = Message::find($quotedMessageId);
+                    \App\Helpers\Logger::info("ConversationService::sendMessage - Mensagem citada: " . ($quotedMessage ? 'ENCONTRADA' : 'NÃO ENCONTRADA'));
                     if ($quotedMessage) {
                         $quotedContent = trim($quotedMessage['content'] ?? '');
                         $quotedSenderType = $quotedMessage['sender_type'] ?? 'unknown';
@@ -1693,6 +1696,8 @@ class ConversationService
                         // Mesmo que o conteúdo esteja vazio, se há reply, deve processar
                         $shouldProcess = !empty(trim($processedContent)) || $quotedMessageId !== null;
                         
+                        \App\Helpers\Logger::info("ConversationService::sendMessage - 📊 Verificação shouldProcess: processedContentLen=" . strlen($processedContent) . ", processedContentEmpty=" . (empty(trim($processedContent)) ? 'YES' : 'NO') . ", quotedMessageId=" . ($quotedMessageId ?? 'NULL') . ", shouldProcess=" . ($shouldProcess ? 'YES' : 'NO'));
+                        
                         if ($shouldProcess) {
                             \App\Helpers\Logger::info("ConversationService::sendMessage - Adicionando mensagem ao buffer (conv={$conversationId}, agent={$aiConversation['ai_agent_id']}, msgLen=" . strlen($processedContent) . ", hasReply=" . ($quotedMessageId !== null ? 'YES' : 'NO') . ")");
                             
@@ -1706,7 +1711,7 @@ class ConversationService
                             \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Mensagem adicionada ao buffer com sucesso");
                             // A resposta será enviada após o timer de contexto expirar
                         } else {
-                            \App\Helpers\Logger::info("ConversationService::sendMessage - Mensagem vazia e sem reply, ignorando processamento com IA");
+                            \App\Helpers\Logger::warning("ConversationService::sendMessage - ⚠️ Mensagem NÃO será processada (shouldProcess=false, processedContentLen=" . strlen($processedContent) . ", quotedMessageId=" . ($quotedMessageId ?? 'NULL') . ")");
                         }
                     }
                 } catch (\Exception $e) {

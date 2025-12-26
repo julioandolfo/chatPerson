@@ -633,6 +633,19 @@ class AIAgentService
     {
         \App\Helpers\Logger::info("AIAgentService::scheduleProcessing - Agendando processamento (conv={$conversationId}, timer={$timerSeconds}s)");
         
+        // ✅ CORRIGIDO: Obter dados do buffer ANTES de criar o script
+        if (!isset(self::$messageBuffers[$conversationId])) {
+            \App\Helpers\Logger::warning("AIAgentService::scheduleProcessing - Buffer não encontrado para conv={$conversationId}");
+            return;
+        }
+        
+        $buffer = self::$messageBuffers[$conversationId];
+        $agentId = $buffer['agent_id'];
+        $messages = array_map(function($msg) {
+            return $msg['content'];
+        }, $buffer['messages']);
+        $groupedMessage = implode("\n\n", $messages);
+        
         // Criar script PHP temporário que aguarda e processa
         $tempScript = sys_get_temp_dir() . '/ai_buffer_' . $conversationId . '_' . time() . '.php';
         
@@ -652,13 +665,24 @@ class AIAgentService
         $phpCode .= "require_once \$basePath . '/app/Helpers/Database.php';\n";
         $phpCode .= "require_once \$basePath . '/app/Services/AIAgentService.php';\n\n";
         $phpCode .= "sleep({$timerSeconds});\n\n";
+        $phpCode .= "// ✅ CORRIGIDO: Passar dados diretamente em vez de usar buffer estático\n";
+        $phpCode .= "\$conversationId = " . (int)$conversationId . ";\n";
+        $phpCode .= "\$agentId = " . (int)$agentId . ";\n";
+        $phpCode .= "\$groupedMessage = " . var_export($groupedMessage, true) . ";\n\n";
         $phpCode .= "try {\n";
-        $phpCode .= "    \\App\\Services\\AIAgentService::processBufferedMessages({$conversationId});\n";
+        $phpCode .= "    \App\Helpers\Logger::info('Background script - Processando mensagem agrupada (conv=' . \$conversationId . ', agent=' . \$agentId . ', msgLen=' . strlen(\$groupedMessage) . ')');\n";
+        $phpCode .= "    \\App\\Services\\AIAgentService::processMessage(\$conversationId, \$agentId, \$groupedMessage);\n";
+        $phpCode .= "    \App\Helpers\Logger::info('Background script - ✅ Processamento concluído');\n";
         $phpCode .= "} catch (\\Exception \$e) {\n";
+        $phpCode .= "    \App\Helpers\Logger::error('Background script - ❌ Erro: ' . \$e->getMessage());\n";
         $phpCode .= "    error_log('Erro ao processar buffer: ' . \$e->getMessage());\n";
         $phpCode .= "}\n";
         
         file_put_contents($tempScript, $phpCode);
+        
+        // ✅ CORRIGIDO: Limpar buffer AGORA (dados já foram passados para o script)
+        \App\Helpers\Logger::info("AIAgentService::scheduleProcessing - Limpando buffer (dados já salvos no script)");
+        unset(self::$messageBuffers[$conversationId]);
         
         // Executar em background (não-bloqueante)
         $phpExecutable = PHP_BINARY;
@@ -674,7 +698,7 @@ class AIAgentService
             exec($command);
         }
         
-        \App\Helpers\Logger::info("AIAgentService::scheduleProcessing - Processamento agendado em background (script: {$tempScript})");
+        \App\Helpers\Logger::info("AIAgentService::scheduleProcessing - ✅ Processamento agendado em background (script: {$tempScript}, msgCount=" . count($messages) . ", totalLen=" . strlen($groupedMessage) . ")");
     }
     
     /**

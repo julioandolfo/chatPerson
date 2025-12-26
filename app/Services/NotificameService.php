@@ -864,9 +864,46 @@ class NotificameService
                 'identifier' => $messageData['from']
             ]);
             
-            // Adicionar avatar se disponível
+            // Processar avatar se disponível
             if (!empty($messageData['avatar'])) {
-                $contactCreateData['avatar'] = $messageData['avatar'];
+                self::logInfo("Notificame webhook: Avatar detectado no payload: " . substr($messageData['avatar'], 0, 100) . "...");
+                
+                // Se for URL externa, baixar e salvar localmente
+                if (AvatarService::isExternalUrl($messageData['avatar'])) {
+                    self::logInfo("Notificame webhook: Avatar é URL externa, tentando baixar...");
+                    
+                    $localAvatar = AvatarService::downloadAndSaveAvatar(
+                        $messageData['avatar'], 
+                        $messageData['from'], 
+                        $channel
+                    );
+                    
+                    if ($localAvatar) {
+                        $contactCreateData['avatar'] = $localAvatar;
+                        self::logInfo("Notificame webhook: ✅ Avatar baixado e salvo localmente: {$localAvatar}");
+                    } else {
+                        // Gerar avatar com iniciais se falhar
+                        self::logInfo("Notificame webhook: ❌ Falha ao baixar avatar, gerando avatar com iniciais...");
+                        $initialsAvatar = AvatarService::generateInitialsAvatar(
+                            $contactData['name'] ?? 'Contato', 
+                            $messageData['from']
+                        );
+                        
+                        if ($initialsAvatar) {
+                            $contactCreateData['avatar'] = $initialsAvatar;
+                            self::logInfo("Notificame webhook: ✅ Avatar com iniciais gerado: {$initialsAvatar}");
+                        } else {
+                            self::logWarning("Notificame webhook: ⚠️ Não foi possível gerar avatar, contato ficará sem avatar");
+                            // NÃO salvar a URL original, deixar null
+                        }
+                    }
+                } else {
+                    // Avatar já é local (raro, mas pode acontecer)
+                    $contactCreateData['avatar'] = $messageData['avatar'];
+                    self::logInfo("Notificame webhook: Avatar já é local: {$messageData['avatar']}");
+                }
+            } else {
+                self::logInfo("Notificame webhook: Nenhum avatar fornecido no payload");
             }
             
             self::logInfo("Notificame webhook: Dados para findOrCreate: " . json_encode($contactCreateData, JSON_UNESCAPED_UNICODE));

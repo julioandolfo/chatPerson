@@ -102,6 +102,23 @@ class SettingService
     }
 
     /**
+     * Obter configurações de IA/Fallback padrão
+     */
+    public static function getDefaultAISettings(): array
+    {
+        return [
+            'ai_fallback_enabled' => Setting::get('ai_fallback_enabled', true),
+            'ai_fallback_check_interval_minutes' => Setting::get('ai_fallback_check_interval_minutes', 15),
+            'ai_fallback_min_delay_minutes' => Setting::get('ai_fallback_min_delay_minutes', 5),
+            'ai_fallback_max_delay_hours' => Setting::get('ai_fallback_max_delay_hours', 24),
+            'ai_fallback_max_retries' => Setting::get('ai_fallback_max_retries', 3),
+            'ai_fallback_escalate_after_hours' => Setting::get('ai_fallback_escalate_after_hours', 2),
+            'ai_fallback_detect_closing_messages' => Setting::get('ai_fallback_detect_closing_messages', true),
+            'ai_fallback_use_ai_for_closing_detection' => Setting::get('ai_fallback_use_ai_for_closing_detection', false),
+        ];
+    }
+
+    /**
      * Obter configurações de WebSocket/Tempo Real padrão
      */
     public static function getDefaultWebSocketSettings(): array

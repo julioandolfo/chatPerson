@@ -748,13 +748,25 @@ class NotificameService
             }
         }
         
+        $isNewConversation = false;
         if (!$conversation) {
             // Criar nova conversa
             $conversation = ConversationService::create($conversationData, false);
+            $isNewConversation = true;
+            
+            // Notificar nova conversa via WebSocket
+            try {
+                $conversationFull = \App\Models\Conversation::find($conversation['id']);
+                if ($conversationFull) {
+                    \App\Helpers\WebSocket::notifyNewConversation($conversationFull);
+                }
+            } catch (\Exception $e) {
+                Logger::error("Erro ao notificar nova conversa via WebSocket: " . $e->getMessage());
+            }
         }
         
         // Salvar mensagem
-        Message::create([
+        $messageId = Message::create([
             'conversation_id' => $conversation['id'],
             'contact_id' => $contact['id'],
             'sender_id' => $contact['id'],
@@ -768,18 +780,37 @@ class NotificameService
             'metadata' => json_encode($messageData['metadata'] ?? [])
         ]);
         
-        // Notificar via WebSocket
-        try {
-            \App\Helpers\WebSocket::notifyNewMessage($conversation['id']);
-        } catch (\Exception $e) {
-            Logger::error("Erro ao notificar WebSocket: " . $e->getMessage());
+        // Buscar mensagem criada para notificar
+        $message = Message::find($messageId);
+        if ($message) {
+            // Adicionar campos necessários para o frontend
+            $message['type'] = ($message['message_type'] ?? 'text') === 'note' ? 'note' : 'message';
+            $message['direction'] = 'incoming';
+            
+            // Notificar via WebSocket
+            try {
+                \App\Helpers\WebSocket::notifyNewMessage($conversation['id'], $message);
+            } catch (\Exception $e) {
+                Logger::error("Erro ao notificar WebSocket: " . $e->getMessage());
+            }
         }
         
         // Executar automações
         try {
+            // Se é nova conversa, disparar trigger de conversation.created
+            if ($isNewConversation) {
+                AutomationService::trigger('conversation.created', [
+                    'conversation_id' => $conversation['id'],
+                    'channel' => $channel,
+                    'integration_account_id' => $account['id']
+                ]);
+            }
+            
+            // Disparar trigger de message.received
             AutomationService::trigger('message.received', [
                 'conversation_id' => $conversation['id'],
-                'channel' => $channel
+                'channel' => $channel,
+                'message_id' => $messageId ?? null
             ]);
         } catch (\Exception $e) {
             Logger::error("Erro ao executar automações: " . $e->getMessage());

@@ -80,6 +80,18 @@ ob_start();
                 </a>
             </li>
             <li class="nav-item mt-2">
+                <a class="nav-link text-active-primary me-10 <?= $activeTab === 'ai' ? 'active' : '' ?>" 
+                   href="<?= \App\Helpers\Url::to('/settings?tab=ai') ?>">
+                    <i class="ki-duotone ki-robot fs-2 me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                        <span class="path4"></span>
+                    </i>
+                    IA
+                </a>
+            </li>
+            <li class="nav-item mt-2">
                 <a class="nav-link text-active-primary me-10 <?= $activeTab === 'websocket' ? 'active' : '' ?>" 
                    href="<?= \App\Helpers\Url::to('/settings?tab=websocket') ?>">
                     <i class="ki-duotone ki-wifi fs-2 me-2">
@@ -504,6 +516,12 @@ ob_start();
             include __DIR__ . '/ai-assistant-tab.php';
             ?>
             <!--end::Form Assistente IA-->
+        <?php elseif ($activeTab === 'ai'): ?>
+            <!--begin::Form IA-->
+            <?php 
+            include __DIR__ . '/ai-tab.php';
+            ?>
+            <!--end::Form IA-->
         <?php endif; ?>
         
         <?php if ($activeTab === 'websocket'): ?>

@@ -34,6 +34,7 @@ class SettingsController
         $securitySettings = SettingService::getDefaultSecuritySettings();
         $websocketSettings = SettingService::getDefaultWebSocketSettings();
         $conversationSettings = ConversationSettingsService::getSettings();
+        $aiSettings = SettingService::getDefaultAISettings();
         
         // Obter dados para preencher selects
         $users = \App\Helpers\Database::fetchAll(
@@ -69,6 +70,7 @@ class SettingsController
             'securitySettings' => $securitySettings,
             'websocketSettings' => $websocketSettings,
             'conversationSettings' => $conversationSettings,
+            'aiSettings' => $aiSettings,
             'users' => $users,
             'departments' => $departments,
             'funnels' => $funnels,
@@ -465,6 +467,37 @@ class SettingsController
             Response::json([
                 'success' => true,
                 'message' => 'Configurações de tempo real salvas com sucesso!'
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao salvar configurações: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Salvar configurações de IA/Fallback
+     */
+    public function saveAI(): void
+    {
+        Permission::abortIfCannot('admin.settings');
+        
+        try {
+            $data = Request::post();
+            
+            SettingService::set('ai_fallback_enabled', isset($data['ai_fallback_enabled']), 'boolean', 'ai');
+            SettingService::set('ai_fallback_check_interval_minutes', (int)($data['ai_fallback_check_interval_minutes'] ?? 15), 'integer', 'ai');
+            SettingService::set('ai_fallback_min_delay_minutes', (int)($data['ai_fallback_min_delay_minutes'] ?? 5), 'integer', 'ai');
+            SettingService::set('ai_fallback_max_delay_hours', (int)($data['ai_fallback_max_delay_hours'] ?? 24), 'integer', 'ai');
+            SettingService::set('ai_fallback_max_retries', (int)($data['ai_fallback_max_retries'] ?? 3), 'integer', 'ai');
+            SettingService::set('ai_fallback_escalate_after_hours', (int)($data['ai_fallback_escalate_after_hours'] ?? 2), 'integer', 'ai');
+            SettingService::set('ai_fallback_detect_closing_messages', isset($data['ai_fallback_detect_closing_messages']), 'boolean', 'ai');
+            SettingService::set('ai_fallback_use_ai_for_closing_detection', isset($data['ai_fallback_use_ai_for_closing_detection']), 'boolean', 'ai');
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Configurações de IA salvas com sucesso!'
             ]);
         } catch (\Exception $e) {
             Response::json([

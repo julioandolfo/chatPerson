@@ -763,35 +763,15 @@ class NotificameService
             'name' => $contactName
         ];
         
-        // Adicionar avatar se disponível (baixar e salvar localmente)
-        if (!empty($messageData['avatar'])) {
-            self::logInfo("Notificame webhook: Avatar detectado, verificando se é URL externa...");
-            
-            if (AvatarService::isExternalUrl($messageData['avatar'])) {
-                self::logInfo("Notificame webhook: Avatar é URL externa, baixando e salvando localmente...");
-                $localAvatar = AvatarService::downloadAndSaveAvatar(
-                    $messageData['avatar'], 
-                    $messageData['from'], 
-                    $channel
-                );
-                
-                if ($localAvatar) {
-                    $contactData['avatar'] = $localAvatar;
-                    self::logInfo("Notificame webhook: Avatar salvo localmente: {$localAvatar}");
-                } else {
-                    self::logWarning("Notificame webhook: Falha ao baixar avatar, gerando avatar com iniciais...");
-                    $initialsAvatar = AvatarService::generateInitialsAvatar($contactName, $messageData['from']);
-                    if ($initialsAvatar) {
-                        $contactData['avatar'] = $initialsAvatar;
-                        self::logInfo("Notificame webhook: Avatar com iniciais gerado: {$initialsAvatar}");
-                    } else {
-                        self::logWarning("Notificame webhook: Falha ao gerar avatar com iniciais, sem avatar");
-                    }
-                }
-            } else {
-                $contactData['avatar'] = $messageData['avatar'];
-                self::logInfo("Notificame webhook: Avatar já é local: {$messageData['avatar']}");
-            }
+        // 🎨 NOTIFICAME: Usar APENAS avatares com iniciais (rápido, bonito, sempre funciona)
+        self::logInfo("Notificame webhook: Gerando avatar com iniciais para {$contactName}");
+        $initialsAvatar = AvatarService::generateInitialsAvatar($contactName, $messageData['from']);
+        
+        if ($initialsAvatar) {
+            $contactData['avatar'] = $initialsAvatar;
+            self::logInfo("Notificame webhook: ✅ Avatar com iniciais gerado: {$initialsAvatar}");
+        } else {
+            self::logWarning("Notificame webhook: ⚠️ Falha ao gerar avatar com iniciais");
         }
         
         // Identificar contato baseado no canal
@@ -805,39 +785,8 @@ class NotificameService
                     'identifier' => $messageData['from']
                 ]));
                 $contact = \App\Models\Contact::find($contactId);
-            } else {
-                // Atualizar avatar se disponível e diferente
-                if (!empty($messageData['avatar']) && $contact['avatar'] !== $messageData['avatar']) {
-                    $avatarToSave = null;
-                    
-                    // Se for URL externa, baixar e salvar localmente
-                    if (AvatarService::isExternalUrl($messageData['avatar'])) {
-                        $localAvatar = AvatarService::downloadAndSaveAvatar(
-                            $messageData['avatar'], 
-                            $messageData['from'], 
-                            $channel
-                        );
-                        if ($localAvatar) {
-                            $avatarToSave = $localAvatar;
-                            self::logInfo("Notificame webhook: Avatar WhatsApp atualizado localmente: {$localAvatar}");
-                        } else {
-                            // Gerar avatar com iniciais se falhar
-                            $initialsAvatar = AvatarService::generateInitialsAvatar($contact['name'], $messageData['from']);
-                            if ($initialsAvatar) {
-                                $avatarToSave = $initialsAvatar;
-                                self::logInfo("Notificame webhook: Avatar WhatsApp com iniciais: {$initialsAvatar}");
-                            }
-                        }
-                    } else {
-                        $avatarToSave = $messageData['avatar'];
-                    }
-                    
-                    if ($avatarToSave) {
-                        \App\Models\Contact::update($contact['id'], ['avatar' => $avatarToSave]);
-                        $contact = \App\Models\Contact::find($contact['id']);
-                    }
-                }
             }
+            // Nota: Avatar já foi definido com iniciais no $contactData acima
         } elseif ($channel === 'email') {
             $email = $messageData['from'];
             // Buscar contato por email (compativel com Model que retorna array)
@@ -855,39 +804,8 @@ class NotificameService
                     'identifier' => $messageData['from']
                 ]));
                 $contact = \App\Models\Contact::find($contactId);
-            } else {
-                // Atualizar avatar se disponível e diferente
-                if (!empty($messageData['avatar']) && $contact['avatar'] !== $messageData['avatar']) {
-                    $avatarToSave = null;
-                    
-                    // Se for URL externa, baixar e salvar localmente
-                    if (AvatarService::isExternalUrl($messageData['avatar'])) {
-                        $localAvatar = AvatarService::downloadAndSaveAvatar(
-                            $messageData['avatar'], 
-                            $messageData['from'], 
-                            $channel
-                        );
-                        if ($localAvatar) {
-                            $avatarToSave = $localAvatar;
-                            self::logInfo("Notificame webhook: Avatar Email atualizado localmente: {$localAvatar}");
-                        } else {
-                            // Gerar avatar com iniciais se falhar
-                            $initialsAvatar = AvatarService::generateInitialsAvatar($contact['name'], $messageData['from']);
-                            if ($initialsAvatar) {
-                                $avatarToSave = $initialsAvatar;
-                                self::logInfo("Notificame webhook: Avatar Email com iniciais: {$initialsAvatar}");
-                            }
-                        }
-                    } else {
-                        $avatarToSave = $messageData['avatar'];
-                    }
-                    
-                    if ($avatarToSave) {
-                        \App\Models\Contact::update($contact['id'], ['avatar' => $avatarToSave]);
-                        $contact = \App\Models\Contact::find($contact['id']);
-                    }
-                }
             }
+            // Nota: Avatar já foi definido com iniciais no $contactData acima
         } else {
             // Para outros canais (Instagram, Facebook, etc), usar identifier genérico
             self::logInfo("Notificame webhook: Criando/buscando contato com identifier={$messageData['from']} (canal={$channel})");
@@ -896,69 +814,14 @@ class NotificameService
                 'identifier' => $messageData['from']
             ]);
             
-            // Processar avatar se disponível
-            if ($channel === 'instagram' && !empty($contactData['name'])) {
-                // INSTAGRAM: Tentar scraping do perfil público (og:image) ANTES de tentar URL do webhook
-                self::logInfo("Notificame webhook: Instagram - Tentando obter avatar via scraping do perfil @{$contactData['name']}");
-                
-                $instagramAvatar = AvatarService::downloadInstagramAvatar($contactData['name'], $messageData['from']);
-                
-                if ($instagramAvatar) {
-                    $contactCreateData['avatar'] = $instagramAvatar;
-                    self::logInfo("Notificame webhook: ✅ Avatar do Instagram obtido via scraping: {$instagramAvatar}");
-                } else {
-                    // Fallback: Gerar avatar com iniciais
-                    self::logInfo("Notificame webhook: ❌ Scraping falhou, gerando avatar com iniciais...");
-                    $initialsAvatar = AvatarService::generateInitialsAvatar(
-                        $contactData['name'] ?? 'Contato', 
-                        $messageData['from']
-                    );
-                    
-                    if ($initialsAvatar) {
-                        $contactCreateData['avatar'] = $initialsAvatar;
-                        self::logInfo("Notificame webhook: ✅ Avatar com iniciais gerado: {$initialsAvatar}");
-                    }
-                }
-            } elseif (!empty($messageData['avatar'])) {
-                // OUTROS CANAIS: Tentar baixar avatar do webhook normalmente
-                self::logInfo("Notificame webhook: Avatar detectado no payload: " . substr($messageData['avatar'], 0, 100) . "...");
-                
-                // Se for URL externa, baixar e salvar localmente
-                if (AvatarService::isExternalUrl($messageData['avatar'])) {
-                    self::logInfo("Notificame webhook: Avatar é URL externa, tentando baixar...");
-                    
-                    $localAvatar = AvatarService::downloadAndSaveAvatar(
-                        $messageData['avatar'], 
-                        $messageData['from'], 
-                        $channel
-                    );
-                    
-                    if ($localAvatar) {
-                        $contactCreateData['avatar'] = $localAvatar;
-                        self::logInfo("Notificame webhook: ✅ Avatar baixado e salvo localmente: {$localAvatar}");
-                    } else {
-                        // Gerar avatar com iniciais se falhar
-                        self::logInfo("Notificame webhook: ❌ Falha ao baixar avatar, gerando avatar com iniciais...");
-                        $initialsAvatar = AvatarService::generateInitialsAvatar(
-                            $contactData['name'] ?? 'Contato', 
-                            $messageData['from']
-                        );
-                        
-                        if ($initialsAvatar) {
-                            $contactCreateData['avatar'] = $initialsAvatar;
-                            self::logInfo("Notificame webhook: ✅ Avatar com iniciais gerado: {$initialsAvatar}");
-                        } else {
-                            self::logWarning("Notificame webhook: ⚠️ Não foi possível gerar avatar, contato ficará sem avatar");
-                            // NÃO salvar a URL original, deixar null
-                        }
-                    }
-                } else {
-                    // Avatar já é local (raro, mas pode acontecer)
-                    $contactCreateData['avatar'] = $messageData['avatar'];
-                    self::logInfo("Notificame webhook: Avatar já é local: {$messageData['avatar']}");
-                }
+            // 🎨 AVATAR: Usar SEMPRE iniciais (rápido, bonito, sempre funciona)
+            // Nota: Avatar já foi gerado com iniciais no início ($contactData)
+            // Apenas adicionar ao $contactCreateData se ainda não tiver
+            if (!empty($contactData['avatar'])) {
+                $contactCreateData['avatar'] = $contactData['avatar'];
+                self::logInfo("Notificame webhook: ✅ Avatar com iniciais já está disponível");
             } else {
-                self::logInfo("Notificame webhook: Nenhum avatar fornecido no payload");
+                self::logInfo("Notificame webhook: ⚠️ Nenhum avatar no contactData");
             }
             
             self::logInfo("Notificame webhook: Dados para findOrCreate: " . json_encode($contactCreateData, JSON_UNESCAPED_UNICODE));

@@ -762,46 +762,50 @@ class NotificameService
      */
     private static function findAccountByWebhook(array $payload, string $channel): ?array
     {
-        // Tentar encontrar por account_id no payload
-        if (isset($payload['account_id'])) {
-            $account = IntegrationAccount::where('provider', '=', 'notificame')
-                ->where('channel', '=', $channel)
-                ->where('account_id', '=', $payload['account_id'])
-                ->first();
-            
-            if ($account) {
-                return $account;
+        // Helper para filtrar contas
+        $all = IntegrationAccount::all();
+        $filtered = function(callable $fn) use ($all) {
+            $arr = array_values(array_filter($all, $fn));
+            return !empty($arr) ? $arr[0] : null;
+        };
+
+        // 1) Por account_id no payload
+        if (!empty($payload['account_id'])) {
+            $acc = $filtered(function($a) use ($channel, $payload) {
+                return ($a['provider'] ?? '') === 'notificame'
+                    && ($a['channel'] ?? '') === $channel
+                    && ($a['account_id'] ?? '') === $payload['account_id'];
+            });
+            if ($acc) return $acc;
+        }
+
+        // 2) Por subscriptionId (id do canal vindo no webhook)
+        if (!empty($payload['subscriptionId'])) {
+            $acc = $filtered(function($a) use ($channel, $payload) {
+                return ($a['provider'] ?? '') === 'notificame'
+                    && ($a['channel'] ?? '') === $channel
+                    && ($a['account_id'] ?? '') === $payload['subscriptionId'];
+            });
+            if ($acc) return $acc;
+        }
+
+        // 3) Para WhatsApp, tentar por telefone
+        if ($channel === 'whatsapp' && !empty($payload['from'])) {
+            $phone = self::normalizePhoneNumber($payload['from']);
+            $acc = IntegrationAccount::findByPhone($phone, 'whatsapp');
+            if ($acc && ($acc['provider'] ?? '') === 'notificame') {
+                return $acc;
             }
         }
 
-        // Tentar por subscriptionId (vem no webhook do Notificame e é o id do canal)
-        if (isset($payload['subscriptionId'])) {
-            $account = IntegrationAccount::where('provider', '=', 'notificame')
-                ->where('channel', '=', $channel)
-                ->where('account_id', '=', $payload['subscriptionId'])
-                ->first();
-            if ($account) {
-                return $account;
-            }
-        }
-        
-        // Tentar encontrar por phone_number (WhatsApp)
-        if ($channel === 'whatsapp' && isset($payload['from'])) {
-            $phone = self::normalizePhoneNumber($payload['from']);
-            $account = IntegrationAccount::findByPhone($phone, 'whatsapp');
-            
-            if ($account && $account['provider'] === 'notificame') {
-                return $account;
-            }
-        }
-        
-        // Tentar encontrar primeira conta ativa do canal
-        $account = IntegrationAccount::where('provider', '=', 'notificame')
-            ->where('channel', '=', $channel)
-            ->where('status', '=', 'active')
-            ->first();
-        
-        return $account;
+        // 4) fallback: primeira ativa do canal/provider notificame
+        $acc = $filtered(function($a) use ($channel) {
+            return ($a['provider'] ?? '') === 'notificame'
+                && ($a['channel'] ?? '') === $channel
+                && ($a['status'] ?? '') === 'active';
+        });
+
+        return $acc;
     }
     
     /**

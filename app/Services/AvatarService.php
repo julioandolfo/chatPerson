@@ -150,45 +150,55 @@ class AvatarService
      */
     private static function downloadImageWithRetry(string $url, string $channel): string|false
     {
+        Logger::notificame("[DEBUG] === DOWNLOAD IMAGE - INICIANDO ===");
+        Logger::notificame("[DEBUG] URL para download: {$url}");
+        Logger::notificame("[DEBUG] Canal: {$channel}");
+        
         // Método 1: file_get_contents (simples e rápido)
-        Logger::notificame("[INFO] AvatarService::downloadImageWithRetry - Tentativa 1/4: file_get_contents");
+        Logger::notificame("[DEBUG] === Tentativa 1/4: file_get_contents ===");
         $imageData = @file_get_contents($url);
+        Logger::notificame("[DEBUG]   Resultado: " . ($imageData !== false ? strlen($imageData) . ' bytes baixados' : 'FALHOU'));
         if ($imageData !== false && !empty($imageData)) {
             Logger::notificame("[INFO] AvatarService::downloadImageWithRetry - ✅ Sucesso com file_get_contents");
             return $imageData;
         }
         
         // Método 2: cURL com User-Agent básico
-        Logger::notificame("[INFO] AvatarService::downloadImageWithRetry - Tentativa 2/4: cURL básico");
+        Logger::notificame("[DEBUG] === Tentativa 2/4: cURL básico ===");
         $imageData = self::downloadWithCurl($url, [
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         ]);
+        Logger::notificame("[DEBUG]   Resultado: " . ($imageData !== false ? strlen($imageData) . ' bytes baixados' : 'FALHOU'));
         if ($imageData !== false && !empty($imageData)) {
             Logger::notificame("[INFO] AvatarService::downloadImageWithRetry - ✅ Sucesso com cURL básico");
             return $imageData;
         }
         
         // Método 3: cURL com headers específicos do Instagram
-        if ($channel === 'instagram' || str_contains($url, 'instagram.com') || str_contains($url, 'cdninstagram.com')) {
-            Logger::notificame("[INFO] AvatarService::downloadImageWithRetry - Tentativa 3/4: cURL com headers Instagram");
+        if ($channel === 'instagram' || str_contains($url, 'instagram.com') || str_contains($url, 'cdninstagram.com') || str_contains($url, 'fbcdn.net')) {
+            Logger::notificame("[DEBUG] === Tentativa 3/4: cURL com headers Instagram ===");
             $imageData = self::downloadWithCurlInstagram($url);
+            Logger::notificame("[DEBUG]   Resultado: " . ($imageData !== false ? strlen($imageData) . ' bytes baixados' : 'FALHOU'));
             if ($imageData !== false && !empty($imageData)) {
                 Logger::notificame("[INFO] AvatarService::downloadImageWithRetry - ✅ Sucesso com cURL Instagram");
                 return $imageData;
             }
+        } else {
+            Logger::notificame("[DEBUG] === Tentativa 3/4: PULADA (não é Instagram/fbcdn) ===");
         }
         
         // Método 4: cURL com User-Agent mobile (última tentativa)
-        Logger::notificame("[INFO] AvatarService::downloadImageWithRetry - Tentativa 4/4: cURL mobile");
+        Logger::notificame("[DEBUG] === Tentativa 4/4: cURL mobile ===");
         $imageData = self::downloadWithCurl($url, [
             'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
         ]);
+        Logger::notificame("[DEBUG]   Resultado: " . ($imageData !== false ? strlen($imageData) . ' bytes baixados' : 'FALHOU'));
         if ($imageData !== false && !empty($imageData)) {
             Logger::notificame("[INFO] AvatarService::downloadImageWithRetry - ✅ Sucesso com cURL mobile");
             return $imageData;
         }
         
-        Logger::notificame("[ERROR] AvatarService::downloadImageWithRetry - ❌ Todas as 4 tentativas falharam");
+        Logger::notificame("[ERROR] AvatarService::downloadImageWithRetry - ❌ TODAS AS 4 TENTATIVAS FALHARAM!");
         return false;
     }
     
@@ -198,6 +208,8 @@ class AvatarService
     private static function downloadWithCurl(string $url, array $userAgents): string|false
     {
         foreach ($userAgents as $ua) {
+            Logger::notificame("[DEBUG]     cURL: User-Agent: " . substr($ua, 0, 50) . "...");
+            
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
@@ -207,12 +219,21 @@ class AvatarService
             
             $imageData = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
             curl_close($ch);
             
-            Logger::notificame("[DEBUG] AvatarService::downloadWithCurl - HTTP {$httpCode}, bytes: " . (is_string($imageData) ? strlen($imageData) : '0'));
+            $bytes = is_string($imageData) ? strlen($imageData) : 0;
+            Logger::notificame("[DEBUG]     cURL: HTTP {$httpCode}, Content-Type: {$contentType}, bytes: {$bytes}");
+            if ($error) {
+                Logger::notificame("[DEBUG]     cURL: Error: {$error}");
+            }
             
             if ($imageData !== false && $httpCode === 200 && !empty($imageData)) {
+                Logger::notificame("[DEBUG]     cURL: ✅ SUCESSO!");
                 return $imageData;
+            } else {
+                Logger::notificame("[DEBUG]     cURL: ❌ Falhou (HTTP {$httpCode})");
             }
         }
         
@@ -224,6 +245,8 @@ class AvatarService
      */
     private static function downloadWithCurlInstagram(string $url): string|false
     {
+        Logger::notificame("[DEBUG]     cURL Instagram: Usando headers específicos do Instagram/Facebook");
+        
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
@@ -252,12 +275,24 @@ class AvatarService
         $imageData = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
+        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        $finalUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
         curl_close($ch);
         
-        Logger::notificame("[DEBUG] AvatarService::downloadWithCurlInstagram - HTTP {$httpCode}, bytes: " . (is_string($imageData) ? strlen($imageData) : '0') . ", error: " . ($error ?: 'none'));
+        $bytes = is_string($imageData) ? strlen($imageData) : 0;
+        Logger::notificame("[DEBUG]     cURL Instagram: HTTP {$httpCode}, Content-Type: {$contentType}, bytes: {$bytes}");
+        if ($finalUrl !== $url) {
+            Logger::notificame("[DEBUG]     cURL Instagram: Redirecionado para: {$finalUrl}");
+        }
+        if ($error) {
+            Logger::notificame("[DEBUG]     cURL Instagram: Error: {$error}");
+        }
         
         if ($imageData !== false && $httpCode === 200 && !empty($imageData)) {
+            Logger::notificame("[DEBUG]     cURL Instagram: ✅ SUCESSO!");
             return $imageData;
+        } else {
+            Logger::notificame("[DEBUG]     cURL Instagram: ❌ Falhou (HTTP {$httpCode})");
         }
         
         return false;
@@ -321,8 +356,14 @@ class AvatarService
             }
             
             Logger::notificame("[DEBUG] AvatarService::fetchInstagramProfileImageUrl - HTML obtido, tamanho: " . strlen($html) . " bytes");
+            Logger::notificame("[DEBUG] AvatarService::fetchInstagramProfileImageUrl - Primeiras 500 chars do HTML: " . substr($html, 0, 500));
+            
+            // Contar quantas tags <img> existem no HTML
+            $imgCount = preg_match_all('/<img[^>]*>/i', $html, $allImgs);
+            Logger::notificame("[DEBUG] AvatarService::fetchInstagramProfileImageUrl - Total de tags <img> encontradas: {$imgCount}");
             
             // 🎯 MÉTODO 1: Buscar tag <img> com alt contendo perfil do usuário (múltiplos idiomas)
+            Logger::notificame("[DEBUG] === MÉTODO 1: Buscando <img> com alt= perfil ===");
             $altPatterns = [
                 'Foto do perfil de',      // Português
                 'Photo de profil de',     // Francês
@@ -333,50 +374,81 @@ class AvatarService
             ];
             
             foreach ($altPatterns as $pattern) {
+                Logger::notificame("[DEBUG]   Tentando padrão: '{$pattern}'");
+                
                 // Formato 1: alt antes de src
                 if (preg_match('/<img[^>]+alt=["\']' . preg_quote($pattern, '/') . '[^"\']*["\'][^>]+src=["\']([^"\']+)["\']/i', $html, $matches)) {
+                    Logger::notificame("[DEBUG]   ✅ MATCH (alt-src)! URL RAW: {$matches[1]}");
                     $imageUrl = self::cleanImageUrl($matches[1]);
-                    Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - ✅ <img> tag encontrada (alt '{$pattern}'): " . substr($imageUrl, 0, 100) . "...");
+                    Logger::notificame("[DEBUG]   ✅ URL LIMPA: {$imageUrl}");
+                    Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - ✅ <img> tag encontrada (alt '{$pattern}')");
                     return $imageUrl;
                 }
                 
                 // Formato 2: src antes de alt
                 if (preg_match('/<img[^>]+src=["\']([^"\']+)["\'][^>]+alt=["\']' . preg_quote($pattern, '/') . '[^"\']*["\']/i', $html, $matches)) {
+                    Logger::notificame("[DEBUG]   ✅ MATCH (src-alt)! URL RAW: {$matches[1]}");
                     $imageUrl = self::cleanImageUrl($matches[1]);
-                    Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - ✅ <img> tag encontrada (src-alt '{$pattern}'): " . substr($imageUrl, 0, 100) . "...");
+                    Logger::notificame("[DEBUG]   ✅ URL LIMPA: {$imageUrl}");
+                    Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - ✅ <img> tag encontrada (src-alt '{$pattern}')");
                     return $imageUrl;
                 }
+                
+                Logger::notificame("[DEBUG]   ❌ Não encontrado com padrão '{$pattern}'");
             }
             
             // 🎯 MÉTODO 2: Buscar tag <img> com classes específicas do Instagram (fbcdn.net)
+            Logger::notificame("[DEBUG] === MÉTODO 2: Buscando <img> com fbcdn.net ===");
             if (preg_match('/<img[^>]+src=["\']([^"\']*fbcdn\.net[^"\']+)["\']/i', $html, $matches)) {
+                Logger::notificame("[DEBUG]   ✅ MATCH fbcdn! URL RAW: {$matches[1]}");
                 $imageUrl = self::cleanImageUrl($matches[1]);
-                Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - ✅ <img> tag fbcdn encontrada: " . substr($imageUrl, 0, 100) . "...");
+                Logger::notificame("[DEBUG]   ✅ URL LIMPA: {$imageUrl}");
+                Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - ✅ <img> tag fbcdn encontrada");
                 return $imageUrl;
             }
+            Logger::notificame("[DEBUG]   ❌ Nenhuma tag <img> com fbcdn.net encontrada");
             
             // 🎯 MÉTODO 3: Meta tag og:image (fallback)
+            Logger::notificame("[DEBUG] === MÉTODO 3: Buscando meta og:image ===");
             if (preg_match('/property=["\']og:image["\']\s+content=["\']([^"\']+)["\']/i', $html, $matches)) {
+                Logger::notificame("[DEBUG]   ✅ MATCH og:image! URL RAW: {$matches[1]}");
                 $imageUrl = self::cleanImageUrl($matches[1]);
-                Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - ✅ og:image encontrado: " . substr($imageUrl, 0, 100) . "...");
+                Logger::notificame("[DEBUG]   ✅ URL LIMPA: {$imageUrl}");
+                Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - ✅ og:image encontrado");
                 return $imageUrl;
             }
             
             // Formato alternativo: content primeiro
             if (preg_match('/content=["\']([^"\']+)["\']\s+property=["\']og:image["\']/i', $html, $matches)) {
+                Logger::notificame("[DEBUG]   ✅ MATCH og:image (alt format)! URL RAW: {$matches[1]}");
                 $imageUrl = self::cleanImageUrl($matches[1]);
-                Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - ✅ og:image encontrado (formato alt): " . substr($imageUrl, 0, 100) . "...");
+                Logger::notificame("[DEBUG]   ✅ URL LIMPA: {$imageUrl}");
+                Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - ✅ og:image encontrado (formato alt)");
                 return $imageUrl;
             }
+            Logger::notificame("[DEBUG]   ❌ Meta og:image não encontrada");
             
             // 🎯 MÉTODO 4: Meta tag twitter:image (fallback)
+            Logger::notificame("[DEBUG] === MÉTODO 4: Buscando meta twitter:image ===");
             if (preg_match('/name=["\']twitter:image["\']\s+content=["\']([^"\']+)["\']/i', $html, $matches)) {
+                Logger::notificame("[DEBUG]   ✅ MATCH twitter:image! URL RAW: {$matches[1]}");
                 $imageUrl = self::cleanImageUrl($matches[1]);
-                Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - ✅ twitter:image encontrado: " . substr($imageUrl, 0, 100) . "...");
+                Logger::notificame("[DEBUG]   ✅ URL LIMPA: {$imageUrl}");
+                Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - ✅ twitter:image encontrado");
                 return $imageUrl;
             }
+            Logger::notificame("[DEBUG]   ❌ Meta twitter:image não encontrada");
             
-            Logger::notificame("[WARNING] AvatarService::fetchInstagramProfileImageUrl - ❌ Nenhuma imagem de perfil encontrada no HTML");
+            Logger::notificame("[ERROR] AvatarService::fetchInstagramProfileImageUrl - ❌ TODOS OS 4 MÉTODOS FALHARAM!");
+            Logger::notificame("[DEBUG] === AMOSTRA DO HTML (tags meta) ===");
+            if (preg_match_all('/<meta[^>]*property=["\']og:[^>]+>/i', $html, $ogTags)) {
+                foreach ($ogTags[0] as $tag) {
+                    Logger::notificame("[DEBUG]   " . substr($tag, 0, 150));
+                }
+            } else {
+                Logger::notificame("[DEBUG]   Nenhuma meta tag og: encontrada");
+            }
+            
             return null;
             
         } catch (\Exception $e) {
@@ -392,31 +464,43 @@ class AvatarService
     public static function downloadInstagramAvatar(string $username, string $identifier): ?string
     {
         try {
-            Logger::notificame("[INFO] AvatarService::downloadInstagramAvatar - Iniciando para @{$username}");
+            Logger::notificame("[INFO] ========== DOWNLOAD INSTAGRAM AVATAR - INÍCIO ==========");
+            Logger::notificame("[INFO] AvatarService::downloadInstagramAvatar - Username: @{$username}");
+            Logger::notificame("[INFO] AvatarService::downloadInstagramAvatar - Identifier: {$identifier}");
             
-            // Passo 1: Buscar URL da imagem via og:image
+            // Passo 1: Buscar URL da imagem via scraping
+            Logger::notificame("[INFO] === PASSO 1: Scraping do perfil público ===");
             $imageUrl = self::fetchInstagramProfileImageUrl($username);
             
             if (!$imageUrl) {
-                Logger::notificame("[WARNING] AvatarService::downloadInstagramAvatar - Não foi possível obter URL da imagem");
+                Logger::notificame("[ERROR] AvatarService::downloadInstagramAvatar - ❌ PASSO 1 FALHOU: Não foi possível encontrar URL da imagem");
+                Logger::notificame("[INFO] ========== DOWNLOAD INSTAGRAM AVATAR - FIM (Falha no scraping) ==========");
                 return null;
             }
             
+            Logger::notificame("[INFO] AvatarService::downloadInstagramAvatar - ✅ PASSO 1 OK: URL encontrada");
+            Logger::notificame("[INFO] AvatarService::downloadInstagramAvatar - URL completa: {$imageUrl}");
+            
             // Passo 2: Baixar a imagem
-            Logger::notificame("[INFO] AvatarService::downloadInstagramAvatar - Baixando imagem de: " . substr($imageUrl, 0, 100) . "...");
+            Logger::notificame("[INFO] === PASSO 2: Download da imagem ===");
             
             $savedPath = self::downloadAndSaveAvatar($imageUrl, $identifier, 'instagram');
             
             if ($savedPath) {
-                Logger::notificame("[INFO] AvatarService::downloadInstagramAvatar - ✅ Avatar do Instagram salvo: {$savedPath}");
+                Logger::notificame("[INFO] AvatarService::downloadInstagramAvatar - ✅ PASSO 2 OK: Avatar salvo");
+                Logger::notificame("[INFO] AvatarService::downloadInstagramAvatar - Caminho local: {$savedPath}");
+                Logger::notificame("[INFO] ========== DOWNLOAD INSTAGRAM AVATAR - FIM (Sucesso) ==========");
                 return $savedPath;
             }
             
-            Logger::notificame("[WARNING] AvatarService::downloadInstagramAvatar - ❌ Falha ao baixar/salvar imagem");
+            Logger::notificame("[ERROR] AvatarService::downloadInstagramAvatar - ❌ PASSO 2 FALHOU: Não foi possível baixar/salvar imagem");
+            Logger::notificame("[INFO] ========== DOWNLOAD INSTAGRAM AVATAR - FIM (Falha no download) ==========");
             return null;
             
         } catch (\Exception $e) {
-            Logger::notificame("[ERROR] AvatarService::downloadInstagramAvatar - Exceção: " . $e->getMessage());
+            Logger::notificame("[ERROR] AvatarService::downloadInstagramAvatar - ❌ EXCEÇÃO: " . $e->getMessage());
+            Logger::notificame("[ERROR] AvatarService::downloadInstagramAvatar - Stack trace: " . $e->getTraceAsString());
+            Logger::notificame("[INFO] ========== DOWNLOAD INSTAGRAM AVATAR - FIM (Exceção) ==========");
             return null;
         }
     }

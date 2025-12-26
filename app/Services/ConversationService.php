@@ -1415,17 +1415,35 @@ class ConversationService
                     $sendResult = null;
                     
                     if ($integrationAccountId) {
-                        // Determinar destinatário (phone ou identifier)
-                        $recipient = $contact['phone'] ?? $contact['identifier'] ?? '';
+                        // Determinar destinatário baseado no canal
+                        $channel = $conversation['channel'] ?? 'whatsapp';
+                        $nonPhoneChannels = ['instagram', 'facebook', 'telegram', 'twitter', 'linkedin', 'tiktok'];
+                        
+                        if (in_array($channel, $nonPhoneChannels)) {
+                            // Para canais sociais, priorizar identifier
+                            $recipient = $contact['identifier'] ?? $contact['phone'] ?? '';
+                        } else {
+                            // Para WhatsApp/Email/SMS, priorizar phone/email
+                            $recipient = $contact['phone'] ?? $contact['email'] ?? $contact['identifier'] ?? '';
+                        }
                         
                         // Usar IntegrationService para nova estrutura
                         \App\Helpers\Logger::info("ConversationService::sendMessage - Preparando envio:");
                         \App\Helpers\Logger::info("  - integration_id: {$integrationAccountId}");
+                        \App\Helpers\Logger::info("  - channel: {$channel}");
                         \App\Helpers\Logger::info("  - contact_id: {$contact['id']}");
                         \App\Helpers\Logger::info("  - phone: " . ($contact['phone'] ?? 'NULL'));
+                        \App\Helpers\Logger::info("  - email: " . ($contact['email'] ?? 'NULL'));
                         \App\Helpers\Logger::info("  - identifier: " . ($contact['identifier'] ?? 'NULL'));
                         \App\Helpers\Logger::info("  - recipient (usado): {$recipient}");
                         \App\Helpers\Logger::info("  - contentLen: " . strlen($content));
+                        
+                        // Validar se temos um destinatário
+                        if (empty($recipient)) {
+                            $error = "Destinatário não encontrado para o contato. Canal: {$channel}, ContactID: {$contact['id']}";
+                            \App\Helpers\Logger::error("ConversationService::sendMessage - " . $error);
+                            throw new \Exception($error);
+                        }
                         
                         try {
                             $sendResult = \App\Services\IntegrationService::sendMessage(

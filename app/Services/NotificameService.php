@@ -708,6 +708,7 @@ class NotificameService
         self::logInfo("Notificame webhook: Dados da mensagem extraídos:");
         self::logInfo("  - From (destinatário para resposta): {$messageData['from']}");
         self::logInfo("  - Name: {$messageData['name']}");
+        self::logInfo("  - Avatar: " . ($messageData['avatar'] ?? 'NULL'));
         self::logInfo("  - Content: " . substr($messageData['content'], 0, 100));
         self::logInfo("  - Type: {$messageData['type']}");
         
@@ -721,6 +722,11 @@ class NotificameService
             'name' => $contactName
         ];
         
+        // Adicionar avatar se disponível
+        if (!empty($messageData['avatar'])) {
+            $contactData['avatar'] = $messageData['avatar'];
+        }
+        
         // Identificar contato baseado no canal
         if ($channel === 'whatsapp') {
             $phone = self::normalizePhoneNumber($messageData['from']);
@@ -728,9 +734,16 @@ class NotificameService
             if (!$contact) {
                 $contactId = \App\Models\Contact::create(array_merge($contactData, [
                     'phone' => $phone,
-                    'whatsapp_id' => $messageData['from']
+                    'whatsapp_id' => $messageData['from'],
+                    'identifier' => $messageData['from']
                 ]));
                 $contact = \App\Models\Contact::find($contactId);
+            } else {
+                // Atualizar avatar se disponível e diferente
+                if (!empty($messageData['avatar']) && $contact['avatar'] !== $messageData['avatar']) {
+                    \App\Models\Contact::update($contact['id'], ['avatar' => $messageData['avatar']]);
+                    $contact = \App\Models\Contact::find($contact['id']);
+                }
             }
         } elseif ($channel === 'email') {
             $email = $messageData['from'];
@@ -745,16 +758,31 @@ class NotificameService
             }
             if (!$contact) {
                 $contactId = \App\Models\Contact::create(array_merge($contactData, [
-                    'email' => $email
+                    'email' => $email,
+                    'identifier' => $messageData['from']
                 ]));
                 $contact = \App\Models\Contact::find($contactId);
+            } else {
+                // Atualizar avatar se disponível e diferente
+                if (!empty($messageData['avatar']) && $contact['avatar'] !== $messageData['avatar']) {
+                    \App\Models\Contact::update($contact['id'], ['avatar' => $messageData['avatar']]);
+                    $contact = \App\Models\Contact::find($contact['id']);
+                }
             }
         } else {
             // Para outros canais (Instagram, Facebook, etc), usar identifier genérico
             self::logInfo("Notificame webhook: Criando/buscando contato com identifier={$messageData['from']} (canal={$channel})");
-            $contact = \App\Models\Contact::findOrCreate(array_merge($contactData, [
+            
+            $contactCreateData = array_merge($contactData, [
                 'identifier' => $messageData['from']
-            ]));
+            ]);
+            
+            // Adicionar avatar se disponível
+            if (!empty($messageData['avatar'])) {
+                $contactCreateData['avatar'] = $messageData['avatar'];
+            }
+            
+            $contact = \App\Models\Contact::findOrCreate($contactCreateData);
         }
         
         if (!$contact) {
@@ -927,6 +955,7 @@ class NotificameService
             'type' => 'text',
             'external_id' => null,
             'name' => null,
+            'avatar' => null,
             'metadata' => []
         ];
         
@@ -936,6 +965,7 @@ class NotificameService
             $data['from'] = $msg['from'] ?? $msg['sender'] ?? null;
             $data['external_id'] = $msg['id'] ?? $msg['message_id'] ?? null;
             $data['name'] = $msg['visitor']['name'] ?? $msg['visitor']['firstName'] ?? $msg['sender_name'] ?? null;
+            $data['avatar'] = $msg['visitor']['picture'] ?? $msg['visitor']['avatar'] ?? null;
             $data['metadata'] = $msg['metadata'] ?? $msg;
 
             // Conteúdo: se houver contents[], usar o primeiro item

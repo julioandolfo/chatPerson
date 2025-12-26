@@ -15,6 +15,7 @@ class Contact extends Model
         'email', 
         'phone', 
         'whatsapp_id',
+        'identifier', // Para Instagram, Facebook, Telegram, etc (ID único do canal)
         'city',
         'country',
         'bio',
@@ -148,20 +149,62 @@ class Contact extends Model
     }
 
     /**
+     * Buscar por identifier (Instagram, Facebook, Telegram, etc)
+     */
+    public static function findByIdentifier(string $identifier): ?array
+    {
+        return self::whereFirst('identifier', '=', $identifier);
+    }
+
+    /**
      * Buscar ou criar contato
      */
     public static function findOrCreate(array $data): array
     {
         $contact = null;
         
-        // Tentar encontrar por telefone primeiro
-        if (!empty($data['phone'])) {
+        // Tentar encontrar por identifier primeiro (Instagram, Facebook, etc)
+        if (!empty($data['identifier'])) {
+            $contact = self::findByIdentifier($data['identifier']);
+        }
+        
+        // Tentar encontrar por telefone
+        if (!$contact && !empty($data['phone'])) {
             $contact = self::findByPhone($data['phone']);
         }
         
         // Se não encontrou, tentar por email
         if (!$contact && !empty($data['email'])) {
             $contact = self::findByEmail($data['email']);
+        }
+        
+        // Se encontrou mas precisa atualizar dados (ex: avatar, identifier)
+        if ($contact) {
+            $needsUpdate = false;
+            $updateData = [];
+            
+            // Atualizar identifier se não tinha antes
+            if (!empty($data['identifier']) && empty($contact['identifier'])) {
+                $updateData['identifier'] = $data['identifier'];
+                $needsUpdate = true;
+            }
+            
+            // Atualizar avatar se não tinha antes ou se mudou
+            if (!empty($data['avatar']) && ($contact['avatar'] !== $data['avatar'])) {
+                $updateData['avatar'] = $data['avatar'];
+                $needsUpdate = true;
+            }
+            
+            // Atualizar nome se não tinha antes
+            if (!empty($data['name']) && empty($contact['name'])) {
+                $updateData['name'] = $data['name'];
+                $needsUpdate = true;
+            }
+            
+            if ($needsUpdate) {
+                self::update($contact['id'], $updateData);
+                $contact = self::find($contact['id']); // Recarregar
+            }
         }
         
         // Se não encontrou, criar novo

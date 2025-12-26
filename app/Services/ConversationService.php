@@ -1317,10 +1317,15 @@ class ConversationService
         if ($senderType === 'agent' && ($integrationAccountId || ($conversation['channel'] === 'whatsapp' && $whatsappAccountId))) {
             \App\Helpers\Logger::info("ConversationService::sendMessage - Condições para WhatsApp atendidas, processando envio");
             try {
-                // Obter contato para pegar o telefone
+                // Obter contato para pegar o telefone/identifier
                 $contact = \App\Models\Contact::find($conversation['contact_id']);
-                if ($contact && !empty($contact['phone'])) {
-                    \App\Helpers\Logger::info("ConversationService::sendMessage - Contato encontrado: phone={$contact['phone']}");
+                $hasRecipient = $contact && (!empty($contact['phone']) || !empty($contact['identifier']) || !empty($contact['email']));
+                
+                if ($hasRecipient) {
+                    \App\Helpers\Logger::notificame("[INFO] ConversationService::sendMessage - Contato encontrado:");
+                    \App\Helpers\Logger::notificame("[INFO]   - phone: " . ($contact['phone'] ?? 'NULL'));
+                    \App\Helpers\Logger::notificame("[INFO]   - identifier: " . ($contact['identifier'] ?? 'NULL'));
+                    \App\Helpers\Logger::notificame("[INFO]   - email: " . ($contact['email'] ?? 'NULL'));
                     // Preparar opções para envio
                     $options = [];
                     
@@ -1503,7 +1508,15 @@ class ConversationService
                         ]);
                     }
                 } else {
-                    \App\Helpers\Logger::warning("ConversationService::sendMessage - Contato não encontrado ou sem telefone");
+                    \App\Helpers\Logger::notificame("[WARNING] ConversationService::sendMessage - Contato não encontrado ou sem destinatário (phone/identifier/email)");
+                    if ($contact) {
+                        \App\Helpers\Logger::notificame("[WARNING]   - ContactID: {$contact['id']}");
+                        \App\Helpers\Logger::notificame("[WARNING]   - phone: " . ($contact['phone'] ?? 'NULL'));
+                        \App\Helpers\Logger::notificame("[WARNING]   - identifier: " . ($contact['identifier'] ?? 'NULL'));
+                        \App\Helpers\Logger::notificame("[WARNING]   - email: " . ($contact['email'] ?? 'NULL'));
+                    } else {
+                        \App\Helpers\Logger::notificame("[ERROR]   - Contato não encontrado!");
+                    }
                 }
             } catch (\Exception $e) {
                 \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO ao enviar WhatsApp: " . $e->getMessage());

@@ -26,6 +26,21 @@ class NotificameService
     ];
     
     /**
+     * Helpers privados para logs Notificame
+     */
+    private static function logInfo(string $message): void {
+        Logger::notificame("[INFO] " . $message);
+    }
+    
+    private static function logError(string $message): void {
+        Logger::notificame("[ERROR] " . $message);
+    }
+    
+    private static function logWarning(string $message): void {
+        Logger::notificame("[WARNING] " . $message);
+    }
+    
+    /**
      * Validar canal
      */
     public static function validateChannel(string $channel): bool
@@ -93,7 +108,7 @@ class NotificameService
         $url = $baseUrl . ltrim($endpoint, '/');
         
         // Log da requisição
-        Logger::info("Notificame API Request: {$method} {$url}");
+        self::logInfo("Notificame API Request: {$method} {$url}");
         
         $ch = curl_init();
         
@@ -125,10 +140,10 @@ class NotificameService
         curl_close($ch);
         
         // Log da resposta
-        Logger::info("Notificame API Response: HTTP {$httpCode}, Content-Type: {$contentType}");
+        self::logInfo("Notificame API Response: HTTP {$httpCode}, Content-Type: {$contentType}");
         
         if ($error) {
-            Logger::error("Notificame API cURL error: {$error}");
+            self::logError("Notificame API cURL error: {$error}");
             throw new \Exception("Erro na requisição Notificame: {$error}");
         }
         
@@ -144,7 +159,7 @@ class NotificameService
         if ($jsonError !== JSON_ERROR_NONE) {
             // Se não for JSON, pode ser HTML ou texto simples (ex: "200")
             $responsePreview = substr(strip_tags($response), 0, 300);
-            Logger::error("Notificame API resposta não-JSON: {$responsePreview}");
+            self::logError("Notificame API resposta não-JSON: {$responsePreview}");
             
             throw new \Exception("A API retornou resposta não-JSON (HTTP {$httpCode}). URL: {$url}. Preview: " . substr($responsePreview, 0, 100));
         }
@@ -159,7 +174,7 @@ class NotificameService
             if (is_array($errorMsg)) {
                 $errorMsg = json_encode($errorMsg);
             }
-            Logger::error("Notificame API error: {$errorMsg}");
+            self::logError("Notificame API error: {$errorMsg}");
             throw new \Exception("Erro na API Notificame: {$errorMsg}");
         }
         
@@ -206,7 +221,7 @@ class NotificameService
         try {
             self::checkConnection($accountId);
         } catch (\Exception $e) {
-            Logger::error("Erro ao verificar conexão Notificame: " . $e->getMessage());
+            self::logError("Erro ao verificar conexão Notificame: " . $e->getMessage());
             IntegrationAccount::update($accountId, [
                 'status' => 'error',
                 'error_message' => $e->getMessage()
@@ -326,7 +341,7 @@ class NotificameService
         // Obter URL da API da conta se configurada
         $apiUrl = $account['api_url'] ?? null;
         
-        Logger::info("Verificando conexão Notificame - Account ID: {$accountId}, API URL: " . ($apiUrl ?: self::BASE_URL));
+        self::logInfo("Verificando conexão Notificame - Account ID: {$accountId}, API URL: " . ($apiUrl ?: self::BASE_URL));
         
         // Tentar diferentes endpoints para verificar status (seguindo docs Notificame)
         // Referência: https://app.notificame.com.br/docs/#/api
@@ -336,7 +351,7 @@ class NotificameService
         
         foreach ($endpoints as $endpoint) {
             try {
-                Logger::info("Tentando endpoint: {$endpoint}");
+                self::logInfo("Tentando endpoint: {$endpoint}");
                 $result = self::makeRequest($endpoint, $token, 'GET', [], $apiUrl);
                 
                 IntegrationAccount::update($accountId, [
@@ -345,7 +360,7 @@ class NotificameService
                     'last_sync_at' => date('Y-m-d H:i:s')
                 ]);
                 
-                Logger::info("Conexão OK usando endpoint: {$endpoint}");
+                self::logInfo("Conexão OK usando endpoint: {$endpoint}");
                 
                 return [
                     'status' => 'active',
@@ -357,7 +372,7 @@ class NotificameService
                 ];
             } catch (\Exception $e) {
                 $errorMessages[$endpoint] = $e->getMessage();
-                Logger::warning("Endpoint {$endpoint} falhou: " . $e->getMessage());
+                self::logWarning("Endpoint {$endpoint} falhou: " . $e->getMessage());
                 $lastError = $e;
                 // Continuar tentando outros endpoints
                 continue;
@@ -370,7 +385,7 @@ class NotificameService
             $errorDetail .= "- {$ep}: " . substr($msg, 0, 100) . "\n";
         }
         
-        Logger::error("Falha ao conectar Notificame: " . $errorDetail);
+        self::logError("Falha ao conectar Notificame: " . $errorDetail);
         
         IntegrationAccount::update($accountId, [
             'status' => 'error',
@@ -487,14 +502,14 @@ class NotificameService
         }
         
         try {
-            Logger::info("========== Notificame sendMessage INÍCIO ==========");
-            Logger::info("Notificame sendMessage - endpoint={$endpoint}, channel={$channel}, to={$to}, accountId={$accountId}");
-            Logger::info("Notificame sendMessage - Payload: " . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            self::logInfo("========== Notificame sendMessage INÍCIO ==========");
+            self::logInfo("Notificame sendMessage - endpoint={$endpoint}, channel={$channel}, to={$to}, accountId={$accountId}");
+            self::logInfo("Notificame sendMessage - Payload: " . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
             
             $result = self::makeRequest($endpoint, $token, 'POST', $payload, $apiUrl);
             
-            Logger::info("Notificame sendMessage - Resposta API: " . json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-            Logger::info("========== Notificame sendMessage FIM (Sucesso) ==========");
+            self::logInfo("Notificame sendMessage - Resposta API: " . json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            self::logInfo("========== Notificame sendMessage FIM (Sucesso) ==========");
             
             return [
                 'success' => true,
@@ -502,8 +517,8 @@ class NotificameService
                 'data' => $result
             ];
         } catch (\Exception $e) {
-            Logger::error("========== Notificame sendMessage FIM (Erro) ==========");
-            Logger::error("Erro ao enviar mensagem Notificame: " . $e->getMessage());
+            self::logError("========== Notificame sendMessage FIM (Erro) ==========");
+            self::logError("Erro ao enviar mensagem Notificame: " . $e->getMessage());
             throw $e;
         }
     }
@@ -560,7 +575,7 @@ class NotificameService
         $endpoint = "{$channel}/template";
         
         try {
-            Logger::info("Notificame sendTemplate endpoint={$endpoint} channel={$channel} to={$to} template={$templateName}");
+            self::logInfo("Notificame sendTemplate endpoint={$endpoint} channel={$channel} to={$to} template={$templateName}");
             $result = self::makeRequest($endpoint, $token, 'POST', $payload, $apiUrl);
             
             return [
@@ -569,7 +584,7 @@ class NotificameService
                 'data' => $result
             ];
         } catch (\Exception $e) {
-            Logger::error("Erro ao enviar template Notificame: " . $e->getMessage());
+            self::logError("Erro ao enviar template Notificame: " . $e->getMessage());
             throw $e;
         }
     }
@@ -596,7 +611,7 @@ class NotificameService
         $endpoint = "{$channel}/interactive";
         
         try {
-            Logger::info("Notificame sendInteractive endpoint={$endpoint} channel={$channel} to={$to}");
+            self::logInfo("Notificame sendInteractive endpoint={$endpoint} channel={$channel} to={$to}");
             $result = self::makeRequest($endpoint, $token, 'POST', $payload, $apiUrl);
             
             return [
@@ -605,7 +620,7 @@ class NotificameService
                 'data' => $result
             ];
         } catch (\Exception $e) {
-            Logger::error("Erro ao enviar mensagem interativa Notificame: " . $e->getMessage());
+            self::logError("Erro ao enviar mensagem interativa Notificame: " . $e->getMessage());
             throw $e;
         }
     }
@@ -646,7 +661,7 @@ class NotificameService
         $endpoint = "subscriptions/";
         
         try {
-            Logger::info("Notificame configureWebhook endpoint={$endpoint} channel={$channel} url={$webhookUrl} channelId={$accountChannelId}");
+            self::logInfo("Notificame configureWebhook endpoint={$endpoint} channel={$channel} url={$webhookUrl} channelId={$accountChannelId}");
             self::makeRequest($endpoint, $token, 'POST', $payload, $apiUrl);
             
             // Salvar webhook URL na conta
@@ -656,7 +671,7 @@ class NotificameService
             
             return true;
         } catch (\Exception $e) {
-            Logger::error("Erro ao configurar webhook Notificame: " . $e->getMessage());
+            self::logError("Erro ao configurar webhook Notificame: " . $e->getMessage());
             throw $e;
         }
     }
@@ -666,35 +681,35 @@ class NotificameService
      */
     public static function processWebhook(array $payload, string $channel): void
     {
-        Logger::info("========== Notificame Webhook INÍCIO ==========");
-        Logger::info("Notificame webhook recebido - Channel: {$channel}");
-        Logger::info("Notificame webhook payload completo: " . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        self::logInfo("========== Notificame Webhook INÍCIO ==========");
+        self::logInfo("Notificame webhook recebido - Channel: {$channel}");
+        self::logInfo("Notificame webhook payload completo: " . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         
         // Identificar conta pelo webhook URL ou outros dados do payload
         $account = self::findAccountByWebhook($payload, $channel);
         
         if (!$account) {
-            Logger::error("Conta Notificame não encontrada para webhook - Channel: {$channel}");
-            Logger::info("========== Notificame Webhook FIM (Erro: Conta não encontrada) ==========");
+            self::logError("Conta Notificame não encontrada para webhook - Channel: {$channel}");
+            self::logInfo("========== Notificame Webhook FIM (Erro: Conta não encontrada) ==========");
             return;
         }
         
-        Logger::info("Notificame conta identificada: ID={$account['id']}, Name={$account['name']}, Channel={$account['channel']}");
+        self::logInfo("Notificame conta identificada: ID={$account['id']}, Name={$account['name']}, Channel={$account['channel']}");
         
         // Extrair dados da mensagem
         $messageData = self::extractMessageData($payload, $channel);
         
         if (!$messageData) {
-            Logger::warning("Notificame webhook: Não foi possível extrair dados da mensagem");
-            Logger::info("========== Notificame Webhook FIM (Erro: Dados inválidos) ==========");
+            self::logWarning("Notificame webhook: Não foi possível extrair dados da mensagem");
+            self::logInfo("========== Notificame Webhook FIM (Erro: Dados inválidos) ==========");
             return;
         }
         
-        Logger::info("Notificame webhook: Dados da mensagem extraídos:");
-        Logger::info("  - From (destinatário para resposta): {$messageData['from']}");
-        Logger::info("  - Name: {$messageData['name']}");
-        Logger::info("  - Content: " . substr($messageData['content'], 0, 100));
-        Logger::info("  - Type: {$messageData['type']}");
+        self::logInfo("Notificame webhook: Dados da mensagem extraídos:");
+        self::logInfo("  - From (destinatário para resposta): {$messageData['from']}");
+        self::logInfo("  - Name: {$messageData['name']}");
+        self::logInfo("  - Content: " . substr($messageData['content'], 0, 100));
+        self::logInfo("  - Type: {$messageData['type']}");
         
         // Criar/encontrar contato
         $contact = null;
@@ -736,24 +751,24 @@ class NotificameService
             }
         } else {
             // Para outros canais (Instagram, Facebook, etc), usar identifier genérico
-            Logger::info("Notificame webhook: Criando/buscando contato com identifier={$messageData['from']} (canal={$channel})");
+            self::logInfo("Notificame webhook: Criando/buscando contato com identifier={$messageData['from']} (canal={$channel})");
             $contact = \App\Models\Contact::findOrCreate(array_merge($contactData, [
                 'identifier' => $messageData['from']
             ]));
         }
         
         if (!$contact) {
-            Logger::error("Notificame webhook: Não foi possível criar/encontrar contato");
-            Logger::info("========== Notificame Webhook FIM (Erro: Contato inválido) ==========");
+            self::logError("Notificame webhook: Não foi possível criar/encontrar contato");
+            self::logInfo("========== Notificame Webhook FIM (Erro: Contato inválido) ==========");
             return;
         }
         
-        Logger::info("Notificame webhook: Contato encontrado/criado:");
-        Logger::info("  - ContactID: {$contact['id']}");
-        Logger::info("  - Name: {$contact['name']}");
-        Logger::info("  - Phone: " . ($contact['phone'] ?? 'NULL'));
-        Logger::info("  - Identifier: " . ($contact['identifier'] ?? 'NULL'));
-        Logger::info("  - Email: " . ($contact['email'] ?? 'NULL'));
+        self::logInfo("Notificame webhook: Contato encontrado/criado:");
+        self::logInfo("  - ContactID: {$contact['id']}");
+        self::logInfo("  - Name: {$contact['name']}");
+        self::logInfo("  - Phone: " . ($contact['phone'] ?? 'NULL'));
+        self::logInfo("  - Identifier: " . ($contact['identifier'] ?? 'NULL'));
+        self::logInfo("  - Email: " . ($contact['email'] ?? 'NULL'));
         
         // Criar/encontrar conversa
         $conversationData = [
@@ -779,10 +794,10 @@ class NotificameService
         $isNewConversation = false;
         if (!$conversation) {
             // Criar nova conversa
-            Logger::info("Notificame webhook: Criando NOVA conversa - ContactID={$contact['id']}, Channel={$channel}");
+            self::logInfo("Notificame webhook: Criando NOVA conversa - ContactID={$contact['id']}, Channel={$channel}");
             $conversation = ConversationService::create($conversationData, false);
             $isNewConversation = true;
-            Logger::info("Notificame webhook: Nova conversa criada - ConversationID={$conversation['id']}");
+            self::logInfo("Notificame webhook: Nova conversa criada - ConversationID={$conversation['id']}");
             
             // Notificar nova conversa via WebSocket
             try {
@@ -791,14 +806,14 @@ class NotificameService
                     \App\Helpers\WebSocket::notifyNewConversation($conversationFull);
                 }
             } catch (\Exception $e) {
-                Logger::error("Erro ao notificar nova conversa via WebSocket: " . $e->getMessage());
+                self::logError("Erro ao notificar nova conversa via WebSocket: " . $e->getMessage());
             }
         } else {
-            Logger::info("Notificame webhook: Conversa EXISTENTE encontrada - ConversationID={$conversation['id']}");
+            self::logInfo("Notificame webhook: Conversa EXISTENTE encontrada - ConversationID={$conversation['id']}");
         }
         
         // Salvar mensagem
-        Logger::info("Notificame webhook: Salvando mensagem - ConversationID={$conversation['id']}, Type={$messageData['type']}");
+        self::logInfo("Notificame webhook: Salvando mensagem - ConversationID={$conversation['id']}, Type={$messageData['type']}");
         $messageId = Message::create([
             'conversation_id' => $conversation['id'],
             'contact_id' => $contact['id'],
@@ -812,7 +827,7 @@ class NotificameService
             'status' => 'received',
             'metadata' => json_encode($messageData['metadata'] ?? [])
         ]);
-        Logger::info("Notificame webhook: Mensagem salva - MessageID={$messageId}");
+        self::logInfo("Notificame webhook: Mensagem salva - MessageID={$messageId}");
         
         // Buscar mensagem criada para notificar
         $message = Message::find($messageId);
@@ -825,7 +840,7 @@ class NotificameService
             try {
                 \App\Helpers\WebSocket::notifyNewMessage($conversation['id'], $message);
             } catch (\Exception $e) {
-                Logger::error("Erro ao notificar WebSocket: " . $e->getMessage());
+                self::logError("Erro ao notificar WebSocket: " . $e->getMessage());
             }
         }
         
@@ -833,21 +848,21 @@ class NotificameService
         try {
             // Se é nova conversa, disparar trigger de conversation.created
             if ($isNewConversation) {
-                Logger::info("Notificame webhook: Disparando automação de nova conversa - ConversationID={$conversation['id']}");
+                self::logInfo("Notificame webhook: Disparando automação de nova conversa - ConversationID={$conversation['id']}");
                 AutomationService::executeForNewConversation($conversation['id']);
             }
             
             // Disparar trigger de message.received
             if (isset($messageId)) {
-                Logger::info("Notificame webhook: Disparando automação de nova mensagem - MessageID={$messageId}");
+                self::logInfo("Notificame webhook: Disparando automação de nova mensagem - MessageID={$messageId}");
                 AutomationService::executeForMessageReceived($messageId);
             }
         } catch (\Exception $e) {
-            Logger::error("Erro ao executar automações: " . $e->getMessage());
+            self::logError("Erro ao executar automações: " . $e->getMessage());
         }
         
-        Logger::info("Notificame webhook processado com sucesso!");
-        Logger::info("========== Notificame Webhook FIM (Sucesso) ==========");
+        self::logInfo("Notificame webhook processado com sucesso!");
+        self::logInfo("========== Notificame Webhook FIM (Sucesso) ==========");
     }
     
     /**
@@ -984,7 +999,7 @@ class NotificameService
             $result = self::makeRequest($endpoint, $token);
             return $result['templates'] ?? $result['data'] ?? [];
         } catch (\Exception $e) {
-            Logger::error("Erro ao listar templates Notificame: " . $e->getMessage());
+            self::logError("Erro ao listar templates Notificame: " . $e->getMessage());
             return [];
         }
     }
@@ -1008,7 +1023,7 @@ class NotificameService
             $result = self::makeRequest($endpoint, 'POST', $templateData, $token);
             return $result;
         } catch (\Exception $e) {
-            Logger::error("Erro ao criar template Notificame: " . $e->getMessage());
+            self::logError("Erro ao criar template Notificame: " . $e->getMessage());
             throw $e;
         }
     }

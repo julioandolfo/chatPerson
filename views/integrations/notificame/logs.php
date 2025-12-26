@@ -3,8 +3,8 @@ $layout = 'layouts.metronic.app';
 $title = 'Logs NotificaMe';
 $pageTitle = 'Logs NotificaMe - Webhook';
 
-// Ler últimas linhas do log que contenham "Notificame"
-$logFile = __DIR__ . '/../../../storage/logs/laravel.log';
+// Ler últimas linhas do log
+$logFile = __DIR__ . '/../../../logs/notificame.log';
 $lines = [];
 $totalLines = 0;
 $fileSize = 0;
@@ -27,10 +27,7 @@ if (file_exists($logFile)) {
     
     $count = 0;
     foreach ($fileLines as $line) {
-        // Filtrar por "Notificame"
-        if (stripos($line, 'Notificame') === false) continue;
-        
-        // Filtrar por termo de busca adicional, se fornecido
+        // Filtrar por termo de busca, se fornecido
         if ($searchTerm && stripos($line, $searchTerm) === false) continue;
         
         $lines[] = $line;
@@ -42,7 +39,19 @@ if (file_exists($logFile)) {
 $fileSizeKB = number_format($fileSize / 1024, 2);
 $fileSizeMB = number_format($fileSize / (1024 * 1024), 2);
 $fileSizeStr = $fileSize > 1024 * 1024 ? "{$fileSizeMB} MB" : "{$fileSizeKB} KB";
-$lastModifiedStr = date('d/m/Y H:i:s', $lastModified);
+$lastModifiedStr = $lastModified > 0 ? date('d/m/Y H:i:s', $lastModified) : 'N/A';
+
+// Mensagem se não houver logs ainda
+if (empty($lines) && !file_exists($logFile)) {
+    $lines[] = "📝 Arquivo de log ainda não foi criado.";
+    $lines[] = "";
+    $lines[] = "💡 Para gerar logs:";
+    $lines[] = "   1. Configure uma conta NotificaMe";
+    $lines[] = "   2. Envie uma mensagem de teste";
+    $lines[] = "   3. Ou receba uma mensagem via webhook";
+    $lines[] = "";
+    $lines[] = "🔍 Os logs aparecerão aqui automaticamente.";
+}
 
 // Content
 ob_start();

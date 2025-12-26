@@ -55,6 +55,14 @@ class Logger
     }
 
     /**
+     * Log específico para Notificame
+     */
+    public static function notificame(string $message): void
+    {
+        self::log($message, 'notificame.log');
+    }
+
+    /**
      * Log de debug
      */
     public static function debug(string $message, string $file = null): void

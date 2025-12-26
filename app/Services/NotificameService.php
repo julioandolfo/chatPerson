@@ -799,19 +799,13 @@ class NotificameService
         try {
             // Se é nova conversa, disparar trigger de conversation.created
             if ($isNewConversation) {
-                AutomationService::trigger('conversation.created', [
-                    'conversation_id' => $conversation['id'],
-                    'channel' => $channel,
-                    'integration_account_id' => $account['id']
-                ]);
+                AutomationService::executeForNewConversation($conversation['id']);
             }
             
             // Disparar trigger de message.received
-            AutomationService::trigger('message.received', [
-                'conversation_id' => $conversation['id'],
-                'channel' => $channel,
-                'message_id' => $messageId ?? null
-            ]);
+            if (isset($messageId)) {
+                AutomationService::executeForMessageReceived($messageId);
+            }
         } catch (\Exception $e) {
             Logger::error("Erro ao executar automações: " . $e->getMessage());
         }

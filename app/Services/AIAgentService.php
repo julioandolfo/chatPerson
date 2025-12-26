@@ -645,7 +645,7 @@ class AIAgentService
     {
         \App\Helpers\Logger::info("AIAgentService::scheduleProcessing - Agendando processamento (conv={$conversationId}, timer={$timerSeconds}s)");
         
-        // ✅ CORRIGIDO: Obter dados do buffer ANTES de criar o script
+        // ✅ CORRIGIDO: Obter dados do buffer ANTES de criar o arquivo
         if (!isset(self::$messageBuffers[$conversationId])) {
             \App\Helpers\Logger::warning("AIAgentService::scheduleProcessing - Buffer não encontrado para conv={$conversationId}");
             return;
@@ -658,11 +658,79 @@ class AIAgentService
         }, $buffer['messages']);
         $groupedMessage = implode("\n\n", $messages);
         
+        // ✅ SOLUÇÃO SIMPLES: Para timers curtos (≤ 10s), processar SÍNCRONAMENTE
+        if ($timerSeconds <= 10) {
+            \App\Helpers\Logger::info("AIAgentService::scheduleProcessing - Timer curto ({$timerSeconds}s), processando SÍNCRONAMENTE");
+            
+            // Limpar buffer antes de processar
+            unset(self::$messageBuffers[$conversationId]);
+            
+            // Aguardar timer
+            sleep($timerSeconds);
+            
+            // Processar imediatamente
+            try {
+                self::processMessage($conversationId, $agentId, $groupedMessage);
+                \App\Helpers\Logger::info("AIAgentService::scheduleProcessing - ✅ Processamento síncrono concluído");
+            } catch (\Exception $e) {
+                \App\Helpers\Logger::error("AIAgentService::scheduleProcessing - ❌ Erro no processamento síncrono: " . $e->getMessage());
+            }
+            
+            return;
+        }
+        
+        // Para timers longos (> 10s), usar sistema de arquivo + background
+        \App\Helpers\Logger::info("AIAgentService::scheduleProcessing - Timer longo ({$timerSeconds}s), usando sistema de arquivo");
+        
+        // ✅ ABORDAGEM HÍBRIDA: Executar em background + fallback de segurança
+        $basePath = dirname(__DIR__, 2); // Volta 2 níveis de app/Services para raiz
+        $bufferDir = $basePath . '/storage/ai_buffers/';
+        
+        // Criar diretório se não existir
+        if (!is_dir($bufferDir)) {
+            mkdir($bufferDir, 0755, true);
+        }
+        
+        // 1. CRIAR ARQUIVO DE FALLBACK (será removido se processamento funcionar)
+        $bufferFile = $bufferDir . 'buffer_' . $conversationId . '_' . time() . '.json';
+        $bufferData = [
+            'conversation_id' => $conversationId,
+            'agent_id' => $agentId,
+            'message' => $groupedMessage,
+            'scheduled_time' => time() + $timerSeconds,
+            'created_at' => date('Y-m-d H:i:s')
+        ];
+        
+        file_put_contents($bufferFile, json_encode($bufferData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        
+        // 2. TENTAR EXECUTAR EM BACKGROUND IMEDIATAMENTE
+        $phpExecutable = PHP_BINARY;
+        $scriptContent = self::generateProcessingScript($conversationId, $agentId, $groupedMessage, $timerSeconds, $bufferFile, $basePath);
+        $tempScript = $bufferDir . 'script_' . $conversationId . '_' . time() . '.php';
+        file_put_contents($tempScript, $scriptContent);
+        
+        $logFile = $basePath . '/storage/logs/ai_buffer.log';
+        
+        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+            // Windows: usar start /B para background
+            $command = 'start /B "" ' . escapeshellarg($phpExecutable) . ' ' . escapeshellarg($tempScript) . ' >> ' . escapeshellarg($logFile) . ' 2>&1';
+            pclose(popen($command, 'r'));
+        } else {
+            // Linux/Unix: usar & para background
+            $command = escapeshellarg($phpExecutable) . ' ' . escapeshellarg($tempScript) . ' >> ' . escapeshellarg($logFile) . ' 2>&1 &';
+            exec($command);
+        }
+        
+        \App\Helpers\Logger::info("AIAgentService::scheduleProcessing - ✅ Processamento agendado (background + fallback, msgCount=" . count($messages) . ", totalLen=" . strlen($groupedMessage) . ", timer={$timerSeconds}s)");
+        
+        // Limpar buffer estático
+        unset(self::$messageBuffers[$conversationId]);
+        
+        return;
+        
+        // ===== CÓDIGO ANTIGO (comentado para referência) =====
         // Criar script PHP temporário que aguarda e processa
         $tempScript = sys_get_temp_dir() . '/ai_buffer_' . $conversationId . '_' . time() . '.php';
-        
-        // Obter caminho base do projeto
-        $basePath = dirname(__DIR__, 2); // Volta 2 níveis de app/Services para raiz
         
         $phpCode = "<?php\n";
         $phpCode .= "// Auto-delete após execução\n";
@@ -676,16 +744,22 @@ class AIAgentService
         $phpCode .= "require_once \$basePath . '/vendor/autoload.php';\n";
         $phpCode .= "require_once \$basePath . '/app/Helpers/Database.php';\n";
         $phpCode .= "require_once \$basePath . '/app/Services/AIAgentService.php';\n\n";
-        $phpCode .= "sleep({$timerSeconds});\n\n";
+        $phpCode .= "error_log('[" . date('Y-m-d H:i:s') . "] Background script INICIADO - conv={$conversationId}');\n";
+        $phpCode .= "sleep({$timerSeconds});\n";
+        $phpCode .= "error_log('[" . date('Y-m-d H:i:s') . "] Background script APÓS SLEEP - conv={$conversationId}');\n\n";
         $phpCode .= "// ✅ CORRIGIDO: Passar dados diretamente em vez de usar buffer estático\n";
         $phpCode .= "\$conversationId = " . (int)$conversationId . ";\n";
         $phpCode .= "\$agentId = " . (int)$agentId . ";\n";
         $phpCode .= "\$groupedMessage = " . var_export($groupedMessage, true) . ";\n\n";
         $phpCode .= "try {\n";
+        $phpCode .= "    error_log('[" . date('Y-m-d H:i:s') . "] Background script - ANTES de Logger');\n";
         $phpCode .= "    \App\Helpers\Logger::info('Background script - Processando mensagem agrupada (conv=' . \$conversationId . ', agent=' . \$agentId . ', msgLen=' . strlen(\$groupedMessage) . ')');\n";
+        $phpCode .= "    error_log('[" . date('Y-m-d H:i:s') . "] Background script - ANTES de processMessage');\n";
         $phpCode .= "    \\App\\Services\\AIAgentService::processMessage(\$conversationId, \$agentId, \$groupedMessage);\n";
+        $phpCode .= "    error_log('[" . date('Y-m-d H:i:s') . "] Background script - APÓS processMessage');\n";
         $phpCode .= "    \App\Helpers\Logger::info('Background script - ✅ Processamento concluído');\n";
         $phpCode .= "} catch (\\Exception \$e) {\n";
+        $phpCode .= "    error_log('[" . date('Y-m-d H:i:s') . "] Background script - ERRO: ' . \$e->getMessage());\n";
         $phpCode .= "    \App\Helpers\Logger::error('Background script - ❌ Erro: ' . \$e->getMessage());\n";
         $phpCode .= "    error_log('Erro ao processar buffer: ' . \$e->getMessage());\n";
         $phpCode .= "}\n";
@@ -698,19 +772,70 @@ class AIAgentService
         
         // Executar em background (não-bloqueante)
         $phpExecutable = PHP_BINARY;
-        $command = escapeshellarg($phpExecutable) . ' ' . escapeshellarg($tempScript);
         
+        // ✅ CORRIGIDO: Windows precisa de caminho absoluto e sintaxe específica
         if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-            // Windows: usar start /B para background
-            $command = "start /B {$command} > NUL 2>&1";
+            // Windows: usar start /B para background e redirecionar para log
+            $logFile = $basePath . '/storage/logs/ai_buffer_' . $conversationId . '.log';
+            $command = 'start /B "" ' . escapeshellarg($phpExecutable) . ' ' . escapeshellarg($tempScript) . ' >> ' . escapeshellarg($logFile) . ' 2>&1';
+            \App\Helpers\Logger::info("AIAgentService::scheduleProcessing - Comando Windows: {$command}");
             pclose(popen($command, 'r'));
         } else {
             // Linux/Unix: usar & para background
-            $command .= ' > /dev/null 2>&1 &';
+            $command = escapeshellarg($phpExecutable) . ' ' . escapeshellarg($tempScript) . ' > /dev/null 2>&1 &';
+            \App\Helpers\Logger::info("AIAgentService::scheduleProcessing - Comando Unix: {$command}");
             exec($command);
         }
         
-        \App\Helpers\Logger::info("AIAgentService::scheduleProcessing - ✅ Processamento agendado em background (script: {$tempScript}, msgCount=" . count($messages) . ", totalLen=" . strlen($groupedMessage) . ")");
+        // \App\Helpers\Logger::info("AIAgentService::scheduleProcessing - ✅ Processamento agendado em background (script: {$tempScript}, msgCount=" . count($messages) . ", totalLen=" . strlen($groupedMessage) . ")");
+    }
+    
+    /**
+     * Gerar script de processamento em background
+     */
+    private static function generateProcessingScript(int $conversationId, int $agentId, string $groupedMessage, int $timerSeconds, string $fallbackFile, string $basePath): string
+    {
+        $phpCode = "<?php\n";
+        $phpCode .= "// Script gerado automaticamente em " . date('Y-m-d H:i:s') . "\n";
+        $phpCode .= "// Processa mensagem após timer e remove arquivo de fallback\n\n";
+        
+        // Auto-delete após execução
+        $phpCode .= "\$scriptPath = __FILE__;\n";
+        $phpCode .= "register_shutdown_function(function() use (\$scriptPath) {\n";
+        $phpCode .= "    if (file_exists(\$scriptPath)) {\n";
+        $phpCode .= "        @unlink(\$scriptPath);\n";
+        $phpCode .= "    }\n";
+        $phpCode .= "});\n\n";
+        
+        // Setup
+        $phpCode .= "\$basePath = " . var_export($basePath, true) . ";\n";
+        $phpCode .= "\$fallbackFile = " . var_export($fallbackFile, true) . ";\n";
+        $phpCode .= "require_once \$basePath . '/vendor/autoload.php';\n\n";
+        
+        // Aguardar timer
+        $phpCode .= "// Aguardar {$timerSeconds} segundos\n";
+        $phpCode .= "sleep({$timerSeconds});\n\n";
+        
+        // Dados
+        $phpCode .= "\$conversationId = " . (int)$conversationId . ";\n";
+        $phpCode .= "\$agentId = " . (int)$agentId . ";\n";
+        $phpCode .= "\$groupedMessage = " . var_export($groupedMessage, true) . ";\n\n";
+        
+        // Processar
+        $phpCode .= "try {\n";
+        $phpCode .= "    \\App\\Helpers\\Logger::info('Background script - Processando (conv=' . \$conversationId . ', agent=' . \$agentId . ', msgLen=' . strlen(\$groupedMessage) . ')');\n";
+        $phpCode .= "    \\App\\Services\\AIAgentService::processMessage(\$conversationId, \$agentId, \$groupedMessage);\n";
+        $phpCode .= "    \\App\\Helpers\\Logger::info('Background script - ✅ Sucesso! Removendo fallback');\n";
+        $phpCode .= "    // Remover arquivo de fallback (processado com sucesso)\n";
+        $phpCode .= "    if (file_exists(\$fallbackFile)) {\n";
+        $phpCode .= "        @unlink(\$fallbackFile);\n";
+        $phpCode .= "    }\n";
+        $phpCode .= "} catch (\\Exception \$e) {\n";
+        $phpCode .= "    \\App\\Helpers\\Logger::error('Background script - ❌ Erro: ' . \$e->getMessage());\n";
+        $phpCode .= "    // Manter arquivo de fallback para cron processar depois\n";
+        $phpCode .= "}\n";
+        
+        return $phpCode;
     }
     
     /**

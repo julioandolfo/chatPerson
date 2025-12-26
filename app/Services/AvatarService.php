@@ -264,13 +264,27 @@ class AvatarService
     }
     
     /**
-     * Buscar URL da foto de perfil do Instagram usando og:image (scraping leve)
+     * Decodificar e limpar URL da imagem
+     */
+    private static function cleanImageUrl(string $url): string
+    {
+        // Decodificar HTML entities (&amp; → &, &quot; → ", etc)
+        $url = html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        
+        // Remover espaços em branco
+        $url = trim($url);
+        
+        return $url;
+    }
+    
+    /**
+     * Buscar URL da foto de perfil do Instagram usando scraping leve
      * Retorna URL da imagem ou null se falhar
      */
     public static function fetchInstagramProfileImageUrl(string $username): ?string
     {
         try {
-            Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - Buscando og:image para @{$username}");
+            Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - Buscando imagem de perfil para @{$username}");
             
             $profileUrl = "https://www.instagram.com/{$username}/";
             
@@ -308,28 +322,61 @@ class AvatarService
             
             Logger::notificame("[DEBUG] AvatarService::fetchInstagramProfileImageUrl - HTML obtido, tamanho: " . strlen($html) . " bytes");
             
-            // Tentar encontrar og:image
+            // 🎯 MÉTODO 1: Buscar tag <img> com alt contendo perfil do usuário (múltiplos idiomas)
+            $altPatterns = [
+                'Foto do perfil de',      // Português
+                'Photo de profil de',     // Francês
+                'Foto de perfil de',      // Espanhol
+                'Profile picture of',     // Inglês
+                'Profilbild von',         // Alemão
+                "Foto del profilo di",    // Italiano
+            ];
+            
+            foreach ($altPatterns as $pattern) {
+                // Formato 1: alt antes de src
+                if (preg_match('/<img[^>]+alt=["\']' . preg_quote($pattern, '/') . '[^"\']*["\'][^>]+src=["\']([^"\']+)["\']/i', $html, $matches)) {
+                    $imageUrl = self::cleanImageUrl($matches[1]);
+                    Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - ✅ <img> tag encontrada (alt '{$pattern}'): " . substr($imageUrl, 0, 100) . "...");
+                    return $imageUrl;
+                }
+                
+                // Formato 2: src antes de alt
+                if (preg_match('/<img[^>]+src=["\']([^"\']+)["\'][^>]+alt=["\']' . preg_quote($pattern, '/') . '[^"\']*["\']/i', $html, $matches)) {
+                    $imageUrl = self::cleanImageUrl($matches[1]);
+                    Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - ✅ <img> tag encontrada (src-alt '{$pattern}'): " . substr($imageUrl, 0, 100) . "...");
+                    return $imageUrl;
+                }
+            }
+            
+            // 🎯 MÉTODO 2: Buscar tag <img> com classes específicas do Instagram (fbcdn.net)
+            if (preg_match('/<img[^>]+src=["\']([^"\']*fbcdn\.net[^"\']+)["\']/i', $html, $matches)) {
+                $imageUrl = self::cleanImageUrl($matches[1]);
+                Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - ✅ <img> tag fbcdn encontrada: " . substr($imageUrl, 0, 100) . "...");
+                return $imageUrl;
+            }
+            
+            // 🎯 MÉTODO 3: Meta tag og:image (fallback)
             if (preg_match('/property=["\']og:image["\']\s+content=["\']([^"\']+)["\']/i', $html, $matches)) {
-                $imageUrl = html_entity_decode($matches[1], ENT_QUOTES);
+                $imageUrl = self::cleanImageUrl($matches[1]);
                 Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - ✅ og:image encontrado: " . substr($imageUrl, 0, 100) . "...");
                 return $imageUrl;
             }
             
-            // Tentar formato alternativo (content primeiro)
+            // Formato alternativo: content primeiro
             if (preg_match('/content=["\']([^"\']+)["\']\s+property=["\']og:image["\']/i', $html, $matches)) {
-                $imageUrl = html_entity_decode($matches[1], ENT_QUOTES);
+                $imageUrl = self::cleanImageUrl($matches[1]);
                 Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - ✅ og:image encontrado (formato alt): " . substr($imageUrl, 0, 100) . "...");
                 return $imageUrl;
             }
             
-            // Tentar meta name="twitter:image"
+            // 🎯 MÉTODO 4: Meta tag twitter:image (fallback)
             if (preg_match('/name=["\']twitter:image["\']\s+content=["\']([^"\']+)["\']/i', $html, $matches)) {
-                $imageUrl = html_entity_decode($matches[1], ENT_QUOTES);
+                $imageUrl = self::cleanImageUrl($matches[1]);
                 Logger::notificame("[INFO] AvatarService::fetchInstagramProfileImageUrl - ✅ twitter:image encontrado: " . substr($imageUrl, 0, 100) . "...");
                 return $imageUrl;
             }
             
-            Logger::notificame("[WARNING] AvatarService::fetchInstagramProfileImageUrl - ❌ Nenhuma meta tag de imagem encontrada no HTML");
+            Logger::notificame("[WARNING] AvatarService::fetchInstagramProfileImageUrl - ❌ Nenhuma imagem de perfil encontrada no HTML");
             return null;
             
         } catch (\Exception $e) {

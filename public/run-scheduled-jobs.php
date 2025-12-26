@@ -2,8 +2,14 @@
 /**
  * Script para executar jobs agendados
  * 
- * Configurar no cron para executar a cada 5 minutos:
- * Exemplo de crontab: 0,5,10,15,20,25,30,35,40,45,50,55 * * * * php /caminho/para/public/run-scheduled-jobs.php
+ * ⚠️ IMPORTANTE: Configurar para executar FREQUENTEMENTE (a cada 1 minuto) para processar buffers de IA!
+ * 
+ * Configurar no cron para executar a cada 1 minuto:
+ * Linux (crontab): * * * * * php /caminho/para/public/run-scheduled-jobs.php
+ * 
+ * Windows (Agendador de Tarefas):
+ * - Gatilho: Repetir tarefa a cada 1 minuto
+ * - Ação: C:\laragon\bin\php\php-8.3.26-Win32-vs16-x64\php.exe C:\laragon\www\chat\public\run-scheduled-jobs.php
  */
 
 require_once __DIR__ . '/../vendor/autoload.php';
@@ -44,6 +50,11 @@ try {
     echo "[" . date('Y-m-d H:i:s') . "] Executando AutomationDelayJob...\n";
     AutomationDelayJob::run();
     echo "[" . date('Y-m-d H:i:s') . "] AutomationDelayJob concluído\n";
+    
+    // ✅ NOVO: Processar buffers de mensagens da IA (a cada execução - crítico!)
+    echo "[" . date('Y-m-d H:i:s') . "] Processando buffers de IA...\n";
+    include __DIR__ . '/process-ai-buffers.php';
+    echo "[" . date('Y-m-d H:i:s') . "] Buffers de IA processados\n";
     
     // Executar monitoramento de fallback de IA (a cada execução, mas respeita intervalo configurado)
     echo "[" . date('Y-m-d H:i:s') . "] Executando AIFallbackMonitoringJob...\n";

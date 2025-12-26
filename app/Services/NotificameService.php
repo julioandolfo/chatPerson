@@ -721,6 +721,38 @@ class NotificameService
         self::logInfo("  - Content: " . substr($messageData['content'], 0, 100));
         self::logInfo("  - Type: {$messageData['type']}");
         
+        // ⚠️ VALIDAÇÃO: Ignorar mensagens do próprio perfil (mensagens enviadas, não recebidas)
+        $messageDirection = $payload['message']['direction'] ?? $payload['direction'] ?? null;
+        $messageTo = $payload['message']['to'] ?? $payload['to'] ?? null;
+        $accountIdentifier = $account['account_id'] ?? null;
+        
+        self::logInfo("Notificame webhook: Validando remetente:");
+        self::logInfo("  - Direction: " . ($messageDirection ?? 'NULL'));
+        self::logInfo("  - To: " . ($messageTo ?? 'NULL'));
+        self::logInfo("  - Account ID: " . ($accountIdentifier ?? 'NULL'));
+        self::logInfo("  - From: {$messageData['from']}");
+        
+        // Ignorar se:
+        // 1. Direção é OUT (mensagem enviada por nós)
+        // 2. Remetente é o mesmo que o destinatário (enviando para si mesmo)
+        // 3. Remetente é o mesmo que o account_id da conta integrada
+        if (
+            $messageDirection === 'OUT' || 
+            $messageDirection === 'out' ||
+            ($messageTo && $messageData['from'] === $messageTo) ||
+            ($accountIdentifier && $messageData['from'] === $accountIdentifier)
+        ) {
+            self::logInfo("Notificame webhook: ⚠️ IGNORANDO - Mensagem do próprio perfil (não deve criar conversa)");
+            self::logInfo("  - Motivo: " . (
+                $messageDirection === 'OUT' || $messageDirection === 'out' ? 'Direction=OUT' :
+                ($messageTo && $messageData['from'] === $messageTo ? 'From=To' : 'From=AccountID')
+            ));
+            self::logInfo("========== Notificame Webhook FIM (Ignorado: próprio perfil) ==========");
+            return;
+        }
+        
+        self::logInfo("Notificame webhook: ✅ Validação OK - Mensagem de contato externo");
+        
         // Criar/encontrar contato
         $contact = null;
         $contactName = $messageData['name'] ?? null;
@@ -1163,8 +1195,10 @@ class NotificameService
     {
         $data = [
             'from' => null,
+            'to' => null,
             'content' => '',
             'type' => 'text',
+            'direction' => null,
             'external_id' => null,
             'name' => null,
             'avatar' => null,
@@ -1175,6 +1209,8 @@ class NotificameService
         if (isset($payload['message'])) {
             $msg = $payload['message'];
             $data['from'] = $msg['from'] ?? $msg['sender'] ?? null;
+            $data['to'] = $msg['to'] ?? null;
+            $data['direction'] = $msg['direction'] ?? null;
             $data['external_id'] = $msg['id'] ?? $msg['message_id'] ?? null;
             $data['name'] = $msg['visitor']['name'] ?? $msg['visitor']['firstName'] ?? $msg['sender_name'] ?? null;
             $data['avatar'] = $msg['visitor']['picture'] ?? $msg['visitor']['avatar'] ?? null;
@@ -1200,6 +1236,8 @@ class NotificameService
         } else {
             // Fallback: usar payload direto
             $data['from'] = $payload['from'] ?? $payload['sender'] ?? null;
+            $data['to'] = $payload['to'] ?? null;
+            $data['direction'] = $payload['direction'] ?? null;
             $data['content'] = $payload['text'] ?? $payload['content'] ?? $payload['message'] ?? '';
             $data['type'] = $payload['type'] ?? 'text';
             $data['external_id'] = $payload['id'] ?? $payload['message_id'] ?? null;

@@ -8,11 +8,8 @@
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
 
-// Configuração do banco (AJUSTE AQUI SE NECESSÁRIO)
-$host = 'localhost';
-$dbname = 'chat';
-$username = 'root';
-$password = '';
+// Carregar configuração do banco (igual ao fix-permissions.php)
+require_once __DIR__ . '/../config/database.php';
 
 ?>
 <!DOCTYPE html>
@@ -50,12 +47,12 @@ $password = '';
         <p style="color: #5f6368; margin-bottom: 20px;">Diagnóstico rápido do sistema de permissões</p>
 
 <?php
-// Conectar ao banco
+// Conectar ao banco (usando as constantes do config/database.php)
 try {
     $pdo = new PDO(
-        "mysql:host={$host};dbname={$dbname};charset=utf8mb4",
-        $username,
-        $password,
+        "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4",
+        DB_USER,
+        DB_PASS,
         [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
@@ -68,8 +65,8 @@ try {
     echo 'Mensagem: ' . htmlspecialchars($e->getMessage()) . '<br><br>';
     echo '<strong>Verifique:</strong><br>';
     echo '1. O MySQL está rodando?<br>';
-    echo '2. O banco de dados "chat" existe?<br>';
-    echo '3. Usuário e senha estão corretos? (Padrão Laragon: root / sem senha)';
+    echo '2. O banco de dados existe?<br>';
+    echo '3. Verifique o arquivo <code>config/database.php</code>';
     echo '</div>';
     echo '</div></body></html>';
     exit;

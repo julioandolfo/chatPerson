@@ -53,12 +53,6 @@ class DashboardController
             // Atividade recente
             $recentActivity = \App\Services\DashboardService::getRecentActivity(10);
             
-            // Distribuição de conversas por dia da semana
-            $conversationsByDayOfWeek = \App\Services\DashboardService::getConversationsByDayOfWeek($dateFrom, $dateTo);
-            
-            // Distribuição de conversas por hora do dia
-            $conversationsByHourOfDay = \App\Services\DashboardService::getConversationsByHourOfDay($dateFrom, $dateTo);
-            
             self::logDash("Passando dados para view");
             Response::view('dashboard/index', [
                 'stats' => $generalStats,
@@ -68,8 +62,6 @@ class DashboardController
                 'allAgentsMetrics' => $allAgentsMetrics,
                 'recentConversations' => $recentConversations,
                 'recentActivity' => $recentActivity,
-                'conversationsByDayOfWeek' => $conversationsByDayOfWeek,
-                'conversationsByHourOfDay' => $conversationsByHourOfDay,
                 'dateFrom' => $dateFrom,
                 'dateTo' => $dateTo
             ]);
@@ -96,8 +88,6 @@ class DashboardController
                 'topAgents' => [],
                 'recentConversations' => [],
                 'recentActivity' => [],
-                'conversationsByDayOfWeek' => [],
-                'conversationsByHourOfDay' => [],
                 'dateFrom' => $dateFrom,
                 'dateTo' => $dateTo
             ]);

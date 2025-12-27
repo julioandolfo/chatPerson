@@ -883,7 +883,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     box-sizing: border-box;
 }
 
-/* Permitir que íudios sejam mais largos */
+/* Permitir que áudios sejam mais largos */
 .chat-message .message-content:has(.audio-only),
 .chat-message .message-content:has(.audio-attachment) {
     max-width: calc(100% - 20px) !important;
@@ -2825,7 +2825,7 @@ function getChannelInfo(channel) {
                             
                             <h3 class="fw-bold mb-3">Acesso Restrito</h3>
                             <p class="text-muted mb-4">
-                                Vocì não está atribuído nem é participante desta conversa.<br>
+                                Você não está atribuído nem é participante desta conversa.<br>
                                 Solicite participação para ter acesso completo.
                             </p>
                             
@@ -3830,7 +3830,7 @@ function getChannelInfo(channel) {
                     </i>
                     <div class="d-flex flex-column">
                         <h4 class="mb-1">Escalação de IA</h4>
-                        <span>Esta conversa serí transferida de um agente de IA para um agente humano. Vocì pode escolher um agente específico ou deixar o sistema atribuir automaticamente.</span>
+                        <span>Esta conversa será transferida de um agente de IA para um agente humano. Você pode escolher um agente específico ou deixar o sistema atribuir automaticamente.</span>
                     </div>
                 </div>
                 <form id="escalateForm">
@@ -3972,7 +3972,7 @@ function getChannelInfo(channel) {
                     </i>
                     <div>
                         <div class="fw-semibold mb-1">Atribuição Automítica</div>
-                        <div class="fs-7">Quando uma conversa fechada for reaberta ou o contato chamar novamente após ter conversa fechada, serí atribuído automaticamente ao agente principal.</div>
+                        <div class="fs-7">Quando uma conversa fechada for reaberta ou o contato chamar novamente após ter conversa fechada, será atribuído automaticamente ao agente principal.</div>
                     </div>
                 </div>
                 
@@ -4191,7 +4191,7 @@ function getChannelInfo(channel) {
                     <div class="mb-5">
                         <label class="form-label fw-semibold mb-2">Anexar arquivo (opcional):</label>
                         <input type="file" class="form-control form-control-solid" id="schedule_message_attachment" name="attachment" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt">
-                        <div class="form-text">Vocì pode anexar imagens, vídeos, íudios ou documentos</div>
+                        <div class="form-text">Você pode anexar imagens, vídeos, áudios ou documentos</div>
                     </div>
                     
                     <div class="mb-5">
@@ -4217,7 +4217,7 @@ function getChannelInfo(channel) {
                         <div class="form-check form-check-custom form-check-solid">
                             <input class="form-check-input" type="checkbox" id="schedule_cancel_if_responded" name="cancel_if_responded">
                             <label class="form-check-label" for="schedule_cancel_if_responded">
-                                Cancelar se jí foi respondida
+                                Cancelar se já foi respondida
                             </label>
                         </div>
                     </div>
@@ -4788,7 +4788,7 @@ function getChannelInfo(channel) {
                     <label class="form-label fw-semibold">Nota/Contexto (opcional):</label>
                     <textarea id="mentionAgentNote" class="form-control form-control-solid" rows="3" 
                               placeholder="Ex: Preciso de ajuda têcnica com esta solicitação..."></textarea>
-                    <div class="form-text">Esta nota serí enviada junto com o convite</div>
+                    <div class="form-text">Esta nota será enviada junto com o convite</div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -4837,7 +4837,7 @@ function getChannelInfo(channel) {
                                 <span class="path1"></span>
                                 <span class="path2"></span>
                             </i>
-                            Convites para Vocì
+                            Convites para Você
                             <span id="invitesTabCount" class="badge badge-sm badge-primary ms-2 d-none">0</span>
                         </a>
                     </li>
@@ -4854,7 +4854,7 @@ function getChannelInfo(channel) {
                 </ul>
                 
                 <div class="tab-content" style="max-height: 60vh; overflow-y: auto;">
-                    <!-- Tab: Convites para Vocì -->
+                    <!-- Tab: Convites para Você -->
                     <div class="tab-pane fade show active p-5" id="tab_invites" role="tabpanel">
                         <div id="pendingInvitesList">
                             <div class="text-center py-10">
@@ -4931,8 +4931,8 @@ function startApi4ComCall(conversationId) {
                 showConfirmButton: false
             });
             
-            // Atualizar interface se necessírio
-            // Vocì pode adicionar um indicador visual de chamada em andamento aqui
+            // Atualizar interface se necessário
+            // Você pode adicionar um indicador visual de chamada em andamento aqui
         } else {
             Swal.fire({
                 icon: 'error',
@@ -5320,7 +5320,7 @@ function renderPendingRequestsModal(requests) {
 function approveRequestFromModal(requestId) {
     Swal.fire({
         title: 'Aprovar solicitação?',
-        text: 'Este agente serí adicionado como participante da conversa.',
+        text: 'Este agente será adicionado como participante da conversa.',
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: 'Sim, aprovar',
@@ -5456,7 +5456,7 @@ function renderPendingInvites(invites) {
                     <span class="path2"></span>
                 </i>
                 <h5 class="text-muted">Nenhum convite pendente</h5>
-                <p class="text-gray-500 fs-7">Vocì não tem convites para participar de conversas</p>
+                <p class="text-gray-500 fs-7">Você não tem convites para participar de conversas</p>
             </div>
         `;
         return;
@@ -5529,7 +5529,7 @@ function renderPendingInvites(invites) {
 function acceptInvite(mentionId, conversationId) {
     Swal.fire({
         title: 'Aceitar convite?',
-        text: 'Vocì serí adicionado como participante desta conversa.',
+        text: 'Você será adicionado como participante desta conversa.',
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: 'Sim, aceitar',
@@ -5554,7 +5554,7 @@ function acceptInvite(mentionId, conversationId) {
                     Swal.fire({
                         icon: 'success',
                         title: 'Convite aceito!',
-                        text: 'Vocì agora é participante da conversa.',
+                        text: 'Você agora é participante da conversa.',
                         timer: 2000,
                         showConfirmButton: false
                     });
@@ -5602,7 +5602,7 @@ function acceptInvite(mentionId, conversationId) {
 function declineInvite(mentionId) {
     Swal.fire({
         title: 'Recusar convite?',
-        text: 'O convite serí marcado como recusado.',
+        text: 'O convite será marcado como recusado.',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Sim, recusar',
@@ -5892,7 +5892,7 @@ function setupInviteWebSocketListeners() {
             Swal.fire({
                 icon: 'success',
                 title: 'Solicitação Aprovada!',
-                html: `Vocì agora é participante da conversa.`,
+                html: `Você agora é participante da conversa.`,
                 toast: true,
                 position: 'top-end',
                 showConfirmButton: true,
@@ -6324,7 +6324,7 @@ window.addAIAgentToConversation = function(conversationId, data) {
                         window.loadAIAgentStatus(conversationId);
                     }, 500);
                     
-                    // Recarregar conversa se necessírio
+                    // Recarregar conversa se necessário
                     if (typeof selectConversation === 'function') {
                         selectConversation(conversationId);
                     }
@@ -6537,7 +6537,7 @@ window.removeAIAgent = function() {
                     // Recarregar status da IA
                     window.loadAIAgentStatus(conversationId);
                     
-                    // Recarregar conversa se necessírio
+                    // Recarregar conversa se necessário
                     if (typeof selectConversation === 'function') {
                         selectConversation(conversationId);
                     }
@@ -6628,18 +6628,18 @@ function parsePhpJson(value) {
     }
 }
 
-// Se jí vier um ID da URL/PHP, setar na inicialização
+// Se já vier um ID da URL/PHP, setar na inicialização
 const initialConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
 if (initialConversationId) {
     currentConversationId = initialConversationId;
     currentContactAvatar = parsePhpJson('<?= json_encode($selectedConversation['contact_avatar'] ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
 }
 
-// Função para adicionar event listener ao botão (funciona mesmo se DOM jí estiver carregado)
+// Função para adicionar event listener ao botão (funciona mesmo se DOM já estiver carregado)
 function attachNewConversationButton() {
     const btnNewConversation = document.getElementById('btn_new_conversation');
     if (btnNewConversation) {
-        // Verificar se jí tem listener (evitar duplicação)
+        // Verificar se já tem listener (evitar duplicação)
         if (btnNewConversation.dataset.listenerAttached === 'true') {
             return;
         }
@@ -6658,15 +6658,15 @@ function attachNewConversationButton() {
     }
 }
 
-// Tentar adicionar o listener imediatamente (se DOM jí estiver pronto)
+// Tentar adicionar o listener imediatamente (se DOM já estiver pronto)
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', attachNewConversationButton);
 } else {
-    // DOM jí está pronto, executar imediatamente
+    // DOM já está pronto, executar imediatamente
     setTimeout(attachNewConversationButton, 100); // Pequeno delay para garantir que tudo está pronto
 }
 
-// Garantir inscrição no cliente de tempo real para conversas da lista (necessírio no modo polling)
+// Garantir inscrição no cliente de tempo real para conversas da lista (necessário no modo polling)
 function subscribeVisibleConversations() {
     if (typeof window.wsClient === 'undefined') return;
     const items = document.querySelectorAll('.conversation-item[data-conversation-id]');
@@ -6862,7 +6862,7 @@ function isLastMessageFromAgent(data) {
 
 function applySlaVisualState(conversationItem, conv) {
     // DESABILITADO: Não aplicar classes SLA ao conversation-item
-    // O sistema de SLA (sla-indicator.js) é responsível por aplicar classes apenas ao avatar
+    // O sistema de SLA (sla-indicator.js) é responsável por aplicar classes apenas ao avatar
     // Remover qualquer classe sla-ok que possa ter sido adicionada
     if (conversationItem) {
         conversationItem.classList.remove('sla-ok');
@@ -7521,7 +7521,7 @@ function showRestrictedAccessView(conversationId, conversation, accessInfo) {
                 </i>
                 <div>
                     <div class="fw-bold">Solicitação Pendente</div>
-                    <div class="fs-7">Vocì jí enviou uma solicitação para participar desta conversa. Aguarde aprovação.</div>
+                    <div class="fs-7">Você já enviou uma solicitação para participar desta conversa. Aguarde aprovação.</div>
                 </div>
             </div>
         `;
@@ -7617,8 +7617,8 @@ function requestParticipation(conversationId) {
         html: `
             <div class="text-start">
                 <p class="text-muted mb-3">
-                    Vocì está solicitando participar desta conversa. 
-                    O agente responsível ou outros participantes precisarão aprovar sua solicitação.
+                    Você está solicitando participar desta conversa. 
+                    O agente responsável ou outros participantes precisarão aprovar sua solicitação.
                 </p>
                 
                 <div class="mb-3">
@@ -7660,7 +7660,7 @@ function requestParticipation(conversationId) {
             Swal.fire({
                 icon: 'success',
                 title: 'Solicitação Enviada!',
-                text: 'Aguarde a aprovação do agente responsível.',
+                text: 'Aguarde a aprovação do agente responsável.',
                 timer: 3000,
                 showConfirmButton: false
             });
@@ -8110,7 +8110,7 @@ function updateConversationSidebar(conversation, tags) {
             const parts = name.split(' ');
             const initials = (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
             
-            // Se jí é um elemento de iniciais, apenas atualizar texto
+            // Se já é um elemento de iniciais, apenas atualizar texto
             if (initialsEl.id === 'sidebar-contact-initials') {
                 initialsEl.textContent = initials;
             } else {
@@ -9036,7 +9036,7 @@ function loadContactAgentsInModal(contactId) {
         // Renderizar lista de agentes com açÁes
         renderContactAgentsList(agents, contactId);
         
-        // Atualizar select removendo agentes jí adicionados
+        // Atualizar select removendo agentes já adicionados
         const agentIds = agents.map(a => a.agent_id || a.id);
         updateAgentSelect(agentIds);
     })
@@ -9047,13 +9047,13 @@ function loadContactAgentsInModal(contactId) {
 }
 
 /**
- * Atualizar select de agentes, ocultando os que jí estão na lista
+ * Atualizar select de agentes, ocultando os que já estão na lista
  */
 function updateAgentSelect(excludedAgentIds) {
     const select = document.getElementById('addContactAgentSelect');
     if (!select) return;
     
-    // Percorrer todas as opçÁes e mostrar/ocultar conforme necessírio
+    // Percorrer todas as opçÁes e mostrar/ocultar conforme necessário
     Array.from(select.options).forEach(option => {
         if (option.value === '') {
             // Manter opção vazia sempre visível
@@ -9192,13 +9192,13 @@ function addContactAgentFromModal() {
         return;
     }
     
-    // Verificar se agente jí está na lista
+    // Verificar se agente já está na lista
     const agentsListEl = document.getElementById('contactAgentsList');
     if (agentsListEl) {
         const existingAgents = agentsListEl.querySelectorAll('[data-agent-id]');
         for (let el of existingAgents) {
             if (el.getAttribute('data-agent-id') == agentId) {
-                showToast('error', 'Este agente jí está na lista');
+                showToast('error', 'Este agente já está na lista');
                 return;
             }
         }
@@ -9338,7 +9338,7 @@ function updateContactAgentPriority(contactId, agentId, priority) {
         return;
     }
     
-    // Atualizar via API (usando mêtodo store que atualiza se jí existe)
+    // Atualizar via API (usando mêtodo store que atualiza se já existe)
     const formData = new FormData();
     formData.append('agent_id', agentId);
     formData.append('priority', priorityValue);
@@ -9538,7 +9538,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return; // Não fazer mais nada
         }
         
-        // Se jí temos dados da conversa do PHP, usar diretamente
+        // Se já temos dados da conversa do PHP, usar diretamente
         if (selectedConversation) {
             // Buscar tags da conversa
             fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${selectedConversationId}/tags`, {
@@ -9792,7 +9792,7 @@ document.addEventListener('DOMContentLoaded', function() {
     updateActiveFiltersCount(); // Atualizar contador inicial
 });
 
-// Tambêm carregar imediatamente se DOM jí estiver pronto
+// Tambêm carregar imediatamente se DOM já estiver pronto
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
     setTimeout(() => {
         loadFunnelsFilter();
@@ -9839,7 +9839,7 @@ function applyFilters() {
     
     // Tratar filtro de agente
     if (agent === 'unassigned') {
-        // Para "Não atribuídas", enviar agent_id=0 ou null (serí tratado no backend)
+        // Para "Não atribuídas", enviar agent_id=0 ou null (será tratado no backend)
         params.append('agent_id', '0');
     } else if (agent) {
         params.append('agent_id', agent);
@@ -9855,7 +9855,7 @@ function applyFilters() {
         });
     });
     
-    // Preservar filtros avançados simples (não preservar unanswered, funnel_id, funnel_stage_id pois jí foram tratados acima)
+    // Preservar filtros avançados simples (não preservar unanswered, funnel_id, funnel_stage_id pois já foram tratados acima)
     ['answered', 'date_from', 'date_to', 'pinned', 'order_by', 'order_dir'].forEach(key => {
         if (urlParams.has(key) && !params.has(key)) {
             params.append(key, urlParams.get(key));
@@ -9995,7 +9995,7 @@ function refreshConversationList(params = null) {
             c.tags_data ? JSON.stringify(c.tags_data) : null
         ]));
         if (window.lastConversationListSignature === signature) {
-            // Se a lista jí estava renderizada, evita ficar preso no spinner
+            // Se a lista já estava renderizada, evita ficar preso no spinner
             conversationsList.dataset.rendering = '0';
             conversationsList.dataset.loaded = conversationsList.dataset.loaded || '1';
             return;
@@ -10281,7 +10281,7 @@ function updateStagesFilter() {
             return;
         }
         
-        // Obter etapas jí selecionadas
+        // Obter etapas já selecionadas
         const selectedStageIds = Array.from(document.querySelectorAll('input[name="funnel_stage_ids[]"]:checked'))
             .map(cb => parseInt(cb.value));
         
@@ -11131,7 +11131,7 @@ function loadVideo(container) {
     
     if (!video || !src) return;
     
-    // Se jí foi carregado, não fazer nada
+    // Se já foi carregado, não fazer nada
     if (video.classList.contains('loaded')) return;
     
     // Carregar vídeo
@@ -11457,7 +11457,7 @@ function addMessageToChat(message) {
     const chatMessages = document.getElementById('chatMessages');
     if (!chatMessages) return null;
 
-    // Evitar duplicação: se jí existe mensagem com o mesmo ID, verificar se precisa reposicionar
+    // Evitar duplicação: se já existe mensagem com o mesmo ID, verificar se precisa reposicionar
     if (message.id) {
         const existing = chatMessages.querySelector(`[data-message-id="${message.id}"]`);
         if (existing) {
@@ -11838,7 +11838,7 @@ function addMessageToChat(message) {
         }
     }
     
-    // Adicionar separador de data se necessírio
+    // Adicionar separador de data se necessário
     if (needsDateSeparator && message.created_at) {
         const dateSeparator = renderDateSeparator(message.created_at);
         if (dateSeparatorPosition) {
@@ -12450,7 +12450,7 @@ function sendMessage() {
     // Preparar mensagem com reply se houver
     // IMPORTANTE: Enviar apenas o texto digitado pelo usuírio
     // O backend processa o quoted_message_id separadamente
-    let finalMessage = message; // Texto que serí enviado ao backend (apenas o digitado)
+    let finalMessage = message; // Texto que será enviado ao backend (apenas o digitado)
     
     // Adicionar nome do agente em negrito se toggle estiver ativo
     const agentNameToggle = document.getElementById('agentNameToggle');
@@ -12479,7 +12479,7 @@ function sendMessage() {
         direction: 'outgoing',
         type: isNote ? 'note' : 'message',
         created_at: new Date().toISOString(),
-        sender_name: 'Vocì',
+        sender_name: 'Você',
         quoted_message_id: replyContext ? replyContext.id : null,
         quoted_sender_name: replyContext ? replyContext.sender : null,
         quoted_text: replyContext ? replyContext.text : null
@@ -12601,7 +12601,7 @@ function showTemplatesModal() {
         return;
     }
     
-    // Verificar se jí existe uma instância do modal
+    // Verificar se já existe uma instância do modal
     let modal = bootstrap.Modal.getInstance(modalElement);
     
     // Se não existe, criar nova instância
@@ -12633,7 +12633,7 @@ function showPersonalTemplatesModal() {
         return;
     }
     
-    // Verificar se jí existe uma instância do modal
+    // Verificar se já existe uma instância do modal
     let modal = bootstrap.Modal.getInstance(modalElement);
     
     // Se não existe, criar nova instância
@@ -12695,7 +12695,7 @@ function loadPersonalTemplates() {
                             <span class="path2"></span>
                             <span class="path3"></span>
                         </i>
-                        <div>Vocì ainda não tem templates pessoais.</div>
+                        <div>Você ainda não tem templates pessoais.</div>
                         <button class="btn btn-sm btn-primary mt-3" onclick="showCreatePersonalTemplateModal()">
                             <i class="ki-duotone ki-plus fs-5">
                                 <span class="path1"></span>
@@ -12729,7 +12729,7 @@ function renderPersonalTemplates(templates) {
         templatesList.innerHTML = `
             <tr>
                 <td colspan="4" class="text-center text-muted py-10">
-                    <div>Vocì ainda não tem templates pessoais.</div>
+                    <div>Você ainda não tem templates pessoais.</div>
                     <button class="btn btn-sm btn-primary mt-3" onclick="showCreatePersonalTemplateModal()">
                         <i class="ki-duotone ki-plus fs-5">
                             <span class="path1"></span>
@@ -12821,7 +12821,7 @@ function showCreatePersonalTemplateModal() {
     if (templateId) templateId.value = '';
     if (templateActive) templateActive.checked = true;
     
-    // Verificar se jí existe uma instância do modal
+    // Verificar se já existe uma instância do modal
     let modal = bootstrap.Modal.getInstance(modalElement);
     
     // Se não existe, criar nova instância
@@ -13614,7 +13614,7 @@ function initTemplateQuickSelect() {
         if (textBeforeCursor.endsWith('{{')) {
             showTemplateQuickSelect();
         } else if (textBeforeCursor.includes('{{') && !textBeforeCursor.includes('}}')) {
-            // Se jí tem {{ mas não fechou, manter aberto
+            // Se já tem {{ mas não fechou, manter aberto
             const lastOpen = textBeforeCursor.lastIndexOf('{{');
             const textAfterOpen = textBeforeCursor.substring(lastOpen + 2);
             if (!textAfterOpen.includes('}}')) {
@@ -15646,7 +15646,7 @@ function renderAttachmentHtml(attachment) {
         </div>`;
     } else if (type === 'audio' || (mimeType && mimeType.startsWith('audio/'))) {
         // Renderização de íudio estilo WhatsApp com largura adequada
-        // ✓ CORRIGIDO: Usar URL direta se começar com / (íudios TTS), senão usar rota de attachments
+        // ✓ CORRIGIDO: Usar URL direta se começar com / (áudios TTS), senão usar rota de attachments
         let audioUrl = url;
         if (!audioUrl && attachment.path) {
             if (attachment.path.startsWith('assets/') || attachment.path.startsWith('/assets/')) {
@@ -15911,7 +15911,7 @@ document.addEventListener('DOMContentLoaded', function() {
         resizeTimeout = setTimeout(handleResize, 250);
     });
     
-    // Se jí tem conversa selecionada, mostrar chat view em mobile
+    // Se já tem conversa selecionada, mostrar chat view em mobile
     const selectedConversationId = <?= json_encode($selectedConversationId ?? null) ?>;
     if (selectedConversationId && isMobile()) {
         setTimeout(() => {
@@ -15965,7 +15965,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 500);
 });
 
-// Sistema de Polling jí declarado acima (antes de selectConversation)
+// Sistema de Polling já declarado acima (antes de selectConversation)
 
 // WebSocket - Atualizar em tempo real
 if (typeof window.wsClient !== 'undefined') {
@@ -16060,7 +16060,7 @@ if (typeof window.wsClient !== 'undefined') {
             console.groupEnd();
             addMessageToChat(data.message);
             
-            // Remover badge se existir (mensagem jí foi marcada como lida no backend)
+            // Remover badge se existir (mensagem já foi marcada como lida no backend)
             if (badge) badge.remove();
         } else {
             // Se não é a conversa atual, atualizar lista completa após um delay para garantir sincronização
@@ -16138,9 +16138,9 @@ if (typeof window.wsClient !== 'undefined') {
         // Usar variível global para refletir a conversa selecionada após navegação AJAX
         const currentConversationId = window.currentConversationId ?? parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
         
-        // Se é a conversa atual, não atualizar badge (jí foi removido ao selecionar)
+        // Se é a conversa atual, não atualizar badge (já foi removido ao selecionar)
         if (currentConversationId == data.conversation_id) {
-            // Recarregar apenas se necessírio (mudanças de status, atribuição)
+            // Recarregar apenas se necessário (mudanças de status, atribuição)
             if (data.changes && (data.changes.status || data.changes.agent_id || data.changes.department_id)) {
                 window.location.reload();
             }
@@ -16169,7 +16169,7 @@ if (typeof window.wsClient !== 'undefined') {
             }
         } else {
             applyConversationUpdate(data.conversation || { id: data.conversation_id, unread_count: data.unread_count });
-            // moveConversationToTop removido - applyConversationUpdate jí ordena via sortConversationList()
+            // moveConversationToTop removido - applyConversationUpdate já ordena via sortConversationList()
         }
     });
     
@@ -16262,10 +16262,10 @@ function addConversationToList(conv) {
         return;
     }
 
-    // Verificar se a conversa jí existe na lista
+    // Verificar se a conversa já existe na lista
     const existingItem = document.querySelector(`[data-conversation-id="${conv.id}"]`);
     if (existingItem) {
-        // Se jí existe, apenas atualizar (applyConversationUpdate jí ordena via sortConversationList)
+        // Se já existe, apenas atualizar (applyConversationUpdate já ordena via sortConversationList)
         applyConversationUpdate(conv);
         return;
     }
@@ -16451,7 +16451,7 @@ function refreshConversationBadges() {
     urlParams.forEach((value, key) => {
         // Para arrays (channels[], tag_ids[], whatsapp_account_ids[]), adicionar cada valor
         if (key.endsWith('[]')) {
-            // Se jí existe, adicionar mais um valor
+            // Se já existe, adicionar mais um valor
             params.append(key, value);
         } else {
             // Parâmetros simples
@@ -16476,7 +16476,7 @@ function refreshConversationBadges() {
         order_dir: urlParams.get('order_dir') || ''
     };
     
-    // Adicionar filtros bísicos apenas se não estiverem jí nos params
+    // Adicionar filtros bísicos apenas se não estiverem já nos params
     Object.keys(filters).forEach(key => {
         if (filters[key] && !params.has(key)) {
             params.append(key, filters[key]);
@@ -16534,7 +16534,7 @@ function refreshConversationBadges() {
                     const unreadCount = conv.unread_count || 0;
                     const currentConversationId = window.currentConversationId ?? parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
                     
-                    // Não atualizar badge se for a conversa atual (jí está sendo gerenciada separadamente)
+                    // Não atualizar badge se for a conversa atual (já está sendo gerenciada separadamente)
                     if (currentConversationId == conv.id) {
                         return;
                     }
@@ -16550,7 +16550,7 @@ function refreshConversationBadges() {
                                 meta.insertAdjacentHTML('beforeend', badgeHtml);
                             }
                         }
-                        // A ordenação correta serí feita por sortConversationList() abaixo
+                        // A ordenação correta será feita por sortConversationList() abaixo
                     } else {
                         // Remover badge se não houver mensagens não lidas
                         if (badge) {
@@ -16558,7 +16558,7 @@ function refreshConversationBadges() {
                         }
                     }
                     
-                    // Atualizar preview e tempo se necessírio
+                    // Atualizar preview e tempo se necessário
                     if (conv.last_message) {
                         const preview = conversationItem.querySelector('.conversation-item-preview');
                         if (preview) {
@@ -16841,7 +16841,7 @@ function renderAIFeatures(features) {
     };
     
     features.forEach(feature => {
-        // Pular "Gerar Resposta" pois jí tem card dedicado
+        // Pular "Gerar Resposta" pois já tem card dedicado
         if (feature.feature_key === 'generate_response') {
             return;
         }
@@ -18086,7 +18086,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (typeof Swal !== 'undefined') {
                             Swal.fire({
                                 icon: 'warning',
-                                title: 'Conversa jí atribuída',
+                                title: 'Conversa já atribuída',
                                 html: `<p>${data.message}</p>`,
                                 confirmButtonText: 'OK',
                                 confirmButtonColor: '#009ef7'
@@ -18183,7 +18183,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         Swal.fire({
                             icon: 'success',
                             title: 'Mensagem agendada!',
-                            text: `Mensagem serí enviada em ${new Date(scheduledAt).toLocaleString('pt-BR')}`,
+                            text: `Mensagem será enviada em ${new Date(scheduledAt).toLocaleString('pt-BR')}`,
                             toast: true,
                             position: 'top-end',
                             showConfirmButton: false,
@@ -18479,7 +18479,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         Swal.fire({
                             icon: 'success',
                             title: 'Lembrete criado!',
-                            text: `Lembrete serí exibido em ${new Date(reminderAt).toLocaleString('pt-BR')}`,
+                            text: `Lembrete será exibido em ${new Date(reminderAt).toLocaleString('pt-BR')}`,
                             toast: true,
                             position: 'top-end',
                             showConfirmButton: false,

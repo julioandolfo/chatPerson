@@ -147,7 +147,18 @@ echo "Agentes agora podem:\n";
 echo "   ✅ Ver conversas não atribuídas\n";
 echo "   ✅ Ver e mover conversas no Kanban\n";
 echo "   ✅ Ver todas as etapas e funis\n\n";
-echo "Você pode fechar esta página.\n";
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
+echo "📋 PRÓXIMOS PASSOS:\n\n";
+echo "1. ✅ Permissões adicionadas\n";
+echo "2. ✅ Cache limpo\n";
+echo "3. 🔄 FAÇA LOGOUT E LOGIN NOVAMENTE\n";
+echo "4. 🧹 Limpe o cache do navegador (Ctrl+Shift+Delete)\n";
+echo "5. ✅ Teste acessando /conversations\n\n";
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
+echo "🔍 Para debug detalhado, acesse:\n";
+echo "<a href='debug-permissions.php' target='_blank'>debug-permissions.php</a>\n\n";
 
 echo "</pre>";
 

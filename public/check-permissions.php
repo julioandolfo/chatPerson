@@ -4,12 +4,16 @@
  * Acesse: http://localhost/check-permissions.php?user_id=1
  */
 
-// Desabilitar erros na tela para não quebrar o HTML
+// ATIVAR erros para debug
 error_reporting(E_ALL);
-ini_set('display_errors', '0');
+ini_set('display_errors', '1');
 
-// Carregar configuração do banco (igual ao fix-permissions.php)
-require_once __DIR__ . '/../config/database.php';
+// Carregar configuração do banco
+$configFile = __DIR__ . '/../config/database.php';
+if (!file_exists($configFile)) {
+    die('<div class="error-box">❌ Arquivo config/database.php não encontrado!</div></div></body></html>');
+}
+require_once $configFile;
 
 ?>
 <!DOCTYPE html>

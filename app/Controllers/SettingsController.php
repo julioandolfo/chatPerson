@@ -536,6 +536,54 @@ class SettingsController
     }
 
     /**
+     * Salvar configurações de disponibilidade
+     */
+    public function saveAvailability(): void
+    {
+        Permission::abortIfCannot('admin.settings');
+        
+        try {
+            $data = Request::post();
+            
+            // Configurações de disponibilidade
+            SettingService::set('availability.auto_online_on_login', isset($data['auto_online_on_login']), 'boolean', 'availability');
+            SettingService::set('availability.auto_offline_on_logout', isset($data['auto_offline_on_logout']), 'boolean', 'availability');
+            SettingService::set('availability.auto_away_enabled', isset($data['auto_away_enabled']), 'boolean', 'availability');
+            SettingService::set('availability.away_timeout_minutes', (int)($data['away_timeout_minutes'] ?? 15), 'integer', 'availability');
+            SettingService::set('availability.activity_tracking_enabled', isset($data['activity_tracking_enabled']), 'boolean', 'availability');
+            SettingService::set('availability.heartbeat_interval_seconds', (int)($data['heartbeat_interval_seconds'] ?? 30), 'integer', 'availability');
+            SettingService::set('availability.offline_timeout_minutes', (int)($data['offline_timeout_minutes'] ?? 5), 'integer', 'availability');
+            SettingService::set('availability.track_mouse_movement', isset($data['track_mouse_movement']), 'boolean', 'availability');
+            SettingService::set('availability.track_keyboard', isset($data['track_keyboard']), 'boolean', 'availability');
+            SettingService::set('availability.track_page_visibility', isset($data['track_page_visibility']), 'boolean', 'availability');
+            
+            // Configurações de horário comercial
+            SettingService::set('business_hours.enabled', isset($data['business_hours_enabled']), 'boolean', 'business_hours');
+            SettingService::set('business_hours.timezone', $data['business_hours_timezone'] ?? 'America/Sao_Paulo', 'string', 'business_hours');
+            
+            $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+            foreach ($days as $day) {
+                SettingService::set("business_hours.{$day}_start", $data["{$day}_start"] ?? '', 'string', 'business_hours');
+                SettingService::set("business_hours.{$day}_end", $data["{$day}_end"] ?? '', 'string', 'business_hours');
+            }
+            
+            Response::successOrRedirect(
+                'Configurações de disponibilidade salvas com sucesso!',
+                '/settings?tab=availability'
+            );
+        } catch (\Exception $e) {
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro ao salvar configurações: ' . $e->getMessage()
+                ], 500);
+            } else {
+                Response::redirect('/settings?tab=availability&error=' . urlencode('Erro ao salvar configurações: ' . $e->getMessage()));
+            }
+        }
+    }
+
+    /**
      * Salvar configurações de conversas
      */
     public function saveConversations(): void

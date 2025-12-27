@@ -13,7 +13,6 @@ use App\Models\Conversation;
 use App\Models\Message;
 use App\Helpers\Logger;
 use App\Helpers\Validator;
-use App\Services\AvatarService;
 
 class NotificameService
 {
@@ -766,17 +765,6 @@ class NotificameService
             'name' => $contactName
         ];
         
-        // 🎨 NOTIFICAME: Usar APENAS avatares com iniciais (rápido, bonito, sempre funciona)
-        self::logInfo("Notificame webhook: Gerando avatar com iniciais para {$contactName}");
-        $initialsAvatar = AvatarService::generateInitialsAvatar($contactName, $messageData['from']);
-        
-        if ($initialsAvatar) {
-            $contactData['avatar'] = $initialsAvatar;
-            self::logInfo("Notificame webhook: ✅ Avatar com iniciais gerado: {$initialsAvatar}");
-        } else {
-            self::logWarning("Notificame webhook: ⚠️ Falha ao gerar avatar com iniciais");
-        }
-        
         // Identificar contato baseado no canal
         if ($channel === 'whatsapp') {
             $phone = self::normalizePhoneNumber($messageData['from']);
@@ -789,7 +777,6 @@ class NotificameService
                 ]));
                 $contact = \App\Models\Contact::find($contactId);
             }
-            // Nota: Avatar já foi definido com iniciais no $contactData acima
         } elseif ($channel === 'email') {
             $email = $messageData['from'];
             // Buscar contato por email (compativel com Model que retorna array)
@@ -808,7 +795,6 @@ class NotificameService
                 ]));
                 $contact = \App\Models\Contact::find($contactId);
             }
-            // Nota: Avatar já foi definido com iniciais no $contactData acima
         } else {
             // Para outros canais (Instagram, Facebook, etc), usar identifier genérico
             self::logInfo("Notificame webhook: Criando/buscando contato com identifier={$messageData['from']} (canal={$channel})");
@@ -816,16 +802,6 @@ class NotificameService
             $contactCreateData = array_merge($contactData, [
                 'identifier' => $messageData['from']
             ]);
-            
-            // 🎨 AVATAR: Usar SEMPRE iniciais (rápido, bonito, sempre funciona)
-            // Nota: Avatar já foi gerado com iniciais no início ($contactData)
-            // Apenas adicionar ao $contactCreateData se ainda não tiver
-            if (!empty($contactData['avatar'])) {
-                $contactCreateData['avatar'] = $contactData['avatar'];
-                self::logInfo("Notificame webhook: ✅ Avatar com iniciais já está disponível");
-            } else {
-                self::logInfo("Notificame webhook: ⚠️ Nenhum avatar no contactData");
-            }
             
             self::logInfo("Notificame webhook: Dados para findOrCreate: " . json_encode($contactCreateData, JSON_UNESCAPED_UNICODE));
             

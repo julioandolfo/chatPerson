@@ -4,8 +4,6 @@ $bhs = $businessHoursSettings ?? [];
 ?>
 
 <form id="availability_form" method="POST" action="<?= \App\Helpers\Url::to('/settings/availability') ?>">
-    <?= \App\Helpers\Csrf::field() ?>
-    
     <!-- Configurações de Disponibilidade -->
     <div class="mb-10">
         <h4 class="fw-bold mb-5">Configurações de Disponibilidade</h4>

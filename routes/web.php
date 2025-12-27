@@ -262,6 +262,28 @@ Router::post('/webhooks/notificame', function () {
     require __DIR__ . '/../public/notificame-webhook.php';
 }, []); // nenhuma middleware
 
+// ==================== ROTAS META (INSTAGRAM + WHATSAPP) ====================
+use App\Controllers\MetaOAuthController;
+use App\Controllers\MetaWebhookController;
+use App\Controllers\MetaIntegrationController;
+
+// OAuth
+Router::get('/integrations/meta/oauth/authorize', [MetaOAuthController::class, 'authorize'], ['Authentication', 'Permission:integrations.manage']);
+Router::get('/integrations/meta/oauth/callback', [MetaOAuthController::class, 'callback'], ['Authentication', 'Permission:integrations.manage']);
+Router::post('/integrations/meta/oauth/disconnect', [MetaOAuthController::class, 'disconnect'], ['Authentication', 'Permission:integrations.manage']);
+
+// Webhooks (sem autenticação - Meta envia)
+Router::get('/webhooks/meta', [MetaWebhookController::class, 'verify'], []); // Verificação GET
+Router::post('/webhooks/meta', [MetaWebhookController::class, 'receive'], []); // Receber POST
+
+// Gerenciamento
+Router::get('/integrations/meta', [MetaIntegrationController::class, 'index'], ['Authentication', 'Permission:integrations.view']);
+Router::post('/integrations/meta/instagram/sync', [MetaIntegrationController::class, 'syncInstagram'], ['Authentication', 'Permission:integrations.manage']);
+Router::post('/integrations/meta/whatsapp/sync', [MetaIntegrationController::class, 'syncWhatsApp'], ['Authentication', 'Permission:integrations.manage']);
+Router::post('/integrations/meta/whatsapp/add', [MetaIntegrationController::class, 'addWhatsAppPhone'], ['Authentication', 'Permission:integrations.manage']);
+Router::post('/integrations/meta/test-message', [MetaIntegrationController::class, 'testMessage'], ['Authentication', 'Permission:integrations.manage']);
+Router::get('/integrations/meta/logs', [MetaIntegrationController::class, 'logs'], ['Authentication', 'Permission:integrations.view']);
+
 // Rotas de Integrações Api4Com
 Router::get('/integrations/api4com', [Api4ComController::class, 'index'], ['Authentication']);
 Router::post('/integrations/api4com', [Api4ComController::class, 'create'], ['Authentication']);

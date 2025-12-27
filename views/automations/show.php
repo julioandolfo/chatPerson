@@ -1013,6 +1013,7 @@ const agentOptionsHtml = <?= json_encode($agentOptions, JSON_UNESCAPED_UNICODE) 
 const funnelOptionsHtml = <?= json_encode($funnelOptions, JSON_UNESCAPED_UNICODE) ?>;
 const departmentOptionsHtml = <?= json_encode($departmentOptions, JSON_UNESCAPED_UNICODE) ?>;
 const aiAgentOptionsHtml = <?= json_encode($aiAgentOptions, JSON_UNESCAPED_UNICODE) ?>;
+const whatsappOptionsHtml = <?= json_encode($whatsappOptions, JSON_UNESCAPED_UNICODE) ?>;
 
 document.addEventListener("DOMContentLoaded", function() {
     canvas = document.getElementById("kt_automation_canvas");

@@ -63,6 +63,16 @@ class Logger
     }
 
     /**
+     * Log específico para Meta (Instagram + WhatsApp)
+     */
+    public static function meta(string $level, string $message, array $context = []): void
+    {
+        $contextStr = !empty($context) ? ' | ' . json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : '';
+        $logMessage = "[{$level}] {$message}{$contextStr}";
+        self::log($logMessage, 'meta.log');
+    }
+
+    /**
      * Log de debug
      */
     public static function debug(string $message, string $file = null): void

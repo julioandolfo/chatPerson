@@ -294,6 +294,16 @@
                             </a>
                         </div>
                         <?php endif; ?>
+                        <?php if (\App\Helpers\Permission::can('integrations.view')): ?>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/integrations/meta', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/integrations/meta') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Meta (Instagram + WhatsApp)</span>
+                            </a>
+                        </div>
+                        <?php endif; ?>
                         <?php if (\App\Helpers\Permission::can('whatsapp_official.view')): ?>
                         <div class="menu-item">
                             <a class="menu-link <?= isActive('/integrations/whatsapp-official', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/integrations/whatsapp-official') ?>">

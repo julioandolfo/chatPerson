@@ -3773,6 +3773,7 @@ function getChannelInfo(channel) {
                                     <label class="form-label fw-semibold">Agente:</label>
                         <select id="assignAgent" class="form-select form-select-solid" required>
                             <option value="">Selecione um agente...</option>
+                            <option value="0">Deixar sem atribuição</option>
                             <?php if (!empty($agents)): ?>
                                         <?php foreach ($agents as $agent): ?>
                                     <option value="<?= $agent['id'] ?>">
@@ -14614,7 +14615,7 @@ document.getElementById('assignForm')?.addEventListener('submit', function(e) {
     const agentId = document.getElementById('assignAgent').value;
     const departmentId = document.getElementById('assignDepartment').value;
     
-    if (!agentId) {
+    if (agentId === '' || agentId === null || agentId === undefined) {
         alert('Selecione um agente');
         return;
     }
@@ -14631,7 +14632,7 @@ document.getElementById('assignForm')?.addEventListener('submit', function(e) {
             'Accept': 'application/json'
         },
         body: JSON.stringify({
-            agent_id: parseInt(agentId),
+            agent_id: agentId === '0' ? 0 : parseInt(agentId, 10),
             department_id: departmentId ? parseInt(departmentId) : null
         })
     })

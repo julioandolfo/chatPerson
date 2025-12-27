@@ -677,6 +677,41 @@ class ConversationService
     }
 
     /**
+     * Remover atribuição de agente (deixar sem atribuição)
+     */
+    public static function unassignAgent(int $conversationId): array
+    {
+        $conversation = Conversation::find($conversationId);
+        if (!$conversation) {
+            throw new \Exception('Conversa não encontrada');
+        }
+
+        $oldAgentId = $conversation['agent_id'] ?? null;
+
+        Conversation::update($conversationId, ['agent_id' => null]);
+
+        // Invalidar cache
+        self::invalidateCache($conversationId);
+
+        // Atualizar contagem do agente anterior, se houver
+        if ($oldAgentId) {
+            User::updateConversationsCount($oldAgentId);
+        }
+
+        // Obter conversa atualizada
+        $conversation = Conversation::findWithRelations($conversationId);
+
+        // Notificar via WebSocket (se disponível)
+        try {
+            \App\Helpers\WebSocket::notifyConversationUpdated($conversationId, $conversation);
+        } catch (\Exception $e) {
+            error_log("Erro ao notificar WebSocket: " . $e->getMessage());
+        }
+
+        return $conversation;
+    }
+
+    /**
      * Atualizar setor da conversa
      */
     public static function updateDepartment(int $conversationId, ?int $departmentId): array

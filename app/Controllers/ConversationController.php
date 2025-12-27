@@ -714,9 +714,9 @@ class ConversationController
             }
             
             // Ler dados (JSON ou form-data)
-            $agentId = \App\Helpers\Request::post('agent_id');
-            
-            if (!$agentId) {
+            $agentIdRaw = \App\Helpers\Request::post('agent_id');
+            // Permitir "0" para deixar sem atribuição
+            if ($agentIdRaw === null || $agentIdRaw === '') {
                 ob_end_clean();
                 Response::json([
                     'success' => false,
@@ -724,6 +724,7 @@ class ConversationController
                 ], 400);
                 return;
             }
+            $agentId = (int) $agentIdRaw;
             
             // Verificar se conversa existe
             $conversation = \App\Models\Conversation::find($id);
@@ -736,6 +737,18 @@ class ConversationController
                 return;
             }
             
+            // Se for 0, remover atribuição
+            if ($agentId === 0) {
+                $conversation = ConversationService::unassignAgent($id);
+                ob_end_clean();
+                Response::json([
+                    'success' => true,
+                    'message' => 'Conversa deixada sem atribuição',
+                    'conversation' => $conversation
+                ]);
+                return;
+            }
+
             // Verificar se agente existe
             $agent = User::find($agentId);
             if (!$agent) {

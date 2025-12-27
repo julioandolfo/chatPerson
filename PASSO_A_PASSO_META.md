@@ -53,7 +53,24 @@
    App Secret: [clique em "Mostrar" e copie]
    ```
 
-### 1.5 Configurar OAuth Redirect
+### 1.5 Configurar Domínio do App ⚠️ **OBRIGATÓRIO**
+
+**⚠️ IMPORTANTE:** Sem configurar o domínio, você receberá erro: "O domínio dessa URL não está incluído nos domínios do app"
+
+1. No menu lateral, vá em **"Configurações > Básico"**
+2. Role até **"Domínios do App"**
+3. Adicione:
+   - **Localhost (desenvolvimento):** `localhost`
+   - **Produção:** `seudominio.com` (sem http/https)
+4. Clique em **"Adicionar domínio"** para cada um
+
+**Exemplo:**
+```
+localhost
+meusite.com.br
+```
+
+### 1.6 Configurar OAuth Redirect
 
 1. No menu lateral, vá em **"Produtos > Facebook Login > Configurações"**
 2. Em **"URIs de redirecionamento do OAuth válidos"**, adicione:
@@ -63,7 +80,9 @@
    ```
 3. Clique em **"Salvar alterações"**
 
-### 1.6 Configurar Webhook (para receber mensagens)
+**💡 DICA:** O sistema gera essas URLs automaticamente na página `/integrations/meta` - basta clicar em "Copiar"!
+
+### 1.7 Configurar Webhook (para receber mensagens)
 
 1. No menu lateral, vá em **"Produtos > Webhooks"**
 2. Clique em **"Configurar"**
@@ -74,12 +93,7 @@
 
 ⚠️ **IMPORTANTE:** O webhook só funcionará em produção (HTTPS). Em localhost, você receberá mensagens via polling.
 
-### 1.7 Domínio do App (Opcional mas recomendado)
-
-1. No menu lateral, vá em **"Configurações > Básico"**
-2. Role até **"Domínios do App"**
-3. Adicione: `seudominio.com` (sem http/https)
-4. Clique em **"Adicionar domínio"**
+**💡 DICA:** O sistema também gera a Webhook URL automaticamente na página `/integrations/meta` - basta clicar em "Copiar"!
 
 ---
 

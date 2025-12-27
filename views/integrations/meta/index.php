@@ -64,6 +64,34 @@ ob_start();
         </div>
     </div>
     <div class="card-body pt-3">
+        <!--begin::Alerta Importante - Domínio do App-->
+        <div class="alert alert-info d-flex align-items-start p-5 mb-5">
+            <i class="ki-duotone ki-information-4 fs-2hx text-info me-4 mt-1">
+                <span class="path1"></span>
+                <span class="path2"></span>
+                <span class="path3"></span>
+            </i>
+            <div class="d-flex flex-column">
+                <h4 class="mb-2 text-info">📋 IMPORTANTE: Configure o domínio no Meta App</h4>
+                <span class="mb-3">Antes de conectar contas, você DEVE adicionar o domínio abaixo nas configurações do seu App Meta:</span>
+                <div class="bg-light-info rounded p-3 mb-3">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <code class="fs-5 fw-bold text-dark"><?= parse_url(\App\Helpers\Url::fullUrl('/'), PHP_URL_HOST) ?></code>
+                        <button class="btn btn-sm btn-info" type="button" onclick="copyDomain()">
+                            <i class="ki-duotone ki-copy fs-3"></i> Copiar
+                        </button>
+                    </div>
+                </div>
+                <span class="text-muted fs-7">
+                    <strong>Onde configurar:</strong> Meta for Developers → Seu App → 
+                    <span class="badge badge-light-info">Configurações</span> → 
+                    <span class="badge badge-light-info">Básico</span> → 
+                    Campo <strong>"Domínios do app"</strong> → Adicionar domínio
+                </span>
+            </div>
+        </div>
+        <!--end::Alerta Importante-->
+        
         <?php if (empty($metaConfig['app_id']) || empty($metaConfig['app_secret'])): ?>
         <div class="alert alert-warning d-flex align-items-center p-5 mb-5">
             <i class="ki-duotone ki-information-5 fs-2hx text-warning me-4">
@@ -700,6 +728,35 @@ function testMessage(type, accountId) {
             });
         }
     });
+}
+
+/**
+ * Copiar domínio para clipboard
+ */
+function copyDomain() {
+    const domain = '<?= parse_url(\App\Helpers\Url::fullUrl('/'), PHP_URL_HOST) ?>';
+    
+    // Criar elemento temporário para copiar
+    const temp = document.createElement('textarea');
+    temp.value = domain;
+    document.body.appendChild(temp);
+    temp.select();
+    
+    try {
+        document.execCommand('copy');
+        Swal.fire({
+            icon: 'success',
+            title: 'Copiado!',
+            text: `Domínio "${domain}" copiado para a área de transferência`,
+            timer: 2000,
+            showConfirmButton: false
+        });
+    } catch (err) {
+        console.error('Erro ao copiar:', err);
+        Swal.fire('Erro', 'Não foi possível copiar o domínio', 'error');
+    }
+    
+    document.body.removeChild(temp);
 }
 
 /**

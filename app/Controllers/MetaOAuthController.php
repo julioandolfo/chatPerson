@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Helpers\Response;
 use App\Helpers\Request;
 use App\Helpers\Permission;
+use App\Helpers\Url;
 use App\Models\MetaOAuthToken;
 use App\Models\InstagramAccount;
 use App\Models\WhatsAppPhone;
@@ -87,15 +88,21 @@ class MetaOAuthController
         $_SESSION['meta_oauth_type'] = $type;
         
         // Montar URL de autorização
+        // IMPORTANTE: Usar URL completa para redirect_uri (não depender de APP_URL do config)
+        $redirectUri = Url::fullUrl('/integrations/meta/oauth/callback');
+        
         $params = [
             'client_id' => self::$config['app_id'],
-            'redirect_uri' => self::$config['oauth']['redirect_uri'],
+            'redirect_uri' => $redirectUri,
             'scope' => implode(',', $scopes),
             'response_type' => 'code',
             'state' => $state,
         ];
         
         $authUrl = 'https://www.facebook.com/dialog/oauth?' . http_build_query($params);
+        
+        error_log("Meta OAuth - Redirect URI gerado: {$redirectUri}");
+        error_log("Meta OAuth - Auth URL completa: {$authUrl}");
         
         Response::redirect($authUrl);
     }

@@ -98,20 +98,34 @@ class MetaIntegrationController
             }
             
             // Salvar em arquivo JSON para não expor no código
-            $configFile = __DIR__ . '/../../storage/config/meta.json';
-            $configDir = dirname($configFile);
+            // Usar caminho absoluto baseado no root do projeto
+            $rootPath = dirname(dirname(__DIR__)); // De app/Controllers para o root
+            $configDir = $rootPath . '/storage/config';
+            $configFile = $configDir . '/meta.json';
             
+            error_log("Meta saveConfig - rootPath: {$rootPath}");
             error_log("Meta saveConfig - configDir: {$configDir}");
             error_log("Meta saveConfig - configFile: {$configFile}");
             
-            // Criar diretório se não existir
+            // Verificar se storage existe
+            $storageDir = $rootPath . '/storage';
+            if (!is_dir($storageDir)) {
+                error_log("Meta saveConfig - ⚠️ Diretório storage não existe! Criando...");
+                if (!mkdir($storageDir, 0755, true)) {
+                    throw new \Exception("Erro ao criar diretório storage");
+                }
+            }
+            
+            // Criar diretório config se não existir
             if (!is_dir($configDir)) {
-                error_log("Meta saveConfig - Criando diretório: {$configDir}");
+                error_log("Meta saveConfig - Criando diretório config: {$configDir}");
                 $created = mkdir($configDir, 0755, true);
                 error_log("Meta saveConfig - Diretório criado: " . ($created ? 'SIM' : 'NÃO'));
                 
                 if (!$created) {
-                    throw new \Exception("Erro ao criar diretório: {$configDir}");
+                    // Verificar permissões
+                    $storagePerms = substr(sprintf('%o', fileperms($storageDir)), -4);
+                    throw new \Exception("Erro ao criar diretório config. Permissões de storage: {$storagePerms}");
                 }
             }
             
@@ -159,7 +173,9 @@ class MetaIntegrationController
     private static function getMetaConfig(): array
     {
         // Tentar ler do arquivo JSON primeiro (configurações salvas pela interface)
-        $configFile = __DIR__ . '/../../storage/config/meta.json';
+        // Usar caminho absoluto baseado no root do projeto
+        $rootPath = dirname(dirname(__DIR__)); // De app/Controllers para o root
+        $configFile = $rootPath . '/storage/config/meta.json';
         
         if (file_exists($configFile)) {
             $json = file_get_contents($configFile);
@@ -171,12 +187,22 @@ class MetaIntegrationController
         }
         
         // Fallback para config/meta.php
-        $metaConfig = require __DIR__ . '/../../config/meta.php';
+        $metaConfigFile = $rootPath . '/config/meta.php';
+        if (file_exists($metaConfigFile)) {
+            $metaConfig = require $metaConfigFile;
+            
+            return [
+                'app_id' => $metaConfig['app_id'] ?? '',
+                'app_secret' => $metaConfig['app_secret'] ?? '',
+                'webhook_verify_token' => $metaConfig['webhooks']['verify_token'] ?? '',
+            ];
+        }
         
+        // Retornar vazio se não encontrar nenhuma configuração
         return [
-            'app_id' => $metaConfig['app_id'] ?? '',
-            'app_secret' => $metaConfig['app_secret'] ?? '',
-            'webhook_verify_token' => $metaConfig['webhooks']['verify_token'] ?? '',
+            'app_id' => '',
+            'app_secret' => '',
+            'webhook_verify_token' => '',
         ];
     }
     

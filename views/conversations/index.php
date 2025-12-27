@@ -9689,6 +9689,10 @@ document.getElementById('filter_tag')?.addEventListener('change', function() {
     applyFilters();
     updateActiveFiltersCount();
 });
+document.getElementById('filter_agent')?.addEventListener('change', function() {
+    applyFilters();
+    updateActiveFiltersCount();
+});
 document.getElementById('filter_funnel')?.addEventListener('change', () => {
     const funnelId = document.getElementById('filter_funnel')?.value || '';
     const stageSelect = document.getElementById('filter_stage');

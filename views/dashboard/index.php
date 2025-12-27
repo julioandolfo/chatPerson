@@ -1012,6 +1012,42 @@ ob_start();
 <!--end::Row-->
 <?php endif; ?>
 
+<!--begin::Row - Distribuição de Conversas-->
+<div class="row g-5 mb-5 mt-5">
+    <!--begin::Col - Conversas por Dia da Semana-->
+    <div class="col-xl-6">
+        <div class="card">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-3 mb-1">Conversas por Dia da Semana</span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">Quais dias recebem mais conversas</span>
+                </h3>
+            </div>
+            <div class="card-body">
+                <div id="chart_conversations_by_day_of_week" style="height: 350px;"></div>
+            </div>
+        </div>
+    </div>
+    <!--end::Col-->
+    
+    <!--begin::Col - Conversas por Hora do Dia-->
+    <div class="col-xl-6">
+        <div class="card">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-3 mb-1">Conversas por Hora do Dia</span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">Horários de pico de atendimento</span>
+                </h3>
+            </div>
+            <div class="card-body">
+                <div id="chart_conversations_by_hour" style="height: 350px;"></div>
+            </div>
+        </div>
+    </div>
+    <!--end::Col-->
+</div>
+<!--end::Row-->
+
 <!--begin::Row - Gráficos-->
 <div class="row g-5 mb-5 mt-5">
     <!--begin::Col - Gráfico de Conversas ao Longo do Tempo-->
@@ -1130,6 +1166,8 @@ let chartConversationsOverTime = null;
 let chartConversationsByChannel = null;
 let chartConversationsByStatus = null;
 let chartAgentsPerformance = null;
+let chartConversationsByDayOfWeek = null;
+let chartConversationsByHour = null;
 
 // Função para carregar dados do gráfico
 function loadChartData(chartType, canvasId, configCallback) {
@@ -1379,12 +1417,158 @@ function configAgentsPerformance(data) {
     };
 }
 
+// Configuração do gráfico de conversas por dia da semana
+function loadConversationsByDayOfWeek() {
+    const data = <?= json_encode($conversationsByDayOfWeek ?? []) ?>;
+    
+    const ctx = document.getElementById("chart_conversations_by_day_of_week");
+    if (!ctx) return;
+    
+    if (chartConversationsByDayOfWeek) {
+        chartConversationsByDayOfWeek.destroy();
+    }
+    
+    const labels = data.map(item => item.day_name);
+    const values = data.map(item => item.total);
+    const maxValue = Math.max(...values);
+    
+    // Cores para cada dia (destaque para dias com mais conversas)
+    const backgroundColors = values.map(val => {
+        const intensity = maxValue > 0 ? (val / maxValue) : 0;
+        return `rgba(54, 162, 235, ${0.3 + (intensity * 0.5)})`;
+    });
+    const borderColors = values.map(val => {
+        return 'rgba(54, 162, 235, 1)';
+    });
+    
+    chartConversationsByDayOfWeek = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Conversas',
+                data: values,
+                backgroundColor: backgroundColors,
+                borderColor: borderColors,
+                borderWidth: 2,
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Conversas: ' + context.parsed.y;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Configuração do gráfico de conversas por hora do dia
+function loadConversationsByHour() {
+    const data = <?= json_encode($conversationsByHourOfDay ?? []) ?>;
+    
+    const ctx = document.getElementById("chart_conversations_by_hour");
+    if (!ctx) return;
+    
+    if (chartConversationsByHour) {
+        chartConversationsByHour.destroy();
+    }
+    
+    const labels = data.map(item => item.hour_label);
+    const values = data.map(item => item.total);
+    const maxValue = Math.max(...values);
+    
+    // Cores gradiente baseadas no volume
+    const backgroundColors = values.map(val => {
+        const intensity = maxValue > 0 ? (val / maxValue) : 0;
+        if (intensity > 0.7) return 'rgba(255, 99, 132, 0.7)'; // Vermelho para picos
+        if (intensity > 0.4) return 'rgba(255, 206, 86, 0.7)'; // Amarelo para médio
+        return 'rgba(75, 192, 192, 0.7)'; // Verde para baixo
+    });
+    
+    chartConversationsByHour = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Conversas',
+                data: values,
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: backgroundColors,
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Conversas: ' + context.parsed.y;
+                        },
+                        title: function(context) {
+                            return 'Horário: ' + context[0].label;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0
+                    }
+                },
+                x: {
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45
+                    }
+                }
+            }
+        }
+    });
+}
+
 // Carregar todos os gráficos
 function loadAllCharts() {
     loadChartData("conversations_over_time", "kt_chart_conversations_over_time", configConversationsOverTime);
     loadChartData("conversations_by_channel", "kt_chart_conversations_by_channel", configConversationsByChannel);
     loadChartData("conversations_by_status", "kt_chart_conversations_by_status", configConversationsByStatus);
     loadChartData("agents_performance", "kt_chart_agents_performance", configAgentsPerformance);
+    
+    // Novos gráficos de distribuição
+    loadConversationsByDayOfWeek();
+    loadConversationsByHour();
 }
 
 // Função para recarregar dashboard

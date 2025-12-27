@@ -130,9 +130,15 @@ ob_start();
                 
                 <div class="col-md-6">
                     <label class="form-label">Redirect URI (OAuth)</label>
-                    <input type="text" class="form-control form-control-solid" 
-                           value="<?= htmlspecialchars(\App\Helpers\Url::to('/integrations/meta/oauth/callback', true)) ?>" 
-                           readonly onclick="this.select()">
+                    <div class="input-group">
+                        <input type="text" class="form-control form-control-solid" 
+                               value="<?= htmlspecialchars(\App\Helpers\Url::fullUrl('/integrations/meta/oauth/callback')) ?>" 
+                               readonly onclick="this.select()" id="redirect_uri_field">
+                        <button class="btn btn-light-primary" type="button" onclick="copyToClipboard('redirect_uri_field', this)">
+                            <i class="ki-duotone ki-copy fs-3"></i>
+                            Copiar
+                        </button>
+                    </div>
                     <div class="form-text">
                         Copie e adicione em: Facebook Login → Configurações → URIs de redirecionamento
                     </div>
@@ -140,9 +146,15 @@ ob_start();
                 
                 <div class="col-md-6">
                     <label class="form-label">Webhook URL</label>
-                    <input type="text" class="form-control form-control-solid" 
-                           value="<?= htmlspecialchars(\App\Helpers\Url::to('/webhooks/meta', true)) ?>" 
-                           readonly onclick="this.select()">
+                    <div class="input-group">
+                        <input type="text" class="form-control form-control-solid" 
+                               value="<?= htmlspecialchars(\App\Helpers\Url::fullUrl('/webhooks/meta')) ?>" 
+                               readonly onclick="this.select()" id="webhook_url_field">
+                        <button class="btn btn-light-primary" type="button" onclick="copyToClipboard('webhook_url_field', this)">
+                            <i class="ki-duotone ki-copy fs-3"></i>
+                            Copiar
+                        </button>
+                    </div>
                     <div class="form-text">
                         Configure em: Webhooks → URL de callback
                     </div>
@@ -688,6 +700,38 @@ function testMessage(type, accountId) {
             });
         }
     });
+}
+
+/**
+ * Copiar texto para clipboard
+ */
+function copyToClipboard(fieldId, button) {
+    const field = document.getElementById(fieldId);
+    if (!field) return;
+    
+    // Selecionar e copiar
+    field.select();
+    field.setSelectionRange(0, 99999); // Para mobile
+    
+    try {
+        document.execCommand('copy');
+        
+        // Feedback visual
+        const originalHtml = button.innerHTML;
+        button.innerHTML = '<i class="ki-duotone ki-check fs-3"></i> Copiado!';
+        button.classList.remove('btn-light-primary');
+        button.classList.add('btn-success');
+        
+        setTimeout(() => {
+            button.innerHTML = originalHtml;
+            button.classList.remove('btn-success');
+            button.classList.add('btn-light-primary');
+        }, 2000);
+        
+    } catch (err) {
+        console.error('Erro ao copiar:', err);
+        Swal.fire('Erro', 'Não foi possível copiar', 'error');
+    }
 }
 </script>
 

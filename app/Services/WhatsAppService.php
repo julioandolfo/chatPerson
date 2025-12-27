@@ -53,7 +53,7 @@ class WhatsAppService
     {
         $errors = \App\Helpers\Validator::validate($data, [
             'name' => 'required|string|max:255',
-            'phone_number' => 'required|string|max:50',
+            'phone_number' => 'required|string',
             'provider' => 'required|string|in:quepasa,evolution',
             'api_url' => 'required|string|max:500',
             'quepasa_user' => 'nullable|string|max:255',

@@ -202,13 +202,13 @@ class AIConversation extends Model
         $messagesSql = "SELECT m.*, 
                                CASE 
                                    WHEN m.sender_type = 'contact' THEN ct.name
-                                   WHEN m.sender_type = 'agent' AND m.user_id IS NOT NULL THEN u.name
+                                   WHEN m.sender_type = 'agent' AND m.ai_agent_id IS NULL THEN u.name
                                    WHEN m.sender_type = 'agent' AND m.ai_agent_id IS NOT NULL THEN aia.name
                                    ELSE 'Sistema'
                                END as sender_name
                         FROM messages m
-                        LEFT JOIN contacts ct ON m.contact_id = ct.id
-                        LEFT JOIN users u ON m.user_id = u.id
+                        LEFT JOIN contacts ct ON m.sender_type = 'contact' AND m.sender_id = ct.id
+                        LEFT JOIN users u ON m.sender_type = 'agent' AND m.ai_agent_id IS NULL AND m.sender_id = u.id
                         LEFT JOIN ai_agents aia ON m.ai_agent_id = aia.id
                         WHERE m.conversation_id = ?
                         ORDER BY m.created_at ASC";

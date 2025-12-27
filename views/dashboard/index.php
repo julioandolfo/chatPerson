@@ -1157,6 +1157,10 @@ $chartDataUrl = \App\Helpers\Url::to('/dashboard/chart-data');
 $dashboardUrl = \App\Helpers\Url::to('/dashboard');
 $exportUrl = \App\Helpers\Url::to('/dashboard/export');
 
+// Preparar dados para JavaScript (garantir que sejam arrays)
+$conversationsByDayOfWeekJson = json_encode($conversationsByDayOfWeek ?? []);
+$conversationsByHourOfDayJson = json_encode($conversationsByHourOfDay ?? []);
+
 // Adicionar Chart.js via CDN
 $scripts = '
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -1419,10 +1423,14 @@ function configAgentsPerformance(data) {
 
 // Configuração do gráfico de conversas por dia da semana
 function loadConversationsByDayOfWeek() {
-    const data = <?= json_encode($conversationsByDayOfWeek ?? []) ?>;
+    const data = ' . ($conversationsByDayOfWeekJson ?? '[]') . ';
+    console.log("Dados por dia da semana:", data);
     
     const ctx = document.getElementById("chart_conversations_by_day_of_week");
-    if (!ctx) return;
+    if (!ctx) {
+        console.error("Elemento chart_conversations_by_day_of_week não encontrado");
+        return;
+    }
     
     if (chartConversationsByDayOfWeek) {
         chartConversationsByDayOfWeek.destroy();
@@ -1483,10 +1491,14 @@ function loadConversationsByDayOfWeek() {
 
 // Configuração do gráfico de conversas por hora do dia
 function loadConversationsByHour() {
-    const data = <?= json_encode($conversationsByHourOfDay ?? []) ?>;
+    const data = ' . ($conversationsByHourOfDayJson ?? '[]') . ';
+    console.log("Dados por hora do dia:", data);
     
     const ctx = document.getElementById("chart_conversations_by_hour");
-    if (!ctx) return;
+    if (!ctx) {
+        console.error("Elemento chart_conversations_by_hour não encontrado");
+        return;
+    }
     
     if (chartConversationsByHour) {
         chartConversationsByHour.destroy();

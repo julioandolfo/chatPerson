@@ -434,45 +434,46 @@ ob_start();
                 <?php endif; ?>
                 <!--end::Tools Utilizadas-->
                 
-                <!--begin::Conversas-->
-                <div class="card mb-5">
-                    <div class="card-header">
-                        <h3 class="card-title">Conversas Atendidas pela IA</h3>
-                    </div>
-                    <div class="card-body">
-                        <div id="ai_conversations_container">
-                            <div class="text-center py-10">
-                                <div class="spinner-border text-primary" role="status">
-                                    <span class="visually-hidden">Carregando...</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div id="ai_conversations_pagination" class="d-flex justify-content-between align-items-center mt-5" style="display: none !important;">
-                            <div class="text-muted fs-7">
-                                <span id="pagination_info">Carregando...</span>
-                            </div>
-                            <div class="d-flex gap-2">
-                                <button type="button" class="btn btn-sm btn-light" id="prev_page_btn" disabled>
-                                    <i class="ki-duotone ki-arrow-left fs-5">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                    Anterior
-                                </button>
-                                <button type="button" class="btn btn-sm btn-light" id="next_page_btn" disabled>
-                                    Próxima
-                                    <i class="ki-duotone ki-arrow-right fs-5">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                </button>
-                            </div>
+            </div>
+        </div>
+        
+        <!--begin::Conversas - largura total-->
+        <div class="card mb-5">
+            <div class="card-header">
+                <h3 class="card-title">Conversas Atendidas pela IA</h3>
+            </div>
+            <div class="card-body">
+                <div id="ai_conversations_container">
+                    <div class="text-center py-10">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Carregando...</span>
                         </div>
                     </div>
                 </div>
-                <!--end::Conversas-->
+                <div id="ai_conversations_pagination" class="d-flex justify-content-between align-items-center mt-5" style="display: none !important;">
+                    <div class="text-muted fs-7">
+                        <span id="pagination_info">Carregando...</span>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-light" id="prev_page_btn" disabled>
+                            <i class="ki-duotone ki-arrow-left fs-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Anterior
+                        </button>
+                        <button type="button" class="btn btn-sm btn-light" id="next_page_btn" disabled>
+                            Próxima
+                            <i class="ki-duotone ki-arrow-right fs-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
+        <!--end::Conversas - largura total-->
     </div>
 </div>
 <!--end::Card-->

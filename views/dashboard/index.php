@@ -1545,9 +1545,10 @@ document.addEventListener("DOMContentLoaded", function() {
     <!--end::Col-->
 </div>
 <!--end::Row-->
+<?php endif; ?>
 
 <!--begin::Row - Horários de Pico-->
-<?php if (!empty($timeAnalysis['peak_times'])): ?>
+<?php if (!empty($timeAnalysis) && !empty($timeAnalysis['peak_times'])): ?>
 <div class="row gy-5 g-xl-10 mb-5 mt-5">
     <div class="col-12">
         <div class="card">

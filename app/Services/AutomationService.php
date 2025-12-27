@@ -242,7 +242,9 @@ class AutomationService
      */
     public static function executeForNewConversation(int $conversationId): void
     {
-        \App\Helpers\Logger::automation("=== executeForNewConversation INÍCIO === conversationId: {$conversationId}");
+        // Log extra para debug
+        error_log("🔥🔥🔥 executeForNewConversation CHAMADO! ConversationID: {$conversationId}");
+        \App\Helpers\Logger::automation("🔥 === executeForNewConversation INÍCIO === conversationId: {$conversationId}");
         
         $conversation = Conversation::find($conversationId);
         if (!$conversation) {

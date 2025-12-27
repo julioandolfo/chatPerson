@@ -75,8 +75,9 @@ class Automation extends Model
      */
     public static function getActiveByTrigger(string $triggerType, array $triggerData = [], ?int $funnelId = null, ?int $stageId = null): array
     {
-        \App\Helpers\Logger::automation("=== Automation::getActiveByTrigger INÍCIO ===");
-        \App\Helpers\Logger::automation("Parâmetros: triggerType={$triggerType}, funnelId={$funnelId}, stageId={$stageId}, triggerData=" . json_encode($triggerData));
+        error_log("🔥🔥🔥 getActiveByTrigger CHAMADO! triggerType={$triggerType}, triggerData=" . json_encode($triggerData));
+        \App\Helpers\Logger::automation("🔥 === Automation::getActiveByTrigger INÍCIO ===");
+        \App\Helpers\Logger::automation("🔥 Parâmetros: triggerType={$triggerType}, funnelId={$funnelId}, stageId={$stageId}, triggerData=" . json_encode($triggerData));
         
         $sql = "SELECT a.*, f.name as funnel_name, fs.name as stage_name
                 FROM automations a

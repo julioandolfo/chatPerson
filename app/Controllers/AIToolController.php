@@ -110,7 +110,7 @@ class AIToolController
         Permission::abortIfCannot('ai_tools.create');
         
         try {
-            $data = Request::post();
+            $data = $this->decodeJsonFields(Request::post());
             $toolId = AIToolService::create($data);
             
             Response::json([
@@ -134,7 +134,7 @@ class AIToolController
         Permission::abortIfCannot('ai_tools.edit');
         
         try {
-            $data = Request::post();
+            $data = $this->decodeJsonFields(Request::post());
             if (AIToolService::update($id, $data)) {
                 Response::json([
                     'success' => true,
@@ -459,6 +459,37 @@ class AIToolController
                 'message' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Decodifica campos JSON recebidos como string para evitar TypeError
+     */
+    private function decodeJsonFields(array $data): array
+    {
+        foreach (['function_schema', 'config'] as $field) {
+            if (!array_key_exists($field, $data)) {
+                continue;
+            }
+
+            if (is_string($data[$field])) {
+                $raw = trim($data[$field]);
+
+                // Campo vazio deve virar array vazio para passar na validação
+                if ($raw === '') {
+                    $data[$field] = [];
+                    continue;
+                }
+
+                $decoded = json_decode($raw, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    throw new \InvalidArgumentException("{$field} inválido: " . json_last_error_msg());
+                }
+
+                $data[$field] = $decoded ?? [];
+            }
+        }
+
+        return $data;
     }
 }
 

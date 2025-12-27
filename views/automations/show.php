@@ -3347,21 +3347,35 @@ document.addEventListener("DOMContentLoaded", function() {
                 const integrationAccountId = nodeData.integration_account_id || '';
                 const whatsappAccountId = nodeData.whatsapp_account_id || '';
                 
+                console.log('🔍 TRIGGER - Valores originais:', {
+                    integration_account_id: integrationAccountId,
+                    whatsapp_account_id: whatsappAccountId
+                });
+                
                 // Se integration_account_id começa com "integration_", extrair o ID
                 if (integrationAccountId && integrationAccountId.startsWith('integration_')) {
                     nodeData.integration_account_id = integrationAccountId.replace('integration_', '');
+                    console.log('🔍 TRIGGER - Tipo: Integration, ID extraído:', nodeData.integration_account_id);
                 } else if (integrationAccountId && integrationAccountId.startsWith('whatsapp_')) {
                     // Se selecionou conta WhatsApp legacy, converter para whatsapp_account_id
                     nodeData.whatsapp_account_id = integrationAccountId.replace('whatsapp_', '');
                     nodeData.integration_account_id = null;
+                    console.log('🔍 TRIGGER - Tipo: WhatsApp, ID extraído:', nodeData.whatsapp_account_id);
                 } else if (!integrationAccountId && whatsappAccountId) {
                     // Manter compatibilidade com whatsapp_account_id legacy
                     nodeData.whatsapp_account_id = whatsappAccountId;
+                    console.log('🔍 TRIGGER - Usando whatsapp_account_id direto:', nodeData.whatsapp_account_id);
                 } else if (!integrationAccountId) {
                     // Se não selecionou nenhuma conta, limpar ambos
                     nodeData.integration_account_id = null;
                     nodeData.whatsapp_account_id = null;
+                    console.log('🔍 TRIGGER - Nenhuma conta selecionada, limpando ambos');
                 }
+                
+                console.log('🔍 TRIGGER - Valores finais:', {
+                    integration_account_id: nodeData.integration_account_id,
+                    whatsapp_account_id: nodeData.whatsapp_account_id
+                });
             }
             
             // Log específico para action_move_stage

@@ -187,13 +187,18 @@ class AutomationService
             $triggerConfig['channel'] = $nodeData['channel'];
         }
         
+        // DEBUG: Ver o que está vindo no nodeData
+        \App\Helpers\Logger::automation("🔍 DEBUG createNode/updateNode - nodeData recebido: " . json_encode($nodeData));
+        
         // Conta de integração
         if (isset($nodeData['integration_account_id']) && !empty($nodeData['integration_account_id'])) {
+            \App\Helpers\Logger::automation("🔍 Salvando integration_account_id: " . $nodeData['integration_account_id']);
             $triggerConfig['integration_account_id'] = $nodeData['integration_account_id'];
         }
         
         // Conta WhatsApp legacy
         if (isset($nodeData['whatsapp_account_id']) && !empty($nodeData['whatsapp_account_id'])) {
+            \App\Helpers\Logger::automation("🔍 Salvando whatsapp_account_id: " . $nodeData['whatsapp_account_id']);
             $triggerConfig['whatsapp_account_id'] = $nodeData['whatsapp_account_id'];
         }
         

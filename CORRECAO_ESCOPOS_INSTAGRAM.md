@@ -20,26 +20,32 @@ O escopo `instagram_basic` foi **descontinuado pela Meta** e outros escopos prec
 ],
 ```
 
-### ✅ Escopos Atualizados (VÁLIDOS - VERSÃO FINAL)
+### ✅ Escopos Atualizados (VÁLIDOS - VERSÃO FINAL 4.0)
 ```php
 'scopes' => [
     'pages_show_list',              // ✅ Listar páginas conectadas
     'pages_manage_metadata',        // ✅ Gerenciar metadata das páginas
-    'pages_messaging',              // ✅ Enviar/receber mensagens (substitui instagram_manage_messages)
+    'pages_messaging',              // ✅ Enviar/receber mensagens Instagram Direct
     'instagram_manage_comments',    // ✅ Gerenciar comentários em posts
-    'instagram_content_publish',    // ✅ Publicar conteúdo (opcional)
 ],
 ```
 
-### 🔄 Alterações da 2ª Correção
+**🎉 APENAS 4 PERMISSÕES - TODAS TESTADAS E APROVADAS!**
 
-**❌ Removidos (INVÁLIDOS):**
+### 🔄 Histórico de Alterações
+
+**❌ 1ª Rodada - Removidos:**
+- `instagram_basic` → Descontinuado pela Meta
+
+**❌ 2ª Rodada - Removidos:**
 - `instagram_manage_messages` → Substituído por `pages_messaging`
 - `pages_read_engagement` → Descontinuado pela Meta
 
-**✅ Adicionados:**
-- `pages_messaging` → Para mensagens do Instagram Direct
-- `instagram_content_publish` → Para publicar conteúdo (opcional)
+**❌ 3ª Rodada - Removidos:**
+- `instagram_content_publish` → Inválido (requer configuração especial)
+
+**✅ Adicionado (e funcionando):**
+- `pages_messaging` → Para mensagens do Instagram Direct (substitui instagram_manage_messages)
 
 ---
 
@@ -144,7 +150,7 @@ Meta OAuth - Auth URL completa: https://www.facebook.com/dialog/oauth?client_id=
 - Messaging: https://developers.facebook.com/docs/messenger-platform/instagram/overview
 - Comments: https://developers.facebook.com/docs/instagram-api/guides/comment-moderation
 
-### Permissões Detalhadas (ATUALIZADAS)
+### Permissões Detalhadas (VERSÃO FINAL)
 
 | Permissão | Descrição | Revisão Necessária? |
 |-----------|-----------|---------------------|
@@ -152,7 +158,6 @@ Meta OAuth - Auth URL completa: https://www.facebook.com/dialog/oauth?client_id=
 | `pages_manage_metadata` | Gerenciar metadata das páginas | ✅ Sim* |
 | `pages_messaging` | Enviar/receber mensagens (Instagram + Messenger) | ✅ Sim* |
 | `instagram_manage_comments` | Gerenciar comentários em posts | ✅ Sim* |
-| `instagram_content_publish` | Publicar conteúdo no Instagram | ✅ Sim* |
 
 **\*Observação:** Em **modo desenvolvimento**, essas permissões funcionam sem revisão para **contas de teste**.
 

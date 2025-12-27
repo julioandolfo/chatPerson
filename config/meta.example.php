@@ -35,14 +35,13 @@ return [
         'base_url' => 'https://graph.instagram.com',
         
         // Permissões necessárias (Instagram + Facebook Login)
-        // Usando apenas permissões BÁSICAS e VÁLIDAS
+        // APENAS permissões TESTADAS e VÁLIDAS para Chat/Mensagens
         // Documentação: https://developers.facebook.com/docs/facebook-login/permissions
         'scopes' => [
             'pages_show_list',              // ✅ Listar páginas conectadas
             'pages_manage_metadata',        // ✅ Gerenciar metadata das páginas
-            'pages_messaging',              // ✅ Enviar/receber mensagens (substitui instagram_manage_messages)
+            'pages_messaging',              // ✅ Enviar/receber mensagens Instagram Direct
             'instagram_manage_comments',    // ✅ Gerenciar comentários em posts
-            'instagram_content_publish',    // ✅ Publicar conteúdo no Instagram (opcional)
         ],
         
         // Endpoints

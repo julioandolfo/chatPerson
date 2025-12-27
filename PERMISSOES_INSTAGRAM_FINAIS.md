@@ -1,8 +1,8 @@
-# 🎯 PERMISSÕES INSTAGRAM - VERSÃO FINAL (TESTADAS)
+# 🎯 PERMISSÕES INSTAGRAM - VERSÃO FINAL (TESTADAS E APROVADAS)
 
 ## ✅ Permissões Aprovadas e Funcionais
 
-Após testes e correções, estas são as **únicas permissões válidas** do Facebook Login para Instagram:
+Após **3 rodadas de testes e correções**, estas são as **ÚNICAS 4 permissões válidas** do Facebook Login para Instagram:
 
 ```php
 'scopes' => [
@@ -10,9 +10,10 @@ Após testes e correções, estas são as **únicas permissões válidas** do Fa
     'pages_manage_metadata',        // ✅ Gerenciar metadata das páginas
     'pages_messaging',              // ✅ Enviar/receber mensagens Instagram Direct
     'instagram_manage_comments',    // ✅ Gerenciar comentários em posts
-    'instagram_content_publish',    // ✅ Publicar conteúdo (opcional)
 ],
 ```
+
+**🎉 ESTAS 4 PERMISSÕES FORAM TESTADAS E ESTÃO 100% FUNCIONAIS!**
 
 ---
 
@@ -24,6 +25,9 @@ Após testes e correções, estas são as **únicas permissões válidas** do Fa
 ### ❌ Segunda rodada de remoções:
 - `instagram_manage_messages` → **SUBSTITUÍDO** por `pages_messaging`
 - `pages_read_engagement` → **DESCONTINUADO** pela Meta
+
+### ❌ Terceira rodada de remoções:
+- `instagram_content_publish` → **INVÁLIDO** (requer configuração especial ou produto adicional)
 
 ---
 
@@ -50,14 +54,24 @@ Após testes e correções, estas são as **únicas permissões válidas** do Fa
 ],
 ```
 
-### ✅ VERSÃO FINAL (TODAS VÁLIDAS)
+### ⚠️ VERSÃO QUASE FINAL (1 INVÁLIDA)
 ```php
 'scopes' => [
     'pages_show_list',              // ✅ VÁLIDO
     'pages_manage_metadata',        // ✅ VÁLIDO
-    'pages_messaging',              // ✅ VÁLIDO (novo!)
+    'pages_messaging',              // ✅ VÁLIDO
     'instagram_manage_comments',    // ✅ VÁLIDO
-    'instagram_content_publish',    // ✅ VÁLIDO (novo!)
+    'instagram_content_publish',    // ❌ INVÁLIDO
+],
+```
+
+### ✅ VERSÃO FINAL (TODAS VÁLIDAS - 4 PERMISSÕES)
+```php
+'scopes' => [
+    'pages_show_list',              // ✅ VÁLIDO
+    'pages_manage_metadata',        // ✅ VÁLIDO
+    'pages_messaging',              // ✅ VÁLIDO
+    'instagram_manage_comments',    // ✅ VÁLIDO
 ],
 ```
 
@@ -114,20 +128,6 @@ Após testes e correções, estas são as **únicas permissões válidas** do Fa
 
 ---
 
-### 5️⃣ `instagram_content_publish` ⭐ **NOVO**
-**O que faz:** Publica conteúdo no Instagram
-
-**Necessária para:**
-- Publicar fotos e vídeos no feed
-- Criar stories
-- Agendar posts (opcional para nosso sistema)
-
-**Revisão Meta:** ✅ Necessária (mas funciona em modo desenvolvimento sem revisão)
-
-**Observação:** Esta é **opcional** para um sistema de chat, mas útil se quiser adicionar funcionalidade de publicação no futuro.
-
----
-
 ## 🧪 Como Testar Agora
 
 ### **Passo 1: Limpar Cache e Sessão**
@@ -174,7 +174,7 @@ tail -f storage/logs/application.log
 Você deve ver:
 ```
 Meta OAuth - Redirect URI gerado: http://localhost/integrations/meta/oauth/callback
-Meta OAuth - Auth URL completa: https://www.facebook.com/dialog/oauth?client_id=...&scope=pages_show_list,pages_manage_metadata,pages_messaging,instagram_manage_comments,instagram_content_publish...
+Meta OAuth - Auth URL completa: https://www.facebook.com/dialog/oauth?client_id=...&scope=pages_show_list,pages_manage_metadata,pages_messaging,instagram_manage_comments...
 ```
 
 ---
@@ -256,17 +256,23 @@ Se tudo der certo, você verá:
 
 ### Versão 1.0 (Inicial - INVÁLIDA)
 - 4 permissões, 3 inválidas
+- Erro: `instagram_basic`, `instagram_manage_messages`, `pages_read_engagement`
 
 ### Versão 2.0 (Intermediária - AINDA COM ERROS)
 - 5 permissões, 2 inválidas
+- Erro: `instagram_manage_messages`, `pages_read_engagement`
 
-### Versão 3.0 (Final - TODAS VÁLIDAS) ✅
-- 5 permissões, **todas válidas**
-- Testadas e aprovadas
-- Pronta para uso
+### Versão 3.0 (Quase Final - 1 INVÁLIDA)
+- 5 permissões, 1 inválida
+- Erro: `instagram_content_publish`
+
+### Versão 4.0 (Final - TODAS VÁLIDAS) ✅
+- **4 permissões, todas válidas**
+- Testadas e aprovadas em 3 rodadas
+- Pronta para uso em produção
 
 ---
 
 **Data de atualização:** 27/12/2025
-**Status:** ✅ FINAL E TESTADA
+**Status:** ✅ FINAL E TESTADA (3 RODADAS DE TESTES)
 

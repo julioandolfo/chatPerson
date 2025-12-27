@@ -20,16 +20,26 @@ O escopo `instagram_basic` foi **descontinuado pela Meta** e outros escopos prec
 ],
 ```
 
-### ✅ Escopos Atualizados (VÁLIDOS)
+### ✅ Escopos Atualizados (VÁLIDOS - VERSÃO FINAL)
 ```php
 'scopes' => [
-    'pages_show_list',              // ✅ Listar páginas conectadas (obrigatório)
-    'pages_manage_metadata',        // ✅ Gerenciar metadata das páginas (obrigatório)
-    'instagram_manage_messages',    // ✅ Gerenciar mensagens Direct (DM)
-    'instagram_manage_comments',    // ✅ Gerenciar comentários (para canal instagram_comment)
-    'pages_read_engagement',        // ✅ Ler métricas de engagement
+    'pages_show_list',              // ✅ Listar páginas conectadas
+    'pages_manage_metadata',        // ✅ Gerenciar metadata das páginas
+    'pages_messaging',              // ✅ Enviar/receber mensagens (substitui instagram_manage_messages)
+    'instagram_manage_comments',    // ✅ Gerenciar comentários em posts
+    'instagram_content_publish',    // ✅ Publicar conteúdo (opcional)
 ],
 ```
+
+### 🔄 Alterações da 2ª Correção
+
+**❌ Removidos (INVÁLIDOS):**
+- `instagram_manage_messages` → Substituído por `pages_messaging`
+- `pages_read_engagement` → Descontinuado pela Meta
+
+**✅ Adicionados:**
+- `pages_messaging` → Para mensagens do Instagram Direct
+- `instagram_content_publish` → Para publicar conteúdo (opcional)
 
 ---
 
@@ -134,15 +144,17 @@ Meta OAuth - Auth URL completa: https://www.facebook.com/dialog/oauth?client_id=
 - Messaging: https://developers.facebook.com/docs/messenger-platform/instagram/overview
 - Comments: https://developers.facebook.com/docs/instagram-api/guides/comment-moderation
 
-### Permissões Detalhadas
+### Permissões Detalhadas (ATUALIZADAS)
 
 | Permissão | Descrição | Revisão Necessária? |
 |-----------|-----------|---------------------|
 | `pages_show_list` | Listar páginas do Facebook conectadas | ❌ Não |
-| `pages_manage_metadata` | Gerenciar metadata das páginas | ✅ Sim |
-| `instagram_manage_messages` | Enviar/receber mensagens Direct | ✅ Sim |
-| `instagram_manage_comments` | Gerenciar comentários em posts | ✅ Sim |
-| `pages_read_engagement` | Ler métricas de engagement | ❌ Não |
+| `pages_manage_metadata` | Gerenciar metadata das páginas | ✅ Sim* |
+| `pages_messaging` | Enviar/receber mensagens (Instagram + Messenger) | ✅ Sim* |
+| `instagram_manage_comments` | Gerenciar comentários em posts | ✅ Sim* |
+| `instagram_content_publish` | Publicar conteúdo no Instagram | ✅ Sim* |
+
+**\*Observação:** Em **modo desenvolvimento**, essas permissões funcionam sem revisão para **contas de teste**.
 
 ---
 

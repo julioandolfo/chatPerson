@@ -215,9 +215,9 @@ curl -X POST https://seudominio.com/webhooks/meta \
 3. Autorize as permissões:
    - `pages_show_list` - Listar páginas conectadas
    - `pages_manage_metadata` - Gerenciar metadata das páginas
-   - `instagram_manage_messages` - Gerenciar mensagens Direct (DM)
-   - `instagram_manage_comments` - Gerenciar comentários
-   - `pages_read_engagement` - Ler métricas de engagement
+   - `pages_messaging` - Enviar/receber mensagens (Instagram + Messenger)
+   - `instagram_manage_comments` - Gerenciar comentários em posts
+   - `instagram_content_publish` - Publicar conteúdo (opcional)
 4. Confirme
 
 ### PASSO 3: Verificar

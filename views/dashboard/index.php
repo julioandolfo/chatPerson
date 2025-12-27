@@ -1442,11 +1442,11 @@ function loadConversationsByDayOfWeek() {
     });
     
     chartConversationsByDayOfWeek = new Chart(ctx, {
-        type: 'bar',
+        type: "bar",
         data: {
             labels: labels,
             datasets: [{
-                label: 'Conversas',
+                label: "Conversas",
                 data: values,
                 backgroundColor: backgroundColors,
                 borderColor: borderColors,
@@ -1505,11 +1505,11 @@ function loadConversationsByHour() {
     });
     
     chartConversationsByHour = new Chart(ctx, {
-        type: 'line',
+        type: "line",
         data: {
             labels: labels,
             datasets: [{
-                label: 'Conversas',
+                label: "Conversas",
                 data: values,
                 backgroundColor: "rgba(75, 192, 192, 0.2)",
                 borderColor: "rgba(75, 192, 192, 1)",

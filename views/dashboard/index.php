@@ -1435,10 +1435,10 @@ function loadConversationsByDayOfWeek() {
     // Cores para cada dia (destaque para dias com mais conversas)
     const backgroundColors = values.map(val => {
         const intensity = maxValue > 0 ? (val / maxValue) : 0;
-        return `rgba(54, 162, 235, ${0.3 + (intensity * 0.5)})`;
+        return "rgba(54, 162, 235, " + (0.3 + (intensity * 0.5)) + ")";
     });
     const borderColors = values.map(val => {
-        return 'rgba(54, 162, 235, 1)';
+        return "rgba(54, 162, 235, 1)";
     });
     
     chartConversationsByDayOfWeek = new Chart(ctx, {
@@ -1464,7 +1464,7 @@ function loadConversationsByDayOfWeek() {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return 'Conversas: ' + context.parsed.y;
+                            return "Conversas: " + context.parsed.y;
                         }
                     }
                 }
@@ -1499,9 +1499,9 @@ function loadConversationsByHour() {
     // Cores gradiente baseadas no volume
     const backgroundColors = values.map(val => {
         const intensity = maxValue > 0 ? (val / maxValue) : 0;
-        if (intensity > 0.7) return 'rgba(255, 99, 132, 0.7)'; // Vermelho para picos
-        if (intensity > 0.4) return 'rgba(255, 206, 86, 0.7)'; // Amarelo para médio
-        return 'rgba(75, 192, 192, 0.7)'; // Verde para baixo
+        if (intensity > 0.7) return "rgba(255, 99, 132, 0.7)"; // Vermelho para picos
+        if (intensity > 0.4) return "rgba(255, 206, 86, 0.7)"; // Amarelo para médio
+        return "rgba(75, 192, 192, 0.7)"; // Verde para baixo
     });
     
     chartConversationsByHour = new Chart(ctx, {
@@ -1511,13 +1511,13 @@ function loadConversationsByHour() {
             datasets: [{
                 label: 'Conversas',
                 data: values,
-                backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                borderColor: 'rgba(75, 192, 192, 1)',
+                backgroundColor: "rgba(75, 192, 192, 0.2)",
+                borderColor: "rgba(75, 192, 192, 1)",
                 borderWidth: 2,
                 fill: true,
                 tension: 0.4,
                 pointBackgroundColor: backgroundColors,
-                pointBorderColor: '#fff',
+                pointBorderColor: "#fff",
                 pointBorderWidth: 2,
                 pointRadius: 4,
                 pointHoverRadius: 6
@@ -1533,10 +1533,10 @@ function loadConversationsByHour() {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return 'Conversas: ' + context.parsed.y;
+                            return "Conversas: " + context.parsed.y;
                         },
                         title: function(context) {
-                            return 'Horário: ' + context[0].label;
+                            return "Horário: " + context[0].label;
                         }
                     }
                 }

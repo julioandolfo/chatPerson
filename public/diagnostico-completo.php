@@ -1,14 +1,5 @@
 <?php
-/**
- * Diagnóstico Completo do Sistema
- * 
- * Verifica:
- * - Banco de dados
- * - Automações
- * - Integrações
- * - WebSocket
- * - Últimas mensagens
- */
+
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../config/database.php';

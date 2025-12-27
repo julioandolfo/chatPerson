@@ -4,21 +4,44 @@
  * Acesse via: http://localhost/debug-permissions.php?user_id=X
  */
 
-require_once __DIR__ . '/../vendor/autoload.php';
-require_once __DIR__ . '/../app/Helpers/Database.php';
-require_once __DIR__ . '/../app/Helpers/Auth.php';
+// Carregar dependências manualmente (sem Composer)
+if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+}
 
-// Iniciar sessão
-session_start();
+// Iniciar sessão ANTES de qualquer output
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-$db = \App\Helpers\Database::getInstance();
+// Carregar helpers necessários
+require_once __DIR__ . '/../config/database.php';
+
+// Conexão direta com banco
+try {
+    $db = new PDO(
+        "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4",
+        DB_USER,
+        DB_PASS,
+        [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+        ]
+    );
+} catch (PDOException $e) {
+    die("Erro de conexão: " . $e->getMessage());
+}
 
 // Obter user_id da URL ou da sessão
-$userId = isset($_GET['user_id']) ? (int)$_GET['user_id'] : \App\Helpers\Auth::id();
+$userId = isset($_GET['user_id']) ? (int)$_GET['user_id'] : (isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null);
 
 if (!$userId) {
     echo "<h1>❌ Erro</h1>";
-    echo "<p>Nenhum usuário especificado. Use ?user_id=X ou faça login.</p>";
+    echo "<p>Nenhum usuário especificado.</p>";
+    echo "<p><strong>Opção 1:</strong> Use <code>?user_id=X</code> na URL (exemplo: ?user_id=1)</p>";
+    echo "<p><strong>Opção 2:</strong> Faça login no sistema primeiro, depois acesse esta página</p>";
+    echo "<hr>";
+    echo "<p><a href='/login'>👉 Ir para Login</a></p>";
     exit;
 }
 

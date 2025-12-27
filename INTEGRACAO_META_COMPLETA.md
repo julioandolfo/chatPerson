@@ -213,10 +213,11 @@ curl -X POST https://seudominio.com/webhooks/meta \
 1. Você será redirecionado para o Facebook
 2. Faça login com sua conta Facebook (vinculada à conta Instagram Business)
 3. Autorize as permissões:
-   - `instagram_basic`
-   - `instagram_manage_messages`
-   - `pages_show_list`
-   - `pages_read_engagement`
+   - `pages_show_list` - Listar páginas conectadas
+   - `pages_manage_metadata` - Gerenciar metadata das páginas
+   - `instagram_manage_messages` - Gerenciar mensagens Direct (DM)
+   - `instagram_manage_comments` - Gerenciar comentários
+   - `pages_read_engagement` - Ler métricas de engagement
 4. Confirme
 
 ### PASSO 3: Verificar

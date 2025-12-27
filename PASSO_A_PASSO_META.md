@@ -31,8 +31,10 @@
 
 #### Instagram:
 1. Na página do app, role até **"Adicionar Produto"**
-2. Encontre **"Instagram"**
+2. Encontre **"Instagram"** (ou "Messenger API para Instagram")
 3. Clique em **"Configurar"**
+
+⚠️ **IMPORTANTE:** Certifique-se de adicionar o produto correto: **Instagram** ou **Messenger API para Instagram** (para mensagens)
 
 #### WhatsApp:
 1. Role até **"Adicionar Produto"**

@@ -29,12 +29,14 @@ return [
         'api_version' => 'v21.0',
         'base_url' => 'https://graph.instagram.com',
         
-        // Permissões necessárias
+        // Permissões necessárias (Instagram Graph API)
+        // Documentação: https://developers.facebook.com/docs/instagram-api/overview#permissions
         'scopes' => [
-            'instagram_basic',
-            'instagram_manage_messages',
-            'pages_show_list',
-            'pages_read_engagement',
+            'pages_show_list',              // Listar páginas conectadas (obrigatório)
+            'pages_manage_metadata',        // Gerenciar metadata das páginas (obrigatório)
+            'instagram_manage_messages',    // Gerenciar mensagens Direct (DM)
+            'instagram_manage_comments',    // Gerenciar comentários (para canal instagram_comment)
+            'pages_read_engagement',        // Ler métricas de engagement
         ],
         
         // Endpoints

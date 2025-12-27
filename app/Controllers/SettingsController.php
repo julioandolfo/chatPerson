@@ -343,15 +343,19 @@ class SettingsController
             SettingService::set('openai_api_key', $data['openai_api_key'] ?? '', 'string', 'general');
             SettingService::set('elevenlabs_api_key', $data['elevenlabs_api_key'] ?? '', 'string', 'general');
             
-            Response::json([
-                'success' => true,
-                'message' => 'Configurações gerais salvas com sucesso!'
-            ]);
+            Response::successOrRedirect(
+                'Configurações gerais salvas com sucesso!',
+                '/settings?tab=general'
+            );
         } catch (\Exception $e) {
-            Response::json([
-                'success' => false,
-                'message' => 'Erro ao salvar configurações: ' . $e->getMessage()
-            ], 500);
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro ao salvar configurações: ' . $e->getMessage()
+                ], 500);
+            } else {
+                Response::redirect('/settings?tab=general&error=' . urlencode('Erro ao salvar configurações: ' . $e->getMessage()));
+            }
         }
     }
 
@@ -374,15 +378,19 @@ class SettingsController
             SettingService::set('email_from_address', $data['email_from_address'] ?? '', 'string', 'email');
             SettingService::set('email_from_name', $data['email_from_name'] ?? '', 'string', 'email');
             
-            Response::json([
-                'success' => true,
-                'message' => 'Configurações de email salvas com sucesso!'
-            ]);
+            Response::successOrRedirect(
+                'Configurações de email salvas com sucesso!',
+                '/settings?tab=email'
+            );
         } catch (\Exception $e) {
-            Response::json([
-                'success' => false,
-                'message' => 'Erro ao salvar configurações: ' . $e->getMessage()
-            ], 500);
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro ao salvar configurações: ' . $e->getMessage()
+                ], 500);
+            } else {
+                Response::redirect('/settings?tab=email&error=' . urlencode('Erro ao salvar configurações: ' . $e->getMessage()));
+            }
         }
     }
 
@@ -404,15 +412,19 @@ class SettingsController
             SettingService::set('whatsapp_webhook_url', $data['whatsapp_webhook_url'] ?? '', 'string', 'whatsapp');
             SettingService::set('whatsapp_allow_group_messages', isset($data['whatsapp_allow_group_messages']), 'boolean', 'whatsapp');
             
-            Response::json([
-                'success' => true,
-                'message' => 'Configurações de WhatsApp salvas com sucesso!'
-            ]);
+            Response::successOrRedirect(
+                'Configurações de WhatsApp salvas com sucesso!',
+                '/settings?tab=whatsapp'
+            );
         } catch (\Exception $e) {
-            Response::json([
-                'success' => false,
-                'message' => 'Erro ao salvar configurações: ' . $e->getMessage()
-            ], 500);
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro ao salvar configurações: ' . $e->getMessage()
+                ], 500);
+            } else {
+                Response::redirect('/settings?tab=whatsapp&error=' . urlencode('Erro ao salvar configurações: ' . $e->getMessage()));
+            }
         }
     }
 
@@ -435,15 +447,19 @@ class SettingsController
             SettingService::set('max_login_attempts', (int)($data['max_login_attempts'] ?? 5), 'integer', 'security');
             SettingService::set('lockout_duration', (int)($data['lockout_duration'] ?? 15), 'integer', 'security');
             
-            Response::json([
-                'success' => true,
-                'message' => 'Configurações de segurança salvas com sucesso!'
-            ]);
+            Response::successOrRedirect(
+                'Configurações de segurança salvas com sucesso!',
+                '/settings?tab=security'
+            );
         } catch (\Exception $e) {
-            Response::json([
-                'success' => false,
-                'message' => 'Erro ao salvar configurações: ' . $e->getMessage()
-            ], 500);
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro ao salvar configurações: ' . $e->getMessage()
+                ], 500);
+            } else {
+                Response::redirect('/settings?tab=security&error=' . urlencode('Erro ao salvar configurações: ' . $e->getMessage()));
+            }
         }
     }
 
@@ -464,15 +480,19 @@ class SettingsController
             SettingService::set('websocket_custom_url', $data['websocket_custom_url'] ?? '', 'string', 'websocket');
             SettingService::set('websocket_polling_interval', (int)($data['websocket_polling_interval'] ?? 3000), 'integer', 'websocket');
             
-            Response::json([
-                'success' => true,
-                'message' => 'Configurações de tempo real salvas com sucesso!'
-            ]);
+            Response::successOrRedirect(
+                'Configurações de tempo real salvas com sucesso!',
+                '/settings?tab=websocket'
+            );
         } catch (\Exception $e) {
-            Response::json([
-                'success' => false,
-                'message' => 'Erro ao salvar configurações: ' . $e->getMessage()
-            ], 500);
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro ao salvar configurações: ' . $e->getMessage()
+                ], 500);
+            } else {
+                Response::redirect('/settings?tab=websocket&error=' . urlencode('Erro ao salvar configurações: ' . $e->getMessage()));
+            }
         }
     }
 
@@ -495,15 +515,19 @@ class SettingsController
             SettingService::set('ai_fallback_detect_closing_messages', isset($data['ai_fallback_detect_closing_messages']), 'boolean', 'ai');
             SettingService::set('ai_fallback_use_ai_for_closing_detection', isset($data['ai_fallback_use_ai_for_closing_detection']), 'boolean', 'ai');
             
-            Response::json([
-                'success' => true,
-                'message' => 'Configurações de IA salvas com sucesso!'
-            ]);
+            Response::successOrRedirect(
+                'Configurações de IA salvas com sucesso!',
+                '/settings?tab=ai'
+            );
         } catch (\Exception $e) {
-            Response::json([
-                'success' => false,
-                'message' => 'Erro ao salvar configurações: ' . $e->getMessage()
-            ], 500);
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro ao salvar configurações: ' . $e->getMessage()
+                ], 500);
+            } else {
+                Response::redirect('/settings?tab=ai&error=' . urlencode('Erro ao salvar configurações: ' . $e->getMessage()));
+            }
         }
     }
 
@@ -641,21 +665,29 @@ class SettingsController
             ];
             
             if (ConversationSettingsService::saveSettings($settings)) {
-                Response::json([
-                    'success' => true,
-                    'message' => 'Configurações de conversas salvas com sucesso!'
-                ]);
+                Response::successOrRedirect(
+                    'Configurações de conversas salvas com sucesso!',
+                    '/settings?tab=conversations'
+                );
             } else {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Falha ao salvar configurações'
-                ], 500);
+                if (Request::isAjax()) {
+                    Response::json([
+                        'success' => false,
+                        'message' => 'Falha ao salvar configurações'
+                    ], 500);
+                } else {
+                    Response::redirect('/settings?tab=conversations&error=' . urlencode('Falha ao salvar configurações'));
+                }
             }
         } catch (\Exception $e) {
-            Response::json([
-                'success' => false,
-                'message' => 'Erro ao salvar configurações: ' . $e->getMessage()
-            ], 500);
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro ao salvar configurações: ' . $e->getMessage()
+                ], 500);
+            } else {
+                Response::redirect('/settings?tab=conversations&error=' . urlencode('Erro ao salvar configurações: ' . $e->getMessage()));
+            }
         }
     }
     

@@ -56,21 +56,29 @@ class TagController
             $data = Request::post();
             $tagId = TagService::create($data);
             
-            Response::json([
-                'success' => true,
-                'message' => 'Tag criada com sucesso!',
-                'id' => $tagId
-            ]);
+            Response::successOrRedirect(
+                'Tag criada com sucesso!',
+                '/tags',
+                ['id' => $tagId]
+            );
         } catch (\InvalidArgumentException $e) {
-            Response::json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 400);
+            } else {
+                Response::redirect('/tags?error=' . urlencode($e->getMessage()));
+            }
         } catch (\Exception $e) {
-            Response::json([
-                'success' => false,
-                'message' => 'Erro ao criar tag: ' . $e->getMessage()
-            ], 500);
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro ao criar tag: ' . $e->getMessage()
+                ], 500);
+            } else {
+                Response::redirect('/tags?error=' . urlencode('Erro ao criar tag: ' . $e->getMessage()));
+            }
         }
     }
 
@@ -84,26 +92,38 @@ class TagController
         try {
             $data = Request::post();
             if (TagService::update($id, $data)) {
-                Response::json([
-                    'success' => true,
-                    'message' => 'Tag atualizada com sucesso!'
-                ]);
+                Response::successOrRedirect(
+                    'Tag atualizada com sucesso!',
+                    '/tags'
+                );
             } else {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Falha ao atualizar tag.'
-                ], 404);
+                if (Request::isAjax()) {
+                    Response::json([
+                        'success' => false,
+                        'message' => 'Falha ao atualizar tag.'
+                    ], 404);
+                } else {
+                    Response::redirect('/tags?error=' . urlencode('Falha ao atualizar tag.'));
+                }
             }
         } catch (\InvalidArgumentException $e) {
-            Response::json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 400);
+            } else {
+                Response::redirect('/tags?error=' . urlencode($e->getMessage()));
+            }
         } catch (\Exception $e) {
-            Response::json([
-                'success' => false,
-                'message' => 'Erro ao atualizar tag: ' . $e->getMessage()
-            ], 500);
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro ao atualizar tag: ' . $e->getMessage()
+                ], 500);
+            } else {
+                Response::redirect('/tags?error=' . urlencode('Erro ao atualizar tag: ' . $e->getMessage()));
+            }
         }
     }
 

@@ -5,6 +5,8 @@
 
 namespace App\Helpers;
 
+use App\Helpers\Request;
+
 class Response
 {
     /**
@@ -251,6 +253,55 @@ class Response
         
         self::view('errors/403', ['message' => $message]);
         exit;
+    }
+
+    /**
+     * Retornar sucesso: JSON se AJAX, redirect se não
+     * 
+     * @param string $message Mensagem de sucesso
+     * @param string|null $redirectUrl URL para redirecionar (se não for AJAX). Se null, usa referer ou '/'
+     * @param array $data Dados adicionais para retornar no JSON
+     * @param int $statusCode Código HTTP
+     */
+    public static function successOrRedirect(
+        string $message = 'Operação realizada com sucesso!',
+        ?string $redirectUrl = null,
+        array $data = [],
+        int $statusCode = 200
+    ): void {
+        // Verificar se é requisição AJAX
+        $isAjax = Request::isAjax();
+        $acceptJson = !empty($_SERVER['HTTP_ACCEPT']) && 
+                      strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false;
+        
+        if ($isAjax || $acceptJson) {
+            // Retornar JSON
+            self::json(array_merge([
+                'success' => true,
+                'message' => $message
+            ], $data), $statusCode);
+            return;
+        }
+        
+        // Não é AJAX, redirecionar
+        if ($redirectUrl === null) {
+            // Tentar usar referer
+            $redirectUrl = $_SERVER['HTTP_REFERER'] ?? '/';
+            // Se referer for da mesma origem, usar. Senão, usar '/'
+            $parsedReferer = parse_url($redirectUrl);
+            $parsedCurrent = parse_url($_SERVER['HTTP_HOST'] ?? '');
+            if ($parsedReferer && isset($parsedReferer['host']) && 
+                isset($parsedCurrent['host']) && 
+                $parsedReferer['host'] !== $parsedCurrent['host']) {
+                $redirectUrl = '/';
+            }
+        }
+        
+        // Adicionar mensagem de sucesso na query string
+        $separator = strpos($redirectUrl, '?') !== false ? '&' : '?';
+        $redirectUrl .= $separator . 'success=' . urlencode($message);
+        
+        self::redirect($redirectUrl);
     }
 }
 

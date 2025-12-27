@@ -58,12 +58,24 @@ class RoleController
             $roleId = Role::create($data);
             
             if ($roleId) {
-                Response::json(['success' => true, 'message' => 'Role criada com sucesso!', 'id' => $roleId]);
+                Response::successOrRedirect(
+                    'Role criada com sucesso!',
+                    '/roles',
+                    ['id' => $roleId]
+                );
             } else {
-                Response::json(['success' => false, 'message' => 'Falha ao criar role.'], 500);
+                if (Request::isAjax()) {
+                    Response::json(['success' => false, 'message' => 'Falha ao criar role.'], 500);
+                } else {
+                    Response::redirect('/roles?error=' . urlencode('Falha ao criar role.'));
+                }
             }
         } catch (\Exception $e) {
-            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+            if (Request::isAjax()) {
+                Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+            } else {
+                Response::redirect('/roles?error=' . urlencode($e->getMessage()));
+            }
         }
     }
 
@@ -77,12 +89,23 @@ class RoleController
         try {
             $data = Request::post();
             if (Role::update($id, $data)) {
-                Response::json(['success' => true, 'message' => 'Role atualizada com sucesso!']);
+                Response::successOrRedirect(
+                    'Role atualizada com sucesso!',
+                    '/roles/' . $id
+                );
             } else {
-                Response::json(['success' => false, 'message' => 'Falha ao atualizar role.'], 404);
+                if (Request::isAjax()) {
+                    Response::json(['success' => false, 'message' => 'Falha ao atualizar role.'], 404);
+                } else {
+                    Response::redirect('/roles/' . $id . '?error=' . urlencode('Falha ao atualizar role.'));
+                }
             }
         } catch (\Exception $e) {
-            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+            if (Request::isAjax()) {
+                Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+            } else {
+                Response::redirect('/roles/' . $id . '?error=' . urlencode($e->getMessage()));
+            }
         }
     }
 

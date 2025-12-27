@@ -123,21 +123,29 @@ class UserController
                 UserService::uploadAvatar($userId, $_FILES['avatar_file']);
             }
             
-            Response::json([
-                'success' => true,
-                'message' => 'Usuário criado com sucesso!',
-                'id' => $userId
-            ]);
+            Response::successOrRedirect(
+                'Usuário criado com sucesso!',
+                '/users',
+                ['id' => $userId]
+            );
         } catch (\InvalidArgumentException $e) {
-            Response::json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 400);
+            } else {
+                Response::redirect('/users?error=' . urlencode($e->getMessage()));
+            }
         } catch (\Exception $e) {
-            Response::json([
-                'success' => false,
-                'message' => 'Erro ao criar usuário: ' . $e->getMessage()
-            ], 500);
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro ao criar usuário: ' . $e->getMessage()
+                ], 500);
+            } else {
+                Response::redirect('/users?error=' . urlencode('Erro ao criar usuário: ' . $e->getMessage()));
+            }
         }
     }
 
@@ -160,26 +168,38 @@ class UserController
             }
             
             if (UserService::update($id, $data)) {
-                Response::json([
-                    'success' => true,
-                    'message' => 'Usuário atualizado com sucesso!'
-                ]);
+                Response::successOrRedirect(
+                    'Usuário atualizado com sucesso!',
+                    '/users/' . $id
+                );
             } else {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Falha ao atualizar usuário.'
-                ], 404);
+                if (Request::isAjax()) {
+                    Response::json([
+                        'success' => false,
+                        'message' => 'Falha ao atualizar usuário.'
+                    ], 404);
+                } else {
+                    Response::redirect('/users/' . $id . '?error=' . urlencode('Falha ao atualizar usuário.'));
+                }
             }
         } catch (\InvalidArgumentException $e) {
-            Response::json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 400);
+            } else {
+                Response::redirect('/users/' . $id . '?error=' . urlencode($e->getMessage()));
+            }
         } catch (\Exception $e) {
-            Response::json([
-                'success' => false,
-                'message' => 'Erro ao atualizar usuário: ' . $e->getMessage()
-            ], 500);
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro ao atualizar usuário: ' . $e->getMessage()
+                ], 500);
+            } else {
+                Response::redirect('/users/' . $id . '?error=' . urlencode('Erro ao atualizar usuário: ' . $e->getMessage()));
+            }
         }
     }
 

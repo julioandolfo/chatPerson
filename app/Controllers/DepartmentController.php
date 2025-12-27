@@ -108,21 +108,29 @@ class DepartmentController
             $data = Request::post();
             $departmentId = DepartmentService::create($data);
             
-            Response::json([
-                'success' => true,
-                'message' => 'Setor criado com sucesso!',
-                'id' => $departmentId
-            ]);
+            Response::successOrRedirect(
+                'Setor criado com sucesso!',
+                '/departments',
+                ['id' => $departmentId]
+            );
         } catch (\InvalidArgumentException $e) {
-            Response::json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 400);
+            } else {
+                Response::redirect('/departments?error=' . urlencode($e->getMessage()));
+            }
         } catch (\Exception $e) {
-            Response::json([
-                'success' => false,
-                'message' => 'Erro ao criar setor: ' . $e->getMessage()
-            ], 500);
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro ao criar setor: ' . $e->getMessage()
+                ], 500);
+            } else {
+                Response::redirect('/departments?error=' . urlencode('Erro ao criar setor: ' . $e->getMessage()));
+            }
         }
     }
 
@@ -136,26 +144,38 @@ class DepartmentController
         try {
             $data = Request::post();
             if (DepartmentService::update($id, $data)) {
-                Response::json([
-                    'success' => true,
-                    'message' => 'Setor atualizado com sucesso!'
-                ]);
+                Response::successOrRedirect(
+                    'Setor atualizado com sucesso!',
+                    '/departments/' . $id
+                );
             } else {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Falha ao atualizar setor.'
-                ], 404);
+                if (Request::isAjax()) {
+                    Response::json([
+                        'success' => false,
+                        'message' => 'Falha ao atualizar setor.'
+                    ], 404);
+                } else {
+                    Response::redirect('/departments/' . $id . '?error=' . urlencode('Falha ao atualizar setor.'));
+                }
             }
         } catch (\InvalidArgumentException $e) {
-            Response::json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 400);
+            } else {
+                Response::redirect('/departments/' . $id . '?error=' . urlencode($e->getMessage()));
+            }
         } catch (\Exception $e) {
-            Response::json([
-                'success' => false,
-                'message' => 'Erro ao atualizar setor: ' . $e->getMessage()
-            ], 500);
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro ao atualizar setor: ' . $e->getMessage()
+                ], 500);
+            } else {
+                Response::redirect('/departments/' . $id . '?error=' . urlencode('Erro ao atualizar setor: ' . $e->getMessage()));
+            }
         }
     }
 

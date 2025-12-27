@@ -150,17 +150,22 @@ class Automation extends Model
     private static function matchesTriggerConfig(?array $config, array $data): bool
     {
         if (empty($config)) {
+            \App\Helpers\Logger::automation("  matchesTriggerConfig: Config vazio, aceitando");
             return true; // Sem filtros específicos
         }
+        
+        \App\Helpers\Logger::automation("  matchesTriggerConfig: Verificando config=" . json_encode($config) . " contra data=" . json_encode($data));
         
         foreach ($config as $key => $value) {
             // Se o filtro é por canal e está vazio, aceitar qualquer canal
             if ($key === 'channel' && empty($value)) {
+                \App\Helpers\Logger::automation("    ✓ Canal vazio, aceitando qualquer canal");
                 continue;
             }
             
             // Se o filtro é por conta e está vazio, aceitar qualquer conta
             if (in_array($key, ['whatsapp_account_id', 'integration_account_id']) && empty($value)) {
+                \App\Helpers\Logger::automation("    ✓ Conta ({$key}) vazia, aceitando qualquer conta");
                 continue;
             }
             
@@ -170,10 +175,12 @@ class Automation extends Model
                 if (in_array($key, ['whatsapp_account_id', 'integration_account_id'])) {
                     // Se está filtrando por conta específica mas não há conta nos dados, não corresponde
                     if (!empty($value)) {
+                        \App\Helpers\Logger::automation("    ✗ Filtro por conta ({$key}={$value}) mas chave não existe nos dados - REJEITADO");
                         return false;
                     }
                     continue;
                 }
+                \App\Helpers\Logger::automation("    ✗ Chave '{$key}' não existe nos dados - REJEITADO");
                 return false;
             }
             
@@ -184,17 +191,22 @@ class Automation extends Model
                     // Verificar se há outra conta que corresponda (para compatibilidade)
                     $otherKey = $key === 'whatsapp_account_id' ? 'integration_account_id' : 'whatsapp_account_id';
                     if (!isset($data[$otherKey]) || $data[$otherKey] != $value) {
+                        \App\Helpers\Logger::automation("    ✗ Conta não corresponde: config[{$key}]={$value} != data[{$key}]={$data[$key]} - REJEITADO");
                         return false;
                     }
+                    \App\Helpers\Logger::automation("    ✓ Conta alternativa ({$otherKey}) corresponde");
                 }
             } else {
-                // Comparação normal
+                // Comparação normal (inclui canal)
                 if ($data[$key] != $value) {
+                    \App\Helpers\Logger::automation("    ✗ Campo '{$key}' não corresponde: esperado='{$value}', recebido='{$data[$key]}' - REJEITADO");
                     return false;
                 }
+                \App\Helpers\Logger::automation("    ✓ Campo '{$key}' corresponde: '{$value}'");
             }
         }
         
+        \App\Helpers\Logger::automation("  matchesTriggerConfig: TODOS os critérios atendidos - ACEITO");
         return true;
     }
 }

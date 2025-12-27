@@ -128,6 +128,11 @@ class AutomationService
             throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));
         }
 
+        // Se for nó trigger, atualizar trigger_config da automação
+        if ($data['node_type'] === 'trigger') {
+            self::updateTriggerConfigFromNode($automationId, $data['node_data']);
+        }
+
         // Serializar node_data
         $data['node_data'] = json_encode($data['node_data']);
         $data['automation_id'] = $automationId;
@@ -147,6 +152,12 @@ class AutomationService
             throw new \InvalidArgumentException('Nó não encontrado');
         }
 
+        // Se for nó trigger, atualizar trigger_config da automação
+        $nodeType = $data['node_type'] ?? $node['node_type'];
+        if ($nodeType === 'trigger' && isset($data['node_data']) && is_array($data['node_data'])) {
+            self::updateTriggerConfigFromNode($node['automation_id'], $data['node_data']);
+        }
+
         // Serializar node_data se for array
         if (isset($data['node_data']) && is_array($data['node_data'])) {
             $data['node_data'] = json_encode($data['node_data']);
@@ -161,6 +172,69 @@ class AutomationService
     public static function deleteNode(int $nodeId): bool
     {
         return AutomationNode::delete($nodeId);
+    }
+
+    /**
+     * Atualizar trigger_config da automação a partir dos dados do nó trigger
+     */
+    private static function updateTriggerConfigFromNode(int $automationId, array $nodeData): void
+    {
+        // Extrair campos relevantes para o trigger_config
+        $triggerConfig = [];
+        
+        // Canal
+        if (isset($nodeData['channel']) && !empty($nodeData['channel'])) {
+            $triggerConfig['channel'] = $nodeData['channel'];
+        }
+        
+        // Conta de integração
+        if (isset($nodeData['integration_account_id']) && !empty($nodeData['integration_account_id'])) {
+            $triggerConfig['integration_account_id'] = $nodeData['integration_account_id'];
+        }
+        
+        // Conta WhatsApp legacy
+        if (isset($nodeData['whatsapp_account_id']) && !empty($nodeData['whatsapp_account_id'])) {
+            $triggerConfig['whatsapp_account_id'] = $nodeData['whatsapp_account_id'];
+        }
+        
+        // Palavra-chave (para message_received)
+        if (isset($nodeData['keyword']) && !empty($nodeData['keyword'])) {
+            $triggerConfig['keyword'] = $nodeData['keyword'];
+        }
+        
+        // Campo que mudou (para conversation_updated)
+        if (isset($nodeData['field']) && !empty($nodeData['field'])) {
+            $triggerConfig['field'] = $nodeData['field'];
+        }
+        
+        // Estágio de origem (para conversation_moved)
+        if (isset($nodeData['from_stage_id']) && !empty($nodeData['from_stage_id'])) {
+            $triggerConfig['from_stage_id'] = $nodeData['from_stage_id'];
+        }
+        
+        // Estágio de destino (para conversation_moved)
+        if (isset($nodeData['to_stage_id']) && !empty($nodeData['to_stage_id'])) {
+            $triggerConfig['to_stage_id'] = $nodeData['to_stage_id'];
+        }
+        
+        // Tempo de espera (para inactivity)
+        if (isset($nodeData['wait_time_value']) && !empty($nodeData['wait_time_value'])) {
+            $triggerConfig['wait_time_value'] = $nodeData['wait_time_value'];
+            $triggerConfig['wait_time_unit'] = $nodeData['wait_time_unit'] ?? 'minutes';
+            $triggerConfig['only_open_conversations'] = $nodeData['only_open_conversations'] ?? true;
+        }
+        
+        // URL do webhook (para webhook)
+        if (isset($nodeData['webhook_url']) && !empty($nodeData['webhook_url'])) {
+            $triggerConfig['webhook_url'] = $nodeData['webhook_url'];
+        }
+        
+        // Atualizar o trigger_config na automação
+        Automation::update($automationId, [
+            'trigger_config' => json_encode($triggerConfig)
+        ]);
+        
+        \App\Helpers\Logger::automation("Trigger config atualizado para automação {$automationId}: " . json_encode($triggerConfig));
     }
 
     /**

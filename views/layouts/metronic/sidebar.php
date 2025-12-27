@@ -186,9 +186,9 @@
                 <!--end:Menu item-->
                 <?php endif; ?>
                 
-                <!--begin:Menu item-->
-                <div data-kt-menu-trigger="click" class="menu-item menu-accordion">
-                    <span class="menu-link <?= isActive('/agents', $currentUri) || isActive('/users', $currentUri) ? 'active' : '' ?>" data-title="Agentes">
+                <!--begin:Menu item - Agentes-->
+                <div class="menu-item">
+                    <a class="menu-link <?= isActive('/agents', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/agents') ?>" data-title="Agentes">
                         <span class="menu-icon">
                             <i class="ki-duotone ki-people fs-2">
                                 <span class="path1"></span>
@@ -196,28 +196,7 @@
                             </i>
                         </span>
                         <span class="menu-title">Agentes</span>
-                        <span class="menu-arrow"></span>
-                    </span>
-                    <!--begin:Menu sub-->
-                    <div class="menu-sub menu-sub-accordion">
-                        <div class="menu-item">
-                            <a class="menu-link <?= isActive('/agents', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/agents') ?>">
-                                <span class="menu-bullet">
-                                    <span class="bullet bullet-dot"></span>
-                                </span>
-                                <span class="menu-title">Lista de Agentes</span>
-                            </a>
-                        </div>
-                        <div class="menu-item">
-                            <a class="menu-link <?= isActive('/users', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/users') ?>">
-                                <span class="menu-bullet">
-                                    <span class="bullet bullet-dot"></span>
-                                </span>
-                                <span class="menu-title">Usuários</span>
-                            </a>
-                        </div>
-                    </div>
-                    <!--end:Menu sub-->
+                    </a>
                 </div>
                 <!--end:Menu item-->
                 

@@ -1111,6 +1111,201 @@ ob_start();
 </div>
 <!--end::Row-->
 
+<!--begin::Row - Análise de Dias e Horários-->
+<?php if (!empty($timeAnalysis)): ?>
+<div class="row gy-5 g-xl-10 mb-5 mt-10">
+    <!--begin::Col - Dias da Semana-->
+    <div class="col-xl-6">
+        <div class="card">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-3 mb-1">Conversas por Dia da Semana</span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">Distribuição semanal</span>
+                </h3>
+            </div>
+            <div class="card-body pt-5">
+                <?php if (!empty($timeAnalysis['by_weekday'])): ?>
+                    <?php 
+                    $maxWeekdayCount = max(array_column($timeAnalysis['by_weekday'], 'count'));
+                    ?>
+                    <div class="d-flex flex-column gap-3">
+                        <?php foreach ($timeAnalysis['by_weekday'] as $day): ?>
+                            <?php 
+                            $percentage = $maxWeekdayCount > 0 ? ($day['count'] / $maxWeekdayCount) * 100 : 0;
+                            $barColor = 'primary';
+                            if ($percentage >= 80) {
+                                $barColor = 'success';
+                            } elseif ($percentage >= 50) {
+                                $barColor = 'info';
+                            } elseif ($percentage >= 30) {
+                                $barColor = 'warning';
+                            } else {
+                                $barColor = 'secondary';
+                            }
+                            ?>
+                            <div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold fs-6"><?= htmlspecialchars($day['name']) ?></span>
+                                    <span class="badge badge-light-<?= $barColor ?> fs-7"><?= $day['count'] ?> conversas</span>
+                                </div>
+                                <div class="progress h-15px">
+                                    <div class="progress-bar bg-<?= $barColor ?>" role="progressbar" 
+                                         style="width: <?= number_format($percentage, 1) ?>%"
+                                         aria-valuenow="<?= $day['count'] ?>" 
+                                         aria-valuemin="0" 
+                                         aria-valuemax="<?= $maxWeekdayCount ?>"></div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="text-center text-muted py-10">
+                        <i class="ki-duotone ki-calendar fs-3x mb-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        <div>Sem dados disponíveis</div>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    <!--end::Col-->
+
+    <!--begin::Col - Horários do Dia-->
+    <div class="col-xl-6">
+        <div class="card">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-3 mb-1">Conversas por Horário</span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">Distribuição ao longo do dia</span>
+                </h3>
+            </div>
+            <div class="card-body pt-5" style="max-height: 500px; overflow-y: auto;">
+                <?php if (!empty($timeAnalysis['by_hour'])): ?>
+                    <?php 
+                    $maxHourCount = max(array_column($timeAnalysis['by_hour'], 'count'));
+                    ?>
+                    <div class="d-flex flex-column gap-2">
+                        <?php foreach ($timeAnalysis['by_hour'] as $hour): ?>
+                            <?php 
+                            $percentage = $maxHourCount > 0 ? ($hour['count'] / $maxHourCount) * 100 : 0;
+                            $barColor = 'primary';
+                            if ($percentage >= 80) {
+                                $barColor = 'danger';
+                            } elseif ($percentage >= 60) {
+                                $barColor = 'warning';
+                            } elseif ($percentage >= 40) {
+                                $barColor = 'info';
+                            } elseif ($percentage >= 20) {
+                                $barColor = 'success';
+                            } else {
+                                $barColor = 'secondary';
+                            }
+                            ?>
+                            <div>
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-semibold fs-7"><?= htmlspecialchars($hour['label']) ?></span>
+                                    <span class="badge badge-light-<?= $barColor ?> fs-8"><?= $hour['count'] ?></span>
+                                </div>
+                                <div class="progress h-10px">
+                                    <div class="progress-bar bg-<?= $barColor ?>" role="progressbar" 
+                                         style="width: <?= number_format($percentage, 1) ?>%"
+                                         aria-valuenow="<?= $hour['count'] ?>" 
+                                         aria-valuemin="0" 
+                                         aria-valuemax="<?= $maxHourCount ?>"></div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="text-center text-muted py-10">
+                        <i class="ki-duotone ki-time fs-3x mb-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        <div>Sem dados disponíveis</div>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    <!--end::Col-->
+</div>
+<!--end::Row-->
+
+<!--begin::Row - Horários de Pico-->
+<?php if (!empty($timeAnalysis['peak_times'])): ?>
+<div class="row gy-5 g-xl-10 mb-5 mt-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-3 mb-1">🔥 Horários de Pico</span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">Top 10 combinações de dia e horário com mais conversas</span>
+                </h3>
+            </div>
+            <div class="card-body pt-5">
+                <div class="table-responsive">
+                    <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
+                        <thead>
+                            <tr class="fw-bold text-muted">
+                                <th class="min-w-50px">#</th>
+                                <th class="min-w-150px">Dia da Semana</th>
+                                <th class="min-w-100px">Horário</th>
+                                <th class="min-w-100px text-end">Conversas</th>
+                                <th class="min-w-200px">Volume</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php 
+                            $maxPeakCount = max(array_column($timeAnalysis['peak_times'], 'count'));
+                            foreach ($timeAnalysis['peak_times'] as $index => $peak): 
+                                $percentage = $maxPeakCount > 0 ? ($peak['count'] / $maxPeakCount) * 100 : 0;
+                                $badgeColor = 'danger';
+                                if ($index >= 7) {
+                                    $badgeColor = 'info';
+                                } elseif ($index >= 4) {
+                                    $badgeColor = 'warning';
+                                }
+                            ?>
+                            <tr>
+                                <td>
+                                    <span class="badge badge-light-<?= $badgeColor ?> fs-7"><?= $index + 1 ?></span>
+                                </td>
+                                <td>
+                                    <span class="fw-bold"><?= htmlspecialchars($peak['weekday_name']) ?></span>
+                                </td>
+                                <td>
+                                    <span class="badge badge-light-primary"><?= htmlspecialchars($peak['hour_label']) ?></span>
+                                </td>
+                                <td class="text-end">
+                                    <span class="fw-bold fs-6"><?= $peak['count'] ?></span>
+                                </td>
+                                <td>
+                                    <div class="progress h-20px">
+                                        <div class="progress-bar bg-<?= $badgeColor ?>" role="progressbar" 
+                                             style="width: <?= number_format($percentage, 1) ?>%"
+                                             aria-valuenow="<?= $peak['count'] ?>" 
+                                             aria-valuemin="0" 
+                                             aria-valuemax="<?= $maxPeakCount ?>">
+                                            <?= number_format($percentage, 0) ?>%
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!--end::Row-->
+<?php endif; ?>
+<?php endif; ?>
+
 <!-- Cards "Ações Rápidas" e "Funcionalidades" removidos -->
 
 <?php 
@@ -1422,200 +1617,5 @@ document.addEventListener("DOMContentLoaded", function() {
 </script>
 ';
 ?>
-
-<!--begin::Row - Análise de Dias e Horários-->
-<?php if (!empty($timeAnalysis)): ?>
-<div class="row gy-5 g-xl-10 mb-5 mt-10">
-    <!--begin::Col - Dias da Semana-->
-    <div class="col-xl-6">
-        <div class="card">
-            <div class="card-header border-0 pt-5">
-                <h3 class="card-title align-items-start flex-column">
-                    <span class="card-label fw-bold fs-3 mb-1">Conversas por Dia da Semana</span>
-                    <span class="text-muted mt-1 fw-semibold fs-7">Distribuição semanal</span>
-                </h3>
-            </div>
-            <div class="card-body pt-5">
-                <?php if (!empty($timeAnalysis['by_weekday'])): ?>
-                    <?php 
-                    $maxWeekdayCount = max(array_column($timeAnalysis['by_weekday'], 'count'));
-                    ?>
-                    <div class="d-flex flex-column gap-3">
-                        <?php foreach ($timeAnalysis['by_weekday'] as $day): ?>
-                            <?php 
-                            $percentage = $maxWeekdayCount > 0 ? ($day['count'] / $maxWeekdayCount) * 100 : 0;
-                            $barColor = 'primary';
-                            if ($percentage >= 80) {
-                                $barColor = 'success';
-                            } elseif ($percentage >= 50) {
-                                $barColor = 'info';
-                            } elseif ($percentage >= 30) {
-                                $barColor = 'warning';
-                            } else {
-                                $barColor = 'secondary';
-                            }
-                            ?>
-                            <div>
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span class="fw-bold fs-6"><?= htmlspecialchars($day['name']) ?></span>
-                                    <span class="badge badge-light-<?= $barColor ?> fs-7"><?= $day['count'] ?> conversas</span>
-                                </div>
-                                <div class="progress h-15px">
-                                    <div class="progress-bar bg-<?= $barColor ?>" role="progressbar" 
-                                         style="width: <?= number_format($percentage, 1) ?>%"
-                                         aria-valuenow="<?= $day['count'] ?>" 
-                                         aria-valuemin="0" 
-                                         aria-valuemax="<?= $maxWeekdayCount ?>"></div>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php else: ?>
-                    <div class="text-center text-muted py-10">
-                        <i class="ki-duotone ki-calendar fs-3x mb-3">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                        </i>
-                        <div>Sem dados disponíveis</div>
-                    </div>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
-    <!--end::Col-->
-
-    <!--begin::Col - Horários do Dia-->
-    <div class="col-xl-6">
-        <div class="card">
-            <div class="card-header border-0 pt-5">
-                <h3 class="card-title align-items-start flex-column">
-                    <span class="card-label fw-bold fs-3 mb-1">Conversas por Horário</span>
-                    <span class="text-muted mt-1 fw-semibold fs-7">Distribuição ao longo do dia</span>
-                </h3>
-            </div>
-            <div class="card-body pt-5" style="max-height: 500px; overflow-y: auto;">
-                <?php if (!empty($timeAnalysis['by_hour'])): ?>
-                    <?php 
-                    $maxHourCount = max(array_column($timeAnalysis['by_hour'], 'count'));
-                    ?>
-                    <div class="d-flex flex-column gap-2">
-                        <?php foreach ($timeAnalysis['by_hour'] as $hour): ?>
-                            <?php 
-                            $percentage = $maxHourCount > 0 ? ($hour['count'] / $maxHourCount) * 100 : 0;
-                            $barColor = 'primary';
-                            if ($percentage >= 80) {
-                                $barColor = 'danger';
-                            } elseif ($percentage >= 60) {
-                                $barColor = 'warning';
-                            } elseif ($percentage >= 40) {
-                                $barColor = 'info';
-                            } elseif ($percentage >= 20) {
-                                $barColor = 'success';
-                            } else {
-                                $barColor = 'secondary';
-                            }
-                            ?>
-                            <div>
-                                <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="fw-semibold fs-7"><?= htmlspecialchars($hour['label']) ?></span>
-                                    <span class="badge badge-light-<?= $barColor ?> fs-8"><?= $hour['count'] ?></span>
-                                </div>
-                                <div class="progress h-10px">
-                                    <div class="progress-bar bg-<?= $barColor ?>" role="progressbar" 
-                                         style="width: <?= number_format($percentage, 1) ?>%"
-                                         aria-valuenow="<?= $hour['count'] ?>" 
-                                         aria-valuemin="0" 
-                                         aria-valuemax="<?= $maxHourCount ?>"></div>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php else: ?>
-                    <div class="text-center text-muted py-10">
-                        <i class="ki-duotone ki-time fs-3x mb-3">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                        </i>
-                        <div>Sem dados disponíveis</div>
-                    </div>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
-    <!--end::Col-->
-</div>
-<!--end::Row-->
-<?php endif; ?>
-
-<!--begin::Row - Horários de Pico-->
-<?php if (!empty($timeAnalysis) && !empty($timeAnalysis['peak_times'])): ?>
-<div class="row gy-5 g-xl-10 mb-5 mt-5">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header border-0 pt-5">
-                <h3 class="card-title align-items-start flex-column">
-                    <span class="card-label fw-bold fs-3 mb-1">🔥 Horários de Pico</span>
-                    <span class="text-muted mt-1 fw-semibold fs-7">Top 10 combinações de dia e horário com mais conversas</span>
-                </h3>
-            </div>
-            <div class="card-body pt-5">
-                <div class="table-responsive">
-                    <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
-                        <thead>
-                            <tr class="fw-bold text-muted">
-                                <th class="min-w-50px">#</th>
-                                <th class="min-w-150px">Dia da Semana</th>
-                                <th class="min-w-100px">Horário</th>
-                                <th class="min-w-100px text-end">Conversas</th>
-                                <th class="min-w-200px">Volume</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php 
-                            $maxPeakCount = max(array_column($timeAnalysis['peak_times'], 'count'));
-                            foreach ($timeAnalysis['peak_times'] as $index => $peak): 
-                                $percentage = $maxPeakCount > 0 ? ($peak['count'] / $maxPeakCount) * 100 : 0;
-                                $badgeColor = 'danger';
-                                if ($index >= 7) {
-                                    $badgeColor = 'info';
-                                } elseif ($index >= 4) {
-                                    $badgeColor = 'warning';
-                                }
-                            ?>
-                            <tr>
-                                <td>
-                                    <span class="badge badge-light-<?= $badgeColor ?> fs-7"><?= $index + 1 ?></span>
-                                </td>
-                                <td>
-                                    <span class="fw-bold"><?= htmlspecialchars($peak['weekday_name']) ?></span>
-                                </td>
-                                <td>
-                                    <span class="badge badge-light-primary"><?= htmlspecialchars($peak['hour_label']) ?></span>
-                                </td>
-                                <td class="text-end">
-                                    <span class="fw-bold fs-6"><?= $peak['count'] ?></span>
-                                </td>
-                                <td>
-                                    <div class="progress h-20px">
-                                        <div class="progress-bar bg-<?= $badgeColor ?>" role="progressbar" 
-                                             style="width: <?= number_format($percentage, 1) ?>%"
-                                             aria-valuenow="<?= $peak['count'] ?>" 
-                                             aria-valuemin="0" 
-                                             aria-valuemax="<?= $maxPeakCount ?>">
-                                            <?= number_format($percentage, 0) ?>%
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-<!--end::Row-->
-<?php endif; ?>
 
 <?php include __DIR__ . '/../layouts/metronic/app.php'; ?>

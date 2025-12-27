@@ -462,6 +462,9 @@ class NotificameService
             'message' => $message
         ];
         
+        // 🔥 INSTAGRAM: Para responder comentários (canal instagram_comment), 
+        // a conta de integração continua sendo 'instagram' e a resposta vai via DM automaticamente
+        // O Notificame detecta que o destinatário ($to) é o usuário que comentou e envia DM
         if ($channel === 'instagram') {
             if (empty($channelId)) {
                 throw new \Exception("Para Instagram, é obrigatório preencher o ID do canal (account_id) que vai em 'from'.");
@@ -851,16 +854,28 @@ class NotificameService
         self::logInfo("  - Avatar: " . (isset($contact['avatar']) ? (strlen($contact['avatar']) > 50 ? substr($contact['avatar'], 0, 50) . '...' : $contact['avatar']) : 'NULL'));
         self::logInfo("  - Email: " . ($contact['email'] ?? 'NULL'));
         
+        // 🔥 NOVO: Detectar se é comentário do Instagram
+        $finalChannel = $channel;
+        if ($channel === 'instagram' && ($messageData['type'] ?? 'text') === 'comment') {
+            $finalChannel = 'instagram_comment';
+            self::logInfo("Notificame webhook: 📷💬 COMENTÁRIO INSTAGRAM detectado! Canal: instagram_comment");
+            
+            // Adicionar informações do comentário aos metadados
+            if (!empty($messageData['metadata']['media'])) {
+                self::logInfo("Notificame webhook: Link do post: " . ($messageData['metadata']['media']['link'] ?? 'N/A'));
+            }
+        }
+        
         // Criar/encontrar conversa
         $conversationData = [
             'contact_id' => $contact['id'],
-            'channel' => $channel,
+            'channel' => $finalChannel,
             'integration_account_id' => $account['id']
         ];
         
         self::logInfo("Notificame webhook: Buscando conversa existente...");
         self::logInfo("  - ContactID: {$contact['id']}");
-        self::logInfo("  - Channel: {$channel}");
+        self::logInfo("  - Channel: {$finalChannel}");
         self::logInfo("  - IntegrationAccountID: {$account['id']}");
         
         // Buscar conversa existente (compativel com Model que retorna array)
@@ -872,7 +887,7 @@ class NotificameService
             foreach ($allConversations as $conv) {
                 if (
                     $conv['contact_id'] == $contact['id'] && 
-                    $conv['channel'] == $channel && 
+                    $conv['channel'] == $finalChannel && 
                     $conv['integration_account_id'] == $account['id']
                 ) {
                     $conversation = $conv;
@@ -894,7 +909,7 @@ class NotificameService
         $isNewConversation = false;
         if (!$conversation) {
             // Criar nova conversa
-            self::logInfo("Notificame webhook: Criando NOVA conversa - ContactID={$contact['id']}, Channel={$channel}");
+            self::logInfo("Notificame webhook: Criando NOVA conversa - ContactID={$contact['id']}, Channel={$finalChannel}");
             self::logInfo("Notificame webhook: Dados para criar conversa: " . json_encode($conversationData, JSON_UNESCAPED_UNICODE));
             
             try {
@@ -1083,11 +1098,18 @@ class NotificameService
             if (!empty($msg['contents']) && is_array($msg['contents'])) {
                 $contentItem = $msg['contents'][0];
                 $data['type'] = $contentItem['type'] ?? 'text';
+                
                 if (($contentItem['type'] ?? '') === 'text') {
                     $data['content'] = $contentItem['text'] ?? '';
                 } elseif (($contentItem['type'] ?? '') === 'file') {
                     $data['content'] = $contentItem['fileUrl'] ?? ($contentItem['fileCaption'] ?? '');
                     $data['metadata']['file'] = $contentItem;
+                } elseif (($contentItem['type'] ?? '') === 'comment') {
+                    // 🔥 NOVO: Comentário do Instagram
+                    $data['content'] = $contentItem['text'] ?? '';
+                    $data['type'] = 'comment';
+                    $data['metadata']['comment'] = $contentItem;
+                    $data['metadata']['media'] = $contentItem['media'] ?? null;
                 } else {
                     $data['content'] = $contentItem['text'] ?? $contentItem['fileUrl'] ?? '';
                 }

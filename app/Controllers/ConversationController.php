@@ -561,7 +561,7 @@ class ConversationController
             
             // Validar canal
             $validChannels = [
-                'whatsapp', 'whatsapp_official', 'instagram', 'facebook', 'tiktok', 
+                'whatsapp', 'whatsapp_official', 'instagram', 'instagram_comment', 'facebook', 'tiktok', 
                 'telegram', 'email', 'chat', 'mercadolivre', 'webchat', 
                 'olx', 'linkedin', 'google_business', 'youtube'
             ];

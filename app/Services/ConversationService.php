@@ -1435,11 +1435,17 @@ class ConversationService
                     if ($integrationAccountId) {
                         // Determinar destinatário baseado no canal
                         $channel = $conversation['channel'] ?? 'whatsapp';
-                        $nonPhoneChannels = ['instagram', 'facebook', 'telegram', 'twitter', 'linkedin', 'tiktok'];
+                        $nonPhoneChannels = ['instagram', 'instagram_comment', 'facebook', 'telegram', 'twitter', 'linkedin', 'tiktok'];
                         
                         if (in_array($channel, $nonPhoneChannels)) {
                             // Para canais sociais, priorizar identifier
+                            // 🔥 IMPORTANTE: Para instagram_comment, o identifier será o ID do usuário que comentou
+                            // A resposta será enviada via DM (Direct Message) automaticamente
                             $recipient = $contact['identifier'] ?? $contact['phone'] ?? '';
+                            
+                            if ($channel === 'instagram_comment') {
+                                \App\Helpers\Logger::notificame("[INFO] 📷💬 Respondendo COMENTÁRIO Instagram - Enviará via DM para: {$recipient}");
+                            }
                         } else {
                             // Para WhatsApp/Email/SMS, priorizar phone/email
                             $recipient = $contact['phone'] ?? $contact['email'] ?? $contact['identifier'] ?? '';

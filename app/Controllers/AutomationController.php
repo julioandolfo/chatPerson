@@ -95,7 +95,7 @@ class AutomationController
             
             // Lista de todos os canais disponíveis
             $allChannels = [
-                'whatsapp', 'instagram', 'facebook', 'telegram', 
+                'whatsapp', 'instagram', 'instagram_comment', 'facebook', 'telegram', 
                 'mercadolivre', 'webchat', 'email', 'olx', 
                 'linkedin', 'google_business', 'youtube', 'tiktok', 'chat'
             ];

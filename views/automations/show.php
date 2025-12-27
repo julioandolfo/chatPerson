@@ -1526,6 +1526,7 @@ function openNodeConfig(nodeId) {
                         <option value="">Todos os Canais</option>
                         <option value="whatsapp">WhatsApp</option>
                 <option value="instagram">Instagram</option>
+                <option value="instagram_comment">Comentário Instagram</option>
                 <option value="facebook">Facebook</option>
                 <option value="telegram">Telegram</option>
                 <option value="mercadolivre">Mercado Livre</option>
@@ -2306,6 +2307,7 @@ function openNodeConfig(nodeId) {
                     <select name="channel" class="form-select form-select-solid" required>
                         <option value="whatsapp">WhatsApp</option>
                         <option value="instagram">Instagram</option>
+                        <option value="instagram_comment">Comentário Instagram</option>
                         <option value="facebook">Facebook</option>
                         <option value="telegram">Telegram</option>
                         <option value="mercadolivre">Mercado Livre</option>

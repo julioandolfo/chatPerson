@@ -192,13 +192,32 @@ class AutomationService
         
         // Conta de integração
         if (isset($nodeData['integration_account_id']) && !empty($nodeData['integration_account_id'])) {
-            \App\Helpers\Logger::automation("🔍 Salvando integration_account_id: " . $nodeData['integration_account_id']);
-            $triggerConfig['integration_account_id'] = $nodeData['integration_account_id'];
+            \App\Helpers\Logger::automation("🔍 Recebido integration_account_id: " . $nodeData['integration_account_id']);
+            
+            // Verificar se é uma conta WhatsApp na integration_accounts
+            // Se for, buscar o whatsapp_account_id correspondente
+            $integrationAccount = \App\Helpers\Database::fetchOne(
+                "SELECT ia.id, ia.channel, ia.phone_number, wa.id as whatsapp_id 
+                 FROM integration_accounts ia 
+                 LEFT JOIN whatsapp_accounts wa ON ia.phone_number = wa.phone_number 
+                 WHERE ia.id = ?",
+                [$nodeData['integration_account_id']]
+            );
+            
+            if ($integrationAccount && $integrationAccount['channel'] === 'whatsapp' && !empty($integrationAccount['whatsapp_id'])) {
+                // É uma conta WhatsApp migrada! Salvar como whatsapp_account_id
+                \App\Helpers\Logger::automation("🔄 Convertendo integration_account_id {$nodeData['integration_account_id']} → whatsapp_account_id {$integrationAccount['whatsapp_id']}");
+                $triggerConfig['whatsapp_account_id'] = $integrationAccount['whatsapp_id'];
+            } else {
+                // É uma conta de integração real (Instagram, etc)
+                \App\Helpers\Logger::automation("✅ Salvando integration_account_id: " . $nodeData['integration_account_id']);
+                $triggerConfig['integration_account_id'] = $nodeData['integration_account_id'];
+            }
         }
         
         // Conta WhatsApp legacy
         if (isset($nodeData['whatsapp_account_id']) && !empty($nodeData['whatsapp_account_id'])) {
-            \App\Helpers\Logger::automation("🔍 Salvando whatsapp_account_id: " . $nodeData['whatsapp_account_id']);
+            \App\Helpers\Logger::automation("✅ Salvando whatsapp_account_id: " . $nodeData['whatsapp_account_id']);
             $triggerConfig['whatsapp_account_id'] = $nodeData['whatsapp_account_id'];
         }
         

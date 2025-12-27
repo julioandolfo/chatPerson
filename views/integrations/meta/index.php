@@ -92,6 +92,29 @@ ob_start();
         </div>
         <!--end::Alerta Importante-->
         
+        <!--begin::Alerta Nova Permissão Instagram-->
+        <?php if (!empty($tokens)): ?>
+        <div class="alert alert-warning d-flex align-items-start p-5 mb-5">
+            <i class="ki-duotone ki-shield-tick fs-2hx text-warning me-4 mt-1">
+                <span class="path1"></span>
+                <span class="path2"></span>
+            </i>
+            <div class="d-flex flex-column">
+                <h4 class="mb-2 text-warning">⚠️ NOVA PERMISSÃO: Reconecte sua conta Instagram</h4>
+                <span class="mb-3">
+                    Uma nova permissão (<code>pages_read_engagement</code>) foi adicionada para acessar contas Instagram Business vinculadas às páginas do Facebook.
+                </span>
+                <span class="mb-3 fw-bold text-dark">
+                    📱 Se suas contas Instagram não estão aparecendo, clique em <strong>"Conectar Instagram"</strong> novamente para atualizar as permissões.
+                </span>
+                <span class="text-muted fs-7">
+                    Essa permissão permite que o sistema identifique quais páginas do Facebook têm contas Instagram Business vinculadas.
+                </span>
+            </div>
+        </div>
+        <?php endif; ?>
+        <!--end::Alerta Nova Permissão-->
+        
         <?php if (empty($metaConfig['app_id']) || empty($metaConfig['app_secret'])): ?>
         <div class="alert alert-warning d-flex align-items-center p-5 mb-5">
             <i class="ki-duotone ki-information-5 fs-2hx text-warning me-4">

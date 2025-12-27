@@ -36,6 +36,7 @@ return [
             'pages_show_list',              // ✅ Listar páginas conectadas
             'pages_manage_metadata',        // ✅ Gerenciar metadata das páginas
             'pages_messaging',              // ✅ Enviar/receber mensagens Instagram Direct
+            'pages_read_engagement',        // ✅ Ler engajamento e acessar Instagram Business Account vinculado
             'instagram_manage_comments',    // ✅ Gerenciar comentários em posts
         ],
         

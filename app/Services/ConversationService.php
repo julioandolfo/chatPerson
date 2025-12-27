@@ -1789,9 +1789,12 @@ class ConversationService
         
         // Executar automações para mensagem recebida (se for do contato)
         if ($senderType === 'contact') {
+            \App\Helpers\Logger::info("ConversationService::sendMessage - DISPARANDO executeForMessageReceived (messageId={$messageId})");
             try {
                 \App\Services\AutomationService::executeForMessageReceived($messageId);
+                \App\Helpers\Logger::info("ConversationService::sendMessage - executeForMessageReceived CONCLUÍDO");
             } catch (\Exception $e) {
+                \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO ao executar automações: " . $e->getMessage());
                 error_log("Erro ao executar automações: " . $e->getMessage());
             }
         }

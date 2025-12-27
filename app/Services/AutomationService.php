@@ -291,8 +291,10 @@ class AutomationService
      */
     public static function executeForMessageReceived(int $messageId): void
     {
-        \App\Helpers\Logger::automation("=== executeForMessageReceived INÍCIO ===");
-        \App\Helpers\Logger::automation("Message ID: {$messageId}");
+        // Log extra para debug
+        error_log("🔥 AutomationService::executeForMessageReceived CHAMADO! MessageID: {$messageId}");
+        \App\Helpers\Logger::automation("🔥 === executeForMessageReceived INÍCIO ===");
+        \App\Helpers\Logger::automation("🔥 Message ID: {$messageId}");
         
         $message = \App\Models\Message::find($messageId);
         if (!$message || $message['sender_type'] === 'agent') {

@@ -1187,5 +1187,159 @@ class DashboardService
             'sla_30min_rate' => $total > 0 ? round((($result['responded_30min'] ?? 0) / $total) * 100, 2) : 0
         ];
     }
+
+    /**
+     * Obter análise de dias e horários com mais conversas novas
+     * 
+     * @param string|null $dateFrom
+     * @param string|null $dateTo
+     * @return array ['by_weekday' => [...], 'by_hour' => [...], 'peak_times' => [...]]
+     */
+    public static function getConversationsByTimeAnalysis(?string $dateFrom = null, ?string $dateTo = null): array
+    {
+        $dateFrom = $dateFrom ?? date('Y-m-d', strtotime('-30 days'));
+        $dateTo = $dateTo ?? date('Y-m-d') . ' 23:59:59';
+
+        // Garantir que dateTo inclui o dia inteiro
+        if (!str_contains($dateTo, ':')) {
+            $dateTo .= ' 23:59:59';
+        }
+
+        // Conversas por dia da semana (0=Domingo, 6=Sábado)
+        $sqlWeekday = "
+            SELECT 
+                DAYOFWEEK(created_at) - 1 as weekday,
+                COUNT(*) as count
+            FROM conversations
+            WHERE created_at >= ? AND created_at <= ?
+            GROUP BY DAYOFWEEK(created_at)
+            ORDER BY weekday
+        ";
+        $weekdayResults = \App\Helpers\Database::fetchAll($sqlWeekday, [$dateFrom, $dateTo]);
+
+        // Nomes dos dias da semana em português
+        $weekdayNames = [
+            0 => 'Domingo',
+            1 => 'Segunda',
+            2 => 'Terça',
+            3 => 'Quarta',
+            4 => 'Quinta',
+            5 => 'Sexta',
+            6 => 'Sábado'
+        ];
+
+        $byWeekday = [];
+        foreach ($weekdayResults as $row) {
+            $dayNum = (int)$row['weekday'];
+            $byWeekday[] = [
+                'weekday' => $dayNum,
+                'name' => $weekdayNames[$dayNum],
+                'short_name' => substr($weekdayNames[$dayNum], 0, 3),
+                'count' => (int)$row['count']
+            ];
+        }
+
+        // Preencher dias sem conversas
+        for ($i = 0; $i < 7; $i++) {
+            $exists = false;
+            foreach ($byWeekday as $day) {
+                if ($day['weekday'] === $i) {
+                    $exists = true;
+                    break;
+                }
+            }
+            if (!$exists) {
+                $byWeekday[] = [
+                    'weekday' => $i,
+                    'name' => $weekdayNames[$i],
+                    'short_name' => substr($weekdayNames[$i], 0, 3),
+                    'count' => 0
+                ];
+            }
+        }
+
+        // Ordenar por dia da semana
+        usort($byWeekday, function($a, $b) {
+            return $a['weekday'] <=> $b['weekday'];
+        });
+
+        // Conversas por hora do dia (0-23)
+        $sqlHour = "
+            SELECT 
+                HOUR(created_at) as hour,
+                COUNT(*) as count
+            FROM conversations
+            WHERE created_at >= ? AND created_at <= ?
+            GROUP BY HOUR(created_at)
+            ORDER BY hour
+        ";
+        $hourResults = \App\Helpers\Database::fetchAll($sqlHour, [$dateFrom, $dateTo]);
+
+        $byHour = [];
+        foreach ($hourResults as $row) {
+            $hour = (int)$row['hour'];
+            $byHour[] = [
+                'hour' => $hour,
+                'label' => sprintf('%02d:00', $hour),
+                'count' => (int)$row['count']
+            ];
+        }
+
+        // Preencher horas sem conversas
+        for ($h = 0; $h < 24; $h++) {
+            $exists = false;
+            foreach ($byHour as $hourData) {
+                if ($hourData['hour'] === $h) {
+                    $exists = true;
+                    break;
+                }
+            }
+            if (!$exists) {
+                $byHour[] = [
+                    'hour' => $h,
+                    'label' => sprintf('%02d:00', $h),
+                    'count' => 0
+                ];
+            }
+        }
+
+        // Ordenar por hora
+        usort($byHour, function($a, $b) {
+            return $a['hour'] <=> $b['hour'];
+        });
+
+        // Encontrar períodos de pico (combinação dia da semana + hora)
+        $sqlPeak = "
+            SELECT 
+                DAYOFWEEK(created_at) - 1 as weekday,
+                HOUR(created_at) as hour,
+                COUNT(*) as count
+            FROM conversations
+            WHERE created_at >= ? AND created_at <= ?
+            GROUP BY DAYOFWEEK(created_at), HOUR(created_at)
+            ORDER BY count DESC
+            LIMIT 10
+        ";
+        $peakResults = \App\Helpers\Database::fetchAll($sqlPeak, [$dateFrom, $dateTo]);
+
+        $peakTimes = [];
+        foreach ($peakResults as $row) {
+            $dayNum = (int)$row['weekday'];
+            $hour = (int)$row['hour'];
+            $peakTimes[] = [
+                'weekday' => $dayNum,
+                'weekday_name' => $weekdayNames[$dayNum],
+                'hour' => $hour,
+                'hour_label' => sprintf('%02d:00', $hour),
+                'count' => (int)$row['count']
+            ];
+        }
+
+        return [
+            'by_weekday' => $byWeekday,
+            'by_hour' => $byHour,
+            'peak_times' => $peakTimes
+        ];
+    }
 }
 

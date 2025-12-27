@@ -516,7 +516,7 @@ ob_start();
 
 <!--begin::Row - Estatísticas por Setor e Funil-->
 <?php if (!empty($departmentStats) || !empty($funnelStats)): ?>
-<div class="row gy-5 g-xl-10 mb-5">
+<div class="row gy-5 g-xl-10 mb-5 mt-10">
     <!--begin::Col - Estatísticas por Setor-->
     <?php if (!empty($departmentStats)): ?>
     <div class="col-xl-6">
@@ -806,7 +806,7 @@ ob_start();
                                 
                                 <div class="separator separator-dashed my-4"></div>
                                 
-                                <!-- SLA 1ª Resposta -->
+                                <!-- SLA 1ª Resposta - Proposta 1: Indicadores Visuais Claros -->
                                 <?php
                                 // Dados do SLA de primeira resposta
                                 $slaFirstRespMinutes = $agent['sla_first_response_minutes'] ?? $slaFirstResponse;
@@ -814,31 +814,56 @@ ob_start();
                                 $avgFirstResponseSeconds = $agent['avg_first_response_seconds'] ?? 0;
                                 $avgFirstResponseMinutes = $agent['avg_first_response_minutes'] ?? 0;
                                 $firstRespWithinSla = $agent['first_response_within_sla'] ?? 0;
+                                $firstRespOutSla = $agent['total_conversations'] - $firstRespWithinSla;
                                 
                                 // Definir status SLA 1ª Resposta
                                 if ($agent['total_conversations'] == 0) {
                                     $sla1Status = 'secondary';
-                                    $sla1Text = 'N/A';
+                                    $sla1Icon = '⚪';
+                                    $sla1Label = 'Sem dados';
                                 } elseif ($slaFirstRespRate >= 80) {
                                     $sla1Status = 'success';
-                                    $sla1Text = number_format($slaFirstRespRate, 0) . '%';
+                                    $sla1Icon = '🟢';
+                                    $sla1Label = 'Excelente';
                                 } elseif ($slaFirstRespRate >= 50) {
                                     $sla1Status = 'warning';
-                                    $sla1Text = number_format($slaFirstRespRate, 0) . '%';
+                                    $sla1Icon = '🟡';
+                                    $sla1Label = 'Regular';
                                 } else {
                                     $sla1Status = 'danger';
-                                    $sla1Text = number_format($slaFirstRespRate, 0) . '%';
+                                    $sla1Icon = '🔴';
+                                    $sla1Label = 'Crítico';
                                 }
+                                
+                                $avgWithinSla = $avgFirstResponseMinutes <= $slaFirstRespMinutes;
                                 ?>
                                 <div class="mb-3">
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <span class="text-muted fs-7">SLA 1ª Resposta (<?= $slaFirstRespMinutes ?>min)</span>
-                                        <span class="badge badge-light-<?= $sla1Status ?>"><?= $sla1Text ?></span>
+                                    <div class="mb-2">
+                                        <span class="text-muted fs-7 fw-bold">SLA 1ª Resposta (<?= $slaFirstRespMinutes ?>min)</span>
                                     </div>
+                                    
                                     <?php if ($agent['total_conversations'] > 0): ?>
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <span class="text-muted fs-8">Tempo Médio:</span>
-                                        <span class="fw-bold fs-8 <?= $avgFirstResponseMinutes <= $slaFirstRespMinutes ? 'text-success' : 'text-danger' ?>">
+                                    <!-- Indicador Principal -->
+                                    <div class="d-flex align-items-center justify-content-between p-3 rounded bg-light-<?= $sla1Status ?> mb-2">
+                                        <div class="d-flex align-items-center">
+                                            <span class="fs-2 me-2"><?= $sla1Icon ?></span>
+                                            <div>
+                                                <div class="fs-2 fw-bold text-<?= $sla1Status ?>"><?= number_format($slaFirstRespRate, 0) ?>%</div>
+                                                <div class="text-muted fs-8"><?= $sla1Label ?></div>
+                                            </div>
+                                        </div>
+                                        <div class="text-end">
+                                            <div class="fs-6 fw-bold">
+                                                <span class="text-success">✅ <?= $firstRespWithinSla ?></span>
+                                            </div>
+                                            <div class="text-muted fs-8">no prazo</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Tempo Médio -->
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="text-muted fs-8">Tempo médio:</span>
+                                        <span class="fw-bold fs-7 <?= $avgWithinSla ? 'text-success' : 'text-danger' ?>">
                                             <?php
                                             if ($avgFirstResponseSeconds > 0) {
                                                 if ($avgFirstResponseSeconds < 60) {
@@ -846,22 +871,39 @@ ob_start();
                                                 } else {
                                                     echo number_format($avgFirstResponseMinutes, 1) . 'min';
                                                 }
+                                                echo $avgWithinSla ? ' ✓' : ' ✗';
                                             } else {
                                                 echo '-';
                                             }
                                             ?>
                                         </span>
                                     </div>
-                                    <div class="progress h-6px">
-                                        <div class="progress-bar bg-<?= $sla1Status ?>" role="progressbar" 
-                                             style="width: <?= min(100, $slaFirstRespRate) ?>%" 
-                                             title="<?= $firstRespWithinSla ?> de <?= $agent['total_conversations'] ?> dentro do SLA"></div>
+                                    
+                                    <!-- Alerta de Conversas Fora do SLA -->
+                                    <?php if ($firstRespOutSla > 0): ?>
+                                    <div class="alert alert-<?= $sla1Status === 'danger' ? 'danger' : 'warning' ?> d-flex align-items-center p-2 mb-0">
+                                        <i class="ki-duotone ki-information-5 fs-2 me-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        <span class="fs-8"><?= $firstRespOutSla ?> conversa<?= $firstRespOutSla > 1 ? 's' : '' ?> fora do SLA</span>
                                     </div>
-                                    <div class="text-muted fs-9 mt-1"><?= $firstRespWithinSla ?>/<?= $agent['total_conversations'] ?> conversas no SLA</div>
+                                    <?php endif; ?>
+                                    
+                                    <?php else: ?>
+                                    <div class="text-center text-muted fs-7 py-3">
+                                        <i class="ki-duotone ki-information fs-2x mb-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        <div>Sem conversas no período</div>
+                                    </div>
                                     <?php endif; ?>
                                 </div>
                                 
-                                <!-- SLA Respostas -->
+                                <!-- SLA Respostas - Proposta 1: Indicadores Visuais Claros -->
                                 <?php
                                 // Dados do SLA de respostas contínuas
                                 $slaRespMinutes = $agent['sla_response_minutes'] ?? $slaOngoingResponse;
@@ -870,31 +912,56 @@ ob_start();
                                 $avgResponseMinutes = $agent['avg_response_minutes'] ?? 0;
                                 $totalResponses = $agent['total_responses'] ?? 0;
                                 $responsesWithinSla = $agent['responses_within_sla'] ?? 0;
+                                $responsesOutSla = $totalResponses - $responsesWithinSla;
                                 
                                 // Definir status SLA Respostas
                                 if ($totalResponses == 0) {
                                     $sla2Status = 'secondary';
-                                    $sla2Text = 'N/A';
+                                    $sla2Icon = '⚪';
+                                    $sla2Label = 'Sem dados';
                                 } elseif ($slaRespRate >= 80) {
                                     $sla2Status = 'success';
-                                    $sla2Text = number_format($slaRespRate, 0) . '%';
+                                    $sla2Icon = '🟢';
+                                    $sla2Label = 'Excelente';
                                 } elseif ($slaRespRate >= 50) {
                                     $sla2Status = 'warning';
-                                    $sla2Text = number_format($slaRespRate, 0) . '%';
+                                    $sla2Icon = '🟡';
+                                    $sla2Label = 'Regular';
                                 } else {
                                     $sla2Status = 'danger';
-                                    $sla2Text = number_format($slaRespRate, 0) . '%';
+                                    $sla2Icon = '🔴';
+                                    $sla2Label = 'Crítico';
                                 }
+                                
+                                $avgRespWithinSla = $avgResponseMinutes <= $slaRespMinutes;
                                 ?>
                                 <div class="mb-2">
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <span class="text-muted fs-7">SLA Respostas (<?= $slaRespMinutes ?>min)</span>
-                                        <span class="badge badge-light-<?= $sla2Status ?>"><?= $sla2Text ?></span>
+                                    <div class="mb-2">
+                                        <span class="text-muted fs-7 fw-bold">SLA Respostas (<?= $slaRespMinutes ?>min)</span>
                                     </div>
+                                    
                                     <?php if ($totalResponses > 0): ?>
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <span class="text-muted fs-8">Tempo Médio:</span>
-                                        <span class="fw-bold fs-8 <?= $avgResponseMinutes <= $slaRespMinutes ? 'text-success' : 'text-danger' ?>">
+                                    <!-- Indicador Principal -->
+                                    <div class="d-flex align-items-center justify-content-between p-3 rounded bg-light-<?= $sla2Status ?> mb-2">
+                                        <div class="d-flex align-items-center">
+                                            <span class="fs-2 me-2"><?= $sla2Icon ?></span>
+                                            <div>
+                                                <div class="fs-2 fw-bold text-<?= $sla2Status ?>"><?= number_format($slaRespRate, 0) ?>%</div>
+                                                <div class="text-muted fs-8"><?= $sla2Label ?></div>
+                                            </div>
+                                        </div>
+                                        <div class="text-end">
+                                            <div class="fs-6 fw-bold">
+                                                <span class="text-success">✅ <?= $responsesWithinSla ?></span>
+                                            </div>
+                                            <div class="text-muted fs-8">no prazo</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Tempo Médio -->
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="text-muted fs-8">Tempo médio:</span>
+                                        <span class="fw-bold fs-7 <?= $avgRespWithinSla ? 'text-success' : 'text-danger' ?>">
                                             <?php
                                             if ($avgResponseSeconds > 0) {
                                                 if ($avgResponseSeconds < 60) {
@@ -902,18 +969,35 @@ ob_start();
                                                 } else {
                                                     echo number_format($avgResponseMinutes, 1) . 'min';
                                                 }
+                                                echo $avgRespWithinSla ? ' ✓' : ' ✗';
                                             } else {
                                                 echo '-';
                                             }
                                             ?>
                                         </span>
                                     </div>
-                                    <div class="progress h-6px">
-                                        <div class="progress-bar bg-<?= $sla2Status ?>" role="progressbar" 
-                                             style="width: <?= min(100, $slaRespRate) ?>%" 
-                                             title="<?= $responsesWithinSla ?> de <?= $totalResponses ?> respostas dentro do SLA"></div>
+                                    
+                                    <!-- Alerta de Respostas Fora do SLA -->
+                                    <?php if ($responsesOutSla > 0): ?>
+                                    <div class="alert alert-<?= $sla2Status === 'danger' ? 'danger' : 'warning' ?> d-flex align-items-center p-2 mb-0">
+                                        <i class="ki-duotone ki-information-5 fs-2 me-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        <span class="fs-8"><?= $responsesOutSla ?> resposta<?= $responsesOutSla > 1 ? 's' : '' ?> fora do SLA</span>
                                     </div>
-                                    <div class="text-muted fs-9 mt-1"><?= $responsesWithinSla ?>/<?= $totalResponses ?> respostas no SLA</div>
+                                    <?php endif; ?>
+                                    
+                                    <?php else: ?>
+                                    <div class="text-center text-muted fs-7 py-3">
+                                        <i class="ki-duotone ki-information fs-2x mb-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        <div>Sem respostas no período</div>
+                                    </div>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -1338,5 +1422,199 @@ document.addEventListener("DOMContentLoaded", function() {
 </script>
 ';
 ?>
+
+<!--begin::Row - Análise de Dias e Horários-->
+<?php if (!empty($timeAnalysis)): ?>
+<div class="row gy-5 g-xl-10 mb-5 mt-10">
+    <!--begin::Col - Dias da Semana-->
+    <div class="col-xl-6">
+        <div class="card">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-3 mb-1">Conversas por Dia da Semana</span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">Distribuição semanal</span>
+                </h3>
+            </div>
+            <div class="card-body pt-5">
+                <?php if (!empty($timeAnalysis['by_weekday'])): ?>
+                    <?php 
+                    $maxWeekdayCount = max(array_column($timeAnalysis['by_weekday'], 'count'));
+                    ?>
+                    <div class="d-flex flex-column gap-3">
+                        <?php foreach ($timeAnalysis['by_weekday'] as $day): ?>
+                            <?php 
+                            $percentage = $maxWeekdayCount > 0 ? ($day['count'] / $maxWeekdayCount) * 100 : 0;
+                            $barColor = 'primary';
+                            if ($percentage >= 80) {
+                                $barColor = 'success';
+                            } elseif ($percentage >= 50) {
+                                $barColor = 'info';
+                            } elseif ($percentage >= 30) {
+                                $barColor = 'warning';
+                            } else {
+                                $barColor = 'secondary';
+                            }
+                            ?>
+                            <div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold fs-6"><?= htmlspecialchars($day['name']) ?></span>
+                                    <span class="badge badge-light-<?= $barColor ?> fs-7"><?= $day['count'] ?> conversas</span>
+                                </div>
+                                <div class="progress h-15px">
+                                    <div class="progress-bar bg-<?= $barColor ?>" role="progressbar" 
+                                         style="width: <?= number_format($percentage, 1) ?>%"
+                                         aria-valuenow="<?= $day['count'] ?>" 
+                                         aria-valuemin="0" 
+                                         aria-valuemax="<?= $maxWeekdayCount ?>"></div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="text-center text-muted py-10">
+                        <i class="ki-duotone ki-calendar fs-3x mb-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        <div>Sem dados disponíveis</div>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    <!--end::Col-->
+
+    <!--begin::Col - Horários do Dia-->
+    <div class="col-xl-6">
+        <div class="card">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-3 mb-1">Conversas por Horário</span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">Distribuição ao longo do dia</span>
+                </h3>
+            </div>
+            <div class="card-body pt-5" style="max-height: 500px; overflow-y: auto;">
+                <?php if (!empty($timeAnalysis['by_hour'])): ?>
+                    <?php 
+                    $maxHourCount = max(array_column($timeAnalysis['by_hour'], 'count'));
+                    ?>
+                    <div class="d-flex flex-column gap-2">
+                        <?php foreach ($timeAnalysis['by_hour'] as $hour): ?>
+                            <?php 
+                            $percentage = $maxHourCount > 0 ? ($hour['count'] / $maxHourCount) * 100 : 0;
+                            $barColor = 'primary';
+                            if ($percentage >= 80) {
+                                $barColor = 'danger';
+                            } elseif ($percentage >= 60) {
+                                $barColor = 'warning';
+                            } elseif ($percentage >= 40) {
+                                $barColor = 'info';
+                            } elseif ($percentage >= 20) {
+                                $barColor = 'success';
+                            } else {
+                                $barColor = 'secondary';
+                            }
+                            ?>
+                            <div>
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-semibold fs-7"><?= htmlspecialchars($hour['label']) ?></span>
+                                    <span class="badge badge-light-<?= $barColor ?> fs-8"><?= $hour['count'] ?></span>
+                                </div>
+                                <div class="progress h-10px">
+                                    <div class="progress-bar bg-<?= $barColor ?>" role="progressbar" 
+                                         style="width: <?= number_format($percentage, 1) ?>%"
+                                         aria-valuenow="<?= $hour['count'] ?>" 
+                                         aria-valuemin="0" 
+                                         aria-valuemax="<?= $maxHourCount ?>"></div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="text-center text-muted py-10">
+                        <i class="ki-duotone ki-time fs-3x mb-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        <div>Sem dados disponíveis</div>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    <!--end::Col-->
+</div>
+<!--end::Row-->
+
+<!--begin::Row - Horários de Pico-->
+<?php if (!empty($timeAnalysis['peak_times'])): ?>
+<div class="row gy-5 g-xl-10 mb-5 mt-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-3 mb-1">🔥 Horários de Pico</span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">Top 10 combinações de dia e horário com mais conversas</span>
+                </h3>
+            </div>
+            <div class="card-body pt-5">
+                <div class="table-responsive">
+                    <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
+                        <thead>
+                            <tr class="fw-bold text-muted">
+                                <th class="min-w-50px">#</th>
+                                <th class="min-w-150px">Dia da Semana</th>
+                                <th class="min-w-100px">Horário</th>
+                                <th class="min-w-100px text-end">Conversas</th>
+                                <th class="min-w-200px">Volume</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php 
+                            $maxPeakCount = max(array_column($timeAnalysis['peak_times'], 'count'));
+                            foreach ($timeAnalysis['peak_times'] as $index => $peak): 
+                                $percentage = $maxPeakCount > 0 ? ($peak['count'] / $maxPeakCount) * 100 : 0;
+                                $badgeColor = 'danger';
+                                if ($index >= 7) {
+                                    $badgeColor = 'info';
+                                } elseif ($index >= 4) {
+                                    $badgeColor = 'warning';
+                                }
+                            ?>
+                            <tr>
+                                <td>
+                                    <span class="badge badge-light-<?= $badgeColor ?> fs-7"><?= $index + 1 ?></span>
+                                </td>
+                                <td>
+                                    <span class="fw-bold"><?= htmlspecialchars($peak['weekday_name']) ?></span>
+                                </td>
+                                <td>
+                                    <span class="badge badge-light-primary"><?= htmlspecialchars($peak['hour_label']) ?></span>
+                                </td>
+                                <td class="text-end">
+                                    <span class="fw-bold fs-6"><?= $peak['count'] ?></span>
+                                </td>
+                                <td>
+                                    <div class="progress h-20px">
+                                        <div class="progress-bar bg-<?= $badgeColor ?>" role="progressbar" 
+                                             style="width: <?= number_format($percentage, 1) ?>%"
+                                             aria-valuenow="<?= $peak['count'] ?>" 
+                                             aria-valuemin="0" 
+                                             aria-valuemax="<?= $maxPeakCount ?>">
+                                            <?= number_format($percentage, 0) ?>%
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!--end::Row-->
+<?php endif; ?>
 
 <?php include __DIR__ . '/../layouts/metronic/app.php'; ?>

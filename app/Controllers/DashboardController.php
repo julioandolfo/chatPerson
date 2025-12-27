@@ -53,6 +53,9 @@ class DashboardController
             // Atividade recente
             $recentActivity = \App\Services\DashboardService::getRecentActivity(10);
             
+            // Análise de dias e horas com mais conversas
+            $timeAnalysis = \App\Services\DashboardService::getConversationsByTimeAnalysis($dateFrom, $dateTo);
+            
             self::logDash("Passando dados para view");
             Response::view('dashboard/index', [
                 'stats' => $generalStats,
@@ -62,6 +65,7 @@ class DashboardController
                 'allAgentsMetrics' => $allAgentsMetrics,
                 'recentConversations' => $recentConversations,
                 'recentActivity' => $recentActivity,
+                'timeAnalysis' => $timeAnalysis,
                 'dateFrom' => $dateFrom,
                 'dateTo' => $dateTo
             ]);
@@ -86,8 +90,10 @@ class DashboardController
                 'departmentStats' => [],
                 'funnelStats' => [],
                 'topAgents' => [],
+                'allAgentsMetrics' => [],
                 'recentConversations' => [],
                 'recentActivity' => [],
+                'timeAnalysis' => ['by_weekday' => [], 'by_hour' => [], 'peak_times' => []],
                 'dateFrom' => $dateFrom,
                 'dateTo' => $dateTo
             ]);

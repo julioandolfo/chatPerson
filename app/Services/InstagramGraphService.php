@@ -65,6 +65,8 @@ class InstagramGraphService extends MetaIntegrationService
                 'followers_count' => $profileData['followers_count'] ?? 0,
                 'follows_count' => $profileData['follows_count'] ?? 0,
                 'media_count' => $profileData['media_count'] ?? 0,
+                'is_active' => true,
+                'is_connected' => true,
                 'last_synced_at' => date('Y-m-d H:i:s'),
             ];
             

@@ -273,19 +273,140 @@ class MetaOAuthController
         // Sincronizar dados baseado no tipo
         if ($type === 'instagram' || $type === 'both') {
             try {
-                $profile = InstagramGraphService::syncProfile($metaUserId, $tokenData['access_token']);
+                error_log("Meta OAuth - Iniciando sincronização Instagram para user: {$metaUserId}");
                 
-                // Criar/atualizar integration_account
-                $this->createOrUpdateIntegrationAccount('instagram', $profile, $tokenId);
+                // Para Instagram, precisamos buscar as páginas e então as contas Instagram
+                $instagramAccounts = $this->getInstagramAccounts($tokenData['access_token']);
+                
+                error_log("Meta OAuth - Encontradas " . count($instagramAccounts) . " conta(s) Instagram");
+                
+                foreach ($instagramAccounts as $account) {
+                    error_log("Meta OAuth - Sincronizando conta: " . ($account['username'] ?? 'unknown'));
+                    
+                    // Sincronizar perfil completo
+                    $profile = InstagramGraphService::syncProfile($account['id'], $tokenData['access_token']);
+                    
+                    // Criar/atualizar integration_account
+                    $this->createOrUpdateIntegrationAccount('instagram', $profile, $tokenId);
+                }
                 
             } catch (\Exception $e) {
                 // Log erro mas não falhar
-                error_log("Erro ao sincronizar Instagram: {$e->getMessage()}");
+                error_log("Meta OAuth - Erro ao sincronizar Instagram: {$e->getMessage()}");
+                error_log("Meta OAuth - Stack trace: " . $e->getTraceAsString());
             }
         }
         
         // Para WhatsApp, não podemos sincronizar automaticamente pois precisamos do phone_number_id
         // O usuário terá que configurar manualmente
+    }
+    
+    /**
+     * Obter contas Instagram conectadas
+     */
+    private function getInstagramAccounts(string $accessToken): array
+    {
+        $accounts = [];
+        
+        try {
+            // 1. Buscar páginas do Facebook conectadas
+            $pagesUrl = 'https://graph.facebook.com/v21.0/me/accounts';
+            $pagesParams = [
+                'fields' => 'id,name,access_token',
+                'access_token' => $accessToken,
+            ];
+            
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL => $pagesUrl . '?' . http_build_query($pagesParams),
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 30,
+            ]);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            if ($httpCode !== 200) {
+                error_log("Meta OAuth - Erro ao buscar páginas: HTTP {$httpCode}");
+                error_log("Meta OAuth - Response: {$response}");
+                return [];
+            }
+            
+            $pagesData = json_decode($response, true);
+            $pages = $pagesData['data'] ?? [];
+            
+            error_log("Meta OAuth - Encontradas " . count($pages) . " página(s) Facebook");
+            
+            // 2. Para cada página, buscar conta Instagram conectada
+            foreach ($pages as $page) {
+                $pageId = $page['id'];
+                $pageToken = $page['access_token'];
+                $pageName = $page['name'];
+                
+                error_log("Meta OAuth - Verificando página: {$pageName} (ID: {$pageId})");
+                
+                // Buscar Instagram Business Account vinculada à página
+                $instagramUrl = "https://graph.facebook.com/v21.0/{$pageId}";
+                $instagramParams = [
+                    'fields' => 'instagram_business_account',
+                    'access_token' => $pageToken,
+                ];
+                
+                $ch = curl_init();
+                curl_setopt_array($ch, [
+                    CURLOPT_URL => $instagramUrl . '?' . http_build_query($instagramParams),
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 30,
+                ]);
+                
+                $response = curl_exec($ch);
+                curl_close($ch);
+                
+                $pageData = json_decode($response, true);
+                
+                if (isset($pageData['instagram_business_account'])) {
+                    $igAccountId = $pageData['instagram_business_account']['id'];
+                    
+                    error_log("Meta OAuth - Conta Instagram encontrada: {$igAccountId}");
+                    
+                    // Buscar dados da conta Instagram
+                    $igProfileUrl = "https://graph.facebook.com/v21.0/{$igAccountId}";
+                    $igProfileParams = [
+                        'fields' => 'id,username,name,profile_picture_url,followers_count,follows_count,media_count,biography,website',
+                        'access_token' => $pageToken,
+                    ];
+                    
+                    $ch = curl_init();
+                    curl_setopt_array($ch, [
+                        CURLOPT_URL => $igProfileUrl . '?' . http_build_query($igProfileParams),
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_TIMEOUT => 30,
+                    ]);
+                    
+                    $response = curl_exec($ch);
+                    curl_close($ch);
+                    
+                    $igProfile = json_decode($response, true);
+                    
+                    if (isset($igProfile['id'])) {
+                        $igProfile['page_id'] = $pageId;
+                        $igProfile['page_access_token'] = $pageToken;
+                        $igProfile['instagram_user_id'] = $igProfile['id'];
+                        $accounts[] = $igProfile;
+                        
+                        error_log("Meta OAuth - Perfil Instagram carregado: @" . ($igProfile['username'] ?? 'unknown'));
+                    }
+                } else {
+                    error_log("Meta OAuth - Página {$pageName} não tem Instagram Business Account vinculado");
+                }
+            }
+            
+        } catch (\Exception $e) {
+            error_log("Meta OAuth - Erro ao buscar contas Instagram: {$e->getMessage()}");
+        }
+        
+        return $accounts;
     }
     
     /**
@@ -311,14 +432,22 @@ class MetaOAuthController
         $data = [
             'provider' => 'meta',
             'channel' => $channel,
-            'account_name' => $accountData['name'] ?? $accountData['username'] ?? 'Conta Meta',
-            'is_active' => true,
-            'status' => 'connected',
+            'name' => $accountData['name'] ?? $accountData['username'] ?? 'Conta Meta',
+            'status' => 'active',
         ];
         
         if ($channel === 'instagram') {
             $data['account_id'] = $accountData['instagram_user_id'] ?? null;
             $data['username'] = $accountData['username'] ?? null;
+            
+            // Salvar page_access_token e page_id para uso posterior
+            if (isset($accountData['page_access_token'])) {
+                $data['config'] = json_encode([
+                    'page_id' => $accountData['page_id'] ?? null,
+                    'page_access_token' => $accountData['page_access_token'],
+                    'instagram_user_id' => $accountData['instagram_user_id'],
+                ]);
+            }
         }
         
         if ($existingAccount) {

@@ -176,12 +176,18 @@ class MetaOAuthController
     {
         $url = 'https://graph.facebook.com/oauth/access_token';
         
+        // IMPORTANTE: Usar a MESMA URL gerada dinamicamente (igual na autorização)
+        $redirectUri = Url::fullUrl('/integrations/meta/oauth/callback');
+        
         $params = [
             'client_id' => self::$config['app_id'],
             'client_secret' => self::$config['app_secret'],
-            'redirect_uri' => self::$config['oauth']['redirect_uri'],
+            'redirect_uri' => $redirectUri,
             'code' => $code,
         ];
+        
+        error_log("Meta OAuth - Exchange Token - Redirect URI: {$redirectUri}");
+        error_log("Meta OAuth - Exchange Token - Request URL: " . $url . '?' . http_build_query($params));
         
         $ch = curl_init();
         curl_setopt_array($ch, [
@@ -194,8 +200,13 @@ class MetaOAuthController
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         
+        error_log("Meta OAuth - Exchange Token - HTTP Code: {$httpCode}");
+        error_log("Meta OAuth - Exchange Token - Response: " . substr($response, 0, 500));
+        
         if ($httpCode !== 200) {
-            throw new \Exception("Erro ao trocar code por token: HTTP {$httpCode}");
+            $errorData = json_decode($response, true);
+            $errorMessage = $errorData['error']['message'] ?? $response;
+            throw new \Exception("Erro ao trocar code por token: HTTP {$httpCode} - {$errorMessage}");
         }
         
         $data = json_decode($response, true);

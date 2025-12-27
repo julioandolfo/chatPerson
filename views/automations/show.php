@@ -996,9 +996,15 @@ function updateAccountOptions(channel) {
     
     let options = '<option value="">Todas as Contas</option>';
     
+    // 🔥 Para instagram_comment, usar contas de instagram
+    let effectiveChannel = channel;
+    if (channel === 'instagram_comment') {
+        effectiveChannel = 'instagram';
+    }
+    
     // Adicionar contas de integração do canal selecionado (já inclui legacy sem duplicatas)
-    if (channel && integrationAccountsByChannel[channel]) {
-        options += integrationAccountsByChannel[channel];
+    if (effectiveChannel && integrationAccountsByChannel[effectiveChannel]) {
+        options += integrationAccountsByChannel[effectiveChannel];
     } else if (!channel) {
         // Se nenhum canal selecionado, mostrar todas as contas
         Object.keys(integrationAccountsByChannel).forEach(ch => {

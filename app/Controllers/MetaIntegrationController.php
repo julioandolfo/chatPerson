@@ -64,28 +64,55 @@ class MetaIntegrationController
      */
     public function saveConfig(): void
     {
-        Permission::abortIfCannot('integrations.manage');
-        
-        $appId = Request::post('app_id');
-        $appSecret = Request::post('app_secret');
-        $webhookVerifyToken = Request::post('webhook_verify_token');
-        
-        if (empty($appId) || empty($appSecret) || empty($webhookVerifyToken)) {
-            Response::json([
-                'success' => false,
-                'error' => 'Todos os campos são obrigatórios'
-            ], 400);
-            return;
-        }
-        
         try {
+            Permission::abortIfCannot('integrations.manage');
+            
+            // Ler JSON do corpo da requisição
+            $jsonBody = file_get_contents('php://input');
+            $data = json_decode($jsonBody, true);
+            
+            error_log("Meta saveConfig - JSON recebido: " . $jsonBody);
+            
+            if (!$data || !is_array($data)) {
+                Response::json([
+                    'success' => false,
+                    'error' => 'Dados inválidos'
+                ], 400);
+                return;
+            }
+            
+            $appId = $data['app_id'] ?? null;
+            $appSecret = $data['app_secret'] ?? null;
+            $webhookVerifyToken = $data['webhook_verify_token'] ?? null;
+            
+            error_log("Meta saveConfig - app_id: " . ($appId ? 'OK' : 'VAZIO'));
+            error_log("Meta saveConfig - app_secret: " . ($appSecret ? 'OK' : 'VAZIO'));
+            error_log("Meta saveConfig - webhook_verify_token: " . ($webhookVerifyToken ? 'OK' : 'VAZIO'));
+            
+            if (empty($appId) || empty($appSecret) || empty($webhookVerifyToken)) {
+                Response::json([
+                    'success' => false,
+                    'error' => 'Todos os campos são obrigatórios'
+                ], 400);
+                return;
+            }
+            
             // Salvar em arquivo JSON para não expor no código
             $configFile = __DIR__ . '/../../storage/config/meta.json';
             $configDir = dirname($configFile);
             
+            error_log("Meta saveConfig - configDir: {$configDir}");
+            error_log("Meta saveConfig - configFile: {$configFile}");
+            
             // Criar diretório se não existir
             if (!is_dir($configDir)) {
-                mkdir($configDir, 0755, true);
+                error_log("Meta saveConfig - Criando diretório: {$configDir}");
+                $created = mkdir($configDir, 0755, true);
+                error_log("Meta saveConfig - Diretório criado: " . ($created ? 'SIM' : 'NÃO'));
+                
+                if (!$created) {
+                    throw new \Exception("Erro ao criar diretório: {$configDir}");
+                }
             }
             
             $config = [
@@ -95,14 +122,21 @@ class MetaIntegrationController
                 'updated_at' => date('Y-m-d H:i:s'),
             ];
             
+            error_log("Meta saveConfig - Salvando arquivo...");
             $result = file_put_contents($configFile, json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
             
             if ($result === false) {
-                throw new \Exception('Erro ao salvar arquivo de configuração');
+                $error = error_get_last();
+                error_log("Meta saveConfig - ERRO file_put_contents: " . json_encode($error));
+                throw new \Exception('Erro ao salvar arquivo de configuração: ' . ($error['message'] ?? 'Desconhecido'));
             }
             
+            error_log("Meta saveConfig - Arquivo salvo com sucesso ({$result} bytes)");
+            
             // Proteger o arquivo
-            chmod($configFile, 0600);
+            if (file_exists($configFile)) {
+                @chmod($configFile, 0600);
+            }
             
             Response::json([
                 'success' => true,
@@ -110,6 +144,8 @@ class MetaIntegrationController
             ]);
             
         } catch (\Exception $e) {
+            error_log("Meta saveConfig - EXCEPTION: " . $e->getMessage());
+            error_log("Meta saveConfig - TRACE: " . $e->getTraceAsString());
             Response::json([
                 'success' => false,
                 'error' => $e->getMessage()

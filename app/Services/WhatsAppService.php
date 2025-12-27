@@ -2108,21 +2108,19 @@ class WhatsAppService
             // Se ainda não existir, criar (usar transação se lock ativo, senão criar direto)
             if (!$conversation) {
                 // Trava: não criar conversa se a primeira mensagem for exatamente o nome do contato (caso sem mídia)
-                if (
-                    $messageType === 'text' &&
-                    empty($mediaUrl)
-                ) {
-                    $normalizedMessage = mb_strtolower(trim(preg_replace('/\s+/', ' ', (string)$message)));
-                    $normalizedContactName = mb_strtolower(trim(preg_replace('/\s+/', ' ', (string)($contact['name'] ?? ''))));
-                    if (!empty($normalizedMessage) && $normalizedMessage === $normalizedContactName) {
-                        Logger::quepasa("processWebhook - Ignorando criação de conversa: primeira mensagem igual ao nome do contato ({$normalizedContactName})");
-                        if ($usedLock && $db->inTransaction()) {
-                            $db->rollBack();
-                        }
-                        return;
+                $shouldIgnoreFirstMessage = $messageType === 'text'
+                    && empty($mediaUrl)
+                    && \App\Services\ConversationService::isFirstMessageContactName((string)$message, $contact['name'] ?? null);
+
+                if ($shouldIgnoreFirstMessage) {
+                    $contactName = trim((string)($contact['name'] ?? ''));
+                    Logger::quepasa("processWebhook - Ignorando criação de conversa: primeira mensagem igual ao nome do contato ({$contactName})");
+                    if ($usedLock && $db->inTransaction()) {
+                        $db->rollBack();
                     }
+                    return;
                 }
-                
+
                 $logMessage = $shouldReopenAsNew 
                     ? "processWebhook - Criando NOVA conversa (reabertura após período de graça)..."
                     : "processWebhook - Conversa não encontrada, criando nova...";
@@ -2175,17 +2173,15 @@ class WhatsAppService
             }
 
             // Trava: não criar conversa se a primeira mensagem for exatamente o nome do contato (caso sem mídia)
-            if (
-                !$conversation &&
-                $messageType === 'text' &&
-                empty($mediaUrl)
-            ) {
-                $normalizedMessage = mb_strtolower(trim(preg_replace('/\s+/', ' ', (string)$message)));
-                $normalizedContactName = mb_strtolower(trim(preg_replace('/\s+/', ' ', (string)($contact['name'] ?? ''))));
-                if (!empty($normalizedMessage) && $normalizedMessage === $normalizedContactName) {
-                    Logger::quepasa("processWebhook - Ignorando criação de conversa: primeira mensagem igual ao nome do contato ({$normalizedContactName})");
-                    return;
-                }
+            $shouldIgnoreFirstMessage = !$conversation
+                && $messageType === 'text'
+                && empty($mediaUrl)
+                && \App\Services\ConversationService::isFirstMessageContactName((string)$message, $contact['name'] ?? null);
+
+            if ($shouldIgnoreFirstMessage) {
+                $contactName = trim((string)($contact['name'] ?? ''));
+                Logger::quepasa("processWebhook - Ignorando criação de conversa: primeira mensagem igual ao nome do contato ({$contactName})");
+                return;
             }
             
             // Verificar se conversa está fechada/resolvida e se deve reabrir

@@ -463,6 +463,20 @@ class WhatsAppCloudService extends MetaIntegrationService
             ['channel', '=', 'whatsapp'],
             ['status', '!=', 'closed']
         ]);
+
+        // Trava: não criar conversa se a primeira mensagem for exatamente o nome do contato (caso sem mídia)
+        if (
+            !$conversation &&
+            $type === 'text' &&
+            empty($mediaUrl) &&
+            ConversationService::isFirstMessageContactName($content, $contact['name'] ?? null)
+        ) {
+            self::logInfo("Ignorando criação de conversa: primeira mensagem igual ao nome do contato", [
+                'contact_id' => $contact['id'],
+                'contact_name' => $contact['name'] ?? null,
+            ]);
+            return;
+        }
         
         if (!$conversation) {
             $conversationData = [

@@ -814,50 +814,92 @@ ob_start();
                                 $avgFirstResponseSeconds = $agent['avg_first_response_seconds'] ?? 0;
                                 $avgFirstResponseMinutes = $agent['avg_first_response_minutes'] ?? 0;
                                 $firstRespWithinSla = $agent['first_response_within_sla'] ?? 0;
+                                $firstRespOutsideSla = ($agent['total_conversations'] ?? 0) - $firstRespWithinSla;
                                 
                                 // Definir status SLA 1ª Resposta
                                 if ($agent['total_conversations'] == 0) {
                                     $sla1Status = 'secondary';
-                                    $sla1Text = 'N/A';
+                                    $sla1Icon = 'minus-circle';
+                                    $sla1Label = 'N/A';
                                 } elseif ($slaFirstRespRate >= 80) {
                                     $sla1Status = 'success';
-                                    $sla1Text = number_format($slaFirstRespRate, 0) . '%';
+                                    $sla1Icon = 'check-circle';
+                                    $sla1Label = 'Excelente';
                                 } elseif ($slaFirstRespRate >= 50) {
                                     $sla1Status = 'warning';
-                                    $sla1Text = number_format($slaFirstRespRate, 0) . '%';
+                                    $sla1Icon = 'information-circle';
+                                    $sla1Label = 'Regular';
                                 } else {
                                     $sla1Status = 'danger';
-                                    $sla1Text = number_format($slaFirstRespRate, 0) . '%';
+                                    $sla1Icon = 'cross-circle';
+                                    $sla1Label = 'Crítico';
                                 }
+                                
+                                $isFirstRespOnTime = $avgFirstResponseMinutes <= $slaFirstRespMinutes;
                                 ?>
                                 <div class="mb-3">
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <span class="text-muted fs-7">SLA 1ª Resposta (<?= $slaFirstRespMinutes ?>min)</span>
-                                        <span class="badge badge-light-<?= $sla1Status ?>"><?= $sla1Text ?></span>
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <span class="text-muted fs-7 fw-bold">SLA 1ª Resposta (Meta: <?= $slaFirstRespMinutes ?>min)</span>
                                     </div>
                                     <?php if ($agent['total_conversations'] > 0): ?>
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <span class="text-muted fs-8">Tempo Médio:</span>
-                                        <span class="fw-bold fs-8 <?= $avgFirstResponseMinutes <= $slaFirstRespMinutes ? 'text-success' : 'text-danger' ?>">
+                                    <div class="d-flex align-items-center justify-content-between mb-2 p-3 bg-light-<?= $sla1Status ?> rounded">
+                                        <div class="d-flex align-items-center">
+                                            <i class="ki-duotone ki-<?= $sla1Icon ?> fs-2x text-<?= $sla1Status ?> me-3">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                            </i>
+                                            <div>
+                                                <div class="fs-2 fw-bold text-<?= $sla1Status ?>"><?= number_format($slaFirstRespRate, 0) ?>%</div>
+                                                <div class="fs-8 text-muted"><?= $sla1Label ?></div>
+                                            </div>
+                                        </div>
+                                        <div class="text-end">
+                                            <div class="fs-6 fw-bold text-gray-800">
+                                                <span class="text-success"><?= $firstRespWithinSla ?></span>
+                                                <span class="text-muted">/</span>
+                                                <span class="text-gray-600"><?= $agent['total_conversations'] ?></span>
+                                            </div>
+                                            <div class="fs-8 text-muted">no prazo</div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="text-muted fs-8">Tempo médio:</span>
+                                        <span class="fw-bold fs-7 <?= $isFirstRespOnTime ? 'text-success' : 'text-danger' ?>">
                                             <?php
                                             if ($avgFirstResponseSeconds > 0) {
                                                 if ($avgFirstResponseSeconds < 60) {
                                                     echo number_format($avgFirstResponseSeconds, 0) . 's';
-                                                } else {
+                                                } elseif ($avgFirstResponseMinutes < 60) {
                                                     echo number_format($avgFirstResponseMinutes, 1) . 'min';
+                                                } else {
+                                                    echo number_format($avgFirstResponseMinutes / 60, 1) . 'h';
                                                 }
+                                                echo $isFirstRespOnTime ? ' ✓' : ' ✗';
                                             } else {
                                                 echo '-';
                                             }
                                             ?>
                                         </span>
                                     </div>
-                                    <div class="progress h-6px">
-                                        <div class="progress-bar bg-<?= $sla1Status ?>" role="progressbar" 
-                                             style="width: <?= min(100, $slaFirstRespRate) ?>%" 
-                                             title="<?= $firstRespWithinSla ?> de <?= $agent['total_conversations'] ?> dentro do SLA"></div>
+                                    <?php if ($firstRespOutsideSla > 0): ?>
+                                    <div class="alert alert-warning d-flex align-items-center p-2 mt-2 mb-0">
+                                        <i class="ki-duotone ki-information fs-2x text-warning me-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        <span class="fs-8 fw-semibold"><?= $firstRespOutsideSla ?> conversa<?= $firstRespOutsideSla > 1 ? 's' : '' ?> fora do SLA</span>
                                     </div>
-                                    <div class="text-muted fs-9 mt-1"><?= $firstRespWithinSla ?>/<?= $agent['total_conversations'] ?> conversas no SLA</div>
+                                    <?php endif; ?>
+                                    <?php else: ?>
+                                    <div class="text-center text-muted fs-7 py-3">
+                                        <i class="ki-duotone ki-information-2 fs-2x mb-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        <div>Sem dados no período</div>
+                                    </div>
                                     <?php endif; ?>
                                 </div>
                                 
@@ -870,50 +912,92 @@ ob_start();
                                 $avgResponseMinutes = $agent['avg_response_minutes'] ?? 0;
                                 $totalResponses = $agent['total_responses'] ?? 0;
                                 $responsesWithinSla = $agent['responses_within_sla'] ?? 0;
+                                $responsesOutsideSla = $totalResponses - $responsesWithinSla;
                                 
                                 // Definir status SLA Respostas
                                 if ($totalResponses == 0) {
                                     $sla2Status = 'secondary';
-                                    $sla2Text = 'N/A';
+                                    $sla2Icon = 'minus-circle';
+                                    $sla2Label = 'N/A';
                                 } elseif ($slaRespRate >= 80) {
                                     $sla2Status = 'success';
-                                    $sla2Text = number_format($slaRespRate, 0) . '%';
+                                    $sla2Icon = 'check-circle';
+                                    $sla2Label = 'Excelente';
                                 } elseif ($slaRespRate >= 50) {
                                     $sla2Status = 'warning';
-                                    $sla2Text = number_format($slaRespRate, 0) . '%';
+                                    $sla2Icon = 'information-circle';
+                                    $sla2Label = 'Regular';
                                 } else {
                                     $sla2Status = 'danger';
-                                    $sla2Text = number_format($slaRespRate, 0) . '%';
+                                    $sla2Icon = 'cross-circle';
+                                    $sla2Label = 'Crítico';
                                 }
+                                
+                                $isRespOnTime = $avgResponseMinutes <= $slaRespMinutes;
                                 ?>
                                 <div class="mb-2">
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <span class="text-muted fs-7">SLA Respostas (<?= $slaRespMinutes ?>min)</span>
-                                        <span class="badge badge-light-<?= $sla2Status ?>"><?= $sla2Text ?></span>
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <span class="text-muted fs-7 fw-bold">SLA Respostas (Meta: <?= $slaRespMinutes ?>min)</span>
                                     </div>
                                     <?php if ($totalResponses > 0): ?>
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <span class="text-muted fs-8">Tempo Médio:</span>
-                                        <span class="fw-bold fs-8 <?= $avgResponseMinutes <= $slaRespMinutes ? 'text-success' : 'text-danger' ?>">
+                                    <div class="d-flex align-items-center justify-content-between mb-2 p-3 bg-light-<?= $sla2Status ?> rounded">
+                                        <div class="d-flex align-items-center">
+                                            <i class="ki-duotone ki-<?= $sla2Icon ?> fs-2x text-<?= $sla2Status ?> me-3">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                            </i>
+                                            <div>
+                                                <div class="fs-2 fw-bold text-<?= $sla2Status ?>"><?= number_format($slaRespRate, 0) ?>%</div>
+                                                <div class="fs-8 text-muted"><?= $sla2Label ?></div>
+                                            </div>
+                                        </div>
+                                        <div class="text-end">
+                                            <div class="fs-6 fw-bold text-gray-800">
+                                                <span class="text-success"><?= $responsesWithinSla ?></span>
+                                                <span class="text-muted">/</span>
+                                                <span class="text-gray-600"><?= $totalResponses ?></span>
+                                            </div>
+                                            <div class="fs-8 text-muted">no prazo</div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="text-muted fs-8">Tempo médio:</span>
+                                        <span class="fw-bold fs-7 <?= $isRespOnTime ? 'text-success' : 'text-danger' ?>">
                                             <?php
                                             if ($avgResponseSeconds > 0) {
                                                 if ($avgResponseSeconds < 60) {
                                                     echo number_format($avgResponseSeconds, 0) . 's';
-                                                } else {
+                                                } elseif ($avgResponseMinutes < 60) {
                                                     echo number_format($avgResponseMinutes, 1) . 'min';
+                                                } else {
+                                                    echo number_format($avgResponseMinutes / 60, 1) . 'h';
                                                 }
+                                                echo $isRespOnTime ? ' ✓' : ' ✗';
                                             } else {
                                                 echo '-';
                                             }
                                             ?>
                                         </span>
                                     </div>
-                                    <div class="progress h-6px">
-                                        <div class="progress-bar bg-<?= $sla2Status ?>" role="progressbar" 
-                                             style="width: <?= min(100, $slaRespRate) ?>%" 
-                                             title="<?= $responsesWithinSla ?> de <?= $totalResponses ?> respostas dentro do SLA"></div>
+                                    <?php if ($responsesOutsideSla > 0): ?>
+                                    <div class="alert alert-warning d-flex align-items-center p-2 mt-2 mb-0">
+                                        <i class="ki-duotone ki-information fs-2x text-warning me-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        <span class="fs-8 fw-semibold"><?= $responsesOutsideSla ?> resposta<?= $responsesOutsideSla > 1 ? 's' : '' ?> fora do SLA</span>
                                     </div>
-                                    <div class="text-muted fs-9 mt-1"><?= $responsesWithinSla ?>/<?= $totalResponses ?> respostas no SLA</div>
+                                    <?php endif; ?>
+                                    <?php else: ?>
+                                    <div class="text-center text-muted fs-7 py-3">
+                                        <i class="ki-duotone ki-information-2 fs-2x mb-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        <div>Sem respostas no período</div>
+                                    </div>
                                     <?php endif; ?>
                                 </div>
                             </div>

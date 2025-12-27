@@ -269,6 +269,19 @@ class InstagramGraphService extends MetaIntegrationService
             ['channel', '=', 'instagram'],
             ['status', '!=', 'closed']
         ]);
+
+        // Trava: não criar conversa se a primeira mensagem for exatamente o nome do contato
+        if (
+            !$conversation &&
+            $text !== '' &&
+            ConversationService::isFirstMessageContactName($text, $contact['name'] ?? null)
+        ) {
+            self::logInfo("Ignorando criação de conversa: primeira mensagem igual ao nome do contato", [
+                'contact_id' => $contact['id'],
+                'contact_name' => $contact['name'] ?? null,
+            ]);
+            return;
+        }
         
         if (!$conversation) {
             $conversationData = [

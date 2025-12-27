@@ -315,6 +315,18 @@ class ConversationService
     }
 
     /**
+     * Verifica se uma mensagem de texto é apenas o nome do contato.
+     * Usado para evitar abrir conversas iniciadas apenas com o nome.
+     */
+    public static function isFirstMessageContactName(?string $message, ?string $contactName): bool
+    {
+        $normalizedMessage = mb_strtolower(trim(preg_replace('/\s+/', ' ', (string)$message)));
+        $normalizedContactName = mb_strtolower(trim(preg_replace('/\s+/', ' ', (string)$contactName)));
+
+        return $normalizedMessage !== '' && $normalizedMessage === $normalizedContactName;
+    }
+
+    /**
      * Listar conversas com filtros
      */
     public static function list(array $filters = [], int $userId = null): array

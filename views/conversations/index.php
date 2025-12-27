@@ -6,8 +6,8 @@ $logFile = __DIR__ . '/../../storage/logs/conversas_bug.log';
 $layout = 'layouts.metronic.app';
 $title = 'Conversas';
 $pageTitle = 'Conversas';
-$hidePageTitle = true; // N├úo mostrar t├¡tulo padr├úo, vamos usar layout customizado
-$hideRightSidebar = true; // Esconder sidebar padr├úo do Metronic (vamos usar nosso pr├│prio)
+$hidePageTitle = true; // Não mostrar título padrão, vamos usar layout customizado
+$hideRightSidebar = true; // Esconder sidebar padrão do Metronic (vamos usar nosso próprio)
 
 /**
  * Renderizar anexo
@@ -15,11 +15,11 @@ $hideRightSidebar = true; // Esconder sidebar padr├úo do Metronic (vamos usar
 function renderAttachment($attachment) {
     $type = $attachment['type'] ?? 'document';
     
-    // Renderizar localiza├º├úo
+    // Renderizar localização
     if ($type === 'location' && isset($attachment['latitude']) && isset($attachment['longitude'])) {
         $lat = $attachment['latitude'];
         $lng = $attachment['longitude'];
-        $name = htmlspecialchars($attachment['name'] ?? 'Localiza├º├úo');
+        $name = htmlspecialchars($attachment['name'] ?? 'Localização');
         $address = htmlspecialchars($attachment['address'] ?? '');
         $mapsUrl = "https://www.google.com/maps?q={$lat},{$lng}";
         
@@ -45,7 +45,7 @@ function renderAttachment($attachment) {
         return $html;
     }
     
-    // Ô£à CORRIGIDO: Usar campo 'url' se dispon├¡vel, sen├úo construir a partir de 'path'
+    // ✓ CORRIGIDO: Usar campo 'url' se disponível, senão construir a partir de 'path'
     $url = !empty($attachment['url']) 
         ? $attachment['url'] 
         : \App\Helpers\Url::to('/' . ltrim($attachment['path'] ?? '', '/'));
@@ -68,11 +68,11 @@ function renderAttachment($attachment) {
         $html .= '</div>';
         $html .= '<video controls style="max-width: 300px; max-height: 200px; border-radius: 8px; display: none;" preload="none">';
         $html .= '<source src="" type="' . ($attachment['mime_type'] ?? $attachment['mimetype'] ?? 'video/mp4') . '">';
-        $html .= 'Seu navegador n├úo suporta v├¡deo.';
+        $html .= 'Seu navegador não suporta vídeo.';
         $html .= '</video>';
         $html .= '</div>';
     } elseif ($type === 'audio') {
-        // Player de ├íudio estilo WhatsApp com largura adequada
+        // Player de íudio estilo WhatsApp com largura adequada
         $html .= '<div class="attachment audio-attachment">';
         $html .= '<div class="d-flex align-items-center gap-2">';
         $html .= '<div class="me-1" style="flex-shrink: 0;">';
@@ -84,33 +84,33 @@ function renderAttachment($attachment) {
         $html .= '<div class="flex-grow-1" style="min-width: 300px;">';
         $html .= '<audio controls style="width: 100%; outline: none;">';
         $html .= '<source src="' . $url . '" type="' . ($attachment['mime_type'] ?? $attachment['mimetype'] ?? 'audio/webm') . '">';
-        $html .= 'Seu navegador n├úo suporta ├íudio.';
+        $html .= 'Seu navegador não suporta íudio.';
         $html .= '</audio>';
         
-        // Ô£à NOVO: Exibir transcri├º├úo/texto original se dispon├¡vel e configurado
+        // ✓ NOVO: Exibir transcrição/texto original se disponível e configurado
         $settings = \App\Services\ConversationSettingsService::getSettings();
         $showTranscription = $settings['audio_transcription']['show_transcription_in_chat'] ?? true;
         
         if ($showTranscription) {
-            // Verificar se ├® ├íudio TTS (tem texto original) ou ├íudio transcrito
+            // Verificar se ê íudio TTS (tem texto original) ou íudio transcrito
             $ttsOriginalText = $attachment['tts_original_text'] ?? null;
             $transcription = $attachment['transcription'] ?? null;
             
             if ($ttsOriginalText) {
-                // ├üudio gerado pela IA - exibir texto original
+                // üudio gerado pela IA - exibir texto original
                 $html .= '<div class="audio-transcription mt-2" style="padding: 8px; background: rgba(52, 211, 153, 0.1); border-radius: 6px; border-left: 3px solid #34d399;">';
                 $html .= '<div class="d-flex align-items-center gap-1 mb-1">';
                 $html .= '<i class="ki-duotone ki-message-text-2 fs-7 text-success"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>';
-                $html .= '<span class="text-success fs-8 fw-semibold">Conte├║do do ├íudio:</span>';
+                $html .= '<span class="text-success fs-8 fw-semibold">Conteúdo do íudio:</span>';
                 $html .= '</div>';
                 $html .= '<div class="fs-7" style="color: rgba(0,0,0,0.7);">' . nl2br(htmlspecialchars($ttsOriginalText)) . '</div>';
                 $html .= '</div>';
             } elseif ($transcription && !empty($transcription['text'])) {
-                // ├üudio do cliente - exibir transcri├º├úo
+                // üudio do cliente - exibir transcrição
                 $html .= '<div class="audio-transcription mt-2" style="padding: 8px; background: rgba(0,0,0,0.05); border-radius: 6px; border-left: 3px solid #3b82f6;">';
                 $html .= '<div class="d-flex align-items-center gap-1 mb-1">';
                 $html .= '<i class="ki-duotone ki-text fs-7 text-muted"><span class="path1"></span><span class="path2"></span></i>';
-                $html .= '<span class="text-muted fs-8 fw-semibold">Transcri├º├úo:</span>';
+                $html .= '<span class="text-muted fs-8 fw-semibold">Transcrição:</span>';
                 $html .= '</div>';
                 $html .= '<div class="fs-7" style="color: rgba(0,0,0,0.7);">' . nl2br(htmlspecialchars($transcription['text'])) . '</div>';
                 $html .= '</div>';
@@ -124,7 +124,7 @@ function renderAttachment($attachment) {
         // Para documentos, usar URL direta se o arquivo estiver em assets/
         $attachmentPath = $attachment['path'] ?? '';
         if (strpos($attachmentPath, 'assets/') === 0) {
-            // Caminho direto para arquivo p├║blico
+            // Caminho direto para arquivo público
             $downloadUrl = \App\Helpers\Url::to('/' . $attachmentPath);
         } else {
             // Rota de download para arquivos fora de assets/
@@ -155,7 +155,7 @@ function renderAttachment($attachment) {
 }
 
 /**
- * Formatar data para exibi├º├úo (HOJE, ONTEM, ou data formatada)
+ * Formatar data para exibição (HOJE, ONTEM, ou data formatada)
  */
 function formatDateLabel($dateString) {
     $date = new DateTime($dateString);
@@ -173,7 +173,7 @@ function formatDateLabel($dateString) {
     } else {
         // Formato: "DIA X" (ex: "15 de Janeiro de 2025")
         $months = [
-            1 => 'Janeiro', 2 => 'Fevereiro', 3 => 'Mar├ºo', 4 => 'Abril',
+            1 => 'Janeiro', 2 => 'Fevereiro', 3 => 'Março', 4 => 'Abril',
             5 => 'Maio', 6 => 'Junho', 7 => 'Julho', 8 => 'Agosto',
             9 => 'Setembro', 10 => 'Outubro', 11 => 'Novembro', 12 => 'Dezembro'
         ];
@@ -186,7 +186,7 @@ function formatDateLabel($dateString) {
 }
 
 /**
- * Verificar se duas datas s├úo de dias diferentes
+ * Verificar se duas datas são de dias diferentes
  */
 function isDifferentDay($date1, $date2) {
     if (empty($date1) || empty($date2)) {
@@ -212,7 +212,7 @@ function renderDateSeparator($dateString) {
 }
 
 /**
- * Obter ├¡cone SVG oficial do canal
+ * Obter ícone SVG oficial do canal
  */
 function getChannelIconSvg($channel, $size = 16) {
     $icons = [
@@ -279,7 +279,7 @@ function renderMessageStatus($msg) {
         </span>';
     }
     
-    // Enviado (padr├úo)
+    // Enviado (padrão)
     return '<span class="message-status" title="Enviado">
         <i class="ki-duotone ki-check fs-6 text-white">
             <span class="path1"></span>
@@ -300,7 +300,7 @@ ob_start();
     z-index: 1200 !important;
 }
 
-/* Cabe├ºalho de M├®tricas */
+/* Cabeçalho de Mêtricas */
 .conversations-metrics-header {
     padding: 15px 20px;
     background: var(--bs-body-bg);
@@ -338,17 +338,17 @@ ob_start();
 .conversations-layout {
     display: flex;
     flex-direction: row;
-    height: calc(100vh - 180px); /* Ajustado para incluir o cabe├ºalho de m├®tricas */
+    height: calc(100vh - 180px); /* Ajustado para incluir o cabeçalho de mêtricas */
     overflow: hidden;
     margin: 0;
-    padding: 0 20px 0 0; /* Padding ├á direita para respiro */
+    padding: 0 20px 0 0; /* Padding á direita para respiro */
     position: relative;
-    z-index: 1; /* Z-index baixo para n├úo sobrepor o header */
-    width: 100%; /* 100% da largura dispon├¡vel */
+    z-index: 1; /* Z-index baixo para não sobrepor o header */
+    width: 100%; /* 100% da largura disponível */
     box-sizing: border-box; /* Inclui padding na largura */
 }
 
-/* For├ºar o container pai a ocupar toda largura - Remove padding do sidebar do Metronic */
+/* Forçar o container pai a ocupar toda largura - Remove padding do sidebar do Metronic */
 .sidebar-enabled .wrapper {
     padding-right: 0 !important;
 }
@@ -391,7 +391,7 @@ ob_start();
 .conversations-list-items {
     flex: 1;
     overflow-y: auto;
-    overflow-x: visible; /* Permitir que dropdowns n├úo sejam cortados */
+    overflow-x: visible; /* Permitir que dropdowns não sejam cortados */
 }
 
 .conversation-item {
@@ -400,7 +400,7 @@ ob_start();
     cursor: pointer;
     transition: background 0.15s ease;
     position: relative;
-    overflow: visible; /* Permitir que dropdown apare├ºa completamente */
+    overflow: visible; /* Permitir que dropdown apareça completamente */
 }
 
 .conversation-item:hover {
@@ -465,14 +465,14 @@ ob_start();
     flex-shrink: 0;
 }
 
-/* Dropdown de a├º├Áes - melhor visibilidade e overflow */
+/* Dropdown de açÁes - melhor visibilidade e overflow */
 .conversation-item-actions {
     position: relative;
     z-index: 10;
-    display: inline-block; /* Garantir que dropdown seja posicionado em rela├º├úo ao bot├úo */
+    display: inline-block; /* Garantir que dropdown seja posicionado em relação ao botão */
 }
 
-/* Quando dropdown est├í aberto, aumentar z-index do item da conversa */
+/* Quando dropdown estí aberto, aumentar z-index do item da conversa */
 .conversation-item:has(.conversation-item-actions .dropdown-menu.show) {
     z-index: 1000 !important;
     position: relative;
@@ -563,24 +563,24 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     border-color: var(--bs-gray-700) !important;
 }
 
-/* Garantir que o dropdown n├úo seja cortado pela altura da linha */
+/* Garantir que o dropdown não seja cortado pela altura da linha */
 .conversation-item {
     overflow: visible !important;
 }
 
-/* Garantir que o dropdown apare├ºa acima de outros elementos */
+/* Garantir que o dropdown apareça acima de outros elementos */
 .conversation-item-actions.show .dropdown-menu {
     display: block !important;
 }
 
-/* Garantir que o container da lista n├úo corte o dropdown */
+/* Garantir que o container da lista não corte o dropdown */
 .conversations-list-items {
     overflow-y: auto;
     overflow-x: visible;
     position: relative;
 }
 
-/* Garantir que o dropdown apare├ºa acima de outros itens */
+/* Garantir que o dropdown apareça acima de outros itens */
 .conversation-item-actions {
     position: relative;
     z-index: 10;
@@ -621,7 +621,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     gap: 8px;
     flex-wrap: wrap;
     position: relative;
-    padding-right: 30px; /* Espa├ºo para o badge */
+    padding-right: 30px; /* Espaço para o badge */
 }
 
 .conversation-item-channel {
@@ -653,7 +653,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
-/* Coluna 2: ├ürea de Chat */
+/* Coluna 2: ürea de Chat */
 .chat-area {
     flex: 1 1 auto;
     min-width: 0; /* Permite que o flex shrink funcione */
@@ -703,7 +703,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     max-width: 100%;
 }
 
-/* Quando acesso ├® restrito, bloquear scroll completamente */
+/* Quando acesso ê restrito, bloquear scroll completamente */
 .chat-messages.access-restricted {
     overflow: hidden !important;
 }
@@ -883,7 +883,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     box-sizing: border-box;
 }
 
-/* Permitir que ├íudios sejam mais largos */
+/* Permitir que íudios sejam mais largos */
 .chat-message .message-content:has(.audio-only),
 .chat-message .message-content:has(.audio-attachment) {
     max-width: calc(100% - 20px) !important;
@@ -892,7 +892,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     box-sizing: border-box;
 }
 
-/* For├ºar attachment-item a n├úo limitar largura */
+/* Forçar attachment-item a não limitar largura */
 .audio-only .attachment-item,
 .message-bubble .attachment-item:has(.audio-attachment) {
     max-width: none !important;
@@ -907,7 +907,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     word-wrap: break-word;
 }
 
-/* Reduzir padding quando cont├®m apenas ├íudio (manter background da bolha) */
+/* Reduzir padding quando contêm apenas íudio (manter background da bolha) */
 .message-bubble.audio-only {
     padding: 8px !important;
     line-height: 1 !important;
@@ -917,7 +917,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     margin: 0;
 }
 
-/* Player de ├íudio deve herdar cor de fundo da bolha */
+/* Player de íudio deve herdar cor de fundo da bolha */
 .chat-message.outgoing .audio-attachment > div {
     background: rgba(255, 255, 255, 0.15) !important;
 }
@@ -926,7 +926,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     background: var(--bs-gray-100) !important;
 }
 
-/* Garantir que bot├Áes de a├º├úo apare├ºam sobre o player de ├íudio */
+/* Garantir que botÁes de ação apareçam sobre o player de íudio */
 .message-content:has(.audio-attachment) {
     position: relative;
 }
@@ -1103,7 +1103,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     border-left-color: #818cf8;
 }
 
-/* Player de ├íudio - layout unificado */
+/* Player de íudio - layout unificado */
 .audio-attachment {
     max-width: none !important;
     min-width: 380px !important;
@@ -1173,7 +1173,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     display: none !important;
 }
 
-/* Garantir que o ├¡cone n├úo aumente a altura */
+/* Garantir que o ícone não aumente a altura */
 .audio-attachment i {
     line-height: 1;
     display: flex;
@@ -1322,7 +1322,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     color: var(--bs-text-muted);
 }
 
-/* Bot├úo de Reply */
+/* Botão de Reply */
 .message-actions {
     position: absolute;
     top: 4px;
@@ -1431,7 +1431,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     border: 1px dashed var(--bs-border-color);
 }
 
-/* Nota Interna - Alinhada ├á direita como mensagens enviadas */
+/* Nota Interna - Alinhada á direita como mensagens enviadas */
 .chat-message.note {
     justify-content: flex-end;
 }
@@ -1441,7 +1441,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
 }
 
 .chat-message.note .message-bubble {
-    background: rgba(255, 193, 7, 0.15); /* Amarelo transl├║cido */
+    background: rgba(255, 193, 7, 0.15); /* Amarelo translúcido */
     border: 1px solid rgba(255, 193, 7, 0.4);
     border-right: 3px solid #ffc107;
     color: var(--bs-text-dark);
@@ -1495,7 +1495,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     border-color: var(--bs-primary);
 }
 
-/* Seletor r├ípido de templates */
+/* Seletor rípido de templates */
 .template-quick-select {
     position: absolute;
     bottom: 100%;
@@ -1613,7 +1613,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
    RESPONSIVIDADE MOBILE
    ============================================================================ */
 
-/* Mobile: Layout vertical com navega├º├úo entre views */
+/* Mobile: Layout vertical com navegação entre views */
 @media (max-width: 767px) {
     /* Layout principal - vertical em mobile */
     .conversations-layout {
@@ -1625,7 +1625,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
         overflow: hidden;
     }
     
-    /* Sistema de views - apenas uma vis├¡vel por vez */
+    /* Sistema de views - apenas uma visível por vez */
     .conversations-list,
     .chat-area,
     .conversation-sidebar {
@@ -1649,7 +1649,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
         opacity: 1;
     }
     
-    /* Views inativas - escondidas ├á esquerda ou direita */
+    /* Views inativas - escondidas á esquerda ou direita */
     .conversations-list:not(.mobile-active) {
         transform: translateX(-100%);
         opacity: 0;
@@ -1668,7 +1668,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
         pointer-events: none;
     }
     
-    /* Cabe├ºalho de m├®tricas - mobile */
+    /* Cabeçalho de mêtricas - mobile */
     .conversations-metrics-header {
         padding: 10px 15px;
         flex-direction: column;
@@ -1719,7 +1719,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
         -webkit-overflow-scrolling: touch;
     }
     
-    /* ├ürea de chat - full width em mobile */
+    /* ürea de chat - full width em mobile */
     .chat-area {
         width: 100%;
         max-width: 100%;
@@ -1740,7 +1740,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
         min-width: 0;
     }
     
-    /* Bot├úo voltar no header do chat (mobile) */
+    /* Botão voltar no header do chat (mobile) */
     .chat-header-back-btn {
         display: flex !important;
         margin-right: 10px;
@@ -1751,7 +1751,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
         display: none !important;
     }
     
-    /* Bot├Áes do header - ajustar tamanho */
+    /* BotÁes do header - ajustar tamanho */
     .chat-header .btn {
         padding: 8px !important;
         min-width: 40px;
@@ -1768,7 +1768,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
         max-width: 85% !important;
     }
     
-    /* Input de mensagem - fixo no rodap├® */
+    /* Input de mensagem - fixo no rodapê */
     .chat-input-container {
         position: sticky;
         bottom: 0;
@@ -1790,7 +1790,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
         width: 100% !important;
     }
     
-    /* Header do sidebar com bot├úo voltar */
+    /* Header do sidebar com botão voltar */
     .sidebar-header {
         padding: 15px;
         position: sticky;
@@ -1858,7 +1858,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     }
 }
 
-/* Tablet: Layout h├¡brido */
+/* Tablet: Layout híbrido */
 @media (min-width: 768px) and (max-width: 991px) {
     .conversations-layout {
         height: calc(100vh - 80px);
@@ -1920,7 +1920,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
         display: none !important;
     }
 }
-/* Anima├º├Áes para Assistente IA */
+/* AnimaçÁes para Assistente IA */
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -2011,7 +2011,7 @@ body.dark-mode .swal2-html-container {
     color: #e0e0e0 !important;
 }
 
-/* Removido: Borda verde aplicada pelo sistema de indicador SLA ao avatar, n├úo ao card */
+/* Removido: Borda verde aplicada pelo sistema de indicador SLA ao avatar, não ao card */
 
 [data-bs-theme="dark"] .swal2-content,
 body.dark-mode .swal2-content {
@@ -2022,80 +2022,80 @@ body.dark-mode .swal2-content {
 <!-- SLA Indicator CSS -->
 <link rel="stylesheet" href="<?= \App\Helpers\Url::asset('css/custom/sla-indicator.css') ?>">
 
-<!-- Script inline para definir fun├º├úo ANTES do HTML do bot├úo -->
+<!-- Script inline para definir função ANTES do HTML do botão -->
 <script>
-// Helper para obter informa├º├Áes de canais
+// Helper para obter informaçÁes de canais
 function getChannelInfo(channel) {
     const channels = {
         'whatsapp': {
             name: 'WhatsApp',
             icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#25D366" style="vertical-align: middle;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>',
-            emoji: '­ƒô▒'
+            emoji: '💬'
         },
         'whatsapp_official': {
             name: 'WhatsApp Oficial',
             icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#25D366" style="vertical-align: middle;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>',
-            emoji: '­ƒô▒'
+            emoji: '💬'
         },
         'instagram': {
             name: 'Instagram',
             icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="url(#instagram-gradient-js)" style="vertical-align: middle;"><defs><linearGradient id="instagram-gradient-js" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#833AB4;stop-opacity:1" /><stop offset="50%" style="stop-color:#FD1D1D;stop-opacity:1" /><stop offset="100%" style="stop-color:#FCAF45;stop-opacity:1" /></linearGradient></defs><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.40z"/></svg>',
-            emoji: '­ƒôÀ'
+            emoji: '📷'
         },
         'instagram_comment': {
             name: 'Comentário',
             icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="url(#instagram-gradient-comment)" style="vertical-align: middle;"><defs><linearGradient id="instagram-gradient-comment" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#833AB4;stop-opacity:1" /><stop offset="50%" style="stop-color:#FD1D1D;stop-opacity:1" /><stop offset="100%" style="stop-color:#FCAF45;stop-opacity:1" /></linearGradient></defs><path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>',
-            emoji: '­ƒÆ¼'
+            emoji: '💬'
         },
         'facebook': {
             name: 'Facebook',
             icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#1877F2" style="vertical-align: middle;"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>',
-            emoji: '­ƒæñ'
+            emoji: '👥'
         },
         'tiktok': {
             name: 'TikTok',
             icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#000000" style="vertical-align: middle;"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg>',
-            emoji: '­ƒÄÁ'
+            emoji: '🎵'
         },
         'telegram': {
             name: 'Telegram',
             icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#0088cc" style="vertical-align: middle;"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>',
-            emoji: 'Ô£ê´©Å'
+            emoji: '✉️'
         },
         'email': {
             name: 'Email',
             icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>',
-            emoji: 'Ô£ë´©Å'
+            emoji: '📧'
         },
         'chat': {
             name: 'Chat',
             icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>',
-            emoji: '­ƒÆ¼'
+            emoji: '💬'
         },
         'mercadolivre': {
             name: 'Mercado Livre',
             icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#FFF159" style="vertical-align: middle;"><path d="M12.5 0C5.596 0 0 5.596 0 12.5S5.596 25 12.5 25 25 19.404 25 12.5 19.404 0 12.5 0zm0 22.5c-5.523 0-10-4.477-10-10S6.977 2.5 12.5 2.5 22.5 6.977 22.5 12.5 18.023 22.5 12.5 22.5z"/><path d="M8.75 7.5h7v9h-7z" fill="#3483FA"/></svg>',
-            emoji: '­ƒøÆ'
+            emoji: '🛒'
         },
         'webchat': {
             name: 'WebChat',
             icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>',
-            emoji: '­ƒÆ¼'
+            emoji: '💬'
         },
         'olx': {
             name: 'OLX',
             icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#00A859" style="vertical-align: middle;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>',
-            emoji: '­ƒôª'
+            emoji: '🏷️'
         },
         'linkedin': {
             name: 'LinkedIn',
             icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#0077B5" style="vertical-align: middle;"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>',
-            emoji: '­ƒÆ╝'
+            emoji: '💼'
         },
         'google_business': {
             name: 'Google Business',
             icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#4285F4" style="vertical-align: middle;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>',
-            emoji: '­ƒöì'
+            emoji: '🔧'
         },
         'youtube': {
             name: 'YouTube',
@@ -2104,24 +2104,24 @@ function getChannelInfo(channel) {
         }
     };
     
-    return channels[channel] || { name: 'Chat', icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>', emoji: '­ƒÆ¼' };
+    return channels[channel] || { name: 'Chat', icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>', emoji: '💬' };
 }
 
-// Definir fun├º├úo IMEDIATAMENTE para estar dispon├¡vel quando o HTML for renderizado
+// Definir função IMEDIATAMENTE para estar disponível quando o HTML for renderizado
 (function() {
     // Mostrar modal de nova conversa
     window.showNewConversationModal = function() {
         const modal = document.getElementById('kt_modal_new_conversation');
         if (!modal) {
-            console.error('Modal de nova conversa n├úo encontrado');
+            console.error('Modal de nova conversa não encontrado');
             return;
         }
         
-        // Limpar formul├írio
+        // Limpar formulírio
         const form = modal.querySelector('#newConversationForm');
         if (form) form.reset();
         
-        // Resetar canal para WhatsApp (padr├úo)
+        // Resetar canal para WhatsApp (padrão)
         const channelSelect = modal.querySelector('#new_conversation_channel');
         if (channelSelect) {
             channelSelect.value = 'whatsapp';
@@ -2144,7 +2144,7 @@ function getChannelInfo(channel) {
 })();
 </script>
 
-<!-- Cabe├ºalho com M├®tricas de SLA e Tempo de Resposta -->
+<!-- Cabeçalho com Mêtricas de SLA e Tempo de Resposta -->
 <div class="conversations-metrics-header" style="padding: 15px 20px; background: var(--bs-body-bg); border-bottom: 1px solid var(--bs-border-color); display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
     <div class="d-flex align-items-center gap-3">
         <h2 class="mb-0 fw-bold fs-3">Conversas - Sistema Multiatendimento</h2>
@@ -2184,7 +2184,7 @@ function getChannelInfo(channel) {
                             </i>
                     <input type="text" id="kt_conversations_search" class="form-control form-control-solid ps-10" placeholder="Buscar conversas e mensagens..." value="<?= htmlspecialchars($filters['search'] ?? '') ?>">
                 </div>
-                <!-- Bot├úo de Convites Pendentes -->
+                <!-- Botão de Convites Pendentes -->
                 <button type="button" class="btn btn-sm btn-icon btn-light-warning position-relative" id="btn_pending_invites" title="Convites pendentes" onclick="showPendingInvitesModal()">
                     <i class="ki-duotone ki-notification-on fs-2">
                         <span class="path1"></span>
@@ -2196,7 +2196,7 @@ function getChannelInfo(channel) {
                     <span id="headerPendingInvitesBadge" class="position-absolute top-0 start-100 translate-middle badge badge-circle badge-sm badge-danger d-none">0</span>
                 </button>
                 
-                <button type="button" class="btn btn-sm btn-icon btn-primary" id="btn_new_conversation" title="Nova conversa" onclick="if(typeof showNewConversationModal === 'function') { showNewConversationModal(); } else { console.error('showNewConversationModal n├úo est├í definida'); }">
+                <button type="button" class="btn btn-sm btn-icon btn-primary" id="btn_new_conversation" title="Nova conversa" onclick="if(typeof showNewConversationModal === 'function') { showNewConversationModal(); } else { console.error('showNewConversationModal não estí definida'); }">
                     <i class="ki-duotone ki-plus fs-2">
                         <span class="path1"></span>
                         <span class="path2"></span>
@@ -2205,7 +2205,7 @@ function getChannelInfo(channel) {
             </div>
         </div>
         
-        <!-- Barra de A├º├Áes em Massa (oculta por padr├úo) -->
+        <!-- Barra de AçÁes em Massa (oculta por padrão) -->
         <div id="bulkActionsBar" class="bulk-actions-bar d-none mb-3 p-3 bg-light-primary rounded">
             <div class="d-flex align-items-center justify-content-between">
                 <div class="d-flex align-items-center gap-3">
@@ -2244,7 +2244,7 @@ function getChannelInfo(channel) {
                                     </li>
                                 <?php endforeach; ?>
                             <?php else: ?>
-                                <li><span class="dropdown-item-text text-muted">Nenhum agente dispon├¡vel</span></li>
+                                <li><span class="dropdown-item-text text-muted">Nenhum agente disponível</span></li>
                             <?php endif; ?>
                         </ul>
                     </div>
@@ -2310,8 +2310,8 @@ function getChannelInfo(channel) {
                                     <option value="open" <?= ($filters['status'] ?? 'open') === 'open' ? 'selected' : '' ?>>Abertas</option>
                                     <option value="resolved" <?= ($filters['status'] ?? 'open') === 'resolved' ? 'selected' : '' ?>>Resolvidas</option>
                                     <option value="closed" <?= ($filters['status'] ?? 'open') === 'closed' ? 'selected' : '' ?>>Fechadas</option>
-                                    <option value="spam" <?= !empty($filters['is_spam']) ? 'selected' : '' ?>>­ƒÜ½ Spam</option>
-                                    <option value="unanswered" <?= !empty($filters['unanswered']) ? 'selected' : '' ?>>­ƒö┤ N├úo respondidas</option>
+                                    <option value="spam" <?= !empty($filters['is_spam']) ? 'selected' : '' ?>>⚠️ Spam</option>
+                                    <option value="unanswered" <?= !empty($filters['unanswered']) ? 'selected' : '' ?>>🔴 Não respondidas</option>
                                 </select>
                                 
                 <select id="filter_channel" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 120px;">
@@ -2319,6 +2319,7 @@ function getChannelInfo(channel) {
                     <option value="whatsapp" <?= ($filters['channel'] ?? '') === 'whatsapp' ? 'selected' : '' ?>>WhatsApp</option>
                     <option value="whatsapp_official" <?= ($filters['channel'] ?? '') === 'whatsapp_official' ? 'selected' : '' ?>>WhatsApp Oficial</option>
                     <option value="instagram" <?= ($filters['channel'] ?? '') === 'instagram' ? 'selected' : '' ?>>Instagram</option>
+                    <option value="instagram_comment" <?= ($filters['channel'] ?? '') === 'instagram_comment' ? 'selected' : '' ?>>Instagram Comentário</option>
                     <option value="facebook" <?= ($filters['channel'] ?? '') === 'facebook' ? 'selected' : '' ?>>Facebook</option>
                     <option value="tiktok" <?= ($filters['channel'] ?? '') === 'tiktok' ? 'selected' : '' ?>>TikTok</option>
                     <option value="telegram" <?= ($filters['channel'] ?? '') === 'telegram' ? 'selected' : '' ?>>Telegram</option>
@@ -2361,7 +2362,7 @@ function getChannelInfo(channel) {
                                 <?php if ($canViewAllConversations || !empty($agents)): ?>
                                 <select id="filter_agent" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 160px;">
                                     <option value="">Agentes</option>
-                                    <option value="unassigned" <?= ($filters['agent_id'] ?? '') === 'unassigned' ? 'selected' : '' ?>>­ƒö┤ N├úo atribu├¡das</option>
+                                    <option value="unassigned" <?= ($filters['agent_id'] ?? '') === 'unassigned' ? 'selected' : '' ?>>🔴 Não atribuídas</option>
                                     <?php if ($canViewAllConversations && !empty($agents)): ?>
                                         <?php foreach ($agents as $agent): ?>
                                             <option value="<?= $agent['id'] ?>" <?= ($filters['agent_id'] ?? '') == $agent['id'] ? 'selected' : '' ?>>
@@ -2388,12 +2389,12 @@ function getChannelInfo(channel) {
                                     <option value="">Etapa</option>
                                 </select>
                                 
-                                <button type="button" class="btn btn-sm btn-light-primary" onclick="openAdvancedFilters()" title="Filtros Avan├ºados">
+                                <button type="button" class="btn btn-sm btn-light-primary" onclick="openAdvancedFilters()" title="Filtros Avançados">
                                     <i class="ki-duotone ki-setting-2 fs-6 me-1">
                                         <span class="path1"></span>
                                         <span class="path2"></span>
                                     </i>
-                                    Avan├ºados
+                                    Avançados
                                 </button>
                                 
                                 <?php if (!empty($filters['unanswered']) || !empty($filters['answered']) || !empty($filters['date_from']) || !empty($filters['date_to']) || isset($filters['pinned'])): ?>
@@ -2450,7 +2451,7 @@ function getChannelInfo(channel) {
                     $isActive = ($selectedConversationId == $conv['id']);
                     ?>
                     <?php
-                    // Usar first_response_at calculado das mensagens se dispon├¡vel, sen├úo usar o campo da conversa
+                    // Usar first_response_at calculado das mensagens se disponível, senão usar o campo da conversa
                     $firstResponseAt = !empty($conv['first_response_at_calc']) ? $conv['first_response_at_calc'] : ($conv['first_response_at'] ?? '');
                     $lastContactAt = $conv['last_contact_message_at'] ?? '';
                     $lastAgentAt = $conv['last_agent_message_at'] ?? '';
@@ -2467,7 +2468,7 @@ function getChannelInfo(channel) {
                          data-agent-id="<?= htmlspecialchars($conv['agent_id'] ?? '') ?>"
                          data-onclick="selectConversation">
                         <div class="d-flex gap-3 w-100">
-                            <!-- Checkbox para sele├º├úo em massa -->
+                            <!-- Checkbox para seleção em massa -->
                             <div class="flex-shrink-0 d-flex align-items-center">
                                 <label class="form-check form-check-custom form-check-solid">
                                     <input class="form-check-input conversation-checkbox" type="checkbox" value="<?= $conv['id'] ?>" 
@@ -2489,7 +2490,7 @@ function getChannelInfo(channel) {
                                 <?php endif; ?>
                             </div>
                             
-                            <!-- Conte├║do -->
+                            <!-- Conteúdo -->
                             <div class="flex-grow-1 min-w-0">
                                 <div class="conversation-item-header">
                                     <div class="conversation-item-name d-flex align-items-center gap-2">
@@ -2500,7 +2501,7 @@ function getChannelInfo(channel) {
                                         </i>
                                         <?php endif; ?>
                                                         <?php if (!empty($conv['is_spam'])): ?>
-                                                            <span class="badge badge-sm badge-danger" title="Marcada como spam">­ƒÜ½ SPAM</span>
+                                                            <span class="badge badge-sm badge-danger" title="Marcada como spam">⚠️ SPAM</span>
                                                         <?php endif; ?>
                                                         <?php
                                                         $nameRaw = $conv['contact_name'] ?? 'Sem nome';
@@ -2565,7 +2566,7 @@ function getChannelInfo(channel) {
                                                     <span class="path1"></span>
                                                     <span class="path2"></span>
                                                 </i>
-                                                Marcar como N├úo Lido
+                                                Marcar como Não Lido
                                             </a>
                                         </li>
                                         <li><hr class="dropdown-divider"></li>
@@ -2611,12 +2612,12 @@ function getChannelInfo(channel) {
                                                 </div>
                                             </div>
     
-    <!-- COLUNA 2: ├üREA DE CHAT -->
+    <!-- COLUNA 2: üREA DE CHAT -->
     <div class="chat-area">
         
         <!-- Header do Chat (sempre presente, mas pode estar oculto) -->
         <div class="chat-header" id="chatHeader" style="<?= empty($selectedConversation) ? 'display: none;' : '' ?>">
-            <!-- Bot├úo Voltar (Mobile) -->
+            <!-- Botão Voltar (Mobile) -->
             <button class="btn btn-sm btn-icon btn-light chat-header-back-btn d-none" onclick="showListView()" title="Voltar para lista" id="chatHeaderBackBtn" style="display: none;">
                 <i class="ki-duotone ki-arrow-left fs-2">
                     <span class="path1"></span>
@@ -2690,10 +2691,10 @@ function getChannelInfo(channel) {
                             <span class="path2"></span>
                         </i>
                         <div id="messageSearchResults" class="position-absolute top-100 start-0 w-100 bg-body border rounded shadow-lg d-none" style="max-height: 300px; overflow-y: auto; z-index: 1000; margin-top: 5px;">
-                            <!-- Resultados da busca ser├úo inseridos aqui -->
+                            <!-- Resultados da busca serão inseridos aqui -->
                         </div>
                     </div>
-                    <button class="btn btn-sm btn-icon btn-light-primary" onclick="showMessageSearchFilters()" title="Filtros avan├ºados" id="messageSearchFiltersBtn">
+                    <button class="btn btn-sm btn-icon btn-light-primary" onclick="showMessageSearchFilters()" title="Filtros avançados" id="messageSearchFiltersBtn">
                         <i class="ki-duotone ki-filter fs-6">
                             <span class="path1"></span>
                             <span class="path2"></span>
@@ -2701,7 +2702,7 @@ function getChannelInfo(channel) {
                     </button>
                 </div>
                 
-                <!-- Bot├úo para mencionar/convidar agente -->
+                <!-- Botão para mencionar/convidar agente -->
                 <button class="btn btn-sm btn-icon btn-light-warning" onclick="showMentionAgentModal()" title="Mencionar agente">
                     <i class="ki-duotone ki-user-tick fs-2">
                         <span class="path1"></span>
@@ -2711,7 +2712,7 @@ function getChannelInfo(channel) {
                 </button>
                 
                 <?php
-                // Verificar se h├í conta Api4Com habilitada e ramal do usu├írio
+                // Verificar se hí conta Api4Com habilitada e ramal do usuírio
                 $api4comAccount = \App\Models\Api4ComAccount::getFirstEnabled();
                 $hasApi4Com = !empty($api4comAccount);
                 $currentUserId = \App\Helpers\Auth::id();
@@ -2730,7 +2731,7 @@ function getChannelInfo(channel) {
                     </i>
                 </button>
                 <script>
-                    // Disponibilizar informa├º├úo de capacidade Api4Com para JavaScript
+                    // Disponibilizar informação de capacidade Api4Com para JavaScript
                     window.api4comCanMakeCalls = <?= $canMakeCalls ? 'true' : 'false' ?>;
                 </script>
                 
@@ -2745,7 +2746,7 @@ function getChannelInfo(channel) {
             </div>
         </div>
         
-        <!-- Banner de IA Ativa (aparece quando IA est├í ativa) -->
+        <!-- Banner de IA Ativa (aparece quando IA estí ativa) -->
         <div id="aiActiveBanner" class="ai-active-banner d-none" style="display: none !important;">
             <div class="ai-active-banner-content">
                 <div class="ai-active-banner-icon">
@@ -2772,7 +2773,7 @@ function getChannelInfo(channel) {
                             <span class="path1"></span>
                             <span class="path2"></span>
                         </i>
-                        Ver Hist├│rico
+                        Ver Histórico
                     </button>
                     <button class="btn btn-sm btn-icon btn-light-danger" id="removeAIButton" title="Remover IA">
                         <i class="ki-duotone ki-cross fs-6">
@@ -2811,7 +2812,7 @@ function getChannelInfo(channel) {
                         </div>
                     </div>
                     
-                    <!-- Overlay com bot├úo de solicitar -->
+                    <!-- Overlay com botão de solicitar -->
                     <div class="restricted-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(var(--bs-body-bg-rgb, 255, 255, 255), 0.85); z-index: 10;">
                         <div class="text-center p-5">
                             <div class="mb-4">
@@ -2824,12 +2825,12 @@ function getChannelInfo(channel) {
                             
                             <h3 class="fw-bold mb-3">Acesso Restrito</h3>
                             <p class="text-muted mb-4">
-                                Voc├¬ n├úo est├í atribu├¡do nem ├® participante desta conversa.<br>
-                                Solicite participa├º├úo para ter acesso completo.
+                                Vocì não estí atribuído nem ê participante desta conversa.<br>
+                                Solicite participação para ter acesso completo.
                             </p>
                             
                             <?php if (!empty($accessInfo['has_pending_request'])): ?>
-                                <!-- J├í tem solicita├º├úo pendente -->
+                                <!-- Jí tem solicitação pendente -->
                                 <div class="alert alert-warning d-inline-flex align-items-center mb-4" role="alert">
                                     <i class="ki-duotone ki-timer fs-2 me-2 text-warning">
                                         <span class="path1"></span>
@@ -2837,24 +2838,24 @@ function getChannelInfo(channel) {
                                         <span class="path3"></span>
                                     </i>
                                     <div class="text-start">
-                                        <div class="fw-bold">Solicita├º├úo Pendente</div>
-                                        <div class="fs-7">Aguarde aprova├º├úo de um agente.</div>
+                                        <div class="fw-bold">Solicitação Pendente</div>
+                                        <div class="fs-7">Aguarde aprovação de um agente.</div>
                                     </div>
                                 </div>
                             <?php else: ?>
-                                <!-- Bot├úo para solicitar participa├º├úo -->
+                                <!-- Botão para solicitar participação -->
                                 <button class="btn btn-primary btn-lg" onclick="requestParticipation(<?= (int)$selectedConversationId ?>)">
                                     <i class="ki-duotone ki-entrance-right fs-2 me-2">
                                         <span class="path1"></span>
                                         <span class="path2"></span>
                                     </i>
-                                    Solicitar Participa├º├úo
+                                    Solicitar Participação
                                 </button>
                             <?php endif; ?>
                             
                             <div class="mt-4">
                                 <small class="text-muted">
-                                    Conversa atribu├¡da a: <strong><?= htmlspecialchars($selectedConversation['agent_name'] ?? 'N├úo atribu├¡da') ?></strong>
+                                    Conversa atribuída a: <strong><?= htmlspecialchars($selectedConversation['agent_name'] ?? 'Não atribuída') ?></strong>
                                 </small>
                             </div>
                         </div>
@@ -2875,7 +2876,7 @@ function getChannelInfo(channel) {
                             $lastDate = $msgCreatedAt;
                             $isFirstMessage = false;
                         } elseif ($lastDate === null) {
-                            // Garantir que sempre h├í um separador antes da primeira mensagem
+                            // Garantir que sempre hí um separador antes da primeira mensagem
                             echo renderDateSeparator($msgCreatedAt);
                             $lastDate = $msgCreatedAt;
                             $isFirstMessage = false;
@@ -2906,7 +2907,7 @@ function getChannelInfo(channel) {
                             </div>
                         
                         <?php elseif ($msgType === 'note'): ?>
-                            <!-- Nota interna - Alinhada ├á direita como mensagens enviadas -->
+                            <!-- Nota interna - Alinhada á direita como mensagens enviadas -->
                             <div class="chat-message note outgoing" data-message-id="<?= $msg['id'] ?? '' ?>" data-timestamp="<?= strtotime($msgCreatedAt) * 1000 ?>">
                                 <div class="message-content">
                                     <div class="message-bubble">
@@ -2926,7 +2927,7 @@ function getChannelInfo(channel) {
                                             <?php else: ?>
                             <!-- Mensagem normal -->
                             <?php
-                            // Verificar se ├® mensagem de IA
+                            // Verificar se ê mensagem de IA
                             $isAIMessage = !empty($msg['ai_agent_id']);
                             $aiAgentName = $msg['ai_agent_name'] ?? 'Assistente IA';
                             $aiAgentInitials = '';
@@ -2945,7 +2946,7 @@ function getChannelInfo(channel) {
                                 <?php elseif ($isAIMessage && $msgDirection === 'outgoing'): ?>
                                     <!-- Avatar do agente de IA -->
                                     <div class="message-avatar ai-agent-avatar" title="<?= htmlspecialchars($aiAgentName) ?>">
-                                        <?= $aiAgentInitials ?: '­ƒñû' ?>
+                                        <?= $aiAgentInitials ?: '🤖' ?>
                                     </div>
                                 <?php endif; ?>
                                 <div class="message-content">
@@ -2964,10 +2965,10 @@ function getChannelInfo(channel) {
                                         </button>
                                     </div>
                                             <?php
-                                    // Verificar se ├® uma mensagem citada/reply
+                                    // Verificar se ê uma mensagem citada/reply
                                     $isQuoted = strpos($msgContent, 'Ôå®´©Å') === 0;
                                     
-                                    // Verificar se ├® apenas ├íudio (sem texto e sem outros anexos)
+                                    // Verificar se ê apenas íudio (sem texto e sem outros anexos)
                                     $hasOnlyAudio = false;
                                     if (!empty($msg['attachments']) && empty($msgContent) && !$isQuoted) {
                                         $attachments = is_string($msg['attachments']) ? json_decode($msg['attachments'], true) : $msg['attachments'];
@@ -2992,7 +2993,7 @@ function getChannelInfo(channel) {
                                     <?php if ($isAIMessage && $msgDirection === 'outgoing'): ?>
                                         <div class="ai-message-badge" title="Mensagem enviada por <?= htmlspecialchars($aiAgentName) ?>">
                                             <div class="ai-avatar-mini">
-                                                <?= $aiAgentInitials ?: '­ƒñû' ?>
+                                                <?= $aiAgentInitials ?: '🤖' ?>
                                             </div>
                                             <i class="ki-duotone ki-robot fs-7">
                                                 <span class="path1"></span>
@@ -3005,10 +3006,10 @@ function getChannelInfo(channel) {
                                     <?php endif; ?>
                                     <div class="<?= $bubbleClass ?>">
                                         <?php 
-                                        // Verificar se tem reply atrav├®s do campo quoted_message_id
+                                        // Verificar se tem reply atravês do campo quoted_message_id
                                         $hasQuote = !empty($msg['quoted_message_id']) || $isQuoted;
                                         if ($hasQuote): 
-                                            // Priorizar campos separados, sen├úo extrair do content
+                                            // Priorizar campos separados, senão extrair do content
                                             if (!empty($msg['quoted_message_id'])) {
                                                 $quotedMsgId = $msg['quoted_message_id'];
                                                 $quotedSenderName = $msg['quoted_sender_name'] ?? 'Remetente';
@@ -3017,7 +3018,7 @@ function getChannelInfo(channel) {
                                                 if (mb_strlen($quotedText) > 100) {
                                                     $quotedText = mb_substr($quotedText, 0, 100) . '...';
                                                 }
-                                                $actualContent = $msgContent; // Content n├úo foi modificado
+                                                $actualContent = $msgContent; // Content não foi modificado
                                             } else {
                                                 // Mensagem antiga com formato antigo (Ôå®´©Å no content)
                                                 $lines = explode("\n", $msgContent, 2);
@@ -3027,7 +3028,7 @@ function getChannelInfo(channel) {
                                                 $quotedSenderName = 'Remetente';
                                             }
                                         ?>
-                                            <div class="quoted-message" onclick="console.log('Quoted message clicado, ID:', <?= $quotedMsgId ?: 'null' ?>); <?= $quotedMsgId ? "scrollToMessage({$quotedMsgId})" : "console.log('Sem ID para scroll')" ?>" title="<?= $quotedMsgId ? 'Clique para ver a mensagem original' : 'Mensagem original n├úo dispon├¡vel' ?>" data-quoted-id="<?= $quotedMsgId ?: '' ?>">
+                                            <div class="quoted-message" onclick="console.log('Quoted message clicado, ID:', <?= $quotedMsgId ?: 'null' ?>); <?= $quotedMsgId ? "scrollToMessage({$quotedMsgId})" : "console.log('Sem ID para scroll')" ?>" title="<?= $quotedMsgId ? 'Clique para ver a mensagem original' : 'Mensagem original não disponível' ?>" data-quoted-id="<?= $quotedMsgId ?: '' ?>">
                                                 <div class="quoted-message-header"><?= htmlspecialchars($quotedSenderName) ?></div>
                                                 <div class="quoted-message-content"><?= htmlspecialchars($quotedText) ?></div>
                                             </div>
@@ -3055,7 +3056,7 @@ function getChannelInfo(channel) {
                         <?php endif; ?>
                         
                     <?php 
-                        // Atualizar ├║ltima data processada
+                        // Atualizar última data processada
                         $lastDate = $msgCreatedAt;
                     endforeach; ?>
                                             <?php else: ?>
@@ -3078,7 +3079,7 @@ function getChannelInfo(channel) {
                         <span class="path3"></span>
                     </i>
                     <h3>Selecione uma conversa</h3>
-                    <p class="text-muted">Escolha uma conversa da lista para come├ºar</p>
+                    <p class="text-muted">Escolha uma conversa da lista para começar</p>
                 </div>
             <?php endif; ?>
         </div>
@@ -3106,10 +3107,10 @@ function getChannelInfo(channel) {
                             <span class="path2"></span>
                         </i>
                     </button>
-                    <button type="button" class="btn btn-sm btn-light-secondary d-none" id="cancelRecordingBtn" title="Cancelar grava├º├úo" onclick="cancelRecording()">
+                    <button type="button" class="btn btn-sm btn-light-secondary d-none" id="cancelRecordingBtn" title="Cancelar gravação" onclick="cancelRecording()">
                         <i class="ki-duotone ki-cross-circle fs-3"><span class="path1"></span><span class="path2"></span></i>
                     </button>
-                    <button class="btn btn-sm btn-icon btn-light-primary" id="recordAudioBtn" title="Gravar ├íudio" onclick="toggleAudioRecording()">
+                    <button class="btn btn-sm btn-icon btn-light-primary" id="recordAudioBtn" title="Gravar íudio" onclick="toggleAudioRecording()">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                             <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
@@ -3153,7 +3154,7 @@ function getChannelInfo(channel) {
                             <span class="path3"></span>
                         </i>
                     </button>
-                    <button class="btn btn-sm btn-icon btn-light-primary" title="Vari├íveis" onclick="showVariablesModal()">
+                    <button class="btn btn-sm btn-icon btn-light-primary" title="Variíveis" onclick="showVariablesModal()">
                         <i class="ki-duotone ki-code fs-3">
                             <span class="path1"></span>
                             <span class="path2"></span>
@@ -3172,7 +3173,7 @@ function getChannelInfo(channel) {
                 <div class="position-relative">
                     <textarea id="messageInput" class="chat-input-textarea" placeholder="Digite sua mensagem..." rows="2"></textarea>
                     
-                    <!-- Dropdown r├ípido de templates -->
+                    <!-- Dropdown rípido de templates -->
                     <div id="templateQuickSelect" class="template-quick-select d-none">
                         <div class="template-quick-select-header">
                             <div class="d-flex align-items-center gap-2">
@@ -3280,7 +3281,7 @@ function getChannelInfo(channel) {
                             <tr class="fw-bold text-muted">
                                 <th class="min-w-200px">Nome</th>
                                 <th class="min-w-150px">Categoria</th>
-                                <th class="text-end min-w-100px">A├º├Áes</th>
+                                <th class="text-end min-w-100px">AçÁes</th>
                             </tr>
                         </thead>
                         <tbody id="templatesList">
@@ -3358,7 +3359,7 @@ function getChannelInfo(channel) {
                 </div>
                                     <div>
                                         <h3 class="fw-bold mb-1">Gerar Resposta</h3>
-                                        <p class="text-muted fs-7 mb-0">Gera sugest├Áes inteligentes baseadas no contexto da conversa</p>
+                                        <p class="text-muted fs-7 mb-0">Gera sugestÁes inteligentes baseadas no contexto da conversa</p>
                                     </div>
                                 </div>
                             </div>
@@ -3374,9 +3375,9 @@ function getChannelInfo(channel) {
                                         Tom da Resposta
                                     </label>
                                     <select id="aiResponseTone" class="form-select form-select-solid">
-                                        <option value="professional">­ƒÆ╝ Profissional</option>
-                                        <option value="friendly">­ƒÿè Amig├ível</option>
-                                        <option value="formal">­ƒôï Formal</option>
+                                        <option value="professional">💼 Profissional</option>
+                                        <option value="friendly">😊 Amigível</option>
+                                        <option value="formal">👔 Formal</option>
                                     </select>
                                 </div>
                                 <div class="col-md-6">
@@ -3387,12 +3388,12 @@ function getChannelInfo(channel) {
                                             <span class="path3"></span>
                                             <span class="path4"></span>
                                         </i>
-                                        Quantidade de Sugest├Áes
+                                        Quantidade de SugestÁes
                                     </label>
                                     <select id="aiResponseCount" class="form-select form-select-solid">
-                                        <option value="1">1 sugest├úo</option>
-                                        <option value="2">2 sugest├Áes</option>
-                                        <option value="3" selected>3 sugest├Áes</option>
+                                        <option value="1">1 sugestão</option>
+                                        <option value="2">2 sugestÁes</option>
+                                        <option value="3" selected>3 sugestÁes</option>
                                     </select>
                                 </div>
                             </div>
@@ -3405,20 +3406,20 @@ function getChannelInfo(channel) {
                                             <span class="path1"></span>
                                             <span class="path2"></span>
                                         </i>
-                                        <h4 class="fw-bold mb-0">Sugest├Áes Geradas</h4>
+                                        <h4 class="fw-bold mb-0">SugestÁes Geradas</h4>
                                     </div>
-                                    <button class="btn btn-sm btn-light-primary" onclick="loadAIResponseHistory()" title="Ver hist├│rico">
+                                    <button class="btn btn-sm btn-light-primary" onclick="loadAIResponseHistory()" title="Ver histórico">
                                         <i class="ki-duotone ki-time fs-5">
                                             <span class="path1"></span>
                                             <span class="path2"></span>
                                         </i>
-                                        Hist├│rico
+                                        Histórico
                         </button>
                             </div>
                                 <div id="aiResponseSuggestions" class="mb-4"></div>
                             </div>
                             
-                            <!-- Hist├│rico de Respostas -->
+                            <!-- Histórico de Respostas -->
                             <div id="aiResponseHistory" class="d-none">
                                 <div class="separator separator-dashed my-6"></div>
                                 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -3427,7 +3428,7 @@ function getChannelInfo(channel) {
                                             <span class="path1"></span>
                                             <span class="path2"></span>
                                         </i>
-                                        Hist├│rico de Respostas
+                                        Histórico de Respostas
                                     </h4>
                                     <button class="btn btn-sm btn-light" onclick="hideAIResponseHistory()">
                                         <i class="ki-duotone ki-cross fs-5">
@@ -3440,7 +3441,7 @@ function getChannelInfo(channel) {
                                 <div id="aiResponseHistoryContent" class="mb-4">
                                     <div class="text-center py-10">
                                         <span class="spinner-border spinner-border-sm text-primary mb-3" role="status"></span>
-                                        <div class="text-muted">Carregando hist├│rico...</div>
+                                        <div class="text-muted">Carregando histórico...</div>
                                     </div>
                                 </div>
                             </div>
@@ -3474,7 +3475,7 @@ function getChannelInfo(channel) {
                             Outras Funcionalidades
                         </h4>
                         <div class="row g-4" id="aiOtherFeatures">
-                            <!-- Ser├í preenchido dinamicamente -->
+                            <!-- Serí preenchido dinamicamente -->
                         </div>
                     </div>
                 </div>
@@ -3497,7 +3498,7 @@ function getChannelInfo(channel) {
     </div>
 </div>
 
-<!-- MODAL: Filtros Avan├ºados de Busca de Mensagens -->
+<!-- MODAL: Filtros Avançados de Busca de Mensagens -->
 <div class="modal fade" id="kt_modal_message_search_filters" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered mw-600px">
         <div class="modal-content">
@@ -3518,10 +3519,10 @@ function getChannelInfo(channel) {
                             <option value="">Todos</option>
                             <option value="text">Texto</option>
                             <option value="image">Imagem</option>
-                            <option value="video">V├¡deo</option>
-                            <option value="audio">├üudio</option>
+                            <option value="video">Vídeo</option>
+                            <option value="audio">üudio</option>
                             <option value="document">Documento</option>
-                            <option value="location">Localiza├º├úo</option>
+                            <option value="location">Localização</option>
                             <option value="note">Nota Interna</option>
                         </select>
                     </div>
@@ -3537,7 +3538,7 @@ function getChannelInfo(channel) {
                     </div>
                     
                     <div class="mb-5" id="filterSenderIdContainer" style="display: none;">
-                        <label class="form-label fw-semibold">Agente Espec├¡fico:</label>
+                        <label class="form-label fw-semibold">Agente Específico:</label>
                         <select id="filterSenderId" class="form-select form-select-solid">
                             <option value="">Todos os agentes</option>
                             <?php 
@@ -3578,12 +3579,12 @@ function getChannelInfo(channel) {
     </div>
 </div>
 
-<!-- MODAL: Vari├íveis Dispon├¡veis -->
+<!-- MODAL: Variíveis Disponíveis -->
 <div class="modal fade" id="kt_modal_variables" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered mw-650px">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="fw-bold">Vari├íveis Dispon├¡veis</h2>
+                <h2 class="fw-bold">Variíveis Disponíveis</h2>
                 <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
                     <i class="ki-duotone ki-cross fs-1">
                         <span class="path1"></span>
@@ -3600,15 +3601,15 @@ function getChannelInfo(channel) {
                             <span class="path3"></span>
                         </i>
                         <div>
-                            <div class="fw-bold">Como usar vari├íveis</div>
-                            <div class="fs-7">Clique em uma vari├ível para inseri-la automaticamente no campo de mensagem. As vari├íveis ser├úo substitu├¡das pelos valores reais quando a mensagem for enviada.</div>
+                            <div class="fw-bold">Como usar variíveis</div>
+                            <div class="fs-7">Clique em uma variível para inseri-la automaticamente no campo de mensagem. As variíveis serão substituídas pelos valores reais quando a mensagem for enviada.</div>
                         </div>
                     </div>
                 </div>
                 <div class="row g-3" id="variablesList">
                     <div class="col-12 text-center py-10">
                         <span class="spinner-border spinner-border-sm text-primary mb-3" role="status"></span>
-                        <div class="text-muted">Carregando vari├íveis...</div>
+                        <div class="text-muted">Carregando variíveis...</div>
                     </div>
                 </div>
             </div>
@@ -3654,8 +3655,8 @@ function getChannelInfo(channel) {
                             <tr class="fw-bold text-muted">
                                 <th class="min-w-200px">Nome</th>
                                 <th class="min-w-150px">Categoria</th>
-                                <th class="min-w-300px">Conte├║do</th>
-                                <th class="text-end min-w-150px">A├º├Áes</th>
+                                <th class="min-w-300px">Conteúdo</th>
+                                <th class="text-end min-w-150px">AçÁes</th>
                             </tr>
                         </thead>
                         <tbody id="personalTemplatesList">
@@ -3693,37 +3694,37 @@ function getChannelInfo(channel) {
                     
                     <div class="mb-5">
                         <label class="form-label fw-semibold">Nome do Template <span class="text-danger">*</span></label>
-                        <input type="text" id="personalTemplateName" name="name" class="form-control form-control-solid" placeholder="Ex: Sauda├º├úo Inicial" required>
-                        <div class="form-text">D├¬ um nome descritivo para identificar este template facilmente.</div>
+                        <input type="text" id="personalTemplateName" name="name" class="form-control form-control-solid" placeholder="Ex: Saudação Inicial" required>
+                        <div class="form-text">Dì um nome descritivo para identificar este template facilmente.</div>
                     </div>
                     
                     <div class="mb-5">
                         <label class="form-label fw-semibold">Categoria</label>
-                        <input type="text" id="personalTemplateCategory" name="category" class="form-control form-control-solid" placeholder="Ex: Sauda├º├úo, Follow-up, Suporte">
+                        <input type="text" id="personalTemplateCategory" name="category" class="form-control form-control-solid" placeholder="Ex: Saudação, Follow-up, Suporte">
                         <div class="form-text">Categoria opcional para organizar seus templates.</div>
                     </div>
                     
                     <div class="mb-5">
-                        <label class="form-label fw-semibold">Descri├º├úo</label>
-                        <textarea id="personalTemplateDescription" name="description" class="form-control form-control-solid" rows="2" placeholder="Descri├º├úo opcional do template"></textarea>
+                        <label class="form-label fw-semibold">Descrição</label>
+                        <textarea id="personalTemplateDescription" name="description" class="form-control form-control-solid" rows="2" placeholder="Descrição opcional do template"></textarea>
                     </div>
                     
                     <div class="mb-5">
                         <label class="form-label fw-semibold">
-                            Conte├║do do Template <span class="text-danger">*</span>
-                            <button type="button" class="btn btn-sm btn-light-primary ms-2" onclick="showVariablesModal()" title="Ver vari├íveis dispon├¡veis">
+                            Conteúdo do Template <span class="text-danger">*</span>
+                            <button type="button" class="btn btn-sm btn-light-primary ms-2" onclick="showVariablesModal()" title="Ver variíveis disponíveis">
                                 <i class="ki-duotone ki-code fs-6">
                                     <span class="path1"></span>
                                     <span class="path2"></span>
                                     <span class="path3"></span>
                                     <span class="path4"></span>
                                 </i>
-                                Vari├íveis
+                                Variíveis
                             </button>
                         </label>
-                        <textarea id="personalTemplateContent" name="content" class="form-control form-control-solid" rows="6" placeholder="Digite o conte├║do do template. Use {{variavel}} para vari├íveis din├ómicas." required></textarea>
+                        <textarea id="personalTemplateContent" name="content" class="form-control form-control-solid" rows="6" placeholder="Digite o conteúdo do template. Use {{variavel}} para variíveis dinâmicas." required></textarea>
                         <div class="form-text">
-                            Use vari├íveis como <code>{{contact.name}}</code>, <code>{{agent.name}}</code>, <code>{{date}}</code>, etc.
+                            Use variíveis como <code>{{contact.name}}</code>, <code>{{agent.name}}</code>, <code>{{date}}</code>, etc.
                         </div>
                     </div>
                     
@@ -3734,7 +3735,7 @@ function getChannelInfo(channel) {
                                 Template ativo
                             </label>
                         </div>
-                        <div class="form-text">Templates inativos n├úo aparecer├úo na lista de sele├º├úo.</div>
+                        <div class="form-text">Templates inativos não aparecerão na lista de seleção.</div>
                     </div>
                     
                     <div class="d-flex justify-content-end gap-2">
@@ -3828,8 +3829,8 @@ function getChannelInfo(channel) {
                         <span class="path3"></span>
                     </i>
                     <div class="d-flex flex-column">
-                        <h4 class="mb-1">Escala├º├úo de IA</h4>
-                        <span>Esta conversa ser├í transferida de um agente de IA para um agente humano. Voc├¬ pode escolher um agente espec├¡fico ou deixar o sistema atribuir automaticamente.</span>
+                        <h4 class="mb-1">Escalação de IA</h4>
+                        <span>Esta conversa serí transferida de um agente de IA para um agente humano. Vocì pode escolher um agente específico ou deixar o sistema atribuir automaticamente.</span>
                     </div>
                 </div>
                 <form id="escalateForm">
@@ -3849,7 +3850,7 @@ function getChannelInfo(channel) {
                                         <?php endforeach; ?>
                             <?php endif; ?>
                                     </select>
-                        <div class="form-text">Deixe em branco para atribui├º├úo autom├ítica baseada em disponibilidade e carga de trabalho.</div>
+                        <div class="form-text">Deixe em branco para atribuição automítica baseada em disponibilidade e carga de trabalho.</div>
                                 </div>
                                 <div class="d-flex justify-content-end">
                         <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
@@ -3931,13 +3932,13 @@ function getChannelInfo(channel) {
                     <input type="text" id="tagSearch" class="form-control form-control-solid" placeholder="Buscar tag...">
                 </div>
                 <div class="d-flex flex-wrap gap-2 mb-5" id="currentTags">
-                    <!-- Tags atuais ser├úo inseridas aqui -->
+                    <!-- Tags atuais serão inseridas aqui -->
                 </div>
                 <div class="separator my-5"></div>
                 <div class="mb-5">
-                    <label class="form-label fw-semibold">Tags Dispon├¡veis:</label>
+                    <label class="form-label fw-semibold">Tags Disponíveis:</label>
                     <div class="d-flex flex-wrap gap-2" id="availableTags">
-                        <!-- Tags dispon├¡veis ser├úo inseridas aqui -->
+                        <!-- Tags disponíveis serão inseridas aqui -->
                     </div>
                 </div>
                 <div class="d-flex justify-content-end">
@@ -3970,15 +3971,15 @@ function getChannelInfo(channel) {
                         <span class="path3"></span>
                     </i>
                     <div>
-                        <div class="fw-semibold mb-1">Atribui├º├úo Autom├ítica</div>
-                        <div class="fs-7">Quando uma conversa fechada for reaberta ou o contato chamar novamente ap├│s ter conversa fechada, ser├í atribu├¡do automaticamente ao agente principal.</div>
+                        <div class="fw-semibold mb-1">Atribuição Automítica</div>
+                        <div class="fs-7">Quando uma conversa fechada for reaberta ou o contato chamar novamente após ter conversa fechada, serí atribuído automaticamente ao agente principal.</div>
                     </div>
                 </div>
                 
                 <input type="hidden" id="contactAgentsModalContactId" value="">
                 
                 <div class="mb-5">
-                    <label class="form-label fw-semibold mb-3">Agentes Atribu├¡dos:</label>
+                    <label class="form-label fw-semibold mb-3">Agentes Atribuídos:</label>
                     <div id="contactAgentsList" class="border rounded p-3" style="min-height: 100px; max-height: 300px; overflow-y: auto;">
                         <div class="text-muted fs-7 text-center py-3">Carregando...</div>
                     </div>
@@ -4072,7 +4073,7 @@ function getChannelInfo(channel) {
                             <input type="text" class="form-control form-control-solid" id="editContactCity" name="city">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Pa├¡s</label>
+                            <label class="form-label fw-semibold">País</label>
                             <input type="text" class="form-control form-control-solid" id="editContactCountry" name="country">
                         </div>
                     </div>
@@ -4084,7 +4085,7 @@ function getChannelInfo(channel) {
                     
                     <div class="mb-5">
                         <label class="form-label fw-semibold">Bio</label>
-                        <textarea class="form-control form-control-solid" id="editContactBio" name="bio" rows="3" placeholder="Informa├º├Áes adicionais sobre o contato..."></textarea>
+                        <textarea class="form-control form-control-solid" id="editContactBio" name="bio" rows="3" placeholder="InformaçÁes adicionais sobre o contato..."></textarea>
                     </div>
                     
                     <div class="d-flex justify-content-end">
@@ -4094,7 +4095,7 @@ function getChannelInfo(channel) {
                                 <span class="path1"></span>
                                 <span class="path2"></span>
                             </i>
-                            Salvar Altera├º├Áes
+                            Salvar AlteraçÁes
                         </button>
                     </div>
                 </form>
@@ -4118,7 +4119,7 @@ function getChannelInfo(channel) {
                                                 </div>
             <div class="modal-body">
                 <div class="mb-5" id="currentParticipants">
-                    <!-- Participantes atuais ser├úo inseridos aqui -->
+                    <!-- Participantes atuais serão inseridos aqui -->
                                                         </div>
                 <div class="separator my-5"></div>
                 <div class="mb-5">
@@ -4141,7 +4142,7 @@ function getChannelInfo(channel) {
                             <span class="path2"></span>
                             <span class="path3"></span>
                         </i>
-                        O agente receber├í um convite e poder├í aceitar ou recusar.
+                        O agente receberí um convite e poderí aceitar ou recusar.
                     </div>
                 </div>
                 
@@ -4190,7 +4191,7 @@ function getChannelInfo(channel) {
                     <div class="mb-5">
                         <label class="form-label fw-semibold mb-2">Anexar arquivo (opcional):</label>
                         <input type="file" class="form-control form-control-solid" id="schedule_message_attachment" name="attachment" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt">
-                        <div class="form-text">Voc├¬ pode anexar imagens, v├¡deos, ├íudios ou documentos</div>
+                        <div class="form-text">Vocì pode anexar imagens, vídeos, íudios ou documentos</div>
                     </div>
                     
                     <div class="mb-5">
@@ -4206,7 +4207,7 @@ function getChannelInfo(channel) {
                     </div>
                     
                     <div class="mb-5">
-                        <label class="form-label fw-semibold mb-3">Op├º├Áes:</label>
+                        <label class="form-label fw-semibold mb-3">OpçÁes:</label>
                         <div class="form-check form-check-custom form-check-solid mb-2">
                             <input class="form-check-input" type="checkbox" id="schedule_cancel_if_resolved" name="cancel_if_resolved">
                             <label class="form-check-label" for="schedule_cancel_if_resolved">
@@ -4216,7 +4217,7 @@ function getChannelInfo(channel) {
                         <div class="form-check form-check-custom form-check-solid">
                             <input class="form-check-input" type="checkbox" id="schedule_cancel_if_responded" name="cancel_if_responded">
                             <label class="form-check-label" for="schedule_cancel_if_responded">
-                                Cancelar se j├í foi respondida
+                                Cancelar se jí foi respondida
                             </label>
                         </div>
                     </div>
@@ -4360,13 +4361,13 @@ function getChannelInfo(channel) {
                     </div>
                     
                     <div class="mb-5" id="new_conversation_whatsapp_account_container">
-                        <label class="form-label fw-semibold mb-2">Integra├º├úo WhatsApp:</label>
+                        <label class="form-label fw-semibold mb-2">Integração WhatsApp:</label>
                         <select class="form-select form-select-solid" id="new_conversation_whatsapp_account" name="whatsapp_account_id">
-                            <option value="">Selecione uma integra├º├úo...</option>
+                            <option value="">Selecione uma integração...</option>
                             <?php 
                             $whatsappAccounts = $whatsappAccounts ?? \App\Models\WhatsAppAccount::getActive();
                             if (empty($whatsappAccounts)): ?>
-                                <option value="" disabled>Nenhuma integra├º├úo WhatsApp ativa encontrada</option>
+                                <option value="" disabled>Nenhuma integração WhatsApp ativa encontrada</option>
                             <?php else: ?>
                                 <?php foreach ($whatsappAccounts as $account): ?>
                                     <option value="<?= $account['id'] ?>">
@@ -4388,9 +4389,9 @@ function getChannelInfo(channel) {
                         <label class="form-label fw-semibold mb-2">Telefone:</label>
                         <div class="input-group">
                             <span class="input-group-text">+55</span>
-                            <input type="text" class="form-control form-control-solid" id="new_contact_phone" name="phone" placeholder="DDD + N├║mero (ex: 11987654321)" maxlength="11" required>
+                            <input type="text" class="form-control form-control-solid" id="new_contact_phone" name="phone" placeholder="DDD + Número (ex: 11987654321)" maxlength="11" required>
                         </div>
-                        <div class="form-text">Digite apenas DDD e n├║mero (ex: 11987654321)</div>
+                        <div class="form-text">Digite apenas DDD e número (ex: 11987654321)</div>
                     </div>
                     
                     <div class="mb-5">
@@ -4413,12 +4414,12 @@ function getChannelInfo(channel) {
     </div>
 </div>
 
-<!-- MODAL: Filtros Avan├ºados -->
+<!-- MODAL: Filtros Avançados -->
 <div class="modal fade" id="kt_modal_advanced_filters" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered mw-700px">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="fw-bold">Filtros Avan├ºados</h2>
+                <h2 class="fw-bold">Filtros Avançados</h2>
                 <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
                     <i class="ki-duotone ki-cross fs-1">
                         <span class="path1"></span>
@@ -4436,7 +4437,7 @@ function getChannelInfo(channel) {
                             $selectedChannels = is_array($filters['channels'] ?? null) ? $filters['channels'] : [];
                             $legacyChannel = $filters['channel'] ?? '';
                             
-                            // Canais dispon├¡veis com ├¡cones SVG oficiais
+                            // Canais disponíveis com ícones SVG oficiais
                             $availableChannels = [
                                 'whatsapp' => ['icon' => getChannelIconSvg('whatsapp', 18), 'name' => 'WhatsApp'],
                                 'whatsapp_official' => ['icon' => getChannelIconSvg('whatsapp_official', 18), 'name' => 'WhatsApp Oficial'],
@@ -4467,9 +4468,9 @@ function getChannelInfo(channel) {
                         <div class="form-text">Selecione um ou mais canais</div>
                     </div>
                     
-                    <!-- Integra├º├Áes WhatsApp (mostrar apenas se WhatsApp selecionado) -->
+                    <!-- IntegraçÁes WhatsApp (mostrar apenas se WhatsApp selecionado) -->
                     <div class="mb-5" id="whatsapp_accounts_filter" style="display: none;">
-                        <label class="form-label fw-semibold mb-2">Integra├º├Áes WhatsApp:</label>
+                        <label class="form-label fw-semibold mb-2">IntegraçÁes WhatsApp:</label>
                         <div class="border rounded p-3" style="max-height: 150px; overflow-y: auto; background: var(--bs-gray-100);">
                             <?php 
                             $whatsappAccounts = \App\Models\WhatsAppAccount::getActive();
@@ -4480,7 +4481,7 @@ function getChannelInfo(channel) {
                                 $selectedAccounts = [(int)$filters['whatsapp_account_id']];
                             }
                             if (empty($whatsappAccounts)): ?>
-                                <div class="text-muted fs-7">Nenhuma integra├º├úo WhatsApp cadastrada</div>
+                                <div class="text-muted fs-7">Nenhuma integração WhatsApp cadastrada</div>
                                             <?php else: ?>
                                 <?php foreach ($whatsappAccounts as $account): ?>
                                     <label class="form-check form-check-custom form-check-solid mb-2">
@@ -4493,7 +4494,7 @@ function getChannelInfo(channel) {
                                 <?php endforeach; ?>
                                             <?php endif; ?>
                         </div>
-                        <div class="form-text">Filtrar por n├║mero/integra├º├úo espec├¡fica do WhatsApp</div>
+                        <div class="form-text">Filtrar por número/integração específica do WhatsApp</div>
                     </div>
                     
                     <!-- Tags (Multi-select) -->
@@ -4530,7 +4531,7 @@ function getChannelInfo(channel) {
                     ?>
                     <?php if ($canViewAllConversations || !empty($agents)): ?>
                     <div class="mb-5">
-                        <label class="form-label fw-semibold mb-2">Agentes Atribu├¡dos:</label>
+                        <label class="form-label fw-semibold mb-2">Agentes Atribuídos:</label>
                         <div class="border rounded p-3" style="max-height: 200px; overflow-y: auto; background: var(--bs-gray-100);">
                             <?php 
                             $selectedAgents = [];
@@ -4540,11 +4541,11 @@ function getChannelInfo(channel) {
                                 $selectedAgents = [(int)$filters['agent_id']];
                             }
                             
-                            // Op├º├úo para n├úo atribu├¡das
+                            // Opção para não atribuídas
                             ?>
                             <label class="form-check form-check-custom form-check-solid mb-2">
                                 <input class="form-check-input" type="checkbox" name="agent_ids[]" value="unassigned" <?= (!empty($filters['agent_id']) && $filters['agent_id'] === 'unassigned') || in_array('unassigned', $selectedAgents) ? 'checked' : '' ?>>
-                                <span class="form-check-label">­ƒö┤ N├úo atribu├¡das</span>
+                                <span class="form-check-label">🔴 Não atribuídas</span>
                             </label>
                             
                             <?php if ($canViewAllConversations && !empty($agents)): ?>
@@ -4637,7 +4638,7 @@ function getChannelInfo(channel) {
                         <label class="form-label fw-semibold mb-2">Etapas:</label>
                         <div class="border rounded p-3" style="max-height: 200px; overflow-y: auto; background: var(--bs-gray-100);">
                             <?php 
-                            // Agrupar etapas por funil para melhor organiza├º├úo
+                            // Agrupar etapas por funil para melhor organização
                             $stagesByFunnel = [];
                             foreach ($allStages as $stage) {
                                 $funnelId = $stage['funnel_id'];
@@ -4694,7 +4695,7 @@ function getChannelInfo(channel) {
             </div>
         </div>
                     
-                    <!-- Per├¡odo -->
+                    <!-- Período -->
                     <div class="row mb-5">
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Data Inicial:</label>
@@ -4720,24 +4721,24 @@ function getChannelInfo(channel) {
                             </label>
                             <label class="form-check form-check-custom form-check-solid">
                                 <input class="form-check-input" type="radio" name="pinned" value="0" <?= isset($filters['pinned']) && $filters['pinned'] === false ? 'checked' : '' ?>>
-                                <span class="form-check-label">N├úo Fixadas</span>
+                                <span class="form-check-label">Não Fixadas</span>
                             </label>
                         </div>
                     </div>
                     
-                    <!-- Ordena├º├úo -->
+                    <!-- Ordenação -->
                     <div class="row mb-5">
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Ordenar por:</label>
                             <select id="filter_order_by" name="order_by" class="form-select form-select-solid">
-                                <option value="">Padr├úo (Atualiza├º├úo)</option>
-                                <option value="last_message" <?= ($filters['order_by'] ?? '') === 'last_message' ? 'selected' : '' ?>>├Ültima Mensagem</option>
-                                <option value="created_at" <?= ($filters['order_by'] ?? '') === 'created_at' ? 'selected' : '' ?>>Data de Cria├º├úo</option>
-                                <option value="updated_at" <?= ($filters['order_by'] ?? '') === 'updated_at' ? 'selected' : '' ?>>├Ültima Atualiza├º├úo</option>
+                                <option value="">Padrão (Atualização)</option>
+                                <option value="last_message" <?= ($filters['order_by'] ?? '') === 'last_message' ? 'selected' : '' ?>>Última Mensagem</option>
+                                <option value="created_at" <?= ($filters['order_by'] ?? '') === 'created_at' ? 'selected' : '' ?>>Data de Criação</option>
+                                <option value="updated_at" <?= ($filters['order_by'] ?? '') === 'updated_at' ? 'selected' : '' ?>>Última Atualização</option>
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Dire├º├úo:</label>
+                            <label class="form-label fw-semibold">Direção:</label>
                             <select id="filter_order_dir" name="order_dir" class="form-select form-select-solid">
                                 <option value="DESC" <?= ($filters['order_dir'] ?? 'DESC') === 'DESC' ? 'selected' : '' ?>>Decrescente</option>
                                 <option value="ASC" <?= ($filters['order_dir'] ?? '') === 'ASC' ? 'selected' : '' ?>>Crescente</option>
@@ -4781,13 +4782,13 @@ function getChannelInfo(channel) {
                     <select id="mentionAgentSelect" class="form-select form-select-solid">
                         <option value="">Carregando agentes...</option>
                     </select>
-                    <div class="form-text">O agente receber├í um convite para participar desta conversa</div>
+                    <div class="form-text">O agente receberí um convite para participar desta conversa</div>
                 </div>
                 <div class="mb-5">
                     <label class="form-label fw-semibold">Nota/Contexto (opcional):</label>
                     <textarea id="mentionAgentNote" class="form-control form-control-solid" rows="3" 
-                              placeholder="Ex: Preciso de ajuda t├®cnica com esta solicita├º├úo..."></textarea>
-                    <div class="form-text">Esta nota ser├í enviada junto com o convite</div>
+                              placeholder="Ex: Preciso de ajuda têcnica com esta solicitação..."></textarea>
+                    <div class="form-text">Esta nota serí enviada junto com o convite</div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -4804,7 +4805,7 @@ function getChannelInfo(channel) {
     </div>
 </div>
 
-<!-- MODAL: Convites e Solicita├º├Áes Pendentes -->
+<!-- MODAL: Convites e SolicitaçÁes Pendentes -->
 <div class="modal fade" id="kt_modal_pending_invites" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered mw-650px">
         <div class="modal-content">
@@ -4817,7 +4818,7 @@ function getChannelInfo(channel) {
                         <span class="path4"></span>
                         <span class="path5"></span>
                     </i>
-                    Convites e Solicita├º├Áes
+                    Convites e SolicitaçÁes
                     <span id="pendingInvitesCountBadge" class="badge badge-circle badge-primary ms-2 d-none">0</span>
                 </h2>
                 <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
@@ -4828,7 +4829,7 @@ function getChannelInfo(channel) {
                 </div>
             </div>
             <div class="modal-body p-0">
-                <!-- Tabs para separar convites de solicita├º├Áes -->
+                <!-- Tabs para separar convites de solicitaçÁes -->
                 <ul class="nav nav-tabs nav-line-tabs nav-line-tabs-2x border-transparent fs-6 fw-semibold mb-0 px-5 pt-3" role="tablist">
                     <li class="nav-item" role="presentation">
                         <a class="nav-link active" data-bs-toggle="tab" href="#tab_invites" role="tab">
@@ -4836,7 +4837,7 @@ function getChannelInfo(channel) {
                                 <span class="path1"></span>
                                 <span class="path2"></span>
                             </i>
-                            Convites para Voc├¬
+                            Convites para Vocì
                             <span id="invitesTabCount" class="badge badge-sm badge-primary ms-2 d-none">0</span>
                         </a>
                     </li>
@@ -4846,14 +4847,14 @@ function getChannelInfo(channel) {
                                 <span class="path1"></span>
                                 <span class="path2"></span>
                             </i>
-                            Solicita├º├Áes de Participa├º├úo
+                            SolicitaçÁes de Participação
                             <span id="requestsTabCount" class="badge badge-sm badge-warning ms-2 d-none">0</span>
                         </a>
                     </li>
                 </ul>
                 
                 <div class="tab-content" style="max-height: 60vh; overflow-y: auto;">
-                    <!-- Tab: Convites para Voc├¬ -->
+                    <!-- Tab: Convites para Vocì -->
                     <div class="tab-pane fade show active p-5" id="tab_invites" role="tabpanel">
                         <div id="pendingInvitesList">
                             <div class="text-center py-10">
@@ -4863,12 +4864,12 @@ function getChannelInfo(channel) {
                         </div>
                     </div>
                     
-                    <!-- Tab: Solicita├º├Áes de Participa├º├úo -->
+                    <!-- Tab: SolicitaçÁes de Participação -->
                     <div class="tab-pane fade p-5" id="tab_requests" role="tabpanel">
                         <div id="pendingRequestsList">
                             <div class="text-center py-10">
                                 <span class="spinner-border spinner-border-sm text-primary"></span>
-                                <span class="ms-2 text-muted">Carregando solicita├º├Áes...</span>
+                                <span class="ms-2 text-muted">Carregando solicitaçÁes...</span>
                             </div>
                         </div>
                     </div>
@@ -4880,11 +4881,11 @@ function getChannelInfo(channel) {
 
 <script>
 // ============================================
-// FUN├ç├òES GLOBAIS - DEFINIR PRIMEIRO
+// FUNÇòES GLOBAIS - DEFINIR PRIMEIRO
 // ============================================
 
 // ============================================
-// SISTEMA DE MEN├ç├òES/CONVITES DE AGENTES
+// SISTEMA DE MENÇòES/CONVITES DE AGENTES
 // ============================================
 
 /**
@@ -4895,12 +4896,12 @@ function startApi4ComCall(conversationId) {
         Swal.fire({
             icon: 'error',
             title: 'Erro',
-            text: 'ID da conversa n├úo encontrado'
+            text: 'ID da conversa não encontrado'
         });
         return;
     }
     
-    // Desabilitar bot├úo durante a requisi├º├úo
+    // Desabilitar botão durante a requisição
     const btn = document.getElementById('btnApi4ComCall');
     if (btn) {
         btn.disabled = true;
@@ -4930,8 +4931,8 @@ function startApi4ComCall(conversationId) {
                 showConfirmButton: false
             });
             
-            // Atualizar interface se necess├írio
-            // Voc├¬ pode adicionar um indicador visual de chamada em andamento aqui
+            // Atualizar interface se necessírio
+            // Vocì pode adicionar um indicador visual de chamada em andamento aqui
         } else {
             Swal.fire({
                 icon: 'error',
@@ -4959,7 +4960,7 @@ function showMentionAgentModal() {
     if (!conversationId) {
         Swal.fire({
             icon: 'warning',
-            title: 'Aten├º├úo',
+            title: 'Atenção',
             text: 'Selecione uma conversa primeiro'
         });
         return;
@@ -4967,7 +4968,7 @@ function showMentionAgentModal() {
     
     const modal = document.getElementById('kt_modal_mention_agent');
     if (!modal) {
-        console.error('Modal de men├º├úo n├úo encontrado');
+        console.error('Modal de menção não encontrado');
         return;
     }
     
@@ -4975,7 +4976,7 @@ function showMentionAgentModal() {
     document.getElementById('mentionAgentSelect').innerHTML = '<option value="">Carregando agentes...</option>';
     document.getElementById('mentionAgentNote').value = '';
     
-    // Carregar agentes dispon├¡veis
+    // Carregar agentes disponíveis
     fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/available-agents`, {
         headers: {
             'X-Requested-With': 'XMLHttpRequest',
@@ -4992,7 +4993,7 @@ function showMentionAgentModal() {
             });
             select.innerHTML = options;
         } else {
-            select.innerHTML = '<option value="">Nenhum agente dispon├¡vel</option>';
+            select.innerHTML = '<option value="">Nenhum agente disponível</option>';
         }
     })
     .catch(error => {
@@ -5006,7 +5007,7 @@ function showMentionAgentModal() {
 }
 
 /**
- * Enviar convite de men├º├úo
+ * Enviar convite de menção
  */
 function sendMentionInvite() {
     const conversationId = window.currentConversationId;
@@ -5016,7 +5017,7 @@ function sendMentionInvite() {
     if (!agentId) {
         Swal.fire({
             icon: 'warning',
-            title: 'Aten├º├úo',
+            title: 'Atenção',
             text: 'Selecione um agente para convidar'
         });
         return;
@@ -5046,7 +5047,7 @@ function sendMentionInvite() {
             Swal.fire({
                 icon: 'success',
                 title: 'Convite Enviado!',
-                text: 'O agente receber├í uma notifica├º├úo para participar da conversa.',
+                text: 'O agente receberí uma notificação para participar da conversa.',
                 timer: 3000,
                 showConfirmButton: false
             });
@@ -5055,7 +5056,7 @@ function sendMentionInvite() {
             const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_mention_agent'));
             if (modal) modal.hide();
             
-            // Atualizar sidebar se estiver aberto (para mostrar nova men├º├úo)
+            // Atualizar sidebar se estiver aberto (para mostrar nova menção)
             if (typeof loadConversationDetails === 'function') {
                 loadConversationDetails(conversationId);
             }
@@ -5083,7 +5084,7 @@ function sendMentionInvite() {
 function showPendingInvitesModal() {
     const modal = document.getElementById('kt_modal_pending_invites');
     if (!modal) {
-        console.error('Modal de convites n├úo encontrado');
+        console.error('Modal de convites não encontrado');
         return;
     }
     
@@ -5136,7 +5137,7 @@ function loadPendingInvites() {
         container.innerHTML = '<div class="text-center py-10 text-muted">Erro ao carregar convites</div>';
     });
     
-    // Tamb├®m carregar solicita├º├Áes de participa├º├úo
+    // Tambêm carregar solicitaçÁes de participação
     loadPendingRequestsModal();
 }
 
@@ -5153,12 +5154,12 @@ function updateInvitesTabCount(count) {
             badge.classList.add('d-none');
         }
     }
-    // Atualizar contador geral tamb├®m
+    // Atualizar contador geral tambêm
     updatePendingInvitesCount(count);
 }
 
 /**
- * Carregar solicita├º├Áes de participa├º├úo pendentes (no modal)
+ * Carregar solicitaçÁes de participação pendentes (no modal)
  */
 function loadPendingRequestsModal() {
     const container = document.getElementById('pendingRequestsList');
@@ -5167,7 +5168,7 @@ function loadPendingRequestsModal() {
     container.innerHTML = `
         <div class="text-center py-10">
             <span class="spinner-border spinner-border-sm text-primary"></span>
-            <span class="ms-2 text-muted">Carregando solicita├º├Áes...</span>
+            <span class="ms-2 text-muted">Carregando solicitaçÁes...</span>
         </div>
     `;
     
@@ -5191,17 +5192,17 @@ function loadPendingRequestsModal() {
             renderPendingRequestsModal(data.requests || []);
             updateRequestsTabCount(data.count || 0);
         } else {
-            container.innerHTML = '<div class="text-center py-10 text-muted">Erro ao carregar solicita├º├Áes</div>';
+            container.innerHTML = '<div class="text-center py-10 text-muted">Erro ao carregar solicitaçÁes</div>';
         }
     })
     .catch(error => {
         console.error('Erro:', error);
-        container.innerHTML = '<div class="text-center py-10 text-muted">Erro ao carregar solicita├º├Áes</div>';
+        container.innerHTML = '<div class="text-center py-10 text-muted">Erro ao carregar solicitaçÁes</div>';
     });
 }
 
 /**
- * Atualizar contador de solicita├º├Áes na tab
+ * Atualizar contador de solicitaçÁes na tab
  */
 function updateRequestsTabCount(count) {
     const badge = document.getElementById('requestsTabCount');
@@ -5216,7 +5217,7 @@ function updateRequestsTabCount(count) {
 }
 
 /**
- * Renderizar lista de solicita├º├Áes de participa├º├úo no modal
+ * Renderizar lista de solicitaçÁes de participação no modal
  */
 function renderPendingRequestsModal(requests) {
     const container = document.getElementById('pendingRequestsList');
@@ -5229,8 +5230,8 @@ function renderPendingRequestsModal(requests) {
                     <span class="path1"></span>
                     <span class="path2"></span>
                 </i>
-                <h5 class="text-muted">Nenhuma solicita├º├úo pendente</h5>
-                <p class="text-gray-500 fs-7">N├úo h├í agentes solicitando participar das suas conversas</p>
+                <h5 class="text-muted">Nenhuma solicitação pendente</h5>
+                <p class="text-gray-500 fs-7">Não hí agentes solicitando participar das suas conversas</p>
             </div>
         `;
         return;
@@ -5314,12 +5315,12 @@ function renderPendingRequestsModal(requests) {
 }
 
 /**
- * Aprovar solicita├º├úo a partir do modal
+ * Aprovar solicitação a partir do modal
  */
 function approveRequestFromModal(requestId) {
     Swal.fire({
-        title: 'Aprovar solicita├º├úo?',
-        text: 'Este agente ser├í adicionado como participante da conversa.',
+        title: 'Aprovar solicitação?',
+        text: 'Este agente serí adicionado como participante da conversa.',
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: 'Sim, aprovar',
@@ -5345,19 +5346,19 @@ function approveRequestFromModal(requestId) {
                     Swal.fire({
                         icon: 'success',
                         title: 'Aprovado!',
-                        text: 'O agente agora ├® participante da conversa.',
+                        text: 'O agente agora ê participante da conversa.',
                         timer: 2000,
                         showConfirmButton: false
                     });
                     
-                    // Recarregar lista de solicita├º├Áes
+                    // Recarregar lista de solicitaçÁes
                     loadPendingRequestsModal();
                     loadPendingInvitesCount();
                 } else {
                     Swal.fire({
                         icon: 'error',
                         title: 'Erro',
-                        text: data.message || 'Erro ao aprovar solicita├º├úo'
+                        text: data.message || 'Erro ao aprovar solicitação'
                     });
                 }
             })
@@ -5366,7 +5367,7 @@ function approveRequestFromModal(requestId) {
                 Swal.fire({
                     icon: 'error',
                     title: 'Erro',
-                    text: 'Erro ao aprovar solicita├º├úo'
+                    text: 'Erro ao aprovar solicitação'
                 });
             });
         }
@@ -5374,12 +5375,12 @@ function approveRequestFromModal(requestId) {
 }
 
 /**
- * Recusar solicita├º├úo a partir do modal
+ * Recusar solicitação a partir do modal
  */
 function rejectRequestFromModal(requestId) {
     Swal.fire({
-        title: 'Recusar solicita├º├úo?',
-        text: 'Esta a├º├úo n├úo poder├í ser desfeita.',
+        title: 'Recusar solicitação?',
+        text: 'Esta ação não poderí ser desfeita.',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Sim, recusar',
@@ -5400,19 +5401,19 @@ function rejectRequestFromModal(requestId) {
                     Swal.fire({
                         icon: 'success',
                         title: 'Recusada',
-                        text: 'Solicita├º├úo recusada.',
+                        text: 'Solicitação recusada.',
                         timer: 2000,
                         showConfirmButton: false
                     });
                     
-                    // Recarregar lista de solicita├º├Áes
+                    // Recarregar lista de solicitaçÁes
                     loadPendingRequestsModal();
                     loadPendingInvitesCount();
                 } else {
                     Swal.fire({
                         icon: 'error',
                         title: 'Erro',
-                        text: data.message || 'Erro ao recusar solicita├º├úo'
+                        text: data.message || 'Erro ao recusar solicitação'
                     });
                 }
             })
@@ -5421,7 +5422,7 @@ function rejectRequestFromModal(requestId) {
                 Swal.fire({
                     icon: 'error',
                     title: 'Erro',
-                    text: 'Erro ao recusar solicita├º├úo'
+                    text: 'Erro ao recusar solicitação'
                 });
             });
         }
@@ -5429,7 +5430,7 @@ function rejectRequestFromModal(requestId) {
 }
 
 /**
- * Ver conversa a partir de solicita├º├úo no modal
+ * Ver conversa a partir de solicitação no modal
  */
 function viewConversationFromRequest(conversationId) {
     if (typeof selectConversation === 'function') {
@@ -5455,7 +5456,7 @@ function renderPendingInvites(invites) {
                     <span class="path2"></span>
                 </i>
                 <h5 class="text-muted">Nenhum convite pendente</h5>
-                <p class="text-gray-500 fs-7">Voc├¬ n├úo tem convites para participar de conversas</p>
+                <p class="text-gray-500 fs-7">Vocì não tem convites para participar de conversas</p>
             </div>
         `;
         return;
@@ -5486,10 +5487,10 @@ function renderPendingInvites(invites) {
                         <span class="badge badge-light-warning fs-8">${timeAgo}</span>
                     </div>
                     <p class="text-muted fs-7 mb-2">
-                        <strong>${escapeHtml(invite.mentioned_by_name || 'Algu├®m')}</strong> convidou voc├¬ para esta conversa
+                        <strong>${escapeHtml(invite.mentioned_by_name || 'Alguêm')}</strong> convidou vocì para esta conversa
                     </p>
                     ${invite.note ? `<div class="bg-white rounded p-2 mb-2 fs-7"><em>"${escapeHtml(invite.note)}"</em></div>` : ''}
-                    ${invite.last_message ? `<div class="text-gray-600 fs-7 mb-2">├Ültima mensagem: ${escapeHtml(invite.last_message.substring(0, 50))}${invite.last_message.length > 50 ? '...' : ''}</div>` : ''}
+                    ${invite.last_message ? `<div class="text-gray-600 fs-7 mb-2">Última mensagem: ${escapeHtml(invite.last_message.substring(0, 50))}${invite.last_message.length > 50 ? '...' : ''}</div>` : ''}
                     <div class="d-flex gap-2 mt-3">
                         <button class="btn btn-sm btn-success" onclick="acceptInvite(${invite.id}, ${invite.conversation_id})">
                             <i class="ki-duotone ki-check fs-6 me-1">
@@ -5528,7 +5529,7 @@ function renderPendingInvites(invites) {
 function acceptInvite(mentionId, conversationId) {
     Swal.fire({
         title: 'Aceitar convite?',
-        text: 'Voc├¬ ser├í adicionado como participante desta conversa.',
+        text: 'Vocì serí adicionado como participante desta conversa.',
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: 'Sim, aceitar',
@@ -5553,7 +5554,7 @@ function acceptInvite(mentionId, conversationId) {
                     Swal.fire({
                         icon: 'success',
                         title: 'Convite aceito!',
-                        text: 'Voc├¬ agora ├® participante da conversa.',
+                        text: 'Vocì agora ê participante da conversa.',
                         timer: 2000,
                         showConfirmButton: false
                     });
@@ -5601,7 +5602,7 @@ function acceptInvite(mentionId, conversationId) {
 function declineInvite(mentionId) {
     Swal.fire({
         title: 'Recusar convite?',
-        text: 'O convite ser├í marcado como recusado.',
+        text: 'O convite serí marcado como recusado.',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Sim, recusar',
@@ -5703,7 +5704,7 @@ function loadPendingInvitesCount() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Atualizar contador total (convites + solicita├º├Áes)
+            // Atualizar contador total (convites + solicitaçÁes)
             updatePendingInvitesCount(data.total_count || 0);
             
             // Atualizar contadores das tabs
@@ -5711,14 +5712,14 @@ function loadPendingInvitesCount() {
             updateRequestsTabCount(data.requests_count || 0);
         }
     })
-    .catch(error => console.error('Erro ao carregar contagem de convites/solicita├º├Áes:', error));
+    .catch(error => console.error('Erro ao carregar contagem de convites/solicitaçÁes:', error));
 }
 
 // Carregar contagem de convites ao iniciar
 document.addEventListener('DOMContentLoaded', function() {
     loadPendingInvitesCount();
     
-    // Atualizar a cada 30 segundos (fallback caso WebSocket n├úo funcione)
+    // Atualizar a cada 30 segundos (fallback caso WebSocket não funcione)
     setInterval(loadPendingInvitesCount, 30000);
     
     // Configurar listeners WebSocket para convites em tempo real
@@ -5726,12 +5727,12 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 /**
- * Configurar listeners WebSocket para notifica├º├Áes de convites em tempo real
+ * Configurar listeners WebSocket para notificaçÁes de convites em tempo real
  */
 function setupInviteWebSocketListeners() {
-    // Verificar se o cliente WebSocket est├í dispon├¡vel
+    // Verificar se o cliente WebSocket estí disponível
     if (typeof window.realtimeClient === 'undefined' && typeof window.websocketClient === 'undefined') {
-        console.warn('[Convites] Cliente WebSocket n├úo encontrado, usando apenas polling');
+        console.warn('[Convites] Cliente WebSocket não encontrado, usando apenas polling');
         return;
     }
     
@@ -5742,13 +5743,13 @@ function setupInviteWebSocketListeners() {
         // Atualizar contador do sino
         loadPendingInvitesCount();
         
-        // Mostrar notifica├º├úo toast
+        // Mostrar notificação toast
         if (typeof Swal !== 'undefined') {
             const mentionData = data.mention || data;
             Swal.fire({
                 icon: 'info',
                 title: 'Novo Convite!',
-                html: `<strong>${escapeHtml(mentionData.mentioned_by_name || 'Um agente')}</strong> convidou voc├¬ para participar de uma conversa.`,
+                html: `<strong>${escapeHtml(mentionData.mentioned_by_name || 'Um agente')}</strong> convidou vocì para participar de uma conversa.`,
                 toast: true,
                 position: 'top-end',
                 showConfirmButton: true,
@@ -5764,7 +5765,7 @@ function setupInviteWebSocketListeners() {
             });
         }
         
-        // Tocar som de notifica├º├úo se dispon├¡vel
+        // Tocar som de notificação se disponível
         if (typeof playNotificationSound === 'function') {
             playNotificationSound();
         }
@@ -5774,7 +5775,7 @@ function setupInviteWebSocketListeners() {
     client.on('mention_accepted', (data) => {
         const mentionData = data.mention || data;
         
-        // Mostrar notifica├º├úo
+        // Mostrar notificação
         if (typeof Swal !== 'undefined') {
             Swal.fire({
                 icon: 'success',
@@ -5803,7 +5804,7 @@ function setupInviteWebSocketListeners() {
     client.on('mention_declined', (data) => {
         const mentionData = data.mention || data;
         
-        // Mostrar notifica├º├úo
+        // Mostrar notificação
         if (typeof Swal !== 'undefined') {
             Swal.fire({
                 icon: 'warning',
@@ -5823,9 +5824,9 @@ function setupInviteWebSocketListeners() {
         }
     });
     
-    // Listener para atualiza├º├úo de conversa (quando algu├®m ├® adicionado como participante)
+    // Listener para atualização de conversa (quando alguêm ê adicionado como participante)
     client.on('conversation_updated', (data) => {
-        // Se o update inclui mudan├ºa de participantes, atualizar
+        // Se o update inclui mudança de participantes, atualizar
         if (data && data.type && data.type.includes('mention')) {
             if (data.conversation_id && window.currentConversationId == data.conversation_id) {
                 loadParticipantsForConversation(data.conversation_id);
@@ -5834,21 +5835,21 @@ function setupInviteWebSocketListeners() {
     });
     
     // ============================================
-    // LISTENERS PARA SOLICITA├ç├òES DE PARTICIPA├ç├âO
+    // LISTENERS PARA SOLICITAÇòES DE PARTICIPAÇâO
     // ============================================
     
-    // Listener para nova solicita├º├úo de participa├º├úo
+    // Listener para nova solicitação de participação
     client.on('new_participation_request', (data) => {
         // Atualizar contador do sino
         loadPendingInvitesCount();
         
-        // Mostrar notifica├º├úo toast
+        // Mostrar notificação toast
         if (typeof Swal !== 'undefined') {
             const requestData = data.mention || data;
             Swal.fire({
                 icon: 'info',
-                title: 'Nova Solicita├º├úo!',
-                html: `<strong>${escapeHtml(requestData.mentioned_by_name || 'Um agente')}</strong> est├í solicitando participar de uma conversa.`,
+                title: 'Nova Solicitação!',
+                html: `<strong>${escapeHtml(requestData.mentioned_by_name || 'Um agente')}</strong> estí solicitando participar de uma conversa.`,
                 toast: true,
                 position: 'top-end',
                 showConfirmButton: true,
@@ -5860,7 +5861,7 @@ function setupInviteWebSocketListeners() {
             }).then(result => {
                 if (result.isConfirmed) {
                     showPendingInvitesModal();
-                    // Ir para aba de solicita├º├Áes
+                    // Ir para aba de solicitaçÁes
                     const requestsTab = document.querySelector('a[href="#tab_requests"]');
                     if (requestsTab) {
                         const tab = new bootstrap.Tab(requestsTab);
@@ -5870,28 +5871,28 @@ function setupInviteWebSocketListeners() {
             });
         }
         
-        // Se estiver na conversa que recebeu a solicita├º├úo, mostrar banner
+        // Se estiver na conversa que recebeu a solicitação, mostrar banner
         if (data.mention && data.mention.conversation_id == window.currentConversationId) {
             // Recarregar conversa para mostrar o banner
             selectConversation(window.currentConversationId);
         }
         
-        // Tocar som de notifica├º├úo se dispon├¡vel
+        // Tocar som de notificação se disponível
         if (typeof playNotificationSound === 'function') {
             playNotificationSound();
         }
     });
     
-    // Listener para solicita├º├úo aprovada (quem solicitou recebe)
+    // Listener para solicitação aprovada (quem solicitou recebe)
     client.on('request_approved', (data) => {
         const requestData = data.mention || data;
         
-        // Mostrar notifica├º├úo
+        // Mostrar notificação
         if (typeof Swal !== 'undefined') {
             Swal.fire({
                 icon: 'success',
-                title: 'Solicita├º├úo Aprovada!',
-                html: `Voc├¬ agora ├® participante da conversa.`,
+                title: 'Solicitação Aprovada!',
+                html: `Vocì agora ê participante da conversa.`,
                 toast: true,
                 position: 'top-end',
                 showConfirmButton: true,
@@ -5916,16 +5917,16 @@ function setupInviteWebSocketListeners() {
         }
     });
     
-    // Listener para solicita├º├úo recusada (quem solicitou recebe)
+    // Listener para solicitação recusada (quem solicitou recebe)
     client.on('request_rejected', (data) => {
         const requestData = data.mention || data;
         
-        // Mostrar notifica├º├úo
+        // Mostrar notificação
         if (typeof Swal !== 'undefined') {
             Swal.fire({
                 icon: 'warning',
-                title: 'Solicita├º├úo Recusada',
-                html: `Sua solicita├º├úo de participa├º├úo foi recusada.`,
+                title: 'Solicitação Recusada',
+                html: `Sua solicitação de participação foi recusada.`,
                 toast: true,
                 position: 'top-end',
                 showConfirmButton: false,
@@ -5935,27 +5936,27 @@ function setupInviteWebSocketListeners() {
         }
     });
     
-    console.log('[Convites] Ô£à Listeners WebSocket configurados para convites e solicita├º├Áes em tempo real');
+    console.log('[Convites] ✓ Listeners WebSocket configurados para convites e solicitaçÁes em tempo real');
 }
 
 // ============================================
-// FIM SISTEMA DE MEN├ç├òES/CONVITES
+// FIM SISTEMA DE MENÇòES/CONVITES
 // ============================================
 
-// Mostrar modal de nova conversa (definir IMEDIATAMENTE para estar dispon├¡vel globalmente)
-// Esta fun├º├úo DEVE estar definida antes de qualquer HTML que possa tentar us├í-la
+// Mostrar modal de nova conversa (definir IMEDIATAMENTE para estar disponível globalmente)
+// Esta função DEVE estar definida antes de qualquer HTML que possa tentar usí-la
 function showNewConversationModal() {
     const modal = document.getElementById('kt_modal_new_conversation');
     if (!modal) {
-        console.error('Modal de nova conversa n├úo encontrado');
+        console.error('Modal de nova conversa não encontrado');
         return;
     }
     
-    // Limpar formul├írio
+    // Limpar formulírio
     const form = modal.querySelector('#newConversationForm');
     if (form) form.reset();
     
-    // Resetar canal para WhatsApp (padr├úo)
+    // Resetar canal para WhatsApp (padrão)
     const channelSelect = modal.querySelector('#new_conversation_channel');
     if (channelSelect) {
         channelSelect.value = 'whatsapp';
@@ -5974,11 +5975,11 @@ function showNewConversationModal() {
     }, 300);
 }
 
-// Garantir que a fun├º├úo esteja no escopo global IMEDIATAMENTE
+// Garantir que a função esteja no escopo global IMEDIATAMENTE
 window.showNewConversationModal = showNewConversationModal;
 
 // ============================================
-// FUN├ç├òES DE IA - DEFINIR IMEDIATAMENTE
+// FUNÇòES DE IA - DEFINIR IMEDIATAMENTE
 // ============================================
 
 /**
@@ -6097,20 +6098,20 @@ window.updateAIAgentSidebar = function(status) {
         if (addSection) addSection.style.display = 'block';
     }
     
-    // Atualizar banner de IA ativa (se a fun├º├úo existir)
+    // Atualizar banner de IA ativa (se a função existir)
     if (typeof window.updateAIActiveBanner === 'function') {
         const conversationId = window.currentConversationId || 0;
         window.updateAIActiveBanner(status, conversationId);
     }
 };
 
-// Fallback: fun├º├Áes de automa├º├úo no sidebar (caso n├úo venham de sidebar-conversation.php)
+// Fallback: funçÁes de automação no sidebar (caso não venham de sidebar-conversation.php)
 if (typeof window.updateAutomationSidebar !== 'function') {
     window.updateAutomationSidebar = function(data) {
         const statusDiv = document.getElementById('sidebar-automation-status');
         if (!statusDiv) return;
         if (!data || !data.has_automation || !data.automation) {
-            statusDiv.innerHTML = '<div class="text-muted fs-7">Nenhuma automa├º├úo ativa</div>';
+            statusDiv.innerHTML = '<div class="text-muted fs-7">Nenhuma automação ativa</div>';
             return;
         }
         const automation = data.automation;
@@ -6123,9 +6124,9 @@ if (typeof window.updateAutomationSidebar !== 'function') {
                     <span class="badge ${autoStatus === 'active' ? 'badge-success' : 'badge-light'}">${autoStatus === 'active' ? 'Ativa' : 'Inativa'}</span>
                     ${automation.trigger_type ? `<span class="badge badge-light">${escapeHtml(automation.trigger_type)}</span>` : ''}
                 </div>
-                <div class="fw-semibold">${escapeHtml(automation.name || 'Automa├º├úo')}</div>
-                <div class="text-muted fs-8">Execu├º├úo: ${escapeHtml(execStatus)}</div>
-                <div class="text-muted fs-8">├Ültima: ${lastExec}</div>
+                <div class="fw-semibold">${escapeHtml(automation.name || 'Automação')}</div>
+                <div class="text-muted fs-8">Execução: ${escapeHtml(execStatus)}</div>
+                <div class="text-muted fs-8">Última: ${lastExec}</div>
             </div>
         `;
     };
@@ -6171,13 +6172,13 @@ window.showAddAIAgentModal = function() {
     if (!conversationId) {
         Swal.fire({
             icon: 'warning',
-            title: 'Aten├º├úo',
+            title: 'Atenção',
             text: 'Selecione uma conversa primeiro'
         });
         return;
     }
     
-    // Carregar agentes dispon├¡veis
+    // Carregar agentes disponíveis
     const url = `<?= \App\Helpers\Url::to('/ai-agents/available') ?>`;
     
     fetch(url, {
@@ -6194,7 +6195,7 @@ window.showAddAIAgentModal = function() {
             try {
                 return JSON.parse(text);
             } catch (e) {
-                throw new Error('Resposta n├úo ├® um JSON v├ílido.');
+                throw new Error('Resposta não ê um JSON vílido.');
             }
         });
     })
@@ -6202,8 +6203,8 @@ window.showAddAIAgentModal = function() {
         if (!data.success || !data.data || data.data.length === 0) {
             Swal.fire({
                 icon: 'warning',
-                title: 'Aten├º├úo',
-                text: data.message || 'Nenhum agente de IA dispon├¡vel'
+                title: 'Atenção',
+                text: data.message || 'Nenhum agente de IA disponível'
             });
             return;
         }
@@ -6247,7 +6248,7 @@ window.showAddAIAgentModal = function() {
                         <label class="form-check form-check-custom form-check-solid">
                             <input class="form-check-input" type="checkbox" id="swal-only-if-unassigned">
                             <span class="form-check-label">
-                                Apenas se n├úo tiver agente atribu├¡do
+                                Apenas se não tiver agente atribuído
                             </span>
                         </label>
                     </div>
@@ -6291,7 +6292,7 @@ window.showAddAIAgentModal = function() {
 };
 
 /**
- * Adicionar agente de IA ├á conversa
+ * Adicionar agente de IA á conversa
  */
 window.addAIAgentToConversation = function(conversationId, data) {
     const btn = Swal.getConfirmButton();
@@ -6318,12 +6319,12 @@ window.addAIAgentToConversation = function(conversationId, data) {
                         showConfirmButton: false
                     });
                     
-                    // Recarregar status da IA ap├│s atualiza├º├úo do banco
+                    // Recarregar status da IA após atualização do banco
                     setTimeout(() => {
                         window.loadAIAgentStatus(conversationId);
                     }, 500);
                     
-                    // Recarregar conversa se necess├írio
+                    // Recarregar conversa se necessírio
                     if (typeof selectConversation === 'function') {
                         selectConversation(conversationId);
                     }
@@ -6346,14 +6347,14 @@ window.addAIAgentToConversation = function(conversationId, data) {
 };
 
 /**
- * Mostrar hist├│rico de mensagens da IA
+ * Mostrar histórico de mensagens da IA
  */
 window.showAIHistory = function() {
     const conversationId = window.currentConversationId || 0;
     if (!conversationId) {
         Swal.fire({
             icon: 'warning',
-            title: 'Aten├º├úo',
+            title: 'Atenção',
             text: 'Selecione uma conversa primeiro'
         });
         return;
@@ -6369,7 +6370,7 @@ window.showAIHistory = function() {
     .then(response => response.json())
     .then(data => {
         if (!data.success) {
-            throw new Error(data.message || 'Erro ao carregar hist├│rico');
+            throw new Error(data.message || 'Erro ao carregar histórico');
         }
         
         const messages = data.data || [];
@@ -6377,7 +6378,7 @@ window.showAIHistory = function() {
         if (messages.length === 0) {
             Swal.fire({
                 icon: 'info',
-                title: 'Hist├│rico',
+                title: 'Histórico',
                 text: 'Nenhuma mensagem da IA encontrada'
             });
             return;
@@ -6408,7 +6409,7 @@ window.showAIHistory = function() {
                 });
                 
                 const toolsHtml = msg.tools_used && msg.tools_used.length > 0
-                    ? `<div class="mt-2"><small class="text-muted">­ƒöº Tools: ${msg.tools_used.join(', ')}</small></div>`
+                    ? `<div class="mt-2"><small class="text-muted">🔌 Tools: ${msg.tools_used.join(', ')}</small></div>`
                     : '';
                 
                 const escapeDiv = document.createElement('div');
@@ -6427,7 +6428,7 @@ window.showAIHistory = function() {
             }).join('');
             
             Swal.fire({
-                title: `Hist├│rico - ${agentName}`,
+                title: `Histórico - ${agentName}`,
                 html: `
                     <div style="max-height: 400px; overflow-y: auto; text-align: left;">
                         ${messagesHtml}
@@ -6444,7 +6445,7 @@ window.showAIHistory = function() {
         Swal.fire({
             icon: 'error',
             title: 'Erro',
-            text: error.message || 'Erro ao carregar hist├│rico da IA'
+            text: error.message || 'Erro ao carregar histórico da IA'
         });
     });
 };
@@ -6457,7 +6458,7 @@ window.removeAIAgent = function() {
     if (!conversationId) {
         Swal.fire({
             icon: 'warning',
-            title: 'Aten├º├úo',
+            title: 'Atenção',
             text: 'Selecione uma conversa primeiro'
         });
         return;
@@ -6473,7 +6474,7 @@ window.removeAIAgent = function() {
                     <label class="form-check form-check-custom form-check-solid">
                         <input class="form-check-input" type="checkbox" id="swal-assign-to-human" checked>
                         <span class="form-check-label">
-                            Atribuir a agente humano ap├│s remover
+                            Atribuir a agente humano após remover
                         </span>
                     </label>
                 </div>
@@ -6481,7 +6482,7 @@ window.removeAIAgent = function() {
                 <div id="swal-human-agent-select-container" style="display: none;">
                     <label class="form-label">Selecione o agente:</label>
                     <select id="swal-human-agent-select" class="form-select">
-                        <option value="">Distribui├º├úo autom├ítica</option>
+                        <option value="">Distribuição automítica</option>
                     </select>
                 </div>
             </div>
@@ -6504,7 +6505,7 @@ window.removeAIAgent = function() {
             return {
                 assign_to_human: assignToHuman,
                 human_agent_id: humanAgentId || null,
-                reason: 'Removido manualmente pelo usu├írio'
+                reason: 'Removido manualmente pelo usuírio'
             };
         }
     }).then((result) => {
@@ -6536,7 +6537,7 @@ window.removeAIAgent = function() {
                     // Recarregar status da IA
                     window.loadAIAgentStatus(conversationId);
                     
-                    // Recarregar conversa se necess├írio
+                    // Recarregar conversa se necessírio
                     if (typeof selectConversation === 'function') {
                         selectConversation(conversationId);
                     }
@@ -6561,13 +6562,13 @@ window.removeAIAgent = function() {
 };
 
 // ============================================
-// VARI├üVEIS E OUTRAS FUN├ç├òES
+// VARIüVEIS E OUTRAS FUNÇòES
 // ============================================
 
 // Capturar erros globais para diagnosticar rapidamente
 window.onerror = function(message, source, lineno, colno, error) {
     console.error('Erro global capturado:', { message, source, lineno, colno, error });
-    // Mostrar alerta m├¡nimo para o usu├írio perceber
+    // Mostrar alerta mínimo para o usuírio perceber
     try {
         Swal.fire({
             icon: 'error',
@@ -6582,7 +6583,7 @@ window.onerror = function(message, source, lineno, colno, error) {
 };
 
 window.addEventListener('unhandledrejection', function(event) {
-    console.error('Promise rejeitada n├úo tratada:', event.reason);
+    console.error('Promise rejeitada não tratada:', event.reason);
     try {
         Swal.fire({
             icon: 'error',
@@ -6604,21 +6605,21 @@ window.addEventListener('error', function(e) {
     }
 }, true);
 
-// Selecionar conversa (carregar via AJAX sem recarregar p├ígina)
-// Sistema de Polling (fallback quando WebSocket n├úo est├í dispon├¡vel)
-// Declarar vari├íveis e fun├º├Áes ANTES de serem usadas
+// Selecionar conversa (carregar via AJAX sem recarregar pígina)
+// Sistema de Polling (fallback quando WebSocket não estí disponível)
+// Declarar variíveis e funçÁes ANTES de serem usadas
 let pollingInterval = null;
 let lastMessageId = null;
 let currentPollingConversationId = null;
 
-// Sistema de Pagina├º├úo Infinita
+// Sistema de Paginação Infinita
 let isLoadingMessages = false;
 let hasMoreMessages = true;
 let oldestMessageId = null;
 let currentConversationId = null;
 let currentContactAvatar = null; // Avatar do contato da conversa atual
 
-// Helper para converter valores vindos do PHP em JSON v├ílido
+// Helper para converter valores vindos do PHP em JSON vílido
 function parsePhpJson(value) {
     try {
         return JSON.parse(value);
@@ -6627,18 +6628,18 @@ function parsePhpJson(value) {
     }
 }
 
-// Se j├í vier um ID da URL/PHP, setar na inicializa├º├úo
+// Se jí vier um ID da URL/PHP, setar na inicialização
 const initialConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
 if (initialConversationId) {
     currentConversationId = initialConversationId;
     currentContactAvatar = parsePhpJson('<?= json_encode($selectedConversation['contact_avatar'] ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
 }
 
-// Fun├º├úo para adicionar event listener ao bot├úo (funciona mesmo se DOM j├í estiver carregado)
+// Função para adicionar event listener ao botão (funciona mesmo se DOM jí estiver carregado)
 function attachNewConversationButton() {
     const btnNewConversation = document.getElementById('btn_new_conversation');
     if (btnNewConversation) {
-        // Verificar se j├í tem listener (evitar duplica├º├úo)
+        // Verificar se jí tem listener (evitar duplicação)
         if (btnNewConversation.dataset.listenerAttached === 'true') {
             return;
         }
@@ -6657,15 +6658,15 @@ function attachNewConversationButton() {
     }
 }
 
-// Tentar adicionar o listener imediatamente (se DOM j├í estiver pronto)
+// Tentar adicionar o listener imediatamente (se DOM jí estiver pronto)
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', attachNewConversationButton);
 } else {
-    // DOM j├í est├í pronto, executar imediatamente
-    setTimeout(attachNewConversationButton, 100); // Pequeno delay para garantir que tudo est├í pronto
+    // DOM jí estí pronto, executar imediatamente
+    setTimeout(attachNewConversationButton, 100); // Pequeno delay para garantir que tudo estí pronto
 }
 
-// Garantir inscri├º├úo no cliente de tempo real para conversas da lista (necess├írio no modo polling)
+// Garantir inscrição no cliente de tempo real para conversas da lista (necessírio no modo polling)
 function subscribeVisibleConversations() {
     if (typeof window.wsClient === 'undefined') return;
     const items = document.querySelectorAll('.conversation-item[data-conversation-id]');
@@ -6691,7 +6692,7 @@ function updateConversationTimes() {
     });
 }
 
-// Remover badge (n├úo lidas) de uma conversa na lista
+// Remover badge (não lidas) de uma conversa na lista
 function removeConversationBadge(conversationId) {
     if (!conversationId) return;
     const conversationItem = document.querySelector(`[data-conversation-id="${conversationId}"]`);
@@ -6709,20 +6710,20 @@ function moveConversationToTop(conversationId) {
     }
 }
 
-// Verificar se h├í dropdown aberto em uma conversa
+// Verificar se hí dropdown aberto em uma conversa
 function hasOpenDropdown(conversationId) {
     const conversationItem = document.querySelector(`[data-conversation-id="${conversationId}"]`);
     if (!conversationItem) return false;
     const dropdown = conversationItem.querySelector('.conversation-item-actions');
     if (!dropdown) return false;
-    // Verificar m├║ltiplas formas de detectar dropdown aberto
+    // Verificar múltiplas formas de detectar dropdown aberto
     return dropdown.classList.contains('show') || 
            dropdown.querySelector('.dropdown-menu.show') ||
            dropdown.dataset.isOpen === 'true' ||
            dropdown.querySelector('button[aria-expanded="true"]') !== null;
 }
 
-// Preservar dropdown aberto durante atualiza├º├Áes
+// Preservar dropdown aberto durante atualizaçÁes
 function preserveOpenDropdown(conversationId) {
     const conversationItem = document.querySelector(`[data-conversation-id="${conversationId}"]`);
     if (!conversationItem) return null;
@@ -6732,7 +6733,7 @@ function preserveOpenDropdown(conversationId) {
     return isOpen ? conversationId : null;
 }
 
-// Restaurar dropdown aberto ap├│s atualiza├º├úo
+// Restaurar dropdown aberto após atualização
 function restoreOpenDropdown(conversationId) {
     if (!conversationId) return;
     setTimeout(() => {
@@ -6748,12 +6749,12 @@ function restoreOpenDropdown(conversationId) {
     }, 50);
 }
 
-// Garantir que o dropdown de a├º├Áes exista e reflita o estado
+// Garantir que o dropdown de açÁes exista e reflita o estado
 function ensureActionsDropdown(conversationItem, pinned, conversationId, preserveOpen = false) {
     const timeContainer = conversationItem.querySelector('.conversation-item-time');
     if (!timeContainer) return;
 
-    // Verificar se dropdown est├í aberto antes de remover
+    // Verificar se dropdown estí aberto antes de remover
     const wasOpen = preserveOpen && hasOpenDropdown(conversationId);
 
     // Remover dropdown existente se houver
@@ -6804,7 +6805,7 @@ function ensureActionsDropdown(conversationItem, pinned, conversationId, preserv
                             <span class="path1"></span>
                             <span class="path2"></span>
                         </i>
-                        Marcar como N├úo Lido
+                        Marcar como Não Lido
                     </a>
                 </li>
                 <li><hr class="dropdown-divider"></li>
@@ -6840,13 +6841,13 @@ function ensureActionsDropdown(conversationItem, pinned, conversationId, preserv
 // Atualizar atributos de data (updated_at) e resortear a lista
 function updateConversationMeta(conversationItem, conv) {
     if (!conversationItem || !conv) return;
-    // Manter estabilidade da ordena├º├úo: priorizar last_message_at; se n├úo houver, manter valor atual; por ├║ltimo usar updated_at
+    // Manter estabilidade da ordenação: priorizar last_message_at; se não houver, manter valor atual; por último usar updated_at
     const currentUpdated = conversationItem.dataset.updatedAt || null;
     const updatedAt = conv.last_message_at || currentUpdated || conv.updated_at || new Date().toISOString();
     conversationItem.dataset.updatedAt = updatedAt;
 }
 
-// Determinar se a ├║ltima mensagem foi do agente (para mostrar borda verde/SLA ok)
+// Determinar se a última mensagem foi do agente (para mostrar borda verde/SLA ok)
 function isLastMessageFromAgent(data) {
     const lastAgent = data.last_agent_message_at || data.lastAgentMessageAt || '';
     const lastContact = data.last_contact_message_at || data.lastContactMessageAt || '';
@@ -6860,8 +6861,8 @@ function isLastMessageFromAgent(data) {
 }
 
 function applySlaVisualState(conversationItem, conv) {
-    // DESABILITADO: N├úo aplicar classes SLA ao conversation-item
-    // O sistema de SLA (sla-indicator.js) ├® respons├ível por aplicar classes apenas ao avatar
+    // DESABILITADO: Não aplicar classes SLA ao conversation-item
+    // O sistema de SLA (sla-indicator.js) ê responsível por aplicar classes apenas ao avatar
     // Remover qualquer classe sla-ok que possa ter sido adicionada
     if (conversationItem) {
         conversationItem.classList.remove('sla-ok');
@@ -6877,7 +6878,7 @@ function sortConversationList() {
         const items = Array.from(list.children);
         if (items.length === 0) return;
         
-        // Ordenar: pinned primeiro, depois updatedAt desc, depois ID desc (crit├®rio de desempate)
+        // Ordenar: pinned primeiro, depois updatedAt desc, depois ID desc (critêrio de desempate)
         items.sort((a, b) => {
             const pinnedA = a.classList?.contains('pinned') ? 1 : 0;
             const pinnedB = b.classList?.contains('pinned') ? 1 : 0;
@@ -6887,7 +6888,7 @@ function sortConversationList() {
             const dateB = Date.parse(b.dataset?.updatedAt || '') || 0;
             if (dateA !== dateB) return dateB - dateA;
             
-            // Crit├®rio de desempate: ID da conversa (maior primeiro = mais recente)
+            // Critêrio de desempate: ID da conversa (maior primeiro = mais recente)
             const idA = parseInt(a.dataset?.conversationId) || 0;
             const idB = parseInt(b.dataset?.conversationId) || 0;
             return idB - idA;
@@ -6928,7 +6929,7 @@ function applyConversationUpdate(conv) {
                 preview.textContent = content;
             }
     if (time && (conv.last_message_at || conv.updated_at)) {
-        // N├úo atualizar o tempo se dropdown estiver aberto (evita fechar)
+        // Não atualizar o tempo se dropdown estiver aberto (evita fechar)
         if (!wasOpen) {
             time.textContent = formatTime(conv.last_message_at || conv.updated_at);
         }
@@ -6942,7 +6943,7 @@ function applyConversationUpdate(conv) {
         }
     }
 
-    // Garantir bot├úo de fixar e classe pinned (preservar dropdown aberto)
+    // Garantir botão de fixar e classe pinned (preservar dropdown aberto)
             ensureActionsDropdown(conversationItem, pinned, conv.id, wasOpen);
 
     // Atualizar data attributes para SLA/tempos
@@ -6954,16 +6955,16 @@ function applyConversationUpdate(conv) {
     conversationItem.dataset.lastAgentMessageAt = lastAgentAt;
     conversationItem.dataset.agentId = conv.agent_id || conversationItem.dataset.agentId || '';
 
-    // Atualizar estado visual de SLA (borda verde quando ├║ltima msg ├® do agente)
+    // Atualizar estado visual de SLA (borda verde quando última msg ê do agente)
     applySlaVisualState(conversationItem, conv);
 
-    // ÔÜá´©Å IMPORTANTE: Respeitar conversas marcadas manualmente como n├úo lidas
+    // ÔÜá´©Å IMPORTANTE: Respeitar conversas marcadas manualmente como não lidas
     const isManuallyMarkedAsUnread = window.manuallyMarkedAsUnread && window.manuallyMarkedAsUnread.has(conv.id);
     const hasManualBadge = badge && badge.getAttribute('data-manual-unread') === 'true';
     
-    // Se foi marcada manualmente como n├úo lida, n├úo remover o badge
+    // Se foi marcada manualmente como não lida, não remover o badge
     if (isManuallyMarkedAsUnread || hasManualBadge) {
-        // Apenas atualizar o n├║mero se aumentou
+        // Apenas atualizar o número se aumentou
         if (badge && conv.unread_count > 0) {
             badge.textContent = conv.unread_count;
         }
@@ -6989,7 +6990,7 @@ function applyConversationUpdate(conv) {
 }
 
 /**
- * Iniciar polling (verifica├º├úo peri├│dica de novas mensagens)
+ * Iniciar polling (verificação periódica de novas mensagens)
  */
 function startPolling(conversationId) {
     // Parar polling anterior se existir
@@ -6999,7 +7000,7 @@ function startPolling(conversationId) {
     
     currentPollingConversationId = conversationId;
     
-    // Se n├úo houver conversa selecionada, n├úo fazer polling
+    // Se não houver conversa selecionada, não fazer polling
     if (!conversationId) {
         return;
     }
@@ -7034,10 +7035,10 @@ function checkForNewMessages(conversationId) {
     const conversationIdNum = parseInt(conversationId);
     const lastMessageIdNum = parseInt(lastMessageId) || 0;
     if (isNaN(conversationIdNum)) {
-        console.error('ID de conversa inv├ílido:', conversationId);
+        console.error('ID de conversa invílido:', conversationId);
         return;
     }
-    // Usar endpoint de mensagens, n├úo a p├ígina da conversa, para evitar 404 e carregar apenas JSON
+    // Usar endpoint de mensagens, não a pígina da conversa, para evitar 404 e carregar apenas JSON
     const url = `<?= \App\Helpers\Url::to('/conversations') ?>/${conversationIdNum}/messages?last_message_id=${lastMessageIdNum}`;
     fetch(url, {
         headers: {
@@ -7065,14 +7066,14 @@ function checkForNewMessages(conversationId) {
                 }
             });
             
-            // Atualizar lista de conversas tamb├®m
+            // Atualizar lista de conversas tambêm
             if (data.messages.length > 0) {
                 updateConversationListPreview(conversationId, data.messages[data.messages.length - 1]);
             }
         }
     })
     .catch(error => {
-        // Silenciar erros de polling (normal quando n├úo h├í novas mensagens)
+        // Silenciar erros de polling (normal quando não hí novas mensagens)
         if (error.message && !error.message.includes('404')) {
             console.error('Erro ao verificar novas mensagens:', error);
         }
@@ -7097,12 +7098,12 @@ function updateConversationListPreview(conversationId, lastMessage) {
             preview.textContent = content.substring(0, maxChars) + (content.length > maxChars ? '...' : '');
         }
         if (time && lastMessage.created_at) {
-            // N├úo atualizar o tempo se dropdown estiver aberto (evita fechar)
+            // Não atualizar o tempo se dropdown estiver aberto (evita fechar)
             if (!wasOpen) {
                 // Usar formatTime com o timestamp real da mensagem
                 time.textContent = formatTime(lastMessage.created_at);
             }
-            // Atualizar data-updated-at para ordena├º├úo correta (sempre)
+            // Atualizar data-updated-at para ordenação correta (sempre)
             conversationItem.setAttribute('data-updated-at', lastMessage.created_at);
         }
         
@@ -7121,11 +7122,11 @@ function updateConversationListPreview(conversationId, lastMessage) {
             }
         }
         
-        // Garantir dropdown de a├º├Áes est├í atualizado (preservar se estava aberto)
+        // Garantir dropdown de açÁes estí atualizado (preservar se estava aberto)
         const pinned = conversationItem.classList.contains('pinned');
         ensureActionsDropdown(conversationItem, pinned, conversationId, wasOpen);
         
-        // Resortear lista ap├│s atualizar (mas preservar posi├º├úo se dropdown aberto)
+        // Resortear lista após atualizar (mas preservar posição se dropdown aberto)
         if (!wasOpen) {
             sortConversationList();
         }
@@ -7145,12 +7146,12 @@ function selectConversation(id) {
     if (conversationItem) {
         conversationItem.classList.add('active');
         
-        // Remover da lista de marcadas manualmente como n├úo lidas
+        // Remover da lista de marcadas manualmente como não lidas
         if (window.manuallyMarkedAsUnread && window.manuallyMarkedAsUnread.has(id)) {
             window.manuallyMarkedAsUnread.delete(id);
         }
         
-        // Remover badge de n├úo lidas imediatamente (otimista - antes da resposta do servidor)
+        // Remover badge de não lidas imediatamente (otimista - antes da resposta do servidor)
         const badge = conversationItem.querySelector('.conversation-item-badge');
         if (badge) {
             badge.remove();
@@ -7166,7 +7167,7 @@ function selectConversation(id) {
     // Mostrar loading
     const chatMessages = document.getElementById('chatMessages');
     if (!chatMessages) {
-        console.error('Elemento chatMessages n├úo encontrado');
+        console.error('Elemento chatMessages não encontrado');
         return;
     }
     
@@ -7192,7 +7193,7 @@ function selectConversation(id) {
         </div>
     `;
     
-    // Fazer requisi├º├úo AJAX
+    // Fazer requisição AJAX
     fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${id}`, {
         headers: {
             'X-Requested-With': 'XMLHttpRequest',
@@ -7200,18 +7201,18 @@ function selectConversation(id) {
         }
     })
     .then(async response => {
-        // Verificar se a resposta ├® JSON
+        // Verificar se a resposta ê JSON
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
             const text = await response.text();
-            console.error('Resposta n├úo ├® JSON:', text.substring(0, 200));
-            throw new Error('Resposta do servidor n├úo ├® JSON. Status: ' + response.status);
+            console.error('Resposta não ê JSON:', text.substring(0, 200));
+            throw new Error('Resposta do servidor não ê JSON. Status: ' + response.status);
         }
         return response.json();
     })
     .then(data => {
-        // ­ƒöì DEBUG: Log para verificar resposta do servidor
-        console.log('­ƒöì [selectConversation] Resposta recebida:', {
+        // 🔧 DEBUG: Log para verificar resposta do servidor
+        console.log('🔧 [selectConversation] Resposta recebida:', {
             success: data.success,
             access_restricted: data.access_restricted,
             has_conversation: !!data.conversation,
@@ -7224,7 +7225,7 @@ function selectConversation(id) {
             window.history.pushState({ conversationId: id }, '', newUrl);
             
             // ============================================
-            // VERIFICAR SE ACESSO ├ë RESTRITO
+            // VERIFICAR SE ACESSO ë RESTRITO
             // ============================================
             if (data.access_restricted === true) {
                 showRestrictedAccessView(id, data.conversation, data.access_info);
@@ -7236,7 +7237,7 @@ function selectConversation(id) {
             // ============================================
             resetRestrictedAccessState();
             
-            // Remover badge de n├úo lidas da conversa atual na lista
+            // Remover badge de não lidas da conversa atual na lista
             if (conversationItem) {
                 const badge = conversationItem.querySelector('.conversation-item-badge');
                 if (badge) {
@@ -7247,9 +7248,9 @@ function selectConversation(id) {
             // Atualizar header do chat
             updateChatHeader(data.conversation);
             
-            // Resetar pagina├º├úo
+            // Resetar paginação
             currentConversationId = parseInt(id);
-            window.currentConversationId = currentConversationId; // Garantir que window tamb├®m ├® atualizado
+            window.currentConversationId = currentConversationId; // Garantir que window tambêm ê atualizado
             currentContactAvatar = data.conversation.contact_avatar || null; // Armazenar avatar do contato
             isLoadingMessages = false;
             hasMoreMessages = true;
@@ -7278,22 +7279,22 @@ function selectConversation(id) {
             if (typeof loadAIAgentStatus === 'function') {
                 loadAIAgentStatus(id);
             }
-            // Carregar status da automa├º├úo
+            // Carregar status da automação
             if (typeof loadAutomationStatus === 'function') {
                 loadAutomationStatus(id);
             }
             
-            // Atualizar timeline quando conversa ├® selecionada
+            // Atualizar timeline quando conversa ê selecionada
             updateConversationTimeline(data.conversation.id);
             
-            // Exibir solicita├º├Áes de participa├º├úo pendentes (se houver)
+            // Exibir solicitaçÁes de participação pendentes (se houver)
             if (data.pending_requests && data.pending_requests.length > 0) {
                 showPendingRequestsBanner(data.pending_requests);
             } else {
                 hidePendingRequestsBanner();
             }
             
-            // Scroll para ├║ltima mensagem
+            // Scroll para última mensagem
             setTimeout(() => {
                 const chatMessagesEl = document.getElementById('chatMessages');
                 if (chatMessagesEl) {
@@ -7301,7 +7302,7 @@ function selectConversation(id) {
                 }
             }, 100);
             
-            // Adicionar listener de scroll para pagina├º├úo infinita
+            // Adicionar listener de scroll para paginação infinita
             setupInfiniteScroll();
             
             // Inscrever no WebSocket para esta conversa
@@ -7310,11 +7311,11 @@ function selectConversation(id) {
                 // Parar polling apenas se o modo for websocket
                 stopPolling();
             } else {
-                // Se WebSocket n├úo estiver dispon├¡vel, iniciar polling
+                // Se WebSocket não estiver disponível, iniciar polling
                 startPolling(id);
             }
             
-            // Atualizar ├║ltimo ID de mensagem conhecido
+            // Atualizar último ID de mensagem conhecido
             if (data.messages && data.messages.length > 0) {
                 const lastMsg = data.messages[data.messages.length - 1];
                 if (lastMsg.id) {
@@ -7371,9 +7372,9 @@ function updateChatHeader(conversation) {
     
     const channelIcon = {
         'whatsapp': '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="#25D366" style="vertical-align: middle; margin-right: 4px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg> WhatsApp',
-        'email': 'Ô£ë´©Å Email',
-        'chat': '­ƒÆ¼ Chat'
-    }[channel] || '­ƒÆ¼ Chat';
+        'email': '📧 Email',
+        'chat': '💬 Chat'
+    }[channel] || '💬 Chat';
     
     const statusClass = {
         'open': 'success',
@@ -7409,10 +7410,10 @@ function updateChatHeader(conversation) {
         subtitleElement.innerHTML = `${channelIcon} ÔÇó <span class="badge badge-sm badge-light-${statusClass}">${statusText}</span>`;
     }
     
-    // Atualizar bot├úo de chamada Api4Com
+    // Atualizar botão de chamada Api4Com
     const callBtn = document.getElementById('btnApi4ComCall');
     if (callBtn) {
-        // Mostrar bot├úo se usu├írio pode fazer chamadas E contato tem telefone
+        // Mostrar botão se usuírio pode fazer chamadas E contato tem telefone
         const contactPhone = conversation.contact_phone || '';
         if (window.api4comCanMakeCalls && contactPhone) {
             callBtn.style.display = '';
@@ -7423,7 +7424,7 @@ function updateChatHeader(conversation) {
 }
 
 // ============================================
-// SISTEMA DE ACESSO RESTRITO / SOLICITA├ç├âO DE PARTICIPA├ç├âO
+// SISTEMA DE ACESSO RESTRITO / SOLICITAÇâO DE PARTICIPAÇâO
 // ============================================
 
 /**
@@ -7445,10 +7446,10 @@ function resetRestrictedAccessState() {
     // Resetar sidebar - remover overlay de acesso restrito
     const sidebar = document.getElementById('conversationSidebar');
     if (sidebar) {
-        // Verificar se ├® a sidebar ofuscada (tem overlay de acesso restrito)
+        // Verificar se ê a sidebar ofuscada (tem overlay de acesso restrito)
         const restrictedOverlay = sidebar.querySelector('.restricted-overlay, [style*="filter: blur"]');
         if (restrictedOverlay || sidebar.querySelector('[style*="Acesso Restrito"]')) {
-            // Recarregar a sidebar via include din├ómico n├úo ├® poss├¡vel, 
+            // Recarregar a sidebar via include dinâmico não ê possível, 
             // mas podemos esconder o overlay
             sidebar.innerHTML = `
                 <div class="text-center p-5">
@@ -7461,7 +7462,7 @@ function resetRestrictedAccessState() {
 }
 
 /**
- * Mostrar view de acesso restrito (chat ofuscado com bot├úo de solicitar)
+ * Mostrar view de acesso restrito (chat ofuscado com botão de solicitar)
  */
 function showRestrictedAccessView(conversationId, conversation, accessInfo) {
     const chatMessages = document.getElementById('chatMessages');
@@ -7470,7 +7471,7 @@ function showRestrictedAccessView(conversationId, conversation, accessInfo) {
     
     if (!chatMessages) return;
     
-    // Atualizar header com info b├ísica
+    // Atualizar header com info bísica
     if (chatHeader) {
         const contactName = conversation.contact_name || 'Contato';
         const initials = getInitials(contactName);
@@ -7478,9 +7479,9 @@ function showRestrictedAccessView(conversationId, conversation, accessInfo) {
         
         const channelIcon = {
             'whatsapp': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>',
-            'email': 'Ô£ë´©Å',
-            'chat': '­ƒÆ¼'
-        }[channel] || '­ƒÆ¼';
+            'email': '📧',
+            'chat': '💬'
+        }[channel] || '💬';
         
         const avatarLabel = chatHeader.querySelector('.symbol-label');
         if (avatarLabel) {
@@ -7506,7 +7507,7 @@ function showRestrictedAccessView(conversationId, conversation, accessInfo) {
         chatInput.style.display = 'none';
     }
     
-    // Determinar texto do bot├úo baseado no status da solicita├º├úo
+    // Determinar texto do botão baseado no status da solicitação
     let actionButton = '';
     let statusMessage = '';
     
@@ -7519,8 +7520,8 @@ function showRestrictedAccessView(conversationId, conversation, accessInfo) {
                     <span class="path3"></span>
                 </i>
                 <div>
-                    <div class="fw-bold">Solicita├º├úo Pendente</div>
-                    <div class="fs-7">Voc├¬ j├í enviou uma solicita├º├úo para participar desta conversa. Aguarde aprova├º├úo.</div>
+                    <div class="fw-bold">Solicitação Pendente</div>
+                    <div class="fs-7">Vocì jí enviou uma solicitação para participar desta conversa. Aguarde aprovação.</div>
                 </div>
             </div>
         `;
@@ -7531,7 +7532,7 @@ function showRestrictedAccessView(conversationId, conversation, accessInfo) {
                     <span class="path1"></span>
                     <span class="path2"></span>
                 </i>
-                Solicitar Participa├º├úo
+                Solicitar Participação
             </button>
         `;
     }
@@ -7561,7 +7562,7 @@ function showRestrictedAccessView(conversationId, conversation, accessInfo) {
                 </div>
             </div>
             
-            <!-- Overlay com informa├º├Áes e bot├úo -->
+            <!-- Overlay com informaçÁes e botão -->
             <div class="access-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; background: rgba(var(--bs-body-bg-rgb), 0.85);">
                 <div class="text-center p-5" style="max-width: 450px;">
                     <div class="mb-4">
@@ -7577,8 +7578,8 @@ function showRestrictedAccessView(conversationId, conversation, accessInfo) {
                     <h3 class="fw-bold mb-3">Acesso Restrito</h3>
                     
                     <p class="text-muted mb-4">
-                        Esta conversa est├í atribu├¡da a outro agente. 
-                        Para visualizar as mensagens e participar, voc├¬ precisa solicitar participa├º├úo.
+                        Esta conversa estí atribuída a outro agente. 
+                        Para visualizar as mensagens e participar, vocì precisa solicitar participação.
                     </p>
                     
                     ${statusMessage}
@@ -7592,7 +7593,7 @@ function showRestrictedAccessView(conversationId, conversation, accessInfo) {
                                 <span class="path2"></span>
                                 <span class="path3"></span>
                             </i>
-                            ${conversation.agent_name ? 'Atribu├¡da a: ' + escapeHtml(conversation.agent_name) : 'Conversa atribu├¡da'}
+                            ${conversation.agent_name ? 'Atribuída a: ' + escapeHtml(conversation.agent_name) : 'Conversa atribuída'}
                         </div>
                     </div>
                 </div>
@@ -7608,16 +7609,16 @@ function showRestrictedAccessView(conversationId, conversation, accessInfo) {
 }
 
 /**
- * Solicitar participa├º├úo em uma conversa
+ * Solicitar participação em uma conversa
  */
 function requestParticipation(conversationId) {
     Swal.fire({
-        title: 'Solicitar Participa├º├úo',
+        title: 'Solicitar Participação',
         html: `
             <div class="text-start">
                 <p class="text-muted mb-3">
-                    Voc├¬ est├í solicitando participar desta conversa. 
-                    O agente respons├ível ou outros participantes precisar├úo aprovar sua solicita├º├úo.
+                    Vocì estí solicitando participar desta conversa. 
+                    O agente responsível ou outros participantes precisarão aprovar sua solicitação.
                 </p>
                 
                 <div class="mb-3">
@@ -7628,7 +7629,7 @@ function requestParticipation(conversationId) {
             </div>
         `,
         showCancelButton: true,
-        confirmButtonText: 'Enviar Solicita├º├úo',
+        confirmButtonText: 'Enviar Solicitação',
         cancelButtonText: 'Cancelar',
         showLoaderOnConfirm: true,
         preConfirm: () => {
@@ -7645,7 +7646,7 @@ function requestParticipation(conversationId) {
             .then(response => response.json())
             .then(data => {
                 if (!data.success) {
-                    throw new Error(data.message || 'Erro ao enviar solicita├º├úo');
+                    throw new Error(data.message || 'Erro ao enviar solicitação');
                 }
                 return data;
             })
@@ -7658,8 +7659,8 @@ function requestParticipation(conversationId) {
         if (result.isConfirmed) {
             Swal.fire({
                 icon: 'success',
-                title: 'Solicita├º├úo Enviada!',
-                text: 'Aguarde a aprova├º├úo do agente respons├ível.',
+                title: 'Solicitação Enviada!',
+                text: 'Aguarde a aprovação do agente responsível.',
                 timer: 3000,
                 showConfirmButton: false
             });
@@ -7673,7 +7674,7 @@ function requestParticipation(conversationId) {
 }
 
 /**
- * Mostrar banner de solicita├º├Áes de participa├º├úo pendentes
+ * Mostrar banner de solicitaçÁes de participação pendentes
  */
 function showPendingRequestsBanner(requests) {
     // Remover banner existente
@@ -7717,7 +7718,7 @@ function showPendingRequestsBanner(requests) {
                         <span class="path1"></span>
                         <span class="path2"></span>
                     </i>
-                    <span class="fw-semibold text-warning">${requests.length} solicita├º├úo(├Áes) de participa├º├úo</span>
+                    <span class="fw-semibold text-warning">${requests.length} solicitação(Áes) de participação</span>
                 </div>
                 <button class="btn btn-sm btn-icon btn-light" onclick="hidePendingRequestsBanner()">
                     <i class="ki-duotone ki-cross fs-6"><span class="path1"></span><span class="path2"></span></i>
@@ -7729,7 +7730,7 @@ function showPendingRequestsBanner(requests) {
         </div>
     `;
     
-    // Inserir ap├│s o header
+    // Inserir após o header
     const chatHeader = document.getElementById('chatHeader');
     if (chatHeader) {
         chatHeader.insertAdjacentHTML('afterend', bannerHtml);
@@ -7737,7 +7738,7 @@ function showPendingRequestsBanner(requests) {
 }
 
 /**
- * Ocultar banner de solicita├º├Áes pendentes
+ * Ocultar banner de solicitaçÁes pendentes
  */
 function hidePendingRequestsBanner() {
     const banner = document.getElementById('pendingRequestsBanner');
@@ -7747,7 +7748,7 @@ function hidePendingRequestsBanner() {
 }
 
 /**
- * Aprovar solicita├º├úo de participa├º├úo
+ * Aprovar solicitação de participação
  */
 function approveParticipationRequest(requestId) {
     fetch(`<?= \App\Helpers\Url::to('/conversations/requests') ?>/${requestId}/approve`, {
@@ -7761,8 +7762,8 @@ function approveParticipationRequest(requestId) {
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
             const text = await response.text();
-            console.error('Resposta n├úo ├® JSON:', text.substring(0, 500));
-            throw new Error('Resposta do servidor n├úo ├® JSON v├ílido');
+            console.error('Resposta não ê JSON:', text.substring(0, 500));
+            throw new Error('Resposta do servidor não ê JSON vílido');
         }
         return response.json();
     })
@@ -7771,7 +7772,7 @@ function approveParticipationRequest(requestId) {
             Swal.fire({
                 icon: 'success',
                 title: 'Aprovado!',
-                text: data.message || 'Solicita├º├úo aprovada com sucesso.',
+                text: data.message || 'Solicitação aprovada com sucesso.',
                 toast: true,
                 position: 'top-end',
                 timer: 3000,
@@ -7784,7 +7785,7 @@ function approveParticipationRequest(requestId) {
                 requestItem.remove();
             }
             
-            // Verificar se ainda h├í solicita├º├Áes
+            // Verificar se ainda hí solicitaçÁes
             const banner = document.getElementById('pendingRequestsBanner');
             if (banner) {
                 const remainingRequests = banner.querySelectorAll('[data-request-id]');
@@ -7794,7 +7795,7 @@ function approveParticipationRequest(requestId) {
                     // Atualizar contador
                     const counter = banner.querySelector('.fw-semibold.text-warning');
                     if (counter) {
-                        counter.textContent = `${remainingRequests.length} solicita├º├úo(├Áes) de participa├º├úo`;
+                        counter.textContent = `${remainingRequests.length} solicitação(Áes) de participação`;
                     }
                 }
             }
@@ -7807,7 +7808,7 @@ function approveParticipationRequest(requestId) {
             Swal.fire({
                 icon: 'error',
                 title: 'Erro',
-                text: data.message || 'Erro ao aprovar solicita├º├úo'
+                text: data.message || 'Erro ao aprovar solicitação'
             });
         }
     })
@@ -7816,18 +7817,18 @@ function approveParticipationRequest(requestId) {
         Swal.fire({
             icon: 'error',
             title: 'Erro',
-            text: 'Erro ao aprovar solicita├º├úo'
+            text: 'Erro ao aprovar solicitação'
         });
     });
 }
 
 /**
- * Recusar solicita├º├úo de participa├º├úo
+ * Recusar solicitação de participação
  */
 function rejectParticipationRequest(requestId) {
     Swal.fire({
-        title: 'Recusar Solicita├º├úo',
-        text: 'Tem certeza que deseja recusar esta solicita├º├úo de participa├º├úo?',
+        title: 'Recusar Solicitação',
+        text: 'Tem certeza que deseja recusar esta solicitação de participação?',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Sim, Recusar',
@@ -7846,8 +7847,8 @@ function rejectParticipationRequest(requestId) {
                 const contentType = response.headers.get('content-type');
                 if (!contentType || !contentType.includes('application/json')) {
                     const text = await response.text();
-                    console.error('Resposta n├úo ├® JSON:', text.substring(0, 500));
-                    throw new Error('Resposta do servidor n├úo ├® JSON v├ílido');
+                    console.error('Resposta não ê JSON:', text.substring(0, 500));
+                    throw new Error('Resposta do servidor não ê JSON vílido');
                 }
                 return response.json();
             })
@@ -7856,7 +7857,7 @@ function rejectParticipationRequest(requestId) {
                     Swal.fire({
                         icon: 'success',
                         title: 'Recusada',
-                        text: 'Solicita├º├úo recusada.',
+                        text: 'Solicitação recusada.',
                         toast: true,
                         position: 'top-end',
                         timer: 3000,
@@ -7869,7 +7870,7 @@ function rejectParticipationRequest(requestId) {
                         requestItem.remove();
                     }
                     
-                    // Verificar se ainda h├í solicita├º├Áes
+                    // Verificar se ainda hí solicitaçÁes
                     const banner = document.getElementById('pendingRequestsBanner');
                     if (banner) {
                         const remainingRequests = banner.querySelectorAll('[data-request-id]');
@@ -7881,7 +7882,7 @@ function rejectParticipationRequest(requestId) {
                     Swal.fire({
                         icon: 'error',
                         title: 'Erro',
-                        text: data.message || 'Erro ao recusar solicita├º├úo'
+                        text: data.message || 'Erro ao recusar solicitação'
                     });
                 }
             })
@@ -7890,7 +7891,7 @@ function rejectParticipationRequest(requestId) {
                 Swal.fire({
                     icon: 'error',
                     title: 'Erro',
-                    text: 'Erro ao recusar solicita├º├úo'
+                    text: 'Erro ao recusar solicitação'
                 });
             });
         }
@@ -7934,12 +7935,12 @@ function updateChatMessages(messages, isInitialLoad = false) {
         const messageDiv = addMessageToChat(msg);
     });
     
-    // Observar elementos lazy ap├│s adicionar todas as mensagens
+    // Observar elementos lazy após adicionar todas as mensagens
     if (chatMessages) {
         observeNewLazyElements(chatMessages);
     }
     
-    // Scroll para ├║ltima mensagem apenas no carregamento inicial
+    // Scroll para última mensagem apenas no carregamento inicial
     if (isInitialLoad) {
         setTimeout(() => {
             if (chatMessages && chatMessages.scrollHeight !== undefined) {
@@ -7961,16 +7962,16 @@ function setupInfiniteScroll() {
     chatMessages.addEventListener('scroll', handleScroll);
 }
 
-// Handler de scroll para pagina├º├úo infinita
+// Handler de scroll para paginação infinita
 function handleScroll(event) {
     const chatMessages = event.target;
     
-    // Se estiver carregando ou n├úo houver mais mensagens, n├úo fazer nada
+    // Se estiver carregando ou não houver mais mensagens, não fazer nada
     if (isLoadingMessages || !hasMoreMessages || !currentConversationId) {
         return;
     }
     
-    // Se scroll estiver pr├│ximo do topo (50px), carregar mais mensagens
+    // Se scroll estiver próximo do topo (50px), carregar mais mensagens
     if (chatMessages.scrollTop <= 50) {
         loadMoreMessages();
     }
@@ -7989,7 +7990,7 @@ async function loadMoreMessages() {
         return;
     }
     
-    // Salvar posi├º├úo atual do scroll
+    // Salvar posição atual do scroll
     const scrollHeightBefore = chatMessages.scrollHeight;
     
     // Adicionar indicador de carregamento
@@ -8013,7 +8014,7 @@ async function loadMoreMessages() {
             }
         });
         
-        // Ler resposta como texto primeiro para verificar se ├® JSON
+        // Ler resposta como texto primeiro para verificar se ê JSON
         const responseText = await response.text();
         
         // Verificar se a resposta foi bem-sucedida
@@ -8030,9 +8031,9 @@ async function loadMoreMessages() {
         let data;
         
         if (!contentType.includes('application/json')) {
-            // Se n├úo for JSON, verificar se o texto come├ºa com HTML
+            // Se não for JSON, verificar se o texto começa com HTML
             if (responseText.trim().startsWith('<')) {
-                console.warn('loadMoreMessages: resposta HTML (prov├ível erro PHP). Encerrando pagina├º├úo.', responseText.substring(0, 200));
+                console.warn('loadMoreMessages: resposta HTML (provível erro PHP). Encerrando paginação.', responseText.substring(0, 200));
                 hasMoreMessages = false;
                 isLoadingMessages = false;
                 loadingIndicator.remove();
@@ -8053,7 +8054,7 @@ async function loadMoreMessages() {
         }
         
         if (data.success && data.messages && data.messages.length > 0) {
-            // Adicionar mensagens no in├¡cio do chat
+            // Adicionar mensagens no início do chat
             data.messages.forEach(msg => {
                 const messageDiv = addMessageToChat(msg);
                 chatMessages.insertBefore(messageDiv, loadingIndicator.nextSibling);
@@ -8065,12 +8066,12 @@ async function loadMoreMessages() {
             // Atualizar flag hasMoreMessages
             hasMoreMessages = data.has_more !== false;
             
-            // Restaurar posi├º├úo do scroll
+            // Restaurar posição do scroll
             const scrollHeightAfter = chatMessages.scrollHeight;
             const scrollDiff = scrollHeightAfter - scrollHeightBefore;
             chatMessages.scrollTop = scrollDiff;
         } else {
-            // N├úo h├í mais mensagens
+            // Não hí mais mensagens
             hasMoreMessages = false;
         }
     } catch (error) {
@@ -8087,7 +8088,7 @@ async function loadMoreMessages() {
 
 // Atualizar sidebar da conversa
 function updateConversationSidebar(conversation, tags) {
-    // Atualizar informa├º├Áes b├ísicas
+    // Atualizar informaçÁes bísicas
     const sidebar = document.getElementById('conversationSidebar');
     if (!sidebar) return;
     
@@ -8109,17 +8110,17 @@ function updateConversationSidebar(conversation, tags) {
             const parts = name.split(' ');
             const initials = (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
             
-            // Se j├í ├® um elemento de iniciais, apenas atualizar texto
+            // Se jí ê um elemento de iniciais, apenas atualizar texto
             if (initialsEl.id === 'sidebar-contact-initials') {
                 initialsEl.textContent = initials;
             } else {
-                // Caso contr├írio, recriar elemento de iniciais
+                // Caso contrírio, recriar elemento de iniciais
                 symbolLabel.innerHTML = `<div id="sidebar-contact-initials" class="symbol-label bg-light-primary text-primary fw-bold">${initials}</div>`;
             }
         }
     }
     
-    // Atualizar informa├º├Áes do contato
+    // Atualizar informaçÁes do contato
     const contactNameEl = sidebar.querySelector('[data-field="contact_name"]');
     if (contactNameEl) contactNameEl.textContent = conversation.contact_name || '-';
     
@@ -8131,7 +8132,7 @@ function updateConversationSidebar(conversation, tags) {
         el.textContent = conversation.contact_phone || '-';
     });
     
-    // Atualizar informa├º├Áes da conversa
+    // Atualizar informaçÁes da conversa
     const conversationStatusEl = sidebar.querySelector('[data-field="status"]');
     if (conversationStatusEl) {
         const statusText = {
@@ -8165,11 +8166,11 @@ function updateConversationSidebar(conversation, tags) {
     const conversationChannelEl = sidebar.querySelector('[data-field="channel"]');
     if (conversationChannelEl) {
         if (conversation.channel === 'whatsapp') {
-            // ├ìcone WhatsApp SVG
+            // ìcone WhatsApp SVG
             const whatsappIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#25D366" style="vertical-align: middle; margin-right: 4px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>`;
             conversationChannelEl.innerHTML = whatsappIcon + ' WhatsApp';
             
-            // Mostrar informa├º├Áes do WhatsApp
+            // Mostrar informaçÁes do WhatsApp
             const whatsappInfoItem = sidebar.querySelector('#sidebar-whatsapp-info');
             const whatsappPhoneItem = sidebar.querySelector('#sidebar-whatsapp-phone');
             
@@ -8190,12 +8191,12 @@ function updateConversationSidebar(conversation, tags) {
             }
         } else {
             const channelText = {
-                'email': 'Ô£ë´©Å Email',
-                'chat': '­ƒÆ¼ Chat'
+                'email': '📧 Email',
+                'chat': '💬 Chat'
             }[conversation.channel] || conversation.channel;
             conversationChannelEl.textContent = channelText;
             
-            // Ocultar informa├º├Áes WhatsApp se n├úo for WhatsApp
+            // Ocultar informaçÁes WhatsApp se não for WhatsApp
             const whatsappInfoItem = sidebar.querySelector('#sidebar-whatsapp-info');
             const whatsappPhoneItem = sidebar.querySelector('#sidebar-whatsapp-phone');
             if (whatsappInfoItem) whatsappInfoItem.style.display = 'none';
@@ -8210,7 +8211,7 @@ function updateConversationSidebar(conversation, tags) {
     
     if (funnelSection && funnelCard) {
         if (conversation.funnel_name || conversation.stage_name) {
-            // Mostrar se├º├úo
+            // Mostrar seção
             funnelSection.style.display = 'block';
             funnelSeparator.style.display = 'block';
             
@@ -8225,7 +8226,7 @@ function updateConversationSidebar(conversation, tags) {
             if (stageBadge) {
                 stageBadge.textContent = conversation.stage_name || '-';
                 
-                // Aplicar cor da etapa (se dispon├¡vel)
+                // Aplicar cor da etapa (se disponível)
                 if (conversation.stage_color) {
                     stageBadge.style.backgroundColor = conversation.stage_color + '20';
                     stageBadge.style.color = conversation.stage_color;
@@ -8237,7 +8238,7 @@ function updateConversationSidebar(conversation, tags) {
                         cardBody.style.borderLeftColor = conversation.stage_color;
                     }
                 } else {
-                    // Cor padr├úo
+                    // Cor padrão
                     stageBadge.className = 'badge badge-primary';
                 }
             }
@@ -8285,7 +8286,7 @@ function updateConversationSidebar(conversation, tags) {
     // Atualizar agente
     const agentNameEl = sidebar.querySelector('[data-field="agent_name"]');
     if (agentNameEl) {
-        agentNameEl.textContent = conversation.agent_name || 'N├úo atribu├¡do';
+        agentNameEl.textContent = conversation.agent_name || 'Não atribuído';
         if (!conversation.agent_name) {
             agentNameEl.classList.add('text-muted');
         } else {
@@ -8293,7 +8294,7 @@ function updateConversationSidebar(conversation, tags) {
         }
     }
     
-    // Atualizar data de cria├º├úo
+    // Atualizar data de criação
     const createdAtEl = sidebar.querySelector('[data-field="created_at"]');
     if (createdAtEl && conversation.created_at) {
         const date = new Date(conversation.created_at);
@@ -8335,7 +8336,7 @@ function updateConversationSidebar(conversation, tags) {
                                     </div>
                                 </div>
                                 <div class="flex-grow-1">
-                                    <div class="fw-semibold fs-7">${escapeHtml(p.user_name || 'Usu├írio')}</div>
+                                    <div class="fw-semibold fs-7">${escapeHtml(p.user_name || 'Usuírio')}</div>
                                     ${p.user_email ? `<div class="text-muted fs-8">${escapeHtml(p.user_email)}</div>` : ''}
                                 </div>
                                 <button type="button" class="btn btn-sm btn-icon btn-light-danger p-0" 
@@ -8381,7 +8382,7 @@ function updateConversationSidebar(conversation, tags) {
         }
     }
     
-    // Atualizar bot├Áes com IDs corretos
+    // Atualizar botÁes com IDs corretos
     const editContactBtn = sidebar.querySelector('#sidebar-edit-contact-btn');
     if (editContactBtn && conversation.contact_id) {
         editContactBtn.setAttribute('onclick', `editContact(${conversation.contact_id})`);
@@ -8394,10 +8395,10 @@ function updateConversationSidebar(conversation, tags) {
         manageTagsBtn.style.display = '';
     }
     
-    // Verificar se conversa est├í com agente de IA
+    // Verificar se conversa estí com agente de IA
     const escalateBtn = sidebar.querySelector('#sidebar-escalate-btn');
     if (escalateBtn && conversation.id) {
-        // Verificar se conversa est├í com IA (buscar via API)
+        // Verificar se conversa estí com IA (buscar via API)
         checkIfConversationHasAI(conversation.id).then(hasAI => {
             if (hasAI) {
                 escalateBtn.setAttribute('onclick', `escalateFromAI(${conversation.id})`);
@@ -8453,21 +8454,21 @@ function updateConversationSidebar(conversation, tags) {
     }
     
     // Carregar status da IA na conversa
-    console.log('­ƒöì Tentando carregar status da IA...', {
+    console.log('🔧 Tentando carregar status da IA...', {
         conversationId: conversation.id,
         loadAIAgentStatusExists: typeof loadAIAgentStatus
     });
     if (conversation.id && typeof loadAIAgentStatus === 'function') {
-        console.log('Ô£à Chamando loadAIAgentStatus para conversation.id:', conversation.id);
+        console.log('✓ Chamando loadAIAgentStatus para conversation.id:', conversation.id);
         loadAIAgentStatus(conversation.id);
     } else {
-        console.warn('ÔØî loadAIAgentStatus n├úo est├í dispon├¡vel ou conversation.id est├í vazio');
+        console.warn('ÔØî loadAIAgentStatus não estí disponível ou conversation.id estí vazio');
     }
     
     // Atualizar timeline
     updateConversationTimeline(conversation.id);
 
-    // Atualizar hist├│rico (aba Hist├│rico)
+    // Atualizar histórico (aba Histórico)
     loadContactHistory(conversation.contact_id);
     
     // Carregar agentes do contato
@@ -8524,7 +8525,7 @@ function updateConversationTimeline(conversationId) {
             // Combinar todos os eventos em um array para ordenar por data
             const events = [];
             
-            // Evento de cria├º├úo
+            // Evento de criação
             if (conv.created_at) {
                 events.push({
                     type: 'created',
@@ -8537,7 +8538,7 @@ function updateConversationTimeline(conversationId) {
                 });
             }
             
-            // Atribui├º├úo (verificar se n├úo h├í evento mais recente de atividades)
+            // Atribuição (verificar se não hí evento mais recente de atividades)
             const hasRecentAssignment = timelineEvents.some(e => e.type === 'assigned');
             if (conv.agent_id && conv.agent_name && !hasRecentAssignment) {
                 events.push({
@@ -8545,7 +8546,7 @@ function updateConversationTimeline(conversationId) {
                     date: conv.updated_at || conv.created_at,
                     icon: 'ki-profile-user',
                     color: 'info',
-                    title: `Atribu├¡da a ${escapeHtml(conv.agent_name)}`,
+                    title: `Atribuída a ${escapeHtml(conv.agent_name)}`,
                     description: null,
                     user_name: null
                 });
@@ -8556,7 +8557,7 @@ function updateConversationTimeline(conversationId) {
                 events.push(event);
             });
             
-            // Mensagens importantes (primeira e ├║ltima) - apenas se n├úo houver muitas mensagens
+            // Mensagens importantes (primeira e última) - apenas se não houver muitas mensagens
             if (messages.length > 0 && messages.length <= 50) {
                 const firstMsg = messages[0];
                 const lastMsg = messages[messages.length - 1];
@@ -8579,7 +8580,7 @@ function updateConversationTimeline(conversationId) {
                         date: lastMsg.created_at,
                         icon: 'ki-message',
                         color: 'warning',
-                        title: '├Ültima mensagem',
+                        title: 'Última mensagem',
                         description: null,
                         user_name: null
                     });
@@ -8594,7 +8595,7 @@ function updateConversationTimeline(conversationId) {
                     date: note.created_at,
                     icon: 'ki-note-edit',
                     color: 'secondary',
-                    title: `Nota por ${escapeHtml(note.user_name || 'Usu├írio')}`,
+                    title: `Nota por ${escapeHtml(note.user_name || 'Usuírio')}`,
                     description: escapeHtml(note.content),
                     userInitials: userInitials,
                     noteId: note.id,
@@ -8604,7 +8605,7 @@ function updateConversationTimeline(conversationId) {
                 });
             });
             
-            // Status - verificar se n├úo h├í evento mais recente
+            // Status - verificar se não hí evento mais recente
             const hasRecentStatusChange = timelineEvents.some(e => e.type === 'closed' || e.type === 'reopened');
             if (conv.status === 'closed' && conv.resolved_at && !hasRecentStatusChange) {
                 events.push({
@@ -8672,7 +8673,7 @@ function updateConversationTimeline(conversationId) {
                         </div>
                     `;
                 } else {
-                    // Determinar se mostra nome do usu├írio
+                    // Determinar se mostra nome do usuírio
                     const showUserName = event.user_name && event.type !== 'note';
                     const userInfo = showUserName ? `<div class="text-muted fs-8 mt-1">por ${escapeHtml(event.user_name)}</div>` : '';
                     
@@ -8713,7 +8714,7 @@ function updateConversationTimeline(conversationId) {
         });
 }
 
-// Hist├│rico do contato (aba Hist├│rico)
+// Histórico do contato (aba Histórico)
 function loadConversationSentiment(conversationId) {
     if (!conversationId) return;
     
@@ -8791,10 +8792,10 @@ function loadContactHistory(contactId) {
     })
     .then(r => r.json())
     .then(data => {
-        console.log('­ƒôè Dados do hist├│rico:', data);
+        console.log('📊 Dados do histórico:', data);
         
         if (!data.success) {
-            if (listEl) listEl.innerHTML = `<div class="text-center py-5"><p class="text-muted fs-7">Erro ao carregar hist├│rico</p></div>`;
+            if (listEl) listEl.innerHTML = `<div class="text-center py-5"><p class="text-muted fs-7">Erro ao carregar histórico</p></div>`;
             if (countEl) countEl.textContent = '-';
             if (avgEl) avgEl.textContent = '-';
             if (csatEl) csatEl.textContent = '--';
@@ -8811,7 +8812,7 @@ function loadContactHistory(contactId) {
         // Atualizar contador de conversas
         if (countEl) countEl.textContent = total;
         
-        // Atualizar tempo m├®dio
+        // Atualizar tempo mêdio
         if (avgEl) {
             if (avgSec !== null && avgSec !== undefined && avgSec > 0) {
                 avgEl.textContent = formatDuration(avgSec);
@@ -8822,7 +8823,7 @@ function loadContactHistory(contactId) {
             }
         }
         
-        // Atualizar CSAT (ainda n├úo implementado)
+        // Atualizar CSAT (ainda não implementado)
         if (csatEl) csatEl.textContent = csat !== null && csat !== undefined ? csat : '--';
 
         if (!previous.length) {
@@ -8848,8 +8849,8 @@ function loadContactHistory(contactId) {
         if (listEl) listEl.innerHTML = html;
     })
     .catch(error => {
-        console.error('ÔØî Erro ao carregar hist├│rico:', error);
-        if (listEl) listEl.innerHTML = `<div class="text-center py-5"><p class="text-muted fs-7">Erro ao carregar hist├│rico</p></div>`;
+        console.error('ÔØî Erro ao carregar histórico:', error);
+        if (listEl) listEl.innerHTML = `<div class="text-center py-5"><p class="text-muted fs-7">Erro ao carregar histórico</p></div>`;
         if (countEl) countEl.textContent = '-';
         if (avgEl) avgEl.textContent = '-';
         if (csatEl) csatEl.textContent = '--';
@@ -8874,7 +8875,7 @@ function formatDateTime(dt) {
            ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
-// Fun├º├úo auxiliar para obter iniciais do nome
+// Função auxiliar para obter iniciais do nome
 function getInitials(name) {
     if (!name) return 'U';
     const parts = name.trim().split(' ');
@@ -8914,7 +8915,7 @@ function loadContactAgents(contactId) {
     .then(r => r.json())
     .then(data => {
         if (!data.success || !data.agents) {
-            agentsListEl.innerHTML = '<div class="text-muted fs-7">Nenhum agente atribu├¡do</div>';
+            agentsListEl.innerHTML = '<div class="text-muted fs-7">Nenhum agente atribuído</div>';
             if (manageBtn) manageBtn.style.display = 'none';
             return;
         }
@@ -8922,7 +8923,7 @@ function loadContactAgents(contactId) {
         const agents = data.agents || [];
         
         if (agents.length === 0) {
-            agentsListEl.innerHTML = '<div class="text-muted fs-7">Nenhum agente atribu├¡do</div>';
+            agentsListEl.innerHTML = '<div class="text-muted fs-7">Nenhum agente atribuído</div>';
             if (manageBtn) manageBtn.style.display = 'none';
             return;
         }
@@ -8955,7 +8956,7 @@ function loadContactAgents(contactId) {
         
         agentsListEl.innerHTML = html;
         
-        // Mostrar bot├úo de gerenciar se tiver permiss├úo
+        // Mostrar botão de gerenciar se tiver permissão
         if (manageBtn) {
             manageBtn.setAttribute('onclick', `manageContactAgents(${contactId})`);
             manageBtn.style.display = '';
@@ -8973,18 +8974,18 @@ function loadContactAgents(contactId) {
  */
 function manageContactAgents(contactId) {
     if (!contactId) {
-        console.error('ID do contato n├úo informado');
+        console.error('ID do contato não informado');
         return;
     }
     
     // Definir ID do contato no modal
     document.getElementById('contactAgentsModalContactId').value = contactId;
     
-    // Limpar sele├º├úo de agente
+    // Limpar seleção de agente
     document.getElementById('addContactAgentSelect').value = '';
     document.getElementById('addAsPrimaryAgent').checked = false;
     
-    // Restaurar todas as op├º├Áes do select antes de carregar
+    // Restaurar todas as opçÁes do select antes de carregar
     const select = document.getElementById('addContactAgentSelect');
     if (select) {
         Array.from(select.options).forEach(option => {
@@ -9019,7 +9020,7 @@ function loadContactAgentsInModal(contactId) {
     .then(r => r.json())
     .then(data => {
         if (!data.success || !data.agents) {
-            agentsListEl.innerHTML = '<div class="text-muted fs-7 text-center py-3">Nenhum agente atribu├¡do</div>';
+            agentsListEl.innerHTML = '<div class="text-muted fs-7 text-center py-3">Nenhum agente atribuído</div>';
             updateAgentSelect([]);
             return;
         }
@@ -9027,15 +9028,15 @@ function loadContactAgentsInModal(contactId) {
         const agents = data.agents || [];
         
         if (agents.length === 0) {
-            agentsListEl.innerHTML = '<div class="text-muted fs-7 text-center py-3">Nenhum agente atribu├¡do</div>';
+            agentsListEl.innerHTML = '<div class="text-muted fs-7 text-center py-3">Nenhum agente atribuído</div>';
             updateAgentSelect([]);
             return;
         }
         
-        // Renderizar lista de agentes com a├º├Áes
+        // Renderizar lista de agentes com açÁes
         renderContactAgentsList(agents, contactId);
         
-        // Atualizar select removendo agentes j├í adicionados
+        // Atualizar select removendo agentes jí adicionados
         const agentIds = agents.map(a => a.agent_id || a.id);
         updateAgentSelect(agentIds);
     })
@@ -9046,33 +9047,33 @@ function loadContactAgentsInModal(contactId) {
 }
 
 /**
- * Atualizar select de agentes, ocultando os que j├í est├úo na lista
+ * Atualizar select de agentes, ocultando os que jí estão na lista
  */
 function updateAgentSelect(excludedAgentIds) {
     const select = document.getElementById('addContactAgentSelect');
     if (!select) return;
     
-    // Percorrer todas as op├º├Áes e mostrar/ocultar conforme necess├írio
+    // Percorrer todas as opçÁes e mostrar/ocultar conforme necessírio
     Array.from(select.options).forEach(option => {
         if (option.value === '') {
-            // Manter op├º├úo vazia sempre vis├¡vel
+            // Manter opção vazia sempre visível
             return;
         }
         
         const isExcluded = excludedAgentIds.includes(parseInt(option.value));
         
         if (isExcluded) {
-            // Ocultar op├º├úo (mas n├úo remover, para poder restaurar depois)
+            // Ocultar opção (mas não remover, para poder restaurar depois)
             option.style.display = 'none';
             option.disabled = true;
         } else {
-            // Mostrar op├º├úo
+            // Mostrar opção
             option.style.display = '';
             option.disabled = false;
         }
     });
     
-    // Se a op├º├úo selecionada foi ocultada, limpar sele├º├úo
+    // Se a opção selecionada foi ocultada, limpar seleção
     if (select.value && excludedAgentIds.includes(parseInt(select.value))) {
         select.value = '';
     }
@@ -9155,7 +9156,7 @@ function renderContactAgentsList(agents, contactId) {
 }
 
 /**
- * Mostrar toast/notifica├º├úo de sucesso ou erro
+ * Mostrar toast/notificação de sucesso ou erro
  */
 function showToast(type, message) {
     if (typeof Swal !== 'undefined') {
@@ -9182,7 +9183,7 @@ function addContactAgentFromModal() {
     const isPrimary = document.getElementById('addAsPrimaryAgent').checked;
     
     if (!contactId) {
-        alert('Erro: ID do contato n├úo encontrado');
+        alert('Erro: ID do contato não encontrado');
         return;
     }
     
@@ -9191,19 +9192,19 @@ function addContactAgentFromModal() {
         return;
     }
     
-    // Verificar se agente j├í est├í na lista
+    // Verificar se agente jí estí na lista
     const agentsListEl = document.getElementById('contactAgentsList');
     if (agentsListEl) {
         const existingAgents = agentsListEl.querySelectorAll('[data-agent-id]');
         for (let el of existingAgents) {
             if (el.getAttribute('data-agent-id') == agentId) {
-                showToast('error', 'Este agente j├í est├í na lista');
+                showToast('error', 'Este agente jí estí na lista');
                 return;
             }
         }
     }
     
-    // Desabilitar bot├úo durante requisi├º├úo
+    // Desabilitar botão durante requisição
     const addBtn = event.target.closest('button');
     const originalText = addBtn.innerHTML;
     addBtn.disabled = true;
@@ -9225,14 +9226,14 @@ function addContactAgentFromModal() {
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            // Limpar formul├írio
+            // Limpar formulírio
             document.getElementById('addContactAgentSelect').value = '';
             document.getElementById('addAsPrimaryAgent').checked = false;
             
-            // Recarregar lista (isso tamb├®m atualizar├í o select)
+            // Recarregar lista (isso tambêm atualizarí o select)
             loadContactAgentsInModal(contactId);
             
-            // Recarregar na sidebar tamb├®m
+            // Recarregar na sidebar tambêm
             loadContactAgents(contactId);
             
             // Mostrar mensagem de sucesso
@@ -9272,7 +9273,7 @@ function removeContactAgent(contactId, agentId, agentName) {
             // Recarregar lista no modal
             loadContactAgentsInModal(contactId);
             
-            // Recarregar na sidebar tamb├®m
+            // Recarregar na sidebar tambêm
             loadContactAgents(contactId);
             
             // Mostrar mensagem de sucesso
@@ -9308,7 +9309,7 @@ function setContactPrimaryAgent(contactId, agentId) {
             // Recarregar lista no modal
             loadContactAgentsInModal(contactId);
             
-            // Recarregar na sidebar tamb├®m
+            // Recarregar na sidebar tambêm
             loadContactAgents(contactId);
             
             // Mostrar mensagem de sucesso
@@ -9337,7 +9338,7 @@ function updateContactAgentPriority(contactId, agentId, priority) {
         return;
     }
     
-    // Atualizar via API (usando m├®todo store que atualiza se j├í existe)
+    // Atualizar via API (usando mêtodo store que atualiza se jí existe)
     const formData = new FormData();
     formData.append('agent_id', agentId);
     formData.append('priority', priorityValue);
@@ -9373,7 +9374,7 @@ function updateContactAgentPriority(contactId, agentId, priority) {
 }
 
 
-// Delega├º├úo de eventos para conversation-item (resolve problema de fun├º├úo n├úo definida em onclick)
+// Delegação de eventos para conversation-item (resolve problema de função não definida em onclick)
 document.addEventListener('click', function(e) {
     const conversationItem = e.target.closest('.conversation-item[data-onclick="selectConversation"]');
     if (conversationItem) {
@@ -9384,7 +9385,7 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// Auto-scroll para ├║ltima mensagem
+// Auto-scroll para última mensagem
 document.addEventListener('DOMContentLoaded', function() {
     const chatMessages = document.getElementById('chatMessages');
     if (chatMessages) {
@@ -9398,22 +9399,22 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Corrigir z-index dos modais e backdrops
-    console.log('Configurando corre├º├úo de z-index para modais');
+    console.log('Configurando correção de z-index para modais');
     fixModalZIndex();
     
-    // Observar quando modais s├úo abertos
+    // Observar quando modais são abertos
     document.addEventListener('shown.bs.modal', function(e) {
         console.log('Modal aberto, corrigindo z-index');
         setTimeout(fixModalZIndex, 100);
     });
     
-    // Listener para checkboxes de canais no modal de filtros avan├ºados
+    // Listener para checkboxes de canais no modal de filtros avançados
     const channelCheckboxes = document.querySelectorAll('input[name="channels[]"]');
     channelCheckboxes.forEach(checkbox => {
         checkbox.addEventListener('change', updateWhatsAppAccountsFilter);
     });
     
-    // Inicializar seletor r├ípido de templates
+    // Inicializar seletor rípido de templates
     initTemplateQuickSelect();
     
     // Inicializar busca de mensagens
@@ -9424,7 +9425,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Handler do formul├írio de escala├º├úo
+    // Handler do formulírio de escalação
     const escalateForm = document.getElementById('escalateForm');
     if (escalateForm) {
         escalateForm.addEventListener('submit', async function(e) {
@@ -9439,7 +9440,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 Swal.fire({
                     icon: 'error',
                     title: 'Erro',
-                    text: 'ID da conversa n├úo encontrado',
+                    text: 'ID da conversa não encontrado',
                     colorScheme: isDarkMode ? 'dark' : 'light'
                 });
                 return;
@@ -9514,13 +9515,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const selectedConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     const selectedConversation = parsePhpJson('<?= json_encode($selectedConversation ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     
-    // Verificar se acesso ├® restrito (passado pelo PHP)
+    // Verificar se acesso ê restrito (passado pelo PHP)
     const accessRestricted = <?= !empty($accessRestricted) ? 'true' : 'false' ?>;
     
     if (selectedConversationId) {
         // IMPORTANTE: Definir currentConversationId para que funcionalidades como Assistente IA funcionem
         currentConversationId = parseInt(selectedConversationId);
-        window.currentConversationId = currentConversationId; // Garantir que window tamb├®m ├® atualizado
+        window.currentConversationId = currentConversationId; // Garantir que window tambêm ê atualizado
         
         // Marcar conversa como ativa na lista
         document.querySelectorAll('.conversation-item').forEach(item => {
@@ -9531,13 +9532,13 @@ document.addEventListener('DOMContentLoaded', function() {
             conversationItem.classList.add('active');
         }
         
-        // Se acesso ├® restrito, n├úo carregar dados adicionais
+        // Se acesso ê restrito, não carregar dados adicionais
         if (accessRestricted) {
-            console.log('­ƒöÆ Acesso restrito - n├úo carregando dados adicionais');
-            return; // N├úo fazer mais nada
+            console.log('🔒 Acesso restrito - não carregando dados adicionais');
+            return; // Não fazer mais nada
         }
         
-        // Se j├í temos dados da conversa do PHP, usar diretamente
+        // Se jí temos dados da conversa do PHP, usar diretamente
         if (selectedConversation) {
             // Buscar tags da conversa
             fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${selectedConversationId}/tags`, {
@@ -9561,7 +9562,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateConversationTimeline(selectedConversationId);
             });
         } else {
-            // Se n├úo temos dados completos, buscar via AJAX
+            // Se não temos dados completos, buscar via AJAX
             fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${selectedConversationId}`, {
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
@@ -9584,14 +9585,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Suportar navega├º├úo pelo hist├│rico do navegador
+    // Suportar navegação pelo histórico do navegador
     window.addEventListener('popstate', function(event) {
         const urlParams = new URLSearchParams(window.location.search);
         const conversationId = urlParams.get('id');
         if (conversationId) {
             selectConversation(parseInt(conversationId));
         } else {
-            // Se n├úo tem ID, limpar chat e resetar currentConversationId
+            // Se não tem ID, limpar chat e resetar currentConversationId
             currentConversationId = null;
             const chatMessages = document.getElementById('chatMessages');
             if (chatMessages) {
@@ -9603,7 +9604,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <span class="path2"></span>
                             </i>
                             <div class="fw-semibold">Selecione uma conversa</div>
-                            <div class="fs-7">Escolha uma conversa da lista para come├ºar</div>
+                            <div class="fs-7">Escolha uma conversa da lista para começar</div>
                         </div>
                     </div>
                 `;
@@ -9638,13 +9639,13 @@ document.getElementById('kt_conversations_search')?.addEventListener('input', fu
         clearTimeout(conversationsSearchDebounce);
     }
     
-    // Debounce: aguardar 500ms ap├│s parar de digitar
+    // Debounce: aguardar 500ms após parar de digitar
     conversationsSearchDebounce = setTimeout(() => {
         applyFilters();
     }, 500);
 });
 
-// Fun├º├úo para atualizar contador de filtros ativos (definir ANTES de usar)
+// Função para atualizar contador de filtros ativos (definir ANTES de usar)
 function updateActiveFiltersCount() {
     const countBadge = document.getElementById('activeFiltersCount');
     if (!countBadge) return;
@@ -9746,12 +9747,12 @@ document.querySelectorAll('#filter_status, #filter_channel, #filter_department, 
     }
 });
 
-// Carregar funis para o filtro ao iniciar a p├ígina
+// Carregar funis para o filtro ao iniciar a pígina
 function loadFunnelsFilter() {
     const funnelSelect = document.getElementById('filter_funnel');
     if (!funnelSelect) return;
     
-    // Helper local para escape HTML (caso escapeHtml global n├úo esteja dispon├¡vel ainda)
+    // Helper local para escape HTML (caso escapeHtml global não esteja disponível ainda)
     const safeEscape = (text) => {
         if (typeof escapeHtml === 'function') return escapeHtml(text);
         const div = document.createElement('div');
@@ -9773,7 +9774,7 @@ function loadFunnelsFilter() {
                 options += `<option value="${funnel.id}">${safeEscape(funnel.name)}</option>`;
             });
             funnelSelect.innerHTML = options;
-            console.log('Ô£à Funis carregados:', data.funnels.length);
+            console.log('✓ Funis carregados:', data.funnels.length);
         } else {
             funnelSelect.innerHTML = '<option value="">Nenhum funil</option>';
             console.log('ÔÜá´©Å Nenhum funil encontrado');
@@ -9785,13 +9786,13 @@ function loadFunnelsFilter() {
     });
 }
 
-// Carregar funis quando a p├ígina carregar
+// Carregar funis quando a pígina carregar
 document.addEventListener('DOMContentLoaded', function() {
     loadFunnelsFilter();
     updateActiveFiltersCount(); // Atualizar contador inicial
 });
 
-// Tamb├®m carregar imediatamente se DOM j├í estiver pronto
+// Tambêm carregar imediatamente se DOM jí estiver pronto
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
     setTimeout(() => {
         loadFunnelsFilter();
@@ -9827,9 +9828,9 @@ function applyFilters() {
     if (funnel) params.append('funnel_id', funnel);
     if (stage) params.append('funnel_stage_id', stage);
     
-    console.log('­ƒôï Filtros aplicados:', {funnel, stage, search, status, channel, department, tag, agent});
+    console.log('👔 Filtros aplicados:', {funnel, stage, search, status, channel, department, tag, agent});
     
-    // Resetar cache para for├ºar novo carregamento
+    // Resetar cache para forçar novo carregamento
     window.lastConversationListSignature = null;
     const conversationsList = document.querySelector('.conversations-list-items');
     if (conversationsList) {
@@ -9838,13 +9839,13 @@ function applyFilters() {
     
     // Tratar filtro de agente
     if (agent === 'unassigned') {
-        // Para "N├úo atribu├¡das", enviar agent_id=0 ou null (ser├í tratado no backend)
+        // Para "Não atribuídas", enviar agent_id=0 ou null (serí tratado no backend)
         params.append('agent_id', '0');
     } else if (agent) {
         params.append('agent_id', agent);
     }
     
-    // Manter filtros avan├ºados da URL (incluindo arrays multi-select)
+    // Manter filtros avançados da URL (incluindo arrays multi-select)
     const urlParams = new URLSearchParams(window.location.search);
     
     // Preservar filtros multi-select (arrays)
@@ -9854,7 +9855,7 @@ function applyFilters() {
         });
     });
     
-    // Preservar filtros avan├ºados simples (n├úo preservar unanswered, funnel_id, funnel_stage_id pois j├í foram tratados acima)
+    // Preservar filtros avançados simples (não preservar unanswered, funnel_id, funnel_stage_id pois jí foram tratados acima)
     ['answered', 'date_from', 'date_to', 'pinned', 'order_by', 'order_dir'].forEach(key => {
         if (urlParams.has(key) && !params.has(key)) {
             params.append(key, urlParams.get(key));
@@ -9867,7 +9868,7 @@ function applyFilters() {
         params.append('id', currentConversationId);
     }
     
-    // Atualizar URL sem recarregar p├ígina
+    // Atualizar URL sem recarregar pígina
     const newUrl = '<?= \App\Helpers\Url::to('/conversations') ?>' + (params.toString() ? '?' + params.toString() : '');
     window.history.pushState({ filters: params.toString() }, '', newUrl);
     
@@ -9879,19 +9880,19 @@ function refreshConversationList(params = null) {
     console.debug('[TAGS_DEBUG] refreshConversationList start', params instanceof URLSearchParams ? Object.fromEntries(params.entries()) : params);
     const conversationsList = document.querySelector('.conversations-list-items');
     if (!conversationsList) {
-        console.error('Elemento .conversations-list-items n├úo encontrado!');
+        console.error('Elemento .conversations-list-items não encontrado!');
         return;
     }
     
-    // Se params n├úo foi fornecido, usar filtros da URL atual preservando TODOS os par├ómetros
+    // Se params não foi fornecido, usar filtros da URL atual preservando TODOS os parâmetros
     if (!params) {
         params = new URLSearchParams(window.location.search);
     }
     
-    // Evitar flicker: s├│ mostra spinner no primeiro carregamento OU quando h├í filtros aplicados E ainda n├úo renderizou
+    // Evitar flicker: só mostra spinner no primeiro carregamento OU quando hí filtros aplicados E ainda não renderizou
     const isFirstLoad = conversationsList.dataset.loaded !== '1';
     
-    // Verificar se h├í filtros aplicados (n├úo ├® apenas polling)
+    // Verificar se hí filtros aplicados (não ê apenas polling)
     const hasFilters = params && params instanceof URLSearchParams && (
         params.has('search') ||
         params.has('status') ||
@@ -9913,7 +9914,7 @@ function refreshConversationList(params = null) {
     
     const shouldShowSpinner = isFirstLoad || (hasFilters && conversationsList.dataset.loaded !== '1');
     
-    // Mostrar loading apenas no primeiro carregamento OU quando filtros aplicados e ainda n├úo renderizado
+    // Mostrar loading apenas no primeiro carregamento OU quando filtros aplicados e ainda não renderizado
     if (shouldShowSpinner) {
         conversationsList.innerHTML = `
             <div class="d-flex align-items-center justify-content-center py-10">
@@ -9929,7 +9930,7 @@ function refreshConversationList(params = null) {
     // Construir URL preservando TODOS os filtros
     let url = '<?= \App\Helpers\Url::to('/conversations') ?>';
     
-    // Se params ├® URLSearchParams, converter para string
+    // Se params ê URLSearchParams, converter para string
     if (params instanceof URLSearchParams) {
         const paramsString = params.toString();
         if (paramsString) {
@@ -9940,7 +9941,7 @@ function refreshConversationList(params = null) {
     } else if (params) {
         url += '?' + params.toString();
     } else {
-        // Usar par├ómetros da URL atual
+        // Usar parâmetros da URL atual
         url += window.location.search;
     }
     
@@ -9956,14 +9957,14 @@ function refreshConversationList(params = null) {
         }
     })
     .then(response => {
-        // Verificar se a resposta ├® JSON
+        // Verificar se a resposta ê JSON
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
             return response.text().then(text => {
-                console.error('Resposta n├úo ├® JSON:', text.substring(0, 500));
+                console.error('Resposta não ê JSON:', text.substring(0, 500));
                 console.error('URL:', url);
                 console.error('Status:', response.status);
-                throw new Error('Resposta n├úo ├® JSON. Status: ' + response.status);
+                throw new Error('Resposta não ê JSON. Status: ' + response.status);
             });
         }
         return response.json();
@@ -9983,7 +9984,7 @@ function refreshConversationList(params = null) {
         const conversations = data.conversations;
         console.debug('[TAGS_DEBUG] conversas:', conversations.length, 'primeira tags_data:', conversations[0]?.tags_data);
         
-        // Calcular assinatura para evitar re-render quando n├úo houver mudan├ºas
+        // Calcular assinatura para evitar re-render quando não houver mudanças
         const signature = JSON.stringify(conversations.map(c => [
             c.id,
             c.pinned,
@@ -9994,7 +9995,7 @@ function refreshConversationList(params = null) {
             c.tags_data ? JSON.stringify(c.tags_data) : null
         ]));
         if (window.lastConversationListSignature === signature) {
-            // Se a lista j├í estava renderizada, evita ficar preso no spinner
+            // Se a lista jí estava renderizada, evita ficar preso no spinner
             conversationsList.dataset.rendering = '0';
             conversationsList.dataset.loaded = conversationsList.dataset.loaded || '1';
             return;
@@ -10076,7 +10077,7 @@ function refreshConversationList(params = null) {
                      data-updated-at="${lastMessageAt || new Date().toISOString()}"
                      data-onclick="selectConversation">
                     <div class="d-flex gap-3 w-100">
-                        <!-- Checkbox para sele├º├úo em massa -->
+                        <!-- Checkbox para seleção em massa -->
                         <div class="flex-shrink-0 d-flex align-items-center">
                             <label class="form-check form-check-custom form-check-solid">
                                 <input class="form-check-input conversation-checkbox" type="checkbox" value="${conv.id}" 
@@ -10090,7 +10091,7 @@ function refreshConversationList(params = null) {
                             <div class="conversation-item-header">
                                 <div class="conversation-item-name d-flex align-items-center gap-2">
                                     ${pinned ? '<i class="ki-duotone ki-pin fs-7 text-warning" title="Fixada"><span class="path1"></span><span class="path2"></span></i>' : ''}
-                                    ${conv.is_spam ? '<span class="badge badge-sm badge-danger" title="Marcada como spam">­ƒÜ½ SPAM</span>' : ''}
+                                    ${conv.is_spam ? '<span class="badge badge-sm badge-danger" title="Marcada como spam">⚠️ SPAM</span>' : ''}
                                     ${escapeHtml(name)}
                                 </div>
                     <div class="conversation-item-time d-flex align-items-center gap-2">
@@ -10133,7 +10134,7 @@ function refreshConversationList(params = null) {
                                             <span class="path1"></span>
                                             <span class="path2"></span>
                                         </i>
-                                        Marcar como N├úo Lido
+                                        Marcar como Não Lido
                                     </a>
                                 </li>
                                 <li><hr class="dropdown-divider"></li>
@@ -10189,7 +10190,7 @@ function refreshConversationList(params = null) {
             <div class="text-center py-10">
                 <div class="text-danger">Erro ao carregar conversas</div>
                 <div class="text-muted fs-7 mt-2">${error.message || 'Erro desconhecido'}</div>
-                <button class="btn btn-sm btn-light mt-3" onclick="location.reload()">Recarregar p├ígina</button>
+                <button class="btn btn-sm btn-light mt-3" onclick="location.reload()">Recarregar pígina</button>
             </div>
         `;
     });
@@ -10222,7 +10223,7 @@ function openAdvancedFilters() {
     const modal = new bootstrap.Modal(document.getElementById('kt_modal_advanced_filters'));
     modal.show();
     
-    // Verificar se WhatsApp est├í selecionado e mostrar/ocultar filtro de integra├º├Áes
+    // Verificar se WhatsApp estí selecionado e mostrar/ocultar filtro de integraçÁes
     updateWhatsAppAccountsFilter();
     
     // Atualizar etapas baseado nos funis selecionados
@@ -10280,7 +10281,7 @@ function updateStagesFilter() {
             return;
         }
         
-        // Obter etapas j├í selecionadas
+        // Obter etapas jí selecionadas
         const selectedStageIds = Array.from(document.querySelectorAll('input[name="funnel_stage_ids[]"]:checked'))
             .map(cb => parseInt(cb.value));
         
@@ -10314,7 +10315,7 @@ function updateStagesFilter() {
     });
 }
 
-// Atualizar visibilidade do filtro de integra├º├Áes WhatsApp
+// Atualizar visibilidade do filtro de integraçÁes WhatsApp
 function updateWhatsAppAccountsFilter() {
     const whatsappCheckbox = document.getElementById('filter_channel_whatsapp');
     const whatsappOfficialCheckbox = document.getElementById('filter_channel_whatsapp_official');
@@ -10329,7 +10330,7 @@ function updateWhatsAppAccountsFilter() {
             whatsappFilter.style.display = 'block';
         } else {
             whatsappFilter.style.display = 'none';
-            // Desmarcar todas as integra├º├Áes quando ocultar
+            // Desmarcar todas as integraçÁes quando ocultar
             const checkboxes = whatsappFilter.querySelectorAll('input[type="checkbox"]');
             checkboxes.forEach(cb => cb.checked = false);
         }
@@ -10355,7 +10356,7 @@ function applyAdvancedFilters() {
     
     const params = new URLSearchParams();
     
-    // Filtros b├ísicos (manter)
+    // Filtros bísicos (manter)
     const search = document.getElementById('kt_conversations_search')?.value || '';
     const status = document.getElementById('filter_status')?.value || '';
     const channel = document.getElementById('filter_channel')?.value || '';
@@ -10390,13 +10391,13 @@ function applyAdvancedFilters() {
         tagIds.forEach(tagId => params.append('tag_ids[]', tagId));
     }
     
-    // Agentes (multi-select) - substituir filtro simples se houver sele├º├úo m├║ltipla
+    // Agentes (multi-select) - substituir filtro simples se houver seleção múltipla
     const agentIds = formData.getAll('agent_ids[]');
     if (agentIds.length > 0) {
         // Usar multiselect de agentes (substitui filtro simples)
         agentIds.forEach(agentId => params.append('agent_ids[]', agentId));
     } else {
-        // Se n├úo houver multiselect, usar filtro simples
+        // Se não houver multiselect, usar filtro simples
         if (agent === 'unassigned') {
             params.append('agent_id', '0');
         } else if (agent) {
@@ -10404,7 +10405,7 @@ function applyAdvancedFilters() {
         }
     }
     
-    // Integra├º├Áes WhatsApp (multi-select)
+    // IntegraçÁes WhatsApp (multi-select)
     const whatsappAccountIds = formData.getAll('whatsapp_account_ids[]');
     if (whatsappAccountIds.length > 0) {
         whatsappAccountIds.forEach(accId => params.append('whatsapp_account_ids[]', accId));
@@ -10422,7 +10423,7 @@ function applyAdvancedFilters() {
         funnelStageIds.forEach(stageId => params.append('funnel_stage_ids[]', stageId));
     }
     
-    // Filtros avan├ºados
+    // Filtros avançados
     const responseStatus = formData.get('response_status');
     if (responseStatus === 'unanswered') {
         params.append('unanswered', '1');
@@ -10453,7 +10454,7 @@ function applyAdvancedFilters() {
 }
 
 function clearAllFilters() {
-    // Redirecionar para a p├ígina com status=open como padr├úo
+    // Redirecionar para a pígina com status=open como padrão
     window.location.href = '<?= \App\Helpers\Url::to('/conversations') ?>?status=open';
 }
 
@@ -10475,7 +10476,7 @@ function togglePin(conversationId, isPinned) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Atualizar UI sem recarregar p├ígina
+            // Atualizar UI sem recarregar pígina
             const conversationItem = document.querySelector(`[data-conversation-id="${conversationId}"]`);
             if (conversationItem) {
                 const newPinnedState = !isPinned;
@@ -10504,7 +10505,7 @@ function togglePin(conversationId, isPinned) {
     });
 }
 
-// Fun├º├úo auxiliar para fechar todos os dropdowns
+// Função auxiliar para fechar todos os dropdowns
 function closeAllDropdowns() {
     const dropdowns = document.querySelectorAll('.dropdown.show');
     dropdowns.forEach(dropdown => {
@@ -10518,13 +10519,13 @@ function closeAllDropdowns() {
     });
 }
 
-// Fun├º├úo para corrigir z-index de modais e backdrops
+// Função para corrigir z-index de modais e backdrops
 function fixModalZIndex() {
     // Remover backdrops duplicados
     const backdrops = document.querySelectorAll('.modal-backdrop');
     if (backdrops.length > 1) {
-        console.warn('M├║ltiplos backdrops encontrados, removendo duplicados:', backdrops.length);
-        // Manter apenas o ├║ltimo
+        console.warn('Múltiplos backdrops encontrados, removendo duplicados:', backdrops.length);
+        // Manter apenas o último
         for (let i = 0; i < backdrops.length - 1; i++) {
             backdrops[i].remove();
         }
@@ -10560,7 +10561,7 @@ function markConversationAsRead(conversationId) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Remover badge de n├úo lido
+            // Remover badge de não lido
             const conversationItem = document.querySelector(`[data-conversation-id="${conversationId}"]`);
             if (conversationItem) {
                 const badge = conversationItem.querySelector('.conversation-item-badge');
@@ -10593,15 +10594,15 @@ function markConversationAsRead(conversationId) {
     });
 }
 
-// Armazenar conversas marcadas como n├úo lidas manualmente
+// Armazenar conversas marcadas como não lidas manualmente
 window.manuallyMarkedAsUnread = window.manuallyMarkedAsUnread || new Set();
 
-// Marcar conversa como n├úo lida
+// Marcar conversa como não lida
 function markConversationAsUnread(conversationId) {
     // Fechar o dropdown imediatamente
     closeAllDropdowns();
     
-    console.log("Marcando conversa como n├úo lida:", conversationId);
+    console.log("Marcando conversa como não lida:", conversationId);
     
     fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/mark-unread`, {
         method: 'POST',
@@ -10615,11 +10616,11 @@ function markConversationAsUnread(conversationId) {
         console.log("Resposta mark-unread:", data);
         
         if (data.success) {
-            // Adicionar ├á lista de conversas marcadas manualmente
+            // Adicionar á lista de conversas marcadas manualmente
             window.manuallyMarkedAsUnread.add(conversationId);
-            console.log("Conversas marcadas como n├úo lidas:", Array.from(window.manuallyMarkedAsUnread));
+            console.log("Conversas marcadas como não lidas:", Array.from(window.manuallyMarkedAsUnread));
             
-            // For├ºar atualiza├º├úo do badge
+            // Forçar atualização do badge
             const conversationItem = document.querySelector(`[data-conversation-id="${conversationId}"]`);
             if (conversationItem) {
                 const meta = conversationItem.querySelector('.conversation-item-meta');
@@ -10650,7 +10651,7 @@ function markConversationAsUnread(conversationId) {
             if (typeof Swal !== 'undefined') {
                 Swal.fire({
                     icon: 'success',
-                    title: 'Conversa marcada como n├úo lida',
+                    title: 'Conversa marcada como não lida',
                     toast: true,
                     position: 'top-end',
                     showConfirmButton: false,
@@ -10658,18 +10659,18 @@ function markConversationAsUnread(conversationId) {
                 });
             }
         } else {
-            alert('Erro ao marcar como n├úo lida: ' + (data.message || 'Erro desconhecido'));
+            alert('Erro ao marcar como não lida: ' + (data.message || 'Erro desconhecido'));
         }
     })
     .catch(error => {
         console.error('Erro:', error);
-        alert('Erro ao marcar conversa como n├úo lida');
+        alert('Erro ao marcar conversa como não lida');
     });
 }
 
 // Mostrar modal de agendar mensagem
 function showScheduleMessageModal() {
-    // Usar vari├ível JavaScript global que ├® atualizada dinamicamente
+    // Usar variível JavaScript global que ê atualizada dinamicamente
     const conversationId = currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     if (!conversationId) {
         alert('Selecione uma conversa primeiro');
@@ -10678,11 +10679,11 @@ function showScheduleMessageModal() {
     
     const modal = document.getElementById('kt_modal_schedule_message');
     if (!modal) {
-        console.error('Modal de agendar mensagem n├úo encontrado');
+        console.error('Modal de agendar mensagem não encontrado');
         return;
     }
     
-    // Limpar formul├írio
+    // Limpar formulírio
     const form = modal.querySelector('#scheduleMessageForm');
     if (form) form.reset();
     
@@ -10692,7 +10693,7 @@ function showScheduleMessageModal() {
         conversationIdInput.value = conversationId;
     }
     
-    // Definir data/hora m├¡nima (hoje, agora)
+    // Definir data/hora mínima (hoje, agora)
     const dateInput = modal.querySelector('#schedule_message_date');
     const timeInput = modal.querySelector('#schedule_message_time');
     if (dateInput) {
@@ -10716,11 +10717,11 @@ function showScheduleMessageModal() {
 function showReminderModal(conversationId) {
     const modal = document.getElementById('kt_modal_reminder');
     if (!modal) {
-        console.error('Modal de lembrete n├úo encontrado');
+        console.error('Modal de lembrete não encontrado');
         return;
     }
     
-    // Limpar formul├írio
+    // Limpar formulírio
     const form = modal.querySelector('#reminderForm');
     if (form) form.reset();
     
@@ -10730,7 +10731,7 @@ function showReminderModal(conversationId) {
         conversationIdInput.value = conversationId;
     }
     
-    // Definir data/hora m├¡nima (hoje, agora)
+    // Definir data/hora mínima (hoje, agora)
     const dateInput = modal.querySelector('#reminder_date');
     const timeInput = modal.querySelector('#reminder_time');
     if (dateInput) {
@@ -10752,7 +10753,7 @@ function showReminderModal(conversationId) {
 
 // Buscar mensagens dentro da conversa
 let messageSearchTimeout = null;
-// Vari├íveis globais para navega├º├úo de busca
+// Variíveis globais para navegação de busca
 let messageSearchResults = [];
 let currentSearchIndex = -1;
 let currentSearchTerm = '';
@@ -10766,7 +10767,7 @@ let messageSearchFilters = {
     has_attachments: null
 };
 
-// Fun├º├úo para destacar texto encontrado
+// Função para destacar texto encontrado
 function highlightSearchTerm(text, searchTerm) {
     if (!searchTerm) return escapeHtml(text);
     
@@ -10774,7 +10775,7 @@ function highlightSearchTerm(text, searchTerm) {
     return escapeHtml(text).replace(regex, '<mark class="bg-warning text-dark" style="padding: 2px 4px; border-radius: 3px;">$1</mark>');
 }
 
-// Fun├º├úo para escapar caracteres especiais em regex
+// Função para escapar caracteres especiais em regex
 function escapeRegex(str) {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -10784,7 +10785,7 @@ function searchMessagesInConversation(event) {
     const searchTerm = searchInput.value.trim();
     const resultsDiv = document.getElementById('messageSearchResults');
     
-    // Obter ID da conversa da URL ou vari├ível global
+    // Obter ID da conversa da URL ou variível global
     let conversationId = currentConversationId;
     if (!conversationId) {
         const urlParams = new URLSearchParams(window.location.search);
@@ -10796,10 +10797,10 @@ function searchMessagesInConversation(event) {
         clearTimeout(messageSearchTimeout);
     }
     
-    // Verificar se h├í filtros ativos
+    // Verificar se hí filtros ativos
     const hasActiveFilters = Object.values(messageSearchFilters).some(v => v !== null && v !== '');
     
-    // Se campo vazio e n├úo h├í filtros, esconder resultados
+    // Se campo vazio e não hí filtros, esconder resultados
     if (!searchTerm && !hasActiveFilters) {
         resultsDiv.classList.add('d-none');
         messageSearchResults = [];
@@ -10846,7 +10847,7 @@ function searchMessagesInConversation(event) {
         .then(response => response.json())
         .then(data => {
             if (data.success && data.messages && data.messages.length > 0) {
-                // Salvar resultados para navega├º├úo
+                // Salvar resultados para navegação
                 messageSearchResults = data.messages;
                 currentSearchTerm = searchTerm;
                 currentSearchIndex = -1;
@@ -10863,7 +10864,7 @@ function searchMessagesInConversation(event) {
                                 </i>
                             </button>
                             <small class="text-gray-700 fw-semibold" id="searchCounter">-</small>
-                            <button class="btn btn-sm btn-icon btn-light-primary" onclick="navigateSearchResults(1)" title="Pr├│ximo (Ôåô)" id="searchNextBtn" style="padding: 2px 6px;">
+                            <button class="btn btn-sm btn-icon btn-light-primary" onclick="navigateSearchResults(1)" title="Próximo (Ôåô)" id="searchNextBtn" style="padding: 2px 6px;">
                                 <i class="ki-duotone ki-down fs-6">
                                     <span class="path1"></span>
                                     <span class="path2"></span>
@@ -10875,7 +10876,7 @@ function searchMessagesInConversation(event) {
                 
                 data.messages.forEach((msg, index) => {
                     const content = msg.content || '';
-                    // Encontrar posi├º├úo do termo no conte├║do para mostrar contexto relevante
+                    // Encontrar posição do termo no conteúdo para mostrar contexto relevante
                     const searchLower = searchTerm.toLowerCase();
                     const contentLower = content.toLowerCase();
                     const termIndex = contentLower.indexOf(searchLower);
@@ -10944,7 +10945,7 @@ function selectSearchResult(index, closeDropdown = false) {
     const msg = messageSearchResults[index];
     currentSearchIndex = index;
     
-    // Scroll at├® a mensagem
+    // Scroll atê a mensagem
     scrollToMessage(msg.id);
     
     // Atualizar contador e destacar item
@@ -10958,11 +10959,11 @@ function selectSearchResult(index, closeDropdown = false) {
     }
 }
 
-// Navegar entre resultados (pr├│ximo/anterior)
+// Navegar entre resultados (próximo/anterior)
 function navigateSearchResults(direction) {
     if (!messageSearchResults || messageSearchResults.length === 0) return;
     
-    // Atualizar ├¡ndice
+    // Atualizar índice
     currentSearchIndex += direction;
     
     // Limites
@@ -11010,7 +11011,7 @@ function highlightSearchResultItem(index) {
     }
 }
 
-// Adicionar navega├º├úo por teclado
+// Adicionar navegação por teclado
 document.addEventListener('DOMContentLoaded', function() {
     const messageSearchInput = document.getElementById('messageSearch');
     if (messageSearchInput) {
@@ -11038,11 +11039,11 @@ document.addEventListener('DOMContentLoaded', function() {
     initLazyLoading();
 });
 
-// Inicializar lazy loading de imagens e v├¡deos
+// Inicializar lazy loading de imagens e vídeos
 function initLazyLoading() {
-    // Verificar se Intersection Observer est├í dispon├¡vel
+    // Verificar se Intersection Observer estí disponível
     if (!('IntersectionObserver' in window)) {
-        // Fallback: carregar todas as imagens/v├¡deos imediatamente
+        // Fallback: carregar todas as imagens/vídeos imediatamente
         document.querySelectorAll('.lazy-image[data-src]').forEach(img => {
             img.src = img.dataset.src;
             img.classList.add('loaded');
@@ -11086,7 +11087,7 @@ function initLazyLoading() {
             }
         });
     }, {
-        rootMargin: '50px' // Come├ºar a carregar 50px antes de ficar vis├¡vel
+        rootMargin: '50px' // Começar a carregar 50px antes de ficar visível
     });
     
     // Observar todas as imagens lazy
@@ -11094,7 +11095,7 @@ function initLazyLoading() {
         imageObserver.observe(img);
     });
     
-    // Configurar Intersection Observer para v├¡deos
+    // Configurar Intersection Observer para vídeos
     const videoObserver = new IntersectionObserver((entries, observer) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
@@ -11104,10 +11105,10 @@ function initLazyLoading() {
             }
         });
     }, {
-        rootMargin: '100px' // V├¡deos come├ºam a carregar mais cedo
+        rootMargin: '100px' // Vídeos começam a carregar mais cedo
     });
     
-    // Observar todos os containers de v├¡deo lazy
+    // Observar todos os containers de vídeo lazy
     document.querySelectorAll('.lazy-video-container').forEach(container => {
         videoObserver.observe(container);
         
@@ -11121,7 +11122,7 @@ function initLazyLoading() {
     });
 }
 
-// Carregar v├¡deo quando ficar vis├¡vel ou ao clicar
+// Carregar vídeo quando ficar visível ou ao clicar
 function loadVideo(container) {
     const video = container.querySelector('video');
     const placeholder = container.querySelector('.lazy-video-placeholder');
@@ -11130,10 +11131,10 @@ function loadVideo(container) {
     
     if (!video || !src) return;
     
-    // Se j├í foi carregado, n├úo fazer nada
+    // Se jí foi carregado, não fazer nada
     if (video.classList.contains('loaded')) return;
     
-    // Carregar v├¡deo
+    // Carregar vídeo
     const source = video.querySelector('source');
     if (source) {
         source.src = src;
@@ -11147,7 +11148,7 @@ function loadVideo(container) {
         placeholder.classList.add('loaded');
     }
     
-    // Quando v├¡deo estiver pronto, mostrar
+    // Quando vídeo estiver pronto, mostrar
     video.addEventListener('loadeddata', function() {
         video.style.display = 'block';
         if (placeholder) {
@@ -11156,7 +11157,7 @@ function loadVideo(container) {
     }, { once: true });
 }
 
-// Fun├º├úo para observar novos elementos adicionados dinamicamente
+// Função para observar novos elementos adicionados dinamicamente
 function observeNewLazyElements(container) {
     if (!container) return;
     
@@ -11202,7 +11203,7 @@ function observeNewLazyElements(container) {
         });
     }
     
-    // Observar novos v├¡deos
+    // Observar novos vídeos
     const newVideos = container.querySelectorAll('.lazy-video-container:not(.lazy-observed)');
     if (newVideos.length > 0 && 'IntersectionObserver' in window) {
         const videoObserver = new IntersectionObserver((entries, observer) => {
@@ -11251,7 +11252,7 @@ function showMessageSearchFilters() {
     document.getElementById('filterHasAttachments').checked = messageSearchFilters.has_attachments === true;
     document.getElementById('filterSenderId').value = messageSearchFilters.sender_id || '';
     
-    // Mostrar/ocultar campo de agente espec├¡fico baseado no tipo de remetente
+    // Mostrar/ocultar campo de agente específico baseado no tipo de remetente
     updateSenderIdFilterVisibility();
     
     // Adicionar listener para atualizar visibilidade quando mudar tipo de remetente
@@ -11262,7 +11263,7 @@ function showMessageSearchFilters() {
     }
 }
 
-// Atualizar visibilidade do filtro de agente espec├¡fico
+// Atualizar visibilidade do filtro de agente específico
 function updateSenderIdFilterVisibility() {
     const senderType = document.getElementById('filterSenderType')?.value;
     const senderIdContainer = document.getElementById('filterSenderIdContainer');
@@ -11309,10 +11310,10 @@ function applyMessageSearchFilters() {
     if (searchInput && searchInput.value.trim()) {
         searchMessagesInConversation({ target: searchInput });
     } else {
-        // Se n├úo houver termo, mostrar que filtros est├úo ativos
+        // Se não houver termo, mostrar que filtros estão ativos
         const hasActiveFilters = Object.values(messageSearchFilters).some(v => v !== null && v !== '');
         if (hasActiveFilters) {
-            // Mostrar mensagem informando que filtros est├úo ativos
+            // Mostrar mensagem informando que filtros estão ativos
             const resultsDiv = document.getElementById('messageSearchResults');
             if (resultsDiv) {
                 resultsDiv.innerHTML = '<div class="p-3 text-center text-gray-500"><i class="ki-duotone ki-filter fs-2x mb-2"><span class="path1"></span><span class="path2"></span></i><br>Digite um termo de busca para aplicar os filtros</div>';
@@ -11334,7 +11335,7 @@ function clearMessageSearchFilters() {
         has_attachments: null
     };
     
-    // Limpar formul├írio
+    // Limpar formulírio
     document.getElementById('filterMessageType').value = '';
     document.getElementById('filterSenderType').value = '';
     document.getElementById('filterDateFrom').value = '';
@@ -11342,7 +11343,7 @@ function clearMessageSearchFilters() {
     document.getElementById('filterHasAttachments').checked = false;
     document.getElementById('filterSenderId').value = '';
     
-    // Ocultar campo de agente espec├¡fico
+    // Ocultar campo de agente específico
     const senderIdContainer = document.getElementById('filterSenderIdContainer');
     if (senderIdContainer) {
         senderIdContainer.style.display = 'none';
@@ -11372,12 +11373,12 @@ function updateFiltersIndicator() {
     } else {
         filtersBtn.classList.remove('btn-primary');
         filtersBtn.classList.add('btn-light-primary');
-        filtersBtn.setAttribute('title', 'Filtros avan├ºados');
+        filtersBtn.setAttribute('title', 'Filtros avançados');
     }
 }
 
 /**
- * Formatar data para exibi├º├úo (HOJE, ONTEM, ou data formatada) - JavaScript
+ * Formatar data para exibição (HOJE, ONTEM, ou data formatada) - JavaScript
  */
 function formatDateLabel(dateString) {
     if (!dateString) return '';
@@ -11398,7 +11399,7 @@ function formatDateLabel(dateString) {
     } else {
         // Formato: "DIA X" (ex: "15 de Janeiro de 2025")
         const months = [
-            'Janeiro', 'Fevereiro', 'Mar├ºo', 'Abril', 'Maio', 'Junho',
+            'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
             'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
         ];
         const day = date.getDate();
@@ -11410,7 +11411,7 @@ function formatDateLabel(dateString) {
 }
 
 /**
- * Verificar se duas datas s├úo de dias diferentes - JavaScript
+ * Verificar se duas datas são de dias diferentes - JavaScript
  */
 function isDifferentDay(date1, date2) {
     if (!date1 || !date2) return false;
@@ -11439,7 +11440,7 @@ function renderDateSeparator(dateString) {
 
 // Adicionar mensagem ao chat dinamicamente
 function addMessageToChat(message) {
-    console.group('­ƒô¿ addMessageToChat');
+    console.group('📝 addMessageToChat');
     console.log('Mensagem recebida:', message);
     console.table({
         'ID': message.id,
@@ -11450,13 +11451,13 @@ function addMessageToChat(message) {
     });
     
     const isIncoming = message.direction === 'incoming';
-    console.log(`Ser├í renderizada como: ${isIncoming ? 'Ô¼à´©Å INCOMING (esquerda)' : 'Ô×í´©Å OUTGOING (direita)'}`);
+    console.log(`Serí renderizada como: ${isIncoming ? 'Ô¼à´©Å INCOMING (esquerda)' : 'Ô×í´©Å OUTGOING (direita)'}`);
     console.groupEnd();
     
     const chatMessages = document.getElementById('chatMessages');
     if (!chatMessages) return null;
 
-    // Evitar duplica├º├úo: se j├í existe mensagem com o mesmo ID, verificar se precisa reposicionar
+    // Evitar duplicação: se jí existe mensagem com o mesmo ID, verificar se precisa reposicionar
     if (message.id) {
         const existing = chatMessages.querySelector(`[data-message-id="${message.id}"]`);
         if (existing) {
@@ -11471,7 +11472,7 @@ function addMessageToChat(message) {
                     existing.setAttribute('data-timestamp', messageTimestamp);
                     existing.remove(); // Remover do DOM para reposicionar
                 } else {
-                    // Mesma mensagem, n├úo precisa reposicionar
+                    // Mesma mensagem, não precisa reposicionar
                     return existing;
                 }
             } else {
@@ -11498,7 +11499,7 @@ function addMessageToChat(message) {
             </div>
         `;
     } else if (message.type === 'note') {
-        // Notas internas ficam alinhadas ├á direita como mensagens enviadas
+        // Notas internas ficam alinhadas á direita como mensagens enviadas
         messageDiv.className = 'chat-message note outgoing';
         const senderName = message.sender_name || 'Sistema';
         messageDiv.innerHTML = `
@@ -11526,7 +11527,7 @@ function addMessageToChat(message) {
             lastMessageId = Math.max(lastMessageId || 0, message.id);
         }
         
-        // Verificar se ├® mensagem de IA
+        // Verificar se ê mensagem de IA
         const isAIMessage = message.ai_agent_id !== null && message.ai_agent_id !== undefined;
         const aiAgentName = message.ai_agent_name || 'Assistente IA';
         
@@ -11547,7 +11548,7 @@ function addMessageToChat(message) {
             }
         } else if (isAIMessage) {
             // Avatar do agente de IA para mensagens de IA
-            avatarHtml = `<div class="message-avatar ai-agent-avatar" title="${escapeHtml(aiAgentName)}">${aiAgentInitials || '­ƒñû'}</div>`;
+            avatarHtml = `<div class="message-avatar ai-agent-avatar" title="${escapeHtml(aiAgentName)}">${aiAgentInitials || '🤖'}</div>`;
         }
         
         // Badge de IA se for mensagem de agente de IA
@@ -11555,7 +11556,7 @@ function addMessageToChat(message) {
         if (isAIMessage && !isIncoming) {
             aiBadgeHtml = `
                 <div class="ai-message-badge" title="Mensagem enviada por ${escapeHtml(aiAgentName)}">
-                    <div class="ai-avatar-mini">${aiAgentInitials || '­ƒñû'}</div>
+                    <div class="ai-avatar-mini">${aiAgentInitials || '🤖'}</div>
                     <i class="ki-duotone ki-robot fs-7">
                         <span class="path1"></span>
                         <span class="path2"></span>
@@ -11567,7 +11568,7 @@ function addMessageToChat(message) {
             `;
         }
         
-        // Fun├º├úo helper para renderizar status
+        // Função helper para renderizar status
         function renderMessageStatusHtml(message) {
             if (!message || message.direction === 'incoming') {
                 return '';
@@ -11614,7 +11615,7 @@ function addMessageToChat(message) {
                 </span>`;
             }
             
-            // Enviado (padr├úo)
+            // Enviado (padrão)
             return `<span class="message-status" title="Enviado">
                 <i class="ki-duotone ki-check fs-6 text-white">
                     <span class="path1"></span>
@@ -11633,7 +11634,7 @@ function addMessageToChat(message) {
             });
         }
         
-        // Verificar se ├® mensagem citada/reply
+        // Verificar se ê mensagem citada/reply
         const hasQuote = message.quoted_message_id || (message.content && message.content.startsWith('Ôå®´©Å'));
         let quotedHtml = '';
         let actualContent = message.content || '';
@@ -11652,7 +11653,7 @@ function addMessageToChat(message) {
                 if (quotedText.length > 100) {
                     quotedText = quotedText.substring(0, 100) + '...';
                 }
-                // Content n├úo foi modificado no novo formato
+                // Content não foi modificado no novo formato
                 actualContent = message.content || '';
             } else {
                 // Formato antigo (Ôå®´©Å no content)
@@ -11667,7 +11668,7 @@ function addMessageToChat(message) {
             const quotedOnclick = quotedMessageId 
                 ? "scrollToMessage(" + quotedMessageId + ")" 
                 : "console.log('Sem ID para scroll')";
-            const quotedTitle = quotedMessageId ? 'Clique para ver a mensagem original' : 'Mensagem original n├úo dispon├¡vel';
+            const quotedTitle = quotedMessageId ? 'Clique para ver a mensagem original' : 'Mensagem original não disponível';
             const quotedDataId = quotedMessageId || '';
             
             quotedHtml = `
@@ -11678,7 +11679,7 @@ function addMessageToChat(message) {
             `;
         }
         
-        // Adicionar bot├Áes de a├º├úo
+        // Adicionar botÁes de ação
         const msgId = message.id || 0;
         const senderName = (message.sender_name || 'Remetente').replace(/'/g, "\\'");
         const msgContent = ((message.content || '').substring(0, 100)).replace(/'/g, "\\'");
@@ -11700,7 +11701,7 @@ function addMessageToChat(message) {
             </div>
         `;
         
-        // Verificar se ├® apenas ├íudio (sem texto e sem outros anexos)
+        // Verificar se ê apenas íudio (sem texto e sem outros anexos)
         const isAudioOnly = attachmentsHtml && attachmentsHtml.includes('audio-attachment') && !actualContent && !quotedHtml;
         const bubbleClass = isAudioOnly ? 'message-bubble audio-only' : 'message-bubble';
         
@@ -11721,7 +11722,7 @@ function addMessageToChat(message) {
         `;
     }
     
-    // Armazenar timestamp no elemento para ordena├º├úo
+    // Armazenar timestamp no elemento para ordenação
     const messageTimestamp = message.created_at ? new Date(message.created_at).getTime() : Date.now();
     messageDiv.setAttribute('data-timestamp', messageTimestamp);
     
@@ -11730,14 +11731,14 @@ function addMessageToChat(message) {
     let needsDateSeparator = false;
     let dateSeparatorPosition = null;
     
-    // Encontrar posi├º├úo correta para inserir (ordem crescente por timestamp)
+    // Encontrar posição correta para inserir (ordem crescente por timestamp)
     let insertPosition = null;
     let previousMessageDate = null;
     
     for (let i = 0; i < allMessages.length; i++) {
         const existingMsg = allMessages[i];
         
-        // Verificar se ├® separador de data
+        // Verificar se ê separador de data
         if (existingMsg.classList.contains('date-separator')) {
             const separatorDate = existingMsg.getAttribute('data-date');
             if (separatorDate && message.created_at) {
@@ -11746,7 +11747,7 @@ function addMessageToChat(message) {
                     const separatorTime = new Date(separatorDate).getTime();
                     const messageTime = new Date(message.created_at).getTime();
                     if (messageTime < separatorTime) {
-                        // Mensagem ├® anterior ao separador, inserir antes dele
+                        // Mensagem ê anterior ao separador, inserir antes dele
                         insertPosition = existingMsg;
                         dateSeparatorPosition = existingMsg;
                         break;
@@ -11761,7 +11762,7 @@ function addMessageToChat(message) {
         if (existingTimestamp) {
             const existingTime = parseInt(existingTimestamp);
             if (!isNaN(existingTime)) {
-                // Comparar timestamps: se nova mensagem ├® mais antiga ou igual, inserir antes
+                // Comparar timestamps: se nova mensagem ê mais antiga ou igual, inserir antes
                 if (messageTimestamp <= existingTime) {
                     insertPosition = existingMsg;
                     
@@ -11786,7 +11787,7 @@ function addMessageToChat(message) {
                 }
             }
         } else {
-            // Se mensagem existente n├úo tem timestamp, tentar pelo ID (fallback)
+            // Se mensagem existente não tem timestamp, tentar pelo ID (fallback)
             const existingId = existingMsg.getAttribute('data-message-id');
             const newId = message.id;
             if (existingId && newId && !existingId.startsWith('temp_') && !newId.toString().startsWith('temp_')) {
@@ -11803,7 +11804,7 @@ function addMessageToChat(message) {
     // Verificar se precisa de separador antes da primeira mensagem ou entre mensagens
     if (!needsDateSeparator && message.created_at) {
         if (insertPosition) {
-            // Verificar se a mensagem anterior ├® de um dia diferente
+            // Verificar se a mensagem anterior ê de um dia diferente
             const prevElement = insertPosition.previousElementSibling;
             if (prevElement && !prevElement.classList.contains('date-separator')) {
                 const prevDate = prevElement.getAttribute('data-date') || 
@@ -11814,7 +11815,7 @@ function addMessageToChat(message) {
                     dateSeparatorPosition = insertPosition;
                 }
             } else if (!prevElement) {
-                // N├úo h├í elemento anterior, primeira mensagem
+                // Não hí elemento anterior, primeira mensagem
                 needsDateSeparator = true;
                 dateSeparatorPosition = insertPosition;
             }
@@ -11823,7 +11824,7 @@ function addMessageToChat(message) {
             needsDateSeparator = true;
             dateSeparatorPosition = null;
         } else {
-            // ├Ültima mensagem - verificar se ├® de dia diferente da anterior
+            // Última mensagem - verificar se ê de dia diferente da anterior
             const lastMsg = allMessages[allMessages.length - 1];
             if (lastMsg && !lastMsg.classList.contains('date-separator')) {
                 const lastDate = lastMsg.getAttribute('data-date') || 
@@ -11837,7 +11838,7 @@ function addMessageToChat(message) {
         }
     }
     
-    // Adicionar separador de data se necess├írio
+    // Adicionar separador de data se necessírio
     if (needsDateSeparator && message.created_at) {
         const dateSeparator = renderDateSeparator(message.created_at);
         if (dateSeparatorPosition) {
@@ -11849,30 +11850,30 @@ function addMessageToChat(message) {
         }
     }
     
-    // Inserir mensagem na posi├º├úo correta ou no final
+    // Inserir mensagem na posição correta ou no final
     if (insertPosition) {
         chatMessages.insertBefore(messageDiv, insertPosition);
     } else {
         chatMessages.appendChild(messageDiv);
     }
     
-    // Adicionar atributo data-date para facilitar compara├º├Áes futuras
+    // Adicionar atributo data-date para facilitar comparaçÁes futuras
     if (message.created_at) {
         messageDiv.setAttribute('data-date', message.created_at);
     }
     
-    // Atualizar ├║ltimo ID de mensagem conhecido
+    // Atualizar último ID de mensagem conhecido
     if (message.id) {
         lastMessageId = Math.max(lastMessageId || 0, message.id);
     }
     
-    // Scroll para ├║ltima mensagem apenas se estiver no final do chat
+    // Scroll para última mensagem apenas se estiver no final do chat
     const isAtBottom = chatMessages.scrollHeight - chatMessages.scrollTop <= chatMessages.clientHeight + 100;
     if (isAtBottom && chatMessages && chatMessages.scrollHeight !== undefined) {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
     
-    // Observar novos elementos lazy (imagens e v├¡deos) na mensagem rec├®m-adicionada
+    // Observar novos elementos lazy (imagens e vídeos) na mensagem recêm-adicionada
     observeNewLazyElements(messageDiv);
     
     return messageDiv;
@@ -11904,10 +11905,10 @@ function nl2br(text) {
     return text.replace(/\n/g, '<br>');
 }
 
-// Vari├ível global para armazenar mensagem sendo respondida
+// Variível global para armazenar mensagem sendo respondida
 let replyingToMessage = null;
 
-// Fun├º├úo para responder uma mensagem
+// Função para responder uma mensagem
 function replyToMessage(messageId, senderName, messageText) {
     replyingToMessage = {
         id: messageId,
@@ -11946,7 +11947,7 @@ function cancelReply() {
 async function forwardMessage(messageId) {
     if (!messageId) return;
     
-    // Usar vari├ível JavaScript global que ├® atualizada dinamicamente
+    // Usar variível JavaScript global que ê atualizada dinamicamente
     const conversationId = currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     if (!conversationId) {
         alert('Selecione uma conversa primeiro');
@@ -11957,12 +11958,12 @@ async function forwardMessage(messageId) {
     try {
         const response = await fetch(`<?= \App\Helpers\Url::to("/conversations/for-forwarding") ?>?exclude=${conversationId}`);
         
-        // Verificar se a resposta ├® JSON
+        // Verificar se a resposta ê JSON
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
             const text = await response.text();
-            console.error('Resposta n├úo ├® JSON:', text.substring(0, 200));
-            throw new Error('Resposta inv├ílida do servidor. Verifique o console para mais detalhes.');
+            console.error('Resposta não ê JSON:', text.substring(0, 200));
+            throw new Error('Resposta invílida do servidor. Verifique o console para mais detalhes.');
         }
         
         const data = await response.json();
@@ -11978,7 +11979,7 @@ async function forwardMessage(messageId) {
         // Criar HTML do modal
         let conversationsHtml = '';
         if (data.conversations.length === 0) {
-            conversationsHtml = '<div class="text-center text-muted p-4">Nenhuma conversa dispon├¡vel para encaminhamento</div>';
+            conversationsHtml = '<div class="text-center text-muted p-4">Nenhuma conversa disponível para encaminhamento</div>';
         } else {
             conversationsHtml = '<div class="forward-conversations-list" style="max-height: 400px; overflow-y: auto;">';
             data.conversations.forEach(conv => {
@@ -12044,7 +12045,7 @@ async function selectForwardConversation(targetConversationId, messageId) {
 const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     
     if (!conversationId || !targetConversationId || !messageId) {
-        alert('Dados inv├ílidos');
+        alert('Dados invílidos');
         return;
     }
     
@@ -12121,37 +12122,37 @@ const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? 
     }
 }
 
-// Scroll at├® mensagem espec├¡fica
+// Scroll atê mensagem específica
 function scrollToMessage(messageId) {
-    console.log('­ƒöì scrollToMessage chamado com messageId:', messageId, 'tipo:', typeof messageId);
+    console.log('🔧 scrollToMessage chamado com messageId:', messageId, 'tipo:', typeof messageId);
     
     if (!messageId || messageId === 'null' || messageId === null || messageId === '') {
-        console.warn('ÔÜá´©Å scrollToMessage: ID de mensagem inv├ílido:', messageId);
+        console.warn('ÔÜá´©Å scrollToMessage: ID de mensagem invílido:', messageId);
         return;
     }
     
-    // Converter para n├║mero se for string
+    // Converter para número se for string
     const numericId = parseInt(messageId);
     if (isNaN(numericId)) {
-        console.error('ÔØî scrollToMessage: ID n├úo ├® um n├║mero v├ílido:', messageId);
+        console.error('ÔØî scrollToMessage: ID não ê um número vílido:', messageId);
         return;
     }
     
     const chatMessages = document.getElementById('chatMessages');
     if (!chatMessages) {
-        console.error('ÔØî scrollToMessage: Container de mensagens n├úo encontrado');
+        console.error('ÔØî scrollToMessage: Container de mensagens não encontrado');
         return;
     }
     
-    console.log('­ƒöì scrollToMessage: Procurando mensagem com ID:', numericId);
+    console.log('🔧 scrollToMessage: Procurando mensagem com ID:', numericId);
     
     // Tentar encontrar a mensagem
     const messageElement = chatMessages.querySelector(`[data-message-id="${numericId}"]`);
     
-    console.log('­ƒöì scrollToMessage: Elemento encontrado:', messageElement);
+    console.log('🔧 scrollToMessage: Elemento encontrado:', messageElement);
     
     if (messageElement) {
-        console.log('Ô£à scrollToMessage: Mensagem encontrada, fazendo scroll...');
+        console.log('✓ scrollToMessage: Mensagem encontrada, fazendo scroll...');
         
         // Remover highlight anterior se houver
         chatMessages.querySelectorAll('.message-highlight').forEach(el => {
@@ -12161,12 +12162,12 @@ function scrollToMessage(messageId) {
         // Adicionar classe de highlight
         messageElement.classList.add('message-highlight');
         
-        // Calcular posi├º├úo relativa ao container do chat
+        // Calcular posição relativa ao container do chat
         const elementTop = messageElement.offsetTop;
         const elementHeight = messageElement.offsetHeight;
         const containerHeight = chatMessages.clientHeight;
         
-        // Scroll suave at├® a mensagem (centralizada no container)
+        // Scroll suave atê a mensagem (centralizada no container)
         const targetScroll = elementTop - (containerHeight / 2) + (elementHeight / 2);
         
         chatMessages.scrollTo({
@@ -12174,55 +12175,55 @@ function scrollToMessage(messageId) {
             behavior: 'smooth'
         });
         
-        // Remover highlight ap├│s 3 segundos
+        // Remover highlight após 3 segundos
             setTimeout(() => {
             messageElement.classList.remove('message-highlight');
             }, 3000);
         
-        console.log('Ô£à scrollToMessage: Scroll executado com sucesso');
+        console.log('✓ scrollToMessage: Scroll executado com sucesso');
         
-        // Remover destaque ap├│s 3 segundos
+        // Remover destaque após 3 segundos
         setTimeout(() => {
             messageElement.style.backgroundColor = '';
             messageElement.style.border = '';
             messageElement.style.borderRadius = '';
         }, 3000);
     } else {
-        // Mensagem n├úo encontrada - pode estar em outra p├ígina ou n├úo carregada
-        console.warn('ÔÜá´©Å scrollToMessage: Mensagem n├úo encontrada com ID:', numericId);
+        // Mensagem não encontrada - pode estar em outra pígina ou não carregada
+        console.warn('ÔÜá´©Å scrollToMessage: Mensagem não encontrada com ID:', numericId);
         const allMessages = chatMessages.querySelectorAll('[data-message-id]');
-        console.log('­ƒôè scrollToMessage: Total de mensagens no DOM:', allMessages.length);
-        console.log('­ƒôè scrollToMessage: IDs dispon├¡veis:', Array.from(allMessages).map(el => el.getAttribute('data-message-id')));
+        console.log('📊 scrollToMessage: Total de mensagens no DOM:', allMessages.length);
+        console.log('📊 scrollToMessage: IDs disponíveis:', Array.from(allMessages).map(el => el.getAttribute('data-message-id')));
         
         // Tentar carregar mais mensagens ou mostrar aviso
         if (typeof Swal !== 'undefined' && Swal.fire) {
             Swal.fire({
                 icon: 'info',
-                title: 'Mensagem n├úo encontrada',
-                text: 'A mensagem pode estar em outra p├ígina do hist├│rico. Tente rolar para cima para encontr├í-la.',
+                title: 'Mensagem não encontrada',
+                text: 'A mensagem pode estar em outra pígina do histórico. Tente rolar para cima para encontrí-la.',
                 timer: 3000,
                 showConfirmButton: false,
                 toast: true,
                 position: 'top-end'
             });
         } else {
-            // Fallback se SweetAlert n├úo estiver dispon├¡vel
-            alert('Mensagem n├úo encontrada. A mensagem pode estar em outra p├ígina do hist├│rico.');
+            // Fallback se SweetAlert não estiver disponível
+            alert('Mensagem não encontrada. A mensagem pode estar em outra pígina do histórico.');
         }
     }
 }
 
-// Vari├íveis para grava├º├úo de ├íudio
+// Variíveis para gravação de íudio
 let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
 let recordingCanceled = false;
 let currentStream = null;
 
-// Gravar ├íudio
+// Gravar íudio
 async function toggleAudioRecording() {
     const btn = document.getElementById('recordAudioBtn');
-    // Usar vari├ível JavaScript global que ├® atualizada dinamicamente
+    // Usar variível JavaScript global que ê atualizada dinamicamente
     const conversationId = currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     
     if (!conversationId) {
@@ -12231,12 +12232,12 @@ async function toggleAudioRecording() {
     }
     
     if (!isRecording) {
-        // Iniciar grava├º├úo
+        // Iniciar gravação
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             currentStream = stream;
 
-            // Tentar preferir OGG/Opus; se n├úo suportar, cair para WebM/Opus
+            // Tentar preferir OGG/Opus; se não suportar, cair para WebM/Opus
             let mimeType = '';
             const preferred = 'audio/ogg;codecs=opus';
             const fallback = 'audio/webm;codecs=opus';
@@ -12254,7 +12255,7 @@ async function toggleAudioRecording() {
             };
             
             mediaRecorder.onstop = async () => {
-                // Se cancelado, n├úo enviar
+                // Se cancelado, não enviar
                 if (recordingCanceled) {
                     recordingCanceled = false;
                     audioChunks = [];
@@ -12274,10 +12275,10 @@ async function toggleAudioRecording() {
             mediaRecorder.start();
             isRecording = true;
             
-            // Atualizar bot├úo
+            // Atualizar botão
             btn.classList.remove('btn-light-primary', 'btn-danger');
             btn.classList.add('btn-success');
-            btn.title = 'Parar e enviar ├íudio';
+            btn.title = 'Parar e enviar íudio';
             btn.innerHTML = `
                 <i class="ki-duotone ki-send fs-3">
                     <span class="path1"></span>
@@ -12285,13 +12286,13 @@ async function toggleAudioRecording() {
                 </i>
             `;
             
-            // Mostrar indicador de grava├º├úo
+            // Mostrar indicador de gravação
             showRecordingIndicator();
             showCancelRecordingButton();
             
         } catch (error) {
             console.error('Erro ao acessar microfone:', error);
-            alert('Erro ao acessar o microfone. Verifique as permiss├Áes.');
+            alert('Erro ao acessar o microfone. Verifique as permissÁes.');
         }
     } else {
         stopRecordingAndSend();
@@ -12306,7 +12307,7 @@ function stopRecordingAndSend() {
     isRecording = false;
     btn.classList.remove('btn-success', 'btn-danger');
     btn.classList.add('btn-light-primary');
-    btn.title = 'Gravar ├íudio';
+    btn.title = 'Gravar íudio';
     btn.innerHTML = `
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
@@ -12329,7 +12330,7 @@ function cancelRecording() {
     const btn = document.getElementById('recordAudioBtn');
     btn.classList.remove('btn-success', 'btn-danger');
     btn.classList.add('btn-light-primary');
-    btn.title = 'Gravar ├íudio';
+    btn.title = 'Gravar íudio';
     btn.innerHTML = `
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
@@ -12360,16 +12361,16 @@ function hideCancelRecordingButton() {
     }
 }
 
-// Mostrar indicador de grava├º├úo
+// Mostrar indicador de gravação
 function showRecordingIndicator() {
     const input = document.getElementById('messageInput');
     if (input) {
-        input.placeholder = '­ƒÄñ Gravando... Clique no microfone para parar';
+        input.placeholder = '🎤 Gravando... Clique no microfone para parar';
         input.disabled = true;
     }
 }
 
-// Esconder indicador de grava├º├úo
+// Esconder indicador de gravação
 function hideRecordingIndicator() {
     const input = document.getElementById('messageInput');
     if (input) {
@@ -12378,10 +12379,10 @@ function hideRecordingIndicator() {
     }
 }
 
-// Enviar mensagem de ├íudio
+// Enviar mensagem de íudio
 async function sendAudioMessage(audioBlob, conversationId) {
     try {
-        // Converter para formato compat├¡vel (webm para ogg ou mp3 seria ideal, mas vamos usar webm)
+        // Converter para formato compatível (webm para ogg ou mp3 seria ideal, mas vamos usar webm)
         const formData = new FormData();
         formData.append('attachments[]', audioBlob, 'audio-' + Date.now() + '.webm');
         formData.append('content', '');
@@ -12391,24 +12392,24 @@ async function sendAudioMessage(audioBlob, conversationId) {
             body: formData
         });
         
-        // Garantir que temos JSON; se n├úo, capturar texto para debug
+        // Garantir que temos JSON; se não, capturar texto para debug
         // IMPORTANTE: Ler o texto primeiro e depois tentar fazer parse JSON para evitar "body stream already read"
         const responseText = await response.text();
         let data;
         try {
             data = JSON.parse(responseText);
         } catch (jsonErr) {
-            throw new Error(`Resposta n├úo ├® JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
+            throw new Error(`Resposta não ê JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
         }
         
         if (data.success && data.message) {
             addMessageToChat(data.message);
         } else {
-            throw new Error(data.message || 'Erro ao enviar ├íudio');
+            throw new Error(data.message || 'Erro ao enviar íudio');
         }
     } catch (error) {
-        console.error('Erro ao enviar ├íudio:', error);
-        alert('Erro ao enviar ├íudio: ' + error.message);
+        console.error('Erro ao enviar íudio:', error);
+        alert('Erro ao enviar íudio: ' + error.message);
     }
 }
 
@@ -12418,12 +12419,12 @@ function sendMessage() {
     const isNote = document.getElementById('noteToggle').checked;
     let message = input.value.trim();
     
-    // N├úo permitir enviar mensagem vazia (mesmo com reply deve ter algum texto)
+    // Não permitir enviar mensagem vazia (mesmo com reply deve ter algum texto)
     if (!message) {
         return;
     }
     
-    // Obter conversationId da vari├ível global atualizada ou do PHP
+    // Obter conversationId da variível global atualizada ou do PHP
     let conversationId = window.currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     // Fallback: tentar pegar da conversa ativa no DOM
     if (!conversationId) {
@@ -12447,9 +12448,9 @@ function sendMessage() {
     } : null;
     
     // Preparar mensagem com reply se houver
-    // IMPORTANTE: Enviar apenas o texto digitado pelo usu├írio
+    // IMPORTANTE: Enviar apenas o texto digitado pelo usuírio
     // O backend processa o quoted_message_id separadamente
-    let finalMessage = message; // Texto que ser├í enviado ao backend (apenas o digitado)
+    let finalMessage = message; // Texto que serí enviado ao backend (apenas o digitado)
     
     // Adicionar nome do agente em negrito se toggle estiver ativo
     const agentNameToggle = document.getElementById('agentNameToggle');
@@ -12474,11 +12475,11 @@ function sendMessage() {
     const tempId = 'temp_' + Date.now();
     const tempMessage = {
         id: tempId,
-        content: previewMessage, // Usar preview formatado para exibi├º├úo
+        content: previewMessage, // Usar preview formatado para exibição
         direction: 'outgoing',
         type: isNote ? 'note' : 'message',
         created_at: new Date().toISOString(),
-        sender_name: 'Voc├¬',
+        sender_name: 'Vocì',
         quoted_message_id: replyContext ? replyContext.id : null,
         quoted_sender_name: replyContext ? replyContext.sender : null,
         quoted_text: replyContext ? replyContext.text : null
@@ -12502,7 +12503,7 @@ function sendMessage() {
             'Accept': 'application/json'
         },
         body: JSON.stringify({
-            message: finalMessage, // Enviar apenas o texto digitado (sem formata├º├úo de reply)
+            message: finalMessage, // Enviar apenas o texto digitado (sem formatação de reply)
             is_note: isNote,
             quoted_message_id: replyContext ? replyContext.id : null
         })
@@ -12525,7 +12526,7 @@ function sendMessage() {
     })
     .then(data => {
         if (data.success) {
-            // Remover mensagem tempor├íria e adicionar a real
+            // Remover mensagem temporíria e adicionar a real
             const tempMsg = document.querySelector(`[data-temp-id="${tempMessage.id}"]`);
             if (tempMsg) tempMsg.remove();
             
@@ -12536,7 +12537,7 @@ function sendMessage() {
             // Atualizar lista de conversas
             updateConversationInList(conversationId, message);
         } else {
-            // Remover mensagem tempor├íria em caso de erro
+            // Remover mensagem temporíria em caso de erro
             const tempMsg = document.querySelector(`[data-temp-id="${tempMessage.id}"]`);
             if (tempMsg) tempMsg.remove();
             
@@ -12545,7 +12546,7 @@ function sendMessage() {
     })
     .catch(error => {
         console.error('Erro:', error);
-        // Remover mensagem tempor├íria em caso de erro
+        // Remover mensagem temporíria em caso de erro
         const tempMsg = document.querySelector(`[data-temp-id="${tempMessage.id}"]`);
         if (tempMsg) tempMsg.remove();
         
@@ -12584,10 +12585,10 @@ function updateConversationInList(conversationId, lastMessage) {
             }
         }
         
-        // Garantir dropdown de a├º├Áes
+        // Garantir dropdown de açÁes
         ensureActionsDropdown(conversationItem, conversationItem.classList.contains('pinned'), conversationId);
         
-        // Resortear lista ap├│s atualizar
+        // Resortear lista após atualizar
         sortConversationList();
     }
 }
@@ -12596,14 +12597,14 @@ function updateConversationInList(conversationId, lastMessage) {
 function showTemplatesModal() {
     const modalElement = document.getElementById('kt_modal_templates');
     if (!modalElement) {
-        console.error('Modal de templates n├úo encontrado');
+        console.error('Modal de templates não encontrado');
         return;
     }
     
-    // Verificar se j├í existe uma inst├óncia do modal
+    // Verificar se jí existe uma instância do modal
     let modal = bootstrap.Modal.getInstance(modalElement);
     
-    // Se n├úo existe, criar nova inst├óncia
+    // Se não existe, criar nova instância
     if (!modal) {
         modal = new bootstrap.Modal(modalElement, {
             backdrop: true,
@@ -12628,14 +12629,14 @@ function showTemplatesModal() {
 function showPersonalTemplatesModal() {
     const modalElement = document.getElementById('kt_modal_personal_templates');
     if (!modalElement) {
-        console.error('Modal de templates pessoais n├úo encontrado');
+        console.error('Modal de templates pessoais não encontrado');
         return;
     }
     
-    // Verificar se j├í existe uma inst├óncia do modal
+    // Verificar se jí existe uma instância do modal
     let modal = bootstrap.Modal.getInstance(modalElement);
     
-    // Se n├úo existe, criar nova inst├óncia
+    // Se não existe, criar nova instância
     if (!modal) {
         modal = new bootstrap.Modal(modalElement, {
             backdrop: true,
@@ -12694,7 +12695,7 @@ function loadPersonalTemplates() {
                             <span class="path2"></span>
                             <span class="path3"></span>
                         </i>
-                        <div>Voc├¬ ainda n├úo tem templates pessoais.</div>
+                        <div>Vocì ainda não tem templates pessoais.</div>
                         <button class="btn btn-sm btn-primary mt-3" onclick="showCreatePersonalTemplateModal()">
                             <i class="ki-duotone ki-plus fs-5">
                                 <span class="path1"></span>
@@ -12728,7 +12729,7 @@ function renderPersonalTemplates(templates) {
         templatesList.innerHTML = `
             <tr>
                 <td colspan="4" class="text-center text-muted py-10">
-                    <div>Voc├¬ ainda n├úo tem templates pessoais.</div>
+                    <div>Vocì ainda não tem templates pessoais.</div>
                     <button class="btn btn-sm btn-primary mt-3" onclick="showCreatePersonalTemplateModal()">
                         <i class="ki-duotone ki-plus fs-5">
                             <span class="path1"></span>
@@ -12805,11 +12806,11 @@ function renderPersonalTemplates(templates) {
 function showCreatePersonalTemplateModal() {
     const modalElement = document.getElementById('kt_modal_personal_template_form');
     if (!modalElement) {
-        console.error('Modal de formul├írio de template pessoal n├úo encontrado');
+        console.error('Modal de formulírio de template pessoal não encontrado');
         return;
     }
     
-    // Resetar formul├írio
+    // Resetar formulírio
     const formTitle = document.getElementById('personalTemplateFormTitle');
     const form = document.getElementById('personalTemplateForm');
     const templateId = document.getElementById('personalTemplateId');
@@ -12820,10 +12821,10 @@ function showCreatePersonalTemplateModal() {
     if (templateId) templateId.value = '';
     if (templateActive) templateActive.checked = true;
     
-    // Verificar se j├í existe uma inst├óncia do modal
+    // Verificar se jí existe uma instância do modal
     let modal = bootstrap.Modal.getInstance(modalElement);
     
-    // Se n├úo existe, criar nova inst├óncia
+    // Se não existe, criar nova instância
     if (!modal) {
         modal = new bootstrap.Modal(modalElement, {
             backdrop: true,
@@ -12867,7 +12868,7 @@ function editPersonalTemplate(templateId) {
             Swal.fire({
                 icon: 'error',
                 title: 'Erro',
-                text: 'Template n├úo encontrado',
+                text: 'Template não encontrado',
                 colorScheme: isDarkMode ? 'dark' : 'light',
                 customClass: {
                     popup: isDarkMode ? 'swal2-dark' : '',
@@ -12897,8 +12898,8 @@ function editPersonalTemplate(templateId) {
 function deletePersonalTemplate(templateId) {
     Swal.fire({
         icon: 'warning',
-        title: 'Confirmar Exclus├úo',
-        text: 'Tem certeza que deseja excluir este template pessoal? Esta a├º├úo n├úo pode ser desfeita.',
+        title: 'Confirmar Exclusão',
+        text: 'Tem certeza que deseja excluir este template pessoal? Esta ação não pode ser desfeita.',
         showCancelButton: true,
         confirmButtonText: 'Sim, excluir',
         cancelButtonText: 'Cancelar',
@@ -12924,7 +12925,7 @@ function deletePersonalTemplate(templateId) {
                     Swal.fire({
                         icon: 'success',
                         title: 'Sucesso!',
-                        text: 'Template exclu├¡do com sucesso',
+                        text: 'Template excluído com sucesso',
                         timer: 2000,
                         showConfirmButton: false,
                         colorScheme: isDarkMode ? 'dark' : 'light',
@@ -12935,7 +12936,7 @@ function deletePersonalTemplate(templateId) {
                         }
                     });
                     loadPersonalTemplates();
-                    loadTemplates(); // Recarregar templates no modal principal tamb├®m
+                    loadTemplates(); // Recarregar templates no modal principal tambêm
                 } else {
                     Swal.fire({
                         icon: 'error',
@@ -12968,7 +12969,7 @@ function deletePersonalTemplate(templateId) {
     });
 }
 
-// Submeter formul├írio de template pessoal
+// Submeter formulírio de template pessoal
 document.addEventListener('DOMContentLoaded', function() {
     const personalTemplateForm = document.getElementById('personalTemplateForm');
     if (personalTemplateForm) {
@@ -13026,7 +13027,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     bootstrap.Modal.getInstance(document.getElementById('kt_modal_personal_template_form')).hide();
                     loadPersonalTemplates();
-                    loadTemplates(); // Recarregar templates no modal principal tamb├®m
+                    loadTemplates(); // Recarregar templates no modal principal tambêm
                 } else {
                     Swal.fire({
                         icon: 'error',
@@ -13078,7 +13079,7 @@ function loadTemplates() {
         </tr>
     `;
     
-    // Buscar templates dispon├¡veis para a conversa atual (inclui pessoais + globais)
+    // Buscar templates disponíveis para a conversa atual (inclui pessoais + globais)
     const conversationId = currentConversationId;
     const url = '<?= \App\Helpers\Url::to('/message-templates/available') ?>' + 
                 (conversationId ? `?conversation_id=${conversationId}` : '');
@@ -13101,7 +13102,7 @@ function loadTemplates() {
                             <span class="path2"></span>
                             <span class="path3"></span>
                         </i>
-                        <div>Nenhum template dispon├¡vel</div>
+                        <div>Nenhum template disponível</div>
                     </td>
                 </tr>
             `;
@@ -13127,7 +13128,7 @@ function renderTemplates(templates) {
         templatesList.innerHTML = `
             <tr>
                 <td colspan="4" class="text-center text-muted py-10">
-                    <div>Nenhum template dispon├¡vel</div>
+                    <div>Nenhum template disponível</div>
                 </td>
             </tr>
         `;
@@ -13268,8 +13269,8 @@ function previewTemplate(templateId) {
     if (!currentConversationId) {
         Swal.fire({
             icon: 'warning',
-            title: 'Aten├º├úo',
-            text: 'Selecione uma conversa primeiro para visualizar o preview com vari├íveis',
+            title: 'Atenção',
+            text: 'Selecione uma conversa primeiro para visualizar o preview com variíveis',
             confirmButtonText: 'OK'
         });
         return;
@@ -13299,7 +13300,7 @@ function previewTemplate(templateId) {
                         <div class="alert alert-info mb-4" style="white-space: pre-wrap; text-align: left;">${escapeHtml(data.processed_content || data.content)}</div>
                         ${data.variables_used ? `
                             <div class="text-muted fs-7">
-                                <strong>Vari├íveis utilizadas:</strong> ${data.variables_used.join(', ')}
+                                <strong>Variíveis utilizadas:</strong> ${data.variables_used.join(', ')}
                             </div>
                         ` : ''}
                     </div>
@@ -13345,7 +13346,7 @@ function useTemplate(templateId) {
     if (!currentConversationId) {
         Swal.fire({
             icon: 'warning',
-            title: 'Aten├º├úo',
+            title: 'Atenção',
             text: 'Selecione uma conversa primeiro',
             confirmButtonText: 'OK'
         });
@@ -13397,7 +13398,7 @@ function useTemplate(templateId) {
 function loadTemplates() {
     const tbody = document.getElementById('templatesList');
     if (!tbody) {
-        console.error('Elemento templatesList n├úo encontrado');
+        console.error('Elemento templatesList não encontrado');
         return;
     }
     
@@ -13423,7 +13424,7 @@ function loadTemplates() {
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="3" class="text-center text-muted py-10">
-                            Nenhum template dispon├¡vel
+                            Nenhum template disponível
                         </td>
                     </tr>
                 `;
@@ -13502,7 +13503,7 @@ function loadTemplates() {
         });
 }
 
-// Preview de template com vari├íveis preenchidas
+// Preview de template com variíveis preenchidas
 function previewTemplate(templateId) {
 const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     const previewDiv = document.getElementById(`preview-${templateId}`);
@@ -13554,7 +13555,7 @@ function useTemplate(templateId) {
     if (!conversationId) {
         Swal.fire({
             icon: 'warning',
-            title: 'Aten├º├úo',
+            title: 'Atenção',
             text: 'Selecione uma conversa primeiro',
             confirmButtonText: 'OK'
         });
@@ -13590,7 +13591,7 @@ function useTemplate(templateId) {
     });
 }
 
-// Seletor r├ípido de templates
+// Seletor rípido de templates
 let templateQuickSelectData = [];
 let templateQuickSelectIndex = -1;
 let templateQuickSelectDebounce = null;
@@ -13603,7 +13604,7 @@ function initTemplateQuickSelect() {
     
     if (!messageInput || !templateQuickSelect || !templateQuickSearch || !templateQuickList) return;
     
-    // Detectar digita├º├úo de {{ no campo de mensagem
+    // Detectar digitação de {{ no campo de mensagem
     messageInput.addEventListener('input', function(e) {
         const value = e.target.value;
         const cursorPos = e.target.selectionStart;
@@ -13613,7 +13614,7 @@ function initTemplateQuickSelect() {
         if (textBeforeCursor.endsWith('{{')) {
             showTemplateQuickSelect();
         } else if (textBeforeCursor.includes('{{') && !textBeforeCursor.includes('}}')) {
-            // Se j├í tem {{ mas n├úo fechou, manter aberto
+            // Se jí tem {{ mas não fechou, manter aberto
             const lastOpen = textBeforeCursor.lastIndexOf('{{');
             const textAfterOpen = textBeforeCursor.substring(lastOpen + 2);
             if (!textAfterOpen.includes('}}')) {
@@ -13640,7 +13641,7 @@ function initTemplateQuickSelect() {
         filterTemplateQuickSelect(e.target.value);
     });
     
-    // Navega├º├úo com teclado
+    // Navegação com teclado
     messageInput.addEventListener('keydown', function(e) {
         if (!templateQuickSelect.classList.contains('d-none')) {
             if (e.key === 'ArrowDown') {
@@ -13659,11 +13660,11 @@ function initTemplateQuickSelect() {
         }
     });
     
-    // Clique no bot├úo de templates tamb├®m abre o quick select
+    // Clique no botão de templates tambêm abre o quick select
     const templateBtn = document.querySelector('button[onclick="showTemplatesModal()"]');
     if (templateBtn) {
         templateBtn.addEventListener('click', function(e) {
-            // Se segurar Shift, abre quick select ao inv├®s do modal
+            // Se segurar Shift, abre quick select ao invês do modal
             if (e.shiftKey) {
                 e.preventDefault();
                 e.stopPropagation();
@@ -13683,7 +13684,7 @@ function showTemplateQuickSelect() {
     templateQuickSelect.classList.remove('d-none');
     templateQuickSelectIndex = -1;
     
-    // Carregar templates se ainda n├úo carregou
+    // Carregar templates se ainda não carregou
     if (templateQuickSelectData.length === 0) {
         loadTemplateQuickSelect();
     } else {
@@ -13725,7 +13726,7 @@ function loadTemplateQuickSelect() {
             } else {
                 templateQuickList.innerHTML = `
                     <div class="text-center text-muted py-5">
-                        Nenhum template dispon├¡vel
+                        Nenhum template disponível
                     </div>
                 `;
             }
@@ -13939,7 +13940,7 @@ function useTemplateQuick(templateId) {
     if (!currentConversationId) {
         Swal.fire({
             icon: 'warning',
-            title: 'Aten├º├úo',
+            title: 'Atenção',
             text: 'Selecione uma conversa primeiro para usar templates',
             confirmButtonText: 'OK'
         });
@@ -13961,13 +13962,13 @@ function useTemplateQuick(templateId) {
     .then(response => response.json())
     .then(data => {
         if (data.success && data.processed_content) {
-            // Substituir {{ pelo conte├║do do template
+            // Substituir {{ pelo conteúdo do template
             const currentValue = messageInput.value;
             const cursorPos = messageInput.selectionStart;
             const textBeforeCursor = currentValue.substring(0, cursorPos);
             const textAfterCursor = currentValue.substring(cursorPos);
             
-            // Encontrar ├║ltimo {{ antes do cursor
+            // Encontrar último {{ antes do cursor
             const lastOpen = textBeforeCursor.lastIndexOf('{{');
             if (lastOpen >= 0) {
                 const newValue = currentValue.substring(0, lastOpen) + data.processed_content + textAfterCursor;
@@ -13975,11 +13976,11 @@ function useTemplateQuick(templateId) {
                 messageInput.style.height = 'auto';
                 messageInput.style.height = Math.min(messageInput.scrollHeight, 150) + 'px';
                 
-                // Posicionar cursor ap├│s o conte├║do inserido
+                // Posicionar cursor após o conteúdo inserido
                 const newCursorPos = lastOpen + data.processed_content.length;
                 messageInput.setSelectionRange(newCursorPos, newCursorPos);
             } else {
-                // Se n├úo encontrou {{, apenas inserir o conte├║do
+                // Se não encontrou {{, apenas inserir o conteúdo
                 messageInput.value = data.processed_content;
                 messageInput.style.height = 'auto';
                 messageInput.style.height = Math.min(messageInput.scrollHeight, 150) + 'px';
@@ -14064,18 +14065,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Modal de Vari├íveis
+// Modal de Variíveis
 function showVariablesModal() {
     const modalElement = document.getElementById('kt_modal_variables');
     if (!modalElement) {
-        console.error('Modal de vari├íveis n├úo encontrado');
+        console.error('Modal de variíveis não encontrado');
         return;
     }
     
     const modal = new bootstrap.Modal(modalElement);
     modal.show();
     
-    // Carregar vari├íveis dispon├¡veis
+    // Carregar variíveis disponíveis
     loadVariables();
 }
 
@@ -14087,7 +14088,7 @@ function loadVariables() {
     variablesList.innerHTML = `
         <div class="col-12 text-center py-10">
             <span class="spinner-border spinner-border-sm text-primary mb-3" role="status"></span>
-            <div class="text-muted">Carregando vari├íveis...</div>
+            <div class="text-muted">Carregando variíveis...</div>
         </div>
     `;
     
@@ -14098,14 +14099,14 @@ function loadVariables() {
         }
     })
     .then(async response => {
-        // Verificar se a resposta ├® JSON antes de fazer parse
+        // Verificar se a resposta ê JSON antes de fazer parse
         const contentType = response.headers.get('content-type') || '';
         const text = await response.text();
         
         if (!contentType.includes('application/json')) {
-            console.error('Resposta n├úo ├® JSON. Content-Type:', contentType);
+            console.error('Resposta não ê JSON. Content-Type:', contentType);
             console.error('Resposta completa:', text.substring(0, 500));
-            throw new Error('Resposta n├úo ├® JSON. Verifique o console para mais detalhes.');
+            throw new Error('Resposta não ê JSON. Verifique o console para mais detalhes.');
         }
         
         try {
@@ -14113,7 +14114,7 @@ function loadVariables() {
         } catch (e) {
             console.error('Erro ao fazer parse do JSON:', e);
             console.error('Texto recebido:', text.substring(0, 500));
-            throw new Error('Resposta n├úo ├® JSON v├ílido. Verifique o console para mais detalhes.');
+            throw new Error('Resposta não ê JSON vílido. Verifique o console para mais detalhes.');
         }
     })
     .then(data => {
@@ -14122,17 +14123,17 @@ function loadVariables() {
         } else {
             variablesList.innerHTML = `
                 <div class="col-12 text-center text-muted py-10">
-                    <div>Nenhuma vari├ível dispon├¡vel</div>
+                    <div>Nenhuma variível disponível</div>
                     ${data.message ? `<div class="fs-7 mt-2">${escapeHtml(data.message)}</div>` : ''}
                 </div>
             `;
         }
     })
     .catch(error => {
-        console.error('Erro ao carregar vari├íveis:', error);
+        console.error('Erro ao carregar variíveis:', error);
         variablesList.innerHTML = `
             <div class="col-12 text-center text-danger py-10">
-                <div>Erro ao carregar vari├íveis</div>
+                <div>Erro ao carregar variíveis</div>
                 <div class="fs-7 mt-2">${escapeHtml(error.message || 'Erro desconhecido')}</div>
                 <div class="fs-8 mt-3 text-muted">Verifique o console para mais detalhes</div>
             </div>
@@ -14146,7 +14147,7 @@ function renderVariables(variables) {
     
     let html = '';
     
-    // Vari├íveis de contato
+    // Variíveis de contato
     if (variables.contact) {
         html += ''
             + '<div class="col-12">'
@@ -14185,7 +14186,7 @@ function renderVariables(variables) {
         });
     }
     
-    // Vari├íveis de agente
+    // Variíveis de agente
     if (variables.agent) {
         html += ''
             + '<div class="col-12 mt-5">'
@@ -14224,7 +14225,7 @@ function renderVariables(variables) {
         });
     }
     
-    // Vari├íveis de conversa
+    // Variíveis de conversa
     if (variables.conversation) {
         html += ''
             + '<div class="col-12 mt-5">'
@@ -14264,7 +14265,7 @@ function renderVariables(variables) {
         });
     }
     
-    // Vari├íveis de data/hora
+    // Variíveis de data/hora
     html += ''
         + '<div class="col-12 mt-5">'
         + '  <h5 class="fw-bold mb-3">'
@@ -14318,11 +14319,11 @@ function insertVariable(variable) {
     const endPos = messageInput.selectionEnd;
     const text = messageInput.value;
     
-    // Inserir vari├ível na posi├º├úo do cursor
+    // Inserir variível na posição do cursor
     const newText = text.substring(0, startPos) + variable + text.substring(endPos);
     messageInput.value = newText;
     
-    // Reposicionar cursor ap├│s a vari├ível inserida
+    // Reposicionar cursor após a variível inserida
     const newPos = startPos + variable.length;
     messageInput.setSelectionRange(newPos, newPos);
     messageInput.focus();
@@ -14334,8 +14335,8 @@ function insertVariable(variable) {
     
     Swal.fire({
         icon: 'success',
-        title: 'Vari├ível inserida!',
-        text: `Vari├ível ${variable} inserida no campo de mensagem`,
+        title: 'Variível inserida!',
+        text: `Variível ${variable} inserida no campo de mensagem`,
         timer: 1500,
         showConfirmButton: false,
         colorScheme: isDarkMode ? 'dark' : 'light',
@@ -14346,7 +14347,7 @@ function insertVariable(variable) {
         }
     });
     
-    // Fechar modal ap├│s inserir
+    // Fechar modal após inserir
     const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_variables'));
     if (modal) {
         setTimeout(() => modal.hide(), 500);
@@ -14359,7 +14360,7 @@ function renderVariables(variables) {
     
     let html = '';
     
-    // Vari├íveis de contato
+    // Variíveis de contato
     if (variables.contact) {
         html += `
             <div class="col-12">
@@ -14395,7 +14396,7 @@ function renderVariables(variables) {
         });
     }
     
-    // Vari├íveis de agente
+    // Variíveis de agente
     if (variables.agent) {
         html += `
             <div class="col-12 mt-5">
@@ -14431,7 +14432,7 @@ function renderVariables(variables) {
         });
     }
     
-    // Vari├íveis de conversa
+    // Variíveis de conversa
     if (variables.conversation) {
         html += `
             <div class="col-12 mt-5">
@@ -14468,7 +14469,7 @@ function renderVariables(variables) {
         });
     }
     
-    // Vari├íveis de data/hora
+    // Variíveis de data/hora
     html += `
         <div class="col-12 mt-5">
             <h5 class="fw-bold mb-3">
@@ -14520,11 +14521,11 @@ function insertVariable(variable) {
     const endPos = messageInput.selectionEnd;
     const text = messageInput.value;
     
-    // Inserir vari├ível na posi├º├úo do cursor
+    // Inserir variível na posição do cursor
     const newText = text.substring(0, startPos) + variable + text.substring(endPos);
     messageInput.value = newText;
     
-    // Reposicionar cursor ap├│s a vari├ível inserida
+    // Reposicionar cursor após a variível inserida
     const newPos = startPos + variable.length;
     messageInput.setSelectionRange(newPos, newPos);
     messageInput.focus();
@@ -14540,8 +14541,8 @@ function insertVariable(variable) {
     
     Swal.fire({
         icon: 'success',
-        title: 'Vari├ível inserida!',
-        text: `Vari├ível ${variable} inserida no campo de mensagem`,
+        title: 'Variível inserida!',
+        text: `Variível ${variable} inserida no campo de mensagem`,
         timer: 1500,
         showConfirmButton: false,
         colorScheme: isDarkMode ? 'dark' : 'light',
@@ -14552,19 +14553,19 @@ function insertVariable(variable) {
         }
     });
     
-    // Fechar modal ap├│s inserir
+    // Fechar modal após inserir
     const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_variables'));
     if (modal) {
         setTimeout(() => modal.hide(), 500);
     }
 }
 
-// Fun├º├úo copyVariable mantida para compatibilidade, mas insertVariable ├® preferida
+// Função copyVariable mantida para compatibilidade, mas insertVariable ê preferida
 function copyVariable(variable) {
     insertVariable(variable);
 }
 
-// Verificar se conversa est├í com agente de IA
+// Verificar se conversa estí com agente de IA
 async function checkIfConversationHasAI(conversationId) {
     try {
         const response = await fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}`, {
@@ -14593,19 +14594,19 @@ function escalateFromAI(conversationId) {
     modal.show();
 }
 
-// Modal de Atribui├º├úo
+// Modal de Atribuição
 function assignConversation(conversationId) {
     const modal = new bootstrap.Modal(document.getElementById('kt_modal_assign'));
     modal.show();
     
-    // Resetar formul├írio
+    // Resetar formulírio
     document.getElementById('assignForm').reset();
     
-    // Salvar ID da conversa no formul├írio
+    // Salvar ID da conversa no formulírio
     document.getElementById('assignForm').dataset.conversationId = conversationId;
 }
 
-// Submeter atribui├º├úo
+// Submeter atribuição
 document.getElementById('assignForm')?.addEventListener('submit', function(e) {
     e.preventDefault();
     
@@ -14668,7 +14669,7 @@ document.getElementById('assignForm')?.addEventListener('submit', function(e) {
     });
 });
 
-// Submeter mudan├ºa de setor
+// Submeter mudança de setor
 document.getElementById('changeDepartmentForm')?.addEventListener('submit', function(e) {
     e.preventDefault();
     
@@ -14769,7 +14770,7 @@ function loadTagsForConversation() {
     fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/tags`)
         .then(response => response.json())
         .then(data => {
-            // Iniciar sele├º├úo com as tags atuais
+            // Iniciar seleção com as tags atuais
             selectedTags = data.success && data.tags ? [...data.tags] : [];
             updateSelectedTagsDisplay();
         })
@@ -14779,14 +14780,14 @@ function loadTagsForConversation() {
             updateSelectedTagsDisplay();
         });
     
-    // Carregar todas as tags dispon├¡veis
+    // Carregar todas as tags disponíveis
     fetch('<?= \App\Helpers\Url::to("/tags/all") ?>')
         .then(response => response.json())
         .then(data => {
             const availableTagsDiv = document.getElementById('availableTags');
             
             if (!data.success || !data.tags || data.tags.length === 0) {
-                availableTagsDiv.innerHTML = '<div class="text-muted">Nenhuma tag dispon├¡vel</div>';
+                availableTagsDiv.innerHTML = '<div class="text-muted">Nenhuma tag disponível</div>';
                 return;
             }
             
@@ -14827,7 +14828,7 @@ let selectedTags = [];
 
 function addTagToList(tagId, tagName, tagColor) {
     if (selectedTags.find(t => t.id === tagId)) {
-        return; // J├í est├í selecionada
+        return; // Jí estí selecionada
     }
     
     selectedTags.push({ id: tagId, name: tagName, color: tagColor });
@@ -14876,13 +14877,13 @@ function saveTags() {
             const currentTagIds = data.success && data.tags ? data.tags.map(t => t.id) : [];
             const selectedTagIds = selectedTags.map(t => t.id);
             
-            // Tags para adicionar (est├úo em selectedTags mas n├úo nas atuais)
+            // Tags para adicionar (estão em selectedTags mas não nas atuais)
             const toAdd = selectedTagIds.filter(id => !currentTagIds.includes(id));
             
-            // Tags para remover (est├úo nas atuais mas n├úo em selectedTags)
+            // Tags para remover (estão nas atuais mas não em selectedTags)
             const toRemove = currentTagIds.filter(id => !selectedTagIds.includes(id));
             
-            // Executar opera├º├Áes
+            // Executar operaçÁes
             const promises = [
                 ...toAdd.map(tagId => 
                     fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/tags`, {
@@ -14930,7 +14931,7 @@ function saveTags() {
                         updateConversationSidebar({ id: conversationId }, tags);
                     }
                     
-                    // Atualizar modelos locais em mem├│ria (selected/current conversation)
+                    // Atualizar modelos locais em memória (selected/current conversation)
                     if (window.selectedConversation && window.selectedConversation.id == conversationId) {
                         window.selectedConversation.tags = tags;
                     }
@@ -14982,7 +14983,7 @@ function saveTags() {
         });
 }
 
-// Fun├º├úo helper para escape HTML
+// Função helper para escape HTML
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
@@ -14998,7 +14999,7 @@ function showAddParticipantModal(conversationId) {
     document.getElementById('kt_modal_participants').dataset.conversationId = conversationId || window.currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     window.currentConversationId = document.getElementById('kt_modal_participants').dataset.conversationId || window.currentConversationId;
     
-    // Carregar participantes e usu├írios dispon├¡veis
+    // Carregar participantes e usuírios disponíveis
     loadParticipantsForConversation(window.currentConversationId);
 }
 
@@ -15007,18 +15008,18 @@ function loadParticipantsForConversation(conversationIdParam = null) {
     const conversationId = conversationIdParam || (modalElement ? modalElement.dataset.conversationId : null) || window.currentConversationId;
     
     if (!conversationId || conversationId === 'undefined' || conversationId === 'null') {
-        console.error('loadParticipantsForConversation: conversationId inv├ílido:', conversationId);
+        console.error('loadParticipantsForConversation: conversationId invílido:', conversationId);
         return;
     }
     
-    // Garantir que o dataset fique sincronizado para as pr├│ximas chamadas
+    // Garantir que o dataset fique sincronizado para as próximas chamadas
     if (modalElement) {
         modalElement.dataset.conversationId = conversationId;
     }
 
     console.log('loadParticipantsForConversation: conversationId =', conversationId);
     
-    // Tamb├®m carregar convites pendentes
+    // Tambêm carregar convites pendentes
     if (typeof loadPendingInvitesForConversation === 'function') {
         loadPendingInvitesForConversation(conversationId);
     }
@@ -15048,7 +15049,7 @@ function loadParticipantsForConversation(conversationIdParam = null) {
                 } catch (e) {
                     console.error('ÔØî Erro ao fazer parse do JSON:', e);
                     console.error('Texto completo:', text);
-                    throw new Error('Resposta n├úo ├® JSON v├ílido');
+                    throw new Error('Resposta não ê JSON vílido');
                 }
             });
         })
@@ -15067,7 +15068,7 @@ function loadParticipantsForConversation(conversationIdParam = null) {
                                 </div>
                             </div>
                             <div class="flex-grow-1">
-                                <div class="fw-semibold fs-7">${escapeHtml(p.user_name || 'Usu├írio')}</div>
+                                <div class="fw-semibold fs-7">${escapeHtml(p.user_name || 'Usuírio')}</div>
                                 ${p.user_email ? `<div class="text-muted fs-8">${escapeHtml(p.user_email)}</div>` : ''}
                             </div>
                             <button type="button" class="btn btn-sm btn-icon btn-light-danger p-0" 
@@ -15094,7 +15095,7 @@ function loadParticipantsForConversation(conversationIdParam = null) {
             }
         });
     
-    // Carregar usu├írios dispon├¡veis (agentes)
+    // Carregar usuírios disponíveis (agentes)
     fetch('<?= \App\Helpers\Url::to("/agents") ?>?format=json', {
         headers: {
             'X-Requested-With': 'XMLHttpRequest',
@@ -15107,24 +15108,24 @@ function loadParticipantsForConversation(conversationIdParam = null) {
             
             if (!data.success || !data.agents || data.agents.length === 0) {
                 if (select) {
-                    select.innerHTML = '<option value="">Nenhum usu├írio dispon├¡vel</option>';
+                    select.innerHTML = '<option value="">Nenhum usuírio disponível</option>';
                 }
                 return;
             }
             
             if (select) {
-                select.innerHTML = '<option value="">Selecione um usu├írio...</option>';
+                select.innerHTML = '<option value="">Selecione um usuírio...</option>';
                 data.agents.forEach(user => {
                     const emailLabel = user.email ? ' (' + escapeHtml(user.email) + ')' : '';
-                    select.innerHTML += `<option value="${user.id}">${escapeHtml(user.name || user.email || 'Usu├írio')}${emailLabel}</option>`;
+                    select.innerHTML += `<option value="${user.id}">${escapeHtml(user.name || user.email || 'Usuírio')}${emailLabel}</option>`;
                 });
             }
         })
         .catch(error => {
-            console.error('Erro ao carregar usu├írios:', error);
+            console.error('Erro ao carregar usuírios:', error);
             const select = document.getElementById('participantUserSelect');
             if (select) {
-                select.innerHTML = '<option value="">Erro ao carregar usu├írios</option>';
+                select.innerHTML = '<option value="">Erro ao carregar usuírios</option>';
             }
         });
 }
@@ -15160,7 +15161,7 @@ function removeParticipant(conversationId, userId) {
             } catch (e) {
                 console.error('ÔØî Erro ao fazer parse do JSON:', e);
                 console.error('Texto completo da resposta:', text);
-                throw new Error('Resposta n├úo ├® JSON v├ílido: ' + text.substring(0, 200));
+                throw new Error('Resposta não ê JSON vílido: ' + text.substring(0, 200));
             }
         });
     })
@@ -15176,7 +15177,7 @@ function removeParticipant(conversationId, userId) {
                     loadConversation(conversationId);
                 }
             }
-            // Atualizar apenas a se├º├úo de participantes do sidebar, se existir (sempre tenta)
+            // Atualizar apenas a seção de participantes do sidebar, se existir (sempre tenta)
             if (typeof updateConversationSidebar === 'function') {
                 updateConversationSidebar({ id: conversationId }, []);
             }
@@ -15202,7 +15203,7 @@ function removeParticipant(conversationId, userId) {
 }
 
 /**
- * Enviar convite para participar da conversa (usa sistema de men├º├Áes)
+ * Enviar convite para participar da conversa (usa sistema de mençÁes)
  */
 function sendParticipantInvite() {
     const modalElement = document.getElementById('kt_modal_participants');
@@ -15212,8 +15213,8 @@ function sendParticipantInvite() {
     if (!conversationId || conversationId === 'undefined' || conversationId === 'null') {
         Swal.fire({
             icon: 'warning',
-            title: 'Aten├º├úo',
-            text: 'ID da conversa n├úo encontrado'
+            title: 'Atenção',
+            text: 'ID da conversa não encontrado'
         });
         return;
     }
@@ -15221,7 +15222,7 @@ function sendParticipantInvite() {
     if (!userId) {
         Swal.fire({
             icon: 'warning',
-            title: 'Aten├º├úo',
+            title: 'Atenção',
             text: 'Por favor, selecione um agente'
         });
         return;
@@ -15231,7 +15232,7 @@ function sendParticipantInvite() {
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Enviando...';
     
-    // Usar endpoint de men├º├úo/convite
+    // Usar endpoint de menção/convite
     fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/mention`, {
         method: 'POST',
         headers: {
@@ -15259,7 +15260,7 @@ function sendParticipantInvite() {
             Swal.fire({
                 icon: 'success',
                 title: 'Convite Enviado!',
-                text: 'O agente receber├í uma notifica├º├úo e poder├í aceitar ou recusar.',
+                text: 'O agente receberí uma notificação e poderí aceitar ou recusar.',
                 timer: 3000,
                 showConfirmButton: false
             });
@@ -15286,7 +15287,7 @@ function sendParticipantInvite() {
 }
 
 /**
- * Carregar convites pendentes de uma conversa espec├¡fica
+ * Carregar convites pendentes de uma conversa específica
  */
 function loadPendingInvitesForConversation(conversationId) {
     const section = document.getElementById('pendingInvitesSection');
@@ -15357,11 +15358,11 @@ function loadPendingInvitesForConversation(conversationId) {
 function cancelInvite(mentionId, conversationId) {
     Swal.fire({
         title: 'Cancelar Convite?',
-        text: 'O agente n├úo receber├í mais este convite.',
+        text: 'O agente não receberí mais este convite.',
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: 'Sim, cancelar',
-        cancelButtonText: 'N├úo'
+        cancelButtonText: 'Não'
     }).then(result => {
         if (result.isConfirmed) {
             fetch(`<?= \App\Helpers\Url::to("/conversations/invites") ?>/${mentionId}/cancel`, {
@@ -15401,7 +15402,7 @@ function cancelInvite(mentionId, conversationId) {
     });
 }
 
-// Fun├º├úo legada para compatibilidade (redireciona para convite)
+// Função legada para compatibilidade (redireciona para convite)
 function addParticipant() {
     sendParticipantInvite();
 }
@@ -15424,7 +15425,7 @@ function attachFile() {
 }
 
 function uploadFile(file) {
-    // Usar vari├ível JavaScript global que ├® atualizada dinamicamente
+    // Usar variível JavaScript global que ê atualizada dinamicamente
     const conversationId = currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     
     if (!conversationId) {
@@ -15464,7 +15465,7 @@ function uploadFile(file) {
 
     const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
-        uploadDiv.innerHTML = '<div class="message-content"><div class="message-bubble text-danger">Arquivo muito grande. Tamanho m├íximo: 10MB</div></div>';
+        uploadDiv.innerHTML = '<div class="message-content"><div class="message-bubble text-danger">Arquivo muito grande. Tamanho míximo: 10MB</div></div>';
         return;
     }
 
@@ -15481,7 +15482,7 @@ function uploadFile(file) {
         /\.(jpg|jpeg|png|gif|webp|mp4|webm|ogg|mp3|wav|pdf|doc|docx|xls|xlsx|txt|csv)$/i.test(file.name);
 
     if (!isAllowed) {
-        uploadDiv.innerHTML = '<div class="message-content"><div class="message-bubble text-danger">Tipo de arquivo n├úo permitido</div></div>';
+        uploadDiv.innerHTML = '<div class="message-content"><div class="message-bubble text-danger">Tipo de arquivo não permitido</div></div>';
         return;
     }
 
@@ -15563,7 +15564,7 @@ function uploadFile(file) {
     };
 
     xhr.onerror = function() {
-        uploadDiv.innerHTML = '<div class="message-content"><div class="message-bubble text-danger">Erro de conex├úo. Tente novamente.</div></div>';
+        uploadDiv.innerHTML = '<div class="message-content"><div class="message-bubble text-danger">Erro de conexão. Tente novamente.</div></div>';
     };
 
     xhr.open('POST', `<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/messages`);
@@ -15584,11 +15585,11 @@ function renderAttachmentHtml(attachment) {
     const type = attachment.type || 'document';
     const mimeType = attachment.mime_type || attachment.mimetype || '';
     
-    // Renderizar localiza├º├úo
+    // Renderizar localização
     if (type === 'location' && attachment.latitude && attachment.longitude) {
         const lat = attachment.latitude;
         const lng = attachment.longitude;
-        const name = escapeHtml(attachment.name || 'Localiza├º├úo');
+        const name = escapeHtml(attachment.name || 'Localização');
         const address = escapeHtml(attachment.address || '');
         const mapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
         
@@ -15614,7 +15615,7 @@ function renderAttachmentHtml(attachment) {
     // Construir URL correta do anexo
     let url = attachment.url || '';
     if (!url && attachment.path) {
-        // Se n├úo tem URL mas tem path, construir URL
+        // Se não tem URL mas tem path, construir URL
         if (attachment.path.startsWith('http')) {
             url = attachment.path;
         } else {
@@ -15640,16 +15641,16 @@ function renderAttachmentHtml(attachment) {
             </div>
             <video controls style="max-width: 300px; max-height: 200px; border-radius: 8px; display: none;" preload="none">
                 <source src="" type="${mimeType || 'video/mp4'}">
-                Seu navegador n├úo suporta v├¡deo.
+                Seu navegador não suporta vídeo.
             </video>
         </div>`;
     } else if (type === 'audio' || (mimeType && mimeType.startsWith('audio/'))) {
-        // Renderiza├º├úo de ├íudio estilo WhatsApp com largura adequada
-        // Ô£à CORRIGIDO: Usar URL direta se come├ºar com / (├íudios TTS), sen├úo usar rota de attachments
+        // Renderização de íudio estilo WhatsApp com largura adequada
+        // ✓ CORRIGIDO: Usar URL direta se começar com / (íudios TTS), senão usar rota de attachments
         let audioUrl = url;
         if (!audioUrl && attachment.path) {
             if (attachment.path.startsWith('assets/') || attachment.path.startsWith('/assets/')) {
-                // Arquivo p├║blico (TTS, etc) - acesso direto
+                // Arquivo público (TTS, etc) - acesso direto
                 audioUrl = '<?= \App\Helpers\Url::to('/') ?>' + attachment.path.replace(/^\//, '');
             } else {
                 // Arquivo de upload - usar rota de attachments
@@ -15657,35 +15658,35 @@ function renderAttachmentHtml(attachment) {
             }
         }
         
-        // Ô£à NOVO: Verificar se h├í transcri├º├úo ou texto original (TTS)
+        // ✓ NOVO: Verificar se hí transcrição ou texto original (TTS)
         let transcriptionHtml = '';
         const showTranscription = <?= json_encode(\App\Services\ConversationSettingsService::getSettings()['audio_transcription']['show_transcription_in_chat'] ?? true) ?>;
         
         if (showTranscription) {
-            // Verificar se ├® ├íudio TTS (tem texto original) ou ├íudio transcrito
+            // Verificar se ê íudio TTS (tem texto original) ou íudio transcrito
             const ttsOriginalText = attachment.tts_original_text;
             const transcription = attachment.transcription;
             
             if (ttsOriginalText) {
-                // ├üudio gerado pela IA - exibir texto original
+                // üudio gerado pela IA - exibir texto original
                 const textContent = escapeHtml(ttsOriginalText);
                 transcriptionHtml = `
                     <div class="audio-transcription mt-2" style="padding: 8px; background: rgba(52, 211, 153, 0.1); border-radius: 6px; border-left: 3px solid #34d399;">
                         <div class="d-flex align-items-center gap-1 mb-1">
                             <i class="ki-duotone ki-message-text-2 fs-7 text-success"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
-                            <span class="text-success fs-8 fw-semibold">Conte├║do do ├íudio:</span>
+                            <span class="text-success fs-8 fw-semibold">Conteúdo do íudio:</span>
                         </div>
                         <div class="fs-7" style="color: rgba(0,0,0,0.7);">${nl2br(textContent)}</div>
                     </div>
                 `;
             } else if (transcription && transcription.text) {
-                // ├üudio do cliente - exibir transcri├º├úo
+                // üudio do cliente - exibir transcrição
                 const transcriptionText = escapeHtml(transcription.text);
                 transcriptionHtml = `
                     <div class="audio-transcription mt-2" style="padding: 8px; background: rgba(0,0,0,0.05); border-radius: 6px; border-left: 3px solid #3b82f6;">
                         <div class="d-flex align-items-center gap-1 mb-1">
                             <i class="ki-duotone ki-text fs-7 text-muted"><span class="path1"></span><span class="path2"></span></i>
-                            <span class="text-muted fs-8 fw-semibold">Transcri├º├úo:</span>
+                            <span class="text-muted fs-8 fw-semibold">Transcrição:</span>
                         </div>
                         <div class="fs-7" style="color: rgba(0,0,0,0.7);">${nl2br(transcriptionText)}</div>
                     </div>
@@ -15704,7 +15705,7 @@ function renderAttachmentHtml(attachment) {
                 <div class="flex-grow-1" style="min-width: 300px;">
                     <audio controls style="width: 100%; outline: none;" preload="metadata" onclick="event.stopPropagation();">
                         <source src="${audioUrl}" type="${mimeType || 'audio/ogg; codecs=opus'}">
-                        Seu navegador n├úo suporta o elemento de ├íudio.
+                        Seu navegador não suporta o elemento de íudio.
                     </audio>
                     ${transcriptionHtml}
                 </div>
@@ -15715,7 +15716,7 @@ function renderAttachmentHtml(attachment) {
         const attachmentPath = attachment.path || '';
         let downloadUrl;
         if (attachmentPath.startsWith('assets/')) {
-            // Caminho direto para arquivo p├║blico
+            // Caminho direto para arquivo público
             downloadUrl = `<?= \App\Helpers\Url::to('/') ?>${attachmentPath}`;
         } else {
             // Rota de download para arquivos fora de assets/
@@ -15744,7 +15745,7 @@ function renderAttachmentHtml(attachment) {
 // Emoji picker (placeholder melhorado)
 function toggleEmoji() {
     // TODO: Implementar emoji picker completo
-    const emojis = ['­ƒÿÇ', '­ƒÿâ', '­ƒÿä', '­ƒÿü', '­ƒÿå', '­ƒÿà', '­ƒñú', '­ƒÿé', '­ƒÖé', '­ƒÖâ', '­ƒÿë', '­ƒÿè', '­ƒÿç', '­ƒÑ░', '­ƒÿì', '­ƒñ®', '­ƒÿÿ', '­ƒÿù', '­ƒÿÜ', '­ƒÿÖ', '­ƒÿï', '­ƒÿø', '­ƒÿ£', '­ƒñ¬', '­ƒÿØ', '­ƒñæ', '­ƒñù', '­ƒñ¡', '­ƒñ½', '­ƒñö', '­ƒñÉ', '­ƒñ¿', '­ƒÿÉ', '­ƒÿæ', '­ƒÿÂ', '­ƒÿÅ', '­ƒÿÆ', '­ƒÖä', '­ƒÿ¼', '­ƒñÑ', '­ƒÿî', '­ƒÿö', '­ƒÿ¬', '­ƒññ', '­ƒÿ┤', '­ƒÿÀ', '­ƒñÆ', '­ƒñò', '­ƒñó', '­ƒñ«', '­ƒñº', '­ƒÑÁ', '­ƒÑÂ', '­ƒÿÂÔÇì­ƒî½´©Å', '­ƒÿÁ', '­ƒÿÁÔÇì­ƒÆ½', '­ƒñ»', '­ƒñá', '­ƒÑ│', '­ƒÑ©', '­ƒÿÄ', '­ƒñô', '­ƒºÉ', '­ƒÿò', '­ƒÿƒ', '­ƒÖü', 'Ôÿ╣´©Å', '­ƒÿ«', '­ƒÿ»', '­ƒÿ▓', '­ƒÿ│', '­ƒÑ║', '­ƒÿª', '­ƒÿº', '­ƒÿ¿', '­ƒÿ░', '­ƒÿÑ', '­ƒÿó', '­ƒÿ¡', '­ƒÿ▒', '­ƒÿû', '­ƒÿú', '­ƒÿ×', '­ƒÿô', '­ƒÿ®', '­ƒÿ½', '­ƒÑ▒', '­ƒÿñ', '­ƒÿí', '­ƒÿá', '­ƒñ¼', '­ƒÿê', '­ƒæ┐', '­ƒÆÇ', 'Ôÿá´©Å', '­ƒÆ®', '­ƒñí', '­ƒæ╣', '­ƒæ║', '­ƒæ╗', '­ƒæ¢', '­ƒæ¥', '­ƒñû', '­ƒÿ║', '­ƒÿ©', '­ƒÿ╣', '­ƒÿ╗', '­ƒÿ╝', '­ƒÿ¢', '­ƒÖÇ', '­ƒÿ┐', '­ƒÿ¥'];
+    const emojis = ['😀', '😁', '😂', '😃', '😄', '😅', '😆', '😉', '😊', '😋', '😌', '😊', '😍', '😎', '😏', '😐', '😑', '😒', '😓', '😔', '😕', '😖', '😗', '😘', '😙', '😚', '😛', '😜', '😝', '😞', '😟', '😠', '😡', '😢', '😣', '😤', '😥', '😦', '😧', '😨', '😩', '😪', '😫', '😬', '😭', '😮', '😯', '😰', '😱', '😲', '😳', '😴', '😵', '👨‍👩‍👦', '😶', '👨‍💻', '😷', '😸', '😹', '😺', '😻', '😼', '😽', '😾', '😿', '🙀', '❤️', '🙁', '🙂', '🙃', '🙄', '🙅', '🙆', '🙇', '🙈', '🙉', '🙊', '🙋', '🙌', '🙍', '🙎', '🙏', '🤐', '🤑', '🤒', '🤓', '🤔', '🤕', '🤖', '🤗', '🤘', '🤙', '🤚', '🤛', '❤️', '🤜', '🤝', '🤞', '🤟', '🤠', '🤡', '🤢', '🤖', '🤣', '🤤', '🤥', '🤦', '🤧', '🤨', '🤩', '🤪', '🤫'];
     
     // Criar modal simples de emoji
     const emojiHtml = emojis.map(emoji => `<span class="btn btn-sm btn-icon btn-light m-1" onclick="insertEmoji('${emoji}')" style="font-size: 24px; cursor: pointer;">${emoji}</span>`).join('');
@@ -15776,10 +15777,10 @@ function insertEmoji(emoji) {
 }
 
 // ============================================================================
-// SISTEMA DE NAVEGA├ç├âO MOBILE
+// SISTEMA DE NAVEGAÇâO MOBILE
 // ============================================================================
 
-// Detectar se est├í em mobile
+// Detectar se estí em mobile
 function isMobile() {
     return window.innerWidth <= 767;
 }
@@ -15874,7 +15875,7 @@ function closeConversationSidebar() {
     localStorage.setItem('conversationSidebarOpen', 'false');
 }
 
-// Inicializar navega├º├úo mobile ao carregar
+// Inicializar navegação mobile ao carregar
 document.addEventListener('DOMContentLoaded', function() {
     // Detectar tamanho da tela e ajustar views
     function handleResize() {
@@ -15910,12 +15911,12 @@ document.addEventListener('DOMContentLoaded', function() {
         resizeTimeout = setTimeout(handleResize, 250);
     });
     
-    // Se j├í tem conversa selecionada, mostrar chat view em mobile
+    // Se jí tem conversa selecionada, mostrar chat view em mobile
     const selectedConversationId = <?= json_encode($selectedConversationId ?? null) ?>;
     if (selectedConversationId && isMobile()) {
         setTimeout(() => {
             showChatView();
-            // Mostrar bot├úo voltar
+            // Mostrar botão voltar
             const backBtn = document.getElementById('chatHeaderBackBtn');
             if (backBtn) backBtn.style.display = 'flex';
         }, 100);
@@ -15924,7 +15925,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Interceptar cliques em conversation-item para mobile
     document.querySelectorAll('.conversation-item').forEach(item => {
         item.addEventListener('click', function(e) {
-            // Se n├úo for clique em checkbox ou bot├úo de a├º├úo
+            // Se não for clique em checkbox ou botão de ação
             if (!e.target.closest('.conversation-checkbox') && 
                 !e.target.closest('.conversation-item-actions') &&
                 !e.target.closest('.dropdown')) {
@@ -15942,18 +15943,18 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Modificar selectConversation para usar navega├º├úo mobile
-// Aguardar que a fun├º├úo seja definida
+// Modificar selectConversation para usar navegação mobile
+// Aguardar que a função seja definida
 document.addEventListener('DOMContentLoaded', function() {
     // Aguardar um pouco para garantir que selectConversation foi definida
     setTimeout(function() {
         if (typeof selectConversation === 'function') {
             const originalSelectConversation = selectConversation;
             window.selectConversation = function(conversationId) {
-                // Chamar fun├º├úo original
+                // Chamar função original
                 originalSelectConversation(conversationId);
                 
-                // Em mobile, mostrar chat view ap├│s selecionar
+                // Em mobile, mostrar chat view após selecionar
                 if (isMobile()) {
                     setTimeout(() => {
                         showChatView();
@@ -15964,7 +15965,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 500);
 });
 
-// Sistema de Polling j├í declarado acima (antes de selectConversation)
+// Sistema de Polling jí declarado acima (antes de selectConversation)
 
 // WebSocket - Atualizar em tempo real
 if (typeof window.wsClient !== 'undefined') {
@@ -15995,7 +15996,7 @@ if (typeof window.wsClient !== 'undefined') {
                 conversationItem.setAttribute('data-updated-at', ts);
             }
             
-            // Atualizar badge de n├úo lidas (se n├úo for a conversa atual)
+            // Atualizar badge de não lidas (se não for a conversa atual)
             if (currentConversationId != data.conversation_id) {
                 const currentCount = badge ? parseInt(badge.textContent) || 0 : 0;
                 if (badge) {
@@ -16007,7 +16008,7 @@ if (typeof window.wsClient !== 'undefined') {
                 }
             }
             
-            // Garantir dropdown de a├º├Áes
+            // Garantir dropdown de açÁes
             ensureActionsDropdown(conversationItem, pinned, data.conversation_id);
             
             // Atualizar indicador SLA em tempo real
@@ -16018,51 +16019,51 @@ if (typeof window.wsClient !== 'undefined') {
                 } else if (data.message.sender_type === 'agent') {
                     conversationItem.dataset.lastAgentMessageAt = data.message.created_at;
                 }
-                // For├ºar atualiza├º├úo do indicador
+                // Forçar atualização do indicador
                 const convData = window.SLAIndicator.getConversationData(data.conversation_id);
                 if (convData) {
                     window.SLAIndicator.updateConversation(data.conversation_id, convData);
                 }
             }
 
-            // Reordenar lista ap├│s atualiza├º├úo (respeita timestamp e pinned)
+            // Reordenar lista após atualização (respeita timestamp e pinned)
             sortConversationList();
         } else {
-            // Se n├úo existe na lista, fazer refresh para for├ºar render (preservando filtros)
-            console.log('new_message: conversa n├úo encontrada na lista, atualizando lista');
+            // Se não existe na lista, fazer refresh para forçar render (preservando filtros)
+            console.log('new_message: conversa não encontrada na lista, atualizando lista');
             const urlParams = new URLSearchParams(window.location.search);
             refreshConversationList(urlParams);
         }
         
-        // Se ├® a conversa atual, adicionar mensagem dinamicamente
+        // Se ê a conversa atual, adicionar mensagem dinamicamente
         if (currentConversationId == data.conversation_id && data.message) {
-            console.group('­ƒöì DEBUG: Nova mensagem via WebSocket/Polling');
+            console.group('🔧 DEBUG: Nova mensagem via WebSocket/Polling');
             console.log('Dados completos:', data);
             console.table({
                 'ID': data.message.id,
-                'Conte├║do': data.message.content?.substring(0, 50),
+                'Conteúdo': data.message.content?.substring(0, 50),
                 'sender_type': data.message.sender_type,
                 'direction': data.message.direction,
                 'message_type': data.message.message_type,
                 'type': data.message.type
             });
             
-            // Valida├º├úo de campos cr├¡ticos
+            // Validação de campos críticos
             if (!data.message.direction) {
-                console.error('ÔØî ERRO: Campo "direction" est├í AUSENTE!');
+                console.error('ÔØî ERRO: Campo "direction" estí AUSENTE!');
             } else if (data.message.direction === 'outgoing' && data.message.sender_type === 'contact') {
                 console.error('ÔØî ERRO: Mensagem do contato (sender_type=contact) mas direction=outgoing (deveria ser incoming)');
             } else if (data.message.direction === 'incoming' && data.message.sender_type === 'contact') {
-                console.log('Ô£à CORRETO: Mensagem do contato com direction=incoming');
+                console.log('✓ CORRETO: Mensagem do contato com direction=incoming');
             }
             
             console.groupEnd();
             addMessageToChat(data.message);
             
-            // Remover badge se existir (mensagem j├í foi marcada como lida no backend)
+            // Remover badge se existir (mensagem jí foi marcada como lida no backend)
             if (badge) badge.remove();
         } else {
-            // Se n├úo ├® a conversa atual, atualizar lista completa ap├│s um delay para garantir sincroniza├º├úo
+            // Se não ê a conversa atual, atualizar lista completa após um delay para garantir sincronização
             setTimeout(() => {
                 refreshConversationBadges();
             }, 1000);
@@ -16107,7 +16108,7 @@ if (typeof window.wsClient !== 'undefined') {
             
             // Atualiza badge/preview/tempo
             applyConversationUpdate(data.conversation || { id: data.conversation_id, unread_count: data.unread_count });
-            // Move para topo se n├úo for a conversa atual (feito no handler abaixo)
+            // Move para topo se não for a conversa atual (feito no handler abaixo)
         }
     });
 
@@ -16119,7 +16120,7 @@ if (typeof window.wsClient !== 'undefined') {
         document.dispatchEvent(new CustomEvent('realtime:new_conversation', { detail: data }));
         
         try {
-            // Adicionar nova conversa ├á lista sem recarregar a p├ígina
+            // Adicionar nova conversa á lista sem recarregar a pígina
             if (data.conversation) {
                 addConversationToList(data.conversation);
             } else {
@@ -16134,26 +16135,26 @@ if (typeof window.wsClient !== 'undefined') {
     });
     
     window.wsClient.on('conversation_updated', (data) => {
-        // Usar vari├ível global para refletir a conversa selecionada ap├│s navega├º├úo AJAX
+        // Usar variível global para refletir a conversa selecionada após navegação AJAX
         const currentConversationId = window.currentConversationId ?? parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
         
-        // Se ├® a conversa atual, n├úo atualizar badge (j├í foi removido ao selecionar)
+        // Se ê a conversa atual, não atualizar badge (jí foi removido ao selecionar)
         if (currentConversationId == data.conversation_id) {
-            // Recarregar apenas se necess├írio (mudan├ºas de status, atribui├º├úo)
+            // Recarregar apenas se necessírio (mudanças de status, atribuição)
             if (data.changes && (data.changes.status || data.changes.agent_id || data.changes.department_id)) {
                 window.location.reload();
             }
-            return; // N├úo atualizar badge se for a conversa atual
+            return; // Não atualizar badge se for a conversa atual
         }
         
-        // Atualizar item e mover para topo (lista refletindo ├║ltima atividade)
-        // Se a conversa ainda n├úo existe na lista (ex.: criada agora), criar e adicionar
+        // Atualizar item e mover para topo (lista refletindo última atividade)
+        // Se a conversa ainda não existe na lista (ex.: criada agora), criar e adicionar
         const existingItem = document.querySelector(`[data-conversation-id="${data.conversation_id}"]`);
         if (!existingItem) {
             if (data.conversation) {
                 addConversationToList(data.conversation);
             } else {
-                // Dados m├¡nimos para criar
+                // Dados mínimos para criar
                 addConversationToList({
                     id: data.conversation_id,
                     last_message: data.last_message || '',
@@ -16168,7 +16169,7 @@ if (typeof window.wsClient !== 'undefined') {
             }
         } else {
             applyConversationUpdate(data.conversation || { id: data.conversation_id, unread_count: data.unread_count });
-            // moveConversationToTop removido - applyConversationUpdate j├í ordena via sortConversationList()
+            // moveConversationToTop removido - applyConversationUpdate jí ordena via sortConversationList()
         }
     });
     
@@ -16182,14 +16183,14 @@ const currentConversationId = parsePhpJson('<?= json_encode($selectedConversatio
             window.wsClient.subscribe(currentConversationId);
             stopPolling(); // Parar polling apenas se WebSocket estiver conectado
         } else {
-            // Se WebSocket n├úo estiver conectado, usar polling
+            // Se WebSocket não estiver conectado, usar polling
             startPolling(currentConversationId);
         }
     }
-    // Inscrever todas as conversas vis├¡veis (modo polling)
+    // Inscrever todas as conversas visíveis (modo polling)
     subscribeVisibleConversations();
     
-    // Sistema de atualiza├º├úo peri├│dica da lista de conversas (para badges de n├úo lidas)
+    // Sistema de atualização periódica da lista de conversas (para badges de não lidas)
     // Atualizar a cada 10 segundos para verificar novas mensagens em todas as conversas
     let conversationListUpdateInterval = setInterval(() => {
         refreshConversationBadges();
@@ -16208,13 +16209,13 @@ const currentConversationId = parsePhpJson('<?= json_encode($selectedConversatio
         });
     }
 } else {
-    // Se WebSocket n├úo estiver dispon├¡vel, usar polling
+    // Se WebSocket não estiver disponível, usar polling
 const currentConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     if (currentConversationId) {
         startPolling(currentConversationId);
     }
     
-    // Sistema de atualiza├º├úo peri├│dica da lista de conversas (para badges de n├úo lidas)
+    // Sistema de atualização periódica da lista de conversas (para badges de não lidas)
     let conversationListUpdateInterval = setInterval(() => {
         refreshConversationBadges();
     }, 10000); // 10 segundos
@@ -16234,7 +16235,7 @@ if (!window.__realtimeGlobalNewConvListener) {
         // Verificar se a conversa passa pelos filtros ativos antes de adicionar
         const urlParams = new URLSearchParams(window.location.search);
         
-        // Se h├í filtros ativos, recarregar lista preservando filtros para incluir a nova conversa
+        // Se hí filtros ativos, recarregar lista preservando filtros para incluir a nova conversa
         if (urlParams.toString().length > 0) {
             console.log('Filtros ativos detectados. Recarregando lista filtrada para incluir nova conversa.');
             refreshConversationList(urlParams);
@@ -16252,24 +16253,24 @@ if (!window.__realtimeGlobalNewConvListener) {
 }
 
 /**
- * Adicionar nova conversa ├á lista dinamicamente (sem recarregar tudo)
+ * Adicionar nova conversa á lista dinamicamente (sem recarregar tudo)
  */
 function addConversationToList(conv) {
     const conversationsList = document.querySelector('.conversations-list-items');
     if (!conversationsList) {
-        console.error('Elemento .conversations-list-items n├úo encontrado!');
+        console.error('Elemento .conversations-list-items não encontrado!');
         return;
     }
 
-    // Verificar se a conversa j├í existe na lista
+    // Verificar se a conversa jí existe na lista
     const existingItem = document.querySelector(`[data-conversation-id="${conv.id}"]`);
     if (existingItem) {
-        // Se j├í existe, apenas atualizar (applyConversationUpdate j├í ordena via sortConversationList)
+        // Se jí existe, apenas atualizar (applyConversationUpdate jí ordena via sortConversationList)
         applyConversationUpdate(conv);
         return;
     }
 
-    // Verificar se h├í mensagem vazia ou estado de "sem conversas"
+    // Verificar se hí mensagem vazia ou estado de "sem conversas"
     const emptyState = conversationsList.querySelector('.text-center');
     if (emptyState) {
         conversationsList.innerHTML = '';
@@ -16335,7 +16336,7 @@ function addConversationToList(conv) {
              data-updated-at="${lastMessageAt || new Date().toISOString()}"
              data-onclick="selectConversation">
             <div class="d-flex gap-3 w-100">
-                <!-- Checkbox para sele├º├úo em massa -->
+                <!-- Checkbox para seleção em massa -->
                 <div class="flex-shrink-0 d-flex align-items-center">
                     <label class="form-check form-check-custom form-check-solid">
                         <input class="form-check-input conversation-checkbox" type="checkbox" value="${conv.id}" 
@@ -16391,7 +16392,7 @@ function addConversationToList(conv) {
                                                 <span class="path1"></span>
                                                 <span class="path2"></span>
                                             </i>
-                                            Marcar como N├úo Lido
+                                            Marcar como Não Lido
                                         </a>
                                     </li>
                                     <li><hr class="dropdown-divider"></li>
@@ -16423,7 +16424,7 @@ function addConversationToList(conv) {
     conversationsList.insertAdjacentHTML('afterbegin', conversationHtml);
     console.log('Conversa adicionada ao topo:', conv.id);
     
-    // Inscrever na nova conversa para receber atualiza├º├Áes
+    // Inscrever na nova conversa para receber atualizaçÁes
     if (typeof window.wsClient !== 'undefined') {
         if (window.wsClient.connected && window.wsClient.currentMode === 'websocket') {
             window.wsClient.subscribe(conv.id);
@@ -16433,11 +16434,11 @@ function addConversationToList(conv) {
     // Resortear lista (respeitando pinned e updated_at)
     sortConversationList();
     
-    console.log('Nova conversa adicionada ├á lista:', conv.id);
+    console.log('Nova conversa adicionada á lista:', conv.id);
 }
 
 /**
- * Atualizar badges de n├úo lidas nas conversas da lista (sem recarregar toda a lista)
+ * Atualizar badges de não lidas nas conversas da lista (sem recarregar toda a lista)
  */
 function refreshConversationBadges() {
     // Buscar lista atualizada de conversas - PRESERVAR TODOS OS FILTROS DA URL
@@ -16446,19 +16447,19 @@ function refreshConversationBadges() {
     // Criar params preservando TODOS os filtros da URL atual
     const params = new URLSearchParams();
     
-    // Preservar todos os par├ómetros da URL atual (incluindo arrays)
+    // Preservar todos os parâmetros da URL atual (incluindo arrays)
     urlParams.forEach((value, key) => {
         // Para arrays (channels[], tag_ids[], whatsapp_account_ids[]), adicionar cada valor
         if (key.endsWith('[]')) {
-            // Se j├í existe, adicionar mais um valor
+            // Se jí existe, adicionar mais um valor
             params.append(key, value);
         } else {
-            // Par├ómetros simples
+            // Parâmetros simples
             params.set(key, value);
         }
     });
     
-    // Garantir que filtros b├ísicos tamb├®m sejam preservados se n├úo estiverem na URL
+    // Garantir que filtros bísicos tambêm sejam preservados se não estiverem na URL
     const filters = {
         status: urlParams.get('status') || '',
         channel: urlParams.get('channel') || '',
@@ -16475,7 +16476,7 @@ function refreshConversationBadges() {
         order_dir: urlParams.get('order_dir') || ''
     };
     
-    // Adicionar filtros b├ísicos apenas se n├úo estiverem j├í nos params
+    // Adicionar filtros bísicos apenas se não estiverem jí nos params
     Object.keys(filters).forEach(key => {
         if (filters[key] && !params.has(key)) {
             params.append(key, filters[key]);
@@ -16494,7 +16495,7 @@ function refreshConversationBadges() {
     .then(response => {
         const contentType = response.headers.get('content-type') || '';
         if (!contentType.includes('application/json')) {
-            throw new Error('Resposta n├úo ├® JSON (refreshConversationBadges)');
+            throw new Error('Resposta não ê JSON (refreshConversationBadges)');
         }
         return response.json();
     })
@@ -16503,27 +16504,27 @@ function refreshConversationBadges() {
             // Obter IDs das conversas que devem estar na lista (segundo o filtro atual)
             const validConversationIds = new Set(data.conversations.map(c => c.id));
             
-            // Remover conversas que N├âO passam pelo filtro atual
+            // Remover conversas que NâO passam pelo filtro atual
             const allConversationItems = document.querySelectorAll('.conversation-item[data-conversation-id]');
             allConversationItems.forEach(item => {
                 const conversationId = parseInt(item.getAttribute('data-conversation-id'));
                 const currentConversationId = window.currentConversationId ?? parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
                 
-                // N├úo remover a conversa atual
+                // Não remover a conversa atual
                 if (conversationId === currentConversationId) {
                     return;
                 }
                 
-                // Se a conversa n├úo est├í na lista v├ílida, remov├¬-la
+                // Se a conversa não estí na lista vílida, removì-la
                 if (!validConversationIds.has(conversationId)) {
                     item.remove();
                 }
             });
             
-            // Atualizar badges de n├úo lidas em cada conversa da lista
+            // Atualizar badges de não lidas em cada conversa da lista
             data.conversations.forEach(conv => {
                 const conversationItem = document.querySelector(`[data-conversation-id="${conv.id}"]`);
-                // Se a conversa passou pelo filtro, mas ainda n├úo est├í renderizada, adicionar agora
+                // Se a conversa passou pelo filtro, mas ainda não estí renderizada, adicionar agora
                 if (!conversationItem) {
                     addConversationToList(conv);
                     return;
@@ -16533,7 +16534,7 @@ function refreshConversationBadges() {
                     const unreadCount = conv.unread_count || 0;
                     const currentConversationId = window.currentConversationId ?? parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
                     
-                    // N├úo atualizar badge se for a conversa atual (j├í est├í sendo gerenciada separadamente)
+                    // Não atualizar badge se for a conversa atual (jí estí sendo gerenciada separadamente)
                     if (currentConversationId == conv.id) {
                         return;
                     }
@@ -16542,22 +16543,22 @@ function refreshConversationBadges() {
                         if (badge) {
                             badge.textContent = unreadCount;
                         } else {
-                            // Criar badge se n├úo existir
+                            // Criar badge se não existir
                             const badgeHtml = `<span class="conversation-item-badge">${unreadCount}</span>`;
                             const meta = conversationItem.querySelector('.conversation-item-meta');
                             if (meta) {
                                 meta.insertAdjacentHTML('beforeend', badgeHtml);
                             }
                         }
-                        // A ordena├º├úo correta ser├í feita por sortConversationList() abaixo
+                        // A ordenação correta serí feita por sortConversationList() abaixo
                     } else {
-                        // Remover badge se n├úo houver mensagens n├úo lidas
+                        // Remover badge se não houver mensagens não lidas
                         if (badge) {
                             badge.remove();
                         }
                     }
                     
-                    // Atualizar preview e tempo se necess├írio
+                    // Atualizar preview e tempo se necessírio
                     if (conv.last_message) {
                         const preview = conversationItem.querySelector('.conversation-item-preview');
                         if (preview) {
@@ -16576,35 +16577,35 @@ function refreshConversationBadges() {
                     if (conv.last_agent_message_at) {
                         conversationItem.dataset.lastAgentMessageAt = conv.last_agent_message_at;
                     }
-                    // Reaplicar estado visual de SLA (borda verde quando ├║ltima msg ├® do agente)
+                    // Reaplicar estado visual de SLA (borda verde quando última msg ê do agente)
                     applySlaVisualState(conversationItem, conv);
                     
                     // Atualizar meta e resortear
                     updateConversationMeta(conversationItem, conv);
-                    // Garantir dropdown de a├º├Áes ap├│s updates
+                    // Garantir dropdown de açÁes após updates
                     ensureActionsDropdown(conversationItem, conv.pinned === 1 || conv.pinned === true, conv.id);
                     sortConversationList();
                 }
             });
 
-            // Atualizar todos os indicadores SLA ap├│s atualizar a lista
+            // Atualizar todos os indicadores SLA após atualizar a lista
             if (window.SLAIndicator) {
                 console.log('[refreshConversationBadges] Atualizando todos os indicadores SLA');
                 window.SLAIndicator.updateAllIndicators();
             }
 
-            // Reinscrever conversas vis├¡veis para receber eventos de polling/new_message
+            // Reinscrever conversas visíveis para receber eventos de polling/new_message
             subscribeVisibleConversations();
         }
     })
     .catch(error => {
-        // Silenciar erros de atualiza├º├úo (n├úo cr├¡tico)
+        // Silenciar erros de atualização (não crítico)
         console.debug('Erro ao atualizar lista de conversas:', error);
     });
 }
 
 /**
- * Assistente IA - Fun├º├Áes
+ * Assistente IA - FunçÁes
  */
 
 let aiAssistantFeatures = [];
@@ -16614,7 +16615,7 @@ function showAIAssistantModal() {
     // Verificar disponibilidade antes de abrir o modal
     checkAIAssistantAvailability().then(availability => {
         if (!availability.available) {
-            // Mostrar erros de forma amig├ível
+            // Mostrar erros de forma amigível
             const issues = availability.issues || [];
             
             if (issues.length > 0) {
@@ -16637,9 +16638,9 @@ function showAIAssistantModal() {
                 if (mainIssue.action_url) {
                     Swal.fire({
                         icon: 'error',
-                        title: 'Assistente IA n├úo dispon├¡vel',
+                        title: 'Assistente IA não disponível',
                         html: message,
-                        confirmButtonText: mainIssue.action === 'configure_api_key' ? 'Ir para Configura├º├Áes' : 'OK',
+                        confirmButtonText: mainIssue.action === 'configure_api_key' ? 'Ir para ConfiguraçÁes' : 'OK',
                         showCancelButton: true,
                         cancelButtonText: 'Cancelar',
                         buttonsStyling: false,
@@ -16659,7 +16660,7 @@ function showAIAssistantModal() {
                 } else {
                     Swal.fire({
                         icon: 'error',
-                        title: 'Assistente IA n├úo dispon├¡vel',
+                        title: 'Assistente IA não disponível',
                         html: message,
                         confirmButtonText: 'OK',
                         buttonsStyling: false,
@@ -16676,7 +16677,7 @@ function showAIAssistantModal() {
             }
         }
         
-        // Se h├í warnings, mostrar mas continuar
+        // Se hí warnings, mostrar mas continuar
         if (availability.warnings && availability.warnings.length > 0) {
             const warning = availability.warnings[0];
             const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
@@ -16718,7 +16719,7 @@ function showAIAssistantModal() {
         Swal.fire({
             icon: 'error',
             title: 'Erro',
-            text: 'N├úo foi poss├¡vel verificar a disponibilidade do Assistente IA. Tente novamente.',
+            text: 'Não foi possível verificar a disponibilidade do Assistente IA. Tente novamente.',
             confirmButtonText: 'OK',
             buttonsStyling: false,
             colorScheme: isDarkMode ? 'dark' : 'light',
@@ -16764,12 +16765,12 @@ function openAIAssistantModal() {
         resultsDiv.classList.add('d-none');
     }
     
-    // Carregar funcionalidades dispon├¡veis
+    // Carregar funcionalidades disponíveis
     loadAIAssistantFeatures();
 }
 
 function checkAIAssistantAvailability() {
-    const featureKey = 'generate_response'; // Funcionalidade padr├úo
+    const featureKey = 'generate_response'; // Funcionalidade padrão
     const url = `<?= \App\Helpers\Url::to('/ai-assistant/check-availability') ?>?conversation_id=${currentConversationId || ''}&feature_key=${featureKey}`;
     
     return fetch(url, {
@@ -16780,7 +16781,7 @@ function checkAIAssistantAvailability() {
     .then(response => response.json())
     .then(data => {
         if (!data.success && !data.available) {
-            // Retornar dados mesmo se n├úo dispon├¡vel para mostrar erros
+            // Retornar dados mesmo se não disponível para mostrar erros
             return data;
         }
         return data;
@@ -16828,25 +16829,25 @@ function renderAIFeatures(features) {
     
     otherFeaturesContainer.innerHTML = '';
     
-    // Mapear ├¡cones para nomes mais amig├íveis
+    // Mapear ícones para nomes mais amigíveis
     const iconMap = {
-        'ki-file-down': '­ƒôä',
-        'ki-tag': '­ƒÅÀ´©Å',
+        'ki-file-down': '📁',
+        'ki-tag': '🏷️',
         'ki-heart': 'ÔØñ´©Å',
-        'ki-translate': '­ƒîÉ',
-        'ki-pencil': 'Ô£Å´©Å',
+        'ki-translate': '🌐',
+        'ki-pencil': '✏️',
         'ki-arrow-right': 'Ô×í´©Å',
         'ki-information': 'Ôä╣´©Å'
     };
     
     features.forEach(feature => {
-        // Pular "Gerar Resposta" pois j├í tem card dedicado
+        // Pular "Gerar Resposta" pois jí tem card dedicado
         if (feature.feature_key === 'generate_response') {
             return;
         }
         
         const icon = feature.icon || 'ki-abstract-26';
-        const emoji = iconMap[icon] || '­ƒñû';
+        const emoji = iconMap[icon] || '🤖';
         const cardHtml = `
             <div class="col-md-6 col-lg-4">
                 <div class="card card-flush h-100 shadow-sm hover-shadow-lg transition-all">
@@ -16906,14 +16907,14 @@ function loadSelectedAgent() {
             }
         } else {
             if (agentInfo) {
-                agentInfo.innerHTML = '<span class="text-muted">Agente padr├úo</span>';
+                agentInfo.innerHTML = '<span class="text-muted">Agente padrão</span>';
             }
         }
     })
     .catch(error => {
         console.error('Erro ao carregar agente:', error);
         if (agentInfo) {
-            agentInfo.innerHTML = '<span class="text-muted">Agente padr├úo</span>';
+            agentInfo.innerHTML = '<span class="text-muted">Agente padrão</span>';
         }
     });
 }
@@ -16930,14 +16931,14 @@ function generateAIResponse() {
     const suggestionsDiv = document.getElementById('aiResponseSuggestions');
     const generateBtn = document.getElementById('aiGenerateBtn');
     
-    // Desabilitar bot├úo e mostrar loading
+    // Desabilitar botão e mostrar loading
     if (generateBtn) {
         generateBtn.disabled = true;
         generateBtn.querySelector('.indicator-label').classList.add('d-none');
         generateBtn.querySelector('.indicator-progress').classList.remove('d-none');
     }
     
-    // Mostrar loading nas sugest├Áes
+    // Mostrar loading nas sugestÁes
     suggestionsDiv.innerHTML = `
         <div class="text-center py-10">
             <div class="mb-4">
@@ -16966,7 +16967,7 @@ function generateAIResponse() {
     })
     .then(response => response.json())
     .then(data => {
-        // Reabilitar bot├úo
+        // Reabilitar botão
         if (generateBtn) {
             generateBtn.disabled = false;
             generateBtn.querySelector('.indicator-label').classList.remove('d-none');
@@ -16977,17 +16978,17 @@ function generateAIResponse() {
             let html = '';
             data.responses.forEach((response, index) => {
                 const toneEmoji = {
-                    'professional': '­ƒÆ╝',
-                    'friendly': '­ƒÿè',
-                    'formal': '­ƒôï'
-                }[tone] || '­ƒÆ¼';
+                    'professional': '💼',
+                    'friendly': '😊',
+                    'formal': '👔'
+                }[tone] || '💬';
                 
                 html += `
                     <div class="card card-flush shadow-sm mb-4 hover-shadow-lg transition-all" style="animation: fadeIn 0.3s ease-in ${index * 0.1}s both;">
                         <div class="card-body p-6">
                             <div class="d-flex justify-content-between align-items-center mb-4">
                                 <div class="d-flex align-items-center">
-                                    <span class="badge badge-light-primary badge-lg me-2">${toneEmoji} Sugest├úo ${index + 1}</span>
+                                    <span class="badge badge-light-primary badge-lg me-2">${toneEmoji} Sugestão ${index + 1}</span>
                                     ${response.tokens_used ? `<span class="badge badge-light-info badge-sm">${response.tokens_used.toLocaleString('pt-BR')} tokens</span>` : ''}
                                 </div>
                                 <div class="d-flex gap-2">
@@ -17025,7 +17026,7 @@ function generateAIResponse() {
             // Armazenar respostas para uso posterior
             window.aiGeneratedResponses = data.responses;
             
-            // Scroll suave para primeira sugest├úo
+            // Scroll suave para primeira sugestão
             setTimeout(() => {
                 const firstCard = suggestionsDiv.querySelector('.card');
                 if (firstCard) {
@@ -17049,7 +17050,7 @@ function generateAIResponse() {
         }
     })
     .catch(error => {
-        // Reabilitar bot├úo
+        // Reabilitar botão
         if (generateBtn) {
             generateBtn.disabled = false;
             generateBtn.querySelector('.indicator-label').classList.remove('d-none');
@@ -17065,7 +17066,7 @@ function generateAIResponse() {
                 </i>
                 <div>
                     <div class="fw-bold">Erro ao gerar respostas</div>
-                    <div class="fs-7">${escapeHtml(error.message || 'Erro de conex├úo')}</div>
+                    <div class="fs-7">${escapeHtml(error.message || 'Erro de conexão')}</div>
                 </div>
             </div>
         `;
@@ -17160,13 +17161,13 @@ function loadAIResponseHistory() {
     
     if (!historyDiv || !historyContent) return;
     
-    // Mostrar se├º├úo de hist├│rico e esconder resultados atuais
+    // Mostrar seção de histórico e esconder resultados atuais
     historyDiv.classList.remove('d-none');
     if (resultsDiv) {
         resultsDiv.classList.add('d-none');
     }
     
-    // Scroll para hist├│rico
+    // Scroll para histórico
     historyDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     
     fetch(`<?= \App\Helpers\Url::to('/ai-assistant/response-history') ?>?conversation_id=${currentConversationId}&limit=20`, {
@@ -17186,7 +17187,7 @@ function loadAIResponseHistory() {
                             <span class="path1"></span>
                             <span class="path2"></span>
                         </i>
-                        <div class="text-muted">Nenhuma resposta no hist├│rico ainda</div>
+                        <div class="text-muted">Nenhuma resposta no histórico ainda</div>
                     </div>
                 `;
                 return;
@@ -17204,10 +17205,10 @@ function loadAIResponseHistory() {
                 });
                 
                 const toneEmoji = {
-                    'professional': '­ƒÆ╝',
-                    'friendly': '­ƒÿè',
-                    'formal': '­ƒôï'
-                }[item.tone] || '­ƒÆ¼';
+                    'professional': '💼',
+                    'friendly': '😊',
+                    'formal': '👔'
+                }[item.tone] || '💬';
                 
                 html += `
                     <div class="card card-flush shadow-sm mb-4">
@@ -17216,7 +17217,7 @@ function loadAIResponseHistory() {
                                 <div class="d-flex align-items-center">
                                     <span class="badge badge-light-primary badge-sm me-2">${toneEmoji} ${escapeHtml(item.tone || 'N/A')}</span>
                                     ${item.is_favorite ? '<span class="badge badge-light-warning badge-sm me-2">Ô¡É Favorita</span>' : ''}
-                                    ${item.used_at ? '<span class="badge badge-light-success badge-sm">Ô£ô Usada</span>' : ''}
+                                    ${item.used_at ? '<span class="badge badge-light-success badge-sm">✓ Usada</span>' : ''}
                                 </div>
                                 <div class="d-flex gap-2">
                                     <button class="btn btn-sm btn-icon btn-light-${item.is_favorite ? 'warning' : 'gray'}" 
@@ -17266,13 +17267,13 @@ function loadAIResponseHistory() {
                         <span class="path2"></span>
                         <span class="path3"></span>
                     </i>
-                    Erro ao carregar hist├│rico
+                    Erro ao carregar histórico
                 </div>
             `;
         }
     })
     .catch(error => {
-        console.error('Erro ao carregar hist├│rico:', error);
+        console.error('Erro ao carregar histórico:', error);
         historyContent.innerHTML = `
             <div class="alert alert-danger">
                 <i class="ki-duotone ki-information-5 fs-2 me-2">
@@ -17280,7 +17281,7 @@ function loadAIResponseHistory() {
                     <span class="path2"></span>
                     <span class="path3"></span>
                 </i>
-                Erro ao carregar hist├│rico
+                Erro ao carregar histórico
             </div>
         `;
     });
@@ -17312,7 +17313,7 @@ function toggleFavoriteResponse(responseId, buttonElement) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Recarregar hist├│rico
+            // Recarregar histórico
             loadAIResponseHistory();
         } else {
             alert('Erro ao atualizar favorito: ' + (data.message || 'Erro desconhecido'));
@@ -17388,7 +17389,7 @@ function executeAIFeature(featureKey) {
     
     const feature = aiAssistantFeatures.find(f => f.feature_key === featureKey);
     if (!feature) {
-        alert('Funcionalidade n├úo encontrada');
+        alert('Funcionalidade não encontrada');
         return;
     }
     
@@ -17400,7 +17401,7 @@ function executeAIFeature(featureKey) {
         </div>
     `;
     
-    // Criar modal tempor├írio para mostrar resultado
+    // Criar modal temporírio para mostrar resultado
     const resultModal = document.createElement('div');
     resultModal.className = 'modal fade';
     resultModal.innerHTML = `
@@ -17486,7 +17487,7 @@ function showAIError(message) {
 }
 
 /**
- * Renderizar resultado do Assistente IA com formata├º├úo especial e a├º├Áes r├ípidas
+ * Renderizar resultado do Assistente IA com formatação especial e açÁes rípidas
  */
 function renderAIResult(featureKey, result, data, conversationId) {
     const agentInfo = `
@@ -17507,7 +17508,7 @@ function renderAIResult(featureKey, result, data, conversationId) {
     
     switch (featureKey) {
         case 'suggest_tags':
-            // Extrair tags do resultado (pode ser lista separada por v├¡rgula)
+            // Extrair tags do resultado (pode ser lista separada por vírgula)
             const tagsText = result.trim();
             const suggestedTags = tagsText.split(/[,;]/).map(t => t.trim()).filter(t => t);
             
@@ -17547,7 +17548,7 @@ function renderAIResult(featureKey, result, data, conversationId) {
             return `
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="fw-bold mb-4">Tradu├º├úo</h5>
+                        <h5 class="fw-bold mb-4">Tradução</h5>
                         <div class="alert alert-light-primary d-flex align-items-start p-4 mb-4">
                             <i class="ki-duotone ki-translate fs-2x text-primary me-3">
                                 <span class="path1"></span>
@@ -17561,7 +17562,7 @@ function renderAIResult(featureKey, result, data, conversationId) {
                                     <span class="path1"></span>
                                     <span class="path2"></span>
                                 </i>
-                                Usar Tradu├º├úo
+                                Usar Tradução
                             </button>
                             <button class="btn btn-sm btn-light" onclick="copyToClipboard('${escapeHtml(result).replace(/'/g, "\\'")}')">
                                 <i class="ki-duotone ki-copy fs-5 me-1">
@@ -17634,7 +17635,7 @@ function renderAIResult(featureKey, result, data, conversationId) {
                                     <span class="path1"></span>
                                     <span class="path2"></span>
                                 </i>
-                                An├ílise de Sentimento
+                                Anílise de Sentimento
                             </span>
                         </div>
                         <div style="white-space: pre-wrap; line-height: 1.8;">${escapeHtml(result)}</div>
@@ -17678,7 +17679,7 @@ function renderAIResult(featureKey, result, data, conversationId) {
                                 <span class="path1"></span>
                                 <span class="path2"></span>
                             </i>
-                            Informa├º├Áes Extra├¡das
+                            InformaçÁes Extraídas
                         </h5>
                         <div style="white-space: pre-wrap; line-height: 1.8;">${escapeHtml(result)}</div>
                         <div class="d-flex gap-2 mt-3">
@@ -17704,7 +17705,7 @@ function renderAIResult(featureKey, result, data, conversationId) {
                                 <span class="path1"></span>
                                 <span class="path2"></span>
                             </i>
-                            Pr├│ximos Passos Sugeridos
+                            Próximos Passos Sugeridos
                         </h5>
                         <div style="white-space: pre-wrap; line-height: 1.8;">${escapeHtml(result)}</div>
                         <div class="d-flex gap-2 mt-3">
@@ -17776,7 +17777,7 @@ async function applySuggestedTags(conversationId, tags) {
             return;
         }
         
-        // Adicionar tags ├á conversa
+        // Adicionar tags á conversa
         const promises = tagsToAdd.map(tagId => 
             fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/tags`, {
                 method: 'POST',
@@ -17790,7 +17791,7 @@ async function applySuggestedTags(conversationId, tags) {
         
         await Promise.all(promises);
         
-        // Fechar modal e recarregar p├ígina para mostrar tags aplicadas
+        // Fechar modal e recarregar pígina para mostrar tags aplicadas
         const modals = document.querySelectorAll('.modal.show');
         modals.forEach(modal => {
             const bsModal = bootstrap.Modal.getInstance(modal);
@@ -17816,7 +17817,7 @@ async function applySuggestedTags(conversationId, tags) {
             }
         });
         
-        // Recarregar p├ígina ap├│s um breve delay
+        // Recarregar pígina após um breve delay
         setTimeout(() => {
             window.location.reload();
         }, 500);
@@ -17864,7 +17865,7 @@ function useImprovedText(text) {
 }
 
 /**
- * Copiar texto para ├írea de transfer├¬ncia
+ * Copiar texto para írea de transferìncia
  */
 function copyToClipboard(text) {
     navigator.clipboard.writeText(text).then(() => {
@@ -17875,7 +17876,7 @@ function copyToClipboard(text) {
         Swal.fire({
             icon: 'success',
             title: 'Copiado!',
-            text: 'Texto copiado para ├írea de transfer├¬ncia',
+            text: 'Texto copiado para írea de transferìncia',
             timer: 1500,
             showConfirmButton: false,
             colorScheme: isDarkMode ? 'dark' : 'light',
@@ -17900,14 +17901,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Preservar dropdowns abertos durante atualiza├º├Áes
-    // Usar delega├º├úo de eventos para dropdowns din├ómicos
+    // Preservar dropdowns abertos durante atualizaçÁes
+    // Usar delegação de eventos para dropdowns dinâmicos
     document.addEventListener('show.bs.dropdown', function(e) {
         const dropdown = e.target.closest('.conversation-item-actions');
         if (dropdown) {
             const conversationId = dropdown.querySelector('[data-conversation-id]')?.getAttribute('data-conversation-id');
             if (conversationId) {
-                // Marcar que este dropdown est├í aberto
+                // Marcar que este dropdown estí aberto
                 dropdown.dataset.isOpen = 'true';
             }
         }
@@ -17920,19 +17921,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Inicializar seletor r├ípido de templates
+    // Inicializar seletor rípido de templates
     initTemplateQuickSelect();
     
-    // Controlar visibilidade do campo de integra├º├úo WhatsApp baseado no canal selecionado
+    // Controlar visibilidade do campo de integração WhatsApp baseado no canal selecionado
     const channelSelect = document.getElementById('new_conversation_channel');
     const whatsappAccountContainer = document.getElementById('new_conversation_whatsapp_account_container');
     const whatsappAccountSelect = document.getElementById('new_conversation_whatsapp_account');
     
     if (channelSelect && whatsappAccountContainer) {
-        // Fun├º├úo para atualizar visibilidade
+        // Função para atualizar visibilidade
         function updateWhatsAppAccountVisibility() {
             const channel = channelSelect.value;
-            // Mostrar apenas para WhatsApp (n├úo WhatsApp Oficial ou outros canais)
+            // Mostrar apenas para WhatsApp (não WhatsApp Oficial ou outros canais)
             if (channel === 'whatsapp') {
                 whatsappAccountContainer.style.display = 'block';
                 if (whatsappAccountSelect) {
@@ -17962,13 +17963,13 @@ document.addEventListener('DOMContentLoaded', function() {
         updateWhatsAppAccountVisibility();
     }
     
-    // Formul├írio de nova conversa
+    // Formulírio de nova conversa
     const newConversationForm = document.getElementById('newConversationForm');
     if (newConversationForm) {
-        console.log('Ô£à Anexando listener ao formul├írio de nova conversa');
+        console.log('✓ Anexando listener ao formulírio de nova conversa');
         newConversationForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            console.log('­ƒôØ Formul├írio de nova conversa submetido');
+            console.log('📤 Formulírio de nova conversa submetido');
             
             const channel = document.getElementById('new_conversation_channel').value.trim();
             const whatsappAccountId = document.getElementById('new_conversation_whatsapp_account')?.value.trim() || null;
@@ -17976,28 +17977,28 @@ document.addEventListener('DOMContentLoaded', function() {
             const phone = document.getElementById('new_contact_phone').value.trim();
             const message = document.getElementById('new_conversation_message').value.trim();
             
-            console.log('­ƒôï Dados do formul├írio:', { channel, whatsappAccountId, name, phone, message });
+            console.log('👔 Dados do formulírio:', { channel, whatsappAccountId, name, phone, message });
             
             if (!channel || !name || !phone || !message) {
-                alert('Preencha todos os campos obrigat├│rios');
+                alert('Preencha todos os campos obrigatórios');
                 return;
             }
             
-            // Se canal for WhatsApp, validar integra├º├úo
+            // Se canal for WhatsApp, validar integração
             if (channel === 'whatsapp' && !whatsappAccountId) {
-                alert('Selecione uma integra├º├úo WhatsApp');
+                alert('Selecione uma integração WhatsApp');
                 return;
             }
             
-            // Validar telefone (deve ter pelo menos 10 d├¡gitos - DDD + n├║mero)
+            // Validar telefone (deve ter pelo menos 10 dígitos - DDD + número)
             if (phone.length < 10 || phone.length > 11) {
-                alert('Telefone inv├ílido. Digite DDD + n├║mero (ex: 11987654321)');
+                alert('Telefone invílido. Digite DDD + número (ex: 11987654321)');
                 return;
             }
             
-            // Formatar telefone completo (+55 + DDD + n├║mero)
+            // Formatar telefone completo (+55 + DDD + número)
             const fullPhone = '55' + phone;
-            console.log('­ƒô× Telefone formatado:', fullPhone);
+            console.log('📞 Telefone formatado:', fullPhone);
             
             const submitBtn = newConversationForm.querySelector('button[type="submit"]');
             const indicator = submitBtn.querySelector('.indicator-label');
@@ -18009,7 +18010,7 @@ document.addEventListener('DOMContentLoaded', function() {
             progress.style.display = 'inline-block';
             submitBtn.disabled = true;
             
-            console.log('­ƒÜÇ Enviando requisi├º├úo para criar nova conversa...');
+            console.log('⏳ Enviando requisição para criar nova conversa...');
             
             try {
                 const requestData = {
@@ -18034,35 +18035,35 @@ document.addEventListener('DOMContentLoaded', function() {
                     body: JSON.stringify(requestData)
                 });
                 
-                console.log('­ƒôí Resposta HTTP:', response.status, response.statusText);
+                console.log('📥 Resposta HTTP:', response.status, response.statusText);
                 
                 const responseText = await response.text();
-                console.log('­ƒôä Resposta texto (primeiros 500 chars):', responseText.substring(0, 500));
+                console.log('📁 Resposta texto (primeiros 500 chars):', responseText.substring(0, 500));
                 
                 let data;
                 try {
                     data = JSON.parse(responseText);
-                    console.log('Ô£à Resposta JSON parseada:', data);
+                    console.log('✓ Resposta JSON parseada:', data);
                 } catch (jsonErr) {
                     console.error('ÔØî Erro ao fazer parse do JSON:', jsonErr);
-                    throw new Error(`Resposta n├úo ├® JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
+                    throw new Error(`Resposta não ê JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
                 }
                 
                 if (data.success) {
-                    console.log('Ô£à Conversa criada com sucesso!', data);
+                    console.log('✓ Conversa criada com sucesso!', data);
                     
                     const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_new_conversation'));
                     if (modal) modal.hide();
                     
-                    // Limpar formul├írio
+                    // Limpar formulírio
                     newConversationForm.reset();
                     
                     // Redirecionar para a nova conversa
                     if (data.conversation_id) {
-                        console.log('­ƒöä Redirecionando para conversa:', data.conversation_id);
+                        console.log('🔄 Redirecionando para conversa:', data.conversation_id);
                         window.location.href = '<?= \App\Helpers\Url::to("/conversations") ?>?id=' + data.conversation_id;
                     } else {
-                        console.log('­ƒöä Recarregando lista de conversas...');
+                        console.log('🔄 Recarregando lista de conversas...');
                         // Recarregar lista de conversas
                         refreshConversationList();
                         
@@ -18080,12 +18081,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 } else {
                     console.error('Erro na resposta:', data);
-                    // Mostrar aviso sobre agente atribu├¡do
+                    // Mostrar aviso sobre agente atribuído
                     if (data.existing_agent) {
                         if (typeof Swal !== 'undefined') {
                             Swal.fire({
                                 icon: 'warning',
-                                title: 'Conversa j├í atribu├¡da',
+                                title: 'Conversa jí atribuída',
                                 html: `<p>${data.message}</p>`,
                                 confirmButtonText: 'OK',
                                 confirmButtonColor: '#009ef7'
@@ -18101,7 +18102,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Erro capturado:', error);
                 alert('Erro ao criar conversa: ' + error.message);
             } finally {
-                console.log('Finalizando requisi├º├úo, escondendo loading...');
+                console.log('Finalizando requisição, escondendo loading...');
                 // Esconder loading
                 submitBtn.removeAttribute('data-kt-indicator');
                 indicator.style.display = 'inline-block';
@@ -18110,10 +18111,10 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     } else {
-        console.warn('Formul├írio newConversationForm n├úo encontrado');
+        console.warn('Formulírio newConversationForm não encontrado');
     }
     
-    // Formul├írio de agendar mensagem
+    // Formulírio de agendar mensagem
     const scheduleMessageForm = document.getElementById('scheduleMessageForm');
     if (scheduleMessageForm) {
         scheduleMessageForm.addEventListener('submit', async function(e) {
@@ -18171,7 +18172,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 try {
                     data = JSON.parse(responseText);
                 } catch (jsonErr) {
-                    throw new Error(`Resposta n├úo ├® JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
+                    throw new Error(`Resposta não ê JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
                 }
                 
                 if (data.success) {
@@ -18182,7 +18183,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         Swal.fire({
                             icon: 'success',
                             title: 'Mensagem agendada!',
-                            text: `Mensagem ser├í enviada em ${new Date(scheduledAt).toLocaleString('pt-BR')}`,
+                            text: `Mensagem serí enviada em ${new Date(scheduledAt).toLocaleString('pt-BR')}`,
                             toast: true,
                             position: 'top-end',
                             showConfirmButton: false,
@@ -18356,7 +18357,7 @@ document.addEventListener('DOMContentLoaded', function() {
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'Sim, cancelar',
-            cancelButtonText: 'N├úo',
+            cancelButtonText: 'Não',
             customClass: {
                 confirmButton: 'btn btn-danger',
                 cancelButton: 'btn btn-light'
@@ -18406,24 +18407,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
     
-    // Fun├º├úo auxiliar para escapar HTML
+    // Função auxiliar para escapar HTML
     function escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     }
     
-    // M├íscara de telefone brasileiro (DDD + n├║mero)
+    // Míscara de telefone brasileiro (DDD + número)
     const phoneInput = document.getElementById('new_contact_phone');
     if (phoneInput) {
         phoneInput.addEventListener('input', function(e) {
-            let value = e.target.value.replace(/\D/g, ''); // Remove tudo que n├úo ├® d├¡gito
-            if (value.length > 11) value = value.substring(0, 11); // Limita a 11 d├¡gitos
+            let value = e.target.value.replace(/\D/g, ''); // Remove tudo que não ê dígito
+            if (value.length > 11) value = value.substring(0, 11); // Limita a 11 dígitos
             e.target.value = value;
         });
     }
     
-    // Formul├írio de criar lembrete
+    // Formulírio de criar lembrete
     const reminderForm = document.getElementById('reminderForm');
     if (reminderForm) {
         reminderForm.addEventListener('submit', async function(e) {
@@ -18467,7 +18468,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 try {
                     data = JSON.parse(responseText);
                 } catch (jsonErr) {
-                    throw new Error(`Resposta n├úo ├® JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
+                    throw new Error(`Resposta não ê JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
                 }
                 
                 if (data.success) {
@@ -18478,7 +18479,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         Swal.fire({
                             icon: 'success',
                             title: 'Lembrete criado!',
-                            text: `Lembrete ser├í exibido em ${new Date(reminderAt).toLocaleString('pt-BR')}`,
+                            text: `Lembrete serí exibido em ${new Date(reminderAt).toLocaleString('pt-BR')}`,
                             toast: true,
                             position: 'top-end',
                             showConfirmButton: false,
@@ -18495,7 +18496,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Inicializar seletor r├ípido de vari├íveis (ao digitar {{)
+    // Inicializar seletor rípido de variíveis (ao digitar {{)
     const messageInput = document.getElementById('messageInput');
     if (messageInput) {
         messageInput.addEventListener('input', function(e) {
@@ -18503,9 +18504,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const cursorPos = e.target.selectionStart;
             const textBeforeCursor = value.substring(0, cursorPos);
             
-            // Se digitar {{, mostrar seletor r├ípido de templates ou vari├íveis
+            // Se digitar {{, mostrar seletor rípido de templates ou variíveis
             if (textBeforeCursor.endsWith('{{')) {
-                // Mostrar seletor r├ípido de templates (pode ser expandido para vari├íveis tamb├®m)
+                // Mostrar seletor rípido de templates (pode ser expandido para variíveis tambêm)
                 showTemplateQuickSelect();
             }
         });
@@ -18513,7 +18514,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ============================================
-// A├ç├òES EM MASSA
+// AÇòES EM MASSA
 // ============================================
 
 // Obter conversas selecionadas
@@ -18522,7 +18523,7 @@ function getSelectedConversations() {
     return Array.from(checkboxes).map(cb => parseInt(cb.value));
 }
 
-// Atualizar contador e barra de a├º├Áes
+// Atualizar contador e barra de açÁes
 function toggleBulkSelection() {
     const selected = getSelectedConversations();
     const bulkBar = document.getElementById('bulkActionsBar');
@@ -18546,7 +18547,7 @@ function selectAllConversations() {
     toggleBulkSelection();
 }
 
-// Limpar sele├º├úo
+// Limpar seleção
 function clearBulkSelection() {
     document.querySelectorAll('.conversation-checkbox').forEach(cb => {
         cb.checked = false;
@@ -18589,7 +18590,7 @@ async function bulkAssignAgent(agentId, agentName) {
         Swal.fire({
             icon: success > 0 ? 'success' : 'error',
             title: success > 0 ? 'Sucesso!' : 'Erro',
-            text: `${success} conversa(s) atribu├¡da(s) com sucesso${failed > 0 ? `. ${failed} falharam.` : '.'}`,
+            text: `${success} conversa(s) atribuída(s) com sucesso${failed > 0 ? `. ${failed} falharam.` : '.'}`,
             colorScheme: isDarkMode ? 'dark' : 'light'
         });
         
@@ -18766,7 +18767,7 @@ async function bulkReopenConversations() {
     }
 }
 
-// Formul├írio de edi├º├úo de contato
+// Formulírio de edição de contato
 const editContactForm = document.getElementById('editContactForm');
 if (editContactForm) {
     editContactForm.addEventListener('submit', function(e) {
@@ -18892,7 +18893,7 @@ function updateAIActiveBanner(status, conversationId) {
         const parts = aiAgent.name.split(' ');
         const initials = (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
         
-        // Atualizar conte├║do do banner
+        // Atualizar conteúdo do banner
         const nameEl = banner.querySelector('.ai-agent-name');
         const typeEl = banner.querySelector('.ai-agent-type');
         const countEl = banner.querySelector('.ai-messages-count');
@@ -18904,7 +18905,7 @@ function updateAIActiveBanner(status, conversationId) {
             countEl.textContent = `${count} ${count === 1 ? 'mensagem' : 'mensagens'}`;
         }
         
-        // Atualizar onclick dos bot├Áes
+        // Atualizar onclick dos botÁes
         const historyBtn = document.getElementById('aiHistoryButton');
         const removeBtn = document.getElementById('removeAIButton');
         
@@ -18913,7 +18914,7 @@ function updateAIActiveBanner(status, conversationId) {
                 if(typeof showAIHistory === 'function') {
                     showAIHistory();
                 } else {
-                    console.error('showAIHistory n├úo est├í dispon├¡vel');
+                    console.error('showAIHistory não estí disponível');
                 }
             };
         }
@@ -18922,7 +18923,7 @@ function updateAIActiveBanner(status, conversationId) {
                 if(typeof removeAIAgent === 'function') {
                     removeAIAgent();
                 } else {
-                    console.error('removeAIAgent n├úo est├í dispon├¡vel');
+                    console.error('removeAIAgent não estí disponível');
                 }
             };
         }
@@ -18937,7 +18938,7 @@ function updateAIActiveBanner(status, conversationId) {
     }
 }
 
-// Fun├º├úo para atualizar m├®tricas do agente atual
+// Função para atualizar mêtricas do agente atual
 function updateAgentMetrics() {
     fetch('<?= \App\Helpers\Url::to('/conversations/metrics/current-agent') ?>', {
         headers: {
@@ -19024,11 +19025,11 @@ function updateAgentMetrics() {
         }
     })
     .catch(error => {
-        console.error('Erro ao atualizar m├®tricas:', error);
+        console.error('Erro ao atualizar mêtricas:', error);
     });
 }
 
-// Atualizar m├®tricas ao carregar a p├ígina
+// Atualizar mêtricas ao carregar a pígina
 document.addEventListener('DOMContentLoaded', function() {
     updateAgentMetrics();
     

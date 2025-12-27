@@ -46,11 +46,102 @@ class MetaIntegrationController
             $phone['has_valid_token'] = WhatsAppPhone::hasValidToken($phone['id']);
         }
         
+        // Carregar configurações Meta
+        $metaConfig = self::getMetaConfig();
+        
         Response::view('integrations/meta/index', [
             'instagramAccounts' => $instagramAccounts,
             'whatsappPhones' => $whatsappPhones,
             'tokens' => $tokens,
+            'metaConfig' => $metaConfig,
         ]);
+    }
+    
+    /**
+     * Salvar configurações Meta
+     * 
+     * POST /integrations/meta/config/save
+     */
+    public function saveConfig(): void
+    {
+        Permission::abortIfCannot('integrations.manage');
+        
+        $appId = Request::post('app_id');
+        $appSecret = Request::post('app_secret');
+        $webhookVerifyToken = Request::post('webhook_verify_token');
+        
+        if (empty($appId) || empty($appSecret) || empty($webhookVerifyToken)) {
+            Response::json([
+                'success' => false,
+                'error' => 'Todos os campos são obrigatórios'
+            ], 400);
+            return;
+        }
+        
+        try {
+            // Salvar em arquivo JSON para não expor no código
+            $configFile = __DIR__ . '/../../storage/config/meta.json';
+            $configDir = dirname($configFile);
+            
+            // Criar diretório se não existir
+            if (!is_dir($configDir)) {
+                mkdir($configDir, 0755, true);
+            }
+            
+            $config = [
+                'app_id' => $appId,
+                'app_secret' => $appSecret,
+                'webhook_verify_token' => $webhookVerifyToken,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ];
+            
+            $result = file_put_contents($configFile, json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            
+            if ($result === false) {
+                throw new \Exception('Erro ao salvar arquivo de configuração');
+            }
+            
+            // Proteger o arquivo
+            chmod($configFile, 0600);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Configurações salvas com sucesso'
+            ]);
+            
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Obter configurações Meta (do arquivo JSON ou config/meta.php)
+     */
+    private static function getMetaConfig(): array
+    {
+        // Tentar ler do arquivo JSON primeiro (configurações salvas pela interface)
+        $configFile = __DIR__ . '/../../storage/config/meta.json';
+        
+        if (file_exists($configFile)) {
+            $json = file_get_contents($configFile);
+            $config = json_decode($json, true);
+            
+            if ($config && !empty($config['app_id'])) {
+                return $config;
+            }
+        }
+        
+        // Fallback para config/meta.php
+        $metaConfig = require __DIR__ . '/../../config/meta.php';
+        
+        return [
+            'app_id' => $metaConfig['app_id'] ?? '',
+            'app_secret' => $metaConfig['app_secret'] ?? '',
+            'webhook_verify_token' => $metaConfig['webhooks']['verify_token'] ?? '',
+        ];
     }
     
     /**

@@ -30,7 +30,7 @@ ob_start();
                     </i>
                     Ver Logs
                 </a>
-                <button class="btn btn-sm btn-primary" onclick="connectAccount()">
+                <button class="btn btn-sm btn-primary" onclick="connectAccount()" <?= empty($metaConfig['app_id']) ? 'disabled' : '' ?>>
                     <i class="ki-duotone ki-plus fs-3"></i>
                     Conectar Conta Meta
                 </button>
@@ -41,6 +41,133 @@ ob_start();
         <p class="text-muted">
             Conecte suas contas Instagram e números WhatsApp oficiais via APIs da Meta
         </p>
+    </div>
+</div>
+
+<!--begin::Configuração de Credenciais-->
+<div class="card mb-5">
+    <div class="card-header border-0 pt-6">
+        <div class="card-title">
+            <h3 class="fw-bold m-0">
+                <i class="ki-duotone ki-setting-2 fs-2 me-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                Configuração do App Meta
+            </h3>
+        </div>
+        <div class="card-toolbar">
+            <a href="https://developers.facebook.com/apps/" target="_blank" class="btn btn-sm btn-light-info">
+                <i class="ki-duotone ki-external-link fs-3"></i>
+                Meta for Developers
+            </a>
+        </div>
+    </div>
+    <div class="card-body pt-3">
+        <?php if (empty($metaConfig['app_id']) || empty($metaConfig['app_secret'])): ?>
+        <div class="alert alert-warning d-flex align-items-center p-5 mb-5">
+            <i class="ki-duotone ki-information-5 fs-2hx text-warning me-4">
+                <span class="path1"></span>
+                <span class="path2"></span>
+                <span class="path3"></span>
+            </i>
+            <div class="d-flex flex-column">
+                <h4 class="mb-1 text-warning">Credenciais não configuradas</h4>
+                <span>Configure as credenciais do seu App Meta abaixo para poder conectar contas Instagram e WhatsApp.</span>
+            </div>
+        </div>
+        <?php endif; ?>
+        
+        <form id="metaConfigForm">
+            <div class="row g-5">
+                <div class="col-md-6">
+                    <label class="form-label required">App ID</label>
+                    <input type="text" name="app_id" class="form-control form-control-solid" 
+                           value="<?= htmlspecialchars($metaConfig['app_id'] ?? '') ?>" 
+                           placeholder="123456789012345">
+                    <div class="form-text">
+                        Obtido em: <a href="https://developers.facebook.com/apps/" target="_blank">Meta for Developers</a> → Seu App → Configurações → Básico
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <label class="form-label required">App Secret</label>
+                    <div class="input-group">
+                        <input type="password" name="app_secret" id="appSecret" class="form-control form-control-solid" 
+                               value="<?= htmlspecialchars($metaConfig['app_secret'] ?? '') ?>" 
+                               placeholder="abc123def456...">
+                        <button class="btn btn-light-secondary" type="button" onclick="toggleSecret()">
+                            <i class="ki-duotone ki-eye fs-2" id="eyeIcon">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                        </button>
+                    </div>
+                    <div class="form-text">
+                        Clique em "Mostrar" na página do App para visualizar
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <label class="form-label required">Webhook Verify Token</label>
+                    <div class="input-group">
+                        <input type="text" name="webhook_verify_token" class="form-control form-control-solid" 
+                               value="<?= htmlspecialchars($metaConfig['webhook_verify_token'] ?? '') ?>" 
+                               placeholder="seu_token_seguro_aqui">
+                        <button class="btn btn-light-info" type="button" onclick="generateToken()">
+                            <i class="ki-duotone ki-refresh fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Gerar
+                        </button>
+                    </div>
+                    <div class="form-text">
+                        Token de verificação para webhooks (pode gerar um aleatório)
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <label class="form-label">Redirect URI (OAuth)</label>
+                    <input type="text" class="form-control form-control-solid" 
+                           value="<?= htmlspecialchars(\App\Helpers\Url::to('/integrations/meta/oauth/callback', true)) ?>" 
+                           readonly onclick="this.select()">
+                    <div class="form-text">
+                        Copie e adicione em: Facebook Login → Configurações → URIs de redirecionamento
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <label class="form-label">Webhook URL</label>
+                    <input type="text" class="form-control form-control-solid" 
+                           value="<?= htmlspecialchars(\App\Helpers\Url::to('/webhooks/meta', true)) ?>" 
+                           readonly onclick="this.select()">
+                    <div class="form-text">
+                        Configure em: Webhooks → URL de callback
+                    </div>
+                </div>
+            </div>
+            
+            <div class="separator my-7"></div>
+            
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="text-muted fs-7">
+                        <i class="ki-duotone ki-information-4 fs-3 text-primary me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        As credenciais são salvas no servidor e não ficam visíveis no código
+                    </span>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="ki-duotone ki-check fs-3"></i>
+                    Salvar Configurações
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -275,6 +402,77 @@ ob_start();
 </div>
 
 <script>
+// Toggle mostrar/ocultar App Secret
+function toggleSecret() {
+    const input = document.getElementById('appSecret');
+    const icon = document.getElementById('eyeIcon');
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('ki-eye');
+        icon.classList.add('ki-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('ki-eye-slash');
+        icon.classList.add('ki-eye');
+    }
+}
+
+// Gerar token aleatório seguro
+function generateToken() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let token = '';
+    for (let i = 0; i < 64; i++) {
+        token += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    document.querySelector('input[name="webhook_verify_token"]').value = token;
+}
+
+// Salvar configurações Meta
+document.getElementById('metaConfigForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const data = Object.fromEntries(formData);
+    
+    // Validar
+    if (!data.app_id || !data.app_secret || !data.webhook_verify_token) {
+        Swal.fire('Erro', 'Preencha todos os campos obrigatórios', 'error');
+        return;
+    }
+    
+    Swal.fire({
+        title: 'Salvando...',
+        text: 'Aguarde enquanto salvamos as configurações',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+    
+    fetch('/integrations/meta/config/save', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            Swal.fire('Sucesso!', 'Configurações salvas com sucesso', 'success')
+                .then(() => location.reload());
+        } else {
+            Swal.fire('Erro', data.error || 'Erro ao salvar', 'error');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        Swal.fire('Erro', 'Erro na requisição', 'error');
+    });
+});
+
 function connectAccount(type = 'both') {
     Swal.fire({
         title: 'Conectar Conta Meta',

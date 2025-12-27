@@ -278,6 +278,7 @@ Router::post('/webhooks/meta', [MetaWebhookController::class, 'receive'], []); /
 
 // Gerenciamento
 Router::get('/integrations/meta', [MetaIntegrationController::class, 'index'], ['Authentication', 'Permission:integrations.view']);
+Router::post('/integrations/meta/config/save', [MetaIntegrationController::class, 'saveConfig'], ['Authentication', 'Permission:integrations.manage']);
 Router::post('/integrations/meta/instagram/sync', [MetaIntegrationController::class, 'syncInstagram'], ['Authentication', 'Permission:integrations.manage']);
 Router::post('/integrations/meta/whatsapp/sync', [MetaIntegrationController::class, 'syncWhatsApp'], ['Authentication', 'Permission:integrations.manage']);
 Router::post('/integrations/meta/whatsapp/add', [MetaIntegrationController::class, 'addWhatsAppPhone'], ['Authentication', 'Permission:integrations.manage']);

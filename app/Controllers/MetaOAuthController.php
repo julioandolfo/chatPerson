@@ -22,11 +22,36 @@ class MetaOAuthController
     private static array $config = [];
     
     /**
-     * Inicializar configurações
+     * Inicializar configurações (do arquivo JSON ou config/meta.php)
      */
     private static function initConfig(): void
     {
         if (empty(self::$config)) {
+            // Tentar ler do arquivo JSON primeiro (configurações salvas pela interface)
+            $jsonConfigFile = __DIR__ . '/../../storage/config/meta.json';
+            
+            if (file_exists($jsonConfigFile)) {
+                $json = file_get_contents($jsonConfigFile);
+                $jsonConfig = json_decode($json, true);
+                
+                if ($jsonConfig && !empty($jsonConfig['app_id'])) {
+                    // Carregar config/meta.php para manter estrutura completa
+                    $configFile = __DIR__ . '/../../config/meta.php';
+                    if (file_exists($configFile)) {
+                        self::$config = require $configFile;
+                    }
+                    
+                    // Sobrescrever com valores do JSON
+                    self::$config['app_id'] = $jsonConfig['app_id'];
+                    self::$config['app_secret'] = $jsonConfig['app_secret'];
+                    if (!empty(self::$config['webhooks'])) {
+                        self::$config['webhooks']['verify_token'] = $jsonConfig['webhook_verify_token'];
+                    }
+                    return;
+                }
+            }
+            
+            // Fallback para config/meta.php
             $configFile = __DIR__ . '/../../config/meta.php';
             if (file_exists($configFile)) {
                 self::$config = require $configFile;

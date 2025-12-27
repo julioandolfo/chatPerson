@@ -95,7 +95,27 @@ class ChatWebSocketServer implements MessageComponentInterface
 
                 case 'ping':
                     // Heartbeat
+                    if (isset($from->userId)) {
+                        try {
+                            // Processar heartbeat
+                            \App\Services\AvailabilityService::processHeartbeat($from->userId);
+                        } catch (\Exception $e) {
+                            echo "Erro ao processar heartbeat: " . $e->getMessage() . "\n";
+                        }
+                    }
                     $from->send(json_encode(['type' => 'pong']));
+                    break;
+
+                case 'activity':
+                    // Atividade do usuário
+                    if (isset($from->userId)) {
+                        try {
+                            $activityType = $data['activity_type'] ?? 'activity';
+                            \App\Services\AvailabilityService::updateActivity($from->userId, $activityType);
+                        } catch (\Exception $e) {
+                            echo "Erro ao processar atividade: " . $e->getMessage() . "\n";
+                        }
+                    }
                     break;
             }
         } catch (\Exception $e) {

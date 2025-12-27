@@ -67,6 +67,16 @@ ob_start();
                 </a>
             </li>
             <li class="nav-item mt-2">
+                <a class="nav-link text-active-primary me-10 <?= $activeTab === 'availability' ? 'active' : '' ?>" 
+                   href="<?= \App\Helpers\Url::to('/settings?tab=availability') ?>">
+                    <i class="ki-duotone ki-status fs-2 me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Disponibilidade
+                </a>
+            </li>
+            <li class="nav-item mt-2">
                 <a class="nav-link text-active-primary me-10 <?= $activeTab === 'ai-assistant' ? 'active' : '' ?>" 
                    href="<?= \App\Helpers\Url::to('/settings?tab=ai-assistant') ?>">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
@@ -510,6 +520,12 @@ ob_start();
             include __DIR__ . '/conversations-tab.php';
             ?>
             <!--end::Form Conversas-->
+        <?php elseif ($activeTab === 'availability'): ?>
+            <!--begin::Form Disponibilidade-->
+            <?php 
+            include __DIR__ . '/availability-tab.php';
+            ?>
+            <!--end::Form Disponibilidade-->
         <?php elseif ($activeTab === 'ai-assistant'): ?>
             <!--begin::Form Assistente IA-->
             <?php 

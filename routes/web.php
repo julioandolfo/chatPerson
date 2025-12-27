@@ -330,6 +330,7 @@ Router::post('/settings/whatsapp', [SettingsController::class, 'saveWhatsApp'], 
 Router::post('/settings/security', [SettingsController::class, 'saveSecurity'], ['Authentication']);
 Router::post('/settings/websocket', [SettingsController::class, 'saveWebSocket'], ['Authentication']);
 Router::post('/settings/conversations', [SettingsController::class, 'saveConversations'], ['Authentication']);
+Router::post('/settings/availability', [SettingsController::class, 'saveAvailability'], ['Authentication']);
 Router::post('/settings/ai', [SettingsController::class, 'saveAI'], ['Authentication']);
 Router::get('/api/settings/sla', [SettingsController::class, 'getSLAConfig'], ['Authentication']); // API para obter config de SLA
 

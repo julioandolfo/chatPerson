@@ -223,6 +223,13 @@
     
     <!-- WebSocket Client -->
     <script src="<?= \App\Helpers\Url::asset('js/realtime-client.js') ?>"></script>
+    <script src="<?= \App\Helpers\Url::asset('js/activity-tracker.js') ?>"></script>
+    <script>
+        // Passar configurações de disponibilidade para o JavaScript
+        <?php if (\App\Helpers\Auth::check()): ?>
+        window.availabilitySettings = <?= json_encode(\App\Services\AvailabilityService::getSettings()) ?>;
+        <?php endif; ?>
+    </script>
     
     <!-- Sound Manager -->
     <script src="<?= \App\Helpers\Url::asset('js/sound-manager.js') ?>"></script>

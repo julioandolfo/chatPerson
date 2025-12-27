@@ -89,6 +89,13 @@ class AuthController
             'role' => $user['role']
         ]);
 
+        // Marcar como online automaticamente (se configurado)
+        try {
+            \App\Services\AvailabilityService::markOnlineOnLogin($user['id']);
+        } catch (\Exception $e) {
+            error_log("Erro ao marcar como online no login: " . $e->getMessage());
+        }
+
         Response::redirect('/dashboard');
     }
 
@@ -97,6 +104,17 @@ class AuthController
      */
     public function logout(): void
     {
+        $userId = Auth::id();
+        
+        // Marcar como offline automaticamente (se configurado)
+        if ($userId) {
+            try {
+                \App\Services\AvailabilityService::markOfflineOnLogout($userId);
+            } catch (\Exception $e) {
+                error_log("Erro ao marcar como offline no logout: " . $e->getMessage());
+            }
+        }
+        
         Auth::logout();
         Response::redirect('/login');
     }

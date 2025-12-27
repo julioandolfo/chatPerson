@@ -744,6 +744,45 @@ ob_start();
                                     </span>
                                 </div>
                                 
+                                <div class="separator separator-dashed my-4"></div>
+                                
+                                <!-- Estatísticas de Disponibilidade -->
+                                <div class="mb-3">
+                                    <span class="text-muted fs-7 fw-bold d-block mb-2">Tempo em Cada Status</span>
+                                    <?php
+                                    $availabilityStats = $agent['availability_stats'] ?? [];
+                                    $statusConfig = [
+                                        'online' => ['label' => 'Online', 'color' => 'success', 'icon' => 'check-circle'],
+                                        'away' => ['label' => 'Ausente', 'color' => 'info', 'icon' => 'clock'],
+                                        'busy' => ['label' => 'Ocupado', 'color' => 'warning', 'icon' => 'pause-circle'],
+                                        'offline' => ['label' => 'Offline', 'color' => 'secondary', 'icon' => 'x-circle']
+                                    ];
+                                    
+                                    foreach ($statusConfig as $status => $config):
+                                        $stats = $availabilityStats[$status] ?? ['formatted' => '0s', 'percentage' => 0];
+                                        if ($stats['seconds'] > 0 || $status === 'online'): // Sempre mostrar online, mesmo se 0
+                                    ?>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="text-muted fs-8">
+                                            <i class="ki-duotone ki-<?= $config['icon'] ?> fs-7 text-<?= $config['color'] ?> me-1">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                            </i>
+                                            <?= $config['label'] ?>
+                                        </span>
+                                        <div class="text-end">
+                                            <span class="fw-bold text-gray-800 fs-7"><?= $stats['formatted'] ?? '0s' ?></span>
+                                            <?php if (($stats['percentage'] ?? 0) > 0): ?>
+                                            <span class="text-muted fs-8 ms-1">(<?= number_format($stats['percentage'], 1) ?>%)</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                    <?php
+                                        endif;
+                                    endforeach;
+                                    ?>
+                                </div>
+                                
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <span class="text-muted fs-7">Tempo Médio de Resposta</span>
                                     <span class="fw-bold text-gray-800">

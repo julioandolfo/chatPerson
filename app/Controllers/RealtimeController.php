@@ -123,6 +123,15 @@ class RealtimeController
                 $lastUpdateTime = 0;
             }
 
+            // Processar heartbeat/atividade do usuário
+            if (isset($data['last_activity']) || isset($data['activity_type'])) {
+                try {
+                    \App\Services\AvailabilityService::processHeartbeat($userId);
+                } catch (\Exception $e) {
+                    \App\Helpers\Logger::error("Erro ao processar heartbeat no polling: " . $e->getMessage());
+                }
+            }
+
             $updates = [
                 'new_messages' => [],
                 'conversation_updates' => [],

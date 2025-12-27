@@ -918,6 +918,24 @@ class DashboardService
         foreach ($agents as $agent) {
             $metrics = self::getAgentMetrics($agent['id'], $dateFrom, $dateTo);
             if (!empty($metrics)) {
+                // Adicionar estatísticas de disponibilidade
+                try {
+                    $availabilityStats = \App\Services\AvailabilityService::getAvailabilityStats(
+                        $agent['id'],
+                        $dateFrom,
+                        $dateTo
+                    );
+                    $metrics['availability_stats'] = $availabilityStats;
+                } catch (\Exception $e) {
+                    \App\Helpers\Logger::error("Erro ao obter estatísticas de disponibilidade para agente {$agent['id']}: " . $e->getMessage());
+                    $metrics['availability_stats'] = [
+                        'online' => ['seconds' => 0, 'formatted' => '0s', 'percentage' => 0],
+                        'offline' => ['seconds' => 0, 'formatted' => '0s', 'percentage' => 0],
+                        'away' => ['seconds' => 0, 'formatted' => '0s', 'percentage' => 0],
+                        'busy' => ['seconds' => 0, 'formatted' => '0s', 'percentage' => 0]
+                    ];
+                }
+                
                 $result[] = $metrics;
             }
         }

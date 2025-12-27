@@ -35,6 +35,8 @@ class SettingsController
         $websocketSettings = SettingService::getDefaultWebSocketSettings();
         $conversationSettings = ConversationSettingsService::getSettings();
         $aiSettings = SettingService::getDefaultAISettings();
+        $availabilitySettings = \App\Services\AvailabilityService::getSettings();
+        $businessHoursSettings = \App\Services\AvailabilityService::getBusinessHoursSettings();
         
         // Obter dados para preencher selects
         $users = \App\Helpers\Database::fetchAll(
@@ -77,7 +79,9 @@ class SettingsController
             'allStages' => $allStages,
             'tags' => $tags,
             'aiAssistantFeatures' => $aiAssistantFeatures ?? [],
-            'aiAgents' => $aiAgents ?? []
+            'aiAgents' => $aiAgents ?? [],
+            'availabilitySettings' => $availabilitySettings,
+            'businessHoursSettings' => $businessHoursSettings
         ]);
     }
 

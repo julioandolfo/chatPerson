@@ -92,7 +92,7 @@ function renderAttachment($attachment) {
         $showTranscription = $settings['audio_transcription']['show_transcription_in_chat'] ?? true;
         
         if ($showTranscription) {
-            // Verificar se ê íudio TTS (tem texto original) ou íudio transcrito
+            // Verificar se é íudio TTS (tem texto original) ou íudio transcrito
             $ttsOriginalText = $attachment['tts_original_text'] ?? null;
             $transcription = $attachment['transcription'] ?? null;
             
@@ -472,7 +472,7 @@ ob_start();
     display: inline-block; /* Garantir que dropdown seja posicionado em relação ao botão */
 }
 
-/* Quando dropdown estí aberto, aumentar z-index do item da conversa */
+/* Quando dropdown está aberto, aumentar z-index do item da conversa */
 .conversation-item:has(.conversation-item-actions .dropdown-menu.show) {
     z-index: 1000 !important;
     position: relative;
@@ -703,7 +703,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     max-width: 100%;
 }
 
-/* Quando acesso ê restrito, bloquear scroll completamente */
+/* Quando acesso é restrito, bloquear scroll completamente */
 .chat-messages.access-restricted {
     overflow: hidden !important;
 }
@@ -1768,7 +1768,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
         max-width: 85% !important;
     }
     
-    /* Input de mensagem - fixo no rodapê */
+    /* Input de mensagem - fixo no rodapé */
     .chat-input-container {
         position: sticky;
         bottom: 0;
@@ -2100,7 +2100,7 @@ function getChannelInfo(channel) {
         'youtube': {
             name: 'YouTube',
             icon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#FF0000" style="vertical-align: middle;"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>',
-            emoji: 'ÔûÂ´©Å'
+            emoji: '▶️'
         }
     };
     
@@ -2196,7 +2196,7 @@ function getChannelInfo(channel) {
                     <span id="headerPendingInvitesBadge" class="position-absolute top-0 start-100 translate-middle badge badge-circle badge-sm badge-danger d-none">0</span>
                 </button>
                 
-                <button type="button" class="btn btn-sm btn-icon btn-primary" id="btn_new_conversation" title="Nova conversa" onclick="if(typeof showNewConversationModal === 'function') { showNewConversationModal(); } else { console.error('showNewConversationModal não estí definida'); }">
+                <button type="button" class="btn btn-sm btn-icon btn-primary" id="btn_new_conversation" title="Nova conversa" onclick="if(typeof showNewConversationModal === 'function') { showNewConversationModal(); } else { console.error('showNewConversationModal não está definida'); }">
                     <i class="ki-duotone ki-plus fs-2">
                         <span class="path1"></span>
                         <span class="path2"></span>
@@ -2661,7 +2661,7 @@ function getChannelInfo(channel) {
                         };
                         echo $channelIcon . ' ' . $channelName;
                         ?>
-                        ÔÇó
+                        •
                         <?php
                         $statusClass = match($selectedConversation['status'] ?? 'open') {
                             'open' => 'success',
@@ -2746,7 +2746,7 @@ function getChannelInfo(channel) {
             </div>
         </div>
         
-        <!-- Banner de IA Ativa (aparece quando IA estí ativa) -->
+        <!-- Banner de IA Ativa (aparece quando IA está ativa) -->
         <div id="aiActiveBanner" class="ai-active-banner d-none" style="display: none !important;">
             <div class="ai-active-banner-content">
                 <div class="ai-active-banner-icon">
@@ -2825,7 +2825,7 @@ function getChannelInfo(channel) {
                             
                             <h3 class="fw-bold mb-3">Acesso Restrito</h3>
                             <p class="text-muted mb-4">
-                                Vocì não estí atribuído nem ê participante desta conversa.<br>
+                                Vocì não está atribuído nem é participante desta conversa.<br>
                                 Solicite participação para ter acesso completo.
                             </p>
                             
@@ -2916,7 +2916,7 @@ function getChannelInfo(channel) {
                                                 <span class="path1"></span>
                                                 <span class="path2"></span>
                                             </i>
-                                            Nota Interna ÔÇó <?= htmlspecialchars($msgSenderName) ?>
+                                            Nota Interna • <?= htmlspecialchars($msgSenderName) ?>
                                         </div>
                                         <?= str_replace("\n", "<br>", htmlspecialchars($msgContent)) ?>
                                     </div>
@@ -2927,7 +2927,7 @@ function getChannelInfo(channel) {
                                             <?php else: ?>
                             <!-- Mensagem normal -->
                             <?php
-                            // Verificar se ê mensagem de IA
+                            // Verificar se é mensagem de IA
                             $isAIMessage = !empty($msg['ai_agent_id']);
                             $aiAgentName = $msg['ai_agent_name'] ?? 'Assistente IA';
                             $aiAgentInitials = '';
@@ -2965,10 +2965,10 @@ function getChannelInfo(channel) {
                                         </button>
                                     </div>
                                             <?php
-                                    // Verificar se ê uma mensagem citada/reply
-                                    $isQuoted = strpos($msgContent, 'Ôå®´©Å') === 0;
+                                    // Verificar se é uma mensagem citada/reply
+                                    $isQuoted = strpos($msgContent, '↩️') === 0;
                                     
-                                    // Verificar se ê apenas íudio (sem texto e sem outros anexos)
+                                    // Verificar se é apenas íudio (sem texto e sem outros anexos)
                                     $hasOnlyAudio = false;
                                     if (!empty($msg['attachments']) && empty($msgContent) && !$isQuoted) {
                                         $attachments = is_string($msg['attachments']) ? json_decode($msg['attachments'], true) : $msg['attachments'];
@@ -3020,9 +3020,9 @@ function getChannelInfo(channel) {
                                                 }
                                                 $actualContent = $msgContent; // Content não foi modificado
                                             } else {
-                                                // Mensagem antiga com formato antigo (Ôå®´©Å no content)
+                                                // Mensagem antiga com formato antigo (↩️ no content)
                                                 $lines = explode("\n", $msgContent, 2);
-                                                $quotedText = substr($lines[0], 2); // Remove "Ôå®´©Å "
+                                                $quotedText = substr($lines[0], 2); // Remove "↩️ "
                                                 $actualContent = $lines[1] ?? '';
                                                 $quotedMsgId = null;
                                                 $quotedSenderName = 'Remetente';
@@ -4805,7 +4805,7 @@ function getChannelInfo(channel) {
     </div>
 </div>
 
-<!-- MODAL: Convites e SolicitaçÁes Pendentes -->
+<!-- MODAL: Convites e Solicitações Pendentes -->
 <div class="modal fade" id="kt_modal_pending_invites" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered mw-650px">
         <div class="modal-content">
@@ -4818,7 +4818,7 @@ function getChannelInfo(channel) {
                         <span class="path4"></span>
                         <span class="path5"></span>
                     </i>
-                    Convites e SolicitaçÁes
+                    Convites e Solicitações
                     <span id="pendingInvitesCountBadge" class="badge badge-circle badge-primary ms-2 d-none">0</span>
                 </h2>
                 <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
@@ -4847,7 +4847,7 @@ function getChannelInfo(channel) {
                                 <span class="path1"></span>
                                 <span class="path2"></span>
                             </i>
-                            SolicitaçÁes de Participação
+                            Solicitações de Participação
                             <span id="requestsTabCount" class="badge badge-sm badge-warning ms-2 d-none">0</span>
                         </a>
                     </li>
@@ -4864,7 +4864,7 @@ function getChannelInfo(channel) {
                         </div>
                     </div>
                     
-                    <!-- Tab: SolicitaçÁes de Participação -->
+                    <!-- Tab: Solicitações de Participação -->
                     <div class="tab-pane fade p-5" id="tab_requests" role="tabpanel">
                         <div id="pendingRequestsList">
                             <div class="text-center py-10">
@@ -5346,7 +5346,7 @@ function approveRequestFromModal(requestId) {
                     Swal.fire({
                         icon: 'success',
                         title: 'Aprovado!',
-                        text: 'O agente agora ê participante da conversa.',
+                        text: 'O agente agora é participante da conversa.',
                         timer: 2000,
                         showConfirmButton: false
                     });
@@ -5554,7 +5554,7 @@ function acceptInvite(mentionId, conversationId) {
                     Swal.fire({
                         icon: 'success',
                         title: 'Convite aceito!',
-                        text: 'Vocì agora ê participante da conversa.',
+                        text: 'Vocì agora é participante da conversa.',
                         timer: 2000,
                         showConfirmButton: false
                     });
@@ -5730,7 +5730,7 @@ document.addEventListener('DOMContentLoaded', function() {
  * Configurar listeners WebSocket para notificaçÁes de convites em tempo real
  */
 function setupInviteWebSocketListeners() {
-    // Verificar se o cliente WebSocket estí disponível
+    // Verificar se o cliente WebSocket está disponível
     if (typeof window.realtimeClient === 'undefined' && typeof window.websocketClient === 'undefined') {
         console.warn('[Convites] Cliente WebSocket não encontrado, usando apenas polling');
         return;
@@ -5824,7 +5824,7 @@ function setupInviteWebSocketListeners() {
         }
     });
     
-    // Listener para atualização de conversa (quando alguêm ê adicionado como participante)
+    // Listener para atualização de conversa (quando alguêm é adicionado como participante)
     client.on('conversation_updated', (data) => {
         // Se o update inclui mudança de participantes, atualizar
         if (data && data.type && data.type.includes('mention')) {
@@ -5849,7 +5849,7 @@ function setupInviteWebSocketListeners() {
             Swal.fire({
                 icon: 'info',
                 title: 'Nova Solicitação!',
-                html: `<strong>${escapeHtml(requestData.mentioned_by_name || 'Um agente')}</strong> estí solicitando participar de uma conversa.`,
+                html: `<strong>${escapeHtml(requestData.mentioned_by_name || 'Um agente')}</strong> está solicitando participar de uma conversa.`,
                 toast: true,
                 position: 'top-end',
                 showConfirmButton: true,
@@ -5892,7 +5892,7 @@ function setupInviteWebSocketListeners() {
             Swal.fire({
                 icon: 'success',
                 title: 'Solicitação Aprovada!',
-                html: `Vocì agora ê participante da conversa.`,
+                html: `Vocì agora é participante da conversa.`,
                 toast: true,
                 position: 'top-end',
                 showConfirmButton: true,
@@ -6117,7 +6117,7 @@ if (typeof window.updateAutomationSidebar !== 'function') {
         const automation = data.automation;
         const execStatus = automation.execution_status || 'unknown';
         const autoStatus = automation.automation_status || 'inactive';
-        const lastExec = automation.last_execution_at ? formatTime(automation.last_execution_at) : 'ÔÇö';
+        const lastExec = automation.last_execution_at ? formatTime(automation.last_execution_at) : '—';
         statusDiv.innerHTML = `
             <div class="d-flex flex-column gap-1">
                 <div class="d-flex align-items-center gap-2">
@@ -6195,7 +6195,7 @@ window.showAddAIAgentModal = function() {
             try {
                 return JSON.parse(text);
             } catch (e) {
-                throw new Error('Resposta não ê um JSON vílido.');
+                throw new Error('Resposta não é um JSON válido.');
             }
         });
     })
@@ -6278,7 +6278,7 @@ window.showAddAIAgentModal = function() {
         });
     })
     .catch(error => {
-        console.error('ÔØî Erro ao carregar agentes:', error);
+        console.error('❌ Erro ao carregar agentes:', error);
         console.error('Detalhes do erro:', {
             message: error.message,
             stack: error.stack
@@ -6606,7 +6606,7 @@ window.addEventListener('error', function(e) {
 }, true);
 
 // Selecionar conversa (carregar via AJAX sem recarregar pígina)
-// Sistema de Polling (fallback quando WebSocket não estí disponível)
+// Sistema de Polling (fallback quando WebSocket não está disponível)
 // Declarar variíveis e funçÁes ANTES de serem usadas
 let pollingInterval = null;
 let lastMessageId = null;
@@ -6619,7 +6619,7 @@ let oldestMessageId = null;
 let currentConversationId = null;
 let currentContactAvatar = null; // Avatar do contato da conversa atual
 
-// Helper para converter valores vindos do PHP em JSON vílido
+// Helper para converter valores vindos do PHP em JSON válido
 function parsePhpJson(value) {
     try {
         return JSON.parse(value);
@@ -6662,8 +6662,8 @@ function attachNewConversationButton() {
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', attachNewConversationButton);
 } else {
-    // DOM jí estí pronto, executar imediatamente
-    setTimeout(attachNewConversationButton, 100); // Pequeno delay para garantir que tudo estí pronto
+    // DOM jí está pronto, executar imediatamente
+    setTimeout(attachNewConversationButton, 100); // Pequeno delay para garantir que tudo está pronto
 }
 
 // Garantir inscrição no cliente de tempo real para conversas da lista (necessírio no modo polling)
@@ -6754,7 +6754,7 @@ function ensureActionsDropdown(conversationItem, pinned, conversationId, preserv
     const timeContainer = conversationItem.querySelector('.conversation-item-time');
     if (!timeContainer) return;
 
-    // Verificar se dropdown estí aberto antes de remover
+    // Verificar se dropdown está aberto antes de remover
     const wasOpen = preserveOpen && hasOpenDropdown(conversationId);
 
     // Remover dropdown existente se houver
@@ -6862,7 +6862,7 @@ function isLastMessageFromAgent(data) {
 
 function applySlaVisualState(conversationItem, conv) {
     // DESABILITADO: Não aplicar classes SLA ao conversation-item
-    // O sistema de SLA (sla-indicator.js) ê responsível por aplicar classes apenas ao avatar
+    // O sistema de SLA (sla-indicator.js) é responsível por aplicar classes apenas ao avatar
     // Remover qualquer classe sla-ok que possa ter sido adicionada
     if (conversationItem) {
         conversationItem.classList.remove('sla-ok');
@@ -6955,10 +6955,10 @@ function applyConversationUpdate(conv) {
     conversationItem.dataset.lastAgentMessageAt = lastAgentAt;
     conversationItem.dataset.agentId = conv.agent_id || conversationItem.dataset.agentId || '';
 
-    // Atualizar estado visual de SLA (borda verde quando última msg ê do agente)
+    // Atualizar estado visual de SLA (borda verde quando última msg é do agente)
     applySlaVisualState(conversationItem, conv);
 
-    // ÔÜá´©Å IMPORTANTE: Respeitar conversas marcadas manualmente como não lidas
+    // ⚠️ IMPORTANTE: Respeitar conversas marcadas manualmente como não lidas
     const isManuallyMarkedAsUnread = window.manuallyMarkedAsUnread && window.manuallyMarkedAsUnread.has(conv.id);
     const hasManualBadge = badge && badge.getAttribute('data-manual-unread') === 'true';
     
@@ -7035,7 +7035,7 @@ function checkForNewMessages(conversationId) {
     const conversationIdNum = parseInt(conversationId);
     const lastMessageIdNum = parseInt(lastMessageId) || 0;
     if (isNaN(conversationIdNum)) {
-        console.error('ID de conversa invílido:', conversationId);
+        console.error('ID de conversa inválido:', conversationId);
         return;
     }
     // Usar endpoint de mensagens, não a pígina da conversa, para evitar 404 e carregar apenas JSON
@@ -7122,7 +7122,7 @@ function updateConversationListPreview(conversationId, lastMessage) {
             }
         }
         
-        // Garantir dropdown de açÁes estí atualizado (preservar se estava aberto)
+        // Garantir dropdown de açÁes está atualizado (preservar se estava aberto)
         const pinned = conversationItem.classList.contains('pinned');
         ensureActionsDropdown(conversationItem, pinned, conversationId, wasOpen);
         
@@ -7201,12 +7201,12 @@ function selectConversation(id) {
         }
     })
     .then(async response => {
-        // Verificar se a resposta ê JSON
+        // Verificar se a resposta é JSON
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
             const text = await response.text();
-            console.error('Resposta não ê JSON:', text.substring(0, 200));
-            throw new Error('Resposta do servidor não ê JSON. Status: ' + response.status);
+            console.error('Resposta não é JSON:', text.substring(0, 200));
+            throw new Error('Resposta do servidor não é JSON. Status: ' + response.status);
         }
         return response.json();
     })
@@ -7250,7 +7250,7 @@ function selectConversation(id) {
             
             // Resetar paginação
             currentConversationId = parseInt(id);
-            window.currentConversationId = currentConversationId; // Garantir que window tambêm ê atualizado
+            window.currentConversationId = currentConversationId; // Garantir que window tambêm é atualizado
             currentContactAvatar = data.conversation.contact_avatar || null; // Armazenar avatar do contato
             isLoadingMessages = false;
             hasMoreMessages = true;
@@ -7284,7 +7284,7 @@ function selectConversation(id) {
                 loadAutomationStatus(id);
             }
             
-            // Atualizar timeline quando conversa ê selecionada
+            // Atualizar timeline quando conversa é selecionada
             updateConversationTimeline(data.conversation.id);
             
             // Exibir solicitaçÁes de participação pendentes (se houver)
@@ -7407,7 +7407,7 @@ function updateChatHeader(conversation) {
     // Atualizar canal e status
     const subtitleElement = header.querySelector('.chat-header-subtitle');
     if (subtitleElement) {
-        subtitleElement.innerHTML = `${channelIcon} ÔÇó <span class="badge badge-sm badge-light-${statusClass}">${statusText}</span>`;
+        subtitleElement.innerHTML = `${channelIcon} • <span class="badge badge-sm badge-light-${statusClass}">${statusText}</span>`;
     }
     
     // Atualizar botão de chamada Api4Com
@@ -7446,10 +7446,10 @@ function resetRestrictedAccessState() {
     // Resetar sidebar - remover overlay de acesso restrito
     const sidebar = document.getElementById('conversationSidebar');
     if (sidebar) {
-        // Verificar se ê a sidebar ofuscada (tem overlay de acesso restrito)
+        // Verificar se é a sidebar ofuscada (tem overlay de acesso restrito)
         const restrictedOverlay = sidebar.querySelector('.restricted-overlay, [style*="filter: blur"]');
         if (restrictedOverlay || sidebar.querySelector('[style*="Acesso Restrito"]')) {
-            // Recarregar a sidebar via include dinâmico não ê possível, 
+            // Recarregar a sidebar via include dinâmico não é possível, 
             // mas podemos esconder o overlay
             sidebar.innerHTML = `
                 <div class="text-center p-5">
@@ -7578,7 +7578,7 @@ function showRestrictedAccessView(conversationId, conversation, accessInfo) {
                     <h3 class="fw-bold mb-3">Acesso Restrito</h3>
                     
                     <p class="text-muted mb-4">
-                        Esta conversa estí atribuída a outro agente. 
+                        Esta conversa está atribuída a outro agente. 
                         Para visualizar as mensagens e participar, vocì precisa solicitar participação.
                     </p>
                     
@@ -7617,7 +7617,7 @@ function requestParticipation(conversationId) {
         html: `
             <div class="text-start">
                 <p class="text-muted mb-3">
-                    Vocì estí solicitando participar desta conversa. 
+                    Vocì está solicitando participar desta conversa. 
                     O agente responsível ou outros participantes precisarão aprovar sua solicitação.
                 </p>
                 
@@ -7762,8 +7762,8 @@ function approveParticipationRequest(requestId) {
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
             const text = await response.text();
-            console.error('Resposta não ê JSON:', text.substring(0, 500));
-            throw new Error('Resposta do servidor não ê JSON vílido');
+            console.error('Resposta não é JSON:', text.substring(0, 500));
+            throw new Error('Resposta do servidor não é JSON válido');
         }
         return response.json();
     })
@@ -7847,8 +7847,8 @@ function rejectParticipationRequest(requestId) {
                 const contentType = response.headers.get('content-type');
                 if (!contentType || !contentType.includes('application/json')) {
                     const text = await response.text();
-                    console.error('Resposta não ê JSON:', text.substring(0, 500));
-                    throw new Error('Resposta do servidor não ê JSON vílido');
+                    console.error('Resposta não é JSON:', text.substring(0, 500));
+                    throw new Error('Resposta do servidor não é JSON válido');
                 }
                 return response.json();
             })
@@ -8014,7 +8014,7 @@ async function loadMoreMessages() {
             }
         });
         
-        // Ler resposta como texto primeiro para verificar se ê JSON
+        // Ler resposta como texto primeiro para verificar se é JSON
         const responseText = await response.text();
         
         // Verificar se a resposta foi bem-sucedida
@@ -8110,7 +8110,7 @@ function updateConversationSidebar(conversation, tags) {
             const parts = name.split(' ');
             const initials = (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
             
-            // Se jí ê um elemento de iniciais, apenas atualizar texto
+            // Se jí é um elemento de iniciais, apenas atualizar texto
             if (initialsEl.id === 'sidebar-contact-initials') {
                 initialsEl.textContent = initials;
             } else {
@@ -8255,13 +8255,13 @@ function updateConversationSidebar(conversation, tags) {
                 
                 let timeText = '';
                 if (diffDays > 0) {
-                    timeText = `ÔÅ▒´©Å ${diffDays}d nesta etapa`;
+                    timeText = `⏱️ ${diffDays}d nesta etapa`;
                 } else if (diffHours > 0) {
-                    timeText = `ÔÅ▒´©Å ${diffHours}h nesta etapa`;
+                    timeText = `⏱️ ${diffHours}h nesta etapa`;
                 } else if (diffMins > 0) {
-                    timeText = `ÔÅ▒´©Å ${diffMins}min nesta etapa`;
+                    timeText = `⏱️ ${diffMins}min nesta etapa`;
                 } else {
-                    timeText = `ÔÅ▒´©Å Agora mesmo`;
+                    timeText = `⏱️ Agora mesmo`;
                 }
                 stageTime.textContent = timeText;
             }
@@ -8395,10 +8395,10 @@ function updateConversationSidebar(conversation, tags) {
         manageTagsBtn.style.display = '';
     }
     
-    // Verificar se conversa estí com agente de IA
+    // Verificar se conversa está com agente de IA
     const escalateBtn = sidebar.querySelector('#sidebar-escalate-btn');
     if (escalateBtn && conversation.id) {
-        // Verificar se conversa estí com IA (buscar via API)
+        // Verificar se conversa está com IA (buscar via API)
         checkIfConversationHasAI(conversation.id).then(hasAI => {
             if (hasAI) {
                 escalateBtn.setAttribute('onclick', `escalateFromAI(${conversation.id})`);
@@ -8462,7 +8462,7 @@ function updateConversationSidebar(conversation, tags) {
         console.log('✓ Chamando loadAIAgentStatus para conversation.id:', conversation.id);
         loadAIAgentStatus(conversation.id);
     } else {
-        console.warn('ÔØî loadAIAgentStatus não estí disponível ou conversation.id estí vazio');
+        console.warn('❌ loadAIAgentStatus não está disponível ou conversation.id está vazio');
     }
     
     // Atualizar timeline
@@ -8849,7 +8849,7 @@ function loadContactHistory(contactId) {
         if (listEl) listEl.innerHTML = html;
     })
     .catch(error => {
-        console.error('ÔØî Erro ao carregar histórico:', error);
+        console.error('❌ Erro ao carregar histórico:', error);
         if (listEl) listEl.innerHTML = `<div class="text-center py-5"><p class="text-muted fs-7">Erro ao carregar histórico</p></div>`;
         if (countEl) countEl.textContent = '-';
         if (avgEl) avgEl.textContent = '-';
@@ -9192,13 +9192,13 @@ function addContactAgentFromModal() {
         return;
     }
     
-    // Verificar se agente jí estí na lista
+    // Verificar se agente jí está na lista
     const agentsListEl = document.getElementById('contactAgentsList');
     if (agentsListEl) {
         const existingAgents = agentsListEl.querySelectorAll('[data-agent-id]');
         for (let el of existingAgents) {
             if (el.getAttribute('data-agent-id') == agentId) {
-                showToast('error', 'Este agente jí estí na lista');
+                showToast('error', 'Este agente jí está na lista');
                 return;
             }
         }
@@ -9515,13 +9515,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const selectedConversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     const selectedConversation = parsePhpJson('<?= json_encode($selectedConversation ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     
-    // Verificar se acesso ê restrito (passado pelo PHP)
+    // Verificar se acesso é restrito (passado pelo PHP)
     const accessRestricted = <?= !empty($accessRestricted) ? 'true' : 'false' ?>;
     
     if (selectedConversationId) {
         // IMPORTANTE: Definir currentConversationId para que funcionalidades como Assistente IA funcionem
         currentConversationId = parseInt(selectedConversationId);
-        window.currentConversationId = currentConversationId; // Garantir que window tambêm ê atualizado
+        window.currentConversationId = currentConversationId; // Garantir que window tambêm é atualizado
         
         // Marcar conversa como ativa na lista
         document.querySelectorAll('.conversation-item').forEach(item => {
@@ -9532,7 +9532,7 @@ document.addEventListener('DOMContentLoaded', function() {
             conversationItem.classList.add('active');
         }
         
-        // Se acesso ê restrito, não carregar dados adicionais
+        // Se acesso é restrito, não carregar dados adicionais
         if (accessRestricted) {
             console.log('🔒 Acesso restrito - não carregando dados adicionais');
             return; // Não fazer mais nada
@@ -9777,11 +9777,11 @@ function loadFunnelsFilter() {
             console.log('✓ Funis carregados:', data.funnels.length);
         } else {
             funnelSelect.innerHTML = '<option value="">Nenhum funil</option>';
-            console.log('ÔÜá´©Å Nenhum funil encontrado');
+            console.log('⚠️ Nenhum funil encontrado');
         }
     })
     .catch(error => {
-        console.error('ÔØî Erro ao carregar funis:', error);
+        console.error('❌ Erro ao carregar funis:', error);
         funnelSelect.innerHTML = '<option value="">Erro ao carregar</option>';
     });
 }
@@ -9892,7 +9892,7 @@ function refreshConversationList(params = null) {
     // Evitar flicker: só mostra spinner no primeiro carregamento OU quando hí filtros aplicados E ainda não renderizou
     const isFirstLoad = conversationsList.dataset.loaded !== '1';
     
-    // Verificar se hí filtros aplicados (não ê apenas polling)
+    // Verificar se hí filtros aplicados (não é apenas polling)
     const hasFilters = params && params instanceof URLSearchParams && (
         params.has('search') ||
         params.has('status') ||
@@ -9930,7 +9930,7 @@ function refreshConversationList(params = null) {
     // Construir URL preservando TODOS os filtros
     let url = '<?= \App\Helpers\Url::to('/conversations') ?>';
     
-    // Se params ê URLSearchParams, converter para string
+    // Se params é URLSearchParams, converter para string
     if (params instanceof URLSearchParams) {
         const paramsString = params.toString();
         if (paramsString) {
@@ -9957,14 +9957,14 @@ function refreshConversationList(params = null) {
         }
     })
     .then(response => {
-        // Verificar se a resposta ê JSON
+        // Verificar se a resposta é JSON
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
             return response.text().then(text => {
-                console.error('Resposta não ê JSON:', text.substring(0, 500));
+                console.error('Resposta não é JSON:', text.substring(0, 500));
                 console.error('URL:', url);
                 console.error('Status:', response.status);
-                throw new Error('Resposta não ê JSON. Status: ' + response.status);
+                throw new Error('Resposta não é JSON. Status: ' + response.status);
             });
         }
         return response.json();
@@ -10223,7 +10223,7 @@ function openAdvancedFilters() {
     const modal = new bootstrap.Modal(document.getElementById('kt_modal_advanced_filters'));
     modal.show();
     
-    // Verificar se WhatsApp estí selecionado e mostrar/ocultar filtro de integraçÁes
+    // Verificar se WhatsApp está selecionado e mostrar/ocultar filtro de integraçÁes
     updateWhatsAppAccountsFilter();
     
     // Atualizar etapas baseado nos funis selecionados
@@ -10670,7 +10670,7 @@ function markConversationAsUnread(conversationId) {
 
 // Mostrar modal de agendar mensagem
 function showScheduleMessageModal() {
-    // Usar variível JavaScript global que ê atualizada dinamicamente
+    // Usar variível JavaScript global que é atualizada dinamicamente
     const conversationId = currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     if (!conversationId) {
         alert('Selecione uma conversa primeiro');
@@ -10857,14 +10857,14 @@ function searchMessagesInConversation(event) {
                     <div class="p-2 border-bottom bg-light-primary d-flex justify-content-between align-items-center">
                         <small class="text-gray-700 fw-semibold">${total} mensagem(ns) encontrada(s)</small>
                         <div class="d-flex gap-2 align-items-center">
-                            <button class="btn btn-sm btn-icon btn-light-primary" onclick="navigateSearchResults(-1)" title="Anterior (Ôåæ)" id="searchPrevBtn" style="padding: 2px 6px;">
+                            <button class="btn btn-sm btn-icon btn-light-primary" onclick="navigateSearchResults(-1)" title="Anterior (↑)" id="searchPrevBtn" style="padding: 2px 6px;">
                                 <i class="ki-duotone ki-up fs-6">
                                     <span class="path1"></span>
                                     <span class="path2"></span>
                                 </i>
                             </button>
                             <small class="text-gray-700 fw-semibold" id="searchCounter">-</small>
-                            <button class="btn btn-sm btn-icon btn-light-primary" onclick="navigateSearchResults(1)" title="Próximo (Ôåô)" id="searchNextBtn" style="padding: 2px 6px;">
+                            <button class="btn btn-sm btn-icon btn-light-primary" onclick="navigateSearchResults(1)" title="Próximo (↓)" id="searchNextBtn" style="padding: 2px 6px;">
                                 <i class="ki-duotone ki-down fs-6">
                                     <span class="path1"></span>
                                     <span class="path2"></span>
@@ -10945,7 +10945,7 @@ function selectSearchResult(index, closeDropdown = false) {
     const msg = messageSearchResults[index];
     currentSearchIndex = index;
     
-    // Scroll atê a mensagem
+    // Scroll até a mensagem
     scrollToMessage(msg.id);
     
     // Atualizar contador e destacar item
@@ -11041,7 +11041,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Inicializar lazy loading de imagens e vídeos
 function initLazyLoading() {
-    // Verificar se Intersection Observer estí disponível
+    // Verificar se Intersection Observer está disponível
     if (!('IntersectionObserver' in window)) {
         // Fallback: carregar todas as imagens/vídeos imediatamente
         document.querySelectorAll('.lazy-image[data-src]').forEach(img => {
@@ -11451,7 +11451,7 @@ function addMessageToChat(message) {
     });
     
     const isIncoming = message.direction === 'incoming';
-    console.log(`Serí renderizada como: ${isIncoming ? 'Ô¼à´©Å INCOMING (esquerda)' : 'Ô×í´©Å OUTGOING (direita)'}`);
+    console.log(`Serí renderizada como: ${isIncoming ? '⬅️ INCOMING (esquerda)' : '➡️ OUTGOING (direita)'}`);
     console.groupEnd();
     
     const chatMessages = document.getElementById('chatMessages');
@@ -11510,7 +11510,7 @@ function addMessageToChat(message) {
                             <span class="path1"></span>
                             <span class="path2"></span>
                         </i>
-                        Nota Interna ÔÇó ${escapeHtml(senderName)}
+                        Nota Interna • ${escapeHtml(senderName)}
                     </div>
                     ${nl2br(escapeHtml(message.content))}
                 </div>
@@ -11527,7 +11527,7 @@ function addMessageToChat(message) {
             lastMessageId = Math.max(lastMessageId || 0, message.id);
         }
         
-        // Verificar se ê mensagem de IA
+        // Verificar se é mensagem de IA
         const isAIMessage = message.ai_agent_id !== null && message.ai_agent_id !== undefined;
         const aiAgentName = message.ai_agent_name || 'Assistente IA';
         
@@ -11634,8 +11634,8 @@ function addMessageToChat(message) {
             });
         }
         
-        // Verificar se ê mensagem citada/reply
-        const hasQuote = message.quoted_message_id || (message.content && message.content.startsWith('Ôå®´©Å'));
+        // Verificar se é mensagem citada/reply
+        const hasQuote = message.quoted_message_id || (message.content && message.content.startsWith('↩️'));
         let quotedHtml = '';
         let actualContent = message.content || '';
         
@@ -11656,9 +11656,9 @@ function addMessageToChat(message) {
                 // Content não foi modificado no novo formato
                 actualContent = message.content || '';
             } else {
-                // Formato antigo (Ôå®´©Å no content)
+                // Formato antigo (↩️ no content)
                 const lines = actualContent.split('\n', 2);
-                quotedText = lines[0].substring(2); // Remove "Ôå®´©Å "
+                quotedText = lines[0].substring(2); // Remove "↩️ "
                 quotedSender = message.quoted_sender_name || 'Remetente';
                 actualContent = lines[1] || '';
                 quotedMessageId = null;
@@ -11701,7 +11701,7 @@ function addMessageToChat(message) {
             </div>
         `;
         
-        // Verificar se ê apenas íudio (sem texto e sem outros anexos)
+        // Verificar se é apenas íudio (sem texto e sem outros anexos)
         const isAudioOnly = attachmentsHtml && attachmentsHtml.includes('audio-attachment') && !actualContent && !quotedHtml;
         const bubbleClass = isAudioOnly ? 'message-bubble audio-only' : 'message-bubble';
         
@@ -11738,7 +11738,7 @@ function addMessageToChat(message) {
     for (let i = 0; i < allMessages.length; i++) {
         const existingMsg = allMessages[i];
         
-        // Verificar se ê separador de data
+        // Verificar se é separador de data
         if (existingMsg.classList.contains('date-separator')) {
             const separatorDate = existingMsg.getAttribute('data-date');
             if (separatorDate && message.created_at) {
@@ -11747,7 +11747,7 @@ function addMessageToChat(message) {
                     const separatorTime = new Date(separatorDate).getTime();
                     const messageTime = new Date(message.created_at).getTime();
                     if (messageTime < separatorTime) {
-                        // Mensagem ê anterior ao separador, inserir antes dele
+                        // Mensagem é anterior ao separador, inserir antes dele
                         insertPosition = existingMsg;
                         dateSeparatorPosition = existingMsg;
                         break;
@@ -11762,7 +11762,7 @@ function addMessageToChat(message) {
         if (existingTimestamp) {
             const existingTime = parseInt(existingTimestamp);
             if (!isNaN(existingTime)) {
-                // Comparar timestamps: se nova mensagem ê mais antiga ou igual, inserir antes
+                // Comparar timestamps: se nova mensagem é mais antiga ou igual, inserir antes
                 if (messageTimestamp <= existingTime) {
                     insertPosition = existingMsg;
                     
@@ -11804,7 +11804,7 @@ function addMessageToChat(message) {
     // Verificar se precisa de separador antes da primeira mensagem ou entre mensagens
     if (!needsDateSeparator && message.created_at) {
         if (insertPosition) {
-            // Verificar se a mensagem anterior ê de um dia diferente
+            // Verificar se a mensagem anterior é de um dia diferente
             const prevElement = insertPosition.previousElementSibling;
             if (prevElement && !prevElement.classList.contains('date-separator')) {
                 const prevDate = prevElement.getAttribute('data-date') || 
@@ -11824,7 +11824,7 @@ function addMessageToChat(message) {
             needsDateSeparator = true;
             dateSeparatorPosition = null;
         } else {
-            // Última mensagem - verificar se ê de dia diferente da anterior
+            // Última mensagem - verificar se é de dia diferente da anterior
             const lastMsg = allMessages[allMessages.length - 1];
             if (lastMsg && !lastMsg.classList.contains('date-separator')) {
                 const lastDate = lastMsg.getAttribute('data-date') || 
@@ -11947,7 +11947,7 @@ function cancelReply() {
 async function forwardMessage(messageId) {
     if (!messageId) return;
     
-    // Usar variível JavaScript global que ê atualizada dinamicamente
+    // Usar variível JavaScript global que é atualizada dinamicamente
     const conversationId = currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     if (!conversationId) {
         alert('Selecione uma conversa primeiro');
@@ -11958,11 +11958,11 @@ async function forwardMessage(messageId) {
     try {
         const response = await fetch(`<?= \App\Helpers\Url::to("/conversations/for-forwarding") ?>?exclude=${conversationId}`);
         
-        // Verificar se a resposta ê JSON
+        // Verificar se a resposta é JSON
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
             const text = await response.text();
-            console.error('Resposta não ê JSON:', text.substring(0, 200));
+            console.error('Resposta não é JSON:', text.substring(0, 200));
             throw new Error('Resposta invílida do servidor. Verifique o console para mais detalhes.');
         }
         
@@ -12045,7 +12045,7 @@ async function selectForwardConversation(targetConversationId, messageId) {
 const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     
     if (!conversationId || !targetConversationId || !messageId) {
-        alert('Dados invílidos');
+        alert('Dados inválidos');
         return;
     }
     
@@ -12122,25 +12122,25 @@ const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? 
     }
 }
 
-// Scroll atê mensagem específica
+// Scroll até mensagem específica
 function scrollToMessage(messageId) {
     console.log('🔧 scrollToMessage chamado com messageId:', messageId, 'tipo:', typeof messageId);
     
     if (!messageId || messageId === 'null' || messageId === null || messageId === '') {
-        console.warn('ÔÜá´©Å scrollToMessage: ID de mensagem invílido:', messageId);
+        console.warn('⚠️ scrollToMessage: ID de mensagem inválido:', messageId);
         return;
     }
     
     // Converter para número se for string
     const numericId = parseInt(messageId);
     if (isNaN(numericId)) {
-        console.error('ÔØî scrollToMessage: ID não ê um número vílido:', messageId);
+        console.error('❌ scrollToMessage: ID não é um número válido:', messageId);
         return;
     }
     
     const chatMessages = document.getElementById('chatMessages');
     if (!chatMessages) {
-        console.error('ÔØî scrollToMessage: Container de mensagens não encontrado');
+        console.error('❌ scrollToMessage: Container de mensagens não encontrado');
         return;
     }
     
@@ -12167,7 +12167,7 @@ function scrollToMessage(messageId) {
         const elementHeight = messageElement.offsetHeight;
         const containerHeight = chatMessages.clientHeight;
         
-        // Scroll suave atê a mensagem (centralizada no container)
+        // Scroll suave até a mensagem (centralizada no container)
         const targetScroll = elementTop - (containerHeight / 2) + (elementHeight / 2);
         
         chatMessages.scrollTo({
@@ -12190,7 +12190,7 @@ function scrollToMessage(messageId) {
         }, 3000);
     } else {
         // Mensagem não encontrada - pode estar em outra pígina ou não carregada
-        console.warn('ÔÜá´©Å scrollToMessage: Mensagem não encontrada com ID:', numericId);
+        console.warn('⚠️ scrollToMessage: Mensagem não encontrada com ID:', numericId);
         const allMessages = chatMessages.querySelectorAll('[data-message-id]');
         console.log('📊 scrollToMessage: Total de mensagens no DOM:', allMessages.length);
         console.log('📊 scrollToMessage: IDs disponíveis:', Array.from(allMessages).map(el => el.getAttribute('data-message-id')));
@@ -12223,7 +12223,7 @@ let currentStream = null;
 // Gravar íudio
 async function toggleAudioRecording() {
     const btn = document.getElementById('recordAudioBtn');
-    // Usar variível JavaScript global que ê atualizada dinamicamente
+    // Usar variível JavaScript global que é atualizada dinamicamente
     const conversationId = currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     
     if (!conversationId) {
@@ -12399,7 +12399,7 @@ async function sendAudioMessage(audioBlob, conversationId) {
         try {
             data = JSON.parse(responseText);
         } catch (jsonErr) {
-            throw new Error(`Resposta não ê JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
+            throw new Error(`Resposta não é JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
         }
         
         if (data.success && data.message) {
@@ -12462,7 +12462,7 @@ function sendMessage() {
     // Para preview otimista, formatar com reply se houver
     let previewMessage = message;
     if (replyContext) {
-        previewMessage = `Ôå®´©Å ${replyContext.text}\n\n${message}`;
+        previewMessage = `↩️ ${replyContext.text}\n\n${message}`;
     }
     
     // Mostrar loading
@@ -14099,14 +14099,14 @@ function loadVariables() {
         }
     })
     .then(async response => {
-        // Verificar se a resposta ê JSON antes de fazer parse
+        // Verificar se a resposta é JSON antes de fazer parse
         const contentType = response.headers.get('content-type') || '';
         const text = await response.text();
         
         if (!contentType.includes('application/json')) {
-            console.error('Resposta não ê JSON. Content-Type:', contentType);
+            console.error('Resposta não é JSON. Content-Type:', contentType);
             console.error('Resposta completa:', text.substring(0, 500));
-            throw new Error('Resposta não ê JSON. Verifique o console para mais detalhes.');
+            throw new Error('Resposta não é JSON. Verifique o console para mais detalhes.');
         }
         
         try {
@@ -14114,7 +14114,7 @@ function loadVariables() {
         } catch (e) {
             console.error('Erro ao fazer parse do JSON:', e);
             console.error('Texto recebido:', text.substring(0, 500));
-            throw new Error('Resposta não ê JSON vílido. Verifique o console para mais detalhes.');
+            throw new Error('Resposta não é JSON válido. Verifique o console para mais detalhes.');
         }
     })
     .then(data => {
@@ -14560,12 +14560,12 @@ function insertVariable(variable) {
     }
 }
 
-// Função copyVariable mantida para compatibilidade, mas insertVariable ê preferida
+// Função copyVariable mantida para compatibilidade, mas insertVariable é preferida
 function copyVariable(variable) {
     insertVariable(variable);
 }
 
-// Verificar se conversa estí com agente de IA
+// Verificar se conversa está com agente de IA
 async function checkIfConversationHasAI(conversationId) {
     try {
         const response = await fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}`, {
@@ -14828,7 +14828,7 @@ let selectedTags = [];
 
 function addTagToList(tagId, tagName, tagColor) {
     if (selectedTags.find(t => t.id === tagId)) {
-        return; // Jí estí selecionada
+        return; // Jí está selecionada
     }
     
     selectedTags.push({ id: tagId, name: tagName, color: tagColor });
@@ -15008,7 +15008,7 @@ function loadParticipantsForConversation(conversationIdParam = null) {
     const conversationId = conversationIdParam || (modalElement ? modalElement.dataset.conversationId : null) || window.currentConversationId;
     
     if (!conversationId || conversationId === 'undefined' || conversationId === 'null') {
-        console.error('loadParticipantsForConversation: conversationId invílido:', conversationId);
+        console.error('loadParticipantsForConversation: conversationId inválido:', conversationId);
         return;
     }
     
@@ -15039,7 +15039,7 @@ function loadParticipantsForConversation(conversationIdParam = null) {
                 console.log('Primeiros 300 chars:', text.substring(0, 300));
                 
                 if (!response.ok) {
-                    console.error('ÔØî Resposta com erro:', text);
+                    console.error('❌ Resposta com erro:', text);
                     throw new Error(`HTTP ${response.status}`);
                 }
                 
@@ -15047,9 +15047,9 @@ function loadParticipantsForConversation(conversationIdParam = null) {
                 try {
                     return JSON.parse(text);
                 } catch (e) {
-                    console.error('ÔØî Erro ao fazer parse do JSON:', e);
+                    console.error('❌ Erro ao fazer parse do JSON:', e);
                     console.error('Texto completo:', text);
-                    throw new Error('Resposta não ê JSON vílido');
+                    throw new Error('Resposta não é JSON válido');
                 }
             });
         })
@@ -15151,7 +15151,7 @@ function removeParticipant(conversationId, userId) {
             console.log('Primeiros 500 chars:', text.substring(0, 500));
             
             if (!response.ok) {
-                console.error('ÔØî Resposta com erro:', text);
+                console.error('❌ Resposta com erro:', text);
                 throw new Error(`HTTP ${response.status}: ${text.substring(0, 100)}`);
             }
             
@@ -15159,9 +15159,9 @@ function removeParticipant(conversationId, userId) {
             try {
                 return JSON.parse(text);
             } catch (e) {
-                console.error('ÔØî Erro ao fazer parse do JSON:', e);
+                console.error('❌ Erro ao fazer parse do JSON:', e);
                 console.error('Texto completo da resposta:', text);
-                throw new Error('Resposta não ê JSON vílido: ' + text.substring(0, 200));
+                throw new Error('Resposta não é JSON válido: ' + text.substring(0, 200));
             }
         });
     })
@@ -15425,7 +15425,7 @@ function attachFile() {
 }
 
 function uploadFile(file) {
-    // Usar variível JavaScript global que ê atualizada dinamicamente
+    // Usar variível JavaScript global que é atualizada dinamicamente
     const conversationId = currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     
     if (!conversationId) {
@@ -15663,7 +15663,7 @@ function renderAttachmentHtml(attachment) {
         const showTranscription = <?= json_encode(\App\Services\ConversationSettingsService::getSettings()['audio_transcription']['show_transcription_in_chat'] ?? true) ?>;
         
         if (showTranscription) {
-            // Verificar se ê íudio TTS (tem texto original) ou íudio transcrito
+            // Verificar se é íudio TTS (tem texto original) ou íudio transcrito
             const ttsOriginalText = attachment.tts_original_text;
             const transcription = attachment.transcription;
             
@@ -15780,7 +15780,7 @@ function insertEmoji(emoji) {
 // SISTEMA DE NAVEGAÇâO MOBILE
 // ============================================================================
 
-// Detectar se estí em mobile
+// Detectar se está em mobile
 function isMobile() {
     return window.innerWidth <= 767;
 }
@@ -16035,7 +16035,7 @@ if (typeof window.wsClient !== 'undefined') {
             refreshConversationList(urlParams);
         }
         
-        // Se ê a conversa atual, adicionar mensagem dinamicamente
+        // Se é a conversa atual, adicionar mensagem dinamicamente
         if (currentConversationId == data.conversation_id && data.message) {
             console.group('🔧 DEBUG: Nova mensagem via WebSocket/Polling');
             console.log('Dados completos:', data);
@@ -16050,9 +16050,9 @@ if (typeof window.wsClient !== 'undefined') {
             
             // Validação de campos críticos
             if (!data.message.direction) {
-                console.error('ÔØî ERRO: Campo "direction" estí AUSENTE!');
+                console.error('❌ ERRO: Campo "direction" está AUSENTE!');
             } else if (data.message.direction === 'outgoing' && data.message.sender_type === 'contact') {
-                console.error('ÔØî ERRO: Mensagem do contato (sender_type=contact) mas direction=outgoing (deveria ser incoming)');
+                console.error('❌ ERRO: Mensagem do contato (sender_type=contact) mas direction=outgoing (deveria ser incoming)');
             } else if (data.message.direction === 'incoming' && data.message.sender_type === 'contact') {
                 console.log('✓ CORRETO: Mensagem do contato com direction=incoming');
             }
@@ -16063,7 +16063,7 @@ if (typeof window.wsClient !== 'undefined') {
             // Remover badge se existir (mensagem jí foi marcada como lida no backend)
             if (badge) badge.remove();
         } else {
-            // Se não ê a conversa atual, atualizar lista completa após um delay para garantir sincronização
+            // Se não é a conversa atual, atualizar lista completa após um delay para garantir sincronização
             setTimeout(() => {
                 refreshConversationBadges();
             }, 1000);
@@ -16138,7 +16138,7 @@ if (typeof window.wsClient !== 'undefined') {
         // Usar variível global para refletir a conversa selecionada após navegação AJAX
         const currentConversationId = window.currentConversationId ?? parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
         
-        // Se ê a conversa atual, não atualizar badge (jí foi removido ao selecionar)
+        // Se é a conversa atual, não atualizar badge (jí foi removido ao selecionar)
         if (currentConversationId == data.conversation_id) {
             // Recarregar apenas se necessírio (mudanças de status, atribuição)
             if (data.changes && (data.changes.status || data.changes.agent_id || data.changes.department_id)) {
@@ -16495,7 +16495,7 @@ function refreshConversationBadges() {
     .then(response => {
         const contentType = response.headers.get('content-type') || '';
         if (!contentType.includes('application/json')) {
-            throw new Error('Resposta não ê JSON (refreshConversationBadges)');
+            throw new Error('Resposta não é JSON (refreshConversationBadges)');
         }
         return response.json();
     })
@@ -16515,7 +16515,7 @@ function refreshConversationBadges() {
                     return;
                 }
                 
-                // Se a conversa não estí na lista vílida, removì-la
+                // Se a conversa não está na lista vílida, removì-la
                 if (!validConversationIds.has(conversationId)) {
                     item.remove();
                 }
@@ -16524,7 +16524,7 @@ function refreshConversationBadges() {
             // Atualizar badges de não lidas em cada conversa da lista
             data.conversations.forEach(conv => {
                 const conversationItem = document.querySelector(`[data-conversation-id="${conv.id}"]`);
-                // Se a conversa passou pelo filtro, mas ainda não estí renderizada, adicionar agora
+                // Se a conversa passou pelo filtro, mas ainda não está renderizada, adicionar agora
                 if (!conversationItem) {
                     addConversationToList(conv);
                     return;
@@ -16534,7 +16534,7 @@ function refreshConversationBadges() {
                     const unreadCount = conv.unread_count || 0;
                     const currentConversationId = window.currentConversationId ?? parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
                     
-                    // Não atualizar badge se for a conversa atual (jí estí sendo gerenciada separadamente)
+                    // Não atualizar badge se for a conversa atual (jí está sendo gerenciada separadamente)
                     if (currentConversationId == conv.id) {
                         return;
                     }
@@ -16577,7 +16577,7 @@ function refreshConversationBadges() {
                     if (conv.last_agent_message_at) {
                         conversationItem.dataset.lastAgentMessageAt = conv.last_agent_message_at;
                     }
-                    // Reaplicar estado visual de SLA (borda verde quando última msg ê do agente)
+                    // Reaplicar estado visual de SLA (borda verde quando última msg é do agente)
                     applySlaVisualState(conversationItem, conv);
                     
                     // Atualizar meta e resortear
@@ -16833,11 +16833,11 @@ function renderAIFeatures(features) {
     const iconMap = {
         'ki-file-down': '📁',
         'ki-tag': '🏷️',
-        'ki-heart': 'ÔØñ´©Å',
+        'ki-heart': '❤️',
         'ki-translate': '🌐',
         'ki-pencil': '✏️',
-        'ki-arrow-right': 'Ô×í´©Å',
-        'ki-information': 'Ôä╣´©Å'
+        'ki-arrow-right': '➡️',
+        'ki-information': 'ℹ️'
     };
     
     features.forEach(feature => {
@@ -17015,7 +17015,7 @@ function generateAIResponse() {
                                     <span class="path4"></span>
                                 </i>
                                 <span class="fw-semibold me-2">${escapeHtml(response.agent_name || 'Assistente IA')}</span>
-                                ${response.cost ? `<span class="text-muted">ÔÇó R$ ${response.cost.toFixed(4).replace('.', ',')}</span>` : ''}
+                                ${response.cost ? `<span class="text-muted">• R$ ${response.cost.toFixed(4).replace('.', ',')}</span>` : ''}
                             </div>
                         </div>
                     </div>
@@ -17088,8 +17088,8 @@ function useAIResponse(index, responseId = null) {
     // Construir HTML de forma segura
     const agentName = escapeHtml(response.agent_name || 'Assistente IA');
     const responseText = escapeHtml(response.text || '');
-    const tokensText = response.tokens_used ? ' ÔÇó ' + response.tokens_used.toLocaleString('pt-BR') + ' tokens' : '';
-    const costText = response.cost ? ' ÔÇó R$ ' + response.cost.toFixed(4).replace('.', ',') : '';
+    const tokensText = response.tokens_used ? ' • ' + response.tokens_used.toLocaleString('pt-BR') + ' tokens' : '';
+    const costText = response.cost ? ' • R$ ' + response.cost.toFixed(4).replace('.', ',') : '';
     
     const htmlContent = '<div class="text-start">' +
         '<div class="alert alert-info mb-4" style="white-space: pre-wrap; text-align: left;">' + responseText + '</div>' +
@@ -17216,7 +17216,7 @@ function loadAIResponseHistory() {
                             <div class="d-flex justify-content-between align-items-start mb-3">
                                 <div class="d-flex align-items-center">
                                     <span class="badge badge-light-primary badge-sm me-2">${toneEmoji} ${escapeHtml(item.tone || 'N/A')}</span>
-                                    ${item.is_favorite ? '<span class="badge badge-light-warning badge-sm me-2">Ô¡É Favorita</span>' : ''}
+                                    ${item.is_favorite ? '<span class="badge badge-light-warning badge-sm me-2">⭐ Favorita</span>' : ''}
                                     ${item.used_at ? '<span class="badge badge-light-success badge-sm">✓ Usada</span>' : ''}
                                 </div>
                                 <div class="d-flex gap-2">
@@ -17249,8 +17249,8 @@ function loadAIResponseHistory() {
                                 </div>
                                 <div>
                                     ${escapeHtml(item.agent_name || 'Assistente IA')}
-                                    ${item.tokens_used ? ` ÔÇó ${item.tokens_used.toLocaleString('pt-BR')} tokens` : ''}
-                                    ${item.cost ? ` ÔÇó R$ ${parseFloat(item.cost).toFixed(4).replace('.', ',')}` : ''}
+                                    ${item.tokens_used ? ` • ${item.tokens_used.toLocaleString('pt-BR')} tokens` : ''}
+                                    ${item.cost ? ` • R$ ${parseFloat(item.cost).toFixed(4).replace('.', ',')}` : ''}
                                 </div>
                             </div>
                         </div>
@@ -17500,8 +17500,8 @@ function renderAIResult(featureKey, result, data, conversationId) {
                     <span class="path4"></span>
                 </i>
                 ${escapeHtml(data.agent_used?.name || 'Assistente IA')}
-                ${data.tokens_used ? `<span class="ms-2">ÔÇó ${data.tokens_used} tokens</span>` : ''}
-                ${data.cost ? `<span class="ms-2">ÔÇó R$ ${data.cost.toFixed(4)}</span>` : ''}
+                ${data.tokens_used ? `<span class="ms-2">• ${data.tokens_used} tokens</span>` : ''}
+                ${data.cost ? `<span class="ms-2">• R$ ${data.cost.toFixed(4)}</span>` : ''}
             </div>
         </div>
     `;
@@ -17908,7 +17908,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (dropdown) {
             const conversationId = dropdown.querySelector('[data-conversation-id]')?.getAttribute('data-conversation-id');
             if (conversationId) {
-                // Marcar que este dropdown estí aberto
+                // Marcar que este dropdown está aberto
                 dropdown.dataset.isOpen = 'true';
             }
         }
@@ -17992,7 +17992,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Validar telefone (deve ter pelo menos 10 dígitos - DDD + número)
             if (phone.length < 10 || phone.length > 11) {
-                alert('Telefone invílido. Digite DDD + número (ex: 11987654321)');
+                alert('Telefone inválido. Digite DDD + número (ex: 11987654321)');
                 return;
             }
             
@@ -18045,8 +18045,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     data = JSON.parse(responseText);
                     console.log('✓ Resposta JSON parseada:', data);
                 } catch (jsonErr) {
-                    console.error('ÔØî Erro ao fazer parse do JSON:', jsonErr);
-                    throw new Error(`Resposta não ê JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
+                    console.error('❌ Erro ao fazer parse do JSON:', jsonErr);
+                    throw new Error(`Resposta não é JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
                 }
                 
                 if (data.success) {
@@ -18172,7 +18172,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 try {
                     data = JSON.parse(responseText);
                 } catch (jsonErr) {
-                    throw new Error(`Resposta não ê JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
+                    throw new Error(`Resposta não é JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
                 }
                 
                 if (data.success) {
@@ -18418,7 +18418,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const phoneInput = document.getElementById('new_contact_phone');
     if (phoneInput) {
         phoneInput.addEventListener('input', function(e) {
-            let value = e.target.value.replace(/\D/g, ''); // Remove tudo que não ê dígito
+            let value = e.target.value.replace(/\D/g, ''); // Remove tudo que não é dígito
             if (value.length > 11) value = value.substring(0, 11); // Limita a 11 dígitos
             e.target.value = value;
         });
@@ -18468,7 +18468,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 try {
                     data = JSON.parse(responseText);
                 } catch (jsonErr) {
-                    throw new Error(`Resposta não ê JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
+                    throw new Error(`Resposta não é JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
                 }
                 
                 if (data.success) {
@@ -18914,7 +18914,7 @@ function updateAIActiveBanner(status, conversationId) {
                 if(typeof showAIHistory === 'function') {
                     showAIHistory();
                 } else {
-                    console.error('showAIHistory não estí disponível');
+                    console.error('showAIHistory não está disponível');
                 }
             };
         }
@@ -18923,7 +18923,7 @@ function updateAIActiveBanner(status, conversationId) {
                 if(typeof removeAIAgent === 'function') {
                     removeAIAgent();
                 } else {
-                    console.error('removeAIAgent não estí disponível');
+                    console.error('removeAIAgent não está disponível');
                 }
             };
         }

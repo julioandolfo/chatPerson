@@ -160,7 +160,7 @@ ob_start();
 
 <!--begin::Modal Adicionar URL-->
 <div class="modal fade" id="kt_modal_add_url" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="fw-bold">Adicionar URL</h2>
@@ -170,8 +170,48 @@ ob_start();
                 <div class="modal-body">
                     <div class="fv-row mb-7">
                         <label class="fw-semibold fs-6 mb-2">URL *</label>
-                        <input type="url" name="url" class="form-control" required placeholder="https://exemplo.com">
-                        <div class="form-text">A URL será processada e adicionada à Knowledge Base automaticamente.</div>
+                        <input type="url" name="url" id="input_url" class="form-control" required placeholder="https://exemplo.com">
+                        <div class="form-text">URL para processar e adicionar à Knowledge Base.</div>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="discover_links" id="discover_links" value="1" onchange="toggleCrawlingOptions()">
+                            <label class="form-check-label" for="discover_links">
+                                <strong>Descobrir automaticamente todas as URLs do site (Crawling)</strong>
+                            </label>
+                        </div>
+                        <div class="form-text">Ative para fazer crawling e descobrir todas as páginas do site (útil para e-commerce).</div>
+                    </div>
+                    
+                    <div id="crawling_options" style="display: none;">
+                        <div class="card bg-light p-4 mb-5">
+                            <h5 class="mb-4">Opções de Crawling</h5>
+                            
+                            <div class="fv-row mb-5">
+                                <label class="fw-semibold fs-6 mb-2">Profundidade Máxima</label>
+                                <input type="number" name="max_depth" class="form-control" value="3" min="1" max="5">
+                                <div class="form-text">Níveis de profundidade para seguir links (1-5). Padrão: 3</div>
+                            </div>
+                            
+                            <div class="fv-row mb-5">
+                                <label class="fw-semibold fs-6 mb-2">Máximo de URLs</label>
+                                <input type="number" name="max_urls" class="form-control" value="500" min="1" max="2000">
+                                <div class="form-text">Número máximo de URLs para descobrir. Padrão: 500</div>
+                            </div>
+                            
+                            <div class="fv-row mb-5">
+                                <label class="fw-semibold fs-6 mb-2">Paths Permitidos (opcional)</label>
+                                <input type="text" name="allowed_paths" class="form-control" placeholder="/produto/, /categoria/">
+                                <div class="form-text">Separados por vírgula. Ex: /produto/, /categoria/ (deixe vazio para todos)</div>
+                            </div>
+                            
+                            <div class="fv-row mb-5">
+                                <label class="fw-semibold fs-6 mb-2">Paths Excluídos (opcional)</label>
+                                <input type="text" name="excluded_paths" class="form-control" placeholder="/admin/, /checkout/">
+                                <div class="form-text">Separados por vírgula. Ex: /admin/, /checkout/, /carrinho/</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -188,7 +228,32 @@ ob_start();
 </div>
 <!--end::Modal Adicionar URL-->
 
+<!--begin::Botão Processar URLs-->
+<?php if (\App\Helpers\Permission::can('ai_agents.edit')): ?>
+<div class="card mb-5">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="fw-bold mb-1">Processar URLs Pendentes</h5>
+                <p class="text-muted mb-0">Processe URLs pendentes em background para adicionar à Knowledge Base</p>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="processUrls()">
+                <i class="ki-duotone ki-play fs-2"></i>
+                Processar URLs
+            </button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+<!--end::Botão Processar URLs-->
+
 <script>
+function toggleCrawlingOptions() {
+    const checkbox = document.getElementById('discover_links');
+    const options = document.getElementById('crawling_options');
+    options.style.display = checkbox.checked ? 'block' : 'none';
+}
+
 document.getElementById('form_add_url').addEventListener('submit', function(e) {
     e.preventDefault();
     
@@ -196,6 +261,21 @@ document.getElementById('form_add_url').addEventListener('submit', function(e) {
     const btn = this.querySelector('button[type="submit"]');
     btn.setAttribute('data-kt-indicator', 'on');
     btn.disabled = true;
+
+    const discoverLinks = document.getElementById('discover_links').checked;
+    
+    if (discoverLinks) {
+        Swal.fire({
+            title: 'Crawling em andamento...',
+            text: 'Isso pode levar alguns minutos. Não feche esta página.',
+            icon: 'info',
+            allowOutsideClick: false,
+            showConfirmButton: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+    }
 
     fetch(`/ai-agents/<?= $agent['id'] ?>/rag/urls`, {
         method: 'POST',
@@ -207,19 +287,77 @@ document.getElementById('form_add_url').addEventListener('submit', function(e) {
         btn.disabled = false;
 
         if (data.success) {
-            Swal.fire('Sucesso!', data.message, 'success').then(() => {
+            Swal.close();
+            Swal.fire({
+                title: 'Sucesso!',
+                html: data.message + (data.urls_discovered ? `<br><br><strong>${data.urls_discovered} URLs descobertas</strong>` : ''),
+                icon: 'success',
+                confirmButtonText: 'OK'
+            }).then(() => {
                 location.reload();
             });
         } else {
+            Swal.close();
             Swal.fire('Erro', data.message, 'error');
         }
     })
     .catch(err => {
         btn.removeAttribute('data-kt-indicator');
         btn.disabled = false;
+        Swal.close();
         Swal.fire('Erro', 'Erro ao adicionar URL', 'error');
     });
 });
+
+function processUrls() {
+    Swal.fire({
+        title: 'Processar URLs?',
+        text: 'Isso processará todas as URLs pendentes em background.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, processar',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            Swal.fire({
+                title: 'Processando...',
+                text: 'Aguarde enquanto processamos as URLs.',
+                icon: 'info',
+                allowOutsideClick: false,
+                showConfirmButton: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            fetch(`/ai-agents/<?= $agent['id'] ?>/rag/urls/process?limit=10`, {
+                method: 'POST'
+            })
+            .then(res => res.json())
+            .then(data => {
+                Swal.close();
+                if (data.success) {
+                    Swal.fire({
+                        title: 'Concluído!',
+                        html: data.message + '<br><br>' + 
+                              `Processadas: ${data.stats.processed}<br>` +
+                              `Sucesso: ${data.stats.success}<br>` +
+                              `Falhas: ${data.stats.failed}`,
+                        icon: 'success'
+                    }).then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire('Erro', data.message, 'error');
+                }
+            })
+            .catch(err => {
+                Swal.close();
+                Swal.fire('Erro', 'Erro ao processar URLs', 'error');
+            });
+        }
+    });
+}
 </script>
 
 <?php

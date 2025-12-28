@@ -21,6 +21,8 @@ use App\Models\Activity;
 use App\Helpers\Database;
 use App\Services\ConversationAIService;
 use App\Services\RAGService;
+use App\Services\FeedbackDetectionService;
+use App\Services\AgentMemoryService;
 
 class OpenAIService
 {
@@ -271,6 +273,39 @@ class OpenAIService
                         'model' => $agent['model'] ?? 'gpt-4'
                     ], JSON_UNESCAPED_UNICODE)
                 ]);
+            }
+
+            // Detectar automaticamente se resposta foi inadequada e registrar feedback
+            try {
+                $lastMessage = Message::whereFirst('conversation_id', '=', $conversationId);
+                $messageId = $lastMessage['id'] ?? null;
+                
+                if ($messageId && \App\Helpers\PostgreSQL::isAvailable()) {
+                    FeedbackDetectionService::detectAndRegister(
+                        $agentId,
+                        $conversationId,
+                        $messageId,
+                        $message,
+                        $content
+                    );
+                }
+            } catch (\Exception $feedbackError) {
+                // Não interromper fluxo se detecção de feedback falhar
+                Logger::warning("OpenAIService::processMessage - Erro ao detectar feedback: " . $feedbackError->getMessage());
+            }
+
+            // Extrair e salvar memórias automaticamente (após algumas mensagens)
+            try {
+                if (\App\Helpers\PostgreSQL::isAvailable()) {
+                    // Extrair memórias apenas após 3+ mensagens na conversa
+                    $messageCount = count(Message::where('conversation_id', '=', $conversationId));
+                    if ($messageCount >= 3 && $messageCount % 5 === 0) { // A cada 5 mensagens
+                        AgentMemoryService::extractAndSave($agentId, $conversationId);
+                    }
+                }
+            } catch (\Exception $memoryError) {
+                // Não interromper fluxo se extração de memória falhar
+                Logger::warning("OpenAIService::processMessage - Erro ao extrair memórias: " . $memoryError->getMessage());
             }
 
             return [

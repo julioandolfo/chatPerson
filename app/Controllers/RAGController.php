@@ -11,6 +11,9 @@ use App\Helpers\Request;
 use App\Helpers\Permission;
 use App\Services\RAGService;
 use App\Services\EmbeddingService;
+use App\Services\URLScrapingService;
+use App\Services\AgentMemoryService;
+use App\Jobs\ProcessURLScrapingJob;
 use App\Models\AIKnowledgeBase;
 use App\Models\AIFeedbackLoop;
 use App\Models\AIUrlScraping;
@@ -344,6 +347,7 @@ class RAGController
         
         $data = Request::post();
         $url = $data['url'] ?? '';
+        $discoverLinks = isset($data['discover_links']) && $data['discover_links'] === '1';
         
         if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
             Response::json(['success' => false, 'message' => 'URL inválida'], 400);
@@ -351,7 +355,34 @@ class RAGController
         }
         
         try {
-            // Verificar se já existe
+            // Se deve descobrir links, fazer crawling
+            if ($discoverLinks) {
+                $options = [
+                    'max_depth' => (int)($data['max_depth'] ?? 3),
+                    'max_urls' => (int)($data['max_urls'] ?? 500),
+                    'allowed_paths' => !empty($data['allowed_paths']) ? explode(',', $data['allowed_paths']) : [],
+                    'excluded_paths' => !empty($data['excluded_paths']) ? explode(',', $data['excluded_paths']) : []
+                ];
+                
+                $result = URLScrapingService::discoverAndAddUrls($agentId, $url, $options);
+                
+                if ($result['success']) {
+                    Response::json([
+                        'success' => true,
+                        'message' => "Crawling concluído! {$result['urls_discovered']} URLs descobertas e adicionadas.",
+                        'urls_discovered' => $result['urls_discovered'],
+                        'urls' => $result['urls']
+                    ]);
+                } else {
+                    Response::json([
+                        'success' => false,
+                        'message' => 'Erro no crawling: ' . ($result['error'] ?? 'Erro desconhecido')
+                    ], 500);
+                }
+                return;
+            }
+            
+            // Adicionar URL única
             if (AIUrlScraping::urlExists($agentId, $url)) {
                 Response::json(['success' => false, 'message' => 'URL já está na lista'], 400);
                 return;
@@ -372,6 +403,31 @@ class RAGController
             Response::json([
                 'success' => false,
                 'message' => 'Erro ao adicionar URL: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Processar URLs pendentes
+     */
+    public function processUrls(int $agentId): void
+    {
+        Permission::abortIfCannot('ai_agents.edit');
+        
+        $limit = (int)Request::get('limit', 10);
+        
+        try {
+            $stats = ProcessURLScrapingJob::processByAgent($agentId, $limit);
+            
+            Response::json([
+                'success' => true,
+                'message' => "Processamento concluído: {$stats['success']} sucesso, {$stats['failed']} falhas",
+                'stats' => $stats
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao processar URLs: ' . $e->getMessage()
             ], 500);
         }
     }

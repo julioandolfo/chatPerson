@@ -376,6 +376,7 @@ Router::post('/ai-agents/{id}/rag/feedback-loop/{feedbackId}/ignore', [RAGContro
 
 Router::get('/ai-agents/{id}/rag/urls', [RAGController::class, 'urls'], ['Authentication']);
 Router::post('/ai-agents/{id}/rag/urls', [RAGController::class, 'addUrl'], ['Authentication']);
+Router::post('/ai-agents/{id}/rag/urls/process', [RAGController::class, 'processUrls'], ['Authentication']);
 
 Router::get('/ai-agents/{id}/rag/memory', [RAGController::class, 'memory'], ['Authentication']);
 

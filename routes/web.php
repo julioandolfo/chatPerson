@@ -27,6 +27,7 @@ use App\Controllers\ActivityController;
 use App\Controllers\AIAgentController;
 use App\Controllers\AIToolController;
 use App\Controllers\RAGController;
+use App\Controllers\KanbanAgentController;
 use App\Controllers\SearchController;
 use App\Controllers\TestController;
 use App\Controllers\AIAssistantController;
@@ -379,6 +380,16 @@ Router::post('/ai-agents/{id}/rag/urls', [RAGController::class, 'addUrl'], ['Aut
 Router::post('/ai-agents/{id}/rag/urls/process', [RAGController::class, 'processUrls'], ['Authentication']);
 
 Router::get('/ai-agents/{id}/rag/memory', [RAGController::class, 'memory'], ['Authentication']);
+
+// Rotas de Agentes Kanban
+Router::get('/kanban-agents', [KanbanAgentController::class, 'index'], ['Authentication']);
+Router::get('/kanban-agents/create', [KanbanAgentController::class, 'create'], ['Authentication']);
+Router::get('/kanban-agents/{id}', [KanbanAgentController::class, 'show'], ['Authentication']);
+Router::get('/kanban-agents/{id}/edit', [KanbanAgentController::class, 'edit'], ['Authentication']);
+Router::post('/kanban-agents', [KanbanAgentController::class, 'store'], ['Authentication']);
+Router::post('/kanban-agents/{id}', [KanbanAgentController::class, 'update'], ['Authentication']);
+Router::delete('/kanban-agents/{id}', [KanbanAgentController::class, 'delete'], ['Authentication']);
+Router::post('/kanban-agents/{id}/execute', [KanbanAgentController::class, 'execute'], ['Authentication']);
 
 // Rotas do Assistente IA (Chat)
 Router::get('/ai-assistant/features', [AIAssistantController::class, 'getFeatures'], ['Authentication']);

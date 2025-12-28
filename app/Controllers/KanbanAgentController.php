@@ -1,0 +1,367 @@
+<?php
+/**
+ * Controller KanbanAgentController
+ * Gerenciamento de Agentes de IA Kanban
+ */
+
+namespace App\Controllers;
+
+use App\Helpers\Response;
+use App\Helpers\Request;
+use App\Helpers\Permission;
+use App\Services\KanbanAgentService;
+use App\Models\AIKanbanAgent;
+use App\Models\AIKanbanAgentExecution;
+use App\Models\AIKanbanAgentActionLog;
+use App\Models\Funnel;
+use App\Models\FunnelStage;
+use App\Helpers\Validator;
+
+class KanbanAgentController
+{
+    /**
+     * Listar agentes Kanban
+     */
+    public function index(): void
+    {
+        Permission::abortIfCannot('ai_agents.view');
+        
+        $filters = [
+            'agent_type' => Request::get('agent_type'),
+            'enabled' => Request::get('enabled'),
+            'search' => Request::get('search')
+        ];
+        
+        $filters = array_filter($filters, function($value) {
+            return $value !== null && $value !== '';
+        });
+
+        try {
+            $agents = AIKanbanAgent::all();
+            
+            // Aplicar filtros
+            if (!empty($filters['agent_type'])) {
+                $agents = array_filter($agents, function($a) use ($filters) {
+                    return $a['agent_type'] === $filters['agent_type'];
+                });
+            }
+            
+            if (isset($filters['enabled'])) {
+                $enabled = $filters['enabled'] === '1' || $filters['enabled'] === 'true';
+                $agents = array_filter($agents, function($a) use ($enabled) {
+                    return (bool)$a['enabled'] === $enabled;
+                });
+            }
+            
+            if (!empty($filters['search'])) {
+                $search = strtolower($filters['search']);
+                $agents = array_filter($agents, function($a) use ($search) {
+                    return strpos(strtolower($a['name']), $search) !== false ||
+                           strpos(strtolower($a['description'] ?? ''), $search) !== false;
+                });
+            }
+            
+            $agents = array_values($agents);
+            
+            Response::view('kanban-agents/index', [
+                'agents' => $agents,
+                'filters' => $filters
+            ]);
+        } catch (\Exception $e) {
+            Response::view('kanban-agents/index', [
+                'agents' => [],
+                'filters' => $filters,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Mostrar agente específico
+     */
+    public function show(int $id): void
+    {
+        Permission::abortIfCannot('ai_agents.view');
+        
+        try {
+            $agent = AIKanbanAgent::find($id);
+            if (!$agent) {
+                Response::redirect('/kanban-agents', ['error' => 'Agente não encontrado']);
+                return;
+            }
+            
+            $executions = AIKanbanAgentExecution::getExecutions($id, 20);
+            $actionLogs = AIKanbanAgent::getActionLogs($id, 50);
+            
+            // Buscar funis e etapas para exibição
+            $funnels = [];
+            $stages = [];
+            
+            if ($agent['target_funnel_ids']) {
+                foreach ($agent['target_funnel_ids'] as $funnelId) {
+                    $funnel = Funnel::find($funnelId);
+                    if ($funnel) {
+                        $funnels[] = $funnel;
+                    }
+                }
+            }
+            
+            if ($agent['target_stage_ids']) {
+                foreach ($agent['target_stage_ids'] as $stageId) {
+                    $stage = FunnelStage::find($stageId);
+                    if ($stage) {
+                        $stages[] = $stage;
+                    }
+                }
+            }
+            
+            Response::view('kanban-agents/show', [
+                'agent' => $agent,
+                'executions' => $executions,
+                'actionLogs' => $actionLogs,
+                'funnels' => $funnels,
+                'stages' => $stages
+            ]);
+        } catch (\Exception $e) {
+            Response::redirect('/kanban-agents', ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Criar novo agente
+     */
+    public function create(): void
+    {
+        Permission::abortIfCannot('ai_agents.create');
+        
+        $funnels = Funnel::whereActive();
+        $allStages = [];
+        
+        foreach ($funnels as $funnel) {
+            $stages = Funnel::getStages($funnel['id']);
+            $allStages[$funnel['id']] = $stages;
+        }
+        
+        Response::view('kanban-agents/create', [
+            'funnels' => $funnels,
+            'allStages' => $allStages
+        ]);
+    }
+
+    /**
+     * Salvar novo agente
+     */
+    public function store(): void
+    {
+        Permission::abortIfCannot('ai_agents.create');
+        
+        $data = Request::post();
+        
+        $errors = Validator::validate($data, [
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'agent_type' => 'required|string|in:kanban_followup,kanban_analyzer,kanban_manager,kanban_custom',
+            'prompt' => 'required|string',
+            'model' => 'required|string',
+            'temperature' => 'nullable|numeric|min:0|max:2',
+            'max_tokens' => 'nullable|integer|min:1',
+            'execution_type' => 'required|string|in:interval,schedule,manual',
+            'execution_interval_hours' => 'nullable|integer|min:1',
+            'max_conversations_per_execution' => 'nullable|integer|min:1|max:1000'
+        ]);
+        
+        if (!empty($errors)) {
+            Response::json(['success' => false, 'errors' => $errors], 400);
+            return;
+        }
+        
+        try {
+            // Processar dados
+            $agentData = [
+                'name' => $data['name'],
+                'description' => $data['description'] ?? null,
+                'agent_type' => $data['agent_type'],
+                'prompt' => $data['prompt'],
+                'model' => $data['model'] ?? 'gpt-4',
+                'temperature' => isset($data['temperature']) ? (float)$data['temperature'] : 0.7,
+                'max_tokens' => isset($data['max_tokens']) ? (int)$data['max_tokens'] : 2000,
+                'enabled' => isset($data['enabled']) ? (bool)$data['enabled'] : true,
+                'execution_type' => $data['execution_type'],
+                'execution_interval_hours' => isset($data['execution_interval_hours']) ? (int)$data['execution_interval_hours'] : null,
+                'max_conversations_per_execution' => isset($data['max_conversations_per_execution']) ? (int)$data['max_conversations_per_execution'] : 50,
+                'target_funnel_ids' => !empty($data['target_funnel_ids']) ? array_map('intval', $data['target_funnel_ids']) : null,
+                'target_stage_ids' => !empty($data['target_stage_ids']) ? array_map('intval', $data['target_stage_ids']) : null,
+                'execution_schedule' => !empty($data['execution_schedule']) ? json_decode($data['execution_schedule'], true) : null,
+                'conditions' => !empty($data['conditions']) ? json_decode($data['conditions'], true) : ['operator' => 'AND', 'conditions' => []],
+                'actions' => !empty($data['actions']) ? json_decode($data['actions'], true) : [],
+                'settings' => !empty($data['settings']) ? json_decode($data['settings'], true) : null
+            ];
+            
+            // Calcular próxima execução se necessário
+            if ($agentData['execution_type'] === 'interval' && $agentData['execution_interval_hours']) {
+                $agentData['next_execution_at'] = date('Y-m-d H:i:s', strtotime("+{$agentData['execution_interval_hours']} hours"));
+            }
+            
+            $agentId = AIKanbanAgent::create($agentData);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Agente Kanban criado com sucesso!',
+                'agent_id' => $agentId
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao criar agente: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Editar agente
+     */
+    public function edit(int $id): void
+    {
+        Permission::abortIfCannot('ai_agents.edit');
+        
+        $agent = AIKanbanAgent::find($id);
+        if (!$agent) {
+            Response::redirect('/kanban-agents', ['error' => 'Agente não encontrado']);
+            return;
+        }
+        
+        $funnels = Funnel::whereActive();
+        $allStages = [];
+        
+        foreach ($funnels as $funnel) {
+            $stages = Funnel::getStages($funnel['id']);
+            $allStages[$funnel['id']] = $stages;
+        }
+        
+        Response::view('kanban-agents/edit', [
+            'agent' => $agent,
+            'funnels' => $funnels,
+            'allStages' => $allStages
+        ]);
+    }
+
+    /**
+     * Atualizar agente
+     */
+    public function update(int $id): void
+    {
+        Permission::abortIfCannot('ai_agents.edit');
+        
+        $agent = AIKanbanAgent::find($id);
+        if (!$agent) {
+            Response::json(['success' => false, 'message' => 'Agente não encontrado'], 404);
+            return;
+        }
+        
+        $data = Request::post();
+        
+        $errors = Validator::validate($data, [
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'agent_type' => 'required|string|in:kanban_followup,kanban_analyzer,kanban_manager,kanban_custom',
+            'prompt' => 'required|string',
+            'model' => 'required|string',
+            'temperature' => 'nullable|numeric|min:0|max:2',
+            'max_tokens' => 'nullable|integer|min:1',
+            'execution_type' => 'required|string|in:interval,schedule,manual',
+            'execution_interval_hours' => 'nullable|integer|min:1',
+            'max_conversations_per_execution' => 'nullable|integer|min:1|max:1000'
+        ]);
+        
+        if (!empty($errors)) {
+            Response::json(['success' => false, 'errors' => $errors], 400);
+            return;
+        }
+        
+        try {
+            $updateData = [
+                'name' => $data['name'],
+                'description' => $data['description'] ?? null,
+                'agent_type' => $data['agent_type'],
+                'prompt' => $data['prompt'],
+                'model' => $data['model'] ?? 'gpt-4',
+                'temperature' => isset($data['temperature']) ? (float)$data['temperature'] : 0.7,
+                'max_tokens' => isset($data['max_tokens']) ? (int)$data['max_tokens'] : 2000,
+                'enabled' => isset($data['enabled']) ? (bool)$data['enabled'] : true,
+                'execution_type' => $data['execution_type'],
+                'execution_interval_hours' => isset($data['execution_interval_hours']) ? (int)$data['execution_interval_hours'] : null,
+                'max_conversations_per_execution' => isset($data['max_conversations_per_execution']) ? (int)$data['max_conversations_per_execution'] : 50,
+                'target_funnel_ids' => !empty($data['target_funnel_ids']) ? array_map('intval', $data['target_funnel_ids']) : null,
+                'target_stage_ids' => !empty($data['target_stage_ids']) ? array_map('intval', $data['target_stage_ids']) : null,
+                'execution_schedule' => !empty($data['execution_schedule']) ? json_decode($data['execution_schedule'], true) : null,
+                'conditions' => !empty($data['conditions']) ? json_decode($data['conditions'], true) : ['operator' => 'AND', 'conditions' => []],
+                'actions' => !empty($data['actions']) ? json_decode($data['actions'], true) : [],
+                'settings' => !empty($data['settings']) ? json_decode($data['settings'], true) : null
+            ];
+            
+            AIKanbanAgent::update($id, $updateData);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Agente Kanban atualizado com sucesso!'
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao atualizar agente: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Deletar agente
+     */
+    public function delete(int $id): void
+    {
+        Permission::abortIfCannot('ai_agents.delete');
+        
+        $agent = AIKanbanAgent::find($id);
+        if (!$agent) {
+            Response::json(['success' => false, 'message' => 'Agente não encontrado'], 404);
+            return;
+        }
+        
+        try {
+            AIKanbanAgent::delete($id);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Agente Kanban deletado com sucesso!'
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao deletar agente: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Executar agente manualmente
+     */
+    public function execute(int $id): void
+    {
+        Permission::abortIfCannot('ai_agents.edit');
+        
+        try {
+            $result = KanbanAgentService::executeAgent($id, 'manual');
+            
+            Response::json([
+                'success' => true,
+                'message' => $result['message'],
+                'stats' => $result['stats'] ?? []
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao executar agente: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+}
+

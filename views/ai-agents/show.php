@@ -113,6 +113,79 @@ ob_start();
                 </div>
                 <!--end::Prompt-->
                 
+                <!--begin::RAG - Sistema de Conhecimento-->
+                <?php if (\App\Helpers\PostgreSQL::isAvailable()): ?>
+                <div class="card mb-5">
+                    <div class="card-header">
+                        <h3 class="card-title">🧠 Sistema RAG (Knowledge Base)</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <a href="<?= \App\Helpers\Url::to('/ai-agents/' . $agent['id'] . '/rag/knowledge-base') ?>" class="card bg-light-primary hoverable h-100">
+                                    <div class="card-body d-flex align-items-center gap-3">
+                                        <i class="ki-duotone ki-book fs-2x text-primary">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                            <span class="path4"></span>
+                                            <span class="path5"></span>
+                                        </i>
+                                        <div>
+                                            <div class="fw-bold">Knowledge Base</div>
+                                            <div class="text-muted fs-7">Gerenciar conhecimentos</div>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                            <div class="col-md-6">
+                                <a href="<?= \App\Helpers\Url::to('/ai-agents/' . $agent['id'] . '/rag/feedback-loop') ?>" class="card bg-light-warning hoverable h-100">
+                                    <div class="card-body d-flex align-items-center gap-3">
+                                        <i class="ki-duotone ki-message-question fs-2x text-warning">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        <div>
+                                            <div class="fw-bold">Feedback Loop</div>
+                                            <div class="text-muted fs-7">Treinar e revisar</div>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                            <div class="col-md-6">
+                                <a href="<?= \App\Helpers\Url::to('/ai-agents/' . $agent['id'] . '/rag/urls') ?>" class="card bg-light-info hoverable h-100">
+                                    <div class="card-body d-flex align-items-center gap-3">
+                                        <i class="ki-duotone ki-link fs-2x text-info">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        <div>
+                                            <div class="fw-bold">URLs</div>
+                                            <div class="text-muted fs-7">Processar páginas web</div>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                            <div class="col-md-6">
+                                <a href="<?= \App\Helpers\Url::to('/ai-agents/' . $agent['id'] . '/rag/memory') ?>" class="card bg-light-success hoverable h-100">
+                                    <div class="card-body d-flex align-items-center gap-3">
+                                        <i class="ki-duotone ki-brain fs-2x text-success">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        <div>
+                                            <div class="fw-bold">Memórias</div>
+                                            <div class="text-muted fs-7">Memória persistente</div>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
+                <!--end::RAG-->
+                
                 <?php 
                 // Calcular tools disponíveis para adicionar
                 $availableTools = [];

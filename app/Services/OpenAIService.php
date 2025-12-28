@@ -20,6 +20,7 @@ use App\Models\FunnelStage;
 use App\Models\Activity;
 use App\Helpers\Database;
 use App\Services\ConversationAIService;
+use App\Services\RAGService;
 
 class OpenAIService
 {
@@ -357,6 +358,24 @@ class OpenAIService
 
         if (!empty($relevantSnippets)) {
             $systemPrompt .= "\n\nTrechos relevantes (histórico anterior):\n" . implode("\n", $relevantSnippets);
+        }
+
+        // Adicionar contexto RAG (Knowledge Base + Memórias) se disponível
+        $agentId = $agent['id'] ?? 0;
+        if ($agentId && \App\Helpers\PostgreSQL::isAvailable()) {
+            try {
+                $ragContext = RAGService::getFullContext($agentId, $userMessage, $conversationId);
+                if (!empty($ragContext)) {
+                    $systemPrompt .= $ragContext;
+                    \App\Helpers\ConversationDebug::aiAgent($conversationId, "Contexto RAG adicionado ao prompt", [
+                        'context_length' => strlen($ragContext)
+                    ]);
+                }
+            } catch (\Exception $e) {
+                // Log erro mas não interrompe o fluxo
+                \App\Helpers\ConversationDebug::error($conversationId, 'RAG', 'Erro ao buscar contexto RAG: ' . $e->getMessage());
+                Logger::warning("OpenAIService::buildMessages - Erro ao buscar contexto RAG: " . $e->getMessage());
+            }
         }
 
         $messages[] = [

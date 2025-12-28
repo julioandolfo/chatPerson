@@ -26,6 +26,7 @@ use App\Controllers\AttachmentController;
 use App\Controllers\ActivityController;
 use App\Controllers\AIAgentController;
 use App\Controllers\AIToolController;
+use App\Controllers\RAGController;
 use App\Controllers\SearchController;
 use App\Controllers\TestController;
 use App\Controllers\AIAssistantController;
@@ -362,6 +363,21 @@ Router::post('/ai-agents/{id}', [AIAgentController::class, 'update'], ['Authenti
 Router::delete('/ai-agents/{id}', [AIAgentController::class, 'destroy'], ['Authentication']);
 Router::post('/ai-agents/{id}/tools', [AIAgentController::class, 'addTool'], ['Authentication']);
 Router::delete('/ai-agents/{id}/tools/{toolId}', [AIAgentController::class, 'removeTool'], ['Authentication']);
+
+// Rotas RAG (Knowledge Base, Feedback Loop, URLs, Memórias)
+Router::get('/ai-agents/{id}/rag/knowledge-base', [RAGController::class, 'knowledgeBase'], ['Authentication']);
+Router::post('/ai-agents/{id}/rag/knowledge-base', [RAGController::class, 'addKnowledge'], ['Authentication']);
+Router::get('/ai-agents/{id}/rag/knowledge-base/search', [RAGController::class, 'searchKnowledge'], ['Authentication']);
+Router::delete('/ai-agents/{id}/rag/knowledge-base/{knowledgeId}', [RAGController::class, 'deleteKnowledge'], ['Authentication']);
+
+Router::get('/ai-agents/{id}/rag/feedback-loop', [RAGController::class, 'feedbackLoop'], ['Authentication']);
+Router::post('/ai-agents/{id}/rag/feedback-loop/{feedbackId}/review', [RAGController::class, 'reviewFeedback'], ['Authentication']);
+Router::post('/ai-agents/{id}/rag/feedback-loop/{feedbackId}/ignore', [RAGController::class, 'ignoreFeedback'], ['Authentication']);
+
+Router::get('/ai-agents/{id}/rag/urls', [RAGController::class, 'urls'], ['Authentication']);
+Router::post('/ai-agents/{id}/rag/urls', [RAGController::class, 'addUrl'], ['Authentication']);
+
+Router::get('/ai-agents/{id}/rag/memory', [RAGController::class, 'memory'], ['Authentication']);
 
 // Rotas do Assistente IA (Chat)
 Router::get('/ai-assistant/features', [AIAssistantController::class, 'getFeatures'], ['Authentication']);

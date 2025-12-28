@@ -25,17 +25,19 @@ class PostgreSQL
         }
 
         // Obter credenciais das configurações
-        $credentials = PostgreSQLSettingsService::getCredentials();
+        $settings = PostgreSQLSettingsService::getSettings();
         
-        if (empty($credentials['password'])) {
-            throw new \Exception('POSTGRES_PASSWORD não configurado nas configurações do sistema');
+        if (empty($settings['postgres_password'])) {
+            throw new \Exception('PostgreSQL password não configurado nas configurações do sistema');
         }
+
+        $dsn = "pgsql:host={$settings['postgres_host']};port={$settings['postgres_port']};dbname={$settings['postgres_database']}";
 
         try {
             self::$connection = new PDO(
-                $credentials['dsn'], 
-                $credentials['username'], 
-                $credentials['password'], 
+                $dsn, 
+                $settings['postgres_username'], 
+                $settings['postgres_password'], 
                 [
                     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,

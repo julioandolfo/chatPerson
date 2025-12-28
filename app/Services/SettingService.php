@@ -165,5 +165,13 @@ class SettingService
             'lockout_duration' => Setting::get('lockout_duration', 15),
         ];
     }
+
+    /**
+     * Obter configurações do PostgreSQL padrão
+     */
+    public static function getDefaultPostgreSQLSettings(): array
+    {
+        return \App\Services\PostgreSQLSettingsService::getSettings();
+    }
 }
 

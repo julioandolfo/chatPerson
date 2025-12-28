@@ -124,6 +124,17 @@ ob_start();
                     Sons
                 </a>
             </li>
+            <li class="nav-item mt-2">
+                <a class="nav-link text-active-primary me-10 <?= $activeTab === 'postgres' ? 'active' : '' ?>" 
+                   href="<?= \App\Helpers\Url::to('/settings?tab=postgres') ?>">
+                    <i class="ki-duotone ki-database fs-2 me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    PostgreSQL (RAG)
+                </a>
+            </li>
         </ul>
         <!--end::Tabs-->
         
@@ -555,6 +566,14 @@ ob_start();
             ?>
             <!--end::Form Sons de Notificação-->
         <?php endif; ?>
+        
+        <?php if ($activeTab === 'postgres'): ?>
+            <!--begin::Form PostgreSQL-->
+            <?php
+            include __DIR__ . '/postgres-tab.php';
+            ?>
+            <!--end::Form PostgreSQL-->
+        <?php endif; ?>
         <!--end::Tab Content-->
     </div>
 </div>
@@ -761,6 +780,15 @@ document.addEventListener('DOMContentLoaded', function() {
         websocketForm.addEventListener('submit', function(e) {
             e.preventDefault();
             submitForm(this, '" . \App\Helpers\Url::to('/settings/websocket') . "');
+        });
+    }
+    
+    // Form PostgreSQL
+    const postgresForm = document.getElementById('kt_settings_postgres_form');
+    if (postgresForm) {
+        postgresForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            submitForm(this, '" . \App\Helpers\Url::to('/settings/postgres') . "');
         });
     }
     

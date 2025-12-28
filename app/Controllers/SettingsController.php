@@ -10,6 +10,7 @@ use App\Helpers\Request;
 use App\Helpers\Permission;
 use App\Services\SettingService;
 use App\Services\ConversationSettingsService;
+use App\Services\PostgreSQLSettingsService;
 
 class SettingsController
 {
@@ -37,6 +38,7 @@ class SettingsController
         $aiSettings = SettingService::getDefaultAISettings();
         $availabilitySettings = \App\Services\AvailabilityService::getSettings();
         $businessHoursSettings = \App\Services\AvailabilityService::getBusinessHoursSettings();
+        $postgresSettings = PostgreSQLSettingsService::getSettings();
         
         // Obter dados para preencher selects
         $users = \App\Helpers\Database::fetchAll(
@@ -81,7 +83,8 @@ class SettingsController
             'aiAssistantFeatures' => $aiAssistantFeatures ?? [],
             'aiAgents' => $aiAgents ?? [],
             'availabilitySettings' => $availabilitySettings,
-            'businessHoursSettings' => $businessHoursSettings
+            'businessHoursSettings' => $businessHoursSettings,
+            'postgresSettings' => $postgresSettings
         ]);
     }
 
@@ -764,6 +767,96 @@ class SettingsController
         }
     }
     
+    /**
+     * Salvar configurações do PostgreSQL
+     */
+    public function savePostgreSQL(): void
+    {
+        Permission::abortIfCannot('admin.settings');
+        
+        try {
+            $data = Request::post();
+            
+            PostgreSQLSettingsService::saveSettings([
+                'postgres_enabled' => isset($data['postgres_enabled']),
+                'postgres_host' => $data['postgres_host'] ?? 'localhost',
+                'postgres_port' => (int)($data['postgres_port'] ?? 5432),
+                'postgres_database' => $data['postgres_database'] ?? 'chat_rag',
+                'postgres_username' => $data['postgres_username'] ?? 'chat_user',
+                'postgres_password' => $data['postgres_password'] ?? '',
+            ]);
+            
+            Response::successOrRedirect(
+                'Configurações do PostgreSQL salvas com sucesso!',
+                '/settings?tab=postgres'
+            );
+        } catch (\Exception $e) {
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro ao salvar configurações: ' . $e->getMessage()
+                ], 500);
+            } else {
+                Response::redirect('/settings?tab=postgres&error=' . urlencode('Erro ao salvar configurações: ' . $e->getMessage()));
+            }
+        }
+    }
+
+    /**
+     * Testar conexão PostgreSQL
+     */
+    public function testPostgreSQL(): void
+    {
+        Permission::abortIfCannot('admin.settings');
+        
+        try {
+            // Primeiro, salvar temporariamente as configurações do POST para testar
+            $data = Request::post();
+            
+            if (empty($data['postgres_enabled']) || !isset($data['postgres_enabled'])) {
+                throw new \Exception('PostgreSQL não está habilitado. Marque a opção "Habilitar PostgreSQL" primeiro.');
+            }
+            
+            // Salvar temporariamente para teste
+            PostgreSQLSettingsService::saveSettings([
+                'postgres_enabled' => isset($data['postgres_enabled']),
+                'postgres_host' => $data['postgres_host'] ?? 'localhost',
+                'postgres_port' => (int)($data['postgres_port'] ?? 5432),
+                'postgres_database' => $data['postgres_database'] ?? 'chat_rag',
+                'postgres_username' => $data['postgres_username'] ?? 'chat_user',
+                'postgres_password' => $data['postgres_password'] ?? '',
+            ]);
+            
+            // Tentar conectar
+            $conn = \App\Helpers\PostgreSQL::getConnection();
+            
+            // Testar query simples
+            $result = \App\Helpers\PostgreSQL::query("SELECT version()");
+            $version = $result[0]['version'] ?? 'Desconhecida';
+            
+            // Verificar extensão pgvector
+            $pgvectorResult = \App\Helpers\PostgreSQL::query("SELECT * FROM pg_extension WHERE extname = 'vector'");
+            $pgvectorInstalled = !empty($pgvectorResult);
+            
+            $message = 'Conexão PostgreSQL estabelecida com sucesso!';
+            if (!$pgvectorInstalled) {
+                $message .= ' ⚠️ A extensão pgvector não está instalada. Execute: CREATE EXTENSION vector;';
+            }
+            
+            Response::json([
+                'success' => true,
+                'message' => $message,
+                'version' => $version,
+                'pgvector_installed' => $pgvectorInstalled
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao conectar: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     /**
      * Obter vozes disponíveis do ElevenLabs
      */

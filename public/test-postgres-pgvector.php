@@ -82,26 +82,46 @@ header('Content-Type: text/html; charset=utf-8');
         $tests = [];
         $allPassed = true;
 
-        // Teste 1: Verificar variáveis de ambiente
+        // Teste 1: Verificar configurações do sistema
         echo '<div class="test-section">';
-        echo '<h2>1. Verificando Variáveis de Ambiente</h2>';
+        echo '<h2>1. Verificando Configurações do Sistema</h2>';
         
-        $requiredVars = ['POSTGRES_HOST', 'POSTGRES_PORT', 'POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PASSWORD'];
-        $envVars = [];
-        
-        foreach ($requiredVars as $var) {
-            $value = getenv($var);
-            if ($value) {
-                $displayValue = ($var === 'POSTGRES_PASSWORD') ? str_repeat('*', strlen($value)) : $value;
-                echo "<p><span class='success'>✅</span> <code>{$var}</code> = {$displayValue}</p>";
-                $envVars[$var] = $value;
+        try {
+            $postgresSettings = \App\Services\PostgreSQLSettingsService::getSettings();
+            
+            echo "<p><span class='info'>ℹ️</span> Usando configurações do sistema (tabela settings)</p>";
+            
+            $requiredSettings = ['postgres_host', 'postgres_port', 'postgres_database', 'postgres_username', 'postgres_password'];
+            $settingsVars = [];
+            
+            foreach ($requiredSettings as $key) {
+                $value = $postgresSettings[$key] ?? null;
+                if ($value !== null && $value !== '') {
+                    $displayValue = ($key === 'postgres_password') ? str_repeat('*', strlen($value)) : $value;
+                    $displayKey = str_replace('postgres_', '', $key);
+                    echo "<p><span class='success'>✅</span> <code>{$displayKey}</code> = {$displayValue}</p>";
+                    $settingsVars[$key] = $value;
+                } else {
+                    $displayKey = str_replace('postgres_', '', $key);
+                    echo "<p><span class='error'>❌</span> <code>{$displayKey}</code> não configurado</p>";
+                    $allPassed = false;
+                }
+            }
+            
+            // Verificar se está habilitado
+            if (!empty($postgresSettings['postgres_enabled'])) {
+                echo "<p><span class='success'>✅</span> PostgreSQL está <strong>habilitado</strong></p>";
             } else {
-                echo "<p><span class='error'>❌</span> <code>{$var}</code> não configurado</p>";
+                echo "<p><span class='error'>❌</span> PostgreSQL está <strong>desabilitado</strong> nas configurações</p>";
                 $allPassed = false;
             }
+            
+            $tests['settings'] = !empty($settingsVars) && !empty($postgresSettings['postgres_enabled']);
+        } catch (\Exception $e) {
+            echo "<p><span class='error'>❌</span> Erro ao buscar configurações: " . htmlspecialchars($e->getMessage()) . "</p>";
+            $tests['settings'] = false;
+            $allPassed = false;
         }
-        
-        $tests['env'] = !empty($envVars);
         echo '</div>';
 
         // Teste 2: Verificar extensão PHP PostgreSQL
@@ -128,33 +148,26 @@ header('Content-Type: text/html; charset=utf-8');
         echo '<div class="test-section">';
         echo '<h2>3. Testando Conexão PostgreSQL</h2>';
         
-        if ($tests['env'] && $tests['php_ext']) {
+        if ($tests['settings'] && $tests['php_ext']) {
             try {
-                $host = $envVars['POSTGRES_HOST'];
-                $port = $envVars['POSTGRES_PORT'];
-                $database = $envVars['POSTGRES_DB'];
-                $username = $envVars['POSTGRES_USER'];
-                $password = $envVars['POSTGRES_PASSWORD'];
-                
-                $dsn = "pgsql:host={$host};port={$port};dbname={$database}";
-                $pdo = new PDO($dsn, $username, $password, [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                ]);
+                $conn = \App\Helpers\PostgreSQL::getConnection();
                 
                 echo "<p><span class='success'>✅</span> Conexão estabelecida com sucesso!</p>";
-                echo "<p class='info'>Host: {$host}:{$port}</p>";
-                echo "<p class='info'>Database: {$database}</p>";
-                echo "<p class='info'>User: {$username}</p>";
                 
+                $postgresSettings = \App\Services\PostgreSQLSettingsService::getSettings();
+                echo "<p class='info'>Host: {$postgresSettings['postgres_host']}:{$postgresSettings['postgres_port']}</p>";
+                echo "<p class='info'>Database: {$postgresSettings['postgres_database']}</p>";
+                echo "<p class='info'>User: {$postgresSettings['postgres_username']}</p>";
+                
+                $pdo = $conn; // Para usar nos testes seguintes
                 $tests['connection'] = true;
-            } catch (PDOException $e) {
+            } catch (\Exception $e) {
                 echo "<p><span class='error'>❌</span> Erro ao conectar: " . htmlspecialchars($e->getMessage()) . "</p>";
                 $tests['connection'] = false;
                 $allPassed = false;
             }
         } else {
-            echo "<p><span class='error'>❌</span> Não é possível testar conexão (variáveis ou extensão faltando)</p>";
+            echo "<p><span class='error'>❌</span> Não é possível testar conexão (configurações ou extensão faltando)</p>";
             $tests['connection'] = false;
         }
         echo '</div>';
@@ -305,7 +318,7 @@ header('Content-Type: text/html; charset=utf-8');
         echo '<h2>📊 Resumo dos Testes</h2>';
         
         $testNames = [
-            'env' => 'Variáveis de Ambiente',
+            'settings' => 'Configurações do Sistema',
             'php_ext' => 'Extensão PHP PostgreSQL',
             'connection' => 'Conexão PostgreSQL',
             'pgvector' => 'Extensão pgvector',

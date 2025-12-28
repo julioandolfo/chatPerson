@@ -354,9 +354,26 @@ class PostgreSQL
 }
 ```
 
-### 4. Variáveis de Ambiente no Coolify
+### 4. Configurar no Sistema (Recomendado) ⭐
 
-No seu projeto PHP no Coolify, adicione as variáveis de ambiente:
+**⚠️ IMPORTANTE**: As configurações do PostgreSQL agora são salvas **dentro do sistema** (tabela `settings`), não mais via variáveis de ambiente!
+
+**Como configurar:**
+
+1. Acesse o sistema: `/settings?tab=postgres`
+2. Preencha os campos:
+   - **Habilitar PostgreSQL**: Marque para ativar
+   - **Host**: Nome do serviço no Coolify (ex: `postgres-pgvector`) ou IP
+   - **Porta**: `5432` (padrão)
+   - **Database**: `chat_rag` (ou o nome que você criou)
+   - **Username**: `chat_user` (ou o usuário que você criou)
+   - **Password**: Senha que você definiu
+3. Clique em **"Salvar"**
+4. Clique em **"Testar Conexão"** para verificar
+
+**Alternativa: Variáveis de Ambiente (Legado)**
+
+Se preferir usar variáveis de ambiente (não recomendado), adicione no Coolify:
 
 ```env
 # PostgreSQL RAG
@@ -373,6 +390,8 @@ POSTGRES_PASSWORD=sua_senha_forte_aqui
 2. Clique em **"Environment Variables"**
 3. Adicione cada variável acima
 4. Salve e reinicie o serviço
+
+**Nota**: O sistema prioriza configurações do sistema sobre variáveis de ambiente.
 
 ---
 

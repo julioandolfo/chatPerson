@@ -332,6 +332,8 @@ Router::post('/settings/websocket', [SettingsController::class, 'saveWebSocket']
 Router::post('/settings/conversations', [SettingsController::class, 'saveConversations'], ['Authentication']);
 Router::post('/settings/availability', [SettingsController::class, 'saveAvailability'], ['Authentication']);
 Router::post('/settings/ai', [SettingsController::class, 'saveAI'], ['Authentication']);
+Router::post('/settings/postgres', [SettingsController::class, 'savePostgreSQL'], ['Authentication']);
+Router::post('/settings/postgres/test', [SettingsController::class, 'testPostgreSQL'], ['Authentication']);
 Router::get('/api/settings/sla', [SettingsController::class, 'getSLAConfig'], ['Authentication']); // API para obter config de SLA
 
 // Rotas de Configurações de Som

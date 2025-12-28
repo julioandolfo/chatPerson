@@ -352,6 +352,7 @@ Router::get('/ai-agents/available', [ConversationController::class, 'getAvailabl
 Router::get('/ai-agents', [AIAgentController::class, 'index'], ['Authentication']);
 Router::get('/ai-agents/{id}/conversations', [AIAgentController::class, 'getConversations'], ['Authentication']);
 Router::get('/ai-agents/{id}/conversations/{conversationId}/history', [AIAgentController::class, 'getConversationHistory'], ['Authentication']);
+Router::get('/ai-agents/{id}/tool-executions', [AIAgentController::class, 'getToolExecutions'], ['Authentication']);
 Router::get('/ai-agents/{id}/stats', [AIAgentController::class, 'getStats'], ['Authentication']);
 Router::get('/ai-agents/{id}', [AIAgentController::class, 'show'], ['Authentication']);
 Router::post('/ai-agents', [AIAgentController::class, 'store'], ['Authentication']);

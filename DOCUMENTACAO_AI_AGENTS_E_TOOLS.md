@@ -1,7 +1,27 @@
 # 📚 DOCUMENTAÇÃO COMPLETA - SISTEMA DE AI AGENTS E AI TOOLS
 
 **Data**: 2025-01-27  
-**Status**: Sistema 75% Implementado
+**Status**: Sistema 95% Implementado
+
+---
+
+## ⚠️ IMPORTANTE: TIPOS DE AGENTES DE IA
+
+Este sistema possui **DOIS TIPOS** de agentes de IA:
+
+1. **Agentes de IA para Automações** (este documento)
+   - Funcionam nas automações
+   - Atendem conversas em tempo real
+   - Processam mensagens quando recebidas
+   - Integrados com sistema de distribuição
+
+2. **Agentes de IA para Kanban** (documento separado)
+   - Funcionam de forma agendada/periódica
+   - Analisam múltiplas conversas de funis/etapas específicas
+   - Executam ações baseadas em condições
+   - **Ver**: `PLANO_AGENTES_IA_KANBAN.md` para detalhes completos
+
+**Este documento trata APENAS dos Agentes de IA para Automações.**
 
 ---
 
@@ -974,8 +994,16 @@ O sistema de **AI Agents** e **AI Tools** é uma implementação completa que pe
 ✅ Escalar para humanos quando necessário  
 ✅ Registrar logs e estatísticas completas  
 
-**Status Atual**: 75% implementado  
+**Status Atual**: 95% implementado  
 **Próximos Passos**: Melhorias de performance, processamento assíncrono, mais tools
+
+---
+
+## 🔗 DOCUMENTAÇÃO RELACIONADA
+
+- **Agentes de IA para Kanban**: Ver `PLANO_AGENTES_IA_KANBAN.md`
+- **Sistema RAG**: Ver `PLANO_SISTEMA_RAG.md`
+- **Progresso Geral**: Ver `PROGRESSO_AGENTES_IA.md`
 
 ---
 

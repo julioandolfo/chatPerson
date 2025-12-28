@@ -1,7 +1,23 @@
 # ⏳ PROGRESSO - SISTEMA DE AGENTES DE IA
 
 **Data**: 2025-01-27  
-**Status**: 75% Completo (era 40%)
+**Status**: 95% Completo (era 40%)
+
+---
+
+## ⚠️ IMPORTANTE: TIPOS DE AGENTES
+
+Este sistema possui **DOIS TIPOS** de agentes de IA:
+
+1. **Agentes de IA para Automações** (este documento)
+   - Funcionam nas automações
+   - Atendem conversas em tempo real
+   - **Status**: 95% implementado
+
+2. **Agentes de IA para Kanban** (documento separado)
+   - Funcionam de forma agendada/periódica
+   - Analisam múltiplas conversas de funis/etapas específicas
+   - **Status**: Planejamento (ver `PLANO_AGENTES_IA_KANBAN.md`)
 
 ---
 
@@ -537,4 +553,12 @@ CREATE TABLE ai_conversations (
 
 **Última atualização**: 2025-01-27
 **Status geral**: 95% Completo (era 40%)
+
+---
+
+## 🔗 DOCUMENTAÇÃO RELACIONADA
+
+- **Agentes de IA para Kanban**: Ver `PLANO_AGENTES_IA_KANBAN.md` (planejamento)
+- **Sistema RAG**: Ver `PLANO_SISTEMA_RAG.md` (planejamento)
+- **Documentação Completa**: Ver `DOCUMENTACAO_AI_AGENTS_E_TOOLS.md`
 

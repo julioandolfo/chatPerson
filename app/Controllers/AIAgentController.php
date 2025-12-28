@@ -434,5 +434,67 @@ class AIAgentController
             ], 500);
         }
     }
+
+    /**
+     * Obter histórico de execuções de tools do agente
+     */
+    public function getToolExecutions(int $id): void
+    {
+        Permission::abortIfCannot('ai_agents.view');
+        
+        try {
+            $page = (int)(Request::get('page') ?? 1);
+            $limit = 20;
+            $offset = ($page - 1) * $limit;
+            
+            // Buscar conversas do agente com tools utilizadas
+            $sql = "SELECT ac.id, ac.conversation_id, ac.tools_used, ac.created_at, ac.updated_at
+                    FROM ai_conversations ac
+                    WHERE ac.ai_agent_id = ? AND ac.tools_used IS NOT NULL AND ac.tools_used != '[]'
+                    ORDER BY ac.updated_at DESC
+                    LIMIT ? OFFSET ?";
+            
+            $conversations = \App\Helpers\Database::fetchAll($sql, [$id, $limit, $offset]);
+            
+            $executions = [];
+            foreach ($conversations as $conv) {
+                $toolsUsed = is_string($conv['tools_used']) 
+                    ? json_decode($conv['tools_used'], true) 
+                    : ($conv['tools_used'] ?? []);
+                
+                if (is_array($toolsUsed)) {
+                    foreach ($toolsUsed as $tool) {
+                        $executions[] = [
+                            'tool' => $tool['tool'] ?? 'N/A',
+                            'call' => $tool['call'] ?? [],
+                            'result' => $tool['result'] ?? [],
+                            'timestamp' => $tool['timestamp'] ?? $conv['created_at'],
+                            'conversation_id' => $conv['conversation_id']
+                        ];
+                    }
+                }
+            }
+            
+            // Ordenar por timestamp (mais recente primeiro)
+            usort($executions, function($a, $b) {
+                return strtotime($b['timestamp']) - strtotime($a['timestamp']);
+            });
+            
+            Response::json([
+                'success' => true,
+                'executions' => $executions,
+                'pagination' => [
+                    'page' => $page,
+                    'limit' => $limit,
+                    'total' => count($executions)
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
 

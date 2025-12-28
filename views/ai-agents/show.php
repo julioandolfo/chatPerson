@@ -89,10 +89,25 @@ ob_start();
                 <div class="card mb-5">
                     <div class="card-header">
                         <h3 class="card-title">Prompt do Sistema</h3>
+                        <div class="card-toolbar">
+                            <button type="button" class="btn btn-sm btn-light-primary" onclick="copyPromptToClipboard()">
+                                <i class="ki-duotone ki-copy fs-5">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Copiar
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body">
-                        <div class="bg-light p-5 rounded">
-                            <pre class="text-gray-800 fs-6" style="white-space: pre-wrap;"><?= htmlspecialchars($agent['prompt']) ?></pre>
+                        <div class="bg-light p-5 rounded position-relative">
+                            <pre id="agent_prompt_display" class="text-gray-800 fs-6 mb-0" style="white-space: pre-wrap; font-family: 'Courier New', monospace;"><?= htmlspecialchars($agent['prompt']) ?></pre>
+                        </div>
+                        <div class="mt-3">
+                            <div class="d-flex gap-2">
+                                <span class="badge badge-light-primary"><?= number_format(mb_strlen($agent['prompt'] ?? '')) ?> caracteres</span>
+                                <span class="badge badge-light-info">≈ <?= number_format(mb_strlen($agent['prompt'] ?? '') / 4) ?> tokens</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -433,6 +448,32 @@ ob_start();
                 </div>
                 <?php endif; ?>
                 <!--end::Tools Utilizadas-->
+                
+                <!--begin::Histórico de Execuções de Tools-->
+                <div class="card mb-5">
+                    <div class="card-header">
+                        <h3 class="card-title">🔧 Histórico de Execuções de Tools</h3>
+                        <div class="card-toolbar">
+                            <button type="button" class="btn btn-sm btn-light-primary" onclick="loadToolExecutions(<?= $agent['id'] ?>, 1)">
+                                <i class="ki-duotone ki-arrows-circle fs-5">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Atualizar
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="tool_executions_container">
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Carregando...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!--end::Histórico de Execuções de Tools-->
                 
             </div>
         </div>
@@ -1205,7 +1246,235 @@ document.addEventListener("DOMContentLoaded", function() {
     
     // Carregar conversas ao carregar a página
     loadConversations(1);
+    loadToolExecutions(<?= $agent['id'] ?>, 1);
 });
+
+// Função para copiar prompt para clipboard
+function copyPromptToClipboard() {
+    const promptText = document.getElementById('agent_prompt_display').textContent;
+    navigator.clipboard.writeText(promptText).then(() => {
+        Swal.fire({
+            icon: 'success',
+            title: 'Copiado!',
+            text: 'Prompt copiado para a área de transferência',
+            timer: 2000,
+            showConfirmButton: false
+        });
+    }).catch(err => {
+        console.error('Erro ao copiar:', err);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Não foi possível copiar o prompt'
+        });
+    });
+}
+
+// Função para carregar histórico de execuções de tools
+function loadToolExecutions(agentId, page = 1) {
+    const container = document.getElementById("tool_executions_container");
+    container.innerHTML = `
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+        </div>
+    `;
+    
+    fetch(`<?= \App\Helpers\Url::to('/ai-agents') ?>/${agentId}/tool-executions?page=${page}`, {
+        headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "Accept": "application/json"
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.executions) {
+            if (data.executions.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-10">
+                        <i class="ki-duotone ki-setting-2 fs-3x text-gray-400 mb-5">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        <h3 class="text-gray-800 fw-bold mb-2">Nenhuma execução de tool encontrada</h3>
+                        <div class="text-gray-500 fs-6">As execuções de tools aparecerão aqui quando o agente começar a usar as ferramentas.</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = `
+                <div class="table-responsive">
+                    <table class="table align-middle table-row-dashed fs-6 gy-5">
+                        <thead>
+                            <tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">
+                                <th class="min-w-150px">Data/Hora</th>
+                                <th class="min-w-200px">Tool</th>
+                                <th class="min-w-150px">Conversa</th>
+                                <th class="min-w-200px">Argumentos</th>
+                                <th class="min-w-100px">Status</th>
+                                <th class="text-end min-w-100px">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            data.executions.forEach(exec => {
+                const date = new Date(exec.timestamp || exec.created_at);
+                const formattedDate = date.toLocaleString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                const args = exec.call ? JSON.stringify(exec.call, null, 2) : '{}';
+                const result = exec.result ? JSON.stringify(exec.result, null, 2) : '{}';
+                const hasError = exec.result && exec.result.error;
+                
+                html += `
+                    <tr>
+                        <td>
+                            <span class="text-gray-800">${formattedDate}</span>
+                        </td>
+                        <td>
+                            <span class="badge badge-light-primary">${escapeHtml(exec.tool || 'N/A')}</span>
+                        </td>
+                        <td>
+                            <a href="<?= \App\Helpers\Url::to('/conversations') ?>/${exec.conversation_id}" class="text-primary fw-semibold" target="_blank">
+                                Conversa #${exec.conversation_id}
+                            </a>
+                        </td>
+                        <td>
+                            <code class="text-gray-600 fs-7" style="white-space: pre-wrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(args.substring(0, 100))}${args.length > 100 ? '...' : ''}</code>
+                        </td>
+                        <td>
+                            ${hasError ? 
+                                '<span class="badge badge-light-danger">Erro</span>' : 
+                                '<span class="badge badge-light-success">Sucesso</span>'
+                            }
+                        </td>
+                        <td class="text-end">
+                            <button type="button" class="btn btn-sm btn-light-info" onclick="showToolExecutionDetails(${JSON.stringify(exec).replace(/"/g, '&quot;')})">
+                                <i class="ki-duotone ki-eye fs-5">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                Detalhes
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="ki-duotone ki-information-5 fs-2 me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    ${data.message || 'Erro ao carregar execuções de tools'}
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        container.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="ki-duotone ki-information-5 fs-2 me-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                    <span class="path3"></span>
+                </i>
+                Erro ao carregar execuções de tools
+            </div>
+        `;
+    });
+}
+
+// Função para mostrar detalhes de execução de tool
+function showToolExecutionDetails(exec) {
+    const args = exec.call ? JSON.stringify(exec.call, null, 2) : '{}';
+    const result = exec.result ? JSON.stringify(exec.result, null, 2) : '{}';
+    const hasError = exec.result && exec.result.error;
+    
+    Swal.fire({
+        title: `Detalhes da Execução - ${escapeHtml(exec.tool || 'N/A')}`,
+        html: `
+            <div class="text-start">
+                <div class="mb-4">
+                    <strong class="text-gray-700">Data/Hora:</strong>
+                    <div class="text-gray-800">${new Date(exec.timestamp || exec.created_at).toLocaleString('pt-BR')}</div>
+                </div>
+                <div class="mb-4">
+                    <strong class="text-gray-700">Conversa:</strong>
+                    <div class="text-gray-800">
+                        <a href="<?= \App\Helpers\Url::to('/conversations') ?>/${exec.conversation_id}" class="text-primary" target="_blank">
+                            Conversa #${exec.conversation_id}
+                        </a>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <strong class="text-gray-700">Status:</strong>
+                    <div>
+                        ${hasError ? 
+                            '<span class="badge badge-light-danger">Erro</span>' : 
+                            '<span class="badge badge-light-success">Sucesso</span>'
+                        }
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <strong class="text-gray-700">Argumentos:</strong>
+                    <pre class="bg-light p-3 rounded mt-2" style="max-height: 200px; overflow-y: auto; font-size: 0.85rem;">${escapeHtml(args)}</pre>
+                </div>
+                <div class="mb-4">
+                    <strong class="text-gray-700">Resultado:</strong>
+                    <pre class="bg-light p-3 rounded mt-2 ${hasError ? 'text-danger' : 'text-success'}" style="max-height: 200px; overflow-y: auto; font-size: 0.85rem;">${escapeHtml(result)}</pre>
+                </div>
+            </div>
+        `,
+        width: '800px',
+        showConfirmButton: true,
+        confirmButtonText: 'Fechar',
+        customClass: {
+            htmlContainer: 'text-start'
+        }
+    });
+}
+
+// Função para copiar prompt para clipboard
+function copyPromptToClipboard() {
+    const promptText = document.getElementById('agent_prompt_display').textContent;
+    navigator.clipboard.writeText(promptText).then(() => {
+        Swal.fire({
+            icon: 'success',
+            title: 'Copiado!',
+            text: 'Prompt copiado para a área de transferência',
+            timer: 2000,
+            showConfirmButton: false
+        });
+    }).catch(err => {
+        console.error('Erro ao copiar:', err);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Não foi possível copiar o prompt'
+        });
+    });
+}
 </script>
 ';
 ?>

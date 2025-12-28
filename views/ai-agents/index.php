@@ -143,9 +143,42 @@ ob_start();
                         </select>
                     </div>
                     <div class="fv-row mb-7">
-                        <label class="required fw-semibold fs-6 mb-2">Prompt do Sistema</label>
-                        <textarea name="prompt" class="form-control form-control-solid" rows="8" placeholder="Digite o prompt do sistema que define o comportamento do agente..." required></textarea>
+                        <label class="required fw-semibold fs-6 mb-2">
+                            Prompt do Sistema
+                            <span class="badge badge-light-info ms-2" id="prompt_char_count">0 caracteres</span>
+                        </label>
+                        <div class="d-flex gap-2 mb-2">
+                            <button type="button" class="btn btn-sm btn-light-primary" onclick="togglePromptPreview('new')">
+                                <i class="ki-duotone ki-eye fs-5">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                Preview
+                            </button>
+                            <button type="button" class="btn btn-sm btn-light-info" onclick="insertPromptTemplate('new')">
+                                <i class="ki-duotone ki-file-up fs-5">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Templates
+                            </button>
+                        </div>
+                        <textarea name="prompt" id="new_prompt" class="form-control form-control-solid" rows="8" placeholder="Digite o prompt do sistema que define o comportamento do agente..." required></textarea>
                         <div class="form-text">Este prompt será usado como instrução para o agente de IA. Seja específico sobre o papel, tom e comportamento esperado.</div>
+                        <!-- Preview do Prompt -->
+                        <div id="new_prompt_preview" class="mt-3 p-4 bg-light rounded" style="display: none;">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="fw-bold">Preview do Prompt:</span>
+                                <button type="button" class="btn btn-sm btn-icon btn-light" onclick="togglePromptPreview('new')">
+                                    <i class="ki-duotone ki-cross fs-5">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                </button>
+                            </div>
+                            <div id="new_prompt_preview_content" class="text-gray-800" style="white-space: pre-wrap; font-family: monospace; font-size: 0.9rem;"></div>
+                        </div>
                     </div>
                     <div class="row">
                         <div class="col-md-4">
@@ -296,9 +329,42 @@ ob_start();
                         </select>
                     </div>
                     <div class="fv-row mb-7">
-                        <label class="required fw-semibold fs-6 mb-2">Prompt do Sistema</label>
+                        <label class="required fw-semibold fs-6 mb-2">
+                            Prompt do Sistema
+                            <span class="badge badge-light-info ms-2" id="edit_prompt_char_count">0 caracteres</span>
+                        </label>
+                        <div class="d-flex gap-2 mb-2">
+                            <button type="button" class="btn btn-sm btn-light-primary" onclick="togglePromptPreview('edit')">
+                                <i class="ki-duotone ki-eye fs-5">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                Preview
+                            </button>
+                            <button type="button" class="btn btn-sm btn-light-info" onclick="insertPromptTemplate('edit')">
+                                <i class="ki-duotone ki-file-up fs-5">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Templates
+                            </button>
+                        </div>
                         <textarea name="prompt" id="edit_prompt" class="form-control form-control-solid" rows="8" placeholder="Digite o prompt do sistema que define o comportamento do agente..." required></textarea>
                         <div class="form-text">Este prompt será usado como instrução para o agente de IA. Seja específico sobre o papel, tom e comportamento esperado.</div>
+                        <!-- Preview do Prompt -->
+                        <div id="edit_prompt_preview" class="mt-3 p-4 bg-light rounded" style="display: none;">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="fw-bold">Preview do Prompt:</span>
+                                <button type="button" class="btn btn-sm btn-icon btn-light" onclick="togglePromptPreview('edit')">
+                                    <i class="ki-duotone ki-cross fs-5">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                </button>
+                            </div>
+                            <div id="edit_prompt_preview_content" class="text-gray-800" style="white-space: pre-wrap; font-family: monospace; font-size: 0.9rem;"></div>
+                        </div>
                     </div>
                     <div class="row">
                         <div class="col-md-4">
@@ -467,6 +533,9 @@ function editAgent(id) {
             document.getElementById("edit_response_delay_max").value = settings.response_delay_max || 0;
             document.getElementById("edit_context_timer_seconds").value = settings.context_timer_seconds || 5;
             
+            // Atualizar contador de caracteres do prompt
+            updatePromptCharCount('edit');
+            
             // Carregar tools do agente
             if (agent.tools && agent.tools.length > 0) {
                 agent.tools.forEach(tool => {
@@ -501,7 +570,138 @@ function editAgent(id) {
     });
 }
 
+// Funções para preview e templates de prompt
+function togglePromptPreview(mode) {
+    const previewDiv = document.getElementById(mode + '_prompt_preview');
+    const previewContent = document.getElementById(mode + '_prompt_preview_content');
+    const promptTextarea = document.getElementById(mode + '_prompt');
+    
+    if (previewDiv.style.display === 'none') {
+        previewContent.textContent = promptTextarea.value || '(vazio)';
+        previewDiv.style.display = 'block';
+    } else {
+        previewDiv.style.display = 'none';
+    }
+}
+
+function insertPromptTemplate(mode) {
+    const templates = {
+        'SDR': `Você é um SDR (Sales Development Representative) especializado em qualificação de leads e primeiro contato.
+
+OBJETIVOS:
+- Qualificar leads rapidamente
+- Identificar necessidades e pain points
+- Agendar reuniões ou demos quando apropriado
+- Criar interesse genuíno no produto/serviço
+
+TOM:
+- Profissional mas amigável
+- Consultivo, não agressivo
+- Focado em ajudar, não em vender
+- Respeitoso com o tempo do cliente
+
+REGRAS:
+- Faça perguntas abertas para entender necessidades
+- Escute mais do que fala
+- Seja honesto sobre limitações do produto
+- Escale para humano se cliente pedir ou se houver objeções complexas
+- Use as tools disponíveis para buscar informações quando necessário`,
+
+        'CS': `Você é um agente de Customer Success focado em garantir satisfação e sucesso dos clientes.
+
+OBJETIVOS:
+- Resolver dúvidas e problemas rapidamente
+- Proativar soluções antes que problemas ocorram
+- Manter relacionamento positivo
+- Identificar oportunidades de upsell quando apropriado
+
+TOM:
+- Empático e compreensivo
+- Solucionador de problemas
+- Paciente e educado
+- Proativo
+
+REGRAS:
+- Priorize resolver problemas do cliente
+- Use as tools para buscar informações de pedidos, produtos, etc
+- Se não souber algo, seja honesto e busque a informação
+- Escale para humano se problema for complexo ou cliente pedir
+- Sempre confirme se problema foi resolvido`,
+
+        'SUPPORT': `Você é um agente de suporte técnico especializado em resolver problemas técnicos.
+
+OBJETIVOS:
+- Diagnosticar problemas técnicos rapidamente
+- Fornecer soluções passo a passo
+- Educar clientes sobre o produto
+- Reduzir tempo de resolução
+
+TOM:
+- Técnico mas acessível
+- Paciente e didático
+- Claro e objetivo
+- Profissional
+
+REGRAS:
+- Faça perguntas específicas para diagnosticar
+- Use as tools para buscar informações técnicas
+- Forneça soluções passo a passo quando possível
+- Documente problemas recorrentes
+- Escale para humano se problema for crítico ou não conseguir resolver`
+    };
+    
+    Swal.fire({
+        title: 'Escolha um Template',
+        html: `
+            <div class="text-start">
+                <button class="btn btn-light-primary w-100 mb-2" onclick="selectTemplate('${mode}', 'SDR')">
+                    <strong>SDR</strong> - Sales Development Representative
+                </button>
+                <button class="btn btn-light-info w-100 mb-2" onclick="selectTemplate('${mode}', 'CS')">
+                    <strong>CS</strong> - Customer Success
+                </button>
+                <button class="btn btn-light-success w-100 mb-2" onclick="selectTemplate('${mode}', 'SUPPORT')">
+                    <strong>SUPPORT</strong> - Suporte Técnico
+                </button>
+            </div>
+        `,
+        showConfirmButton: false,
+        showCancelButton: true,
+        cancelButtonText: 'Cancelar',
+        width: '500px'
+    });
+    
+    window.selectTemplate = function(mode, templateKey) {
+        const promptTextarea = document.getElementById(mode + '_prompt');
+        promptTextarea.value = templates[templateKey] || '';
+        updatePromptCharCount(mode);
+        Swal.close();
+    };
+}
+
+function updatePromptCharCount(mode) {
+    const promptTextarea = document.getElementById(mode + '_prompt');
+    const charCount = document.getElementById(mode + '_prompt_char_count');
+    if (promptTextarea && charCount) {
+        const count = promptTextarea.value.length;
+        charCount.textContent = count.toLocaleString('pt-BR') + ' caracteres';
+    }
+}
+
 document.addEventListener("DOMContentLoaded", function() {
+    // Contador de caracteres do prompt
+    const newPrompt = document.getElementById("new_prompt");
+    const editPrompt = document.getElementById("edit_prompt");
+    
+    if (newPrompt) {
+        newPrompt.addEventListener("input", () => updatePromptCharCount('new'));
+        updatePromptCharCount('new');
+    }
+    
+    if (editPrompt) {
+        editPrompt.addEventListener("input", () => updatePromptCharCount('edit'));
+    }
+    
     // Formulário de criação
     const form = document.getElementById("kt_modal_new_ai_agent_form");
     if (form) {

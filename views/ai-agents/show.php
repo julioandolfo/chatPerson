@@ -723,8 +723,15 @@ foreach ($allTools as $tool) {
 
 <?php 
 $content = ob_get_clean(); 
-$scripts = '
+$agentsUrl = \App\Helpers\Url::to('/ai-agents');
+$conversationsUrl = \App\Helpers\Url::to('/conversations');
+$agentId = (int)($agent['id'] ?? 0);
+
+$scriptTemplate = <<<'HTML'
 <script>
+const AGENTS_URL = __AGENTS_URL__;
+const CONVERSATIONS_URL = __CONVERSATIONS_URL__;
+
 function removeTool(agentId, toolId) {
     Swal.fire({
         title: "Tem certeza?",
@@ -736,7 +743,7 @@ function removeTool(agentId, toolId) {
         confirmButtonColor: "#d33"
     }).then((result) => {
         if (result.isConfirmed) {
-            fetch("' . \App\Helpers\Url::to('/ai-agents') . '/" + agentId + "/tools/" + toolId, {
+            fetch(`${AGENTS_URL}/${agentId}/tools/${toolId}`, {
                 method: "DELETE",
                 headers: {
                     "X-Requested-With": "XMLHttpRequest"
@@ -762,7 +769,7 @@ function removeTool(agentId, toolId) {
                     });
                 }
             })
-            .catch(error => {
+            .catch(() => {
                 Swal.fire({
                     icon: "error",
                     title: "Erro",
@@ -784,7 +791,7 @@ document.addEventListener("DOMContentLoaded", function() {
             
             const formData = new FormData(addToolForm);
             
-            fetch("' . \App\Helpers\Url::to('/ai-agents') . '/" + formData.get("agent_id") + "/tools", {
+            fetch(`${AGENTS_URL}/${formData.get("agent_id")}/tools`, {
                 method: "POST",
                 headers: {
                     "X-Requested-With": "XMLHttpRequest"
@@ -814,7 +821,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     });
                 }
             })
-            .catch(error => {
+            .catch(() => {
                 submitBtn.removeAttribute("data-kt-indicator");
                 submitBtn.disabled = false;
                 Swal.fire({
@@ -840,7 +847,7 @@ document.addEventListener("DOMContentLoaded", function() {
             // Converter enabled checkbox para boolean
             formData.set("enabled", document.getElementById("edit_agent_enabled").checked ? "1" : "0");
             
-            fetch("' . \App\Helpers\Url::to('/ai-agents') . '/" + agentId, {
+            fetch(`${AGENTS_URL}/${agentId}`, {
                 method: "POST",
                 headers: {
                     "X-Requested-With": "XMLHttpRequest"
@@ -870,7 +877,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     });
                 }
             })
-            .catch(error => {
+            .catch(() => {
                 submitBtn.removeAttribute("data-kt-indicator");
                 submitBtn.disabled = false;
                 Swal.fire({
@@ -883,7 +890,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
     
     // Carregar conversas do agente
-    const agentId = ' . (int)($agent['id'] ?? 0) . ';
+    const agentId = __AGENT_ID__;
     let currentPage = 1;
     const limit = 20;
     
@@ -899,7 +906,7 @@ document.addEventListener("DOMContentLoaded", function() {
             </div>
         `;
         
-        fetch("' . \App\Helpers\Url::to('/ai-agents') . '/" + agentId + "/conversations?page=" + page + "&limit=" + limit, {
+        fetch(`${AGENTS_URL}/${agentId}/conversations?page=${page}&limit=${limit}`, {
             headers: {
                 "X-Requested-With": "XMLHttpRequest"
             }
@@ -1066,7 +1073,7 @@ document.addEventListener("DOMContentLoaded", function() {
         
         modal.show();
         
-        fetch("' . \App\Helpers\Url::to('/ai-agents') . '/" + agentId + "/conversations/" + conversationId + "/history", {
+        fetch(`${AGENTS_URL}/${agentId}/conversations/${conversationId}/history`, {
             headers: {
                 "X-Requested-With": "XMLHttpRequest"
             }
@@ -1246,7 +1253,7 @@ document.addEventListener("DOMContentLoaded", function() {
     
     // Carregar conversas ao carregar a página
     loadConversations(1);
-    loadToolExecutions(<?= $agent['id'] ?>, 1);
+    loadToolExecutions(agentId, 1);
 });
 
 // Função para copiar prompt para clipboard
@@ -1281,7 +1288,7 @@ function loadToolExecutions(agentId, page = 1) {
         </div>
     `;
     
-    fetch(`<?= \App\Helpers\Url::to('/ai-agents') ?>/${agentId}/tool-executions?page=${page}`, {
+    fetch(`${AGENTS_URL}/${agentId}/tool-executions?page=${page}`, {
         headers: {
             "X-Requested-With": "XMLHttpRequest",
             "Accept": "application/json"
@@ -1331,7 +1338,6 @@ function loadToolExecutions(agentId, page = 1) {
                 });
                 
                 const args = exec.call ? JSON.stringify(exec.call, null, 2) : '{}';
-                const result = exec.result ? JSON.stringify(exec.result, null, 2) : '{}';
                 const hasError = exec.result && exec.result.error;
                 
                 html += `
@@ -1343,7 +1349,7 @@ function loadToolExecutions(agentId, page = 1) {
                             <span class="badge badge-light-primary">${escapeHtml(exec.tool || 'N/A')}</span>
                         </td>
                         <td>
-                            <a href="<?= \App\Helpers\Url::to('/conversations') ?>/${exec.conversation_id}" class="text-primary fw-semibold" target="_blank">
+                            <a href="${CONVERSATIONS_URL}/${exec.conversation_id}" class="text-primary fw-semibold" target="_blank">
                                 Conversa #${exec.conversation_id}
                             </a>
                         </td>
@@ -1422,7 +1428,7 @@ function showToolExecutionDetails(exec) {
                 <div class="mb-4">
                     <strong class="text-gray-700">Conversa:</strong>
                     <div class="text-gray-800">
-                        <a href="<?= \App\Helpers\Url::to('/conversations') ?>/${exec.conversation_id}" class="text-primary" target="_blank">
+                        <a href="${CONVERSATIONS_URL}/${exec.conversation_id}" class="text-primary" target="_blank">
                             Conversa #${exec.conversation_id}
                         </a>
                     </div>
@@ -1454,29 +1460,14 @@ function showToolExecutionDetails(exec) {
         }
     });
 }
-
-// Função para copiar prompt para clipboard
-function copyPromptToClipboard() {
-    const promptText = document.getElementById('agent_prompt_display').textContent;
-    navigator.clipboard.writeText(promptText).then(() => {
-        Swal.fire({
-            icon: 'success',
-            title: 'Copiado!',
-            text: 'Prompt copiado para a área de transferência',
-            timer: 2000,
-            showConfirmButton: false
-        });
-    }).catch(err => {
-        console.error('Erro ao copiar:', err);
-        Swal.fire({
-            icon: 'error',
-            title: 'Erro',
-            text: 'Não foi possível copiar o prompt'
-        });
-    });
-}
 </script>
-';
+HTML;
+
+$scripts = str_replace(
+    ['__AGENTS_URL__', '__CONVERSATIONS_URL__', '__AGENT_ID__'],
+    [json_encode($agentsUrl), json_encode($conversationsUrl), (string)$agentId],
+    $scriptTemplate
+);
 ?>
 
 <?php include __DIR__ . '/../layouts/metronic/app.php'; ?>

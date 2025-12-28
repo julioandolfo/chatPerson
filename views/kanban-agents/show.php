@@ -82,6 +82,104 @@ ob_start();
             </div>
         </div>
         
+        <div class="row mb-10">
+            <div class="col-md-6">
+                <div class="d-flex flex-column">
+                    <span class="text-muted fs-7 mb-1">Última Execução</span>
+                    <span class="text-gray-800 fw-semibold">
+                        <?= $agent['last_execution_at'] ? date('d/m/Y H:i', strtotime($agent['last_execution_at'])) : 'Nunca' ?>
+                    </span>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="d-flex flex-column">
+                    <span class="text-muted fs-7 mb-1">Máximo de Conversas</span>
+                    <span class="text-gray-800 fw-semibold">
+                        <?= $agent['max_conversations_per_execution'] ?? 50 ?> por execução
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Funis e Etapas Alvo -->
+        <?php if (!empty($funnels) || !empty($stages)): ?>
+        <div class="separator separator-dashed my-10"></div>
+        <h4 class="fw-bold mb-5">Funis e Etapas Alvo</h4>
+        <div class="row mb-10">
+            <?php if (!empty($funnels)): ?>
+            <div class="col-md-6">
+                <span class="text-muted fs-7 mb-2 d-block">Funis:</span>
+                <?php foreach ($funnels as $funnel): ?>
+                    <span class="badge badge-light-primary me-2 mb-2"><?= htmlspecialchars($funnel['name']) ?></span>
+                <?php endforeach; ?>
+            </div>
+            <?php else: ?>
+            <div class="col-md-6">
+                <span class="text-muted fs-7 mb-2 d-block">Funis:</span>
+                <span class="badge badge-light-info">Todos os funis</span>
+            </div>
+            <?php endif; ?>
+            
+            <?php if (!empty($stages)): ?>
+            <div class="col-md-6">
+                <span class="text-muted fs-7 mb-2 d-block">Etapas:</span>
+                <?php foreach ($stages as $stage): ?>
+                    <span class="badge badge-light-success me-2 mb-2"><?= htmlspecialchars($stage['name']) ?></span>
+                <?php endforeach; ?>
+            </div>
+            <?php else: ?>
+            <div class="col-md-6">
+                <span class="text-muted fs-7 mb-2 d-block">Etapas:</span>
+                <span class="badge badge-light-info">Todas as etapas</span>
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+        
+        <!-- Condições e Ações -->
+        <div class="separator separator-dashed my-10"></div>
+        <div class="row mb-10">
+            <div class="col-md-6">
+                <h5 class="fw-bold mb-3">Condições</h5>
+                <?php 
+                $conditions = $agent['conditions'] ?? ['operator' => 'AND', 'conditions' => []];
+                $conditionsCount = count($conditions['conditions'] ?? []);
+                ?>
+                <div class="d-flex align-items-center mb-2">
+                    <span class="badge badge-light-info me-2"><?= strtoupper($conditions['operator'] ?? 'AND') ?></span>
+                    <span class="text-gray-600"><?= $conditionsCount ?> condição(ões) configurada(s)</span>
+                </div>
+                <?php if ($conditionsCount === 0): ?>
+                    <div class="text-muted fs-7">Nenhuma condição configurada (todas as conversas serão analisadas)</div>
+                <?php endif; ?>
+            </div>
+            <div class="col-md-6">
+                <h5 class="fw-bold mb-3">Ações</h5>
+                <?php 
+                $actions = $agent['actions'] ?? [];
+                $actionsCount = count($actions);
+                ?>
+                <div class="d-flex align-items-center mb-2">
+                    <span class="badge badge-light-success me-2"><?= $actionsCount ?></span>
+                    <span class="text-gray-600">ação(ões) configurada(s)</span>
+                </div>
+                <?php if ($actionsCount === 0): ?>
+                    <div class="text-muted fs-7">Nenhuma ação configurada</div>
+                <?php else: ?>
+                    <div class="mt-2">
+                        <?php foreach (array_slice($actions, 0, 3) as $action): ?>
+                            <?php if ($action['enabled'] ?? true): ?>
+                                <span class="badge badge-light-primary me-1 mb-1"><?= htmlspecialchars($action['type'] ?? 'unknown') ?></span>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                        <?php if ($actionsCount > 3): ?>
+                            <span class="text-muted fs-7">+<?= $actionsCount - 3 ?> mais</span>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        
         <!-- Últimas Execuções -->
         <div class="separator separator-dashed my-10"></div>
         <h4 class="fw-bold mb-5">Últimas Execuções</h4>

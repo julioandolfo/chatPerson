@@ -14,9 +14,12 @@ use App\Models\Message;
 use App\Models\Contact;
 use App\Models\Funnel;
 use App\Models\FunnelStage;
+use App\Models\User;
 use App\Helpers\Database;
 use App\Helpers\Logger;
 use App\Services\OpenAIService;
+use App\Services\TagService;
+use App\Services\ConversationNoteService;
 
 class KanbanAgentService
 {
@@ -353,9 +356,9 @@ class KanbanAgentService
     }
 
     /**
-     * Avaliar condições
+     * Avaliar condições (público para testes)
      */
-    private static function evaluateConditions(array $conditions, array $conversation, array $analysis): array
+    public static function evaluateConditions(array $conditions, array $conversation, array $analysis): array
     {
         if (empty($conditions) || empty($conditions['conditions'])) {
             return ['met' => true, 'details' => []];
@@ -575,9 +578,23 @@ class KanbanAgentService
             $message = self::processTemplate($template, $conversation, $analysis);
         }
 
-        // Enviar mensagem (usar MessageService ou similar)
-        // Por enquanto, apenas retornar
-        return ['message' => 'Mensagem de followup gerada', 'content' => $message];
+        if (empty(trim($message))) {
+            throw new \Exception('Mensagem de followup não pode estar vazia');
+        }
+
+        // Enviar mensagem usando ConversationService
+        $messageId = \App\Services\ConversationService::sendMessage(
+            $conversation['id'],
+            $message,
+            'agent',
+            null, // Sistema
+            [],
+            'text',
+            null,
+            null // Não é agente de IA tradicional
+        );
+
+        return ['message' => 'Mensagem de followup enviada', 'message_id' => $messageId, 'content' => $message];
     }
 
     /**
@@ -660,9 +677,40 @@ class KanbanAgentService
             throw new \Exception('Nenhuma tag especificada');
         }
 
-        // Implementar adição de tags
-        // Por enquanto, apenas retornar
-        return ['message' => 'Tags adicionadas: ' . implode(', ', $tags)];
+        $addedTags = [];
+        $errors = [];
+
+        foreach ($tags as $tag) {
+            try {
+                // Se for ID numérico, usar diretamente
+                if (is_numeric($tag)) {
+                    \App\Services\TagService::addToConversation($conversation['id'], (int)$tag);
+                    $tagObj = \App\Models\Tag::find((int)$tag);
+                    $addedTags[] = $tagObj ? $tagObj['name'] : "Tag #{$tag}";
+                } else {
+                    // Se for nome, buscar tag por nome
+                    $tagObj = \App\Models\Tag::whereFirst('name', '=', $tag);
+                    if ($tagObj) {
+                        \App\Services\TagService::addToConversation($conversation['id'], $tagObj['id']);
+                        $addedTags[] = $tagObj['name'];
+                    } else {
+                        $errors[] = "Tag '{$tag}' não encontrada";
+                    }
+                }
+            } catch (\Exception $e) {
+                $errors[] = "Erro ao adicionar tag '{$tag}': " . $e->getMessage();
+            }
+        }
+
+        if (!empty($errors)) {
+            Logger::warning("KanbanAgentService::actionAddTag - Erros: " . implode(', ', $errors));
+        }
+
+        return [
+            'message' => !empty($addedTags) ? 'Tags adicionadas: ' . implode(', ', $addedTags) : 'Nenhuma tag adicionada',
+            'added_tags' => $addedTags,
+            'errors' => $errors
+        ];
     }
 
     /**
@@ -672,10 +720,34 @@ class KanbanAgentService
     {
         $summaryType = $config['summary_type'] ?? 'internal';
         $summary = $analysis['summary'] ?? 'Resumo não disponível';
+        $includeRecommendations = $config['include_recommendations'] ?? false;
 
-        // Criar nota ou atividade com resumo
-        // Por enquanto, apenas retornar
-        return ['message' => 'Resumo criado', 'summary' => $summary];
+        $noteContent = "📊 **Resumo da Análise**\n\n{$summary}";
+        
+        if ($includeRecommendations && !empty($analysis['recommendations'])) {
+            $noteContent .= "\n\n**Recomendações:**\n";
+            foreach ($analysis['recommendations'] as $rec) {
+                $noteContent .= "- {$rec}\n";
+            }
+        }
+
+        // Criar nota usando ConversationNoteService
+        // Usar user_id = 0 para sistema (ou buscar um usuário admin)
+        $systemUserId = self::getSystemUserId();
+        
+        try {
+            $note = \App\Services\ConversationNoteService::create(
+                $conversation['id'],
+                $systemUserId,
+                $noteContent,
+                $summaryType === 'internal' // isPrivate
+            );
+            
+            return ['message' => 'Resumo criado', 'note_id' => $note['id'] ?? null, 'summary' => $summary];
+        } catch (\Exception $e) {
+            Logger::error("KanbanAgentService::actionCreateSummary - Erro: " . $e->getMessage());
+            throw new \Exception('Erro ao criar resumo: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -686,12 +758,29 @@ class KanbanAgentService
         $note = $config['note'] ?? '';
         $isInternal = $config['is_internal'] ?? true;
 
-        // Processar template da nota
-        $note = self::processTemplate($note, $conversation, $analysis);
+        if (empty(trim($note))) {
+            throw new \Exception('Conteúdo da nota não pode estar vazio');
+        }
 
-        // Criar nota
-        // Por enquanto, apenas retornar
-        return ['message' => 'Nota criada', 'note' => $note];
+        // Processar template da nota
+        $noteContent = self::processTemplate($note, $conversation, $analysis);
+
+        // Criar nota usando ConversationNoteService
+        $systemUserId = self::getSystemUserId();
+        
+        try {
+            $createdNote = \App\Services\ConversationNoteService::create(
+                $conversation['id'],
+                $systemUserId,
+                $noteContent,
+                $isInternal
+            );
+            
+            return ['message' => 'Nota criada', 'note_id' => $createdNote['id'] ?? null, 'note' => $noteContent];
+        } catch (\Exception $e) {
+            Logger::error("KanbanAgentService::actionCreateNote - Erro: " . $e->getMessage());
+            throw new \Exception('Erro ao criar nota: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -725,9 +814,49 @@ class KanbanAgentService
      */
     private static function getRoundRobinAgent(?int $departmentId = null): ?int
     {
-        // Implementar lógica de round-robin
-        // Por enquanto, retornar null
-        return null;
+        try {
+            $sql = "SELECT u.id, u.name, 
+                           (SELECT COUNT(*) FROM conversations c WHERE c.agent_id = u.id AND c.status = 'open') as active_conversations
+                    FROM users u
+                    WHERE u.status = 'active' AND u.role_id > 0";
+            
+            $params = [];
+            
+            if ($departmentId) {
+                $sql .= " AND u.department_id = ?";
+                $params[] = $departmentId;
+            }
+            
+            $sql .= " ORDER BY active_conversations ASC, u.id ASC LIMIT 1";
+            
+            $agent = Database::fetch($sql, $params);
+            
+            return $agent ? (int)$agent['id'] : null;
+        } catch (\Exception $e) {
+            Logger::error("KanbanAgentService::getRoundRobinAgent - Erro: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Obter ID do usuário do sistema (para criar notas/atividades)
+     */
+    private static function getSystemUserId(): int
+    {
+        // Tentar buscar um usuário admin/super admin
+        $admin = \App\Models\User::whereFirst('role_id', '=', 1); // Assumindo que role_id 1 é super admin
+        if ($admin) {
+            return (int)$admin['id'];
+        }
+        
+        // Se não encontrar, buscar qualquer usuário ativo
+        $user = \App\Models\User::whereFirst('status', '=', 'active');
+        if ($user) {
+            return (int)$user['id'];
+        }
+        
+        // Fallback: retornar 0 (sistema)
+        return 0;
     }
 }
 

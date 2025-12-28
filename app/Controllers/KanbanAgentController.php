@@ -238,6 +238,14 @@ class KanbanAgentController
             $allStages[$funnel['id']] = $stages;
         }
         
+        // Garantir que arrays estão inicializados
+        if (!is_array($agent['target_funnel_ids'])) {
+            $agent['target_funnel_ids'] = [];
+        }
+        if (!is_array($agent['target_stage_ids'])) {
+            $agent['target_stage_ids'] = [];
+        }
+        
         Response::view('kanban-agents/edit', [
             'agent' => $agent,
             'funnels' => $funnels,
@@ -360,6 +368,60 @@ class KanbanAgentController
             Response::json([
                 'success' => false,
                 'message' => 'Erro ao executar agente: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Testar condições em uma conversa específica
+     */
+    public function testConditions(int $id): void
+    {
+        Permission::abortIfCannot('ai_agents.view');
+        
+        $data = Request::post();
+        $conversationId = $data['conversation_id'] ?? null;
+        $conditions = $data['conditions'] ?? null;
+        
+        if (!$conversationId || !$conditions) {
+            Response::json([
+                'success' => false,
+                'message' => 'ID da conversa e condições são obrigatórios'
+            ], 400);
+            return;
+        }
+        
+        try {
+            $conversation = Conversation::find($conversationId);
+            if (!$conversation) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Conversa não encontrada'
+                ], 404);
+                return;
+            }
+            
+            // Simular análise básica
+            $analysis = [
+                'summary' => 'Análise de teste',
+                'score' => 75,
+                'sentiment' => 'neutral',
+                'urgency' => 'medium',
+                'recommendations' => []
+            ];
+            
+            // Avaliar condições usando método público do service
+            $result = \App\Services\KanbanAgentService::evaluateConditions($conditions, $conversation, $analysis);
+            
+            Response::json([
+                'success' => true,
+                'result' => $result['met'] ?? false,
+                'details' => $result['details'] ?? []
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao testar condições: ' . $e->getMessage()
             ], 500);
         }
     }

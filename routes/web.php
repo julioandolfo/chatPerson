@@ -390,6 +390,7 @@ Router::post('/kanban-agents', [KanbanAgentController::class, 'store'], ['Authen
 Router::post('/kanban-agents/{id}', [KanbanAgentController::class, 'update'], ['Authentication']);
 Router::delete('/kanban-agents/{id}', [KanbanAgentController::class, 'delete'], ['Authentication']);
 Router::post('/kanban-agents/{id}/execute', [KanbanAgentController::class, 'execute'], ['Authentication']);
+Router::post('/kanban-agents/{id}/test-conditions', [KanbanAgentController::class, 'testConditions'], ['Authentication']);
 
 // Rotas do Assistente IA (Chat)
 Router::get('/ai-assistant/features', [AIAssistantController::class, 'getFeatures'], ['Authentication']);

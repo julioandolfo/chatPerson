@@ -83,6 +83,28 @@ ob_start();
             
             <div class="separator separator-dashed my-10"></div>
             
+            <h4 class="fw-bold mb-5">Funis e Etapas Alvo</h4>
+            <div class="row mb-5">
+                <div class="col-md-6">
+                    <label class="form-label">Funis (deixe vazio para todos)</label>
+                    <select name="target_funnel_ids[]" class="form-select" id="target_funnels" multiple size="5">
+                        <?php foreach ($funnels as $funnel): ?>
+                            <option value="<?= $funnel['id'] ?>"><?= htmlspecialchars($funnel['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <div class="form-text">Segure Ctrl/Cmd para selecionar múltiplos funis</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Etapas (deixe vazio para todas)</label>
+                    <select name="target_stage_ids[]" class="form-select" id="target_stages" multiple size="5">
+                        <option value="">Carregando etapas...</option>
+                    </select>
+                    <div class="form-text">Segure Ctrl/Cmd para selecionar múltiplas etapas</div>
+                </div>
+            </div>
+            
+            <div class="separator separator-dashed my-10"></div>
+            
             <div class="d-flex justify-content-end">
                 <a href="<?= \App\Helpers\Url::to('/kanban-agents') ?>" class="btn btn-light me-3">Cancelar</a>
                 <button type="submit" class="btn btn-primary">Criar Agente</button>
@@ -93,6 +115,8 @@ ob_start();
 <!--end::Card-->
 
 <script>
+const allStages = <?= json_encode($allStages, JSON_UNESCAPED_UNICODE) ?>;
+
 document.getElementById('execution_type').addEventListener('change', function() {
     const intervalContainer = document.getElementById('interval_hours_container');
     if (this.value === 'interval') {
@@ -102,11 +126,68 @@ document.getElementById('execution_type').addEventListener('change', function() 
     }
 });
 
+// Atualizar etapas quando funis são selecionados
+document.getElementById('target_funnels').addEventListener('change', function() {
+    const selectedFunnels = Array.from(this.selectedOptions).map(opt => parseInt(opt.value));
+    const stagesSelect = document.getElementById('target_stages');
+    
+    stagesSelect.innerHTML = '';
+    
+    if (selectedFunnels.length === 0) {
+        // Se nenhum funil selecionado, mostrar todas as etapas
+        Object.keys(allStages).forEach(funnelId => {
+            allStages[funnelId].forEach(stage => {
+                const option = document.createElement('option');
+                option.value = stage.id;
+                option.textContent = stage.name + ' (Funil: ' + stage.funnel_id + ')';
+                stagesSelect.appendChild(option);
+            });
+        });
+    } else {
+        // Mostrar apenas etapas dos funis selecionados
+        selectedFunnels.forEach(funnelId => {
+            if (allStages[funnelId]) {
+                allStages[funnelId].forEach(stage => {
+                    const option = document.createElement('option');
+                    option.value = stage.id;
+                    option.textContent = stage.name;
+                    stagesSelect.appendChild(option);
+                });
+            }
+        });
+    }
+});
+
+// Carregar todas as etapas inicialmente
+document.getElementById('target_funnels').dispatchEvent(new Event('change'));
+
 document.getElementById('kt_form_kanban_agent').addEventListener('submit', function(e) {
     e.preventDefault();
     
     const formData = new FormData(this);
-    const data = Object.fromEntries(formData);
+    const data = {};
+    
+    // Processar campos normais
+    for (let [key, value] of formData.entries()) {
+        if (key.endsWith('[]')) {
+            const realKey = key.replace('[]', '');
+            if (!data[realKey]) {
+                data[realKey] = [];
+            }
+            data[realKey].push(value);
+        } else {
+            data[key] = value;
+        }
+    }
+    
+    // Converter arrays vazios para null
+    if (data.target_funnel_ids && data.target_funnel_ids.length === 0) {
+        data.target_funnel_ids = null;
+    }
+    if (data.target_stage_ids && data.target_stage_ids.length === 0) {
+        data.target_stage_ids = null;
+    }
+    
     data.enabled = document.getElementById('enabled').checked;
     data.conditions = JSON.stringify({operator: 'AND', conditions: []});
     data.actions = JSON.stringify([]);

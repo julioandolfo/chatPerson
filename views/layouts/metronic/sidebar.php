@@ -203,7 +203,7 @@
                 <?php if (\App\Helpers\Permission::can('ai_agents.view')): ?>
                 <!--begin:Menu item-->
                 <div data-kt-menu-trigger="click" class="menu-item menu-accordion">
-                    <span class="menu-link <?= isActive('/ai-agents', $currentUri) || isActive('/ai-tools', $currentUri) ? 'active' : '' ?>" data-title="Agentes de IA">
+                    <span class="menu-link <?= isActive('/ai-agents', $currentUri) || isActive('/ai-tools', $currentUri) || isActive('/kanban-agents', $currentUri) ? 'active' : '' ?>" data-title="Agentes de IA">
                         <span class="menu-icon">
                             <i class="ki-duotone ki-abstract-26 fs-2">
                                 <span class="path1"></span>
@@ -225,6 +225,16 @@
                                 <span class="menu-title">Agentes</span>
                             </a>
                         </div>
+                        <?php if (\App\Helpers\Permission::can('ai_agents.view')): ?>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/kanban-agents', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/kanban-agents') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Agentes Kanban</span>
+                            </a>
+                        </div>
+                        <?php endif; ?>
                         <?php if (\App\Helpers\Permission::can('ai_tools.view')): ?>
                         <div class="menu-item">
                             <a class="menu-link <?= isActive('/ai-tools', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/ai-tools') ?>">

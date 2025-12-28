@@ -18,7 +18,8 @@ RUN apt-get update && apt-get install -y \
     zip \
     curl \
     ffmpeg \
- && docker-php-ext-install pdo pdo_mysql \
+    libpq-dev \
+ && docker-php-ext-install pdo pdo_mysql pdo_pgsql pgsql \
  && a2enmod rewrite
 
 # Ajusta DocumentRoot para /public

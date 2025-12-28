@@ -655,13 +655,13 @@ REGRAS:
         title: 'Escolha um Template',
         html: `
             <div class="text-start">
-                <button class="btn btn-light-primary w-100 mb-2" onclick="selectTemplate('${mode}', 'SDR')">
+                <button class="btn btn-light-primary w-100 mb-2" onclick="selectTemplate('\${mode}', 'SDR')">
                     <strong>SDR</strong> - Sales Development Representative
                 </button>
-                <button class="btn btn-light-info w-100 mb-2" onclick="selectTemplate('${mode}', 'CS')">
+                <button class="btn btn-light-info w-100 mb-2" onclick="selectTemplate('\${mode}', 'CS')">
                     <strong>CS</strong> - Customer Success
                 </button>
-                <button class="btn btn-light-success w-100 mb-2" onclick="selectTemplate('${mode}', 'SUPPORT')">
+                <button class="btn btn-light-success w-100 mb-2" onclick="selectTemplate('\${mode}', 'SUPPORT')">
                     <strong>SUPPORT</strong> - Suporte Técnico
                 </button>
             </div>

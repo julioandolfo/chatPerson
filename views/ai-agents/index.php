@@ -494,12 +494,13 @@ ob_start();
 
 <?php 
 $content = ob_get_clean(); 
-$scripts = '
+$agentsUrl = \App\Helpers\Url::to('/ai-agents');
+$scripts = <<<HTML
 <script>
 // Função global para editar agente
 function editAgent(id) {
     // Carregar dados do agente
-    fetch("' . \App\Helpers\Url::to('/ai-agents') . '/" + id, {
+    fetch("{$agentsUrl}/" + id, {
         headers: {
             "X-Requested-With": "XMLHttpRequest",
             "Accept": "application/json"
@@ -731,7 +732,7 @@ document.addEventListener("DOMContentLoaded", function() {
             }
             data.tools = tools;
             
-            fetch("' . \App\Helpers\Url::to('/ai-agents') . '", {
+            fetch("{$agentsUrl}", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -804,7 +805,7 @@ document.addEventListener("DOMContentLoaded", function() {
             }
             data.tools = tools;
             
-            fetch("' . \App\Helpers\Url::to('/ai-agents') . '/" + agentId, {
+            fetch("{$agentsUrl}/" + agentId, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -848,7 +849,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 </script>
-';
+HTML;
 ?>
 
 <?php include __DIR__ . '/../layouts/metronic/app.php'; ?>

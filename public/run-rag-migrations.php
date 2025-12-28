@@ -153,8 +153,13 @@ require_once __DIR__ . '/../app/Helpers/autoload.php';
                     require $migrationPath;
                     
                     // Extrair nome da função
+                    // Remove número inicial (ex: 060_)
                     $functionName = preg_replace('/^\d+_/', '', $migration);
+                    // Remove extensão .php
                     $functionName = str_replace('.php', '', $functionName);
+                    // Remove prefixo create_ se existir
+                    $functionName = preg_replace('/^create_/', '', $functionName);
+                    // Adiciona prefixo up_
                     $functionName = 'up_' . $functionName;
                     
                     if (function_exists($functionName)) {
@@ -169,6 +174,17 @@ require_once __DIR__ . '/../app/Helpers/autoload.php';
                     } else {
                         $output = ob_get_clean();
                         echo '<span class="error">❌ Função "' . htmlspecialchars($functionName) . '" não encontrada</span>';
+                        
+                        // Debug: mostrar funções disponíveis que começam com "up_"
+                        $allFunctions = get_defined_functions()['user'];
+                        $upFunctions = array_filter($allFunctions, function($fn) {
+                            return strpos($fn, 'up_') === 0;
+                        });
+                        
+                        if (!empty($upFunctions)) {
+                            echo '<br><small class="info">💡 Funções disponíveis que começam com "up_": ' . implode(', ', array_slice($upFunctions, 0, 10)) . '</small>';
+                        }
+                        
                         $allSuccess = false;
                     }
                     

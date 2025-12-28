@@ -92,7 +92,7 @@ ob_start();
                                         Ver
                                     </a>
                                     <?php if (\App\Helpers\Permission::can('ai_agents.edit')): ?>
-                                    <button type="button" class="btn btn-sm btn-light-info" onclick="editAgent(<?= $agent['id'] ?>)">
+                                    <button type="button" class="btn btn-sm btn-light-info" onclick="editAgent(<?php echo $agent['id']; ?>)">
                                         Editar
                                     </button>
                                     <?php endif; ?>

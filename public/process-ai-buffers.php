@@ -50,6 +50,8 @@ try {
 
 use App\Helpers\Logger;
 use App\Services\AIAgentService;
+use App\Models\Conversation;
+use App\Models\AIAgent;
 
 // Diretório de buffers
 $bufferDir = __DIR__ . '/../storage/ai_buffers/';
@@ -88,6 +90,20 @@ foreach ($bufferFiles as $bufferFile) {
         
         if (!$conversationId || !$agentId || empty($messages)) {
             Logger::aiTools("[BUFFER PROCESSOR] Dados incompletos no buffer: convId={$conversationId}, agentId={$agentId}, msgs=" . count($messages));
+            @unlink($bufferFile);
+            continue;
+        }
+        
+        // Verificar se a conversa e o agente ainda existem
+        $conversation = Conversation::find($conversationId);
+        if (empty($conversation) || empty($conversation['contact_id'])) {
+            Logger::aiTools("[BUFFER PROCESSOR] 🔥 Descartando buffer: conversa inexistente ou sem contato (convId={$conversationId})");
+            @unlink($bufferFile);
+            continue;
+        }
+        $agentModel = AIAgent::find($agentId);
+        if (empty($agentModel) || empty($agentModel['enabled'])) {
+            Logger::aiTools("[BUFFER PROCESSOR] 🔥 Descartando buffer: agente inexistente/inativo (agentId={$agentId}, convId={$conversationId})");
             @unlink($bufferFile);
             continue;
         }

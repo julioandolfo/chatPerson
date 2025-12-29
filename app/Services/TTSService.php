@@ -36,6 +36,11 @@ class TTSService
             'similarity_boost' => 0.75, // Similaridade (ElevenLabs: 0.0 a 1.0)
             'output_format' => 'mp3', // mp3, opus, ogg, pcm
             'convert_to_whatsapp_format' => true, // Converter para formato compatível com WhatsApp
+            // Fallbacks dedicados
+            'fallback_openai_voice' => 'alloy',
+            'fallback_openai_model' => 'tts-1',
+            'fallback_elevenlabs_voice' => null,
+            'fallback_elevenlabs_model' => null,
         ], $ttsSettings);
     }
 
@@ -94,6 +99,22 @@ class TTSService
             ? self::PROVIDER_ELEVENLABS 
             : self::PROVIDER_OPENAI;
         
+        // Ajustar settings para o fallback (voz/modelo seguros)
+        $fallbackSettings = $mergedSettings;
+        if ($fallbackProvider === self::PROVIDER_OPENAI) {
+            // Voz e modelo padrão/configuráveis para o fallback OpenAI
+            $fallbackSettings['voice_id'] = $settings['fallback_openai_voice'] ?? 'alloy';
+            $fallbackSettings['model'] = $settings['fallback_openai_model'] ?? 'tts-1';
+        } else {
+            // Voz/modelo para fallback ElevenLabs (se configurados), senão mantém os atuais
+            if (!empty($settings['fallback_elevenlabs_voice'])) {
+                $fallbackSettings['voice_id'] = $settings['fallback_elevenlabs_voice'];
+            }
+            if (!empty($settings['fallback_elevenlabs_model'])) {
+                $fallbackSettings['model'] = $settings['fallback_elevenlabs_model'];
+            }
+        }
+        
         // Verificar se fallback está configurado
         if (!self::isProviderConfigured($fallbackProvider)) {
             Logger::error("TTSService::generateAudio - ⚠️ Fallback {$fallbackProvider} não está configurado. Retornando erro original.");
@@ -102,7 +123,7 @@ class TTSService
         
         // ✅ Tentar com fallback
         Logger::info("TTSService::generateAudio - 🔄 Tentando fallback: {$fallbackProvider}");
-        $fallbackResult = self::tryGenerateWithProvider($fallbackProvider, $text, $mergedSettings);
+        $fallbackResult = self::tryGenerateWithProvider($fallbackProvider, $text, $fallbackSettings);
         
         if ($fallbackResult['success']) {
             Logger::info("TTSService::generateAudio - ✅ SUCESSO com fallback {$fallbackProvider}!");

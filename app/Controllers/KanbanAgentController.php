@@ -470,7 +470,7 @@ class KanbanAgentController
             $agents = \App\Models\User::getAgents();
             
             // Agentes de IA
-            $aiAgents = \App\Models\AIAgent::whereActive();
+            $aiAgents = \App\Models\AIAgent::where('enabled', '=', true);
             
             // Tags
             $tags = \App\Services\TagService::getAll();

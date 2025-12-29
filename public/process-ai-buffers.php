@@ -15,7 +15,17 @@
  * }
  */
 
+// Saída silenciosa por padrão (CLI ou web)
+header('Content-Type: text/plain; charset=utf-8');
+
+try {
 require_once __DIR__ . '/../vendor/autoload.php';
+} catch (\Throwable $e) {
+    error_log('[process-ai-buffers] Autoload error: ' . $e->getMessage());
+    echo "error: autoload\n";
+    http_response_code(500);
+    exit(1);
+}
 
 use App\Helpers\Logger;
 use App\Services\AIAgentService;
@@ -23,11 +33,11 @@ use App\Services\AIAgentService;
 // Diretório de buffers
 $bufferDir = __DIR__ . '/../storage/ai_buffers/';
 if (!is_dir($bufferDir)) {
-    mkdir($bufferDir, 0755, true);
+    @mkdir($bufferDir, 0755, true);
 }
 
 // Buscar arquivos de buffer
-$bufferFiles = glob($bufferDir . 'buffer_*.json');
+$bufferFiles = glob($bufferDir . 'buffer_*.json') ?: [];
 
 if (empty($bufferFiles)) {
     // Sem buffers para processar
@@ -41,7 +51,7 @@ $skipped = 0;
 foreach ($bufferFiles as $bufferFile) {
     try {
         // Ler dados do buffer
-        $bufferData = json_decode(file_get_contents($bufferFile), true);
+        $bufferData = json_decode(@file_get_contents($bufferFile), true);
         
         if (!$bufferData) {
             Logger::aiTools("[BUFFER PROCESSOR] Arquivo de buffer inválido: " . basename($bufferFile));
@@ -63,7 +73,6 @@ foreach ($bufferFiles as $bufferFile) {
         
         // Verificar se já passou o tempo de expiração
         if ($expiresAt > $now) {
-            $remaining = $expiresAt - $now;
             $skipped++;
             continue; // Ainda não expirou
         }
@@ -84,7 +93,7 @@ foreach ($bufferFiles as $bufferFile) {
         @unlink($bufferFile);
         $processed++;
         
-    } catch (\Exception $e) {
+    } catch (\Throwable $e) {
         Logger::aiTools("[BUFFER PROCESSOR ERROR] Erro ao processar " . basename($bufferFile) . ": " . $e->getMessage());
         Logger::aiTools("[BUFFER PROCESSOR ERROR] Stack trace: " . $e->getTraceAsString());
         // Remover arquivo problemático para evitar loop infinito
@@ -96,5 +105,6 @@ if ($processed > 0 || $skipped > 0) {
     Logger::aiTools("[BUFFER PROCESSOR] Ciclo concluído: processados={$processed}, aguardando={$skipped}");
 }
 
+echo "ok\n";
 exit(0);
 

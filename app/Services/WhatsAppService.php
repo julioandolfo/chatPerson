@@ -1114,54 +1114,20 @@ class WhatsAppService
             }
 
             // Verificar se mensagem foi enviada DO número conectado (não recebida)
-            // Quando você envia do celular conectado, o webhook recebe:
-            // - chatid/wid = número conectado (origem)
-            // - from = número de destino (para quem você enviou)
+            // Critérios confiáveis: flags fromme/frominternal ou participant == número conectado
             $isMessageFromConnectedNumber = false;
             $connectedNumberNormalized = self::normalizePhoneNumber($account['phone_number']);
             
             Logger::quepasa("processWebhook - 🔍 VERIFICANDO SE É MENSAGEM ENVIADA: connectedNumber={$connectedNumberNormalized}, chatid={$chatid}");
             
-            // Comparar chatid/wid com número da conta conectada
-            // O chatid pode ter formato: "553591970289:87@s.whatsapp.net"
-            // Precisamos extrair apenas o número antes dos dois pontos
-            if ($chatid) {
-                $chatidClean = str_replace('@s.whatsapp.net', '', $chatid);
-                $chatidNumber = explode(':', $chatidClean)[0];
-                $chatidNumberNormalized = self::normalizePhoneNumber($chatidNumber);
-                
-                Logger::quepasa("processWebhook - Comparando: chatidNormalized={$chatidNumberNormalized} vs connectedNormalized={$connectedNumberNormalized}");
-                
-                // Comparar números normalizados
-                // Se correspondem exatamente OU se os primeiros 10-11 dígitos correspondem, é o mesmo número
-                if ($chatidNumberNormalized === $connectedNumberNormalized) {
-                    $isMessageFromConnectedNumber = true;
-                    Logger::quepasa("processWebhook - Mensagem ENVIADA do número conectado detectada (exato): chatid={$chatidNumberNormalized}, account={$connectedNumberNormalized}");
-                } else {
-                    // Comparar prefixos (primeiros 10-11 dígitos) para casos onde há diferença de formatação
-                    $minLength = min(strlen($chatidNumberNormalized), strlen($connectedNumberNormalized));
-                    $prefixLength = min(11, max(10, $minLength - 1)); // Comparar pelo menos 10 dígitos
-                    
-                    $chatidPrefix = substr($chatidNumberNormalized, 0, $prefixLength);
-                    $accountPrefix = substr($connectedNumberNormalized, 0, $prefixLength);
-                    
-                    if ($chatidPrefix === $accountPrefix && strlen($chatidPrefix) >= 10) {
-                        $isMessageFromConnectedNumber = true;
-                        Logger::quepasa("processWebhook - Mensagem ENVIADA do número conectado detectada (por prefixo): chatid={$chatidNumberNormalized}, account={$connectedNumberNormalized}, prefix={$chatidPrefix}");
-                    }
-                }
+            // 1) Flags explícitas do provedor
+            $fromme = $payload['fromme'] ?? $payload['from_internal'] ?? $payload['frominternal'] ?? $payload['from_me'] ?? $payload['fromMe'] ?? false;
+            if ($fromme === true || $fromme === 'true' || $fromme === 1 || $fromme === '1') {
+                $isMessageFromConnectedNumber = true;
+                Logger::quepasa("processWebhook - Mensagem ENVIADA detectada via flag fromme/frominternal");
             }
             
-            // Verificar também campo fromme/frominternal se existir no payload
-            if (!$isMessageFromConnectedNumber) {
-                $fromme = $payload['fromme'] ?? $payload['from_internal'] ?? $payload['frominternal'] ?? false;
-                if ($fromme === true || $fromme === 'true' || $fromme === 1 || $fromme === '1') {
-                    $isMessageFromConnectedNumber = true;
-                    Logger::quepasa("processWebhook - Mensagem ENVIADA detectada via campo fromme/frominternal");
-                }
-            }
-            
-            // Verificar também se o participante/sender é o próprio bot
+            // 2) Participant explicitamente igual ao número conectado
             if (!$isMessageFromConnectedNumber && isset($payload['participant'])) {
                 $participant = $payload['participant'];
                 $participantPhone = null;
@@ -1176,6 +1142,18 @@ class WhatsAppService
                     Logger::quepasa("processWebhook - Mensagem ENVIADA detectada via campo participant");
                 }
             }
+            
+            // 3) Campo from igual ao número conectado (fallback leve)
+            if (!$isMessageFromConnectedNumber && isset($payload['from'])) {
+                $fromCandidate = self::normalizePhoneNumber($payload['from']);
+                if ($fromCandidate && $fromCandidate === $connectedNumberNormalized) {
+                    $isMessageFromConnectedNumber = true;
+                    Logger::quepasa("processWebhook - Mensagem ENVIADA detectada via campo from == número conectado");
+                }
+            }
+            
+            // Observação: NÃO usamos mais chatid/wid sozinho para inferir outbound,
+            // pois provedores podem enviar chatid com o número da instância mesmo em mensagens recebidas.
             
             // Se detectou que foi enviada do número conectado, mas não consegue identificar destinatário,
             // simplesmente ignorar (não processar como mensagem recebida)

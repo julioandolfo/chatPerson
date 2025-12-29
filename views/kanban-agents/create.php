@@ -40,6 +40,7 @@ ob_start();
                 <div class="col-md-6">
                     <label class="form-label required">Modelo</label>
                     <select name="model" class="form-select" required>
+                        <option value="gpt-4o" selected>GPT-4o</option>
                         <option value="gpt-4">GPT-4</option>
                         <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
                     </select>
@@ -117,11 +118,6 @@ ob_start();
                         Ações
                     </a>
                 </li>
-                <li class="nav-item mt-2">
-                    <a class="nav-link text-active-primary me-10 py-5" data-bs-toggle="tab" href="#kt_tab_schedule">
-                        Agendamento
-                    </a>
-                </li>
             </ul>
             
             <div class="tab-content" id="kt_tab_content">
@@ -163,41 +159,6 @@ ob_start();
                                 <i class="ki-duotone ki-plus fs-2"></i>
                                 Adicionar Ação
                             </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Aba Agendamento -->
-                <div class="tab-pane fade" id="kt_tab_schedule" role="tabpanel">
-                    <div class="card mt-5">
-                        <div class="card-header">
-                            <h3 class="card-title">Configurar Agendamento</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="row mb-5">
-                                <div class="col-md-12">
-                                    <label class="form-label">Dias da Semana</label>
-                                    <div class="d-flex flex-wrap gap-2">
-                                        <?php
-                                        $days = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-                                        for ($i = 0; $i < 7; $i++):
-                                        ?>
-                                            <div class="form-check form-check-custom form-check-solid">
-                                                <input class="form-check-input" type="checkbox" value="<?= $i ?>" id="schedule_day_<?= $i ?>">
-                                                <label class="form-check-label" for="schedule_day_<?= $i ?>">
-                                                    <?= $days[$i] ?>
-                                                </label>
-                                            </div>
-                                        <?php endfor; ?>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="row mb-5">
-                                <div class="col-md-6">
-                                    <label class="form-label">Horário</label>
-                                    <input type="time" id="schedule_time" class="form-control" value="09:00">
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>

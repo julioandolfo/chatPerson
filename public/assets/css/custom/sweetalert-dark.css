@@ -1,0 +1,215 @@
+/**
+ * SweetAlert2 Dark Mode Support
+ * Garante que todos os textos e elementos do SweetAlert fiquem claros no modo dark
+ */
+
+/* Classe específica para dark mode */
+.swal2-dark {
+    background-color: #1e1e2e !important;
+    color: #ffffff !important;
+}
+
+.swal2-dark .swal2-title {
+    color: #ffffff !important;
+}
+
+.swal2-dark .swal2-html-container {
+    color: #e0e0e0 !important;
+}
+
+.swal2-dark .swal2-content {
+    color: #e0e0e0 !important;
+}
+
+.swal2-dark .swal2-icon {
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.swal2-dark .swal2-icon.swal2-error {
+    border-color: #f1416c !important;
+}
+
+.swal2-dark .swal2-icon.swal2-warning {
+    border-color: #ffc700 !important;
+}
+
+.swal2-dark .swal2-icon.swal2-info {
+    border-color: #009ef7 !important;
+}
+
+.swal2-dark .swal2-icon.swal2-success {
+    border-color: #50cd89 !important;
+}
+
+.swal2-dark .swal2-icon.swal2-question {
+    border-color: #7239ea !important;
+}
+
+.swal2-dark .swal2-popup {
+    background-color: #1e1e2e !important;
+}
+
+.swal2-dark ul {
+    color: #e0e0e0 !important;
+}
+
+.swal2-dark li {
+    color: #e0e0e0 !important;
+}
+
+/* Estilos baseados no atributo data-bs-theme e classe dark-mode */
+[data-bs-theme="dark"] .swal2-popup,
+body.dark-mode .swal2-popup {
+    background-color: #1e1e2e !important;
+    color: #ffffff !important;
+}
+
+[data-bs-theme="dark"] .swal2-title,
+body.dark-mode .swal2-title {
+    color: #ffffff !important;
+}
+
+[data-bs-theme="dark"] .swal2-html-container,
+body.dark-mode .swal2-html-container {
+    color: #e0e0e0 !important;
+}
+
+[data-bs-theme="dark"] .swal2-content,
+body.dark-mode .swal2-content {
+    color: #e0e0e0 !important;
+}
+
+/* Inputs, selects e textareas dentro do SweetAlert no modo dark */
+[data-bs-theme="dark"] .swal2-popup input,
+[data-bs-theme="dark"] .swal2-popup select,
+[data-bs-theme="dark"] .swal2-popup textarea,
+body.dark-mode .swal2-popup input,
+body.dark-mode .swal2-popup select,
+body.dark-mode .swal2-popup textarea,
+.swal2-dark input,
+.swal2-dark select,
+.swal2-dark textarea {
+    background-color: #2b2b3d !important;
+    color: #ffffff !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-bs-theme="dark"] .swal2-popup input:focus,
+[data-bs-theme="dark"] .swal2-popup select:focus,
+[data-bs-theme="dark"] .swal2-popup textarea:focus,
+body.dark-mode .swal2-popup input:focus,
+body.dark-mode .swal2-popup select:focus,
+body.dark-mode .swal2-popup textarea:focus,
+.swal2-dark input:focus,
+.swal2-dark select:focus,
+.swal2-dark textarea:focus {
+    background-color: #2b2b3d !important;
+    color: #ffffff !important;
+    border-color: #009ef7 !important;
+    box-shadow: 0 0 0 0.2rem rgba(0, 158, 247, 0.25) !important;
+}
+
+/* Labels e textos dentro do SweetAlert */
+[data-bs-theme="dark"] .swal2-popup label,
+[data-bs-theme="dark"] .swal2-popup .form-label,
+body.dark-mode .swal2-popup label,
+body.dark-mode .swal2-popup .form-label,
+.swal2-dark label,
+.swal2-dark .form-label {
+    color: #e0e0e0 !important;
+}
+
+/* Textos gerais dentro do popup */
+[data-bs-theme="dark"] .swal2-popup p,
+[data-bs-theme="dark"] .swal2-popup div,
+[data-bs-theme="dark"] .swal2-popup span,
+body.dark-mode .swal2-popup p,
+body.dark-mode .swal2-popup div,
+body.dark-mode .swal2-popup span,
+.swal2-dark p,
+.swal2-dark div,
+.swal2-dark span {
+    color: inherit !important;
+}
+
+/* Alertas e mensagens dentro do SweetAlert */
+[data-bs-theme="dark"] .swal2-popup .alert,
+body.dark-mode .swal2-popup .alert,
+.swal2-dark .alert {
+    background-color: rgba(0, 158, 247, 0.1) !important;
+    border-color: rgba(0, 158, 247, 0.3) !important;
+    color: #e0e0e0 !important;
+}
+
+[data-bs-theme="dark"] .swal2-popup .alert-info,
+body.dark-mode .swal2-popup .alert-info,
+.swal2-dark .alert-info {
+    background-color: rgba(0, 158, 247, 0.1) !important;
+    border-color: rgba(0, 158, 247, 0.3) !important;
+    color: #b3d9ff !important;
+}
+
+[data-bs-theme="dark"] .swal2-popup .alert-success,
+body.dark-mode .swal2-popup .alert-success,
+.swal2-dark .alert-success {
+    background-color: rgba(80, 205, 137, 0.1) !important;
+    border-color: rgba(80, 205, 137, 0.3) !important;
+    color: #b3ffd9 !important;
+}
+
+[data-bs-theme="dark"] .swal2-popup .alert-warning,
+body.dark-mode .swal2-popup .alert-warning,
+.swal2-dark .alert-warning {
+    background-color: rgba(255, 199, 0, 0.1) !important;
+    border-color: rgba(255, 199, 0, 0.3) !important;
+    color: #fff4b3 !important;
+}
+
+[data-bs-theme="dark"] .swal2-popup .alert-danger,
+body.dark-mode .swal2-popup .alert-danger,
+.swal2-dark .alert-danger {
+    background-color: rgba(241, 65, 108, 0.1) !important;
+    border-color: rgba(241, 65, 108, 0.3) !important;
+    color: #ffb3c1 !important;
+}
+
+/* Checkboxes e radios */
+[data-bs-theme="dark"] .swal2-popup .form-check-input,
+body.dark-mode .swal2-popup .form-check-input,
+.swal2-dark .form-check-input {
+    background-color: #2b2b3d !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+[data-bs-theme="dark"] .swal2-popup .form-check-label,
+body.dark-mode .swal2-popup .form-check-label,
+.swal2-dark .form-check-label {
+    color: #e0e0e0 !important;
+}
+
+/* Links dentro do SweetAlert */
+[data-bs-theme="dark"] .swal2-popup a,
+body.dark-mode .swal2-popup a,
+.swal2-dark a {
+    color: #009ef7 !important;
+}
+
+[data-bs-theme="dark"] .swal2-popup a:hover,
+body.dark-mode .swal2-popup a:hover,
+.swal2-dark a:hover {
+    color: #00b3ff !important;
+}
+
+/* Textos muted */
+[data-bs-theme="dark"] .swal2-popup .text-muted,
+body.dark-mode .swal2-popup .text-muted,
+.swal2-dark .text-muted {
+    color: #9ca3af !important;
+}
+
+/* Backdrop do SweetAlert no modo dark */
+[data-bs-theme="dark"] .swal2-backdrop-show,
+body.dark-mode .swal2-backdrop-show {
+    background-color: rgba(0, 0, 0, 0.75) !important;
+}
+

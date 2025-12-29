@@ -22,6 +22,7 @@
     <!-- Custom CSS -->
     <link href="<?= \App\Helpers\Url::asset('css/custom/theme-dark-light-fix.css') ?>" rel="stylesheet" type="text/css" />
     <link href="<?= \App\Helpers\Url::asset('css/custom/sidebar-toggle.css') ?>" rel="stylesheet" type="text/css" />
+    <link href="<?= \App\Helpers\Url::asset('css/custom/sweetalert-dark.css') ?>" rel="stylesheet" type="text/css" />
     
     <style>
         :root {
@@ -217,6 +218,23 @@
     
     <!-- Custom JS -->
     <script src="<?= \App\Helpers\Url::asset('js/custom/modals.js') ?>"></script>
+    <!-- SweetAlert2 Dark Mode - Deve ser carregado após o SweetAlert2 estar disponível -->
+    <script>
+        // Aguardar SweetAlert2 estar disponível antes de carregar o script de dark mode
+        (function() {
+            function loadSweetAlertDark() {
+                if (typeof Swal !== 'undefined') {
+                    var script = document.createElement('script');
+                    script.src = '<?= \App\Helpers\Url::asset('js/custom/sweetalert-dark.js') ?>';
+                    script.async = false;
+                    document.head.appendChild(script);
+                } else {
+                    setTimeout(loadSweetAlertDark, 100);
+                }
+            }
+            loadSweetAlertDark();
+        })();
+    </script>
     <?php if (file_exists(__DIR__ . '/../../../../public/assets/js/custom/layout.js')): ?>
     <script src="<?= \App\Helpers\Url::asset('js/custom/layout.js') ?>"></script>
     <?php endif; ?>

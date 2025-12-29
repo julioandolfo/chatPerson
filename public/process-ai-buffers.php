@@ -23,6 +23,7 @@ try {
         __DIR__ . '/../vendor/autoload.php',
         dirname(__DIR__) . '/vendor/autoload.php',
         __DIR__ . '/vendor/autoload.php',
+        __DIR__ . '/../app/Helpers/autoload.php', // fallback simples do projeto
     ];
     $loaded = false;
     foreach ($autoloadCandidates as $autoload) {
@@ -33,7 +34,7 @@ try {
         }
     }
     if (!$loaded) {
-        $msg = '[process-ai-buffers] Autoload não encontrado. Rode "composer install". Procurei: ' . implode(', ', $autoloadCandidates);
+        $msg = '[process-ai-buffers] Autoload não encontrado. Rode "composer install" ou verifique app/Helpers/autoload.php. Procurei: ' . implode(', ', $autoloadCandidates);
         error_log($msg);
         echo "error: autoload - not found\ncandidates:\n" . implode("\n", $autoloadCandidates) . "\n";
         http_response_code(500);

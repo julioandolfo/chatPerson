@@ -37,6 +37,12 @@ class Logger
         $timestamp = date('Y-m-d H:i:s');
         $logMessage = "[{$timestamp}] {$message}" . PHP_EOL;
         
+        // Garantir que o arquivo exista
+        if (!is_file($logFile)) {
+            @touch($logFile);
+            @chmod($logFile, 0666);
+        }
+
         // Tentar escrever, mas não falhar se não conseguir (silenciar erro)
         @file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
     }

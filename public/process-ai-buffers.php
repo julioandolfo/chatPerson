@@ -35,7 +35,7 @@ try {
     if (!$loaded) {
         $msg = '[process-ai-buffers] Autoload não encontrado. Rode "composer install". Procurei: ' . implode(', ', $autoloadCandidates);
         error_log($msg);
-        echo "error: autoload - not found\n";
+        echo "error: autoload - not found\ncandidates:\n" . implode("\n", $autoloadCandidates) . "\n";
         http_response_code(500);
         exit(1);
     }

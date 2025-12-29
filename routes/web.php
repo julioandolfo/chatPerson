@@ -383,6 +383,7 @@ Router::get('/ai-agents/{id}/rag/memory', [RAGController::class, 'memory'], ['Au
 
 // Rotas de Agentes Kanban
 Router::get('/kanban-agents', [KanbanAgentController::class, 'index'], ['Authentication']);
+Router::get('/kanban-agents/system-data', [KanbanAgentController::class, 'getSystemData'], ['Authentication']);
 Router::get('/kanban-agents/create', [KanbanAgentController::class, 'create'], ['Authentication']);
 Router::get('/kanban-agents/{id}', [KanbanAgentController::class, 'show'], ['Authentication']);
 Router::get('/kanban-agents/{id}/edit', [KanbanAgentController::class, 'edit'], ['Authentication']);
@@ -391,7 +392,6 @@ Router::post('/kanban-agents/{id}', [KanbanAgentController::class, 'update'], ['
 Router::delete('/kanban-agents/{id}', [KanbanAgentController::class, 'delete'], ['Authentication']);
 Router::post('/kanban-agents/{id}/execute', [KanbanAgentController::class, 'execute'], ['Authentication']);
 Router::post('/kanban-agents/{id}/test-conditions', [KanbanAgentController::class, 'testConditions'], ['Authentication']);
-Router::get('/kanban-agents/system-data', [KanbanAgentController::class, 'getSystemData'], ['Authentication']);
 
 // Rotas do Assistente IA (Chat)
 Router::get('/ai-assistant/features', [AIAssistantController::class, 'getFeatures'], ['Authentication']);

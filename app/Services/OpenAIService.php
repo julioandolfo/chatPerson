@@ -582,14 +582,19 @@ class OpenAIService
     {
         $results = [];
 
+        \App\Helpers\Logger::aiTools("[TOOL EXECUTION] Iniciando execução de " . count($toolCalls) . " tool calls para conversationId={$conversationId}, agentId={$agentId}");
+
         foreach ($toolCalls as $call) {
             $toolCallId = $call['id'] ?? null;
             $functionName = $call['function']['name'] ?? null;
             $functionArguments = json_decode($call['function']['arguments'] ?? '{}', true);
 
+            \App\Helpers\Logger::aiTools("[TOOL EXECUTION] Tool Call: id={$toolCallId}, function={$functionName}, args=" . json_encode($functionArguments));
+
             \App\Helpers\ConversationDebug::toolCall($conversationId, $functionName ?? 'unknown', $functionArguments);
 
             if (!$functionName || !$toolCallId) {
+                \App\Helpers\Logger::aiTools("[TOOL EXECUTION ERROR] Tool call sem nome ou ID");
                 \App\Helpers\ConversationDebug::error($conversationId, 'executeToolCalls', 'Tool call sem nome ou ID');
                 continue;
             }
@@ -597,12 +602,15 @@ class OpenAIService
             try {
                 // Buscar tool pelo nome da function
                 $tool = AITool::findBySlug($functionName);
+                \App\Helpers\Logger::aiTools("[TOOL EXECUTION] Tool encontrada: " . ($tool ? "ID={$tool['id']}, tipo={$tool['tool_type']}" : "NÃO ENCONTRADA"));
+                
                 if (!$tool || !$tool['enabled']) {
+                    \App\Helpers\Logger::aiTools("[TOOL EXECUTION ERROR] Tool não encontrada ou inativa: {$functionName}");
                     \App\Helpers\ConversationDebug::toolResponse($conversationId, $functionName, 'Tool não encontrada ou inativa', false);
                     $results[] = [
                         'tool_call_id' => $toolCallId,
                         'name' => $functionName,
-                        'result' => ['error' => 'Tool não encontrada ou inativa']
+                        'result' => ['error' => 'Desculpe, a ferramenta solicitada não está disponível no momento.']
                     ];
                     continue;
                 }
@@ -617,7 +625,10 @@ class OpenAIService
                     }
                 }
 
+                \App\Helpers\Logger::aiTools("[TOOL EXECUTION] Tool atribuída ao agente: " . ($toolAssigned ? "SIM" : "NÃO"));
+
                 if (!$toolAssigned) {
+                    \App\Helpers\Logger::aiTools("[TOOL EXECUTION ERROR] Tool não atribuída ao agente: {$functionName}");
                     \App\Helpers\ConversationDebug::toolResponse($conversationId, $functionName, 'Tool não atribuída a este agente', false);
                     $results[] = [
                         'tool_call_id' => $toolCallId,
@@ -650,14 +661,21 @@ class OpenAIService
                 ];
 
             } catch (\Exception $e) {
-                error_log("Erro ao executar tool {$functionName}: " . $e->getMessage());
+                \App\Helpers\Logger::aiTools("[TOOL EXECUTION ERROR] Erro ao executar tool {$functionName}: " . $e->getMessage());
+                \App\Helpers\Logger::aiTools("[TOOL EXECUTION ERROR] Stack trace: " . $e->getTraceAsString());
                 $results[] = [
                     'tool_call_id' => $toolCallId,
                     'name' => $functionName,
-                    'result' => ['error' => $e->getMessage()]
+                    'result' => [
+                        'error' => 'Desculpe, não consegui executar esta ação no momento.',
+                        'details' => $e->getMessage(),
+                        'fallback_message' => 'Por favor, informe ao cliente que houve um problema temporário ao buscar as informações e peça para tentar novamente em alguns instantes ou contatar o suporte.'
+                    ]
                 ];
             }
         }
+
+        \App\Helpers\Logger::aiTools("[TOOL EXECUTION] Finalizou execução de tools. Total de resultados: " . count($results));
 
         return $results;
     }
@@ -1352,7 +1370,12 @@ class OpenAIService
         $rawResponseField = $config['raw_response_field'] ?? 'message';
         $timeout = (int)($config['timeout'] ?? 120);
         
+        \App\Helpers\Logger::aiTools("[N8N TOOL] Iniciando execução: function={$functionName}, conversationId={$conversationId}");
+        \App\Helpers\Logger::aiTools("[N8N TOOL] Config: url={$n8nUrl}, webhookId={$webhookId}, useRawResponse=" . ($useRawResponse ? 'true' : 'false'));
+        \App\Helpers\Logger::aiTools("[N8N TOOL] Arguments: " . json_encode($arguments));
+        
         if (!$n8nUrl) {
+            \App\Helpers\Logger::aiTools("[N8N TOOL ERROR] URL do N8N não configurada");
             return ['error' => 'URL do N8N não configurada'];
         }
         
@@ -1465,6 +1488,9 @@ class OpenAIService
         ]);
         
         // Fazer requisição POST ao webhook (passa todos os arguments da IA)
+        \App\Helpers\Logger::aiTools("[N8N TOOL] Enviando requisição para: {$webhookUrl}");
+        \App\Helpers\Logger::aiTools("[N8N TOOL] Payload: " . json_encode($arguments, JSON_UNESCAPED_UNICODE));
+        
                 $ch = curl_init($webhookUrl);
                 curl_setopt_array($ch, [
                     CURLOPT_RETURNTRANSFER => true,
@@ -1481,13 +1507,18 @@ class OpenAIService
                 $error = curl_error($ch);
                 curl_close($ch);
                 
+        \App\Helpers\Logger::aiTools("[N8N TOOL] Resposta recebida: httpCode={$httpCode}, error=" . ($error ?: 'none'));
+        \App\Helpers\Logger::aiTools("[N8N TOOL] Response body: " . substr($response, 0, 1000));
+                
                 if ($error) {
+            \App\Helpers\Logger::aiTools("[N8N TOOL ERROR] Erro cURL: {$error}");
                     return ['error' => 'Erro ao executar workflow N8N: ' . $error];
                 }
                 
                 $responseData = json_decode($response, true);
                 if (json_last_error() !== JSON_ERROR_NONE) {
             // Se não é JSON válido, tratar como texto
+            \App\Helpers\Logger::aiTools("[N8N TOOL] Resposta não é JSON válido, tratando como texto");
                     $responseData = ['raw_response' => $response];
                 }
                 
@@ -1498,9 +1529,13 @@ class OpenAIService
                     'response' => $responseData
                 ];
             
+        \App\Helpers\Logger::aiTools("[N8N TOOL] Resultado: success=" . ($result['success'] ? 'true' : 'false') . ", useRawResponse=" . ($useRawResponse ? 'true' : 'false'));
+            
         // Se use_raw_response está ativo, extrair a mensagem direta do N8N
         if ($useRawResponse && $result['success']) {
             $rawMessage = self::extractN8NMessage($responseData, $response, $rawResponseField);
+            
+            \App\Helpers\Logger::aiTools("[N8N TOOL] Raw message extraída: " . ($rawMessage ? substr($rawMessage, 0, 200) : 'null'));
             
             if ($rawMessage !== null) {
                 $result['use_raw_response'] = true;
@@ -1509,6 +1544,7 @@ class OpenAIService
             }
         }
         
+        \App\Helpers\Logger::aiTools("[N8N TOOL] Finalizando execução com sucesso");
         return $result;
     }
 

@@ -10,6 +10,7 @@ $logFiles = [
     'Quepasa' => __DIR__ . '/../logs/quepasa.log',
     'Automação' => __DIR__ . '/../logs/automacao.log',
     'AI Agent' => __DIR__ . '/../logs/ai_agent.log',
+    'AI Tools' => __DIR__ . '/../logs/ai_tools.log',
     'Erros PHP' => __DIR__ . '/../logs/error.log',
 ];
 
@@ -104,7 +105,8 @@ $logFiles = [
         <button class="nav-btn" onclick="document.getElementById('conversas-log').scrollIntoView({behavior: 'smooth'})">Conversas</button>
         <button class="nav-btn" onclick="document.getElementById('quepasa-log').scrollIntoView({behavior: 'smooth'})">Quepasa</button>
         <button class="nav-btn" onclick="document.getElementById('automacao-log').scrollIntoView({behavior: 'smooth'})">Automação</button>
-        <button class="nav-btn" onclick="document.getElementById('ai-log').scrollIntoView({behavior: 'smooth'})">AI Agent</button>
+        <button class="nav-btn" onclick="document.getElementById('ai-agent-log').scrollIntoView({behavior: 'smooth'})">AI Agent</button>
+        <button class="nav-btn" onclick="document.getElementById('ai-tools-log').scrollIntoView({behavior: 'smooth'})">AI Tools</button>
         <button onclick="window.history.back()">← Voltar</button>
     </div>
     

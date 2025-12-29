@@ -63,6 +63,14 @@ class Logger
     }
 
     /**
+     * Log específico para AI Tools (ferramentas de IA)
+     */
+    public static function aiTools(string $message): void
+    {
+        self::log($message, 'ai_tools.log');
+    }
+
+    /**
      * Log específico para Meta (Instagram + WhatsApp)
      */
     public static function meta(string $level, string $message, array $context = []): void

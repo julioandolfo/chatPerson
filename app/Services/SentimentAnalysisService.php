@@ -422,7 +422,7 @@ class SentimentAnalysisService
         $maxAgeDays = (int)($settings['max_conversation_age_days'] ?? 30);
 
         // Buscar conversas abertas que precisam ser analisadas
-        $sql = "SELECT DISTINCT c.id 
+        $sql = "SELECT DISTINCT c.id, c.updated_at 
                 FROM conversations c
                 LEFT JOIN conversation_sentiments cs ON c.id = cs.conversation_id 
                     AND cs.analyzed_at >= DATE_SUB(NOW(), INTERVAL ? HOUR)

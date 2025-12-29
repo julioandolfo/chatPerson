@@ -646,7 +646,7 @@ class AIAgentService
     
     /**
      * 🆕 Agendar processamento após timer de contexto
-     * Usa execução em background não-bloqueante
+     * Usa requisição HTTP não-bloqueante para processar em background
      * 
      * @param int $conversationId ID da conversa
      * @param int $timerSeconds Segundos para aguardar
@@ -654,70 +654,48 @@ class AIAgentService
      */
     private static function scheduleProcessing(int $conversationId, int $timerSeconds): void
     {
-        \App\Helpers\Logger::info("AIAgentService::scheduleProcessing - Agendando processamento (conv={$conversationId}, timer={$timerSeconds}s)");
+        \App\Helpers\Logger::aiTools("[BUFFER] Agendamento criado: conv={$conversationId}, timer={$timerSeconds}s");
         
-        // ✅ CORRIGIDO: Obter dados do buffer ANTES de criar o arquivo
-        if (!isset(self::$messageBuffers[$conversationId])) {
-            \App\Helpers\Logger::warning("AIAgentService::scheduleProcessing - Buffer não encontrado para conv={$conversationId}");
-            return;
-        }
-        
-        $buffer = self::$messageBuffers[$conversationId];
-        $agentId = $buffer['agent_id'];
-        $messages = array_map(function($msg) {
-            return $msg['content'];
-        }, $buffer['messages']);
-        $groupedMessage = implode("\n\n", $messages);
-        
-        // ✅ SOLUÇÃO: Aguardar timer e verificar se ainda é válido antes de processar
-        \App\Helpers\Logger::info("AIAgentService::scheduleProcessing - Aguardando {$timerSeconds}s...");
-        sleep($timerSeconds);
-        
-        // ✅ VERIFICAR: Ler buffer do arquivo para confirmar timestamp
-        $bufferDir = self::getBufferDirectory();
-        $bufferFile = $bufferDir . '/buffer_' . $conversationId . '.json';
-        
-        if (!file_exists($bufferFile)) {
-            \App\Helpers\Logger::warning("AIAgentService::scheduleProcessing - Buffer não existe mais, ignorando");
-            unset(self::$messageBuffers[$conversationId]);
-            return;
-        }
-        
-        $bufferData = json_decode(file_get_contents($bufferFile), true);
-        if (empty($bufferData)) {
-            \App\Helpers\Logger::warning("AIAgentService::scheduleProcessing - Buffer vazio, ignorando");
-            @unlink($bufferFile);
-            unset(self::$messageBuffers[$conversationId]);
-            return;
-        }
-        
-        $now = time();
-        $expiresAt = $bufferData['expires_at'] ?? 0;
-        $lastMessageAt = $bufferData['last_message_at'] ?? 0;
-        
-        // ✅ VALIDAÇÃO: Só processar se o tempo de expiração já passou
-        if ($expiresAt > $now) {
-            $remainingTime = $expiresAt - $now;
-            \App\Helpers\Logger::info("AIAgentService::scheduleProcessing - ⏰ Timer RENOVADO por nova mensagem, faltam {$remainingTime}s (expires: " . date('H:i:s', $expiresAt) . ")");
-            unset(self::$messageBuffers[$conversationId]);
-            return; // Não processar ainda, aguardar nova expiração
-        }
-        
-        // ✅ PROCESSAR: Agrupar todas as mensagens
-        $messages = array_map(function($msg) {
-            return $msg['content'];
-        }, $bufferData['messages']);
-        $groupedMessage = implode("\n\n", $messages);
-        $agentId = $bufferData['agent_id'];
-        
-        \App\Helpers\Logger::info("AIAgentService::scheduleProcessing - ✅ Timer expirado, processando " . count($messages) . " mensagens agrupadas");
-        
-        // Limpar buffer e arquivos
-        @unlink($bufferFile);
-        unset(self::$messageBuffers[$conversationId]);
-        
-        // Processar
+        // Fazer requisição HTTP não-bloqueante para processar o buffer
+        // Isso faz com que o processamento aconteça em outra thread/processo
+        self::triggerBackgroundProcessing($conversationId, $timerSeconds);
+    }
+    
+    /**
+     * Disparar processamento de buffer em background (sem bloquear)
+     * Usa exec em background (Linux) ou lock file (Windows)
+     */
+    private static function triggerBackgroundProcessing(int $conversationId, int $timerSeconds): void
+    {
         try {
+            // MÉTODO 1: Usar exec em background (Linux/Unix)
+            if (PHP_OS_FAMILY !== 'Windows') {
+                $scriptPath = __DIR__ . '/../../public/process-single-buffer.php';
+                $command = sprintf(
+                    'php %s %d %d > /dev/null 2>&1 &',
+                    escapeshellarg($scriptPath),
+                    $conversationId,
+                    $timerSeconds
+                );
+                exec($command);
+                \App\Helpers\Logger::aiTools("[BUFFER] Processamento disparado via exec (Linux): conv={$conversationId}");
+                return;
+            }
+            
+            // MÉTODO 2: Windows - criar lock e usar endpoint de polling
+            $lockFile = self::getBufferDirectory() . '/process_' . $conversationId . '.lock';
+            file_put_contents($lockFile, json_encode([
+                'conversation_id' => $conversationId,
+                'timer_seconds' => $timerSeconds,
+                'created_at' => time()
+            ]));
+            
+            \App\Helpers\Logger::aiTools("[BUFFER] Lock criado para polling (Windows): conv={$conversationId}");
+            
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::aiTools("[BUFFER ERROR] Erro ao disparar processamento: " . $e->getMessage());
+        }
+    }
             self::processMessage($conversationId, $agentId, $groupedMessage);
             \App\Helpers\Logger::info("AIAgentService::scheduleProcessing - ✅ Processamento concluído");
         } catch (\Exception $e) {

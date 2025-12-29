@@ -261,29 +261,223 @@ document.getElementById('target_funnels').dispatchEvent(new Event('change'));
 // Variáveis globais para condições e ações
 let conditions = [];
 let actions = [];
+let systemData = null;
 
-// Tipos de condições disponíveis
-const conditionTypes = {
-    'conversation_status': { label: 'Status da Conversa', operators: ['equals', 'not_equals'], valueType: 'select', options: ['open', 'closed', 'resolved'] },
-    'conversation_priority': { label: 'Prioridade', operators: ['equals', 'not_equals'], valueType: 'select', options: ['low', 'normal', 'high', 'urgent'] },
-    'last_message_hours': { label: 'Horas desde Última Mensagem', operators: ['greater_than', 'less_than', 'greater_or_equal', 'less_or_equal'], valueType: 'number' },
-    'last_message_from': { label: 'Última Mensagem de', operators: ['equals', 'not_equals'], valueType: 'select', options: ['contact', 'agent', 'system'] },
-    'stage_duration_hours': { label: 'Tempo no Estágio (horas)', operators: ['greater_than', 'less_than', 'greater_or_equal', 'less_or_equal'], valueType: 'number' },
-    'ai_analysis_score': { label: 'Score de Análise IA', operators: ['greater_than', 'less_than', 'greater_or_equal', 'less_or_equal'], valueType: 'number', min: 0, max: 100 },
-    'ai_sentiment': { label: 'Sentimento IA', operators: ['equals', 'not_equals'], valueType: 'select', options: ['positive', 'neutral', 'negative'] },
-    'ai_urgency': { label: 'Urgência IA', operators: ['equals', 'not_equals'], valueType: 'select', options: ['low', 'medium', 'high'] }
-};
+// Tipos de condições disponíveis (será atualizado com dados do sistema)
+let conditionTypes = {};
+let actionTypes = {};
 
-// Tipos de ações disponíveis
-const actionTypes = {
-    'send_followup_message': { label: 'Enviar Mensagem de Followup', icon: 'ki-message-text-2' },
-    'move_to_stage': { label: 'Mover para Etapa', icon: 'ki-arrow-right' },
-    'move_to_next_stage': { label: 'Mover para Próxima Etapa', icon: 'ki-arrow-right' },
-    'assign_to_agent': { label: 'Atribuir a Agente', icon: 'ki-user' },
-    'add_tag': { label: 'Adicionar Tag', icon: 'ki-tag' },
-    'create_summary': { label: 'Criar Resumo', icon: 'ki-document' },
-    'create_note': { label: 'Criar Nota', icon: 'ki-note-edit' }
-};
+// Carregar dados do sistema
+async function loadSystemData() {
+    try {
+        const response = await fetch('/kanban-agents/system-data');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            systemData = result.data;
+            
+            // Definir tipos de condições com dados reais
+            conditionTypes = {
+                'conversation_status': { 
+                    label: 'Status da Conversa', 
+                    operators: ['equals', 'not_equals'], 
+                    valueType: 'select', 
+                    options: systemData.conversation_statuses || ['open', 'closed', 'resolved', 'pending', 'spam']
+                },
+                'conversation_priority': { 
+                    label: 'Prioridade', 
+                    operators: ['equals', 'not_equals'], 
+                    valueType: 'select', 
+                    options: systemData.priorities || ['low', 'normal', 'medium', 'high', 'urgent']
+                },
+                'conversation_channel': {
+                    label: 'Canal',
+                    operators: ['equals', 'not_equals'],
+                    valueType: 'select',
+                    options: Object.keys(systemData.channels || {}),
+                    optionLabels: systemData.channels || {}
+                },
+                'conversation_funnel': {
+                    label: 'Funil',
+                    operators: ['equals', 'not_equals'],
+                    valueType: 'select',
+                    options: (systemData.funnels || []).map(f => f.id.toString()),
+                    optionLabels: (systemData.funnels || []).reduce((acc, f) => { acc[f.id] = f.name; return acc; }, {})
+                },
+                'conversation_stage': {
+                    label: 'Etapa',
+                    operators: ['equals', 'not_equals'],
+                    valueType: 'select',
+                    options: getAllStagesIds(),
+                    optionLabels: getAllStagesLabels()
+                },
+                'conversation_assigned': {
+                    label: 'Atribuída a Agente',
+                    operators: ['equals', 'not_equals', 'is_empty'],
+                    valueType: 'select',
+                    options: (systemData.agents || []).map(a => a.id.toString()),
+                    optionLabels: (systemData.agents || []).reduce((acc, a) => { acc[a.id] = a.name; return acc; }, {})
+                },
+                'conversation_department': {
+                    label: 'Setor',
+                    operators: ['equals', 'not_equals'],
+                    valueType: 'select',
+                    options: (systemData.departments || []).map(d => d.id.toString()),
+                    optionLabels: (systemData.departments || []).reduce((acc, d) => { acc[d.id] = d.name; return acc; }, {})
+                },
+                'has_tag': {
+                    label: 'Tem Tag',
+                    operators: ['equals', 'not_equals'],
+                    valueType: 'select',
+                    options: (systemData.tags || []).map(t => t.id.toString()),
+                    optionLabels: (systemData.tags || []).reduce((acc, t) => { acc[t.id] = t.name; return acc; }, {})
+                },
+                'last_message_hours': { 
+                    label: 'Horas desde Última Mensagem', 
+                    operators: ['greater_than', 'less_than', 'greater_or_equal', 'less_or_equal'], 
+                    valueType: 'number' 
+                },
+                'last_message_from': { 
+                    label: 'Última Mensagem de', 
+                    operators: ['equals', 'not_equals'], 
+                    valueType: 'select', 
+                    options: ['contact', 'agent', 'system'] 
+                },
+                'stage_duration_hours': { 
+                    label: 'Tempo no Estágio (horas)', 
+                    operators: ['greater_than', 'less_than', 'greater_or_equal', 'less_or_equal'], 
+                    valueType: 'number' 
+                },
+                'conversation_age_hours': {
+                    label: 'Idade da Conversa (horas)',
+                    operators: ['greater_than', 'less_than', 'greater_or_equal', 'less_or_equal'],
+                    valueType: 'number'
+                },
+                'message_count': {
+                    label: 'Total de Mensagens',
+                    operators: ['greater_than', 'less_than', 'greater_or_equal', 'less_or_equal'],
+                    valueType: 'number'
+                },
+                'ai_analysis_score': { 
+                    label: 'Score de Análise IA', 
+                    operators: ['greater_than', 'less_than', 'greater_or_equal', 'less_or_equal'], 
+                    valueType: 'number', 
+                    min: 0, 
+                    max: 100 
+                },
+                'ai_sentiment': { 
+                    label: 'Sentimento IA', 
+                    operators: ['equals', 'not_equals'], 
+                    valueType: 'select', 
+                    options: ['positive', 'neutral', 'negative'] 
+                },
+                'ai_urgency': { 
+                    label: 'Urgência IA', 
+                    operators: ['equals', 'not_equals'], 
+                    valueType: 'select', 
+                    options: ['low', 'medium', 'high'] 
+                }
+            };
+            
+            // Definir tipos de ações com dados reais
+            actionTypes = {
+                'send_followup_message': { 
+                    label: 'Enviar Mensagem de Followup', 
+                    icon: 'ki-message-text-2' 
+                },
+                'move_to_stage': { 
+                    label: 'Mover para Etapa', 
+                    icon: 'ki-arrow-right',
+                    requiresConfig: true
+                },
+                'move_to_next_stage': { 
+                    label: 'Mover para Próxima Etapa', 
+                    icon: 'ki-arrow-right' 
+                },
+                'assign_to_agent': { 
+                    label: 'Atribuir a Agente', 
+                    icon: 'ki-user',
+                    requiresConfig: true
+                },
+                'assign_to_department': {
+                    label: 'Atribuir a Setor',
+                    icon: 'ki-briefcase',
+                    requiresConfig: true
+                },
+                'add_tag': { 
+                    label: 'Adicionar Tag', 
+                    icon: 'ki-tag',
+                    requiresConfig: true
+                },
+                'remove_tag': {
+                    label: 'Remover Tag',
+                    icon: 'ki-cross',
+                    requiresConfig: true
+                },
+                'change_priority': {
+                    label: 'Alterar Prioridade',
+                    icon: 'ki-star',
+                    requiresConfig: true
+                },
+                'change_status': {
+                    label: 'Alterar Status',
+                    icon: 'ki-check',
+                    requiresConfig: true
+                },
+                'create_summary': { 
+                    label: 'Criar Resumo', 
+                    icon: 'ki-document' 
+                },
+                'create_note': { 
+                    label: 'Criar Nota', 
+                    icon: 'ki-note-edit' 
+                }
+            };
+            
+            // Recarregar condições e ações se já existirem
+            if (conditions.length > 0) {
+                loadConditions();
+            }
+            if (actions.length > 0) {
+                loadActions();
+            }
+        }
+    } catch (error) {
+        console.error('Erro ao carregar dados do sistema:', error);
+        // Usar valores padrão em caso de erro
+        conditionTypes = {
+            'conversation_status': { label: 'Status da Conversa', operators: ['equals', 'not_equals'], valueType: 'select', options: ['open', 'closed', 'resolved'] }
+        };
+        actionTypes = {
+            'send_followup_message': { label: 'Enviar Mensagem de Followup', icon: 'ki-message-text-2' }
+        };
+    }
+}
+
+// Funções auxiliares para obter todas as etapas
+function getAllStagesIds() {
+    if (!systemData || !systemData.stages) return [];
+    const ids = [];
+    Object.values(systemData.stages).forEach(stages => {
+        stages.forEach(stage => {
+            ids.push(stage.id.toString());
+        });
+    });
+    return ids;
+}
+
+function getAllStagesLabels() {
+    if (!systemData || !systemData.stages || !systemData.funnels) return {};
+    const labels = {};
+    Object.entries(systemData.stages).forEach(([funnelId, stages]) => {
+        const funnel = systemData.funnels.find(f => f.id == funnelId);
+        const funnelName = funnel ? funnel.name : `Funil ${funnelId}`;
+        stages.forEach(stage => {
+            labels[stage.id] = `${stage.name} (${funnelName})`;
+        });
+    });
+    return labels;
+}
 
 // Carregar condições existentes
 function loadConditions() {
@@ -359,11 +553,19 @@ function addConditionUI(condition = null, index = null) {
 // Obter input de valor baseado no tipo
 function getConditionValueInput(conditionData, typeConfig) {
     if (typeConfig.valueType === 'select') {
+        const options = typeConfig.options || [];
+        const optionLabels = typeConfig.optionLabels || {};
+        
+        // Se tem optionLabels, usar eles, senão usar o próprio valor como label
+        const optionsHTML = options.map(opt => {
+            const label = optionLabels[opt] || opt;
+            return `<option value="${opt}" ${conditionData.value === opt ? 'selected' : ''}>${label}</option>`;
+        }).join('');
+        
         return `
             <select class="form-select condition-value">
-                ${typeConfig.options.map(opt => 
-                    `<option value="${opt}" ${conditionData.value === opt ? 'selected' : ''}>${opt}</option>`
-                ).join('')}
+                <option value="">Selecione...</option>
+                ${optionsHTML}
             </select>
         `;
     } else if (typeConfig.valueType === 'number') {
@@ -504,6 +706,10 @@ function getActionConfigHTML(actionData, index) {
     const type = actionData.type;
     const config = actionData.config || {};
     
+    if (!systemData) {
+        return '<div class="text-muted">Carregando dados do sistema...</div>';
+    }
+    
     switch(type) {
         case 'send_followup_message':
             return `
@@ -515,21 +721,73 @@ function getActionConfigHTML(actionData, index) {
                 <textarea class="form-control action-config-template" rows="2" placeholder="Template da mensagem..." ${config.use_ai_generated ? 'disabled' : ''}>${config.template || ''}</textarea>
             `;
         case 'move_to_stage':
+            const stagesOptions = getAllStagesLabels();
+            const stagesSelect = Object.entries(stagesOptions).map(([id, label]) => 
+                `<option value="${id}" ${config.stage_id == id ? 'selected' : ''}>${label}</option>`
+            ).join('');
             return `
-                <label class="form-label">ID da Etapa</label>
-                <input type="number" class="form-control action-config-stage_id" value="${config.stage_id || ''}" placeholder="ID da etapa...">
+                <label class="form-label">Etapa</label>
+                <select class="form-select action-config-stage_id">
+                    <option value="">Selecione uma etapa...</option>
+                    ${stagesSelect}
+                </select>
             `;
         case 'assign_to_agent':
+            const agentsOptions = (systemData.agents || []).map(a => 
+                `<option value="${a.id}" ${config.agent_id == a.id ? 'selected' : ''}>${a.name}</option>`
+            ).join('');
             return `
-                <label class="form-label">Método</label>
-                <select class="form-select action-config-method">
-                    <option value="round_robin" ${config.method === 'round_robin' ? 'selected' : ''}>Round-Robin</option>
+                <label class="form-label">Agente</label>
+                <select class="form-select action-config-agent_id">
+                    <option value="">Selecione um agente...</option>
+                    ${agentsOptions}
+                </select>
+                <div class="form-text mt-1">Ou deixe vazio para usar método de distribuição automática</div>
+            `;
+        case 'assign_to_department':
+            const departmentsOptions = (systemData.departments || []).map(d => 
+                `<option value="${d.id}" ${config.department_id == d.id ? 'selected' : ''}>${d.name}</option>`
+            ).join('');
+            return `
+                <label class="form-label">Setor</label>
+                <select class="form-select action-config-department_id">
+                    <option value="">Selecione um setor...</option>
+                    ${departmentsOptions}
                 </select>
             `;
         case 'add_tag':
+        case 'remove_tag':
+            const tagsOptions = (systemData.tags || []).map(t => 
+                `<option value="${t.id}" ${(Array.isArray(config.tag_ids) && config.tag_ids.includes(t.id.toString())) ? 'selected' : ''}>${t.name}</option>`
+            ).join('');
             return `
-                <label class="form-label">Tags (separadas por vírgula)</label>
-                <input type="text" class="form-control action-config-tags" value="${Array.isArray(config.tags) ? config.tags.join(', ') : (config.tags || '')}" placeholder="tag1, tag2, tag3">
+                <label class="form-label">Tags</label>
+                <select class="form-select action-config-tag_ids" multiple size="5">
+                    ${tagsOptions}
+                </select>
+                <div class="form-text mt-1">Segure Ctrl/Cmd para selecionar múltiplas tags</div>
+            `;
+        case 'change_priority':
+            const prioritiesOptions = (systemData.priorities || []).map(p => 
+                `<option value="${p}" ${config.priority === p ? 'selected' : ''}>${p}</option>`
+            ).join('');
+            return `
+                <label class="form-label">Prioridade</label>
+                <select class="form-select action-config-priority">
+                    <option value="">Selecione uma prioridade...</option>
+                    ${prioritiesOptions}
+                </select>
+            `;
+        case 'change_status':
+            const statusesOptions = (systemData.conversation_statuses || []).map(s => 
+                `<option value="${s}" ${config.status === s ? 'selected' : ''}>${s}</option>`
+            ).join('');
+            return `
+                <label class="form-label">Status</label>
+                <select class="form-select action-config-status">
+                    <option value="">Selecione um status...</option>
+                    ${statusesOptions}
+                </select>
             `;
         case 'create_note':
             return `
@@ -619,10 +877,18 @@ function collectActions() {
                 config.template = input.value;
             } else if (className.includes('action-config-stage_id')) {
                 config.stage_id = parseInt(input.value) || null;
+            } else if (className.includes('action-config-agent_id')) {
+                config.agent_id = parseInt(input.value) || null;
+            } else if (className.includes('action-config-department_id')) {
+                config.department_id = parseInt(input.value) || null;
+            } else if (className.includes('action-config-tag_ids')) {
+                config.tag_ids = Array.from(input.selectedOptions).map(opt => opt.value);
+            } else if (className.includes('action-config-priority')) {
+                config.priority = input.value;
+            } else if (className.includes('action-config-status')) {
+                config.status = input.value;
             } else if (className.includes('action-config-method')) {
                 config.method = input.value;
-            } else if (className.includes('action-config-tags')) {
-                config.tags = input.value.split(',').map(t => t.trim()).filter(t => t);
             } else if (className.includes('action-config-note')) {
                 config.note = input.value;
             }
@@ -642,7 +908,8 @@ function collectActions() {
 }
 
 // Inicializar ao carregar página
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+    await loadSystemData();
     loadConditions();
     loadActions();
 });

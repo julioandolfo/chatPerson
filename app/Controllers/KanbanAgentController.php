@@ -425,5 +425,76 @@ class KanbanAgentController
             ], 500);
         }
     }
+    
+    /**
+     * Obter dados do sistema para condições e ações (status, prioridades, canais, funis, etapas, agentes, tags, departamentos)
+     */
+    public function getSystemData(): void
+    {
+        Permission::abortIfCannot('ai_agents.view');
+        
+        try {
+            // Status de conversas
+            $conversationStatuses = ['open', 'closed', 'resolved', 'pending', 'spam'];
+            
+            // Prioridades
+            $priorities = ['low', 'normal', 'medium', 'high', 'urgent'];
+            
+            // Canais disponíveis
+            $channels = [
+                'whatsapp' => 'WhatsApp',
+                'whatsapp_official' => 'WhatsApp Oficial',
+                'instagram' => 'Instagram',
+                'facebook' => 'Facebook',
+                'telegram' => 'Telegram',
+                'email' => 'Email',
+                'chat' => 'Chat',
+                'mercadolivre' => 'Mercado Livre',
+                'webchat' => 'WebChat',
+                'olx' => 'OLX',
+                'linkedin' => 'LinkedIn',
+                'google_business' => 'Google Business',
+                'youtube' => 'YouTube',
+                'tiktok' => 'TikTok'
+            ];
+            
+            // Funis e etapas
+            $funnels = Funnel::whereActive();
+            $allStages = [];
+            foreach ($funnels as $funnel) {
+                $stages = Funnel::getStages($funnel['id']);
+                $allStages[$funnel['id']] = $stages;
+            }
+            
+            // Agentes
+            $agents = \App\Models\User::getAgents();
+            
+            // Tags
+            $tags = \App\Services\TagService::getAll();
+            
+            // Departamentos
+            $departments = \App\Services\DepartmentService::list([]);
+            
+            Response::json([
+                'success' => true,
+                'data' => [
+                    'conversation_statuses' => $conversationStatuses,
+                    'priorities' => $priorities,
+                    'channels' => $channels,
+                    'funnels' => $funnels,
+                    'stages' => $allStages,
+                    'agents' => $agents,
+                    'tags' => $tags,
+                    'departments' => $departments
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'data' => []
+            ], 500);
+        }
+    }
 }
 

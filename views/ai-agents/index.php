@@ -92,8 +92,13 @@ ob_start();
                                         Ver
                                     </a>
                                     <?php if (\App\Helpers\Permission::can('ai_agents.edit')): ?>
-                                    <button type="button" class="btn btn-sm btn-light-info" data-agent-id="<?= $agent['id'] ?>" onclick="editAgent(this.getAttribute('data-agent-id'))">
+                                    <button type="button" class="btn btn-sm btn-light-info me-2" data-agent-id="<?= $agent['id'] ?>" onclick="editAgent(this.getAttribute('data-agent-id'))">
                                         Editar
+                                    </button>
+                                    <?php endif; ?>
+                                    <?php if (\App\Helpers\Permission::can('ai_agents.delete')): ?>
+                                    <button type="button" class="btn btn-sm btn-light-danger" data-agent-id="<?= $agent['id'] ?>" onclick="deleteAgent(this.getAttribute('data-agent-id'), '<?= htmlspecialchars(addslashes($agent['name'])) ?>')">
+                                        Deletar
                                     </button>
                                     <?php endif; ?>
                                 </td>
@@ -497,6 +502,70 @@ $content = ob_get_clean();
 $agentsUrl = \App\Helpers\Url::to('/ai-agents');
 $scripts = <<<HTML
 <script>
+// Função global para deletar agente
+function deleteAgent(id, name) {
+    Swal.fire({
+        title: 'Tem certeza?',
+        html: `Deseja realmente deletar o agente <strong>${name}</strong>?<br><br>Esta ação não pode ser desfeita.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Sim, deletar!',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Mostrar loading
+            Swal.fire({
+                title: 'Deletando...',
+                text: 'Aguarde enquanto o agente é deletado.',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                willOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+            
+            fetch("{$agentsUrl}/" + id, {
+                method: "DELETE",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Accept": "application/json"
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        icon: "success",
+                        title: "Deletado!",
+                        text: data.message || "Agente de IA deletado com sucesso!",
+                        timer: 2000,
+                        showConfirmButton: false
+                    }).then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire({
+                        icon: "error",
+                        title: "Erro",
+                        text: data.message || "Erro ao deletar agente de IA"
+                    });
+                }
+            })
+            .catch(error => {
+                console.error("Erro:", error);
+                Swal.fire({
+                    icon: "error",
+                    title: "Erro",
+                    text: "Não foi possível deletar o agente de IA"
+                });
+            });
+        }
+    });
+}
+
 // Função global para editar agente
 function editAgent(id) {
     // Carregar dados do agente
@@ -537,6 +606,9 @@ function editAgent(id) {
             // Atualizar contador de caracteres do prompt
             updatePromptCharCount('edit');
             
+            // Limpar todas as tools primeiro
+            document.querySelectorAll(".tool-checkbox-edit").forEach(cb => cb.checked = false);
+            
             // Carregar tools do agente
             if (agent.tools && agent.tools.length > 0) {
                 agent.tools.forEach(tool => {
@@ -545,9 +617,6 @@ function editAgent(id) {
                         checkbox.checked = true;
                     }
                 });
-            } else {
-                // Desmarcar todos
-                document.querySelectorAll(".tool-checkbox-edit").forEach(cb => cb.checked = false);
             }
             
             // Abrir modal

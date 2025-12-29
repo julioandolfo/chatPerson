@@ -439,6 +439,19 @@ ob_start();
                     </div>
                     <!--end::Timer de Contexto (Edição)-->
                     
+                    <!--begin::Preferir Tools-->
+                    <div class="fv-row mb-7">
+                        <label class="d-flex align-items-center">
+                            <input type="checkbox" name="prefer_tools" id="edit_prefer_tools" class="form-check-input me-2" />
+                            <span class="fw-semibold">Preferir uso de tools</span>
+                        </label>
+                        <div class="form-text text-info">
+                            <i class="ki-duotone ki-information-5 fs-7 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                            Quando ativado, instrui fortemente a IA a usar as ferramentas disponíveis sempre que possível ao invés de responder diretamente. Recomendado para agentes com tools de busca de dados (WooCommerce, Database, etc).
+                        </div>
+                    </div>
+                    <!--end::Preferir Tools-->
+                    
                     <div class="fv-row mb-7">
                         <label class="d-flex align-items-center">
                             <input type="checkbox" name="enabled" id="edit_enabled" class="form-check-input me-2" />
@@ -597,11 +610,14 @@ function editAgent(id) {
             document.getElementById("edit_max_conversations").value = agent.max_conversations || "";
             document.getElementById("edit_enabled").checked = agent.enabled == 1 || agent.enabled === true;
             
-            // Carregar delay humanizado das settings
+            // Carregar delay humanizado e outras configurações das settings
             const settings = agent.settings ? (typeof agent.settings === "string" ? JSON.parse(agent.settings) : agent.settings) : {};
             document.getElementById("edit_response_delay_min").value = settings.response_delay_min || 0;
             document.getElementById("edit_response_delay_max").value = settings.response_delay_max || 0;
             document.getElementById("edit_context_timer_seconds").value = settings.context_timer_seconds || 5;
+            if (document.getElementById("edit_prefer_tools")) {
+                document.getElementById("edit_prefer_tools").checked = settings.prefer_tools || false;
+            }
             
             // Atualizar contador de caracteres do prompt
             updatePromptCharCount('edit');

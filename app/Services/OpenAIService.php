@@ -101,6 +101,7 @@ class OpenAIService
             // Obter tools do agente
             $tools = AIAgent::getTools($agentId);
             $functions = [];
+            $toolDescriptions = []; // Para incluir no prompt
             foreach ($tools as $tool) {
                 $functionSchema = is_string($tool['function_schema']) 
                     ? json_decode($tool['function_schema'], true) 
@@ -110,6 +111,12 @@ class OpenAIService
                     // Corrigir schema se properties for array vazio (deveria ser objeto)
                     $functionSchema = self::normalizeToolSchema($functionSchema);
                     $functions[] = $functionSchema;
+                    
+                    // Extrair nome e descrição da tool para o prompt
+                    $funcData = $functionSchema['function'] ?? $functionSchema;
+                    $toolName = $funcData['name'] ?? 'unknown';
+                    $toolDesc = $funcData['description'] ?? 'Sem descrição';
+                    $toolDescriptions[] = "- **{$toolName}**: {$toolDesc}";
                 }
             }
             
@@ -118,8 +125,8 @@ class OpenAIService
                 'tools_full' => $functions
             ]);
 
-            // Construir mensagens do histórico
-            $messages = self::buildMessages($agent, $message, $context);
+            // Construir mensagens do histórico (passando tools para incluir no prompt)
+            $messages = self::buildMessages($agent, $message, $context, $toolDescriptions);
 
             // Preparar payload
             $payload = [
@@ -139,6 +146,10 @@ class OpenAIService
                     // Senão, adicionar o wrapper
                     return ['type' => 'function', 'function' => $func];
                 }, $functions);
+                
+                // IMPORTANTE: Usar 'auto' permite que a IA escolha, mas com instruções claras no prompt
+                // Use 'required' apenas se quiser FORÇAR o uso de uma tool
+                $payload['tool_choice'] = 'auto';
             }
 
             // Fazer requisição à API
@@ -329,12 +340,31 @@ class OpenAIService
     /**
      * Construir array de mensagens para a API
      */
-    private static function buildMessages(array $agent, string $userMessage, array $context): array
+    private static function buildMessages(array $agent, string $userMessage, array $context, array $toolDescriptions = []): array
     {
         $messages = [];
 
         // Mensagem do sistema (prompt do agente)
         $systemPrompt = $agent['prompt'];
+        
+        // IMPORTANTE: Adicionar instruções sobre tools disponíveis
+        if (!empty($toolDescriptions)) {
+            $systemPrompt .= "\n\n## FERRAMENTAS DISPONÍVEIS\n\n";
+            $systemPrompt .= "Você tem acesso às seguintes ferramentas (tools) para ajudar o cliente:\n\n";
+            $systemPrompt .= implode("\n", $toolDescriptions);
+            
+            // Verificar se agente tem preferência por usar tools
+            $settings = is_string($agent['settings'] ?? '') 
+                ? json_decode($agent['settings'], true) 
+                : ($agent['settings'] ?? []);
+            $preferTools = !empty($settings['prefer_tools']);
+            
+            if ($preferTools) {
+                $systemPrompt .= "\n\n**INSTRUÇÃO CRÍTICA**: Você DEVE usar as ferramentas disponíveis sempre que a solicitação do cliente envolver buscar dados, verificar status, consultar informações ou realizar ações no sistema. NUNCA invente informações que podem ser obtidas através das ferramentas. Se houver dúvida se deve usar uma ferramenta, USE-A.";
+            } else {
+                $systemPrompt .= "\n\n**IMPORTANTE**: Use essas ferramentas sempre que necessário para buscar informações, realizar ações ou ajudar o cliente de forma mais eficaz. Não invente informações quando você pode buscá-las usando as ferramentas disponíveis.";
+            }
+        }
         
         // Adicionar contexto se disponível
         if (!empty($context['contact'])) {

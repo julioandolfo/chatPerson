@@ -8019,6 +8019,7 @@ function updateConversationSidebar(conversation, tags) {
     
     // Atualizar ID da conversa no sidebar
     sidebar.dataset.conversationId = conversation.id;
+    sidebar.dataset.contactId = conversation.contact_id || '';
     
     // Atualizar avatar ou iniciais do contato
     const initialsEl = sidebar.querySelector('#sidebar-contact-initials');

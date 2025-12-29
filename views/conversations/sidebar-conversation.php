@@ -325,6 +325,9 @@ document.addEventListener('DOMContentLoaded', function() {
             <li class="nav-item">
                 <a class="nav-link" data-bs-toggle="tab" href="#kt_tab_history">Histórico</a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#kt_tab_orders" onclick="loadWooCommerceOrders()">Pedidos</a>
+            </li>
         </ul>
     </div>
     
@@ -720,6 +723,49 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     <div id="history-previous-conversations" class="text-center py-5">
                         <p class="text-muted fs-7">Nenhuma conversa anterior</p>
+                    </div>
+                </div>
+                
+            </div>
+            
+            <!-- ABA: PEDIDOS WOOCOMMERCE -->
+            <div class="tab-pane fade" id="kt_tab_orders">
+                
+                <!-- Filtros -->
+                <div class="sidebar-section">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="sidebar-section-title">Pedidos WooCommerce</div>
+                        <button class="btn btn-sm btn-icon btn-light-primary" onclick="loadWooCommerceOrders()" title="Atualizar">
+                            <i class="ki-duotone ki-arrows-loop fs-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                        </button>
+                    </div>
+                    
+                    <div class="d-flex flex-column gap-2 mb-3">
+                        <select class="form-select form-select-sm" id="woocommerce-integration-filter" onchange="loadWooCommerceOrders()">
+                            <option value="">Todas as lojas</option>
+                        </select>
+                        <select class="form-select form-select-sm" id="woocommerce-status-filter" onchange="loadWooCommerceOrders()">
+                            <option value="">Todos os status</option>
+                            <option value="pending">Pendente</option>
+                            <option value="processing">Processando</option>
+                            <option value="on-hold">Em espera</option>
+                            <option value="completed">Concluído</option>
+                            <option value="cancelled">Cancelado</option>
+                            <option value="refunded">Reembolsado</option>
+                            <option value="failed">Falhou</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="separator my-3"></div>
+                
+                <!-- Lista de pedidos -->
+                <div class="sidebar-section">
+                    <div id="woocommerce-orders-list" class="text-center py-5">
+                        <div class="text-muted fs-7">Clique na aba para carregar pedidos</div>
                     </div>
                 </div>
                 
@@ -1831,7 +1877,231 @@ console.log('✅ Todas as funções do sidebar carregadas:', {
     updateAIAgentSidebar: typeof window.updateAIAgentSidebar,
     showAddAIAgentModal: typeof window.showAddAIAgentModal,
     showAIHistory: typeof window.showAIHistory,
-    removeAIAgent: typeof window.removeAIAgent
+    removeAIAgent: typeof window.removeAIAgent,
+    loadWooCommerceOrders: typeof window.loadWooCommerceOrders
+});
+
+// ============================================================================
+// FUNÇÕES WOOCOMMERCE
+// ============================================================================
+
+/**
+ * Carregar pedidos do WooCommerce para o contato da conversa atual
+ */
+window.loadWooCommerceOrders = function() {
+    const conversationId = window.currentConversationId;
+    if (!conversationId) {
+        const ordersList = document.getElementById('woocommerce-orders-list');
+        if (ordersList) {
+            ordersList.innerHTML = '<div class="text-muted fs-7">Selecione uma conversa primeiro</div>';
+        }
+        return;
+    }
+    
+    // Obter contact_id da conversa atual
+    let contactId = null;
+    if (window.currentConversation?.contact_id) {
+        contactId = window.currentConversation.contact_id;
+    } else {
+        const sidebar = document.getElementById('conversationSidebar');
+        contactId = sidebar?.dataset?.contactId;
+    }
+    
+    if (!contactId) {
+        const ordersList = document.getElementById('woocommerce-orders-list');
+        if (ordersList) {
+            ordersList.innerHTML = '<div class="text-muted fs-7">Erro: ID do contato não encontrado</div>';
+        }
+        return;
+    }
+    
+    renderWooCommerceOrders(contactId);
+};
+
+/**
+ * Renderizar pedidos do WooCommerce
+ */
+function renderWooCommerceOrders(contactId) {
+    const ordersList = document.getElementById('woocommerce-orders-list');
+    if (!ordersList) return;
+    
+    const integrationFilter = document.getElementById('woocommerce-integration-filter')?.value || '';
+    const statusFilter = document.getElementById('woocommerce-status-filter')?.value || '';
+    
+    ordersList.innerHTML = '<div class="text-muted fs-7">Carregando pedidos...</div>';
+    
+    let url = `<?= \App\Helpers\Url::to('/integrations/woocommerce/contacts') ?>/${contactId}/orders`;
+    if (integrationFilter) {
+        url += `?integration_id=${integrationFilter}`;
+    }
+    
+    fetch(url, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            throw new Error(data.message || 'Erro ao carregar pedidos');
+        }
+        
+        const orders = data.orders || [];
+        
+        // Filtrar por status se necessário
+        let filteredOrders = orders;
+        if (statusFilter) {
+            filteredOrders = orders.filter(order => order.status === statusFilter);
+        }
+        
+        if (filteredOrders.length === 0) {
+            ordersList.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="ki-duotone ki-information-5 fs-3x text-muted mb-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <p class="text-muted fs-7">Nenhum pedido encontrado</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Renderizar lista de pedidos
+        let html = '<div class="d-flex flex-column gap-3">';
+        
+        filteredOrders.forEach(order => {
+            const orderDate = new Date(order.date_created).toLocaleDateString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            const statusColors = {
+                'pending': 'warning',
+                'processing': 'info',
+                'on-hold': 'warning',
+                'completed': 'success',
+                'cancelled': 'danger',
+                'refunded': 'secondary',
+                'failed': 'danger'
+            };
+            
+            const statusLabels = {
+                'pending': 'Pendente',
+                'processing': 'Processando',
+                'on-hold': 'Em espera',
+                'completed': 'Concluído',
+                'cancelled': 'Cancelado',
+                'refunded': 'Reembolsado',
+                'failed': 'Falhou'
+            };
+            
+            const statusColor = statusColors[order.status] || 'secondary';
+            const statusLabel = statusLabels[order.status] || order.status;
+            const total = parseFloat(order.total || 0).toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+            });
+            
+            html += `
+                <div class="card card-flush card-hover">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <div class="fw-bold fs-6 text-gray-800">Pedido #${order.id}</div>
+                                <div class="fs-7 text-muted">${orderDate}</div>
+                            </div>
+                            <span class="badge badge-light-${statusColor}">${statusLabel}</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <div class="fs-5 fw-bold text-primary">${total}</div>
+                            ${order.number ? `<div class="fs-7 text-muted">Nº ${order.number}</div>` : ''}
+                        </div>
+                        ${order.line_items && order.line_items.length > 0 ? `
+                            <div class="mt-3 pt-3 border-top">
+                                <div class="fs-7 fw-semibold text-gray-700 mb-2">Itens:</div>
+                                <div class="d-flex flex-column gap-1">
+                                    ${order.line_items.slice(0, 3).map(item => `
+                                        <div class="d-flex justify-content-between">
+                                            <span class="fs-7">${(item.name || 'Produto').substring(0, 30)}${(item.name || '').length > 30 ? '...' : ''} x${item.quantity || 1}</span>
+                                            <span class="fs-7 fw-semibold">${parseFloat(item.total || 0).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</span>
+                                        </div>
+                                    `).join('')}
+                                    ${order.line_items.length > 3 ? `<div class="fs-7 text-muted">+${order.line_items.length - 3} mais</div>` : ''}
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        ordersList.innerHTML = html;
+        
+        // Carregar lista de integrações para o filtro
+        loadWooCommerceIntegrations();
+    })
+    .catch(error => {
+        console.error('Erro ao carregar pedidos WooCommerce:', error);
+        ordersList.innerHTML = `
+            <div class="text-center py-5">
+                <i class="ki-duotone ki-information-5 fs-3x text-danger mb-3">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                    <span class="path3"></span>
+                </i>
+                <p class="text-danger fs-7">Erro ao carregar pedidos</p>
+                <p class="text-muted fs-8">${error.message}</p>
+            </div>
+        `;
+    });
+}
+
+/**
+ * Carregar lista de integrações WooCommerce para o filtro
+ */
+function loadWooCommerceIntegrations() {
+    const filterSelect = document.getElementById('woocommerce-integration-filter');
+    if (!filterSelect || filterSelect.options.length > 1) {
+        return; // Já carregado
+    }
+    
+    fetch('<?= \App\Helpers\Url::to('/integrations/woocommerce') ?>', {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.integrations && Array.isArray(data.integrations)) {
+            data.integrations.forEach(integration => {
+                const option = document.createElement('option');
+                option.value = integration.id;
+                option.textContent = integration.name;
+                filterSelect.appendChild(option);
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao carregar integrações:', error);
+    });
+}
+
+// Carregar pedidos quando a aba for clicada
+document.addEventListener('DOMContentLoaded', function() {
+    const ordersTab = document.querySelector('a[href="#kt_tab_orders"]');
+    if (ordersTab) {
+        ordersTab.addEventListener('shown.bs.tab', function() {
+            loadWooCommerceOrders();
+        });
+    }
 });
 </script>
 

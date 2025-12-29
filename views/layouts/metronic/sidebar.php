@@ -253,7 +253,7 @@
                 
                 <!--begin:Menu item-->
                 <div data-kt-menu-trigger="click" class="menu-item menu-accordion">
-                    <span class="menu-link <?= isActive('/integrations', $currentUri) || isActive('/whatsapp', $currentUri) || isActive('/integrations/notificame', $currentUri) || isActive('/integrations/whatsapp-official', $currentUri) ? 'active' : '' ?>" data-title="Integrações">
+                    <span class="menu-link <?= isActive('/integrations', $currentUri) || isActive('/whatsapp', $currentUri) || isActive('/integrations/notificame', $currentUri) || isActive('/integrations/whatsapp-official', $currentUri) || isActive('/integrations/woocommerce', $currentUri) ? 'active' : '' ?>" data-title="Integrações">
                         <span class="menu-icon">
                             <i class="ki-duotone ki-sms fs-2">
                                 <span class="path1"></span>
@@ -318,6 +318,16 @@
                                     <span class="bullet bullet-dot"></span>
                                 </span>
                                 <span class="menu-title">Chamadas Api4Com</span>
+                            </a>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (\App\Helpers\Permission::can('integrations.view')): ?>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/integrations/woocommerce', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/integrations/woocommerce') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">WooCommerce</span>
                             </a>
                         </div>
                         <?php endif; ?>

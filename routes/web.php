@@ -37,6 +37,7 @@ use App\Controllers\SoundSettingsController;
 use App\Controllers\ProfileController;
 use App\Controllers\Api4ComController;
 use App\Controllers\Api4ComCallController;
+use App\Controllers\WooCommerceController;
 
 // Rotas públicas
 Router::get('/', function() {
@@ -299,6 +300,14 @@ Router::post('/integrations/api4com/{accountId}/extensions', [Api4ComController:
 Router::delete('/integrations/api4com/{accountId}/extensions/{extensionId}', [Api4ComController::class, 'deleteExtension'], ['Authentication']);
 Router::get('/integrations/api4com/{id}/show', [Api4ComController::class, 'show'], ['Authentication']);
 Router::post('/integrations/api4com/{id}/test', [Api4ComController::class, 'testConnection'], ['Authentication']);
+
+// Rotas de Integrações WooCommerce
+Router::get('/integrations/woocommerce', [WooCommerceController::class, 'index'], ['Authentication']);
+Router::post('/integrations/woocommerce', [WooCommerceController::class, 'store'], ['Authentication']);
+Router::post('/integrations/woocommerce/{id}', [WooCommerceController::class, 'update'], ['Authentication']);
+Router::delete('/integrations/woocommerce/{id}', [WooCommerceController::class, 'delete'], ['Authentication']);
+Router::post('/integrations/woocommerce/{id}/test', [WooCommerceController::class, 'testConnection'], ['Authentication']);
+Router::get('/integrations/woocommerce/contacts/{contactId}/orders', [WooCommerceController::class, 'getContactOrders'], ['Authentication']);
 
 // Rotas de Chamadas Api4Com
 Router::get('/api4com-calls', [Api4ComCallController::class, 'index'], ['Authentication']);

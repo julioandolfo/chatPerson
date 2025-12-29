@@ -586,7 +586,15 @@ function updateConditionType(select, index) {
     const typeConfig = conditionTypes[type] || {};
     const conditionItem = select.closest('.condition-item');
     const operatorSelect = conditionItem.querySelector('.condition-operator');
-    const valueContainer = conditionItem.querySelector('.col-md-4:last-of-type');
+    
+    // Buscar o container do valor de forma mais específica
+    const allCols = conditionItem.querySelectorAll('.col-md-4, .col-md-3');
+    const valueContainer = allCols[2]; // Terceira coluna (0=tipo, 1=operador, 2=valor)
+    
+    if (!valueContainer) {
+        console.error('Value container não encontrado');
+        return;
+    }
     
     operatorSelect.innerHTML = typeConfig.operators ? 
         typeConfig.operators.map(op => `<option value="${op}">${getOperatorLabel(op)}</option>`).join('') :

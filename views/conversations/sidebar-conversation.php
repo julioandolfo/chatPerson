@@ -326,7 +326,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <a class="nav-link" data-bs-toggle="tab" href="#kt_tab_history">Histórico</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" data-bs-toggle="tab" href="#kt_tab_orders" onclick="loadWooCommerceOrders()">Pedidos</a>
+                <a class="nav-link" data-bs-toggle="tab" href="#kt_tab_orders">Pedidos</a>
             </li>
         </ul>
     </div>
@@ -2099,9 +2099,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const ordersTab = document.querySelector('a[href="#kt_tab_orders"]');
     if (ordersTab) {
         ordersTab.addEventListener('shown.bs.tab', function() {
-            loadWooCommerceOrders();
+            console.log('🛒 Aba de pedidos aberta, carregando...');
+            if (typeof window.loadWooCommerceOrders === 'function') {
+                window.loadWooCommerceOrders();
+            } else {
+                console.error('❌ Função loadWooCommerceOrders não encontrada');
+            }
         });
+        console.log('✅ Event listener de pedidos WooCommerce registrado');
+    } else {
+        console.warn('⚠️ Aba de pedidos não encontrada');
     }
 });
+
+// Debug: verificar se a função está disponível
+console.log('🔍 loadWooCommerceOrders disponível?', typeof window.loadWooCommerceOrders);
 </script>
 

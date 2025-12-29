@@ -19,7 +19,26 @@
 header('Content-Type: text/plain; charset=utf-8');
 
 try {
-require_once __DIR__ . '/../vendor/autoload.php';
+    $autoloadCandidates = [
+        __DIR__ . '/../vendor/autoload.php',
+        dirname(__DIR__) . '/vendor/autoload.php',
+        __DIR__ . '/vendor/autoload.php',
+    ];
+    $loaded = false;
+    foreach ($autoloadCandidates as $autoload) {
+        if (is_file($autoload)) {
+            require_once $autoload;
+            $loaded = true;
+            break;
+        }
+    }
+    if (!$loaded) {
+        $msg = '[process-ai-buffers] Autoload não encontrado. Rode "composer install". Procurei: ' . implode(', ', $autoloadCandidates);
+        error_log($msg);
+        echo "error: autoload\n";
+        http_response_code(500);
+        exit(1);
+    }
 } catch (\Throwable $e) {
     error_log('[process-ai-buffers] Autoload error: ' . $e->getMessage());
     echo "error: autoload\n";

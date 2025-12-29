@@ -696,13 +696,6 @@ class AIAgentService
             \App\Helpers\Logger::aiTools("[BUFFER ERROR] Erro ao disparar processamento: " . $e->getMessage());
         }
     }
-            self::processMessage($conversationId, $agentId, $groupedMessage);
-            \App\Helpers\Logger::info("AIAgentService::scheduleProcessing - ✅ Processamento concluído");
-        } catch (\Exception $e) {
-            \App\Helpers\Logger::error("AIAgentService::scheduleProcessing - ❌ Erro: " . $e->getMessage());
-        }
-        
-    }
     
     /**
      * Obter diretório de buffers

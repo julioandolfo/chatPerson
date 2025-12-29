@@ -519,7 +519,7 @@ $scripts = <<<HTML
 function deleteAgent(id, name) {
     Swal.fire({
         title: 'Tem certeza?',
-        html: `Deseja realmente deletar o agente <strong>${name}</strong>?<br><br>Esta ação não pode ser desfeita.`,
+        html: 'Deseja realmente deletar o agente <strong>' + name + '</strong>?<br><br>Esta ação não pode ser desfeita.',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',

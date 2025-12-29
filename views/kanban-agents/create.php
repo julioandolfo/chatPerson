@@ -304,6 +304,16 @@ async function loadSystemData() {
                     valueType: 'select', 
                     options: ['contact', 'agent', 'system'] 
                 },
+                'client_no_response_minutes': { 
+                    label: 'Cliente não responde há (minutos)', 
+                    operators: ['greater_than', 'less_than', 'greater_or_equal', 'less_or_equal'], 
+                    valueType: 'number' 
+                },
+                'agent_no_response_minutes': { 
+                    label: 'Agente não responde há (minutos)', 
+                    operators: ['greater_than', 'less_than', 'greater_or_equal', 'less_or_equal'], 
+                    valueType: 'number' 
+                },
                 'stage_duration_hours': { 
                     label: 'Tempo no Estágio (horas)', 
                     operators: ['greater_than', 'less_than', 'greater_or_equal', 'less_or_equal'], 
@@ -363,6 +373,11 @@ async function loadSystemData() {
                 'assign_to_department': {
                     label: 'Atribuir a Setor',
                     icon: 'ki-briefcase',
+                    requiresConfig: true
+                },
+                'assign_ai_agent': {
+                    label: 'Atribuir Agente de IA',
+                    icon: 'ki-robot',
                     requiresConfig: true
                 },
                 'add_tag': { 
@@ -722,6 +737,17 @@ function getActionConfigHTML(actionData, index) {
                 <select class="form-select action-config-department_id">
                     <option value="">Selecione um setor...</option>
                     ${departmentsOptions}
+                </select>
+            `;
+        case 'assign_ai_agent':
+            const aiAgentsOptions = (systemData.ai_agents || []).map(a => 
+                `<option value="${a.id}" ${config.ai_agent_id == a.id ? 'selected' : ''}>${a.name}</option>`
+            ).join('');
+            return `
+                <label class="form-label">Agente de IA</label>
+                <select class="form-select action-config-ai_agent_id">
+                    <option value="">Selecione um agente de IA...</option>
+                    ${aiAgentsOptions}
                 </select>
             `;
         case 'add_tag':

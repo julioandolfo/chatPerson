@@ -5,8 +5,24 @@
  * cd /var/www/html && php public/scripts/analyze-sentiments.php >> logs/sentiment-analysis.log 2>&1
  */
 
-require_once __DIR__ . '/../../vendor/autoload.php';
-require_once __DIR__ . '/../../config/bootstrap.php';
+// Mudar para diretório raiz do projeto
+chdir(__DIR__ . '/../../');
+
+// Autoloader
+require_once __DIR__ . '/../../app/Helpers/autoload.php';
+
+// Configurar timezone
+date_default_timezone_set('America/Sao_Paulo');
+
+// Configurar error reporting
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
+
+// Garantir que o diretório de logs existe
+$logsDir = __DIR__ . '/../../logs';
+if (!is_dir($logsDir)) {
+    mkdir($logsDir, 0755, true);
+}
 
 use App\Services\SentimentAnalysisService;
 

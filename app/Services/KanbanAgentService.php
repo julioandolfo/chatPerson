@@ -416,6 +416,34 @@ class KanbanAgentService
                 }
                 return self::compare($lastMessage['sender_type'] ?? '', $operator, $value);
             
+            case 'client_no_response_minutes':
+                // Buscar última mensagem do contato
+                $lastClientMessage = Message::whereFirst(
+                    'conversation_id', 
+                    '=', 
+                    $conversation['id'], 
+                    'AND sender_type = \'contact\' ORDER BY created_at DESC'
+                );
+                if (!$lastClientMessage) {
+                    return false;
+                }
+                $minutes = (time() - strtotime($lastClientMessage['created_at'])) / 60;
+                return self::compare($minutes, $operator, $value);
+            
+            case 'agent_no_response_minutes':
+                // Buscar última mensagem de agente
+                $lastAgentMessage = Message::whereFirst(
+                    'conversation_id', 
+                    '=', 
+                    $conversation['id'], 
+                    'AND sender_type = \'agent\' ORDER BY created_at DESC'
+                );
+                if (!$lastAgentMessage) {
+                    return false;
+                }
+                $minutes = (time() - strtotime($lastAgentMessage['created_at'])) / 60;
+                return self::compare($minutes, $operator, $value);
+            
             case 'stage_duration_hours':
                 if (!$conversation['moved_at']) {
                     return false;
@@ -548,6 +576,9 @@ class KanbanAgentService
             case 'assign_to_agent':
                 return self::actionAssignToAgent($conversation, $config);
             
+            case 'assign_ai_agent':
+                return self::actionAssignAIAgent($conversation, $config);
+            
             case 'add_tag':
                 return self::actionAddTag($conversation, $config);
             
@@ -665,6 +696,42 @@ class KanbanAgentService
         ]);
 
         return ['message' => "Conversa atribuída ao agente $agentId"];
+    }
+
+    /**
+     * Ação: Atribuir Agente de IA
+     */
+    private static function actionAssignAIAgent(array $conversation, array $config): array
+    {
+        $aiAgentId = $config['ai_agent_id'] ?? null;
+        
+        if (!$aiAgentId) {
+            throw new \Exception('Nenhum agente de IA especificado');
+        }
+        
+        // Verificar se o agente de IA existe e está ativo
+        $aiAgent = \App\Models\AIAgent::find($aiAgentId);
+        if (!$aiAgent || !$aiAgent['enabled']) {
+            throw new \Exception('Agente de IA não encontrado ou inativo');
+        }
+        
+        // Atribuir o agente de IA à conversa
+        Conversation::update($conversation['id'], [
+            'ai_agent_id' => $aiAgentId
+        ]);
+        
+        // Adicionar mensagem do sistema informando a atribuição
+        \App\Services\ConversationService::sendMessage(
+            $conversation['id'],
+            "🤖 Agente de IA '{$aiAgent['name']}' foi adicionado à conversa.",
+            'system',
+            null,
+            []
+        );
+        
+        Logger::info("KanbanAgentService::actionAssignAIAgent - Agente de IA {$aiAgent['name']} (ID: {$aiAgentId}) atribuído à conversa {$conversation['id']}");
+        
+        return ['message' => "Agente de IA '{$aiAgent['name']}' atribuído à conversa"];
     }
 
     /**

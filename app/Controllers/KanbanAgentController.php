@@ -469,6 +469,9 @@ class KanbanAgentController
             // Agentes
             $agents = \App\Models\User::getAgents();
             
+            // Agentes de IA
+            $aiAgents = \App\Models\AIAgent::whereActive();
+            
             // Tags
             $tags = \App\Services\TagService::getAll();
             
@@ -484,6 +487,7 @@ class KanbanAgentController
                     'funnels' => $funnels,
                     'stages' => $allStages,
                     'agents' => $agents,
+                    'ai_agents' => $aiAgents,
                     'tags' => $tags,
                     'departments' => $departments
                 ]

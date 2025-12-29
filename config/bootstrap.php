@@ -7,12 +7,8 @@
 // Garantir que estamos no diretório raiz do projeto
 chdir(dirname(__DIR__));
 
-// Autoloader
-require_once __DIR__ . '/../vendor/autoload.php';
-
-// Carregar configurações
-require_once __DIR__ . '/app.php';
-require_once __DIR__ . '/database.php';
+// Autoloader personalizado (PHP Vanilla, sem Composer)
+require_once __DIR__ . '/../app/Helpers/autoload.php';
 
 // Garantir que o diretório de logs existe
 $logsDir = __DIR__ . '/../logs';

@@ -30,4 +30,5 @@ require __DIR__ . '/Router.php';
 require __DIR__ . '/Url.php';
 require __DIR__ . '/Request.php';
 require __DIR__ . '/Permission.php';
+require __DIR__ . '/Logger.php';
 

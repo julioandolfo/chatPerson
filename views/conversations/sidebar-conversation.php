@@ -2098,14 +2098,14 @@ window.loadWooCommerceIntegrations = function() {
         console.warn('⚠️ Select de integrações não encontrado');
         return;
     }
-    
-    if (filterSelect.options.length > 1) {
-        console.log('✅ Integrações já carregadas');
-        return; // Já carregado
-    }
-    
+
     console.log('🔍 Carregando integrações WooCommerce...');
-    
+
+    // Mostrar estado de carregamento e evitar interação
+    const placeholder = filterSelect.options[0];
+    placeholder.textContent = 'Carregando lojas...';
+    filterSelect.disabled = true;
+
     fetch('<?= \App\Helpers\Url::to('/integrations/woocommerce') ?>', {
         headers: {
             'X-Requested-With': 'XMLHttpRequest',
@@ -2118,10 +2118,20 @@ window.loadWooCommerceIntegrations = function() {
     })
     .then(data => {
         console.log('📦 Dados recebidos:', data);
-        
+
+        // Limpar opções anteriores mantendo apenas o placeholder
+        while (filterSelect.options.length > 1) {
+            filterSelect.remove(1);
+        }
+
+        const seen = new Set();
         if (data.integrations && Array.isArray(data.integrations)) {
             console.log(`✅ ${data.integrations.length} integração(ões) encontrada(s)`);
             data.integrations.forEach(integration => {
+                if (seen.has(integration.id)) {
+                    return; // evita duplicados
+                }
+                seen.add(integration.id);
                 const option = document.createElement('option');
                 option.value = integration.id;
                 option.textContent = integration.name;
@@ -2134,6 +2144,10 @@ window.loadWooCommerceIntegrations = function() {
     })
     .catch(error => {
         console.error('❌ Erro ao carregar integrações:', error);
+    })
+    .finally(() => {
+        placeholder.textContent = 'Todas as lojas';
+        filterSelect.disabled = false;
     });
 }
 

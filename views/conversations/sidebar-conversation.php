@@ -2099,6 +2099,12 @@ window.loadWooCommerceIntegrations = function() {
         return;
     }
 
+    // Evitar recarregar se já fizemos uma carga bem-sucedida e não houve pedido de refresh
+    if (filterSelect.dataset.loaded === '1') {
+        console.log('✅ Integrações já carregadas (cache em memória)');
+        return;
+    }
+
     console.log('🔍 Carregando integrações WooCommerce...');
 
     // Mostrar estado de carregamento e evitar interação
@@ -2128,22 +2134,27 @@ window.loadWooCommerceIntegrations = function() {
         if (data.integrations && Array.isArray(data.integrations)) {
             console.log(`✅ ${data.integrations.length} integração(ões) encontrada(s)`);
             data.integrations.forEach(integration => {
-                if (seen.has(integration.id)) {
+                const key = `${integration.id}-${integration.name}`;
+                if (seen.has(key)) {
                     return; // evita duplicados
                 }
-                seen.add(integration.id);
+                seen.add(key);
                 const option = document.createElement('option');
                 option.value = integration.id;
                 option.textContent = integration.name;
                 filterSelect.appendChild(option);
                 console.log(`  ➕ Adicionada: ${integration.name} (ID: ${integration.id})`);
             });
+            // Marcar como carregado com sucesso
+            filterSelect.dataset.loaded = '1';
         } else {
             console.warn('⚠️ Nenhuma integração encontrada ou formato inválido');
+            filterSelect.dataset.loaded = '0';
         }
     })
     .catch(error => {
         console.error('❌ Erro ao carregar integrações:', error);
+        filterSelect.dataset.loaded = '0';
     })
     .finally(() => {
         placeholder.textContent = 'Todas as lojas';

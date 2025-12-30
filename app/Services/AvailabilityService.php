@@ -111,7 +111,8 @@ class AvailabilityService
         }
 
         $data = [
-            'last_activity_at' => date('Y-m-d H:i:s')
+            'last_activity_at' => date('Y-m-d H:i:s'),
+            'last_seen_at' => date('Y-m-d H:i:s') // Atualizar também last_seen_at
         ];
 
         // Se estava 'away' e teve atividade, voltar para 'online'
@@ -128,7 +129,12 @@ class AvailabilityService
      */
     public static function processHeartbeat(int $userId): void
     {
-        self::updateActivity($userId, 'heartbeat');
+        // Atualizar last_seen_at (heartbeat recebido)
+        User::update($userId, [
+            'last_seen_at' => date('Y-m-d H:i:s')
+        ]);
+        
+        // Verificar e atualizar status se necessário
         self::checkAndUpdateStatus($userId);
     }
 
@@ -146,34 +152,98 @@ class AvailabilityService
 
         $currentStatus = $user['availability_status'] ?? 'offline';
         $lastActivity = $user['last_activity_at'] ?? null;
-
-        if (!$lastActivity) {
-            return;
-        }
+        $lastSeen = $user['last_seen_at'] ?? null;
 
         $now = new \DateTime();
-        $lastActivityDt = new \DateTime($lastActivity);
-        $diffMinutes = ($now->getTimestamp() - $lastActivityDt->getTimestamp()) / 60;
 
-        // Se está online e passou do timeout de away
-        if ($currentStatus === 'online' && $settings['auto_away_enabled']) {
+        // Verificar timeout de offline (baseado em last_seen_at - heartbeat)
+        if (in_array($currentStatus, ['online', 'away', 'busy']) && $lastSeen) {
+            $lastSeenDt = new \DateTime($lastSeen);
+            $offlineDiffMinutes = ($now->getTimestamp() - $lastSeenDt->getTimestamp()) / 60;
+            
+            if ($offlineDiffMinutes >= $settings['offline_timeout_minutes']) {
+                self::updateAvailabilityStatus($userId, 'offline', 'heartbeat_timeout');
+                return; // Já mudou para offline, não precisa verificar away
+            }
+        }
+
+        // Verificar timeout de away (baseado em last_activity_at - atividade real)
+        if ($currentStatus === 'online' && $settings['auto_away_enabled'] && $lastActivity) {
+            $lastActivityDt = new \DateTime($lastActivity);
+            $diffMinutes = ($now->getTimestamp() - $lastActivityDt->getTimestamp()) / 60;
+            
             if ($diffMinutes >= $settings['away_timeout_minutes']) {
                 self::updateAvailabilityStatus($userId, 'away', 'inactivity_timeout');
             }
         }
+    }
 
-        // Se está away ou online e passou do timeout de offline (sem heartbeat)
-        if (in_array($currentStatus, ['online', 'away'])) {
-            $lastSeen = $user['last_seen_at'] ?? null;
+    /**
+     * Verificar todos os agentes e atualizar status (para cron)
+     */
+    public static function checkAllAgents(): array
+    {
+        $settings = self::getSettings();
+        $offlineTimeoutMinutes = $settings['offline_timeout_minutes'];
+        $awayTimeoutMinutes = $settings['away_timeout_minutes'];
+        
+        // Buscar agentes que estão online, away ou busy
+        $sql = "SELECT id, name, availability_status, last_seen_at, last_activity_at
+                FROM users 
+                WHERE role IN ('agent', 'admin', 'supervisor')
+                AND status = 'active'
+                AND availability_status IN ('online', 'away', 'busy')";
+        
+        $agents = Database::fetchAll($sql);
+        
+        $updated = [];
+        $now = new \DateTime();
+        
+        foreach ($agents as $agent) {
+            $agentId = $agent['id'];
+            $currentStatus = $agent['availability_status'];
+            $lastSeen = $agent['last_seen_at'];
+            $lastActivity = $agent['last_activity_at'];
+            
+            // Verificar timeout de offline (sem heartbeat)
             if ($lastSeen) {
                 $lastSeenDt = new \DateTime($lastSeen);
-                $offlineDiffMinutes = ($now->getTimestamp() - $lastSeenDt->getTimestamp()) / 60;
+                $minutesSinceLastSeen = ($now->getTimestamp() - $lastSeenDt->getTimestamp()) / 60;
                 
-                if ($offlineDiffMinutes >= $settings['offline_timeout_minutes']) {
-                    self::updateAvailabilityStatus($userId, 'offline', 'heartbeat_timeout');
+                if ($minutesSinceLastSeen >= $offlineTimeoutMinutes) {
+                    self::updateAvailabilityStatus($agentId, 'offline', 'heartbeat_timeout_cron');
+                    $updated[] = [
+                        'id' => $agentId,
+                        'name' => $agent['name'],
+                        'old_status' => $currentStatus,
+                        'new_status' => 'offline',
+                        'reason' => 'heartbeat_timeout',
+                        'minutes' => round($minutesSinceLastSeen, 1)
+                    ];
+                    continue;
+                }
+            }
+            
+            // Verificar timeout de away (sem atividade)
+            if ($currentStatus === 'online' && $settings['auto_away_enabled'] && $lastActivity) {
+                $lastActivityDt = new \DateTime($lastActivity);
+                $minutesSinceActivity = ($now->getTimestamp() - $lastActivityDt->getTimestamp()) / 60;
+                
+                if ($minutesSinceActivity >= $awayTimeoutMinutes) {
+                    self::updateAvailabilityStatus($agentId, 'away', 'inactivity_timeout_cron');
+                    $updated[] = [
+                        'id' => $agentId,
+                        'name' => $agent['name'],
+                        'old_status' => $currentStatus,
+                        'new_status' => 'away',
+                        'reason' => 'inactivity_timeout',
+                        'minutes' => round($minutesSinceActivity, 1)
+                    ];
                 }
             }
         }
+        
+        return $updated;
     }
 
     /**
@@ -362,8 +432,10 @@ class AvailabilityService
         
         $totalSeconds = array_sum($timeInStatus);
         
+        // Se não há histórico ainda, retornar zeros mas com formato correto
         $stats = [];
-        foreach ($timeInStatus as $status => $seconds) {
+        foreach (['online', 'offline', 'away', 'busy'] as $status) {
+            $seconds = $timeInStatus[$status] ?? 0;
             $stats[$status] = [
                 'seconds' => $seconds,
                 'formatted' => self::formatTime($seconds),
@@ -398,4 +470,3 @@ class AvailabilityService
         }
     }
 }
-

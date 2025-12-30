@@ -39,12 +39,7 @@ Se não puder configurar cron no servidor, use um serviço externo como:
 
 **URL para configurar:**
 ```
-https://seudominio.com/cron-availability.php?token=SEU_TOKEN_SECRETO
-```
-
-**Configurar token no `.env`:**
-```env
-CRON_TOKEN=seu_token_secreto_aqui_gere_um_aleatorio
+https://seudominio.com/cron-availability.php
 ```
 
 **Frequência recomendada:** A cada 5 minutos
@@ -94,9 +89,9 @@ Para corrigir agentes que estão online há dias, execute manualmente:
 php public/check-availability.php
 ```
 
-Ou acesse via navegador (se configurou o token):
+Ou acesse via navegador:
 ```
-https://seudominio.com/cron-availability.php?token=SEU_TOKEN
+https://seudominio.com/cron-availability.php
 ```
 
 Isso irá verificar todos os agentes e atualizar os status conforme as regras.

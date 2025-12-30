@@ -3,28 +3,13 @@
  * Endpoint para verificar disponibilidade dos agentes via HTTP
  * Pode ser chamado via cron ou serviço externo (ex: cron-job.org)
  * 
- * URL: https://seudominio.com/cron-availability.php?token=SEU_TOKEN_SECRETO
- * 
- * Configure o token em .env: CRON_TOKEN=seu_token_secreto_aqui
+ * URL: https://seudominio.com/cron-availability.php
  */
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../app/Helpers/autoload.php';
 
 use App\Services\AvailabilityService;
-
-// Verificar token de segurança
-$expectedToken = $_ENV['CRON_TOKEN'] ?? 'change-me-in-production';
-$providedToken = $_GET['token'] ?? '';
-
-if ($providedToken !== $expectedToken) {
-    http_response_code(403);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Token inválido'
-    ]);
-    exit;
-}
 
 header('Content-Type: application/json');
 

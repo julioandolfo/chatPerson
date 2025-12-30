@@ -19047,8 +19047,21 @@ document.addEventListener('DOMContentLoaded', function() {
         window.loadWooCommerceIntegrations = window.loadWooCommerceIntegrations || function() {
             const filterSelect = document.getElementById('woocommerce-integration-filter');
             if (!filterSelect) return;
-            // Evitar duplicar opções
-            if (filterSelect.options.length > 1) return;
+
+            // Se já carregamos com sucesso, não repetir
+            if (filterSelect.dataset.loaded === '1') {
+                return;
+            }
+
+            // Limpar opções anteriores mantendo placeholder
+            while (filterSelect.options.length > 1) {
+                filterSelect.remove(1);
+            }
+
+            // Estado de carregamento
+            const placeholder = filterSelect.options[0];
+            placeholder.textContent = 'Carregando lojas...';
+            filterSelect.disabled = true;
 
             fetch('<?= \App\Helpers\Url::to('/integrations/woocommerce') ?>', {
                 headers: {
@@ -19058,16 +19071,30 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(r => r.json())
             .then(data => {
+                const seen = new Set();
                 if (data.integrations && Array.isArray(data.integrations)) {
                     data.integrations.forEach(integration => {
+                        const key = `${integration.id}-${integration.name}`;
+                        if (seen.has(key)) return;
+                        seen.add(key);
                         const opt = document.createElement('option');
                         opt.value = integration.id;
                         opt.textContent = integration.name;
                         filterSelect.appendChild(opt);
                     });
+                    filterSelect.dataset.loaded = '1';
+                } else {
+                    filterSelect.dataset.loaded = '0';
                 }
             })
-            .catch(err => console.error('Woo Fallback: erro ao carregar integrações', err));
+            .catch(err => {
+                console.error('Woo Fallback: erro ao carregar integrações', err);
+                filterSelect.dataset.loaded = '0';
+            })
+            .finally(() => {
+                placeholder.textContent = 'Todas as lojas';
+                filterSelect.disabled = false;
+            });
         };
 
         window.loadWooCommerceOrders = function() {

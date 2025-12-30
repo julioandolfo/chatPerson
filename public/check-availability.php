@@ -4,18 +4,66 @@
  * Deve ser executado periodicamente via cron (ex: a cada 5 minutos)
  * 
  * Cron exemplo (Linux):
- * */5 * * * * php /var/www/html/public/check-availability.php >> /var/log/availability-cron.log 2>&1
+ * A cada 5 minutos: 0,5,10,15,20,25,30,35,40,45,50,55 * * * * php /var/www/html/public/check-availability.php >> /var/log/availability-cron.log 2>&1
  * 
  * Cron exemplo (Windows Task Scheduler):
  * php C:\laragon\www\chat\public\check-availability.php
  */
 
-// Habilitar exibição de erros
-error_reporting(E_ALL);
+// Habilitar exibição de erros (máximo detalhamento)
+error_reporting(E_ALL | E_STRICT);
 ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+ini_set('log_errors', 1);
 
-require_once __DIR__ . '/../vendor/autoload.php';
-require_once __DIR__ . '/../app/Helpers/autoload.php';
+// Se executado via HTTP, definir header de texto
+if (php_sapi_name() !== 'cli') {
+    header('Content-Type: text/plain; charset=utf-8');
+}
+
+// Capturar erros fatais
+register_shutdown_function(function() {
+    $error = error_get_last();
+    if ($error !== NULL && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        echo "\n\n=== ERRO FATAL ===\n";
+        echo "Tipo: " . $error['type'] . "\n";
+        echo "Mensagem: " . $error['message'] . "\n";
+        echo "Arquivo: " . $error['file'] . "\n";
+        echo "Linha: " . $error['line'] . "\n";
+        exit(1);
+    }
+});
+
+// Handler de erros
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    echo "\n=== ERRO PHP ===\n";
+    echo "Nível: " . $errno . "\n";
+    echo "Mensagem: " . $errstr . "\n";
+    echo "Arquivo: " . $errfile . "\n";
+    echo "Linha: " . $errline . "\n\n";
+    return false; // Continuar com o handler padrão
+});
+
+echo "Iniciando script...\n";
+echo "PHP Version: " . PHP_VERSION . "\n";
+echo "SAPI: " . php_sapi_name() . "\n";
+echo "Diretório: " . __DIR__ . "\n\n";
+
+try {
+    require_once __DIR__ . '/../vendor/autoload.php';
+    echo "✓ vendor/autoload.php carregado\n";
+} catch (\Exception $e) {
+    echo "✗ ERRO ao carregar vendor/autoload.php: " . $e->getMessage() . "\n";
+    exit(1);
+}
+
+try {
+    require_once __DIR__ . '/../app/Helpers/autoload.php';
+    echo "✓ app/Helpers/autoload.php carregado\n\n";
+} catch (\Exception $e) {
+    echo "✗ ERRO ao carregar app/Helpers/autoload.php: " . $e->getMessage() . "\n";
+    exit(1);
+}
 
 use App\Services\AvailabilityService;
 use App\Helpers\Database;

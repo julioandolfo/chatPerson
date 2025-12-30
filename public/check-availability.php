@@ -1,11 +1,18 @@
 <?php
 /**
- * Script para verificar e atualizar disponibilidade dos agentes
+ * Script CLI para verificar e atualizar disponibilidade dos agentes
  * Deve ser executado periodicamente via cron (ex: a cada 5 minutos)
  * 
- * Cron exemplo:
- * (asterisco)/5 * * * * php /var/www/html/public/check-availability.php
+ * Cron exemplo (Linux):
+ * */5 * * * * php /var/www/html/public/check-availability.php >> /var/log/availability-cron.log 2>&1
+ * 
+ * Cron exemplo (Windows Task Scheduler):
+ * php C:\laragon\www\chat\public\check-availability.php
  */
+
+// Habilitar exibição de erros
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../app/Helpers/autoload.php';
@@ -92,9 +99,12 @@ try {
     echo "Total atualizado: {$updated}\n";
     echo "Concluído em: " . date('Y-m-d H:i:s') . "\n";
     
-} catch (Exception $e) {
-    echo "ERRO: " . $e->getMessage() . "\n";
-    echo "Stack trace:\n" . $e->getTraceAsString() . "\n";
+} catch (\Exception $e) {
+    echo "\n=== ERRO ===\n";
+    echo "Mensagem: " . $e->getMessage() . "\n";
+    echo "Arquivo: " . $e->getFile() . "\n";
+    echo "Linha: " . $e->getLine() . "\n";
+    echo "\nStack trace:\n" . $e->getTraceAsString() . "\n";
     exit(1);
 }
 

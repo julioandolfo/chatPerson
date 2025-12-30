@@ -2092,7 +2092,7 @@ function renderWooCommerceOrders(contactId) {
 /**
  * Carregar lista de integrações WooCommerce para o filtro
  */
-function loadWooCommerceIntegrations() {
+window.loadWooCommerceIntegrations = function() {
     const filterSelect = document.getElementById('woocommerce-integration-filter');
     if (!filterSelect) {
         console.warn('⚠️ Select de integrações não encontrado');

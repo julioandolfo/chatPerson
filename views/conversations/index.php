@@ -18977,11 +18977,16 @@ document.addEventListener('DOMContentLoaded', function() {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 WooCommerce sidebar bootstrap iniciado');
 
+    let wooAttempts = 0;
+
     function tryInitWooSidebar() {
+        wooAttempts += 1;
         const sidebarLoaded = typeof window.loadWooCommerceOrders === 'function';
         const integrationFilter = document.getElementById('woocommerce-integration-filter');
         const statusFilter = document.getElementById('woocommerce-status-filter');
         const refreshBtn = document.getElementById('btn-refresh-woocommerce-orders');
+
+        console.log(`[Woo Init] Tentativa ${wooAttempts} | func loaded: ${sidebarLoaded} | elementos => integration:${!!integrationFilter} status:${!!statusFilter} refresh:${!!refreshBtn}`);
 
         // Se ainda não temos a função ou elementos, tentar de novo em 500ms
         if (!sidebarLoaded || (!integrationFilter && !statusFilter && !refreshBtn)) {
@@ -19020,6 +19025,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     tryInitWooSidebar();
+
+    // Fallback: tentar carregar integrações mesmo sem encontrar sidebar (evitar cache vazio)
+    setTimeout(() => {
+        if (typeof window.loadWooCommerceIntegrations === 'function') {
+            console.log('⏱️ Fallback: carregando integrações WooCommerce (2s)...');
+            window.loadWooCommerceIntegrations();
+        } else {
+            console.warn('⚠️ Fallback: loadWooCommerceIntegrations ainda não disponível');
+        }
+    }, 2000);
 });
 </script>
 

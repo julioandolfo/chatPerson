@@ -744,10 +744,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                     
                     <div class="d-flex flex-column gap-2 mb-3">
-                        <select class="form-select form-select-sm" id="woocommerce-integration-filter" onchange="loadWooCommerceOrders()">
+                        <select class="form-select form-select-sm" id="woocommerce-integration-filter">
                             <option value="">Todas as lojas</option>
                         </select>
-                        <select class="form-select form-select-sm" id="woocommerce-status-filter" onchange="loadWooCommerceOrders()">
+                        <select class="form-select form-select-sm" id="woocommerce-status-filter">
                             <option value="">Todos os status</option>
                             <option value="pending">Pendente</option>
                             <option value="processing">Processando</option>
@@ -1889,8 +1889,13 @@ console.log('✅ Todas as funções do sidebar carregadas:', {
  * Carregar pedidos do WooCommerce para o contato da conversa atual
  */
 window.loadWooCommerceOrders = function() {
+    console.log('🛒 loadWooCommerceOrders chamada!');
+    console.log('  - currentConversationId:', window.currentConversationId);
+    console.log('  - currentConversation:', window.currentConversation);
+    
     const conversationId = window.currentConversationId;
     if (!conversationId) {
+        console.warn('⚠️ Nenhuma conversa selecionada');
         const ordersList = document.getElementById('woocommerce-orders-list');
         if (ordersList) {
             ordersList.innerHTML = '<div class="text-muted fs-7">Selecione uma conversa primeiro</div>';
@@ -1902,12 +1907,15 @@ window.loadWooCommerceOrders = function() {
     let contactId = null;
     if (window.currentConversation?.contact_id) {
         contactId = window.currentConversation.contact_id;
+        console.log('✅ ContactId obtido de window.currentConversation:', contactId);
     } else {
         const sidebar = document.getElementById('conversationSidebar');
         contactId = sidebar?.dataset?.contactId;
+        console.log('✅ ContactId obtido do sidebar dataset:', contactId);
     }
     
     if (!contactId) {
+        console.error('❌ ContactId não encontrado!');
         const ordersList = document.getElementById('woocommerce-orders-list');
         if (ordersList) {
             ordersList.innerHTML = '<div class="text-muted fs-7">Erro: ID do contato não encontrado</div>';
@@ -1915,6 +1923,7 @@ window.loadWooCommerceOrders = function() {
         return;
     }
     
+    console.log('📞 Chamando renderWooCommerceOrders com contactId:', contactId);
     renderWooCommerceOrders(contactId);
 };
 
@@ -1922,11 +1931,18 @@ window.loadWooCommerceOrders = function() {
  * Renderizar pedidos do WooCommerce
  */
 function renderWooCommerceOrders(contactId) {
+    console.log('📦 renderWooCommerceOrders iniciada com contactId:', contactId);
+    
     const ordersList = document.getElementById('woocommerce-orders-list');
-    if (!ordersList) return;
+    if (!ordersList) {
+        console.error('❌ Elemento woocommerce-orders-list não encontrado!');
+        return;
+    }
     
     const integrationFilter = document.getElementById('woocommerce-integration-filter')?.value || '';
     const statusFilter = document.getElementById('woocommerce-status-filter')?.value || '';
+    
+    console.log('🔍 Filtros:', { integrationFilter, statusFilter });
     
     ordersList.innerHTML = '<div class="text-muted fs-7">Carregando pedidos...</div>';
     
@@ -1935,14 +1951,20 @@ function renderWooCommerceOrders(contactId) {
         url += `?integration_id=${integrationFilter}`;
     }
     
+    console.log('🌐 Fazendo requisição para:', url);
+    
     fetch(url, {
         headers: {
             'X-Requested-With': 'XMLHttpRequest',
             'Accept': 'application/json'
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('📡 Response recebida:', response.status, response.statusText);
+        return response.json();
+    })
     .then(data => {
+        console.log('📦 Dados recebidos:', data);
         if (!data.success) {
             throw new Error(data.message || 'Erro ao carregar pedidos');
         }
@@ -2140,6 +2162,30 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         console.log('✅ Event listener do botão de atualizar registrado');
+    }
+    
+    // Filtros de integração e status
+    const integrationFilter = document.getElementById('woocommerce-integration-filter');
+    const statusFilter = document.getElementById('woocommerce-status-filter');
+    
+    if (integrationFilter) {
+        integrationFilter.addEventListener('change', function() {
+            console.log('🔍 Filtro de integração alterado:', this.value);
+            if (typeof window.loadWooCommerceOrders === 'function') {
+                window.loadWooCommerceOrders();
+            }
+        });
+        console.log('✅ Event listener do filtro de integração registrado');
+    }
+    
+    if (statusFilter) {
+        statusFilter.addEventListener('change', function() {
+            console.log('📊 Filtro de status alterado:', this.value);
+            if (typeof window.loadWooCommerceOrders === 'function') {
+                window.loadWooCommerceOrders();
+            }
+        });
+        console.log('✅ Event listener do filtro de status registrado');
     }
 });
 

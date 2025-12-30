@@ -777,6 +777,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <script>
+console.log('📋📋📋 SIDEBAR-CONVERSATION.PHP INICIANDO... 📋📋📋');
 console.log('📋 sidebar-conversation.php carregado');
 
 // ============================================================================
@@ -1871,6 +1872,7 @@ window.escapeHtml = function(text) {
     return div.innerHTML;
 };
 
+console.log('✅✅✅ TODAS AS FUNÇÕES DO SIDEBAR CARREGADAS ✅✅✅');
 console.log('✅ Todas as funções do sidebar carregadas:', {
     editContact: typeof window.editContact,
     loadAIAgentStatus: typeof window.loadAIAgentStatus,
@@ -1884,6 +1886,8 @@ console.log('✅ Todas as funções do sidebar carregadas:', {
 // ============================================================================
 // FUNÇÕES WOOCOMMERCE
 // ============================================================================
+
+console.log('🛒🛒🛒 INICIANDO CARREGAMENTO DAS FUNÇÕES WOOCOMMERCE 🛒🛒🛒');
 
 /**
  * Carregar pedidos do WooCommerce para o contato da conversa atual

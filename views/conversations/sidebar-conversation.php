@@ -2191,6 +2191,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         console.log('✅ Event listener do filtro de status registrado');
     }
+
+    // Garantir que o select de lojas seja populado assim que a página carregar
+    if (typeof window.loadWooCommerceIntegrations === 'function') {
+        console.log('🔍 Carregando integrações WooCommerce (onload)...');
+        window.loadWooCommerceIntegrations();
+    } else {
+        console.warn('⚠️ loadWooCommerceIntegrations não disponível no onload');
+    }
 });
 
 // Debug: verificar se a função está disponível

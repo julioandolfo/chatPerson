@@ -18971,6 +18971,58 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- SLA Indicator JavaScript -->
 <script src="<?= \App\Helpers\Url::asset('js/custom/sla-indicator.js') ?>"></script>
 
+<!-- WooCommerce Sidebar Bootstrap -->
+<script>
+// Garantir que os handlers do WooCommerce sejam registrados mesmo em carregamentos dinâmicos
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 WooCommerce sidebar bootstrap iniciado');
+
+    function tryInitWooSidebar() {
+        const sidebarLoaded = typeof window.loadWooCommerceOrders === 'function';
+        const integrationFilter = document.getElementById('woocommerce-integration-filter');
+        const statusFilter = document.getElementById('woocommerce-status-filter');
+        const refreshBtn = document.getElementById('btn-refresh-woocommerce-orders');
+
+        // Se ainda não temos a função ou elementos, tentar de novo em 500ms
+        if (!sidebarLoaded || (!integrationFilter && !statusFilter && !refreshBtn)) {
+            setTimeout(tryInitWooSidebar, 500);
+            return;
+        }
+
+        console.log('✅ WooCommerce sidebar detectada. Função carregada?', sidebarLoaded);
+
+        // Registrar listeners apenas uma vez
+        if (integrationFilter && !integrationFilter.dataset.wooInit) {
+            integrationFilter.addEventListener('change', () => window.loadWooCommerceOrders && window.loadWooCommerceOrders());
+            integrationFilter.dataset.wooInit = '1';
+            console.log('✅ Listener do filtro de integração registrado (bootstrap)');
+        }
+
+        if (statusFilter && !statusFilter.dataset.wooInit) {
+            statusFilter.addEventListener('change', () => window.loadWooCommerceOrders && window.loadWooCommerceOrders());
+            statusFilter.dataset.wooInit = '1';
+            console.log('✅ Listener do filtro de status registrado (bootstrap)');
+        }
+
+        if (refreshBtn && !refreshBtn.dataset.wooInit) {
+            refreshBtn.addEventListener('click', () => window.loadWooCommerceOrders && window.loadWooCommerceOrders());
+            refreshBtn.dataset.wooInit = '1';
+            console.log('✅ Listener do botão de atualizar registrado (bootstrap)');
+        }
+
+        // Carregar integrações imediatamente para popular o select
+        if (typeof window.loadWooCommerceIntegrations === 'function') {
+            console.log('🔍 Bootstrap: carregando integrações WooCommerce...');
+            window.loadWooCommerceIntegrations();
+        } else {
+            console.warn('⚠️ Bootstrap: loadWooCommerceIntegrations não disponível');
+        }
+    }
+
+    tryInitWooSidebar();
+});
+</script>
+
 <?php $content = ob_get_clean(); ?>
 
 <?php include __DIR__ . '/../layouts/metronic/app.php'; ?>

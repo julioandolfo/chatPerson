@@ -19035,6 +19035,146 @@ document.addEventListener('DOMContentLoaded', function() {
             console.warn('⚠️ Fallback: loadWooCommerceIntegrations ainda não disponível');
         }
     }, 2000);
+
+    // Fallback definitivo: se a função ainda não existir após 3s, registramos uma implementação mínima
+    setTimeout(() => {
+        if (typeof window.loadWooCommerceOrders === 'function') {
+            return;
+        }
+
+        console.warn('⚠️ Fallback: registrando funções WooCommerce diretamente no index (sidebar JS pode não ter carregado)');
+
+        window.loadWooCommerceIntegrations = window.loadWooCommerceIntegrations || function() {
+            const filterSelect = document.getElementById('woocommerce-integration-filter');
+            if (!filterSelect) return;
+            // Evitar duplicar opções
+            if (filterSelect.options.length > 1) return;
+
+            fetch('<?= \App\Helpers\Url::to('/integrations/woocommerce') ?>', {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                }
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.integrations && Array.isArray(data.integrations)) {
+                    data.integrations.forEach(integration => {
+                        const opt = document.createElement('option');
+                        opt.value = integration.id;
+                        opt.textContent = integration.name;
+                        filterSelect.appendChild(opt);
+                    });
+                }
+            })
+            .catch(err => console.error('Woo Fallback: erro ao carregar integrações', err));
+        };
+
+        window.loadWooCommerceOrders = function() {
+            const ordersList = document.getElementById('woocommerce-orders-list');
+            if (!ordersList) return;
+
+            const conversationId = window.currentConversationId || null;
+            const contactId = window.currentConversation?.contact_id || document.getElementById('conversationSidebar')?.dataset?.contactId || null;
+
+            if (!conversationId || !contactId) {
+                ordersList.innerHTML = '<div class="text-muted fs-7">Selecione uma conversa primeiro</div>';
+                return;
+            }
+
+            const integrationFilter = document.getElementById('woocommerce-integration-filter')?.value || '';
+            const statusFilter = document.getElementById('woocommerce-status-filter')?.value || '';
+
+            ordersList.innerHTML = '<div class="text-muted fs-7">Carregando pedidos...</div>';
+
+            let url = `<?= \App\Helpers\Url::to('/integrations/woocommerce/contacts') ?>/${contactId}/orders`;
+            if (integrationFilter) {
+                url += `?integration_id=${integrationFilter}`;
+            }
+
+            fetch(url, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                }
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.message || 'Erro ao carregar pedidos');
+                }
+
+                const orders = data.orders || [];
+                let filtered = orders;
+                if (statusFilter) {
+                    filtered = orders.filter(o => o.status === statusFilter);
+                }
+
+                if (!filtered.length) {
+                    ordersList.innerHTML = '<div class="text-center py-5 text-muted fs-7">Nenhum pedido encontrado</div>';
+                    return;
+                }
+
+                let html = '<div class="d-flex flex-column gap-3">';
+                filtered.forEach(order => {
+                    const total = parseFloat(order.total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                    const statusLabels = {
+                        'pending': 'Pendente',
+                        'processing': 'Processando',
+                        'on-hold': 'Em espera',
+                        'completed': 'Concluído',
+                        'cancelled': 'Cancelado',
+                        'refunded': 'Reembolsado',
+                        'failed': 'Falhou'
+                    };
+                    const statusColors = {
+                        'pending': 'warning',
+                        'processing': 'info',
+                        'on-hold': 'warning',
+                        'completed': 'success',
+                        'cancelled': 'danger',
+                        'refunded': 'secondary',
+                        'failed': 'danger'
+                    };
+                    const statusLabel = statusLabels[order.status] || order.status || '-';
+                    const statusColor = statusColors[order.status] || 'secondary';
+                    html += `
+                        <div class="card card-flush card-hover">
+                            <div class="card-body p-4">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div>
+                                        <div class="fw-bold fs-6 text-gray-800">Pedido #${order.id || '-'}</div>
+                                        <div class="fs-7 text-muted">${order.date_created || ''}</div>
+                                    </div>
+                                    <span class="badge badge-light-${statusColor}">${statusLabel}</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-3">
+                                    <div class="fs-5 fw-bold text-primary">${total}</div>
+                                    ${order.number ? `<div class="fs-7 text-muted">Nº ${order.number}</div>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                ordersList.innerHTML = html;
+
+                // Garantir que integrações apareçam
+                window.loadWooCommerceIntegrations();
+            })
+            .catch(err => {
+                console.error('Woo Fallback: erro ao carregar pedidos', err);
+                ordersList.innerHTML = `<div class="text-center py-5 text-danger fs-7">Erro ao carregar pedidos<br><small>${err.message}</small></div>`;
+            });
+        };
+
+        // Após registrar fallback, tente carregar integrações/pedidos se já houver conversa aberta
+        window.loadWooCommerceIntegrations();
+        const hasConversation = window.currentConversationId || window.currentConversation?.contact_id;
+        if (hasConversation) {
+            window.loadWooCommerceOrders();
+        }
+    }, 3000);
 });
 </script>
 

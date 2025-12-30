@@ -47,19 +47,39 @@ set_error_handler(function($errno, $errstr, $errfile, $errline) {
 echo "Iniciando script...\n";
 echo "PHP Version: " . PHP_VERSION . "\n";
 echo "SAPI: " . php_sapi_name() . "\n";
-echo "Diretório: " . __DIR__ . "\n\n";
+echo "Diretório: " . __DIR__ . "\n";
+echo "Diretório raiz: " . dirname(__DIR__) . "\n\n";
 
-try {
-    require_once __DIR__ . '/../vendor/autoload.php';
-    echo "✓ vendor/autoload.php carregado\n";
-} catch (\Exception $e) {
-    echo "✗ ERRO ao carregar vendor/autoload.php: " . $e->getMessage() . "\n";
+// Tentar carregar vendor/autoload.php (opcional - apenas se existir)
+$vendorPath = dirname(__DIR__) . '/vendor/autoload.php';
+if (file_exists($vendorPath)) {
+    echo "Verificando: {$vendorPath}\n";
+    try {
+        require_once $vendorPath;
+        echo "✓ vendor/autoload.php carregado (opcional)\n";
+    } catch (\Exception $e) {
+        echo "⚠ Aviso: Não foi possível carregar vendor/autoload.php: " . $e->getMessage() . "\n";
+        echo "Continuando apenas com app/Helpers/autoload.php...\n";
+    }
+} else {
+    echo "ℹ vendor/autoload.php não encontrado (opcional - continuando...)\n";
+}
+
+// Verificar se app/Helpers/autoload.php existe
+$autoloadPath = dirname(__DIR__) . '/app/Helpers/autoload.php';
+echo "Verificando: {$autoloadPath}\n";
+
+if (!file_exists($autoloadPath)) {
+    echo "\n✗ ERRO CRÍTICO: Arquivo app/Helpers/autoload.php não encontrado!\n";
+    echo "Caminho esperado: {$autoloadPath}\n";
     exit(1);
 }
 
+echo "✓ app/Helpers/autoload.php encontrado\n";
+
 try {
-    require_once __DIR__ . '/../app/Helpers/autoload.php';
-    echo "✓ app/Helpers/autoload.php carregado\n\n";
+    require_once $autoloadPath;
+    echo "✓ app/Helpers/autoload.php carregado com sucesso\n\n";
 } catch (\Exception $e) {
     echo "✗ ERRO ao carregar app/Helpers/autoload.php: " . $e->getMessage() . "\n";
     exit(1);

@@ -13,8 +13,14 @@ error_reporting(E_ALL);
 ini_set('display_errors', 0); // Não exibir erros na tela, apenas no log
 ini_set('log_errors', 1);
 
-require_once __DIR__ . '/../vendor/autoload.php';
+// Carregar autoload do App (obrigatório)
 require_once __DIR__ . '/../app/Helpers/autoload.php';
+
+// Tentar carregar vendor/autoload.php (opcional - apenas se existir)
+$vendorPath = __DIR__ . '/../vendor/autoload.php';
+if (file_exists($vendorPath)) {
+    require_once $vendorPath;
+}
 
 use App\Services\AvailabilityService;
 

@@ -24,10 +24,31 @@ class WooCommerceController
         try {
             $integrations = WooCommerceIntegration::all();
             
+            // Se for requisição AJAX, retornar JSON
+            if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+                strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+                Response::json([
+                    'success' => true,
+                    'integrations' => $integrations
+                ]);
+                return;
+            }
+            
             Response::view('integrations/woocommerce/index', [
                 'integrations' => $integrations
             ]);
         } catch (\Exception $e) {
+            // Se for requisição AJAX, retornar erro em JSON
+            if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+                strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+                Response::json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                    'integrations' => []
+                ], 500);
+                return;
+            }
+            
             Response::view('integrations/woocommerce/index', [
                 'integrations' => [],
                 'error' => $e->getMessage()

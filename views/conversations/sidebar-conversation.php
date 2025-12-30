@@ -735,7 +735,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="sidebar-section">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div class="sidebar-section-title">Pedidos WooCommerce</div>
-                        <button class="btn btn-sm btn-icon btn-light-primary" onclick="loadWooCommerceOrders()" title="Atualizar">
+                        <button class="btn btn-sm btn-icon btn-light-primary" id="btn-refresh-woocommerce-orders" title="Atualizar">
                             <i class="ki-duotone ki-arrows-loop fs-5">
                                 <span class="path1"></span>
                                 <span class="path2"></span>
@@ -2068,9 +2068,17 @@ function renderWooCommerceOrders(contactId) {
  */
 function loadWooCommerceIntegrations() {
     const filterSelect = document.getElementById('woocommerce-integration-filter');
-    if (!filterSelect || filterSelect.options.length > 1) {
+    if (!filterSelect) {
+        console.warn('⚠️ Select de integrações não encontrado');
+        return;
+    }
+    
+    if (filterSelect.options.length > 1) {
+        console.log('✅ Integrações já carregadas');
         return; // Já carregado
     }
+    
+    console.log('🔍 Carregando integrações WooCommerce...');
     
     fetch('<?= \App\Helpers\Url::to('/integrations/woocommerce') ?>', {
         headers: {
@@ -2078,19 +2086,28 @@ function loadWooCommerceIntegrations() {
             'Accept': 'application/json'
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('📡 Response status:', response.status);
+        return response.json();
+    })
     .then(data => {
+        console.log('📦 Dados recebidos:', data);
+        
         if (data.integrations && Array.isArray(data.integrations)) {
+            console.log(`✅ ${data.integrations.length} integração(ões) encontrada(s)`);
             data.integrations.forEach(integration => {
                 const option = document.createElement('option');
                 option.value = integration.id;
                 option.textContent = integration.name;
                 filterSelect.appendChild(option);
+                console.log(`  ➕ Adicionada: ${integration.name} (ID: ${integration.id})`);
             });
+        } else {
+            console.warn('⚠️ Nenhuma integração encontrada ou formato inválido');
         }
     })
     .catch(error => {
-        console.error('Erro ao carregar integrações:', error);
+        console.error('❌ Erro ao carregar integrações:', error);
     });
 }
 
@@ -2109,6 +2126,20 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('✅ Event listener de pedidos WooCommerce registrado');
     } else {
         console.warn('⚠️ Aba de pedidos não encontrada');
+    }
+    
+    // Botão de atualizar pedidos
+    const refreshBtn = document.getElementById('btn-refresh-woocommerce-orders');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', function() {
+            console.log('🔄 Atualizando pedidos WooCommerce...');
+            if (typeof window.loadWooCommerceOrders === 'function') {
+                window.loadWooCommerceOrders();
+            } else {
+                console.error('❌ Função loadWooCommerceOrders não encontrada');
+            }
+        });
+        console.log('✅ Event listener do botão de atualizar registrado');
     }
 });
 

@@ -48,6 +48,9 @@ try {
     exit(1);
 }
 
+// ✅ CRÍTICO: Definir timezone ANTES de qualquer operação com data/hora
+date_default_timezone_set('America/Sao_Paulo');
+
 use App\Helpers\Logger;
 use App\Services\AIAgentService;
 use App\Models\Conversation;

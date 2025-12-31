@@ -509,6 +509,28 @@ class AIAgentService
             
             \App\Helpers\Logger::info("AIAgentService::processMessage - ANTES de sendMessage (contentLen=" . strlen($messageContent) . ", attachments=" . count($attachments) . ", type={$messageType})");
             
+            // ✅ CORREÇÃO: Buscar timestamp da última mensagem do cliente para manter ordem cronológica
+            // Garantir que estamos usando o timezone correto (America/Sao_Paulo)
+            $originalTimezone = date_default_timezone_get();
+            date_default_timezone_set('America/Sao_Paulo');
+            
+            $lastClientMessageSql = "SELECT created_at FROM messages 
+                                     WHERE conversation_id = ? 
+                                       AND sender_type = 'contact' 
+                                     ORDER BY id DESC 
+                                     LIMIT 1";
+            $lastClientMessage = \App\Helpers\Database::fetch($lastClientMessageSql, [$conversationId]);
+            $clientMessageTimestamp = null;
+            
+            if ($lastClientMessage && !empty($lastClientMessage['created_at'])) {
+                // Converter created_at para timestamp e adicionar 1 segundo
+                $clientMessageTimestamp = strtotime($lastClientMessage['created_at']) + 1;
+                \App\Helpers\Logger::info("AIAgentService::processMessage - Usando timestamp baseado na mensagem do cliente: " . date('Y-m-d H:i:s', $clientMessageTimestamp) . " (timezone: America/Sao_Paulo)");
+            }
+            
+            // Restaurar timezone original
+            date_default_timezone_set($originalTimezone);
+            
             // Criar mensagem na conversa
             $aiMessageId = \App\Services\ConversationService::sendMessage(
                 $conversationId,
@@ -518,7 +540,8 @@ class AIAgentService
                 $attachments,
                 $messageType,
                 null, // quotedMessageId
-                $agentId // aiAgentId
+                $agentId, // aiAgentId
+                $clientMessageTimestamp // ✅ NOVO: Passar timestamp para manter ordem
             );
             
             \App\Helpers\Logger::info("AIAgentService::processMessage - DEPOIS de sendMessage (aiMessageId={$aiMessageId})");

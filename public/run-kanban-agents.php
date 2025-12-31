@@ -8,6 +8,10 @@
  */
 
 require_once __DIR__ . '/../vendor/autoload.php';
+
+// ✅ CRÍTICO: Definir timezone ANTES de qualquer operação com data/hora
+date_default_timezone_set('America/Sao_Paulo');
+
 require_once __DIR__ . '/../config/bootstrap.php';
 
 use App\Services\KanbanAgentService;

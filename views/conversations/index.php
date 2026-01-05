@@ -5081,12 +5081,15 @@ function showPendingInvitesModal() {
  * Carregar convites pendentes
  */
 function loadPendingInvites() {
+    console.log('[Invites] Iniciando loadPendingInvites...');
+    
     const container = document.getElementById('pendingInvitesList');
     if (!container) {
-        console.error('Container pendingInvitesList não encontrado');
+        console.error('[Invites] Container pendingInvitesList não encontrado');
         return;
     }
     
+    console.log('[Invites] Container encontrado, mostrando loading...');
     container.innerHTML = `
         <div class="text-center py-10">
             <span class="spinner-border spinner-border-sm text-primary"></span>
@@ -5094,6 +5097,7 @@ function loadPendingInvites() {
         </div>
     `;
     
+    console.log('[Invites] Fazendo fetch...');
     fetch('<?= \App\Helpers\Url::to('/conversations/invites') ?>', {
         headers: {
             'X-Requested-With': 'XMLHttpRequest',
@@ -5101,17 +5105,22 @@ function loadPendingInvites() {
         }
     })
     .then(response => {
+        console.log('[Invites] Response recebida:', response.status);
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         return response.json();
     })
     .then(data => {
+        console.log('[Invites] Data recebida:', data);
         if (data.success) {
+            console.log('[Invites] Chamando renderPendingInvites com', data.invites.length, 'convites');
             renderPendingInvites(data.invites || []);
             const invitesCount = data.count || 0;
             updateInvitesTabCount(invitesCount);
+            console.log('[Invites] Render concluído!');
         } else {
+            console.error('[Invites] Erro no data:', data.message);
             container.innerHTML = `
                 <div class="text-center py-10 text-muted">
                     <i class="ki-duotone ki-information-5 fs-2x mb-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
@@ -5120,7 +5129,7 @@ function loadPendingInvites() {
         }
     })
     .catch(error => {
-        console.error('Erro ao carregar convites:', error);
+        console.error('[Invites] Erro ao carregar convites:', error);
         container.innerHTML = `
             <div class="text-center py-10 text-muted">
                 <i class="ki-duotone ki-cross-circle fs-2x text-danger mb-3"><span class="path1"></span><span class="path2"></span></i>
@@ -5130,6 +5139,7 @@ function loadPendingInvites() {
     });
     
     // Também carregar solicitações de participação
+    console.log('[Invites] Chamando loadPendingRequestsModal...');
     loadPendingRequestsModal();
 }
 
@@ -5154,12 +5164,15 @@ function updateInvitesTabCount(count) {
  * Carregar solicitaçÁes de participação pendentes (no modal)
  */
 function loadPendingRequestsModal() {
+    console.log('[Requests] Iniciando loadPendingRequestsModal...');
+    
     const container = document.getElementById('pendingRequestsList');
     if (!container) {
-        console.error('Container pendingRequestsList não encontrado');
+        console.error('[Requests] Container pendingRequestsList não encontrado');
         return;
     }
     
+    console.log('[Requests] Container encontrado, mostrando loading...');
     container.innerHTML = `
         <div class="text-center py-10">
             <span class="spinner-border spinner-border-sm text-primary"></span>
@@ -5167,6 +5180,7 @@ function loadPendingRequestsModal() {
         </div>
     `;
     
+    console.log('[Requests] Fazendo fetch...');
     fetch('<?= \App\Helpers\Url::to('/conversations/requests/pending') ?>', {
         headers: {
             'X-Requested-With': 'XMLHttpRequest',
@@ -5174,16 +5188,21 @@ function loadPendingRequestsModal() {
         }
     })
     .then(response => {
+        console.log('[Requests] Response recebida:', response.status);
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         return response.json();
     })
     .then(data => {
+        console.log('[Requests] Data recebida:', data);
         if (data.success) {
+            console.log('[Requests] Chamando renderPendingRequestsModal com', data.requests.length, 'requests');
             renderPendingRequestsModal(data.requests || []);
             updateRequestsTabCount(data.count || 0);
+            console.log('[Requests] Render concluído!');
         } else {
+            console.error('[Requests] Erro no data:', data.message);
             container.innerHTML = `
                 <div class="text-center py-10 text-muted">
                     <i class="ki-duotone ki-information-5 fs-2x mb-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
@@ -5192,7 +5211,7 @@ function loadPendingRequestsModal() {
         }
     })
     .catch(error => {
-        console.error('Erro ao carregar solicitações:', error);
+        console.error('[Requests] Erro ao carregar solicitações:', error);
         container.innerHTML = `
             <div class="text-center py-10 text-muted">
                 <i class="ki-duotone ki-cross-circle fs-2x text-danger mb-3"><span class="path1"></span><span class="path2"></span></i>
@@ -5221,10 +5240,18 @@ function updateRequestsTabCount(count) {
  * Renderizar lista de solicitaçÁes de participação no modal
  */
 function renderPendingRequestsModal(requests) {
+    console.log('[RenderReq] renderPendingRequestsModal chamada com', requests.length, 'requests');
+    
     const container = document.getElementById('pendingRequestsList');
-    if (!container) return;
+    if (!container) {
+        console.error('[RenderReq] Container pendingRequestsList não encontrado!');
+        return;
+    }
+    
+    console.log('[RenderReq] Container encontrado, renderizando...');
     
     if (requests.length === 0) {
+        console.log('[RenderReq] Nenhuma request, mostrando mensagem vazia');
         container.innerHTML = `
             <div class="text-center py-10">
                 <i class="ki-duotone ki-check-circle fs-3x text-success mb-3">
@@ -5232,9 +5259,10 @@ function renderPendingRequestsModal(requests) {
                     <span class="path2"></span>
                 </i>
                 <h5 class="text-muted">Nenhuma solicitação pendente</h5>
-                <p class="text-gray-500 fs-7">Não hí agentes solicitando participar das suas conversas</p>
+                <p class="text-gray-500 fs-7">Não há agentes solicitando participar das suas conversas</p>
             </div>
         `;
+        console.log('[RenderReq] Mensagem vazia renderizada!');
         return;
     }
     
@@ -5447,9 +5475,18 @@ function viewConversationFromRequest(conversationId) {
  * Renderizar lista de convites pendentes
  */
 function renderPendingInvites(invites) {
+    console.log('[Render] renderPendingInvites chamada com', invites.length, 'invites');
+    
     const container = document.getElementById('pendingInvitesList');
+    if (!container) {
+        console.error('[Render] Container pendingInvitesList não encontrado!');
+        return;
+    }
+    
+    console.log('[Render] Container encontrado, renderizando...');
     
     if (invites.length === 0) {
+        console.log('[Render] Nenhum convite, mostrando mensagem vazia');
         container.innerHTML = `
             <div class="text-center py-10">
                 <i class="ki-duotone ki-check-circle fs-3x text-success mb-3">
@@ -5460,6 +5497,7 @@ function renderPendingInvites(invites) {
                 <p class="text-gray-500 fs-7">Você não tem convites para participar de conversas</p>
             </div>
         `;
+        console.log('[Render] Mensagem vazia renderizada!');
         return;
     }
     

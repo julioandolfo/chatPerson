@@ -347,6 +347,17 @@ class PermissionService
             }
         }
 
+        // ✅ NOVA REGRA: Conversas NÃO ATRIBUÍDAS - agentes com permissão de funil podem enviar
+        $agentId = $conversation['agent_id'] ?? null;
+        $isUnassigned = ($agentId === null || $agentId === 0 || $agentId === '0' || $agentId === '');
+        
+        if ($isUnassigned) {
+            // Se tem permissão de funil (canViewConversation já passou), pode enviar
+            if (\App\Models\AgentFunnelPermission::canViewConversation($userId, $conversation)) {
+                return self::hasPermission($userId, 'messages.send.own');
+            }
+        }
+
         // Verificar se é do mesmo departamento
         if (isset($conversation['department_id'])) {
             $userDepartments = User::getDepartments($userId);

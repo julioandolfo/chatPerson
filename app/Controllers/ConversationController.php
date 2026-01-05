@@ -2539,47 +2539,54 @@ class ConversationController
      */
     public function getInvites(): void
     {
+        // Limpar TODOS os buffers antes de fazer qualquer coisa
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
+        // Desabilitar erros
+        @ini_set('display_errors', '0');
+        @error_reporting(0);
+        
         try {
-            // Log inicial
-            error_log("[getInvites] INÍCIO");
-            
             $userId = \App\Helpers\Auth::id();
-            error_log("[getInvites] userId={$userId}");
             
-            // Verificar se ConversationMentionService existe
-            if (!class_exists('\App\Services\ConversationMentionService')) {
-                error_log("[getInvites] ERRO: ConversationMentionService não encontrado!");
-                Response::json(['success' => false, 'message' => 'Serviço não encontrado'], 500);
-                return;
+            $invites = \App\Services\ConversationMentionService::getPendingInvites($userId);
+            $count = \App\Services\ConversationMentionService::countPending($userId);
+            
+            // Garantir que não há output buffer ativo
+            while (ob_get_level() > 0) {
+                ob_end_clean();
             }
             
-            error_log("[getInvites] Chamando getPendingInvites...");
-            $invites = \App\Services\ConversationMentionService::getPendingInvites($userId);
-            error_log("[getInvites] Invites retornados: " . count($invites));
+            // Enviar headers
+            http_response_code(200);
+            header('Content-Type: application/json; charset=utf-8');
+            header('Cache-Control: no-cache, must-revalidate');
             
-            error_log("[getInvites] Chamando countPending...");
-            $count = \App\Services\ConversationMentionService::countPending($userId);
-            error_log("[getInvites] Count: {$count}");
-            
-            error_log("[getInvites] Enviando resposta JSON...");
-            Response::json([
+            // Enviar JSON e sair
+            echo json_encode([
                 'success' => true,
                 'invites' => $invites,
                 'count' => $count
-            ]);
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             
-            error_log("[getInvites] FIM - Resposta enviada");
+            exit;
         } catch (\Throwable $e) {
-            error_log("[getInvites] EXCEPTION: " . $e->getMessage());
-            error_log("[getInvites] File: " . $e->getFile() . " Line: " . $e->getLine());
-            error_log("[getInvites] Trace: " . $e->getTraceAsString());
+            // Limpar buffers
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
             
-            Response::json([
+            http_response_code(500);
+            header('Content-Type: application/json; charset=utf-8');
+            
+            echo json_encode([
                 'success' => false, 
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ], 500);
+                'message' => $e->getMessage()
+            ], JSON_UNESCAPED_UNICODE);
+            
+            exit;
         }
     }
 
@@ -2850,38 +2857,56 @@ class ConversationController
      */
     public function getPendingRequests(): void
     {
+        // Limpar TODOS os buffers antes de fazer qualquer coisa
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
+        // Desabilitar erros
+        @ini_set('display_errors', '0');
+        @error_reporting(0);
+        
         try {
-            error_log("[getPendingRequests] INÍCIO");
-            
             $userId = \App\Helpers\Auth::id();
-            error_log("[getPendingRequests] userId={$userId}");
             
-            // Verificar se Model existe
-            if (!class_exists('\App\Models\ConversationMention')) {
-                error_log("[getPendingRequests] ERRO: ConversationMention não encontrado!");
-                Response::json(['success' => false, 'message' => 'Model não encontrado'], 500);
-                return;
+            $requests = \App\Models\ConversationMention::getPendingRequestsToApprove($userId);
+            $count = \App\Models\ConversationMention::countPendingRequestsToApprove($userId);
+            
+            // Garantir que não há output buffer ativo
+            while (ob_get_level() > 0) {
+                ob_end_clean();
             }
             
-            error_log("[getPendingRequests] Chamando getPendingRequestsToApprove...");
-            $requests = \App\Models\ConversationMention::getPendingRequestsToApprove($userId);
-            error_log("[getPendingRequests] Requests retornados: " . count($requests));
+            // Enviar headers
+            http_response_code(200);
+            header('Content-Type: application/json; charset=utf-8');
+            header('Cache-Control: no-cache, must-revalidate');
             
-            error_log("[getPendingRequests] Chamando countPendingRequestsToApprove...");
-            $count = \App\Models\ConversationMention::countPendingRequestsToApprove($userId);
-            error_log("[getPendingRequests] Count: {$count}");
-            
-            error_log("[getPendingRequests] Enviando resposta JSON...");
-            Response::json([
+            // Enviar JSON e sair
+            echo json_encode([
                 'success' => true,
                 'requests' => $requests,
                 'count' => $count
-            ]);
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             
-            error_log("[getPendingRequests] FIM - Resposta enviada");
+            exit;
         } catch (\Throwable $e) {
-            error_log("[getPendingRequests] EXCEPTION: " . $e->getMessage());
-            error_log("[getPendingRequests] File: " . $e->getFile() . " Line: " . $e->getLine());
+            // Limpar buffers
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            
+            http_response_code(500);
+            header('Content-Type: application/json; charset=utf-8');
+            
+            echo json_encode([
+                'success' => false, 
+                'message' => $e->getMessage()
+            ], JSON_UNESCAPED_UNICODE);
+            
+            exit;
+        }
+    }
             
             // Limpar buffers novamente
             while (ob_get_level() > 0) {

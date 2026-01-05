@@ -428,9 +428,9 @@
                       <!--end:Menu item-->
                       <?php endif; ?>
                       
-                      <!--begin:Menu item-->
-                      <div class="menu-item">
-                          <a class="menu-link <?= isActive('/settings', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/settings') ?>" data-title="Configurações">
+                      <!--begin:Menu item (Configurações)-->
+                      <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= isActive('/settings', $currentUri) ? 'show' : '' ?>">
+                          <span class="menu-link" data-title="Configurações">
                               <span class="menu-icon">
                                   <i class="ki-duotone ki-setting-2 fs-2">
                                       <span class="path1"></span>
@@ -438,7 +438,30 @@
                                   </i>
                               </span>
                               <span class="menu-title">Configurações</span>
-                          </a>
+                              <span class="menu-arrow"></span>
+                          </span>
+                          <!--begin:Menu sub-->
+                          <div class="menu-sub menu-sub-accordion <?= isActive('/settings', $currentUri) ? 'show' : '' ?>">
+                              <div class="menu-item">
+                                  <a class="menu-link <?= isActive('/settings', $currentUri) && !isActive('/settings/api-tokens', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/settings') ?>">
+                                      <span class="menu-bullet">
+                                          <span class="bullet bullet-dot"></span>
+                                      </span>
+                                      <span class="menu-title">Geral</span>
+                                  </a>
+                              </div>
+                              <?php if (\App\Helpers\Permission::can('settings.manage')): ?>
+                              <div class="menu-item">
+                                  <a class="menu-link <?= isActive('/settings/api-tokens', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/settings/api-tokens') ?>">
+                                      <span class="menu-bullet">
+                                          <span class="bullet bullet-dot"></span>
+                                      </span>
+                                      <span class="menu-title">API & Tokens</span>
+                                  </a>
+                              </div>
+                              <?php endif; ?>
+                          </div>
+                          <!--end:Menu sub-->
                       </div>
                       <!--end:Menu item-->
             </div>

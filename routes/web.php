@@ -347,6 +347,13 @@ Router::post('/settings/postgres', [SettingsController::class, 'savePostgreSQL']
 Router::post('/settings/postgres/test', [SettingsController::class, 'testPostgreSQL'], ['Authentication']);
 Router::get('/api/settings/sla', [SettingsController::class, 'getSLAConfig'], ['Authentication']); // API para obter config de SLA
 
+// Rotas de API Tokens (Configurações)
+Router::get('/settings/api-tokens', [\App\Controllers\ApiTokenController::class, 'index'], ['Authentication']);
+Router::post('/settings/api-tokens', [\App\Controllers\ApiTokenController::class, 'store'], ['Authentication']);
+Router::post('/settings/api-tokens/{id}/revoke', [\App\Controllers\ApiTokenController::class, 'revoke'], ['Authentication']);
+Router::get('/settings/api-tokens/logs', [\App\Controllers\ApiTokenController::class, 'logs'], ['Authentication']);
+Router::get('/settings/api-tokens/stats', [\App\Controllers\ApiTokenController::class, 'stats'], ['Authentication']);
+
 // Rotas de Configurações de Som
 Router::get('/settings/sounds', [SoundSettingsController::class, 'getUserSettings'], ['Authentication']);
 Router::post('/settings/sounds', [SoundSettingsController::class, 'updateUserSettings'], ['Authentication']);

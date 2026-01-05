@@ -101,6 +101,13 @@ class AvailabilityService
 
     /**
      * Atualizar atividade do usuário
+     * 
+     * IMPORTANTE: Este método registra atividade REAL do usuário (mouse, teclado, click).
+     * NÃO atualiza last_seen_at (que é específico para heartbeat/ping).
+     * 
+     * Conceitos:
+     * - last_seen_at: Último heartbeat (navegador aberto)
+     * - last_activity_at: Última atividade real (usuário interagindo)
      */
     public static function updateActivity(int $userId, ?string $activityType = null): void
     {
@@ -111,11 +118,13 @@ class AvailabilityService
         }
 
         $data = [
-            'last_activity_at' => date('Y-m-d H:i:s'),
-            'last_seen_at' => date('Y-m-d H:i:s') // Atualizar também last_seen_at
+            'last_activity_at' => date('Y-m-d H:i:s')
+            // ❌ REMOVIDO: 'last_seen_at' => date('Y-m-d H:i:s')
+            // ✅ last_seen_at só é atualizado pelo heartbeat (processHeartbeat)
+            // Motivo: Separar claramente heartbeat (navegador vivo) de atividade (usuário interagindo)
         ];
 
-        // Se estava 'away' e teve atividade, voltar para 'online'
+        // Se estava 'away' e teve atividade, voltar para 'online' IMEDIATAMENTE
         $user = User::find($userId);
         if ($user && ($user['availability_status'] ?? 'offline') === 'away') {
             self::updateAvailabilityStatus($userId, 'online', 'activity_detected');
@@ -126,6 +135,10 @@ class AvailabilityService
 
     /**
      * Processar heartbeat
+     * 
+     * IMPORTANTE: Este método APENAS registra que o cliente está vivo (heartbeat).
+     * A verificação de timeouts é feita APENAS pelo CRON (check-availability.php)
+     * para evitar conflitos e mudanças rápidas de status.
      */
     public static function processHeartbeat(int $userId): void
     {
@@ -134,8 +147,9 @@ class AvailabilityService
             'last_seen_at' => date('Y-m-d H:i:s')
         ]);
         
-        // Verificar e atualizar status se necessário
-        self::checkAndUpdateStatus($userId);
+        // ❌ REMOVIDO: self::checkAndUpdateStatus($userId);
+        // ✅ Deixar o CRON fazer a verificação de timeouts
+        // Motivo: Evitar verificações duplicadas e mudanças rápidas de status
     }
 
     /**

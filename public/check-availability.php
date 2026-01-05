@@ -123,20 +123,21 @@ try {
         $lastSeen = $agent['last_seen_at'];
         $lastActivity = $agent['last_activity_at'];
         
-        echo "Verificando: {$agentName} (Status: {$currentStatus})\n";
+        echo "[" . date('H:i:s') . "] Verificando: {$agentName} (Status: {$currentStatus})\n";
         
         // Verificar last_seen_at para marcar como offline
         if ($lastSeen) {
             $lastSeenDt = new DateTime($lastSeen);
             $minutesSinceLastSeen = ($now->getTimestamp() - $lastSeenDt->getTimestamp()) / 60;
             
-            echo "  - Último visto: {$lastSeen} ({$minutesSinceLastSeen} minutos atrás)\n";
+            echo "  - Último visto: {$lastSeen} (" . round($minutesSinceLastSeen, 1) . " minutos atrás)\n";
             
             // Se passou do timeout de offline
             if ($minutesSinceLastSeen >= $offlineTimeoutMinutes) {
-                echo "  ⚠️  AÇÃO: Marcar como OFFLINE (sem heartbeat há {$minutesSinceLastSeen} minutos)\n";
+                echo "  ⚠️  AÇÃO: Marcar como OFFLINE (sem heartbeat há " . round($minutesSinceLastSeen, 1) . " minutos)\n";
                 AvailabilityService::updateAvailabilityStatus($agentId, 'offline', 'heartbeat_timeout_cron');
                 $updated++;
+                echo "\n"; // Separar agentes que mudaram
                 continue;
             }
         } else {
@@ -148,13 +149,14 @@ try {
             $lastActivityDt = new DateTime($lastActivity);
             $minutesSinceActivity = ($now->getTimestamp() - $lastActivityDt->getTimestamp()) / 60;
             
-            echo "  - Última atividade: {$lastActivity} ({$minutesSinceActivity} minutos atrás)\n";
+            echo "  - Última atividade: {$lastActivity} (" . round($minutesSinceActivity, 1) . " minutos atrás)\n";
             
             // Se passou do timeout de away
             if ($minutesSinceActivity >= $awayTimeoutMinutes) {
-                echo "  ⚠️  AÇÃO: Marcar como AWAY (sem atividade há {$minutesSinceActivity} minutos)\n";
+                echo "  ⚠️  AÇÃO: Marcar como AWAY (sem atividade há " . round($minutesSinceActivity, 1) . " minutos)\n";
                 AvailabilityService::updateAvailabilityStatus($agentId, 'away', 'inactivity_timeout_cron');
                 $updated++;
+                echo "\n"; // Separar agentes que mudaram
                 continue;
             }
         }

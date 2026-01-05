@@ -252,13 +252,13 @@ ob_start();
                 <h4 class="fw-bold mb-3">Como usar:</h4>
                 <div class="bg-light rounded p-4">
                     <code class="text-dark">
-                        curl -X GET "<?= Url::getBaseUrl() ?>/api/v1/conversations" \<br>
+                        curl -X GET "<?= Url::fullUrl('/api/v1/conversations') ?>" \<br>
                         &nbsp;&nbsp;-H "Authorization: Bearer SEU_TOKEN_AQUI"
                     </code>
                 </div>
                 
                 <div class="mt-5">
-                    <a href="<?= Url::to('/api/README.md') ?>" target="_blank" class="btn btn-light-primary">
+                    <a href="<?= Url::to('/settings/api-tokens/docs') ?>" class="btn btn-light-primary">
                         <i class="ki-duotone ki-document fs-2"><span class="path1"></span><span class="path2"></span></i>
                         Ver Documentação Completa
                     </a>

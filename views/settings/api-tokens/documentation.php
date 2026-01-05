@@ -6,7 +6,9 @@
 use App\Helpers\Url;
 
 $pageTitle = 'Documentação da API';
-$baseUrl = Url::getBaseUrl();
+$baseUrl = Url::fullUrl('/api/v1');
+// Remover /api/v1 do final para usar como base
+$baseUrl = substr($baseUrl, 0, -7);
 ob_start();
 ?>
 

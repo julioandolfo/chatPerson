@@ -3,6 +3,10 @@
  * Atualiza progress bars circulares ao redor dos avatares
  */
 
+// Desabilitar logs de SLA no console
+const SLA_DEBUG = false; // Mude para true se precisar debugar
+const slaLog = SLA_DEBUG ? console.log.bind(console) : () => {};
+
 const SLAIndicator = {
     // Configurações de SLA (serão carregadas do backend)
     config: {
@@ -55,7 +59,7 @@ const SLAIndicator = {
      * Inicializar sistema de SLA
      */
     init: async function() {
-        console.log('[SLA] Inicializando sistema de indicadores...');
+        slaLog('[SLA] Inicializando sistema de indicadores...');
         
         // Limpar qualquer classe/estilo SLA indevido dos conversation-items
         document.querySelectorAll('.conversation-item').forEach(item => {
@@ -79,7 +83,7 @@ const SLAIndicator = {
             this.updateAllIndicators();
         }, 10000);
         
-        console.log('[SLA] Sistema inicializado com sucesso');
+        slaLog('[SLA] Sistema inicializado com sucesso');
         
         // Integrar com eventos de tempo real
         this.setupRealtimeListeners();
@@ -91,12 +95,12 @@ const SLAIndicator = {
     setupRealtimeListeners: function() {
         // Listener global para novas mensagens
         document.addEventListener('realtime:new_message', (event) => {
-            console.log('[SLA] Evento realtime:new_message recebido:', event.detail);
+            slaLog('[SLA] Evento realtime:new_message recebido:', event.detail);
             if (event.detail && event.detail.conversation_id) {
                 // Aguardar um pouco para garantir que o DOM foi atualizado
                 setTimeout(() => {
                     const convData = this.getConversationData(event.detail.conversation_id);
-                    console.log('[SLA] Dados da conversa obtidos:', convData);
+                    slaLog('[SLA] Dados da conversa obtidos:', convData);
                     if (convData) {
                         this.updateConversation(event.detail.conversation_id, convData);
                     }
@@ -106,7 +110,7 @@ const SLAIndicator = {
         
         // Listener global para conversas atualizadas
         document.addEventListener('realtime:conversation_updated', (event) => {
-            console.log('[SLA] Evento realtime:conversation_updated recebido:', event.detail);
+            slaLog('[SLA] Evento realtime:conversation_updated recebido:', event.detail);
             if (event.detail && event.detail.conversation_id) {
                 setTimeout(() => {
                     const convData = this.getConversationData(event.detail.conversation_id);
@@ -119,7 +123,7 @@ const SLAIndicator = {
         
         // Listener global para nova conversa adicionada
         document.addEventListener('realtime:new_conversation', (event) => {
-            console.log('[SLA] Evento realtime:new_conversation recebido:', event.detail);
+            slaLog('[SLA] Evento realtime:new_conversation recebido:', event.detail);
             if (event.detail && event.detail.conversation) {
                 // Aguardar DOM ser atualizado
                 setTimeout(() => {
@@ -128,7 +132,7 @@ const SLAIndicator = {
             }
         });
         
-        console.log('[SLA] Listeners de tempo real configurados');
+        slaLog('[SLA] Listeners de tempo real configurados');
     },
     
     /**
@@ -150,7 +154,7 @@ const SLAIndicator = {
                         workingHoursEnd: data.sla.working_hours_end || '18:00',
                         enabled: data.sla.enable_sla_monitoring !== false
                     };
-                    console.log('[SLA] Configurações carregadas:', this.config);
+                    slaLog('[SLA] Configurações carregadas:', this.config);
                     
                     // Atualizar indicadores imediatamente após carregar config
                     this.updateAllIndicators();

@@ -5082,6 +5082,11 @@ function showPendingInvitesModal() {
  */
 function loadPendingInvites() {
     const container = document.getElementById('pendingInvitesList');
+    if (!container) {
+        console.error('Container pendingInvitesList não encontrado');
+        return;
+    }
+    
     container.innerHTML = `
         <div class="text-center py-10">
             <span class="spinner-border spinner-border-sm text-primary"></span>
@@ -5095,14 +5100,11 @@ function loadPendingInvites() {
             'Accept': 'application/json'
         }
     })
-    .then(response => response.text())
-    .then(text => {
-        try {
-            return JSON.parse(text);
-        } catch (e) {
-            console.error('Resposta /conversations/invites:', text);
-            throw e;
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
+        return response.json();
     })
     .then(data => {
         if (data.success) {
@@ -5110,15 +5112,24 @@ function loadPendingInvites() {
             const invitesCount = data.count || 0;
             updateInvitesTabCount(invitesCount);
         } else {
-            container.innerHTML = '<div class="text-center py-10 text-muted">Erro ao carregar convites</div>';
+            container.innerHTML = `
+                <div class="text-center py-10 text-muted">
+                    <i class="ki-duotone ki-information-5 fs-2x mb-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                    <div>${data.message || 'Erro ao carregar convites'}</div>
+                </div>`;
         }
     })
     .catch(error => {
-        console.error('Erro:', error);
-        container.innerHTML = '<div class="text-center py-10 text-muted">Erro ao carregar convites</div>';
+        console.error('Erro ao carregar convites:', error);
+        container.innerHTML = `
+            <div class="text-center py-10 text-muted">
+                <i class="ki-duotone ki-cross-circle fs-2x text-danger mb-3"><span class="path1"></span><span class="path2"></span></i>
+                <div>Erro ao carregar convites</div>
+                <div class="fs-7 mt-2">${error.message}</div>
+            </div>`;
     });
     
-    // Tambêm carregar solicitaçÁes de participação
+    // Também carregar solicitações de participação
     loadPendingRequestsModal();
 }
 
@@ -5144,12 +5155,15 @@ function updateInvitesTabCount(count) {
  */
 function loadPendingRequestsModal() {
     const container = document.getElementById('pendingRequestsList');
-    if (!container) return;
+    if (!container) {
+        console.error('Container pendingRequestsList não encontrado');
+        return;
+    }
     
     container.innerHTML = `
         <div class="text-center py-10">
             <span class="spinner-border spinner-border-sm text-primary"></span>
-            <span class="ms-2 text-muted">Carregando solicitaçÁes...</span>
+            <span class="ms-2 text-muted">Carregando solicitações...</span>
         </div>
     `;
     
@@ -5159,26 +5173,32 @@ function loadPendingRequestsModal() {
             'Accept': 'application/json'
         }
     })
-    .then(response => response.text())
-    .then(text => {
-        try {
-            return JSON.parse(text);
-        } catch (e) {
-            console.error('Resposta /conversations/requests/pending:', text);
-            throw e;
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
+        return response.json();
     })
     .then(data => {
         if (data.success) {
             renderPendingRequestsModal(data.requests || []);
             updateRequestsTabCount(data.count || 0);
         } else {
-            container.innerHTML = '<div class="text-center py-10 text-muted">Erro ao carregar solicitaçÁes</div>';
+            container.innerHTML = `
+                <div class="text-center py-10 text-muted">
+                    <i class="ki-duotone ki-information-5 fs-2x mb-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                    <div>${data.message || 'Erro ao carregar solicitações'}</div>
+                </div>`;
         }
     })
     .catch(error => {
-        console.error('Erro:', error);
-        container.innerHTML = '<div class="text-center py-10 text-muted">Erro ao carregar solicitaçÁes</div>';
+        console.error('Erro ao carregar solicitações:', error);
+        container.innerHTML = `
+            <div class="text-center py-10 text-muted">
+                <i class="ki-duotone ki-cross-circle fs-2x text-danger mb-3"><span class="path1"></span><span class="path2"></span></i>
+                <div>Erro ao carregar solicitações</div>
+                <div class="fs-7 mt-2">${error.message}</div>
+            </div>`;
     });
 }
 

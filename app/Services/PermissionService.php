@@ -198,7 +198,14 @@ class PermissionService
         // ⚠️ IMPORTANTE: Verificar permissão de FUNIL primeiro
         // Essa verificação se aplica a TODAS as conversas (atribuídas ou não)
         if (class_exists('\App\Models\AgentFunnelPermission')) {
-            if (!\App\Models\AgentFunnelPermission::canViewConversation($userId, $conversation)) {
+            $hasFunnelPermission = \App\Models\AgentFunnelPermission::canViewConversation($userId, $conversation);
+            
+            // 🐛 DEBUG - Remover depois dos testes
+            if (!$hasFunnelPermission) {
+                \App\Helpers\Log::debug("🚫 [canViewConversation] Conversa bloqueada por permissão de funil - convId={$conversation['id']}, funnelId={$conversation['funnel_id']}, stageId={$conversation['funnel_stage_id']}, userId={$userId}", 'conversas.log');
+            }
+            
+            if (!$hasFunnelPermission) {
                 return false; // Não tem permissão para o funil/etapa desta conversa
             }
         }

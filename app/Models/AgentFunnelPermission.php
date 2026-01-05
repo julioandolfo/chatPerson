@@ -227,14 +227,20 @@ class AgentFunnelPermission extends Model
         $funnelId = (int)$conversation['funnel_id'];
         $stageId = !empty($conversation['funnel_stage_id']) ? (int)$conversation['funnel_stage_id'] : null;
         
+        // 🐛 DEBUG - Verificação de permissão
+        $hasFunnelPermission = self::canViewFunnel($userId, $funnelId);
+        \App\Helpers\Log::debug("🔍 [AgentFunnelPermission::canViewConversation] convId={$conversation['id']}, userId={$userId}, funnelId={$funnelId}, stageId={$stageId}, canViewFunnel=" . ($hasFunnelPermission ? 'true' : 'false'), 'conversas.log');
+        
         // Verificar permissão de funil
-        if (!self::canViewFunnel($userId, $funnelId)) {
+        if (!$hasFunnelPermission) {
             return false;
         }
         
         // Se tem etapa, verificar permissão de etapa
         if ($stageId !== null) {
-            return self::canViewStage($userId, $stageId);
+            $hasStagePermission = self::canViewStage($userId, $stageId);
+            \App\Helpers\Log::debug("🔍 [AgentFunnelPermission::canViewConversation] convId={$conversation['id']}, stageId={$stageId}, canViewStage=" . ($hasStagePermission ? 'true' : 'false'), 'conversas.log');
+            return $hasStagePermission;
         }
         
         // Tem permissão no funil e não tem etapa específica

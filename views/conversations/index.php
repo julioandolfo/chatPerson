@@ -1948,6 +1948,62 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
 
 <!-- Script inline para definir função ANTES do HTML do botão -->
 <script>
+// 🔐 Permissões de Funil do Usuário (para filtrar conversas em tempo real)
+window.userFunnelPermissions = <?= json_encode([
+    'allowed_funnel_ids' => \App\Models\AgentFunnelPermission::getAllowedFunnelIds(\App\Helpers\Auth::id()),
+    'allowed_stage_ids' => \App\Models\AgentFunnelPermission::getAllowedStageIds(\App\Helpers\Auth::id())
+]) ?>;
+
+/**
+ * Verifica se o usuário tem permissão para visualizar uma conversa baseado no funil/etapa
+ * @param {Object} conversation - Objeto da conversa
+ * @returns {boolean} - true se pode visualizar, false se não
+ */
+function canViewConversationByFunnel(conversation) {
+    if (!conversation) return false;
+    
+    const permissions = window.userFunnelPermissions;
+    if (!permissions) return true; // Fallback: permitir se não houver permissões carregadas
+    
+    // Se allowed_funnel_ids é null = Admin (pode ver tudo)
+    if (permissions.allowed_funnel_ids === null) {
+        return true;
+    }
+    
+    // Se conversa não tem funil, permitir (conversas antigas)
+    if (!conversation.funnel_id) {
+        return true;
+    }
+    
+    // Verificar se tem permissão no funil
+    const funnelId = parseInt(conversation.funnel_id);
+    const allowedFunnels = permissions.allowed_funnel_ids || [];
+    
+    if (!allowedFunnels.includes(funnelId)) {
+        console.log('🚫 [Filtro Funil] Conversa bloqueada - convId:', conversation.id, 'funnelId:', funnelId, 'allowedFunnels:', allowedFunnels);
+        return false; // Não tem permissão no funil
+    }
+    
+    // Se tem etapa, verificar permissão da etapa
+    if (conversation.funnel_stage_id) {
+        const stageId = parseInt(conversation.funnel_stage_id);
+        const allowedStages = permissions.allowed_stage_ids || [];
+        
+        // Se allowed_stage_ids é null = Admin (pode ver todas)
+        if (allowedStages === null) {
+            return true;
+        }
+        
+        if (!allowedStages.includes(stageId)) {
+            console.log('🚫 [Filtro Etapa] Conversa bloqueada - convId:', conversation.id, 'stageId:', stageId, 'allowedStages:', allowedStages);
+            return false; // Não tem permissão na etapa
+        }
+    }
+    
+    // Tem permissão!
+    return true;
+}
+
 // Helper para obter informaçÁes de canais
 function getChannelInfo(channel) {
     const channels = {
@@ -16052,6 +16108,12 @@ if (typeof window.wsClient !== 'undefined') {
         try {
             // Adicionar nova conversa á lista sem recarregar a pígina
             if (data.conversation) {
+                // ✅ VERIFICAR PERMISSÃO DE FUNIL antes de adicionar
+                if (!canViewConversationByFunnel(data.conversation)) {
+                    console.log('🚫 Nova conversa bloqueada por permissões de funil - convId:', data.conversation.id);
+                    return; // Não adicionar à lista
+                }
+                
                 addConversationToList(data.conversation);
             } else {
                 console.warn('new_conversation sem campo conversation', data);
@@ -16081,22 +16143,27 @@ if (typeof window.wsClient !== 'undefined') {
         // Se a conversa ainda não existe na lista (ex.: criada agora), criar e adicionar
         const existingItem = document.querySelector(`[data-conversation-id="${data.conversation_id}"]`);
         if (!existingItem) {
-            if (data.conversation) {
-                addConversationToList(data.conversation);
-            } else {
-                // Dados mínimos para criar
-                addConversationToList({
-                    id: data.conversation_id,
-                    last_message: data.last_message || '',
-                    last_message_at: data.updated_at || new Date().toISOString(),
-                    updated_at: data.updated_at || new Date().toISOString(),
-                    contact_name: data.contact_name || 'Contato',
-                    channel: data.channel || 'whatsapp',
-                    unread_count: data.unread_count || 0,
-                    tags_data: null,
-                    pinned: 0
-                });
+            // ✅ VERIFICAR PERMISSÃO DE FUNIL antes de adicionar
+            const conversationToAdd = data.conversation || {
+                id: data.conversation_id,
+                last_message: data.last_message || '',
+                last_message_at: data.updated_at || new Date().toISOString(),
+                updated_at: data.updated_at || new Date().toISOString(),
+                contact_name: data.contact_name || 'Contato',
+                channel: data.channel || 'whatsapp',
+                unread_count: data.unread_count || 0,
+                tags_data: null,
+                pinned: 0,
+                funnel_id: data.funnel_id || null,
+                funnel_stage_id: data.funnel_stage_id || null
+            };
+            
+            if (!canViewConversationByFunnel(conversationToAdd)) {
+                console.log('🚫 Conversa atualizada bloqueada por permissões de funil - convId:', data.conversation_id);
+                return; // Não adicionar à lista
             }
+            
+            addConversationToList(conversationToAdd);
         } else {
             applyConversationUpdate(data.conversation || { id: data.conversation_id, unread_count: data.unread_count });
             // moveConversationToTop removido - applyConversationUpdate já ordena via sortConversationList()
@@ -16162,6 +16229,13 @@ if (!window.__realtimeGlobalNewConvListener) {
     window.addEventListener('realtime:new_conversation', (e) => {
         console.log('Nova conversa recebida (evento global):', e.detail);
         
+        // ✅ VERIFICAR PERMISSÃO DE FUNIL antes de adicionar
+        const conversation = e.detail.conversation || e.detail;
+        if (!canViewConversationByFunnel(conversation)) {
+            console.log('🚫 Nova conversa bloqueada por permissões de funil (evento global) - convId:', conversation.id);
+            return; // Não adicionar à lista
+        }
+        
         // Verificar se a conversa passa pelos filtros ativos antes de adicionar
         const urlParams = new URLSearchParams(window.location.search);
         
@@ -16173,7 +16247,7 @@ if (!window.__realtimeGlobalNewConvListener) {
         }
         
         try {
-            addConversationToList(e.detail);
+            addConversationToList(conversation);
         } catch (err) {
             console.error('Erro ao adicionar nova conversa (evento global):', err);
             // Preservar filtros ao recarregar

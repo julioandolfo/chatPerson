@@ -336,8 +336,8 @@ class ConversationService
         }
         
         try {
-            // Verificar se pode usar cache (apenas para listas sem filtros complexos)
-            $canUseCache = self::canUseCache($filters);
+            // 🐛 TEMPORÁRIO: Desabilitar cache para debug de permissões de funil
+            $canUseCache = false; // self::canUseCache($filters);
             
             if ($canUseCache) {
                 $cacheKey = "user_{$userId}_conversations_" . md5(json_encode($filters));
@@ -349,6 +349,8 @@ class ConversationService
             
             // Obter todas as conversas
             $conversations = Conversation::getAll($filters);
+            
+            \App\Helpers\Log::debug("🔍 [ConversationService::list] Total conversas do banco: " . count($conversations) . ", userId={$userId}", 'conversas.log');
         } catch (\Exception $e) {
             \App\Helpers\Log::error("Erro em ConversationService::list: " . $e->getMessage(), 'conversas.log');
             \App\Helpers\Log::context("Filtros", $filters, 'conversas.log', 'ERROR');
@@ -365,6 +367,7 @@ class ConversationService
             $participantConversationIds = \App\Models\ConversationParticipant::getConversationsByParticipant($userId);
         }
         
+        $blocked = 0;
         foreach ($conversations as $conversation) {
             // Verificar se é participante
             $isParticipant = in_array($conversation['id'], $participantConversationIds);
@@ -378,8 +381,12 @@ class ConversationService
             // Caso contrário, verificar permissões normais
             if (\App\Services\PermissionService::canViewConversation($userId, $conversation)) {
                 $filtered[] = $conversation;
+            } else {
+                $blocked++;
             }
         }
+        
+        \App\Helpers\Log::debug("🔍 [ConversationService::list] Conversas filtradas: " . count($filtered) . ", bloqueadas={$blocked}", 'conversas.log');
         
         // Salvar no cache se aplicável
         if ($canUseCache) {

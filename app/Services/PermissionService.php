@@ -195,6 +195,14 @@ class PermissionService
             return true;
         }
 
+        // ⚠️ IMPORTANTE: Verificar permissão de FUNIL primeiro
+        // Essa verificação se aplica a TODAS as conversas (atribuídas ou não)
+        if (class_exists('\App\Models\AgentFunnelPermission')) {
+            if (!\App\Models\AgentFunnelPermission::canViewConversation($userId, $conversation)) {
+                return false; // Não tem permissão para o funil/etapa desta conversa
+            }
+        }
+
         // ✅ NOVA REGRA: Conversas NÃO ATRIBUÍDAS são visíveis para agentes com permissão
         // Isso permite que qualquer agente veja e responda conversas sem dono
         // Verificar se agent_id é NULL, 0 ou string '0'
@@ -204,11 +212,11 @@ class PermissionService
         if ($isUnassigned) {
             // Verificar se tem permissão para ver conversas não atribuídas
             if (self::hasPermission($userId, 'conversations.view.unassigned')) {
-                return true;
+                return true; // ✅ Tem permissão de funil E de ver não atribuídas
             }
             // Ou se tem permissão para ver próprias (agentes padrão também podem ver não atribuídas)
             if (self::hasPermission($userId, 'conversations.view.own')) {
-                return true;
+                return true; // ✅ Tem permissão de funil E de ver próprias
             }
         }
 

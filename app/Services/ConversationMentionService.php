@@ -633,18 +633,50 @@ class ConversationMentionService
         $hasPendingRequest = ConversationMention::hasPendingRequest($conversationId, $userId);
         \App\Helpers\Log::debug("🔍 [checkUserAccess] hasPendingRequest=" . ($hasPendingRequest ? 'true' : 'false'), 'conversas.log');
         
-        // Usuário pode ver se é atribuído OU participante
-        $canView = $isAssigned || $isParticipant;
+        // ⚠️ IMPORTANTE: Verificar permissão de FUNIL para conversas não atribuídas
+        $isUnassigned = empty($agentId) || $agentId === 0 || $agentId === '0';
+        $hasFunnelPermission = true; // Default para conversas atribuídas/participantes
         
-        \App\Helpers\Log::debug("🔍 [checkUserAccess] Resultado: canView=" . ($canView ? 'true' : 'false') . ", reason=" . ($canView ? 'authorized' : 'not_authorized'), 'conversas.log');
+        if ($isUnassigned && !$isParticipant) {
+            // Para conversas não atribuídas, verificar permissão de funil
+            if (class_exists('\App\Models\AgentFunnelPermission')) {
+                $hasFunnelPermission = \App\Models\AgentFunnelPermission::canViewConversation($userId, $conversation);
+                \App\Helpers\Log::debug("🔍 [checkUserAccess] Conversa não atribuída - hasFunnelPermission=" . ($hasFunnelPermission ? 'true' : 'false'), 'conversas.log');
+            }
+        }
+        
+        // Usuário pode ver se:
+        // 1. É atribuído OU participante
+        // 2. Conversa não atribuída E tem permissão de funil
+        $canView = ($isAssigned || $isParticipant) || ($isUnassigned && $hasFunnelPermission);
+        
+        // Determinar motivo
+        $reason = 'not_authorized';
+        if ($canView) {
+            if ($isAssigned) {
+                $reason = 'assigned';
+            } elseif ($isParticipant) {
+                $reason = 'participant';
+            } elseif ($isUnassigned && $hasFunnelPermission) {
+                $reason = 'unassigned_with_funnel_permission';
+            } else {
+                $reason = 'authorized';
+            }
+        } elseif ($isUnassigned && !$hasFunnelPermission) {
+            $reason = 'no_funnel_permission';
+        }
+        
+        \App\Helpers\Log::debug("🔍 [checkUserAccess] Resultado: canView=" . ($canView ? 'true' : 'false') . ", reason={$reason}", 'conversas.log');
         
         return [
             'can_view' => $canView,
             'is_participant' => $isParticipant,
             'is_assigned' => $isAssigned,
             'has_pending_request' => $hasPendingRequest,
+            'has_funnel_permission' => $hasFunnelPermission,
+            'is_unassigned' => $isUnassigned,
             'conversation' => $conversation,
-            'reason' => $canView ? 'authorized' : 'not_authorized'
+            'reason' => $reason
         ];
     }
 

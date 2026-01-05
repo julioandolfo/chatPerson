@@ -17,7 +17,24 @@ class FunnelController
         Permission::abortIfCannot('funnels.view');
         
         try {
-            $funnels = Funnel::all();
+            $userId = \App\Helpers\Auth::id();
+            $allFunnels = Funnel::all();
+            
+            // Filtrar funis por permissões do agente
+            $funnels = [];
+            $allowedFunnelIds = \App\Models\AgentFunnelPermission::getAllowedFunnelIds($userId);
+            
+            // Se NULL = admin (pode ver todos)
+            if ($allowedFunnelIds === null) {
+                $funnels = $allFunnels;
+            } else {
+                // Filtrar apenas funis permitidos
+                foreach ($allFunnels as $funnel) {
+                    if (in_array($funnel['id'], $allowedFunnelIds)) {
+                        $funnels[] = $funnel;
+                    }
+                }
+            }
             
             // Se for requisição AJAX, retornar JSON
             if (Request::isAjax()) {
@@ -574,7 +591,24 @@ class FunnelController
         Permission::abortIfCannot('funnels.view');
         
         try {
-            $stages = \App\Models\FunnelStage::where('funnel_id', '=', $id);
+            $userId = \App\Helpers\Auth::id();
+            $allStages = \App\Models\FunnelStage::where('funnel_id', '=', $id);
+            
+            // Filtrar etapas por permissões do agente
+            $stages = [];
+            $allowedStageIds = \App\Models\AgentFunnelPermission::getAllowedStageIds($userId);
+            
+            // Se NULL = admin (pode ver todas)
+            if ($allowedStageIds === null) {
+                $stages = $allStages;
+            } else {
+                // Filtrar apenas etapas permitidas
+                foreach ($allStages as $stage) {
+                    if (in_array($stage['id'], $allowedStageIds)) {
+                        $stages[] = $stage;
+                    }
+                }
+            }
             
             // Ordenar por stage_order (com fallback para position e id)
             usort($stages, function($a, $b) {

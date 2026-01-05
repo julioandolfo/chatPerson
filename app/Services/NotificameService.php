@@ -830,6 +830,13 @@ class NotificameService
         self::logInfo("  - Avatar: " . (isset($contact['avatar']) ? (strlen($contact['avatar']) > 50 ? substr($contact['avatar'], 0, 50) . '...' : $contact['avatar']) : 'NULL'));
         self::logInfo("  - Email: " . ($contact['email'] ?? 'NULL'));
         
+        // ⚠️ VALIDAÇÃO: Não criar conversa se contato tiver phone = 'system'
+        if (isset($contact['phone']) && ($contact['phone'] === 'system' || $contact['phone'] === '0')) {
+            self::logInfo("⚠️ Abortando: Contato com phone do sistema (phone={$contact['phone']}, id={$contact['id']})");
+            self::logInfo("========== Notificame Webhook FIM (Contato do sistema) ==========");
+            return;
+        }
+        
         // 🔥 NOVO: Detectar se é comentário do Instagram
         $finalChannel = $channel;
         if ($channel === 'instagram' && ($messageData['type'] ?? 'text') === 'comment') {

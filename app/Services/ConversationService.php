@@ -59,6 +59,12 @@ class ConversationService
         if (!$contact) {
             throw new \Exception('Contato não encontrado');
         }
+        
+        // ⚠️ VALIDAÇÃO: Não criar conversa para contatos do sistema
+        if (isset($contact['phone']) && ($contact['phone'] === 'system' || $contact['phone'] === '0')) {
+            Logger::debug("ConversationService::create - ⚠️ Abortando: Contato com phone do sistema (phone={$contact['phone']}, id={$contact['id']})", 'conversas.log');
+            throw new \Exception('Não é possível criar conversa para contatos do sistema');
+        }
 
         // ------------------------------------------------------------------
         // Resolver funil/etapa padrão (Integração -> WhatsApp (legacy) -> sistema)

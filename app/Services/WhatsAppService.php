@@ -1953,6 +1953,12 @@ class WhatsAppService
                     
                     $normalizedPhone = \App\Models\Contact::normalizePhoneNumber($fromPhone);
                     
+                    // ⚠️ Ignorar se o telefone normalizado for 'system' ou inválido
+                    if ($normalizedPhone === 'system' || $normalizedPhone === '0' || empty($normalizedPhone)) {
+                        Logger::quepasa("processWebhook - Ignorando contato do sistema: phone={$normalizedPhone}");
+                        return;
+                    }
+                    
                     Logger::quepasa("processWebhook - Criando novo contato: name={$contactName}, phone={$normalizedPhone} (normalizado de {$fromPhone}), whatsapp_id={$whatsappId}");
                     $contactId = \App\Models\Contact::create([
                         'name' => $contactName,
@@ -2047,6 +2053,12 @@ class WhatsAppService
                         Logger::quepasa("Erro ao buscar avatar: " . $e->getMessage());
                     }
                 }
+            }
+
+            // ⚠️ VALIDAÇÃO FINAL: Não criar conversa se contato tiver phone = 'system'
+            if (isset($contact['phone']) && ($contact['phone'] === 'system' || $contact['phone'] === '0')) {
+                Logger::quepasa("processWebhook - ⚠️ Abortando: Contato com phone do sistema (phone={$contact['phone']}, id={$contact['id']})");
+                return;
             }
 
             // Criar ou buscar conversa (proteção contra duplicatas; se falhar lock, usa fallback sem transação)

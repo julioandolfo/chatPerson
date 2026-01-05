@@ -458,6 +458,15 @@ class WhatsAppCloudService extends MetaIntegrationService
             self::logInfo("Contato WhatsApp criado: {$contactId}");
         }
         
+        // ⚠️ VALIDAÇÃO: Não criar conversa se contato tiver phone = 'system'
+        if (isset($contact['phone']) && ($contact['phone'] === 'system' || $contact['phone'] === '0')) {
+            self::logInfo("⚠️ Abortando: Contato com phone do sistema", [
+                'phone' => $contact['phone'],
+                'contact_id' => $contact['id']
+            ]);
+            return;
+        }
+        
         // Buscar ou criar conversa
         $conversation = Conversation::whereFirst('contact_id', '=', $contact['id'], [
             ['channel', '=', 'whatsapp'],

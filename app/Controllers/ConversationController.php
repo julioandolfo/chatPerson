@@ -2907,15 +2907,6 @@ class ConversationController
             exit;
         }
     }
-            
-            // Limpar buffers novamente
-            while (ob_get_level() > 0) {
-                ob_end_clean();
-            }
-            
-            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
-    }
 
     /**
      * Obter contadores de convites e solicitações pendentes

@@ -125,7 +125,61 @@ class WooCommerceIntegrationService
             $orders = array_merge($orders, $nameOrders);
         }
         
-        return $orders;
+        // VALIDAR pedidos retornados para garantir que pertencem ao contato
+        $validatedOrders = self::validateOrders($orders, $contact, $mapping);
+        
+        return $validatedOrders;
+    }
+    
+    /**
+     * Validar pedidos retornados para garantir que pertencem ao contato
+     */
+    private static function validateOrders(array $orders, array $contact, array $mapping): array
+    {
+        $validated = [];
+        
+        // Gerar variações do telefone do contato para comparação
+        $phoneVariations = !empty($contact['phone']) 
+            ? PhoneNormalizationService::generateVariations($contact['phone']) 
+            : [];
+        
+        foreach ($orders as $order) {
+            $isValid = false;
+            
+            // Validar por telefone (mais confiável)
+            if ($mapping['phone']['enabled'] ?? false) {
+                $orderPhone = $order['billing']['phone'] ?? '';
+                if (!empty($orderPhone)) {
+                    // Normalizar telefone do pedido e comparar com variações do contato
+                    $normalizedOrderPhone = PhoneNormalizationService::normalizeWooCommercePhone($orderPhone);
+                    if (in_array($normalizedOrderPhone, $phoneVariations)) {
+                        $isValid = true;
+                    }
+                }
+            }
+            
+            // Validar por email (muito confiável)
+            if (!$isValid && ($mapping['email']['enabled'] ?? false)) {
+                $orderEmail = strtolower(trim($order['billing']['email'] ?? ''));
+                $contactEmail = strtolower(trim($contact['email'] ?? ''));
+                if (!empty($orderEmail) && !empty($contactEmail) && $orderEmail === $contactEmail) {
+                    $isValid = true;
+                }
+            }
+            
+            // Se busca por nome está habilitada, exigir que pelo menos telefone OU email batam
+            // (não aceitar pedidos APENAS por nome)
+            if (($mapping['name']['enabled'] ?? false) && !($mapping['phone']['enabled'] ?? false) && !($mapping['email']['enabled'] ?? false)) {
+                // Se APENAS nome está habilitado (não recomendado), aceitar o pedido
+                $isValid = true;
+            }
+            
+            if ($isValid) {
+                $validated[] = $order;
+            }
+        }
+        
+        return $validated;
     }
     
     /**

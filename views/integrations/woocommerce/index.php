@@ -205,7 +205,7 @@ ob_start();
                     
                     <div class="mb-5">
                         <div class="form-check form-check-custom form-check-solid mb-3">
-                            <input class="form-check-input" type="checkbox" name="field_mapping[name][enabled]" id="field_name_enabled" checked>
+                            <input class="form-check-input" type="checkbox" name="field_mapping[name][enabled]" id="field_name_enabled">
                             <label class="form-check-label" for="field_name_enabled">
                                 <span class="fw-bold">Nome</span>
                                 <span class="text-muted fs-7 d-block">Buscar pedidos pelo nome do contato</span>
@@ -214,6 +214,7 @@ ob_start();
                         <div class="ms-8">
                             <label class="form-label fs-7">Campo no WooCommerce</label>
                             <input type="text" class="form-control form-control-sm" name="field_mapping[name][woocommerce_field]" value="billing.first_name" placeholder="billing.first_name">
+                            <div class="form-text text-warning">⚠️ Busca por nome pode retornar pedidos de outras pessoas com mesmo nome</div>
                         </div>
                     </div>
                     
@@ -299,6 +300,78 @@ ob_start();
                             <option value="active">Ativa</option>
                             <option value="inactive">Inativa</option>
                         </select>
+                    </div>
+                    
+                    <div class="separator separator-dashed my-5"></div>
+                    
+                    <h4 class="fw-bold mb-4">Mapeamento de Campos</h4>
+                    <p class="text-muted fs-7 mb-4">Configure quais campos do contato usar para buscar pedidos no WooCommerce</p>
+                    
+                    <div class="mb-5">
+                        <div class="form-check form-check-custom form-check-solid mb-3">
+                            <input class="form-check-input" type="checkbox" name="field_mapping[phone][enabled]" id="edit_field_phone_enabled">
+                            <label class="form-check-label" for="edit_field_phone_enabled">
+                                <span class="fw-bold">Telefone</span>
+                                <span class="text-muted fs-7 d-block">Buscar pedidos pelo telefone do contato</span>
+                            </label>
+                        </div>
+                        <div class="ms-8">
+                            <label class="form-label fs-7">Campo no WooCommerce</label>
+                            <input type="text" class="form-control form-control-sm" name="field_mapping[phone][woocommerce_field]" id="edit_field_phone_wc" placeholder="billing.phone">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <div class="form-check form-check-custom form-check-solid mb-3">
+                            <input class="form-check-input" type="checkbox" name="field_mapping[email][enabled]" id="edit_field_email_enabled">
+                            <label class="form-check-label" for="edit_field_email_enabled">
+                                <span class="fw-bold">Email</span>
+                                <span class="text-muted fs-7 d-block">Buscar pedidos pelo email do contato</span>
+                            </label>
+                        </div>
+                        <div class="ms-8">
+                            <label class="form-label fs-7">Campo no WooCommerce</label>
+                            <input type="text" class="form-control form-control-sm" name="field_mapping[email][woocommerce_field]" id="edit_field_email_wc" placeholder="billing.email">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <div class="form-check form-check-custom form-check-solid mb-3">
+                            <input class="form-check-input" type="checkbox" name="field_mapping[name][enabled]" id="edit_field_name_enabled">
+                            <label class="form-check-label" for="edit_field_name_enabled">
+                                <span class="fw-bold">Nome</span>
+                                <span class="text-muted fs-7 d-block">Buscar pedidos pelo nome do contato</span>
+                            </label>
+                        </div>
+                        <div class="ms-8">
+                            <label class="form-label fs-7">Campo no WooCommerce</label>
+                            <input type="text" class="form-control form-control-sm" name="field_mapping[name][woocommerce_field]" id="edit_field_name_wc" placeholder="billing.first_name">
+                            <div class="form-text text-warning">⚠️ Busca por nome pode retornar pedidos de outras pessoas com mesmo nome</div>
+                        </div>
+                    </div>
+                    
+                    <div class="separator separator-dashed my-5"></div>
+                    
+                    <h4 class="fw-bold mb-4">Configurações de Busca</h4>
+                    
+                    <div class="mb-5">
+                        <div class="form-check form-check-custom form-check-solid">
+                            <input class="form-check-input" type="checkbox" name="search_settings[phone_variations]" id="edit_phone_variations">
+                            <label class="form-check-label" for="edit_phone_variations">
+                                Buscar variações de telefone (com/sem 9º dígito, com/sem +55)
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-5">
+                            <label class="form-label">Máximo de Resultados</label>
+                            <input type="number" class="form-control" name="search_settings[max_results]" id="edit_max_results" min="1" max="100">
+                        </div>
+                        <div class="col-md-6 mb-5">
+                            <label class="form-label">Cache (minutos)</label>
+                            <input type="number" class="form-control" name="cache_ttl_minutes" id="edit_cache_ttl" min="1">
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -407,12 +480,60 @@ function saveIntegration(event) {
 
 // Editar integração
 function editIntegration(id, integration) {
+    // Campos básicos
     document.getElementById('edit_integration_id').value = id;
     document.getElementById('edit_name').value = integration.name || '';
     document.getElementById('edit_woocommerce_url').value = integration.woocommerce_url || '';
     document.getElementById('edit_consumer_key').value = integration.consumer_key || '';
     document.getElementById('edit_consumer_secret').value = '';
     document.getElementById('edit_status').value = integration.status || 'active';
+    
+    // Parse do mapeamento de campos (JSON)
+    let fieldMapping = {};
+    try {
+        fieldMapping = typeof integration.contact_field_mapping === 'string' 
+            ? JSON.parse(integration.contact_field_mapping) 
+            : integration.contact_field_mapping || {};
+    } catch (e) {
+        console.error('Erro ao parsear contact_field_mapping:', e);
+        fieldMapping = {};
+    }
+    
+    // Popular campos de telefone
+    const phoneEnabled = fieldMapping.phone?.enabled || false;
+    const phoneField = fieldMapping.phone?.woocommerce_field || 'billing.phone';
+    document.getElementById('edit_field_phone_enabled').checked = phoneEnabled;
+    document.getElementById('edit_field_phone_wc').value = phoneField;
+    
+    // Popular campos de email
+    const emailEnabled = fieldMapping.email?.enabled || false;
+    const emailField = fieldMapping.email?.woocommerce_field || 'billing.email';
+    document.getElementById('edit_field_email_enabled').checked = emailEnabled;
+    document.getElementById('edit_field_email_wc').value = emailField;
+    
+    // Popular campos de nome
+    const nameEnabled = fieldMapping.name?.enabled || false;
+    const nameField = fieldMapping.name?.woocommerce_field || 'billing.first_name';
+    document.getElementById('edit_field_name_enabled').checked = nameEnabled;
+    document.getElementById('edit_field_name_wc').value = nameField;
+    
+    // Parse das configurações de busca (JSON)
+    let searchSettings = {};
+    try {
+        searchSettings = typeof integration.search_settings === 'string' 
+            ? JSON.parse(integration.search_settings) 
+            : integration.search_settings || {};
+    } catch (e) {
+        console.error('Erro ao parsear search_settings:', e);
+        searchSettings = {};
+    }
+    
+    // Popular configurações de busca
+    const phoneVariations = searchSettings.phone_variations !== false; // Default true
+    const maxResults = searchSettings.max_results || 50;
+    document.getElementById('edit_phone_variations').checked = phoneVariations;
+    document.getElementById('edit_max_results').value = maxResults;
+    document.getElementById('edit_cache_ttl').value = integration.cache_ttl_minutes || 5;
     
     const modal = new bootstrap.Modal(document.getElementById('kt_modal_edit_woocommerce'));
     modal.show();
@@ -435,9 +556,46 @@ function updateIntegration(event) {
     const data = {};
     const id = formData.get('id');
     
+    // Processar dados do formulário (similar a saveIntegration)
     formData.forEach((value, key) => {
-        if (key !== 'id' && value !== '') {
-            data[key] = value;
+        if (key === 'id') return; // Pular ID
+        
+        if (key.startsWith('field_mapping[')) {
+            // Processar mapeamento de campos
+            const match = key.match(/field_mapping\[(\w+)\]\[(\w+)\]/);
+            if (match) {
+                const field = match[1]; // phone, email, name
+                const prop = match[2];  // enabled, woocommerce_field
+                
+                if (!data.contact_field_mapping) {
+                    data.contact_field_mapping = {};
+                }
+                if (!data.contact_field_mapping[field]) {
+                    data.contact_field_mapping[field] = {};
+                }
+                
+                // Checkboxes vêm como 'on', converter para boolean
+                if (prop === 'enabled') {
+                    data.contact_field_mapping[field][prop] = value === 'on';
+                } else {
+                    data.contact_field_mapping[field][prop] = value;
+                }
+            }
+        } else if (key.startsWith('search_settings[')) {
+            // Processar configurações de busca
+            const match = key.match(/search_settings\[(\w+)\]/);
+            if (match) {
+                const setting = match[1];
+                if (!data.search_settings) {
+                    data.search_settings = {};
+                }
+                data.search_settings[setting] = value === 'on' ? true : value;
+            }
+        } else {
+            // Outros campos normais
+            if (value !== '') {
+                data[key] = value;
+            }
         }
     });
     

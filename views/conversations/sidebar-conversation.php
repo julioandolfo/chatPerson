@@ -2162,16 +2162,24 @@ window.loadWooCommerceIntegrations = function() {
     });
 }
 
-// Carregar pedidos quando a aba for clicada
+// Carregar pedidos quando a aba for clicada (apenas na primeira vez ou ao forçar)
 document.addEventListener('DOMContentLoaded', function() {
+    let ordersLoaded = false; // Flag para evitar carregamentos desnecessários
+    
     const ordersTab = document.querySelector('a[href="#kt_tab_orders"]');
     if (ordersTab) {
         ordersTab.addEventListener('shown.bs.tab', function() {
-            console.log('🛒 Aba de pedidos aberta, carregando...');
-            if (typeof window.loadWooCommerceOrders === 'function') {
-                window.loadWooCommerceOrders();
+            console.log('🛒 Aba de pedidos aberta');
+            if (!ordersLoaded) {
+                console.log('🛒 Carregando pedidos pela primeira vez...');
+                ordersLoaded = true;
+                if (typeof window.loadWooCommerceOrders === 'function') {
+                    window.loadWooCommerceOrders();
+                } else {
+                    console.error('❌ Função loadWooCommerceOrders não encontrada');
+                }
             } else {
-                console.error('❌ Função loadWooCommerceOrders não encontrada');
+                console.log('🛒 Pedidos já carregados, pulando...');
             }
         });
         console.log('✅ Event listener de pedidos WooCommerce registrado');
@@ -2179,28 +2187,31 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn('⚠️ Aba de pedidos não encontrada');
     }
     
-    // Botão de atualizar pedidos
+    // Botão de atualizar pedidos (força recarregamento)
     const refreshBtn = document.getElementById('btn-refresh-woocommerce-orders');
     if (refreshBtn) {
         refreshBtn.addEventListener('click', function() {
-            console.log('🔄 Atualizando pedidos WooCommerce...');
+            console.log('🔄 Forçando atualização de pedidos WooCommerce...');
+            ordersLoaded = false; // Reset flag para forçar recarregamento
             if (typeof window.loadWooCommerceOrders === 'function') {
                 window.loadWooCommerceOrders();
             } else {
                 console.error('❌ Função loadWooCommerceOrders não encontrada');
             }
+            ordersLoaded = true;
         });
         console.log('✅ Event listener do botão de atualizar registrado');
     }
     
-    // Filtros de integração e status
+    // Filtros de integração e status (forçam recarregamento)
     const integrationFilter = document.getElementById('woocommerce-integration-filter');
     const statusFilter = document.getElementById('woocommerce-status-filter');
     
     if (integrationFilter) {
         integrationFilter.addEventListener('change', function() {
             console.log('🔍 Filtro de integração alterado:', this.value);
-            if (typeof window.loadWooCommerceOrders === 'function') {
+            if (ordersLoaded && typeof window.loadWooCommerceOrders === 'function') {
+                console.log('🔄 Recarregando pedidos após filtro...');
                 window.loadWooCommerceOrders();
             }
         });
@@ -2210,7 +2221,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (statusFilter) {
         statusFilter.addEventListener('change', function() {
             console.log('📊 Filtro de status alterado:', this.value);
-            if (typeof window.loadWooCommerceOrders === 'function') {
+            if (ordersLoaded && typeof window.loadWooCommerceOrders === 'function') {
+                console.log('🔄 Recarregando pedidos após filtro...');
                 window.loadWooCommerceOrders();
             }
         });

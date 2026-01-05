@@ -19269,12 +19269,8 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         };
 
-        // Após registrar fallback, tente carregar integrações/pedidos se já houver conversa aberta
+        // Após registrar fallback, carregar apenas as integrações (pedidos só ao clicar na aba)
         window.loadWooCommerceIntegrations();
-        const hasConversation = window.currentConversationId || window.currentConversation?.contact_id;
-        if (hasConversation) {
-            window.loadWooCommerceOrders();
-        }
     }, 3000);
 });
 </script>

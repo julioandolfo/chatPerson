@@ -37,9 +37,9 @@ ob_start();
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" href="<?= Url::to('/api/README.md') ?>" target="_blank">
+            <a class="nav-link" href="<?= Url::to('/settings/api-tokens/docs') ?>">
                 <i class="ki-duotone ki-document fs-3 me-1"><span class="path1"></span><span class="path2"></span></i>
-                Documentação
+                Documentação da API
             </a>
         </li>
     </ul>

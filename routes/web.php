@@ -352,6 +352,10 @@ Router::get('/settings/api-tokens', [\App\Controllers\ApiTokenController::class,
 Router::post('/settings/api-tokens', [\App\Controllers\ApiTokenController::class, 'store'], ['Authentication']);
 Router::post('/settings/api-tokens/{id}/revoke', [\App\Controllers\ApiTokenController::class, 'revoke'], ['Authentication']);
 Router::get('/settings/api-tokens/logs', [\App\Controllers\ApiTokenController::class, 'logs'], ['Authentication']);
+Router::get('/settings/api-tokens/docs', function() {
+    \App\Helpers\Permission::abortIfCannot('settings.manage');
+    \App\Helpers\Response::view('settings/api-tokens/documentation', []);
+}, ['Authentication']);
 Router::get('/settings/api-tokens/stats', [\App\Controllers\ApiTokenController::class, 'stats'], ['Authentication']);
 
 // Rotas de Configurações de Som

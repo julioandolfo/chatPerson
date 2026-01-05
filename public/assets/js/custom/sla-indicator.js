@@ -232,7 +232,7 @@ const SLAIndicator = {
         
         // Calcular status do SLA
         const slaStatus = this.calculateSLAStatus(conv);
-        console.log(`[SLA] Status calculado para conversa ${conv.id}:`, slaStatus);
+        slaLog(`[SLA] Status calculado para conversa ${conv.id}:`, slaStatus);
         
         // Remover classes SLA do conversation-item (se aplicadas por engano)
         const conversationItem = avatar.closest('.conversation-item');
@@ -255,7 +255,7 @@ const SLAIndicator = {
             avatar.classList.remove('symbol-sla');
             // Remover todas as classes sla-status do avatar
             avatar.className = avatar.className.replace(/sla-status-\w+/g, '');
-            console.log(`[SLA] Indicador oculto para conversa ${conv.id}`);
+            slaLog(`[SLA] Indicador oculto para conversa ${conv.id}`);
             return;
         }
         
@@ -269,7 +269,7 @@ const SLAIndicator = {
             const indicator = this.createIndicatorSVG(avatar);
             avatar.insertAdjacentHTML('afterbegin', indicator);
             existingIndicator = avatar.querySelector('.sla-progress-ring');
-            console.log(`[SLA] Indicador criado para conversa ${conv.id}`, existingIndicator);
+            slaLog(`[SLA] Indicador criado para conversa ${conv.id}`, existingIndicator);
         }
         
         // Atualizar progresso
@@ -364,7 +364,7 @@ const SLAIndicator = {
             return { percentage: 0, status: 'none', breached: false, show: false };
         }
         
-        console.log(`[SLA] Calculando para conversa ${conv.id}:`, {
+        slaLog(`[SLA] Calculando para conversa ${conv.id}:`, {
             created_at: conv.created_at,
             first_response_at: conv.first_response_at,
             last_contact_message_at: conv.last_contact_message_at,
@@ -375,13 +375,13 @@ const SLAIndicator = {
         
         // Se conversa está fechada ou resolvida, não calcular SLA
         if (conv.status === 'closed' || conv.status === 'resolved') {
-            console.log(`[SLA] Conversa ${conv.id} está ${conv.status}, ignorando SLA`);
+            slaLog(`[SLA] Conversa ${conv.id} está ${conv.status}, ignorando SLA`);
             return { percentage: 0, status: 'none', breached: false, show: false };
         }
         
         // Se ainda não há agente atribuído ou não houve primeira resposta
         const waitingFirstResponse = !firstResponseAt;
-        console.log(`[SLA] Conversa ${conv.id} aguardando primeira resposta: ${waitingFirstResponse}`);
+        slaLog(`[SLA] Conversa ${conv.id} aguardando primeira resposta: ${waitingFirstResponse}`);
         
         if (waitingFirstResponse) {
             // Calcular SLA de primeira resposta
@@ -526,7 +526,7 @@ const SLAIndicator = {
      * Atualizar indicador de uma conversa específica (chamado externamente)
      */
     updateConversation: function(convId, convData) {
-        console.log(`[SLA] updateConversation chamado para conversa ${convId}`, convData);
+        slaLog(`[SLA] updateConversation chamado para conversa ${convId}`, convData);
         const item = document.querySelector(`[data-conversation-id="${convId}"]`);
         if (!item) {
             console.warn(`[SLA] Conversa ${convId} não encontrada no DOM`);
@@ -554,4 +554,5 @@ if (document.readyState === 'loading') {
 
 // Expor globalmente para uso em outros scripts
 window.SLAIndicator = SLAIndicator;
+
 

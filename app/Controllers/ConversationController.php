@@ -2539,50 +2539,47 @@ class ConversationController
      */
     public function getInvites(): void
     {
-        // Garantir que não há output antes
-        @ini_set('display_errors', '0');
-        @error_reporting(0);
-
-        // Log rápido para confirmar se a rota foi executada
         try {
-            $logPath = __DIR__ . '/../../storage/logs/conversas.log';
-            @file_put_contents($logPath, date('c') . " [getInvites] start\n", FILE_APPEND);
-        } catch (\Throwable $e) {
-            // Ignorar erros de log para não quebrar a resposta
-        }
-        
-        // Limpar todos os buffers
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
-        
-        try {
-            \App\Helpers\Log::debug("[getInvites] Iniciando...", 'conversas.log');
+            // Log inicial
+            error_log("[getInvites] INÍCIO");
             
             $userId = \App\Helpers\Auth::id();
-            \App\Helpers\Log::debug("[getInvites] userId={$userId}", 'conversas.log');
+            error_log("[getInvites] userId={$userId}");
             
+            // Verificar se ConversationMentionService existe
+            if (!class_exists('\App\Services\ConversationMentionService')) {
+                error_log("[getInvites] ERRO: ConversationMentionService não encontrado!");
+                Response::json(['success' => false, 'message' => 'Serviço não encontrado'], 500);
+                return;
+            }
+            
+            error_log("[getInvites] Chamando getPendingInvites...");
             $invites = \App\Services\ConversationMentionService::getPendingInvites($userId);
-            \App\Helpers\Log::debug("[getInvites] Invites: " . count($invites), 'conversas.log');
+            error_log("[getInvites] Invites retornados: " . count($invites));
             
+            error_log("[getInvites] Chamando countPending...");
             $count = \App\Services\ConversationMentionService::countPending($userId);
-            \App\Helpers\Log::debug("[getInvites] Count: {$count}", 'conversas.log');
+            error_log("[getInvites] Count: {$count}");
             
+            error_log("[getInvites] Enviando resposta JSON...");
             Response::json([
                 'success' => true,
                 'invites' => $invites,
                 'count' => $count
             ]);
-        } catch (\Exception $e) {
-            \App\Helpers\Log::error("[getInvites] Exception: " . $e->getMessage(), 'conversas.log');
-            \App\Helpers\Log::error("[getInvites] Trace: " . $e->getTraceAsString(), 'conversas.log');
             
-            // Limpar buffers novamente antes de enviar erro
-            while (ob_get_level() > 0) {
-                ob_end_clean();
-            }
+            error_log("[getInvites] FIM - Resposta enviada");
+        } catch (\Throwable $e) {
+            error_log("[getInvites] EXCEPTION: " . $e->getMessage());
+            error_log("[getInvites] File: " . $e->getFile() . " Line: " . $e->getLine());
+            error_log("[getInvites] Trace: " . $e->getTraceAsString());
             
-            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+            Response::json([
+                'success' => false, 
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ], 500);
         }
     }
 
@@ -2853,35 +2850,38 @@ class ConversationController
      */
     public function getPendingRequests(): void
     {
-        // Garantir que não há output antes
-        @ini_set('display_errors', '0');
-        @error_reporting(0);
-
-        // Log rápido para confirmar se a rota foi executada
         try {
-            $logPath = __DIR__ . '/../../storage/logs/conversas.log';
-            @file_put_contents($logPath, date('c') . " [getPendingRequests] start\n", FILE_APPEND);
-        } catch (\Throwable $e) {
-            // Ignorar erros de log
-        }
-        
-        // Limpar todos os buffers
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
-        
-        try {
-            $userId = \App\Helpers\Auth::id();
-            $requests = \App\Models\ConversationMention::getPendingRequestsToApprove($userId);
-            $count = \App\Models\ConversationMention::countPendingRequestsToApprove($userId);
+            error_log("[getPendingRequests] INÍCIO");
             
+            $userId = \App\Helpers\Auth::id();
+            error_log("[getPendingRequests] userId={$userId}");
+            
+            // Verificar se Model existe
+            if (!class_exists('\App\Models\ConversationMention')) {
+                error_log("[getPendingRequests] ERRO: ConversationMention não encontrado!");
+                Response::json(['success' => false, 'message' => 'Model não encontrado'], 500);
+                return;
+            }
+            
+            error_log("[getPendingRequests] Chamando getPendingRequestsToApprove...");
+            $requests = \App\Models\ConversationMention::getPendingRequestsToApprove($userId);
+            error_log("[getPendingRequests] Requests retornados: " . count($requests));
+            
+            error_log("[getPendingRequests] Chamando countPendingRequestsToApprove...");
+            $count = \App\Models\ConversationMention::countPendingRequestsToApprove($userId);
+            error_log("[getPendingRequests] Count: {$count}");
+            
+            error_log("[getPendingRequests] Enviando resposta JSON...");
             Response::json([
                 'success' => true,
                 'requests' => $requests,
                 'count' => $count
             ]);
-        } catch (\Exception $e) {
-            \App\Helpers\Log::error("[getPendingRequests] Exception: " . $e->getMessage(), 'conversas.log');
+            
+            error_log("[getPendingRequests] FIM - Resposta enviada");
+        } catch (\Throwable $e) {
+            error_log("[getPendingRequests] EXCEPTION: " . $e->getMessage());
+            error_log("[getPendingRequests] File: " . $e->getFile() . " Line: " . $e->getLine());
             
             // Limpar buffers novamente
             while (ob_get_level() > 0) {

@@ -8331,6 +8331,7 @@ function updateConversationSidebar(conversation, tags) {
                 const assignedTo = conversation.assigned_to ?? conversation.agent_id ?? null;
                 const isCurrentUserAssigned = loggedUserId && assignedTo && parseInt(assignedTo) === loggedUserId;
                 
+                const allowManageParticipants = isCurrentUserAssigned || !isCurrentUserParticipant;
                 if (data.participants.length > 0) {
                     participantsContainer.innerHTML = data.participants.map(p => {
                         const initials = (p.user_name || 'U').charAt(0).toUpperCase();
@@ -8345,14 +8346,16 @@ function updateConversationSidebar(conversation, tags) {
                                     <div class="fw-semibold fs-7">${escapeHtml(p.user_name || 'Usuírio')}</div>
                                     ${p.user_email ? `<div class="text-muted fs-8">${escapeHtml(p.user_email)}</div>` : ''}
                                 </div>
-                                <button type="button" class="btn btn-sm btn-icon btn-light-danger p-0" 
-                                        onclick="removeParticipant(${conversation.id}, ${p.user_id})" 
-                                        title="Remover participante">
-                                    <i class="ki-duotone ki-cross fs-7">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                </button>
+                                ${allowManageParticipants ? `
+                                    <button type="button" class="btn btn-sm btn-icon btn-light-danger p-0" 
+                                            onclick="removeParticipant(${conversation.id}, ${p.user_id})" 
+                                            title="Remover participante">
+                                        <i class="ki-duotone ki-cross fs-7">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                    </button>
+                                ` : ''}
                             </div>
                         `;
                     }).join('');

@@ -586,6 +586,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         </i>
                         Adicionar Participante
                     </button>
+                    
+                    <button class="btn btn-sm btn-light-danger w-100 mt-2" id="sidebar-leave-conversation-btn" style="display: none;" onclick="leaveConversation()">
+                        <i class="ki-duotone ki-exit-right-corner fs-5">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Sair da Conversa
+                    </button>
                 </div>
                 
                 <div class="separator my-5"></div>

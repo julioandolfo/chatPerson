@@ -8305,6 +8305,9 @@ function updateConversationSidebar(conversation, tags) {
     // Atualizar participantes
     const participantsContainer = sidebar.querySelector('#participants-list');
     const addParticipantBtn = sidebar.querySelector('#sidebar-add-participant-btn');
+    const leaveConversationBtn = sidebar.querySelector('#sidebar-leave-conversation-btn');
+    const loggedUserId = window.LOGGED_USER_ID ?? (parseInt('<?= (int)\App\Helpers\Auth::id() ?>') || null);
+    window.LOGGED_USER_ID = loggedUserId;
     if (participantsContainer && conversation.id) {
         // Mostrar loading
         participantsContainer.innerHTML = '<div class="text-muted fs-7">Carregando...</div>';
@@ -8324,6 +8327,10 @@ function updateConversationSidebar(conversation, tags) {
         })
         .then(data => {
             if (data.success && data.participants) {
+                const isCurrentUserParticipant = loggedUserId ? data.participants.some(p => parseInt(p.user_id) === loggedUserId) : false;
+                const assignedTo = conversation.assigned_to ?? conversation.agent_id ?? null;
+                const isCurrentUserAssigned = loggedUserId && assignedTo && parseInt(assignedTo) === loggedUserId;
+                
                 if (data.participants.length > 0) {
                     participantsContainer.innerHTML = data.participants.map(p => {
                         const initials = (p.user_name || 'U').charAt(0).toUpperCase();
@@ -8354,16 +8361,32 @@ function updateConversationSidebar(conversation, tags) {
                 }
                 
                 if (addParticipantBtn) {
-                    addParticipantBtn.style.display = 'block';
-                    addParticipantBtn.setAttribute('onclick', `showAddParticipantModal(${conversation.id})`);
+                    // Só permite adicionar participantes se for o agente principal ou não for participante comum
+                    if (isCurrentUserAssigned || !isCurrentUserParticipant) {
+                        addParticipantBtn.style.display = 'block';
+                        addParticipantBtn.setAttribute('onclick', `showAddParticipantModal(${conversation.id})`);
+                    } else {
+                        addParticipantBtn.style.display = 'none';
+                    }
+                }
+                
+                if (leaveConversationBtn) {
+                    if (isCurrentUserParticipant && !isCurrentUserAssigned) {
+                        leaveConversationBtn.style.display = 'block';
+                        leaveConversationBtn.setAttribute('onclick', `leaveConversation(${conversation.id})`);
+                    } else {
+                        leaveConversationBtn.style.display = 'none';
+                    }
                 }
             } else {
                 participantsContainer.innerHTML = '<div class="text-muted fs-7">Erro ao carregar participantes</div>';
+                if (leaveConversationBtn) leaveConversationBtn.style.display = 'none';
             }
         })
         .catch(error => {
             console.error('Erro ao carregar participantes:', error);
             participantsContainer.innerHTML = '<div class="text-muted fs-7">Erro ao carregar participantes</div>';
+            if (leaveConversationBtn) leaveConversationBtn.style.display = 'none';
         });
     }
     
@@ -9626,6 +9649,34 @@ document.getElementById('messageInput')?.addEventListener('keypress', function(e
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         sendMessage();
+    }
+});
+
+// Colar imagem (clipboard) como anexo
+document.getElementById('messageInput')?.addEventListener('paste', function(e) {
+    const clipboard = e.clipboardData || window.clipboardData;
+    if (!clipboard || !clipboard.items) return;
+    
+    const hasText = !!clipboard.getData('text');
+    const imageFiles = [];
+    
+    for (const item of clipboard.items) {
+        if (item.type && item.type.startsWith('image/')) {
+            const file = item.getAsFile();
+            if (file) {
+                const ext = (file.type && file.type.split('/')[1]) || 'png';
+                const namedFile = new File([file], `pasted-image-${Date.now()}.${ext}`, { type: file.type });
+                imageFiles.push(namedFile);
+            }
+        }
+    }
+    
+    if (imageFiles.length > 0) {
+        // Se só veio imagem, evita colar base64 no textarea
+        if (!hasText) {
+            e.preventDefault();
+        }
+        imageFiles.forEach(file => uploadFile(file));
     }
 });
 
@@ -15133,8 +15184,8 @@ function loadParticipantsForConversation(conversationIdParam = null) {
         });
 }
 
-function removeParticipant(conversationId, userId) {
-    if (!confirm('Tem certeza que deseja remover este participante?')) {
+function removeParticipant(conversationId, userId, skipConfirm = false) {
+    if (!skipConfirm && !confirm('Tem certeza que deseja remover este participante?')) {
         return;
     }
     
@@ -15203,6 +15254,26 @@ function removeParticipant(conversationId, userId) {
         console.error('Erro ao remover participante:', error);
         alert('Erro ao remover participante: ' + error.message);
     });
+}
+
+function leaveConversation(conversationIdParam = null) {
+    const conversationId = conversationIdParam || window.currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+    const loggedUserId = window.LOGGED_USER_ID ?? (parseInt('<?= (int)\App\Helpers\Auth::id() ?>') || null);
+    
+    if (!conversationId) {
+        alert('ID da conversa não encontrado');
+        return;
+    }
+    if (!loggedUserId) {
+        alert('ID do usuário não encontrado');
+        return;
+    }
+    
+    if (!confirm('Deseja sair desta conversa?')) {
+        return;
+    }
+    
+    removeParticipant(conversationId, loggedUserId, true);
 }
 
 /**

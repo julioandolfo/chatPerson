@@ -15098,8 +15098,8 @@ function loadParticipantsForConversation(conversationIdParam = null) {
             }
         });
     
-    // Carregar usuírios disponíveis (agentes)
-    fetch('<?= \App\Helpers\Url::to("/agents") ?>?format=json', {
+    // Carregar agentes disponíveis para a conversa
+    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/available-agents`, {
         headers: {
             'X-Requested-With': 'XMLHttpRequest',
             'Accept': 'application/json'
@@ -15111,24 +15111,24 @@ function loadParticipantsForConversation(conversationIdParam = null) {
             
             if (!data.success || !data.agents || data.agents.length === 0) {
                 if (select) {
-                    select.innerHTML = '<option value="">Nenhum usuírio disponível</option>';
+                    select.innerHTML = '<option value="">Nenhum agente disponível</option>';
                 }
                 return;
             }
             
             if (select) {
-                select.innerHTML = '<option value="">Selecione um usuírio...</option>';
-                data.agents.forEach(user => {
-                    const emailLabel = user.email ? ' (' + escapeHtml(user.email) + ')' : '';
-                    select.innerHTML += `<option value="${user.id}">${escapeHtml(user.name || user.email || 'Usuírio')}${emailLabel}</option>`;
+                select.innerHTML = '<option value="">Selecione um agente...</option>';
+                data.agents.forEach(agent => {
+                    const emailLabel = agent.email ? ' (' + escapeHtml(agent.email) + ')' : '';
+                    select.innerHTML += `<option value="${agent.id}">${escapeHtml(agent.name || agent.email || 'Agente')}${emailLabel}</option>`;
                 });
             }
         })
         .catch(error => {
-            console.error('Erro ao carregar usuírios:', error);
+            console.error('Erro ao carregar agentes:', error);
             const select = document.getElementById('participantUserSelect');
             if (select) {
-                select.innerHTML = '<option value="">Erro ao carregar usuírios</option>';
+                select.innerHTML = '<option value="">Erro ao carregar agentes</option>';
             }
         });
 }

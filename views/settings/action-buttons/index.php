@@ -106,8 +106,14 @@ ob_start();
                     <input type="text" class="form-control" name="name" id="ab_name" required>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label">Cor (hex)</label>
-                    <input type="text" class="form-control" name="color" id="ab_color" value="#009ef7">
+                    <label class="form-label d-flex align-items-center justify-content-between">
+                        <span>Cor</span>
+                        <small class="text-muted">Selecione ou ajuste no picker</small>
+                    </label>
+                    <div class="input-group">
+                        <input type="color" class="form-control form-control-color" id="ab_color_picker" value="#009ef7" title="Escolher cor" onchange="syncColorInput(this.value)">
+                        <input type="text" class="form-control" name="color" id="ab_color" value="#009ef7" oninput="syncColorPicker(this.value)">
+                    </div>
                 </div>
             </div>
             <div class="row mb-3">
@@ -218,11 +224,11 @@ function openActionButtonModal(button = null, steps = []) {
     document.getElementById('icon-select-wrapper').style.display = 'none';
 }
 
-function addStepRowFromData(step) {
-    addStepRow(step.type, step.payload);
+window.addStepRowFromData = function(step) {
+    window.addStepRow(step.type, step.payload);
 }
 
-function addStepRow(type = '', payload = '{}') {
+window.addStepRow = function(type = '', payload = '{}') {
     const container = document.getElementById('stepsContainer');
     const idx = stepCount++;
     let parsed = payload;
@@ -254,15 +260,15 @@ function addStepRow(type = '', payload = '{}') {
         </div>
     `;
     container.insertAdjacentHTML('beforeend', html);
-    updatePayloadPlaceholders(idx, parsed || {});
+    window.updatePayloadPlaceholders(idx, parsed || {});
 }
 
-function removeStepRow(idx) {
+window.removeStepRow = function(idx) {
     const el = document.querySelector(`[data-step-index="${idx}"]`);
     if (el) el.remove();
 }
 
-function updatePayloadPlaceholders(idx, payload = {}) {
+window.updatePayloadPlaceholders = function(idx, payload = {}) {
     const select = document.querySelector(`[name="steps[${idx}][type]"]`);
     const hint = document.getElementById(`hint_${idx}`);
     if (!select || !hint) return;
@@ -413,6 +419,18 @@ function toggleIconSelect() {
     wrap.style.display = wrap.style.display === 'none' ? 'block' : 'none';
 }
 
+function syncColorInput(val) {
+    const text = document.getElementById('ab_color');
+    if (text) text.value = val;
+}
+
+function syncColorPicker(val) {
+    const picker = document.getElementById('ab_color_picker');
+    if (picker && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(val.trim())) {
+        picker.value = val.trim();
+    }
+}
+
 // Inicializar select ao carregar
 document.addEventListener('DOMContentLoaded', () => {
     const currentIcon = document.getElementById('ab_icon')?.value || 'ki-bolt';
@@ -426,6 +444,18 @@ let cacheFunnels = [];
 let cacheStagesByFunnel = {};
 let cacheAgents = [];
 let cacheTags = [];
+
+// Expor funções para uso em onclick inline (caso o browser não hoiste para window)
+window.toggleIconSelect = toggleIconSelect;
+window.selectIcon = selectIcon;
+window.syncIconPreview = syncIconPreview;
+window.populateIconSelect = populateIconSelect;
+window.addStepRow = addStepRow;
+window.addStepRowFromData = addStepRowFromData;
+window.removeStepRow = removeStepRow;
+window.updatePayloadPlaceholders = updatePayloadPlaceholders;
+window.syncColorInput = syncColorInput;
+window.syncColorPicker = syncColorPicker;
 
 function preloadActionData() {
     fetchFunis();

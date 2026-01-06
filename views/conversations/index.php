@@ -2617,7 +2617,7 @@ function getChannelInfo(channel) {
                     <div class="symbol-label bg-light-primary text-primary fs-3 fw-bold"><?= $initials ?></div>
                 </div>
                 <div>
-                    <div class="chat-header-title"><?= htmlspecialchars($selectedConversation['contact_name'] ?? 'Sem nome') ?></div>
+                    <div class="chat-header-title" id="chat-header-contact-name"><?= htmlspecialchars($selectedConversation['contact_name'] ?? 'Sem nome') ?></div>
                     <div class="chat-header-subtitle">
                         <?php
                         $channelIcon = getChannelIconSvg($selectedConversation['channel'] ?? 'chat', 18);
@@ -19039,44 +19039,102 @@ if (editContactForm) {
                     modal.hide();
                 }
                 
-                // Atualizar sidebar
-                if (window.currentConversation && window.currentConversation.contact_id == contactId) {
-                    // Recarregar dados do contato
-                    fetch(`<?= \App\Helpers\Url::to('/contacts') ?>/${contactId}`, {
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'Accept': 'application/json'
+                // Atualizar interface com novos dados
+                if (data.contact) {
+                    const contact = data.contact;
+                    
+                    // 1. Atualizar window.currentConversation com novos dados
+                    if (window.currentConversation && window.currentConversation.contact_id == contactId) {
+                        window.currentConversation.contact_name = contact.name;
+                        window.currentConversation.contact_email = contact.email || '';
+                        window.currentConversation.contact_phone = contact.phone || '';
+                        window.currentConversation.contact_city = contact.city || '';
+                        window.currentConversation.contact_country = contact.country || '';
+                        window.currentConversation.contact_company = contact.company || '';
+                        window.currentConversation.contact_bio = contact.bio || '';
+                    }
+                    
+                    // 2. Atualizar todos os elementos no sidebar
+                    const sidebar = document.getElementById('kt_conversation_sidebar');
+                    if (sidebar) {
+                        // Nome em todos os lugares
+                        sidebar.querySelectorAll('[data-field="contact_name"]').forEach(el => {
+                            el.textContent = contact.name || '-';
+                        });
+                        
+                        // Email
+                        sidebar.querySelectorAll('[data-field="contact_email"]').forEach(el => {
+                            el.textContent = contact.email || '-';
+                        });
+                        
+                        // Telefone
+                        sidebar.querySelectorAll('[data-field="contact_phone"]').forEach(el => {
+                            el.textContent = contact.phone || '-';
+                        });
+                        
+                        // Cidade
+                        sidebar.querySelectorAll('[data-field="contact_city"]').forEach(el => {
+                            el.textContent = contact.city || '-';
+                        });
+                        
+                        // País
+                        sidebar.querySelectorAll('[data-field="contact_country"]').forEach(el => {
+                            el.textContent = contact.country || '-';
+                        });
+                        
+                        // Empresa
+                        sidebar.querySelectorAll('[data-field="contact_company"]').forEach(el => {
+                            el.textContent = contact.company || '-';
+                        });
+                        
+                        // Bio
+                        sidebar.querySelectorAll('[data-field="contact_bio"]').forEach(el => {
+                            el.textContent = contact.bio || '-';
+                        });
+                        
+                        // Atualizar iniciais do avatar
+                        const initialsEl = sidebar.querySelector('#sidebar-contact-initials');
+                        if (initialsEl && contact.name) {
+                            const nameParts = contact.name.trim().split(/\s+/);
+                            let initials = 'NN';
+                            if (nameParts.length === 1) {
+                                initials = nameParts[0].substring(0, 2).toUpperCase();
+                            } else {
+                                initials = (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
+                            }
+                            initialsEl.textContent = initials;
                         }
-                    })
-                    .then(r => r.json())
-                    .then(result => {
-                        if (result.success && result.contact) {
-                            // Atualizar campos no sidebar
-                            const sidebar = document.getElementById('kt_conversation_sidebar');
-                            if (sidebar) {
-                                const nameEl = sidebar.querySelector('[data-field="contact_name"]');
-                                const emailEl = sidebar.querySelector('[data-field="contact_email"]');
-                                const phoneEl = sidebar.querySelector('[data-field="contact_phone"]');
-                                
-                                if (nameEl) {
-                                    nameEl.textContent = result.contact.name || '-';
+                    }
+                    
+                    // 3. Atualizar nome do contato na lista de conversas
+                    if (window.currentConversationId) {
+                        const conversationItem = document.querySelector(`[data-conversation-id="${window.currentConversationId}"]`);
+                        if (conversationItem) {
+                            const nameEl = conversationItem.querySelector('.conversation-item-name');
+                            if (nameEl) {
+                                nameEl.textContent = contact.name || 'Sem nome';
+                            }
+                            
+                            // Atualizar iniciais no avatar da lista também
+                            const listAvatar = conversationItem.querySelector('.symbol-label');
+                            if (listAvatar && contact.name) {
+                                const nameParts = contact.name.trim().split(/\s+/);
+                                let initials = 'NN';
+                                if (nameParts.length === 1) {
+                                    initials = nameParts[0].substring(0, 2).toUpperCase();
+                                } else {
+                                    initials = (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
                                 }
-                                if (emailEl) {
-                                    emailEl.textContent = result.contact.email || '-';
-                                }
-                                if (phoneEl) {
-                                    phoneEl.textContent = result.contact.phone || '-';
-                                }
-                                
-                                // Atualizar iniciais
-                                const initialsEl = sidebar.querySelector('#sidebar-contact-initials');
-                                if (initialsEl && result.contact.name) {
-                                    const initials = result.contact.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-                                    initialsEl.textContent = initials || 'NN';
-                                }
+                                listAvatar.textContent = initials;
                             }
                         }
-                    });
+                    }
+                    
+                    // 4. Atualizar cabeçalho do chat (nome do contato)
+                    const chatHeader = document.getElementById('chat-header-contact-name');
+                    if (chatHeader) {
+                        chatHeader.textContent = contact.name || 'Sem nome';
+                    }
                 }
                 
                 const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 

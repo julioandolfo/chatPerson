@@ -12,7 +12,7 @@ ob_start();
             <h1 class="fw-bold mb-1">Botões de Ações</h1>
             <p class="text-muted mb-0">Crie atalhos para executar ações rápidas nas conversas.</p>
         </div>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#actionButtonModal" onclick="openActionButtonModal()">
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#actionButtonModal" onclick="window.openActionButtonModal()">
             <i class="ki-duotone ki-plus fs-2"></i>
             Novo Botão
         </button>
@@ -25,7 +25,7 @@ ob_start();
                     <i class="ki-duotone ki-bolt fs-2x text-muted mb-3"><span class="path1"></span><span class="path2"></span></i>
                     <div class="fw-semibold mb-1">Nenhum botão configurado ainda.</div>
                     <div class="text-muted fs-7 mb-3">Crie seu primeiro botão de ação para acelerar os fluxos.</div>
-                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#actionButtonModal" onclick="openActionButtonModal()">Criar botão</button>
+                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#actionButtonModal" onclick="window.openActionButtonModal()">Criar botão</button>
                 </div>
             <?php else: ?>
                 <div class="table-responsive">
@@ -72,10 +72,10 @@ ob_start();
                                         <?php endif; ?>
                                     </td>
                                     <td class="text-end">
-                                        <button class="btn btn-sm btn-light" onclick='openActionButtonModal(<?= json_encode($btn) ?>, <?= json_encode($stepsByButton[$btn["id"]] ?? []) ?>)'>
+                                        <button class="btn btn-sm btn-light" onclick='window.openActionButtonModal(<?= json_encode($btn) ?>, <?= json_encode($stepsByButton[$btn["id"]] ?? []) ?>)'>
                                             Editar
                                         </button>
-                                        <button class="btn btn-sm btn-light-danger" onclick="deleteActionButton(<?= (int)$btn['id'] ?>)">
+                                        <button class="btn btn-sm btn-light-danger" onclick="window.deleteActionButton(<?= (int)$btn['id'] ?>)">
                                             Excluir
                                         </button>
                                     </td>
@@ -111,8 +111,8 @@ ob_start();
                         <small class="text-muted">Selecione ou ajuste no picker</small>
                     </label>
                     <div class="input-group">
-                        <input type="color" class="form-control form-control-color" id="ab_color_picker" value="#009ef7" title="Escolher cor" onchange="syncColorInput(this.value)">
-                        <input type="text" class="form-control" name="color" id="ab_color" value="#009ef7" oninput="syncColorPicker(this.value)">
+                        <input type="color" class="form-control form-control-color" id="ab_color_picker" value="#009ef7" title="Escolher cor" onchange="window.syncColorInput(this.value)">
+                        <input type="text" class="form-control" name="color" id="ab_color" value="#009ef7" oninput="window.syncColorPicker(this.value)">
                     </div>
                 </div>
             </div>
@@ -126,11 +126,11 @@ ob_start();
                         <span class="input-group-text bg-light" id="ab_icon_preview">
                             <i class="ki-duotone ki-bolt fs-3"><span class="path1"></span><span class="path2"></span></i>
                         </span>
-                        <input type="text" class="form-control" name="icon" id="ab_icon" value="ki-bolt" oninput="syncIconPreview(this.value)">
-                        <button class="btn btn-light-primary" type="button" onclick="toggleIconSelect()">Escolher</button>
+                        <input type="text" class="form-control" name="icon" id="ab_icon" value="ki-bolt" oninput="window.syncIconPreview(this.value)">
+                        <button class="btn btn-light-primary" type="button" onclick="window.toggleIconSelect()">Escolher</button>
                     </div>
                     <div class="mt-2" id="icon-select-wrapper" style="display:none;">
-                        <select class="form-select" id="ab_icon_select" size="6" onchange="selectIcon(this.value)">
+                        <select class="form-select" id="ab_icon_select" size="6" onchange="window.selectIcon(this.value)">
                             <!-- opções inseridas via JS -->
                         </select>
                     </div>
@@ -155,7 +155,7 @@ ob_start();
             <div class="mb-3">
                 <div class="d-flex align-items-center justify-content-between">
                     <label class="form-label mb-0">Etapas</label>
-                    <button type="button" class="btn btn-sm btn-light-primary" onclick="addStepRow()">Adicionar Etapa</button>
+                    <button type="button" class="btn btn-sm btn-light-primary" onclick="window.addStepRow()">Adicionar Etapa</button>
                 </div>
                 <div id="stepsContainer" class="mt-3"></div>
             </div>
@@ -163,13 +163,15 @@ ob_start();
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" class="btn btn-primary" onclick="submitActionButton()">Salvar</button>
+        <button type="button" class="btn btn-primary" onclick="window.submitActionButton()">Salvar</button>
       </div>
     </div>
   </div>
 </div>
 
 <script>
+// ===== DEFINIR TODAS AS FUNÇÕES GLOBAIS PRIMEIRO =====
+// Variáveis globais
 let stepCount = 0;
 const stepTypes = [
     { value: 'set_funnel_stage', label: 'Mover para etapa' },
@@ -196,6 +198,209 @@ let cacheFunnels = [];
 let cacheStagesByFunnel = {};
 let cacheAgents = [];
 let cacheTags = [];
+
+// ===== FUNÇÕES EXPOSTAS GLOBALMENTE (usadas em onclick) =====
+window.syncColorInput = function(colorValue) {
+    const input = document.getElementById('ab_color');
+    if (input) input.value = colorValue;
+};
+
+window.syncColorPicker = function(hexValue) {
+    const picker = document.getElementById('ab_color_picker');
+    if (picker) picker.value = hexValue;
+};
+
+window.toggleIconSelect = function() {
+    const wrap = document.getElementById('icon-select-wrapper');
+    if (wrap) wrap.style.display = wrap.style.display === 'none' ? 'block' : 'none';
+};
+
+window.selectIcon = function(val) {
+    const input = document.getElementById('ab_icon');
+    if (input) {
+        input.value = val;
+        window.syncIconPreview(val);
+    }
+};
+
+window.syncIconPreview = function(val) {
+    const preview = document.getElementById('ab_icon_preview');
+    if (preview) preview.innerHTML = `<i class="ki-duotone ${val} fs-3"><span class="path1"></span><span class="path2"></span></i>`;
+};
+
+window.addStepRow = function(type = '', payload = '{}') {
+    const container = document.getElementById('stepsContainer');
+    const idx = stepCount++;
+    let parsed = payload;
+    if (typeof payload === 'string') {
+        try { parsed = JSON.parse(payload); } catch(e) { parsed = {}; }
+    }
+    const html = `
+        <div class="border rounded p-3 mb-2" data-step-index="${idx}">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <strong>Etapa</strong>
+                <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="window.removeStepRow(${idx})">
+                    <i class="ki-duotone ki-cross fs-6"></i>
+                </button>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Tipo</label>
+                    <select class="form-select" name="steps[${idx}][type]" onchange="window.updatePayloadPlaceholders(${idx})">
+                        ${stepTypes.map(s => `<option value="${s.value}" ${type===s.value?'selected':''}>${s.label}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label">Configuração da etapa</label>
+                    <div id="payload_fields_${idx}" class="d-flex flex-column gap-2"></div>
+                    <input type="hidden" name="steps[${idx}][payload]" id="payload_${idx}" value='${JSON.stringify(parsed || {})}'>
+                    <div class="text-muted fs-8" id="hint_${idx}"></div>
+                </div>
+            </div>
+        </div>
+    `;
+    container.insertAdjacentHTML('beforeend', html);
+    window.updatePayloadPlaceholders(idx, parsed || {});
+};
+
+window.addStepRowFromData = function(step) {
+    window.addStepRow(step.type, step.payload);
+};
+
+window.removeStepRow = function(idx) {
+    const el = document.querySelector(`[data-step-index="${idx}"]`);
+    if (el) el.remove();
+};
+
+window.updatePayloadPlaceholders = function(idx, payload = {}) {
+    const select = document.querySelector(`[name="steps[${idx}][type]"]`);
+    const container = document.getElementById(`payload_fields_${idx}`);
+    const hidden = document.getElementById(`payload_${idx}`);
+    const hint = document.getElementById(`hint_${idx}`);
+    if (!select || !container || !hidden) return;
+    
+    const type = select.value;
+    const p = payload;
+    container.innerHTML = '';
+    
+    if (type === 'set_funnel_stage') {
+        container.innerHTML = `
+            <div class="mb-2">
+                <label class="form-label fs-8">Funil</label>
+                <select class="form-select form-select-sm" data-field="funnel_id" onchange="window.onPayloadFieldChange(${idx}); window.onFunnelChange(${idx});">
+                    <option value="">Selecione</option>
+                    ${cacheFunnels.map(f => `<option value="${f.id}" ${p.funnel_id==f.id?'selected':''}>${window.escapeHtml(f.name || 'Funil')}</option>`).join('')}
+                </select>
+            </div>
+            <div class="mb-2">
+                <label class="form-label fs-8">Etapa</label>
+                <select class="form-select form-select-sm" data-field="stage_id" onchange="window.onPayloadFieldChange(${idx});">
+                    <option value="">Selecione o funil primeiro</option>
+                </select>
+            </div>
+        `;
+        if (p.funnel_id) {
+            window.fetchStagesForFunnel(p.funnel_id).then(() => {
+                const stageSelect = container.querySelector('[data-field="stage_id"]');
+                if (stageSelect) stageSelect.innerHTML = `<option value="">Selecione</option>` + window.getStagesOptions(p.funnel_id, p.stage_id);
+            });
+        }
+    } else if (type === 'assign_agent' || type === 'add_participant') {
+        const field = type === 'assign_agent' ? 'agent_id' : 'participant_id';
+        container.innerHTML = `
+            <label class="form-label fs-8">Selecione</label>
+            <select class="form-select form-select-sm" data-field="${field}" onchange="window.onPayloadFieldChange(${idx});">
+                <option value="">Selecione</option>
+                ${cacheAgents.map(a => `<option value="${a.id}" ${p[field]==a.id?'selected':''}>${window.escapeHtml(a.name || a.email)}</option>`).join('')}
+            </select>
+        `;
+    } else if (type === 'add_tag' || type === 'remove_tag') {
+        container.innerHTML = `
+            <label class="form-label fs-8">Selecione</label>
+            <select class="form-select form-select-sm" data-field="tag_id" onchange="window.onPayloadFieldChange(${idx});">
+                <option value="">Selecione</option>
+                ${cacheTags.map(t => `<option value="${t.id}" ${p.tag_id==t.id?'selected':''}>${window.escapeHtml(t.name)}</option>`).join('')}
+            </select>
+        `;
+    } else if (type === 'close_conversation') {
+        hint.textContent = 'Sem configuração necessária';
+    }
+    
+    window.onPayloadFieldChange(idx);
+};
+
+window.onFunnelChange = function(idx) {
+    const container = document.getElementById(`payload_fields_${idx}`);
+    if (!container) return;
+    const funnelSelect = container.querySelector('[data-field="funnel_id"]');
+    const stageSelect = container.querySelector('[data-field="stage_id"]');
+    if (!funnelSelect || !stageSelect) return;
+    const funnelId = funnelSelect.value;
+    if (!funnelId) {
+        stageSelect.innerHTML = '<option value="">Selecione o funil primeiro</option>';
+        return;
+    }
+    window.fetchStagesForFunnel(funnelId).then(() => {
+        stageSelect.innerHTML = `<option value="">Selecione</option>` + window.getStagesOptions(funnelId, '');
+    });
+};
+
+window.onPayloadFieldChange = function(idx) {
+    const container = document.getElementById(`payload_fields_${idx}`);
+    const hidden = document.getElementById(`payload_${idx}`);
+    if (!container || !hidden) return;
+    const selects = container.querySelectorAll('select[data-field]');
+    const obj = {};
+    selects.forEach(sel => {
+        const key = sel.getAttribute('data-field');
+        const val = sel.value;
+        if (val !== '') obj[key] = isNaN(Number(val)) ? val : Number(val);
+    });
+    hidden.value = JSON.stringify(obj);
+};
+
+window.getStagesOptions = function(funnelId, selectedId) {
+    if (!funnelId || !cacheStagesByFunnel[funnelId]) return '';
+    return cacheStagesByFunnel[funnelId].map(s => `<option value="${s.id}" ${selectedId==s.id?'selected':''}>${window.escapeHtml(s.name || 'Etapa')}</option>`).join('');
+};
+
+window.escapeHtml = function(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+};
+
+window.submitActionButton = function() {
+    const id = document.getElementById('ab_id').value;
+    const form = document.getElementById('actionButtonForm');
+    form.action = id ? '<?= Url::to('/settings/action-buttons') ?>/' + id : '<?= Url::to('/settings/action-buttons') ?>';
+    form.method = 'POST';
+    form.submit();
+};
+
+window.deleteActionButton = function(id) {
+    if (!confirm('Excluir este botão?')) return;
+    fetch('<?= Url::to('/settings/action-buttons') ?>/' + id, {
+        method: 'DELETE',
+        headers: {'X-Requested-With': 'XMLHttpRequest'}
+    }).then(r => r.json()).then(() => location.reload());
+};
+
+window.populateIconSelect = function(selected) {
+    const sel = document.getElementById('ab_icon_select');
+    if (!sel) return;
+    sel.innerHTML = iconOptions.map(ic => `<option value="${ic}" ${ic === selected ? 'selected' : ''}>${ic}</option>`).join('');
+};
+
+window.fetchStagesForFunnel = function(funnelId) {
+    if (!funnelId || cacheStagesByFunnel[funnelId]) return Promise.resolve();
+    return fetch('<?= Url::to('/funnels') ?>/' + funnelId + '/stages?format=json', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.json())
+        .then(data => { cacheStagesByFunnel[funnelId] = data.stages || data || []; })
+        .catch(() => { cacheStagesByFunnel[funnelId] = []; });
+};
+
+// ===== FUNÇÕES INTERNAS (não usadas em onclick) =====
 
 function openActionButtonModal(button = null, steps = []) {
     const form = document.getElementById('actionButtonForm');
@@ -422,16 +627,34 @@ function toggleIconSelect() {
 }
 
 function syncColorInput(val) {
+    // Atualiza o input de texto quando o picker muda
     const text = document.getElementById('ab_color');
     if (text) text.value = val;
 }
 
 function syncColorPicker(val) {
+    // Atualiza o picker quando o input de texto muda
     const picker = document.getElementById('ab_color_picker');
-    if (picker && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(val.trim())) {
-        picker.value = val.trim();
+    const cleanVal = (val || '').trim();
+    if (picker && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(cleanVal)) {
+        picker.value = cleanVal;
     }
 }
+
+// Expor funções para uso em onclick inline ANTES de qualquer uso
+window.toggleIconSelect = toggleIconSelect;
+window.selectIcon = selectIcon;
+window.syncIconPreview = syncIconPreview;
+window.populateIconSelect = populateIconSelect;
+window.addStepRow = addStepRow;
+window.addStepRowFromData = addStepRowFromData;
+window.removeStepRow = removeStepRow;
+window.updatePayloadPlaceholders = updatePayloadPlaceholders;
+window.syncColorInput = syncColorInput;
+window.syncColorPicker = syncColorPicker;
+window.submitActionButton = submitActionButton;
+window.deleteActionButton = deleteActionButton;
+window.openActionButtonModal = openActionButtonModal;
 
 // Inicializar select ao carregar
 document.addEventListener('DOMContentLoaded', () => {
@@ -448,18 +671,6 @@ let cacheFunnels = [];
 let cacheStagesByFunnel = {};
 let cacheAgents = [];
 let cacheTags = [];
-
-// Expor funções para uso em onclick inline (caso o browser não hoiste para window)
-window.toggleIconSelect = toggleIconSelect;
-window.selectIcon = selectIcon;
-window.syncIconPreview = syncIconPreview;
-window.populateIconSelect = populateIconSelect;
-window.addStepRow = addStepRow;
-window.addStepRowFromData = addStepRowFromData;
-window.removeStepRow = removeStepRow;
-window.updatePayloadPlaceholders = updatePayloadPlaceholders;
-window.syncColorInput = syncColorInput;
-window.syncColorPicker = syncColorPicker;
 
 function preloadActionData() {
     fetchFunis();

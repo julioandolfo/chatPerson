@@ -112,8 +112,22 @@ ob_start();
             </div>
             <div class="row mb-3">
                 <div class="col-md-6">
-                    <label class="form-label">Ícone (classe Metronic)</label>
-                    <input type="text" class="form-control" name="icon" id="ab_icon" value="ki-bolt">
+                    <label class="form-label d-flex align-items-center justify-content-between">
+                        <span>Ícone (classe Metronic)</span>
+                        <small class="text-muted">Selecione na lista ou edite manualmente</small>
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light" id="ab_icon_preview">
+                            <i class="ki-duotone ki-bolt fs-3"><span class="path1"></span><span class="path2"></span></i>
+                        </span>
+                        <input type="text" class="form-control" name="icon" id="ab_icon" value="ki-bolt" oninput="syncIconPreview(this.value)">
+                        <button class="btn btn-light-primary" type="button" onclick="toggleIconSelect()">Escolher</button>
+                    </div>
+                    <div class="mt-2" id="icon-select-wrapper" style="display:none;">
+                        <select class="form-select" id="ab_icon_select" size="6" onchange="selectIcon(this.value)">
+                            <!-- opções inseridas via JS -->
+                        </select>
+                    </div>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Ordem</label>
@@ -160,6 +174,23 @@ const stepTypes = [
     { value: 'remove_tag', label: 'Remover tag' }
 ];
 
+const iconOptions = [
+    'ki-bolt','ki-check','ki-check-circle','ki-close-circle','ki-cross','ki-user','ki-user-tick','ki-user-add',
+    'ki-call','ki-call-calling','ki-whatsapp','ki-send','ki-send-right','ki-double-check','ki-shield-check',
+    'ki-star','ki-like','ki-dislike','ki-filter','ki-filter-edit','ki-setting','ki-gear','ki-rocket','ki-flash',
+    'ki-timer','ki-calendar','ki-time','ki-refresh','ki-loop','ki-repeat','ki-upload','ki-download','ki-cloud',
+    'ki-tag','ki-bookmark','ki-chat','ki-message','ki-bell','ki-graph','ki-chart-simple','ki-chart-line',
+    'ki-chart-pie','ki-folder','ki-file','ki-document','ki-link','ki-lock','ki-unlock','ki-shield-cross',
+    'ki-magnifier','ki-search-list','ki-emoji-happy','ki-emoji-sad','ki-emoji-neutral','ki-smile','ki-happy',
+    'ki-menu','ki-dots-circle','ki-dots-square','ki-dots-vertical','ki-dots-horizontal','ki-exit-right-corner'
+];
+
+// Caches para selects dinâmicos
+let cacheFunnels = [];
+let cacheStagesByFunnel = {};
+let cacheAgents = [];
+let cacheTags = [];
+
 function openActionButtonModal(button = null, steps = []) {
     const form = document.getElementById('actionButtonForm');
     form.action = '<?= Url::to('/settings/action-buttons') ?>';
@@ -171,7 +202,9 @@ function openActionButtonModal(button = null, steps = []) {
     document.getElementById('ab_name').value = button ? button.name : '';
     document.getElementById('ab_description').value = button ? (button.description || '') : '';
     document.getElementById('ab_color').value = button ? (button.color || '#009ef7') : '#009ef7';
-    document.getElementById('ab_icon').value = button ? (button.icon || 'ki-bolt') : 'ki-bolt';
+    const iconVal = button ? (button.icon || 'ki-bolt') : 'ki-bolt';
+    document.getElementById('ab_icon').value = iconVal;
+    syncIconPreview(iconVal);
     document.getElementById('ab_sort_order').value = button ? (button.sort_order || 0) : 0;
     document.getElementById('ab_is_active').value = button ? button.is_active : 1;
 
@@ -180,6 +213,9 @@ function openActionButtonModal(button = null, steps = []) {
     } else {
         addStepRow();
     }
+
+    populateIconSelect(iconVal);
+    document.getElementById('icon-select-wrapper').style.display = 'none';
 }
 
 function addStepRowFromData(step) {
@@ -209,15 +245,16 @@ function addStepRow(type = '', payload = '{}') {
                     </select>
                 </div>
                 <div class="col-md-8">
-                    <label class="form-label">Payload (JSON)</label>
-                    <textarea class="form-control" rows="2" name="steps[${idx}][payload]" id="payload_${idx}">${JSON.stringify(parsed || {}, null, 0)}</textarea>
+                    <label class="form-label">Configuração da etapa</label>
+                    <div id="payload_fields_${idx}" class="d-flex flex-column gap-2"></div>
+                    <input type="hidden" name="steps[${idx}][payload]" id="payload_${idx}" value='${JSON.stringify(parsed || {})}'>
                     <div class="text-muted fs-8" id="hint_${idx}"></div>
                 </div>
             </div>
         </div>
     `;
     container.insertAdjacentHTML('beforeend', html);
-    updatePayloadPlaceholders(idx);
+    updatePayloadPlaceholders(idx, parsed || {});
 }
 
 function removeStepRow(idx) {
@@ -225,20 +262,113 @@ function removeStepRow(idx) {
     if (el) el.remove();
 }
 
-function updatePayloadPlaceholders(idx) {
+function updatePayloadPlaceholders(idx, payload = {}) {
     const select = document.querySelector(`[name="steps[${idx}][type]"]`);
     const hint = document.getElementById(`hint_${idx}`);
     if (!select || !hint) return;
     const value = select.value;
     const hints = {
-        set_funnel_stage: 'Ex: {"stage_id": 12}',
-        assign_agent: 'Ex: {"agent_id": 5}',
-        add_participant: 'Ex: {"participant_id": 7}',
-        close_conversation: 'Sem payload',
-        add_tag: 'Ex: {"tag_id": 3}',
-        remove_tag: 'Ex: {"tag_id": 3}'
+        set_funnel_stage: 'Selecione funil e etapa',
+        assign_agent: 'Selecione o agente',
+        add_participant: 'Selecione o participante',
+        close_conversation: 'Sem configuração',
+        add_tag: 'Selecione a tag',
+        remove_tag: 'Selecione a tag'
     };
     hint.textContent = hints[value] || '';
+    renderPayloadFields(idx, value, payload);
+}
+
+function renderPayloadFields(idx, type, payload = {}) {
+    const wrap = document.getElementById(`payload_fields_${idx}`);
+    const hidden = document.getElementById(`payload_${idx}`);
+    if (!wrap || !hidden) return;
+    const p = payload || {};
+    const controls = {
+        set_funnel_stage: () => `
+            <div class="row g-2">
+                <div class="col-6">
+                    <label class="form-label">Funil</label>
+                    <select class="form-select" data-field="funnel_id" onchange="onPayloadFieldChange(${idx}); onFunnelChange(${idx});">
+                        <option value="">Selecione</option>
+                        ${cacheFunnels.map(f => `<option value="${f.id}" ${p.funnel_id==f.id?'selected':''}>${escapeHtml(f.name || 'Funil')}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="col-6">
+                    <label class="form-label">Etapa</label>
+                    <select class="form-select" data-field="stage_id" onchange="onPayloadFieldChange(${idx})">
+                        <option value="">Selecione</option>
+                        ${getStagesOptions(p.funnel_id, p.stage_id)}
+                    </select>
+                </div>
+            </div>
+        `,
+        assign_agent: () => `
+            <label class="form-label">Agente</label>
+            <select class="form-select" data-field="agent_id" onchange="onPayloadFieldChange(${idx})">
+                <option value="">Selecione</option>
+                ${cacheAgents.map(a => `<option value="${a.id}" ${p.agent_id==a.id?'selected':''}>${escapeHtml(a.name || a.email || 'Agente')}</option>`).join('')}
+            </select>
+        `,
+        add_participant: () => `
+            <label class="form-label">Participante</label>
+            <select class="form-select" data-field="participant_id" onchange="onPayloadFieldChange(${idx})">
+                <option value="">Selecione</option>
+                ${cacheAgents.map(a => `<option value="${a.id}" ${p.participant_id==a.id?'selected':''}>${escapeHtml(a.name || a.email || 'Usuário')}</option>`).join('')}
+            </select>
+        `,
+        close_conversation: () => `<div class="text-muted fs-8">Sem configuração necessária.</div>`,
+        add_tag: () => `
+            <label class="form-label">Tag</label>
+            <select class="form-select" data-field="tag_id" onchange="onPayloadFieldChange(${idx})">
+                <option value="">Selecione</option>
+                ${cacheTags.map(t => `<option value="${t.id}" ${p.tag_id==t.id?'selected':''}>${escapeHtml(t.name || 'Tag')}</option>`).join('')}
+            </select>
+        `,
+        remove_tag: () => `
+            <label class="form-label">Tag</label>
+            <select class="form-select" data-field="tag_id" onchange="onPayloadFieldChange(${idx})">
+                <option value="">Selecione</option>
+                ${cacheTags.map(t => `<option value="${t.id}" ${p.tag_id==t.id?'selected':''}>${escapeHtml(t.name || 'Tag')}</option>`).join('')}
+            </select>
+        `
+    };
+    wrap.innerHTML = (controls[type] || (() => '<div class="text-muted fs-8">Selecione o tipo.</div>'))();
+    onPayloadFieldChange(idx);
+}
+
+function onFunnelChange(idx) {
+    const wrap = document.getElementById(`payload_fields_${idx}`);
+    if (!wrap) return;
+    const funnelSelect = wrap.querySelector('[data-field="funnel_id"]');
+    if (!funnelSelect) return;
+    const funnelId = funnelSelect.value;
+    if (!funnelId) return;
+    fetchStagesForFunnel(funnelId).then(() => {
+        const stageSelect = wrap.querySelector('[data-field="stage_id"]');
+        if (stageSelect) {
+            stageSelect.innerHTML = '<option value="">Selecione</option>' + getStagesOptions(funnelId, stageSelect.value || '');
+        }
+    });
+}
+
+function onPayloadFieldChange(idx) {
+    const wrap = document.getElementById(`payload_fields_${idx}`);
+    const hidden = document.getElementById(`payload_${idx}`);
+    if (!wrap || !hidden) return;
+    const selects = wrap.querySelectorAll('[data-field]');
+    const obj = {};
+    selects.forEach(sel => {
+        const key = sel.getAttribute('data-field');
+        const val = sel.value;
+        if (val !== '') obj[key] = isNaN(Number(val)) ? val : Number(val);
+    });
+    hidden.value = JSON.stringify(obj);
+}
+
+function getStagesOptions(funnelId, selectedId) {
+    if (!funnelId || !cacheStagesByFunnel[funnelId]) return '';
+    return cacheStagesByFunnel[funnelId].map(s => `<option value="${s.id}" ${selectedId==s.id?'selected':''}>${escapeHtml(s.name || 'Etapa')}</option>`).join('');
 }
 
 function submitActionButton() {
@@ -255,6 +385,89 @@ function deleteActionButton(id) {
         method: 'DELETE',
         headers: {'X-Requested-With': 'XMLHttpRequest'}
     }).then(r => r.json()).then(() => location.reload());
+}
+
+function populateIconSelect(selected) {
+    const sel = document.getElementById('ab_icon_select');
+    if (!sel) return;
+    sel.innerHTML = iconOptions.map(ic => `<option value="${ic}" ${ic === selected ? 'selected' : ''}>${ic}</option>`).join('');
+}
+
+function selectIcon(val) {
+    const input = document.getElementById('ab_icon');
+    if (input) {
+        input.value = val;
+        syncIconPreview(val);
+    }
+}
+
+function syncIconPreview(val) {
+    const preview = document.getElementById('ab_icon_preview');
+    if (!preview) return;
+    preview.innerHTML = `<i class="ki-duotone ${val} fs-3"><span class="path1"></span><span class="path2"></span></i>`;
+}
+
+function toggleIconSelect() {
+    const wrap = document.getElementById('icon-select-wrapper');
+    if (!wrap) return;
+    wrap.style.display = wrap.style.display === 'none' ? 'block' : 'none';
+}
+
+// Inicializar select ao carregar
+document.addEventListener('DOMContentLoaded', () => {
+    const currentIcon = document.getElementById('ab_icon')?.value || 'ki-bolt';
+    populateIconSelect(currentIcon);
+    syncIconPreview(currentIcon);
+    preloadActionData();
+});
+
+// Caches para selects dinâmicos
+let cacheFunnels = [];
+let cacheStagesByFunnel = {};
+let cacheAgents = [];
+let cacheTags = [];
+
+function preloadActionData() {
+    fetchFunis();
+    fetchAgentes();
+    fetchTags();
+}
+
+function fetchFunis() {
+    if (cacheFunnels.length) return;
+    fetch('<?= Url::to('/funnels?format=json') ?>', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.json())
+        .then(data => {
+            cacheFunnels = data.funnels || data || [];
+            if (data.stagesByFunnel) {
+                cacheStagesByFunnel = data.stagesByFunnel;
+            }
+        })
+        .catch(() => {});
+}
+
+function fetchStagesForFunnel(funnelId) {
+    if (!funnelId || cacheStagesByFunnel[funnelId]) return Promise.resolve();
+    return fetch('<?= Url::to('/funnels') ?>/' + funnelId + '/stages?format=json', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.json())
+        .then(data => { cacheStagesByFunnel[funnelId] = data.stages || data || []; })
+        .catch(() => { cacheStagesByFunnel[funnelId] = []; });
+}
+
+function fetchAgentes() {
+    if (cacheAgents.length) return;
+    fetch('<?= Url::to('/agents?format=json') ?>', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.json())
+        .then(data => { cacheAgents = data.agents || data || []; })
+        .catch(() => {});
+}
+
+function fetchTags() {
+    if (cacheTags.length) return;
+    fetch('<?= Url::to('/tags?format=json') ?>', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.json())
+        .then(data => { cacheTags = data.tags || data || []; })
+        .catch(() => {});
 }
 </script>
 

@@ -4023,13 +4023,14 @@ function getChannelInfo(channel) {
                 </div>
             </div>
             <div class="modal-body">
-                <form id="editContactForm">
+                <form id="editContactForm" novalidate>
                     <input type="hidden" id="editContactId" value="">
                     
                     <div class="row mb-5">
                         <div class="col-md-6">
                             <label class="form-label fw-semibold required">Nome</label>
                             <input type="text" class="form-control form-control-solid" id="editContactName" name="name" required>
+                            <div class="invalid-feedback">Por favor, informe o nome do contato.</div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Sobrenome</label>
@@ -4040,11 +4041,20 @@ function getChannelInfo(channel) {
                     <div class="row mb-5">
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Email</label>
-                            <input type="email" class="form-control form-control-solid" id="editContactEmail" name="email">
+                            <input type="text" class="form-control form-control-solid" id="editContactEmail" name="email">
+                            <div class="form-text text-muted">Opcional - informe se disponível</div>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Telefone</label>
-                            <input type="text" class="form-control form-control-solid" id="editContactPhone" name="phone" placeholder="Ex: 5511999999999">
+                            <label class="form-label fw-semibold">
+                                Telefone
+                                <i class="ki-duotone ki-information-3 fs-7 ms-1" title="O telefone não pode ser alterado">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                            </label>
+                            <input type="text" class="form-control form-control-solid bg-light" id="editContactPhone" name="phone" placeholder="Ex: 5511999999999" readonly>
+                            <div class="form-text text-muted">O telefone não pode ser alterado</div>
                         </div>
                     </div>
                     
@@ -18967,7 +18977,45 @@ if (editContactForm) {
             return;
         }
         
+        // Validação customizada - apenas nome é obrigatório
+        const nameField = document.getElementById('editContactName');
+        const emailField = document.getElementById('editContactEmail');
+        
+        // Resetar estados de validação
+        nameField.classList.remove('is-invalid');
+        emailField.classList.remove('is-invalid');
+        
+        let hasError = false;
+        
+        // Validar nome (obrigatório)
+        if (!nameField.value || nameField.value.trim() === '') {
+            nameField.classList.add('is-invalid');
+            hasError = true;
+        }
+        
+        // Validar email apenas se preenchido (formato básico)
+        if (emailField.value && emailField.value.trim() !== '') {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(emailField.value)) {
+                emailField.classList.add('is-invalid');
+                if (!emailField.nextElementSibling || !emailField.nextElementSibling.classList.contains('invalid-feedback')) {
+                    const feedback = document.createElement('div');
+                    feedback.className = 'invalid-feedback';
+                    feedback.textContent = 'Por favor, informe um email válido.';
+                    emailField.parentNode.insertBefore(feedback, emailField.nextElementSibling);
+                }
+                hasError = true;
+            }
+        }
+        
+        if (hasError) {
+            return;
+        }
+        
         const formData = new FormData(this);
+        
+        // Remover o campo telefone do envio (não pode ser editado)
+        formData.delete('phone');
         
         // Mostrar loading
         const submitBtn = this.querySelector('button[type="submit"]');

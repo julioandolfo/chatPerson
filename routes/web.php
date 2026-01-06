@@ -358,6 +358,14 @@ Router::get('/settings/api-tokens/docs', function() {
 }, ['Authentication']);
 Router::get('/settings/api-tokens/stats', [\App\Controllers\ApiTokenController::class, 'stats'], ['Authentication']);
 
+// Botões de Ações
+Router::get('/settings/action-buttons', [\App\Controllers\ConversationActionButtonController::class, 'index'], ['Authentication']);
+Router::post('/settings/action-buttons', [\App\Controllers\ConversationActionButtonController::class, 'store'], ['Authentication']);
+Router::post('/settings/action-buttons/{id}', [\App\Controllers\ConversationActionButtonController::class, 'update'], ['Authentication']);
+Router::delete('/settings/action-buttons/{id}', [\App\Controllers\ConversationActionButtonController::class, 'delete'], ['Authentication']);
+Router::get('/conversations/{id}/actions', [\App\Controllers\ConversationActionButtonController::class, 'listForConversation'], ['Authentication']);
+Router::post('/conversations/{id}/actions/{buttonId}/run', [\App\Controllers\ConversationActionButtonController::class, 'run'], ['Authentication']);
+
 // Rotas de Configurações de Som
 Router::get('/settings/sounds', [SoundSettingsController::class, 'getUserSettings'], ['Authentication']);
 Router::post('/settings/sounds', [SoundSettingsController::class, 'updateUserSettings'], ['Authentication']);

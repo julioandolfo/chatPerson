@@ -570,6 +570,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 <div class="separator my-5"></div>
                 
+                <!-- Ações Rápidas -->
+                <div class="sidebar-section" id="sidebar-quick-actions-section" style="display:none;">
+                    <div class="sidebar-section-title">Ações Rápidas</div>
+                    <div id="sidebar-action-buttons" class="d-flex flex-column gap-2">
+                        <div class="text-muted fs-7">Carregando ações...</div>
+                    </div>
+                </div>
+                
+                <div class="separator my-5"></div>
+                
                 <!-- Participantes -->
                 <div class="sidebar-section">
                     <div class="sidebar-section-title">Participantes</div>

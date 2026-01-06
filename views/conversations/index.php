@@ -8308,6 +8308,11 @@ function updateConversationSidebar(conversation, tags) {
     const leaveConversationBtn = sidebar.querySelector('#sidebar-leave-conversation-btn');
     const loggedUserId = window.LOGGED_USER_ID ?? (parseInt('<?= (int)\App\Helpers\Auth::id() ?>') || null);
     window.LOGGED_USER_ID = loggedUserId;
+
+    // Ações rápidas
+    if (conversation.id) {
+        loadConversationActions(conversation.id);
+    }
     if (participantsContainer && conversation.id) {
         // Mostrar loading
         participantsContainer.innerHTML = '<div class="text-muted fs-7">Carregando...</div>';
@@ -15277,6 +15282,98 @@ function leaveConversation(conversationIdParam = null) {
     }
     
     removeParticipant(conversationId, loggedUserId, true);
+}
+
+// Ações rápidas no sidebar
+function loadConversationActions(conversationId) {
+    const section = document.getElementById('sidebar-quick-actions-section');
+    const container = document.getElementById('sidebar-action-buttons');
+    if (!section || !container) return;
+    container.innerHTML = '<div class="text-muted fs-7">Carregando ações...</div>';
+    section.style.display = 'block';
+
+    fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/actions`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success || !data.buttons) {
+            container.innerHTML = '<div class="text-muted fs-7">Nenhuma ação disponível</div>';
+            return;
+        }
+        if (data.buttons.length === 0) {
+            container.innerHTML = '<div class="text-muted fs-7">Nenhuma ação disponível</div>';
+            return;
+        }
+
+        const html = data.buttons.map(btn => {
+            const color = btn.color || '#009ef7';
+            const icon = btn.icon || 'ki-bolt';
+            const desc = btn.description ? `<div class="text-muted fs-8">${escapeHtml(btn.description)}</div>` : '';
+            return `
+                <button class="btn w-100 text-start" style="background:${color}20; color:${color}; border-color:${color}30;" 
+                        onclick="runActionButton(${btn.id}, ${conversationId}, this)">
+                    <i class="ki-duotone ${icon} fs-4 me-2">
+                        <span class="path1"></span><span class="path2"></span>
+                    </i>
+                    <span class="fw-semibold">${escapeHtml(btn.name)}</span>
+                    ${desc}
+                </button>
+            `;
+        }).join('');
+        container.innerHTML = html;
+    })
+    .catch(err => {
+        console.error('Erro ao carregar ações:', err);
+        container.innerHTML = '<div class="text-danger fs-7">Erro ao carregar ações</div>';
+    });
+}
+
+function runActionButton(buttonId, conversationId, btnEl) {
+    if (!buttonId || !conversationId) return;
+    const originalHtml = btnEl ? btnEl.innerHTML : '';
+    if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Executando...';
+    }
+    fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/actions/${buttonId}/run`, {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) {
+            throw new Error(data.message || 'Erro ao executar ação');
+        }
+        if (typeof loadConversationDetails === 'function') {
+            loadConversationDetails(conversationId);
+        } else if (typeof loadConversation === 'function') {
+            loadConversation(conversationId);
+        }
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({ icon: 'success', title: 'Ação executada', timer: 1400, showConfirmButton: false });
+        }
+    })
+    .catch(err => {
+        console.error('Erro ao executar ação:', err);
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({ icon: 'error', title: 'Erro', text: err.message });
+        } else {
+            alert(err.message);
+        }
+    })
+    .finally(() => {
+        if (btnEl) {
+            btnEl.disabled = false;
+            btnEl.innerHTML = originalHtml;
+        }
+    });
 }
 
 /**

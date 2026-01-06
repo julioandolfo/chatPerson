@@ -153,6 +153,19 @@
                     </a>
                 </div>
                 <!--end:Menu item-->
+                <!--begin:Menu item-->
+                <div class="menu-item">
+                    <a class="menu-link <?= isActive('/settings/action-buttons', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/settings/action-buttons') ?>" data-title="Botões de Ações">
+                        <span class="menu-icon">
+                            <i class="ki-duotone ki-bolt fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                        </span>
+                        <span class="menu-title">Botões de Ações</span>
+                    </a>
+                </div>
+                <!--end:Menu item-->
                 
                 <!--begin:Menu item-->
                 <?php if (\App\Helpers\Permission::can('tags.view')): ?>

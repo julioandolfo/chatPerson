@@ -720,13 +720,13 @@ class ConversationController
                 exit;
             }
             
-            // Verificar permissão baseada no estado atual da conversa
-            $hasAssignAll = Permission::can('conversations.assign.all');
-            $hasAssignOwn = Permission::can('conversations.assign.own');
+            // Permissões: aceitar assign.* ou edit.*
+            $hasAssignAll = Permission::can('conversations.assign.all') || Permission::can('conversations.edit.all');
+            $hasAssignOwn = Permission::can('conversations.assign.own') || Permission::can('conversations.edit.own');
             
-            // Se tem .assign.all, pode atribuir qualquer conversa
+            // Se tem .assign/.edit all, pode atribuir qualquer conversa
             if (!$hasAssignAll) {
-                // Se tem .assign.own, só pode atribuir conversas não atribuídas ou atribuídas a si mesmo
+                // Se tem .assign/.edit own, pode atribuir conversas sem dono ou atribuídas a si mesmo
                 if (!$hasAssignOwn) {
                     Response::json([
                         'success' => false,
@@ -735,7 +735,6 @@ class ConversationController
                     exit;
                 }
                 
-                // Verificar se a conversa está sem atribuição OU atribuída ao próprio usuário
                 $currentAssignedTo = $conversation['assigned_to'] ?? null;
                 if ($currentAssignedTo !== null && (int)$currentAssignedTo !== $currentUserId) {
                     Response::json([
@@ -2410,44 +2409,43 @@ class ConversationController
      */
     public function removeParticipant(int $id, int $userId): void
     {
-        error_log("=== removeParticipant CHAMADO === ConversationID: {$id}, UserID: {$userId}");
-        
-        $config = $this->prepareJsonResponse();
+        // Limpar buffers e desabilitar erros HTML
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        @ini_set('display_errors', '0');
+        @error_reporting(0);
         
         try {
-            error_log("ConversationController::removeParticipant - INÍCIO - ConversationID: {$id}, UserID: {$userId}");
-            
-            // Verificar permissão sem abortar (retornar JSON se não tiver)
+            // Verificar permissão (usar mesma regra de edição)
             if (!Permission::can('conversations.edit.own') && !Permission::can('conversations.edit.all')) {
-                error_log("ConversationController::removeParticipant - Sem permissão");
-                ob_end_clean();
                 Response::json([
                     'success' => false,
                     'message' => 'Sem permissão para editar conversas'
                 ], 403);
-                return;
+                exit;
             }
             
-            error_log("ConversationController::removeParticipant - Chamando ConversationParticipant::removeParticipant");
             $success = \App\Models\ConversationParticipant::removeParticipant($id, $userId);
             
-            error_log("ConversationController::removeParticipant - Success: " . ($success ? 'true' : 'false'));
-            
-            // Limpar buffer antes de enviar JSON
-            ob_end_clean();
-            
             if ($success) {
-                // Invalidar cache da conversa
-                ConversationService::invalidateCache($id);
-
-                // Registrar no timeline
-                if (class_exists('\App\Services\ActivityService')) {
-                    try {
+                // Registrar no timeline, mas só se o método existir
+                try {
+                    if (class_exists('\App\Services\ActivityService') && method_exists('\App\Services\ActivityService', 'logParticipantRemoved')) {
                         $removedBy = \App\Helpers\Auth::id();
                         \App\Services\ActivityService::logParticipantRemoved($id, $userId, $removedBy);
-                    } catch (\Exception $e) {
-                        error_log("Activity log participant_removed falhou: " . $e->getMessage());
                     }
+                } catch (\Exception $e) {
+                    // Ignorar erro de log
+                }
+                
+                // Notificar via WebSocket (opcional, não bloqueia)
+                try {
+                    if (class_exists('\App\Helpers\WebSocket')) {
+                        \App\Helpers\WebSocket::notifyConversationUpdate($id);
+                    }
+                } catch (\Exception $e) {
+                    // Ignorar erro
                 }
                 
                 Response::json([
@@ -2461,19 +2459,12 @@ class ConversationController
                 ], 400);
             }
         } catch (\Exception $e) {
-            // Limpar buffer em caso de erro
-            ob_end_clean();
-            
-            error_log("ConversationController::removeParticipant - Erro: " . $e->getMessage());
-            error_log("ConversationController::removeParticipant - Trace: " . $e->getTraceAsString());
-            
             Response::json([
                 'success' => false,
                 'message' => 'Erro ao remover participante: ' . $e->getMessage()
             ], 500);
-        } finally {
-            $this->restoreAfterJsonResponse($config);
         }
+        exit;
     }
 
     // ========================================================================

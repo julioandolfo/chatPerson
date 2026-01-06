@@ -700,70 +700,86 @@ class ConversationController
      */
     public function assign(int $id): void
     {
-        $config = $this->prepareJsonResponse();
+        // Limpar buffers
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        @ini_set('display_errors', '0');
+        @error_reporting(0);
         
         try {
-            // Verificar permissão sem abortar (retornar JSON se não tiver)
-            if (!Permission::can('conversations.assign.all') && !Permission::can('conversations.assign.own')) {
-                ob_end_clean();
-                Response::json([
-                    'success' => false,
-                    'message' => 'Sem permissão para atribuir conversas'
-                ], 403);
-                return;
-            }
-            
-            // Ler dados (JSON ou form-data)
-            $agentIdRaw = \App\Helpers\Request::post('agent_id');
-            // Permitir "0" para deixar sem atribuição
-            if ($agentIdRaw === null || $agentIdRaw === '') {
-                ob_end_clean();
-                Response::json([
-                    'success' => false,
-                    'message' => 'Agente não informado'
-                ], 400);
-                return;
-            }
-            $agentId = (int) $agentIdRaw;
+            $currentUserId = \App\Helpers\Auth::id();
             
             // Verificar se conversa existe
             $conversation = \App\Models\Conversation::find($id);
             if (!$conversation) {
-                ob_end_clean();
                 Response::json([
                     'success' => false,
                     'message' => 'Conversa não encontrada'
                 ], 404);
-                return;
+                exit;
             }
+            
+            // Verificar permissão baseada no estado atual da conversa
+            $hasAssignAll = Permission::can('conversations.assign.all');
+            $hasAssignOwn = Permission::can('conversations.assign.own');
+            
+            // Se tem .assign.all, pode atribuir qualquer conversa
+            if (!$hasAssignAll) {
+                // Se tem .assign.own, só pode atribuir conversas não atribuídas ou atribuídas a si mesmo
+                if (!$hasAssignOwn) {
+                    Response::json([
+                        'success' => false,
+                        'message' => 'Sem permissão para atribuir conversas'
+                    ], 403);
+                    exit;
+                }
+                
+                // Verificar se a conversa está sem atribuição OU atribuída ao próprio usuário
+                $currentAssignedTo = $conversation['assigned_to'] ?? null;
+                if ($currentAssignedTo !== null && (int)$currentAssignedTo !== $currentUserId) {
+                    Response::json([
+                        'success' => false,
+                        'message' => 'Você só pode atribuir conversas não atribuídas ou atribuídas a você'
+                    ], 403);
+                    exit;
+                }
+            }
+            
+            // Ler dados (JSON ou form-data)
+            $agentIdRaw = \App\Helpers\Request::post('agent_id');
+            if ($agentIdRaw === null || $agentIdRaw === '') {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Agente não informado'
+                ], 400);
+                exit;
+            }
+            $agentId = (int) $agentIdRaw;
             
             // Se for 0, remover atribuição
             if ($agentId === 0) {
                 $conversation = ConversationService::unassignAgent($id);
-                ob_end_clean();
                 Response::json([
                     'success' => true,
                     'message' => 'Conversa deixada sem atribuição',
                     'conversation' => $conversation
                 ]);
-                return;
+                exit;
             }
 
             // Verificar se agente existe
             $agent = User::find($agentId);
             if (!$agent) {
-                ob_end_clean();
                 Response::json([
                     'success' => false,
                     'message' => 'Agente não encontrado'
                 ], 404);
-                return;
+                exit;
             }
 
             // Atribuir forçadamente (ignora limites) quando é atribuição manual
             $conversation = ConversationService::assignToAgent($id, $agentId, true);
-            
-            ob_end_clean();
             
             Response::json([
                 'success' => true,
@@ -771,17 +787,12 @@ class ConversationController
                 'conversation' => $conversation
             ]);
         } catch (\Exception $e) {
-            ob_end_clean();
-            error_log("ConversationController::assign - Erro: " . $e->getMessage());
-            error_log("ConversationController::assign - Trace: " . $e->getTraceAsString());
-            
             Response::json([
                 'success' => false,
                 'message' => 'Erro ao atribuir conversa: ' . $e->getMessage()
             ], 500);
-        } finally {
-            $this->restoreAfterJsonResponse($config);
         }
+        exit;
     }
 
     /**
@@ -1091,6 +1102,27 @@ class ConversationController
             // Se não tem conteúdo nem anexos, retornar erro
             if (empty($content) && empty($attachments)) {
                 throw new \Exception('Mensagem não pode estar vazia');
+            }
+
+            // AUTO-ATRIBUIÇÃO: Se conversa não está atribuída e agente está enviando mensagem (não nota)
+            // então atribuir automaticamente ao agente
+            if (!$isNote && empty($conversation['assigned_to'])) {
+                try {
+                    // Verificar se o usuário atual é um agente (não é contato/sistema/IA)
+                    $user = \App\Models\User::find($userId);
+                    if ($user && !empty($user['id'])) {
+                        // Atribuir a conversa ao agente que está respondendo
+                        ConversationService::assignToAgent($id, $userId, true);
+                        
+                        // Atualizar a variável local para refletir a atribuição
+                        $conversation['assigned_to'] = $userId;
+                        
+                        error_log("[AUTO-ASSIGN] Conversa #{$id} atribuída automaticamente ao agente #{$userId}");
+                    }
+                } catch (\Exception $e) {
+                    // Não bloquear o envio da mensagem se a atribuição falhar
+                    error_log("[AUTO-ASSIGN] Falha ao atribuir conversa #{$id} automaticamente: " . $e->getMessage());
+                }
             }
 
             // Determinar tipo de mensagem
@@ -2104,16 +2136,22 @@ class ConversationController
             $success = \App\Models\ConversationParticipant::addParticipant($id, $userId, $addedBy);
             
             if ($success) {
-                // Invalidar cache
-                ConversationService::invalidateCache($id);
-
-                // Registrar no timeline
-                if (class_exists('\App\Services\ActivityService')) {
-                    try {
+                // Registrar no timeline (sem bloquear em caso de erro)
+                try {
+                    if (class_exists('\App\Services\ActivityService')) {
                         \App\Services\ActivityService::logParticipantAdded($id, $userId, $addedBy);
-                    } catch (\Exception $e) {
-                        // Ignorar erro de log
                     }
+                } catch (\Exception $e) {
+                    // Ignorar erro de log
+                }
+                
+                // Notificar via WebSocket (sem bloquear)
+                try {
+                    if (class_exists('\App\Helpers\WebSocket')) {
+                        \App\Helpers\WebSocket::notifyConversationUpdate($id);
+                    }
+                } catch (\Exception $e) {
+                    // Ignorar erro de notificação
                 }
                 
                 Response::json([

@@ -2040,75 +2040,71 @@ class ConversationController
      */
     public function addParticipant(int $id): void
     {
-        error_log("=== addParticipant CHAMADO === ConversationID: {$id}");
+        // Limpar TODOS os buffers imediatamente
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
         
-        $config = $this->prepareJsonResponse();
+        // Desabilitar erros HTML
+        @ini_set('display_errors', '0');
+        @error_reporting(0);
         
         try {
-            error_log("ConversationController::addParticipant - INÍCIO - ConversationID: {$id}");
-            
-            // Verificar permissão sem abortar (retornar JSON se não tiver)
+            // Verificar permissão
             if (!Permission::can('conversations.edit.own') && !Permission::can('conversations.edit.all')) {
-                error_log("ConversationController::addParticipant - Sem permissão");
-                ob_end_clean();
                 Response::json([
                     'success' => false,
                     'message' => 'Sem permissão para editar conversas'
                 ], 403);
-                return;
+                exit;
             }
             
-            // Ler dados (JSON ou form-data)
-            $rawPost = \App\Helpers\Request::post();
-            error_log("ConversationController::addParticipant - POST data: " . json_encode($rawPost));
-            
+            // Ler dados JSON
             $userId = (int)\App\Helpers\Request::post('user_id');
-            error_log("ConversationController::addParticipant - UserID: {$userId}");
             
             if (!$userId) {
-                ob_end_clean();
                 Response::json([
                     'success' => false,
                     'message' => 'ID do usuário é obrigatório'
                 ], 400);
-                return;
+                exit;
             }
             
             // Verificar se conversação existe
             $conversation = \App\Models\Conversation::find($id);
             if (!$conversation) {
-                ob_end_clean();
                 Response::json([
                     'success' => false,
                     'message' => 'Conversa não encontrada'
                 ], 404);
-                return;
+                exit;
             }
             
             // Verificar se usuário existe
             $user = \App\Models\User::find($userId);
             if (!$user) {
-                ob_end_clean();
                 Response::json([
                     'success' => false,
                     'message' => 'Usuário não encontrado'
                 ], 404);
-                return;
+                exit;
+            }
+            
+            // Verificar se já é participante
+            $isParticipant = \App\Models\ConversationParticipant::isParticipant($id, $userId);
+            if ($isParticipant) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Este usuário já é participante desta conversa'
+                ], 400);
+                exit;
             }
             
             $addedBy = \App\Helpers\Auth::id();
-            error_log("ConversationController::addParticipant - AddedBy: {$addedBy}");
-            error_log("ConversationController::addParticipant - Chamando ConversationParticipant::addParticipant");
-            
             $success = \App\Models\ConversationParticipant::addParticipant($id, $userId, $addedBy);
             
-            error_log("ConversationController::addParticipant - Success: " . ($success ? 'true' : 'false'));
-            
-            // Limpar buffer antes de enviar JSON
-            ob_end_clean();
-            
             if ($success) {
-                // Invalidar cache da conversa
+                // Invalidar cache
                 ConversationService::invalidateCache($id);
 
                 // Registrar no timeline
@@ -2116,7 +2112,7 @@ class ConversationController
                     try {
                         \App\Services\ActivityService::logParticipantAdded($id, $userId, $addedBy);
                     } catch (\Exception $e) {
-                        error_log("Activity log participant_added falhou: " . $e->getMessage());
+                        // Ignorar erro de log
                     }
                 }
                 
@@ -2127,23 +2123,16 @@ class ConversationController
             } else {
                 Response::json([
                     'success' => false,
-                    'message' => 'Erro ao adicionar participante. Talvez ele já faça parte da conversa.'
+                    'message' => 'Erro ao adicionar participante'
                 ], 400);
             }
         } catch (\Exception $e) {
-            // Limpar buffer em caso de erro
-            ob_end_clean();
-            
-            error_log("ConversationController::addParticipant - Erro: " . $e->getMessage());
-            error_log("ConversationController::addParticipant - Trace: " . $e->getTraceAsString());
-            
             Response::json([
                 'success' => false,
-                'message' => 'Erro ao adicionar participante: ' . $e->getMessage()
+                'message' => 'Erro: ' . $e->getMessage()
             ], 500);
-        } finally {
-            $this->restoreAfterJsonResponse($config);
         }
+        exit;
     }
 
     /**

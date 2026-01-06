@@ -15248,7 +15248,28 @@ function sendParticipantInvite() {
             role: 'collaborator' // ou 'observer'
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        // Primeiro pegar o texto para ver o que está vindo
+        return response.text().then(text => {
+            console.log('=== RESPOSTA BRUTA (addParticipant) ===');
+            console.log('Status:', response.status);
+            console.log('Content-Type:', response.headers.get('Content-Type'));
+            console.log('Primeiros 500 chars:', text.substring(0, 500));
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${text.substring(0, 100)}`);
+            }
+            
+            // Tentar parsear como JSON
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                console.error('Erro ao parsear JSON:', e);
+                console.error('Resposta completa:', text);
+                throw new Error('Resposta inválida do servidor (não é JSON)');
+            }
+        });
+    })
     .then(data => {
         if (data.success) {
             // Limpar select

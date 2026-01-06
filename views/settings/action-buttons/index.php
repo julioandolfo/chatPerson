@@ -1,14 +1,16 @@
 <?php
+use App\Helpers\Url;
 $buttons = $buttons ?? [];
 $stepsByButton = $stepsByButton ?? [];
+$pageTitle = 'Botões de Ações';
+ob_start();
 ?>
-<?php include __DIR__ . '/../../layouts/metronic/header.php'; ?>
 
-<div class="container-xxl">
+<div class="container-fluid">
     <div class="d-flex align-items-center justify-content-between mb-5">
         <div>
-            <h1 class="fw-bold">Botões de Ações</h1>
-            <div class="text-muted">Crie atalhos para executar ações rápidas nas conversas.</div>
+            <h1 class="fw-bold mb-1">Botões de Ações</h1>
+            <p class="text-muted mb-0">Crie atalhos para executar ações rápidas nas conversas.</p>
         </div>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#actionButtonModal" onclick="openActionButtonModal()">
             <i class="ki-duotone ki-plus fs-2"></i>
@@ -19,14 +21,19 @@ $stepsByButton = $stepsByButton ?? [];
     <div class="card">
         <div class="card-body">
             <?php if (empty($buttons)): ?>
-                <div class="text-muted">Nenhum botão configurado ainda.</div>
+                <div class="text-center text-muted py-10">
+                    <i class="ki-duotone ki-bolt fs-2x text-muted mb-3"><span class="path1"></span><span class="path2"></span></i>
+                    <div class="fw-semibold mb-1">Nenhum botão configurado ainda.</div>
+                    <div class="text-muted fs-7 mb-3">Crie seu primeiro botão de ação para acelerar os fluxos.</div>
+                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#actionButtonModal" onclick="openActionButtonModal()">Criar botão</button>
+                </div>
             <?php else: ?>
                 <div class="table-responsive">
                     <table class="table align-middle">
                         <thead>
                             <tr>
                                 <th>Nome</th>
-                                <th>Cor/Icone</th>
+                                <th>Cor/Ícone</th>
                                 <th>Ordem</th>
                                 <th>Ativo</th>
                                 <th>Etapas</th>
@@ -91,7 +98,7 @@ $stepsByButton = $stepsByButton ?? [];
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <form id="actionButtonForm" method="POST" action="<?= \App\Helpers\Url::to('/settings/action-buttons') ?>">
+        <form id="actionButtonForm" method="POST" action="<?= Url::to('/settings/action-buttons') ?>">
             <input type="hidden" name="id" id="ab_id">
             <div class="row mb-3">
                 <div class="col-md-6">
@@ -155,7 +162,7 @@ const stepTypes = [
 
 function openActionButtonModal(button = null, steps = []) {
     const form = document.getElementById('actionButtonForm');
-    form.action = '<?= \App\Helpers\Url::to('/settings/action-buttons') ?>';
+    form.action = '<?= Url::to('/settings/action-buttons') ?>';
     form.reset();
     stepCount = 0;
     document.getElementById('stepsContainer').innerHTML = '';
@@ -237,18 +244,20 @@ function updatePayloadPlaceholders(idx) {
 function submitActionButton() {
     const id = document.getElementById('ab_id').value;
     const form = document.getElementById('actionButtonForm');
-    form.action = id ? '<?= \App\Helpers\Url::to('/settings/action-buttons') ?>/' + id : '<?= \App\Helpers\Url::to('/settings/action-buttons') ?>';
+    form.action = id ? '<?= Url::to('/settings/action-buttons') ?>/' + id : '<?= Url::to('/settings/action-buttons') ?>';
     form.method = 'POST';
     form.submit();
 }
 
 function deleteActionButton(id) {
     if (!confirm('Excluir este botão?')) return;
-    fetch('<?= \App\Helpers\Url::to('/settings/action-buttons') ?>/' + id, {
+    fetch('<?= Url::to('/settings/action-buttons') ?>/' + id, {
         method: 'DELETE',
         headers: {'X-Requested-With': 'XMLHttpRequest'}
     }).then(r => r.json()).then(() => location.reload());
 }
 </script>
 
-<?php include __DIR__ . '/../../layouts/metronic/footer.php'; ?>
+<?php
+$content = ob_get_clean();
+include __DIR__ . '/../../layouts/metronic/app.php';

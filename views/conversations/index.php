@@ -4104,17 +4104,17 @@ function getChannelInfo(channel) {
                                                         </div>
                 <div class="separator my-5"></div>
                 <div class="mb-5">
-                    <label class="form-label fw-semibold mb-2">Convidar Agente:</label>
+                    <label class="form-label fw-semibold mb-2">Adicionar Agente:</label>
                     <div class="d-flex gap-2">
                         <select id="participantUserSelect" class="form-select form-select-solid flex-grow-1">
                             <option value="">Selecione um agente...</option>
                         </select>
                         <button type="button" class="btn btn-primary" id="addParticipantBtn" onclick="sendParticipantInvite()">
-                            <i class="ki-duotone ki-send fs-5 me-1">
+                            <i class="ki-duotone ki-user-plus fs-5 me-1">
                                 <span class="path1"></span>
                                 <span class="path2"></span>
                             </i>
-                            Convidar
+                            Adicionar
                         </button>
                     </div>
                     <div class="form-text text-muted mt-2">
@@ -4123,7 +4123,7 @@ function getChannelInfo(channel) {
                             <span class="path2"></span>
                             <span class="path3"></span>
                         </i>
-                        O agente receberí um convite e poderí aceitar ou recusar.
+                        O agente será adicionado imediatamente como participante da conversa.
                     </div>
                 </div>
                 
@@ -15206,7 +15206,7 @@ function removeParticipant(conversationId, userId) {
 }
 
 /**
- * Enviar convite para participar da conversa (usa sistema de mençÁes)
+ * Adicionar participante diretamente à conversa (sem necessidade de aceitar convite)
  */
 function sendParticipantInvite() {
     const modalElement = document.getElementById('kt_modal_participants');
@@ -15233,10 +15233,10 @@ function sendParticipantInvite() {
     
     const btn = document.getElementById('addParticipantBtn');
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Enviando...';
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Adicionando...';
     
-    // Usar endpoint de menção/convite
-    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/mention`, {
+    // Usar endpoint de participantes (adiciona diretamente)
+    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/participants`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -15245,7 +15245,7 @@ function sendParticipantInvite() {
         },
         body: JSON.stringify({ 
             user_id: parseInt(userId),
-            note: null // Pode adicionar nota opcional
+            role: 'collaborator' // ou 'observer'
         })
     })
     .then(response => response.json())
@@ -15254,16 +15254,13 @@ function sendParticipantInvite() {
             // Limpar select
             document.getElementById('participantUserSelect').value = '';
             
-            // Atualizar lista de convites pendentes no modal
-            loadPendingInvitesForConversation(conversationId);
-            
             // Recarregar participantes
             loadParticipantsForConversation(conversationId);
             
             Swal.fire({
                 icon: 'success',
-                title: 'Convite Enviado!',
-                text: 'O agente receberí uma notificação e poderí aceitar ou recusar.',
+                title: 'Participante Adicionado!',
+                text: 'O agente foi adicionado com sucesso à conversa.',
                 timer: 3000,
                 showConfirmButton: false
             });
@@ -15271,21 +15268,21 @@ function sendParticipantInvite() {
             Swal.fire({
                 icon: 'error',
                 title: 'Erro',
-                text: data.message || 'Erro ao enviar convite'
+                text: data.message || 'Erro ao adicionar participante'
             });
         }
     })
     .catch(error => {
-        console.error('Erro ao enviar convite:', error);
+        console.error('Erro ao adicionar participante:', error);
         Swal.fire({
             icon: 'error',
             title: 'Erro',
-            text: 'Erro ao enviar convite: ' + error.message
+            text: 'Erro ao adicionar participante: ' + error.message
         });
     })
     .finally(() => {
         btn.disabled = false;
-        btn.innerHTML = '<i class="ki-duotone ki-send fs-5 me-1"><span class="path1"></span><span class="path2"></span></i> Convidar';
+        btn.innerHTML = '<i class="ki-duotone ki-send fs-5 me-1"><span class="path1"></span><span class="path2"></span></i> Adicionar';
     });
 }
 

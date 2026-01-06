@@ -1105,7 +1105,9 @@ class ConversationController
 
             // AUTO-ATRIBUIÇÃO: Se conversa não está atribuída e agente está enviando mensagem (não nota)
             // então atribuir automaticamente ao agente
-            if (!$isNote && empty($conversation['assigned_to'])) {
+            $assignedTo = $conversation['assigned_to'] ?? null;
+            $isUnassigned = ($assignedTo === null || $assignedTo === '' || $assignedTo === 0 || $assignedTo === '0');
+            if (!$isNote && $isUnassigned) {
                 try {
                     // Verificar se o usuário atual é um agente (não é contato/sistema/IA)
                     $user = \App\Models\User::find($userId);

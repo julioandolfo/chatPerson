@@ -207,7 +207,9 @@ function openActionButtonModal(button = null, steps = []) {
     document.getElementById('ab_id').value = button ? button.id : '';
     document.getElementById('ab_name').value = button ? button.name : '';
     document.getElementById('ab_description').value = button ? (button.description || '') : '';
-    document.getElementById('ab_color').value = button ? (button.color || '#009ef7') : '#009ef7';
+    const colorVal = button ? (button.color || '#009ef7') : '#009ef7';
+    document.getElementById('ab_color').value = colorVal;
+    syncColorPicker(colorVal);
     const iconVal = button ? (button.icon || 'ki-bolt') : 'ki-bolt';
     document.getElementById('ab_icon').value = iconVal;
     syncIconPreview(iconVal);
@@ -224,11 +226,11 @@ function openActionButtonModal(button = null, steps = []) {
     document.getElementById('icon-select-wrapper').style.display = 'none';
 }
 
-window.addStepRowFromData = function(step) {
-    window.addStepRow(step.type, step.payload);
+function addStepRowFromData(step) {
+    addStepRow(step.type, step.payload);
 }
 
-window.addStepRow = function(type = '', payload = '{}') {
+function addStepRow(type = '', payload = '{}') {
     const container = document.getElementById('stepsContainer');
     const idx = stepCount++;
     let parsed = payload;
@@ -260,15 +262,15 @@ window.addStepRow = function(type = '', payload = '{}') {
         </div>
     `;
     container.insertAdjacentHTML('beforeend', html);
-    window.updatePayloadPlaceholders(idx, parsed || {});
+    updatePayloadPlaceholders(idx, parsed || {});
 }
 
-window.removeStepRow = function(idx) {
+function removeStepRow(idx) {
     const el = document.querySelector(`[data-step-index="${idx}"]`);
     if (el) el.remove();
 }
 
-window.updatePayloadPlaceholders = function(idx, payload = {}) {
+function updatePayloadPlaceholders(idx, payload = {}) {
     const select = document.querySelector(`[name="steps[${idx}][type]"]`);
     const hint = document.getElementById(`hint_${idx}`);
     if (!select || !hint) return;
@@ -436,6 +438,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentIcon = document.getElementById('ab_icon')?.value || 'ki-bolt';
     populateIconSelect(currentIcon);
     syncIconPreview(currentIcon);
+    const currentColor = document.getElementById('ab_color')?.value || '#009ef7';
+    syncColorPicker(currentColor);
     preloadActionData();
 });
 

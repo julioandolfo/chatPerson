@@ -2135,6 +2135,13 @@ class ConversationController
             $success = \App\Models\ConversationParticipant::addParticipant($id, $userId, $addedBy);
             
             if ($success) {
+                // Invalida cache para que o polling traga dados atualizados
+                try {
+                    \App\Services\ConversationService::invalidateCache($id);
+                } catch (\Exception $e) {
+                    // Não bloquear em caso de falha de cache
+                }
+                
                 // Registrar no timeline (sem bloquear em caso de erro)
                 try {
                     if (class_exists('\App\Services\ActivityService') && method_exists('\App\Services\ActivityService', 'logParticipantAdded')) {
@@ -2146,8 +2153,11 @@ class ConversationController
                 
                 // Notificar via WebSocket (sem bloquear)
                 try {
-                    if (class_exists('\App\Helpers\WebSocket')) {
-                        \App\Helpers\WebSocket::notifyConversationUpdate($id);
+                    if (class_exists('\App\Helpers\WebSocket') && method_exists('\App\Helpers\WebSocket', 'notifyConversationUpdated')) {
+                        $conversationData = \App\Services\ConversationService::getConversation($id);
+                        if ($conversationData) {
+                            \App\Helpers\WebSocket::notifyConversationUpdated($id, $conversationData);
+                        }
                     }
                 } catch (\Exception $e) {
                     // Ignorar erro de notificação
@@ -2439,10 +2449,20 @@ class ConversationController
                     // Ignorar erro de log
                 }
                 
+                // Invalida cache para que o polling traga dados atualizados
+                try {
+                    \App\Services\ConversationService::invalidateCache($id);
+                } catch (\Exception $e) {
+                    // Não bloquear em caso de falha de cache
+                }
+                
                 // Notificar via WebSocket (opcional, não bloqueia)
                 try {
-                    if (class_exists('\App\Helpers\WebSocket')) {
-                        \App\Helpers\WebSocket::notifyConversationUpdate($id);
+                    if (class_exists('\App\Helpers\WebSocket') && method_exists('\App\Helpers\WebSocket', 'notifyConversationUpdated')) {
+                        $conversationData = \App\Services\ConversationService::getConversation($id);
+                        if ($conversationData) {
+                            \App\Helpers\WebSocket::notifyConversationUpdated($id, $conversationData);
+                        }
                     }
                 } catch (\Exception $e) {
                     // Ignorar erro

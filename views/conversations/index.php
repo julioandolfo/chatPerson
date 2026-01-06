@@ -7228,8 +7228,10 @@ function selectConversation(id) {
         });
         
     if (data.success && data.conversation) {
-            // Atualizar URL sem recarregar
-            const newUrl = `<?= \App\Helpers\Url::to('/conversations') ?>?id=${id}`;
+            // Atualizar URL sem recarregar (preservando filtros existentes)
+            const currentParams = new URLSearchParams(window.location.search);
+            currentParams.set('id', id); // Adicionar ou atualizar apenas o ID
+            const newUrl = `<?= \App\Helpers\Url::to('/conversations') ?>?${currentParams.toString()}`;
             window.history.pushState({ conversationId: id }, '', newUrl);
             
             // ============================================
@@ -10519,6 +10521,13 @@ function applyAdvancedFilters() {
     
     const orderDir = formData.get('order_dir');
     if (orderDir) params.append('order_dir', orderDir);
+    
+    // Preservar ID da conversa selecionada se houver
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentConversationId = urlParams.get('id');
+    if (currentConversationId) {
+        params.append('id', currentConversationId);
+    }
     
     // Fechar modal e aplicar filtros
     bootstrap.Modal.getInstance(document.getElementById('kt_modal_advanced_filters')).hide();
@@ -18257,10 +18266,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Limpar formulírio
                     newConversationForm.reset();
                     
-                    // Redirecionar para a nova conversa
+                    // Redirecionar para a nova conversa (com status=open para garantir que apareça)
                     if (data.conversation_id) {
                         console.log('🔄 Redirecionando para conversa:', data.conversation_id);
-                        window.location.href = '<?= \App\Helpers\Url::to("/conversations") ?>?id=' + data.conversation_id;
+                        window.location.href = '<?= \App\Helpers\Url::to("/conversations") ?>?status=open&id=' + data.conversation_id;
                     } else {
                         console.log('🔄 Recarregando lista de conversas...');
                         // Recarregar lista de conversas

@@ -170,8 +170,7 @@ ob_start();
 </div>
 
 <script>
-// ===== DEFINIR TODAS AS FUNÇÕES GLOBAIS PRIMEIRO =====
-// Variáveis globais
+// ===== VARIÁVEIS GLOBAIS =====
 let stepCount = 0;
 const stepTypes = [
     { value: 'set_funnel_stage', label: 'Mover para etapa' },
@@ -199,7 +198,8 @@ let cacheStagesByFunnel = {};
 let cacheAgents = [];
 let cacheTags = [];
 
-// ===== FUNÇÕES EXPOSTAS GLOBALMENTE (usadas em onclick) =====
+// ===== FUNÇÕES GLOBAIS EXPOSTAS NO WINDOW (IMEDIATAMENTE) =====
+// Cores
 window.syncColorInput = function(colorValue) {
     const input = document.getElementById('ab_color');
     if (input) input.value = colorValue;
@@ -208,6 +208,12 @@ window.syncColorInput = function(colorValue) {
 window.syncColorPicker = function(hexValue) {
     const picker = document.getElementById('ab_color_picker');
     if (picker) picker.value = hexValue;
+};
+
+// Ícones
+window.syncIconPreview = function(val) {
+    const preview = document.getElementById('ab_icon_preview');
+    if (preview) preview.innerHTML = `<i class="ki-duotone ${val} fs-3"><span class="path1"></span><span class="path2"></span></i>`;
 };
 
 window.toggleIconSelect = function() {
@@ -223,11 +229,13 @@ window.selectIcon = function(val) {
     }
 };
 
-window.syncIconPreview = function(val) {
-    const preview = document.getElementById('ab_icon_preview');
-    if (preview) preview.innerHTML = `<i class="ki-duotone ${val} fs-3"><span class="path1"></span><span class="path2"></span></i>`;
+window.populateIconSelect = function(selected) {
+    const sel = document.getElementById('ab_icon_select');
+    if (!sel) return;
+    sel.innerHTML = iconOptions.map(ic => `<option value="${ic}" ${ic === selected ? 'selected' : ''}>${ic}</option>`).join('');
 };
 
+// Steps (etapas)
 window.addStepRow = function(type = '', payload = '{}') {
     const container = document.getElementById('stepsContainer');
     const idx = stepCount++;
@@ -370,6 +378,7 @@ window.escapeHtml = function(text) {
     return div.innerHTML;
 };
 
+// Ações principais
 window.submitActionButton = function() {
     const id = document.getElementById('ab_id').value;
     const form = document.getElementById('actionButtonForm');
@@ -386,12 +395,6 @@ window.deleteActionButton = function(id) {
     }).then(r => r.json()).then(() => location.reload());
 };
 
-window.populateIconSelect = function(selected) {
-    const sel = document.getElementById('ab_icon_select');
-    if (!sel) return;
-    sel.innerHTML = iconOptions.map(ic => `<option value="${ic}" ${ic === selected ? 'selected' : ''}>${ic}</option>`).join('');
-};
-
 window.fetchStagesForFunnel = function(funnelId) {
     if (!funnelId || cacheStagesByFunnel[funnelId]) return Promise.resolve();
     return fetch('<?= Url::to('/funnels') ?>/' + funnelId + '/stages?format=json', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
@@ -400,9 +403,7 @@ window.fetchStagesForFunnel = function(funnelId) {
         .catch(() => { cacheStagesByFunnel[funnelId] = []; });
 };
 
-// ===== FUNÇÕES INTERNAS (não usadas em onclick) =====
-
-function openActionButtonModal(button = null, steps = []) {
+window.openActionButtonModal = function(button = null, steps = []) {
     const form = document.getElementById('actionButtonForm');
     form.action = '<?= Url::to('/settings/action-buttons') ?>';
     form.reset();
@@ -414,22 +415,24 @@ function openActionButtonModal(button = null, steps = []) {
     document.getElementById('ab_description').value = button ? (button.description || '') : '';
     const colorVal = button ? (button.color || '#009ef7') : '#009ef7';
     document.getElementById('ab_color').value = colorVal;
-    syncColorPicker(colorVal);
+    window.syncColorPicker(colorVal);
     const iconVal = button ? (button.icon || 'ki-bolt') : 'ki-bolt';
     document.getElementById('ab_icon').value = iconVal;
-    syncIconPreview(iconVal);
+    window.syncIconPreview(iconVal);
     document.getElementById('ab_sort_order').value = button ? (button.sort_order || 0) : 0;
     document.getElementById('ab_is_active').value = button ? button.is_active : 1;
 
     if (steps && steps.length) {
-        steps.forEach(addStepRowFromData);
+        steps.forEach(s => window.addStepRow(s.type, s.payload));
     } else {
-        addStepRow();
+        window.addStepRow();
     }
 
-    populateIconSelect(iconVal);
+    window.populateIconSelect(iconVal);
     document.getElementById('icon-select-wrapper').style.display = 'none';
-}
+};
+
+// ===== FUNÇÕES INTERNAS (não usadas em onclick) =====
 
 function addStepRowFromData(step) {
     addStepRow(step.type, step.payload);
@@ -584,85 +587,28 @@ function getStagesOptions(funnelId, selectedId) {
     return cacheStagesByFunnel[funnelId].map(s => `<option value="${s.id}" ${selectedId==s.id?'selected':''}>${escapeHtml(s.name || 'Etapa')}</option>`).join('');
 }
 
-function submitActionButton() {
-    const id = document.getElementById('ab_id').value;
-    const form = document.getElementById('actionButtonForm');
-    form.action = id ? '<?= Url::to('/settings/action-buttons') ?>/' + id : '<?= Url::to('/settings/action-buttons') ?>';
-    form.method = 'POST';
-    form.submit();
-}
+// Log de debug - verificar se as funções estão disponíveis
+console.log('✅ Funções globais registradas:', {
+    syncColorInput: typeof window.syncColorInput,
+    syncColorPicker: typeof window.syncColorPicker,
+    toggleIconSelect: typeof window.toggleIconSelect,
+    selectIcon: typeof window.selectIcon,
+    syncIconPreview: typeof window.syncIconPreview,
+    addStepRow: typeof window.addStepRow,
+    removeStepRow: typeof window.removeStepRow,
+    updatePayloadPlaceholders: typeof window.updatePayloadPlaceholders,
+    submitActionButton: typeof window.submitActionButton,
+    deleteActionButton: typeof window.deleteActionButton,
+    openActionButtonModal: typeof window.openActionButtonModal
+});
 
-function deleteActionButton(id) {
-    if (!confirm('Excluir este botão?')) return;
-    fetch('<?= Url::to('/settings/action-buttons') ?>/' + id, {
-        method: 'DELETE',
-        headers: {'X-Requested-With': 'XMLHttpRequest'}
-    }).then(r => r.json()).then(() => location.reload());
-}
-
-function populateIconSelect(selected) {
-    const sel = document.getElementById('ab_icon_select');
-    if (!sel) return;
-    sel.innerHTML = iconOptions.map(ic => `<option value="${ic}" ${ic === selected ? 'selected' : ''}>${ic}</option>`).join('');
-}
-
-function selectIcon(val) {
-    const input = document.getElementById('ab_icon');
-    if (input) {
-        input.value = val;
-        syncIconPreview(val);
-    }
-}
-
-function syncIconPreview(val) {
-    const preview = document.getElementById('ab_icon_preview');
-    if (!preview) return;
-    preview.innerHTML = `<i class="ki-duotone ${val} fs-3"><span class="path1"></span><span class="path2"></span></i>`;
-}
-
-function toggleIconSelect() {
-    const wrap = document.getElementById('icon-select-wrapper');
-    if (!wrap) return;
-    wrap.style.display = wrap.style.display === 'none' ? 'block' : 'none';
-}
-
-function syncColorInput(val) {
-    // Atualiza o input de texto quando o picker muda
-    const text = document.getElementById('ab_color');
-    if (text) text.value = val;
-}
-
-function syncColorPicker(val) {
-    // Atualiza o picker quando o input de texto muda
-    const picker = document.getElementById('ab_color_picker');
-    const cleanVal = (val || '').trim();
-    if (picker && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(cleanVal)) {
-        picker.value = cleanVal;
-    }
-}
-
-// Expor funções para uso em onclick inline ANTES de qualquer uso
-window.toggleIconSelect = toggleIconSelect;
-window.selectIcon = selectIcon;
-window.syncIconPreview = syncIconPreview;
-window.populateIconSelect = populateIconSelect;
-window.addStepRow = addStepRow;
-window.addStepRowFromData = addStepRowFromData;
-window.removeStepRow = removeStepRow;
-window.updatePayloadPlaceholders = updatePayloadPlaceholders;
-window.syncColorInput = syncColorInput;
-window.syncColorPicker = syncColorPicker;
-window.submitActionButton = submitActionButton;
-window.deleteActionButton = deleteActionButton;
-window.openActionButtonModal = openActionButtonModal;
-
-// Inicializar select ao carregar
+// Inicializar ao carregar a página
 document.addEventListener('DOMContentLoaded', () => {
     const currentIcon = document.getElementById('ab_icon')?.value || 'ki-bolt';
-    populateIconSelect(currentIcon);
-    syncIconPreview(currentIcon);
+    window.populateIconSelect(currentIcon);
+    window.syncIconPreview(currentIcon);
     const currentColor = document.getElementById('ab_color')?.value || '#009ef7';
-    syncColorPicker(currentColor);
+    window.syncColorPicker(currentColor);
     preloadActionData();
 });
 

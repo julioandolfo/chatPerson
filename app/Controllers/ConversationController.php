@@ -2137,7 +2137,7 @@ class ConversationController
             if ($success) {
                 // Registrar no timeline (sem bloquear em caso de erro)
                 try {
-                    if (class_exists('\App\Services\ActivityService')) {
+                    if (class_exists('\App\Services\ActivityService') && method_exists('\App\Services\ActivityService', 'logParticipantAdded')) {
                         \App\Services\ActivityService::logParticipantAdded($id, $userId, $addedBy);
                     }
                 } catch (\Exception $e) {

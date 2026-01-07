@@ -121,7 +121,19 @@ class ConversationActionButtonService
         $type = $step['type'];
         $payload = $step['payload'];
         if (is_string($payload)) {
-            $payload = json_decode($payload, true) ?: [];
+            // Primeira tentativa de decodificação
+            $decoded = json_decode($payload, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                // Alguns registros antigos armazenaram o JSON como string dentro de string
+                if (is_string($decoded)) {
+                    $decoded2 = json_decode($decoded, true);
+                    $payload = (json_last_error() === JSON_ERROR_NONE && is_array($decoded2)) ? $decoded2 : [];
+                } else {
+                    $payload = is_array($decoded) ? $decoded : [];
+                }
+            } else {
+                $payload = [];
+            }
         }
         try {
             Log::info("[ActionButton] Executando step={$type}, payload=" . json_encode($payload) . ", conversation_id={$conversationId}, user_id={$userId}", 'automacao.log');

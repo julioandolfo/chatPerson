@@ -17,6 +17,9 @@ class ConversationActionButtonController
         Permission::abortIfCannot('conversations.actions.manage');
 
         $buttons = \App\Helpers\Database::fetchAll("SELECT * FROM conversation_action_buttons ORDER BY sort_order ASC, id ASC") ?? [];
+        foreach ($buttons as &$btn) {
+            $btn['visibility'] = json_decode($btn['visibility'] ?? '', true) ?: [];
+        }
         $steps = \App\Helpers\Database::fetchAll("SELECT * FROM conversation_action_steps ORDER BY sort_order ASC, id ASC") ?? [];
 
         $stepsByButton = [];
@@ -40,7 +43,8 @@ class ConversationActionButtonController
             'color' => Request::post('color') ?: '#009ef7',
             'icon' => Request::post('icon') ?: 'ki-bolt',
             'sort_order' => (int)(Request::post('sort_order') ?? 0),
-            'is_active' => (int)(Request::post('is_active') ?? 1)
+            'is_active' => (int)(Request::post('is_active') ?? 1),
+            'visibility' => json_encode(Request::post('visibility') ?? [])
         ];
 
         $buttonId = ConversationActionButton::create($data);
@@ -61,7 +65,8 @@ class ConversationActionButtonController
             'color' => Request::post('color') ?: '#009ef7',
             'icon' => Request::post('icon') ?: 'ki-bolt',
             'sort_order' => (int)(Request::post('sort_order') ?? 0),
-            'is_active' => (int)(Request::post('is_active') ?? 1)
+            'is_active' => (int)(Request::post('is_active') ?? 1),
+            'visibility' => json_encode(Request::post('visibility') ?? [])
         ];
 
         ConversationActionButton::update($id, $data);
@@ -82,7 +87,7 @@ class ConversationActionButtonController
     public function listForConversation(int $conversationId): void
     {
         Permission::abortIfCannot('conversations.actions.run');
-        $buttons = ConversationActionButtonService::listWithSteps();
+        $buttons = ConversationActionButtonService::listWithSteps(\App\Helpers\Auth::id());
         Response::json(['success' => true, 'buttons' => $buttons]);
     }
 

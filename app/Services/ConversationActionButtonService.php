@@ -7,6 +7,7 @@ use App\Models\ConversationActionButton;
 use App\Models\ConversationActionLog;
 use App\Models\ConversationActionStep;
 use App\Models\ConversationParticipant;
+use App\Models\Activity;
 use App\Helpers\Permission;
 use App\Helpers\Log;
 
@@ -24,7 +25,7 @@ class ConversationActionButtonService
     /**
     * Lista botões com steps
     */
-    public static function listWithSteps(): array
+    public static function listWithSteps(?int $userId = null): array
     {
         $buttons = self::listActive();
         $buttonIds = array_column($buttons, 'id');
@@ -39,7 +40,19 @@ class ConversationActionButtonService
             $stepsByButton[$step['button_id']][] = $step;
         }
         foreach ($buttons as &$btn) {
+            $btn['visibility'] = json_decode($btn['visibility'] ?? '', true) ?: [];
             $btn['steps'] = $stepsByButton[$btn['id']] ?? [];
+        }
+        // Filtrar por visibilidade (se userId informado)
+        if ($userId) {
+            $buttons = array_values(array_filter($buttons, function($btn) use ($userId) {
+                $vis = $btn['visibility'];
+                if (empty($vis)) return true; // sem restrição
+                if (!empty($vis['agents']) && is_array($vis['agents'])) {
+                    return in_array($userId, $vis['agents']);
+                }
+                return true;
+            }));
         }
         return $buttons;
     }
@@ -81,7 +94,7 @@ class ConversationActionButtonService
 
         try {
             foreach ($steps as $step) {
-                self::executeStep($conversationId, $step, $userId);
+                self::executeStep($conversationId, $step, $userId, $button);
                 $executed[] = ['id' => $step['id'], 'type' => $step['type']];
             }
 
@@ -92,6 +105,22 @@ class ConversationActionButtonService
                 'result' => 'success',
                 'steps_executed' => json_encode($executed)
             ]);
+
+            // Registrar atividade agregada do botão
+            try {
+                Activity::log(
+                    'action_button',
+                    'conversation',
+                    $conversationId,
+                    $userId,
+                    "Botão '{$button['name']}' executado",
+                    [
+                        'button_id' => $buttonId,
+                        'button_name' => $button['name'] ?? null,
+                        'steps_executed' => $executed
+                    ]
+                );
+            } catch (\Throwable $t) {}
 
             try {
                 Log::info("[ActionButton] Sucesso. conversation_id={$conversationId}, button_id={$buttonId}, executed=" . json_encode($executed), 'automacao.log');
@@ -116,7 +145,7 @@ class ConversationActionButtonService
         }
     }
 
-    protected static function executeStep(int $conversationId, array $step, int $userId): void
+    protected static function executeStep(int $conversationId, array $step, int $userId, ?array $button = null): void
     {
         $type = $step['type'];
         $payload = $step['payload'];
@@ -147,6 +176,21 @@ class ConversationActionButtonService
                     throw new \InvalidArgumentException('Etapa não informada');
                 }
                 \App\Services\FunnelService::moveConversation($conversationId, (int)$stageId, $userId);
+                try {
+                    Activity::log(
+                        'action_button_step',
+                        'conversation',
+                        $conversationId,
+                        $userId,
+                        ($button['name'] ?? 'Botão de Ação') . ' - Moveu para etapa ID ' . $stageId,
+                        [
+                            'button_id' => $button['id'] ?? null,
+                            'button_name' => $button['name'] ?? null,
+                            'step_type' => $type,
+                            'payload' => $payload
+                        ]
+                    );
+                } catch (\Throwable $t) {}
                 break;
             case 'assign_agent':
                 Permission::abortIfCannot('conversations.assign.own');
@@ -155,6 +199,21 @@ class ConversationActionButtonService
                     throw new \InvalidArgumentException('Agente não informado');
                 }
                 \App\Services\ConversationService::assignToAgent($conversationId, (int)$agentId, true);
+                try {
+                    Activity::log(
+                        'action_button_step',
+                        'conversation',
+                        $conversationId,
+                        $userId,
+                        ($button['name'] ?? 'Botão de Ação') . ' - Atribuiu agente ID ' . $agentId,
+                        [
+                            'button_id' => $button['id'] ?? null,
+                            'button_name' => $button['name'] ?? null,
+                            'step_type' => $type,
+                            'payload' => $payload
+                        ]
+                    );
+                } catch (\Throwable $t) {}
                 break;
             case 'add_participant':
                 Permission::abortIfCannot('conversations.edit.own');
@@ -164,10 +223,40 @@ class ConversationActionButtonService
                 }
                 ConversationParticipant::addParticipant($conversationId, (int)$participantId, $userId);
                 \App\Services\ConversationService::invalidateCache($conversationId);
+                try {
+                    Activity::log(
+                        'action_button_step',
+                        'conversation',
+                        $conversationId,
+                        $userId,
+                        ($button['name'] ?? 'Botão de Ação') . ' - Adicionou participante ID ' . $participantId,
+                        [
+                            'button_id' => $button['id'] ?? null,
+                            'button_name' => $button['name'] ?? null,
+                            'step_type' => $type,
+                            'payload' => $payload
+                        ]
+                    );
+                } catch (\Throwable $t) {}
                 break;
             case 'close_conversation':
                 Permission::abortIfCannot('conversations.edit.own');
                 \App\Services\ConversationService::close($conversationId);
+                try {
+                    Activity::log(
+                        'action_button_step',
+                        'conversation',
+                        $conversationId,
+                        $userId,
+                        ($button['name'] ?? 'Botão de Ação') . ' - Encerrou a conversa',
+                        [
+                            'button_id' => $button['id'] ?? null,
+                            'button_name' => $button['name'] ?? null,
+                            'step_type' => $type,
+                            'payload' => $payload
+                        ]
+                    );
+                } catch (\Throwable $t) {}
                 break;
             case 'add_tag':
                 Permission::abortIfCannot('conversations.edit.own');
@@ -176,6 +265,21 @@ class ConversationActionButtonService
                     throw new \InvalidArgumentException('Tag não informada');
                 }
                 \App\Services\TagService::addToConversation($conversationId, (int)$tagId);
+                try {
+                    Activity::log(
+                        'action_button_step',
+                        'conversation',
+                        $conversationId,
+                        $userId,
+                        ($button['name'] ?? 'Botão de Ação') . ' - Adicionou tag ID ' . $tagId,
+                        [
+                            'button_id' => $button['id'] ?? null,
+                            'button_name' => $button['name'] ?? null,
+                            'step_type' => $type,
+                            'payload' => $payload
+                        ]
+                    );
+                } catch (\Throwable $t) {}
                 break;
             case 'remove_tag':
                 Permission::abortIfCannot('conversations.edit.own');
@@ -184,6 +288,44 @@ class ConversationActionButtonService
                     throw new \InvalidArgumentException('Tag não informada');
                 }
                 \App\Services\TagService::removeFromConversation($conversationId, (int)$tagId);
+                try {
+                    Activity::log(
+                        'action_button_step',
+                        'conversation',
+                        $conversationId,
+                        $userId,
+                        ($button['name'] ?? 'Botão de Ação') . ' - Removeu tag ID ' . $tagId,
+                        [
+                            'button_id' => $button['id'] ?? null,
+                            'button_name' => $button['name'] ?? null,
+                            'step_type' => $type,
+                            'payload' => $payload
+                        ]
+                    );
+                } catch (\Throwable $t) {}
+                break;
+            case 'leave_conversation':
+                // Permitir que o próprio participante saia, mesmo sem permissão de editar
+                $removed = ConversationParticipant::removeParticipant($conversationId, $userId);
+                \App\Services\ConversationService::invalidateCache($conversationId);
+                if (!$removed) {
+                    throw new \InvalidArgumentException('Não foi possível sair da conversa');
+                }
+                try {
+                    Activity::log(
+                        'action_button_step',
+                        'conversation',
+                        $conversationId,
+                        $userId,
+                        ($button['name'] ?? 'Botão de Ação') . ' - Saiu da conversa',
+                        [
+                            'button_id' => $button['id'] ?? null,
+                            'button_name' => $button['name'] ?? null,
+                            'step_type' => $type,
+                            'payload' => $payload
+                        ]
+                    );
+                } catch (\Throwable $t) {}
                 break;
             default:
                 throw new \InvalidArgumentException('Tipo de etapa não suportado: ' . $type);

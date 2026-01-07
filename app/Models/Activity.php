@@ -284,7 +284,9 @@ class Activity extends Model
             'funnel_updated' => 'Funil Atualizado',
             'stage_created' => 'Estágio Criado',
             'stage_updated' => 'Estágio Atualizado',
-            'stage_deleted' => 'Estágio Deletado'
+            'stage_deleted' => 'Estágio Deletado',
+            'action_button' => 'Botão de Ação Executado',
+            'action_button_step' => 'Etapa de Botão de Ação'
         ];
     }
 }

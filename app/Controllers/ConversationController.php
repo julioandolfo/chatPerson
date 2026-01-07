@@ -1707,6 +1707,28 @@ class ConversationController
                                 'user_name' => $activity['user_name'] ?? null
                             ];
                             break;
+                        case 'action_button':
+                            $events[] = [
+                                'type' => 'action_button',
+                                'date' => $activity['created_at'],
+                                'icon' => 'ki-bolt',
+                                'color' => 'primary',
+                                'title' => $activity['description'] ?? 'Botão de ação executado',
+                                'description' => null,
+                                'user_name' => $activity['user_name'] ?? null
+                            ];
+                            break;
+                        case 'action_button_step':
+                            $events[] = [
+                                'type' => 'action_button_step',
+                                'date' => $activity['created_at'],
+                                'icon' => 'ki-bolt',
+                                'color' => 'info',
+                                'title' => $activity['description'] ?? 'Etapa executada',
+                                'description' => null,
+                                'user_name' => $activity['user_name'] ?? null
+                            ];
+                            break;
                         case 'conversation_assigned':
                             $events[] = [
                                 'type' => 'assigned',

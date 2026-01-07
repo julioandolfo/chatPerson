@@ -15,6 +15,7 @@ ob_start();
         { value: 'set_funnel_stage', label: 'Mover para etapa' },
         { value: 'assign_agent', label: 'Atribuir agente' },
         { value: 'add_participant', label: 'Adicionar participante' },
+        { value: 'leave_conversation', label: 'Sair da conversa (participante atual)' },
         { value: 'close_conversation', label: 'Encerrar conversa' },
         { value: 'add_tag', label: 'Adicionar tag' },
         { value: 'remove_tag', label: 'Remover tag' }
@@ -85,6 +86,22 @@ ob_start();
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    };
+
+    // Visibilidade (agentes)
+    window.populateVisibilitySelect = function(selected = []) {
+        const sel = document.getElementById('ab_visibility_agents');
+        if (!sel) return;
+        const selectedSet = new Set((selected || []).map(v => String(v)));
+        if (!window.cacheAgents || !window.cacheAgents.length) {
+            sel.innerHTML = '<option value=\"\">Carregando agentes...</option>';
+            return;
+        }
+        sel.innerHTML = window.cacheAgents.map(a => {
+            const id = String(a.id);
+            const isSel = selectedSet.has(id);
+            return `<option value=\"${id}\" ${isSel ? 'selected' : ''}>${window.escapeHtml(a.name || a.email || 'Agente')}</option>`;
+        }).join('');
     };
 
     // Steps (etapas)
@@ -185,6 +202,11 @@ ob_start();
                 </select>
             `;
             if (hint) hint.textContent = 'Selecione o participante';
+        } else if (type === 'leave_conversation') {
+            container.innerHTML = `
+                <div class="text-muted fs-8">Sem configuração: usará o usuário que clicar para sair da conversa.</div>
+            `;
+            if (hint) hint.textContent = 'Sem configuração necessária';
         } else if (type === 'add_tag' || type === 'remove_tag') {
             container.innerHTML = `
                 <label class="form-label fs-8">Tag</label>
@@ -277,6 +299,10 @@ ob_start();
         document.getElementById('ab_id').value = button ? button.id : '';
         document.getElementById('ab_name').value = button ? button.name : '';
         document.getElementById('ab_description').value = button ? (button.description || '') : '';
+        const visibilityAgents = button && button.visibility && Array.isArray(button.visibility.agents)
+            ? button.visibility.agents
+            : [];
+        window.populateVisibilitySelect(visibilityAgents);
         const colorVal = button ? (button.color || '#009ef7') : '#009ef7';
         document.getElementById('ab_color').value = colorVal;
         window.syncColorPicker(colorVal);
@@ -317,6 +343,7 @@ ob_start();
             .then(data => { 
                 window.cacheAgents = data.agents || data || []; 
                 console.log('Agentes carregados:', window.cacheAgents.length);
+                window.populateVisibilitySelect(window.visibilitySelected || []);
             })
             .catch(err => { console.error('Erro ao carregar agentes:', err); });
 
@@ -489,6 +516,16 @@ ob_start();
             <div class="mb-3">
                 <label class="form-label">Descrição</label>
                 <textarea class="form-control" name="description" id="ab_description"></textarea>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label d-flex align-items-center justify-content-between">
+                    <span>Visibilidade (agentes)</span>
+                    <small class="text-muted">Deixe vazio para todos</small>
+                </label>
+                <select class="form-select" name="visibility[agents][]" id="ab_visibility_agents" multiple>
+                    <!-- opções preenchidas via JS -->
+                </select>
             </div>
 
             <div class="mb-3">

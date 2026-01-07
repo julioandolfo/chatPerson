@@ -15370,13 +15370,12 @@ function runActionButton(buttonId, conversationId, btnEl) {
         if (!data.success) {
             throw new Error(data.message || 'Erro ao executar ação');
         }
-        if (typeof loadConversationDetails === 'function') {
-            loadConversationDetails(conversationId);
-        } else if (typeof loadConversation === 'function') {
-            loadConversation(conversationId);
-        }
+        // Recarregar a página para refletir todas as alterações (etapa, participantes, tags, etc)
         if (typeof Swal !== 'undefined') {
-            Swal.fire({ icon: 'success', title: 'Ação executada', timer: 1400, showConfirmButton: false });
+            Swal.fire({ icon: 'success', title: 'Ação executada', timer: 900, showConfirmButton: false })
+                .then(() => window.location.reload());
+        } else {
+            window.location.reload();
         }
     })
     .catch(err => {

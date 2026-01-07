@@ -18,6 +18,9 @@ class Validator
             $rulesArray = explode('|', $ruleString);
             $value = $data[$field] ?? null;
 
+            // Flag para saber se devemos tratar max/min como numérico
+            $isNumericRule = in_array('numeric', $rulesArray, true);
+
             foreach ($rulesArray as $rule) {
                 $ruleParts = explode(':', $rule);
                 $ruleName = $ruleParts[0];
@@ -37,16 +40,16 @@ class Validator
                         break;
 
                     case 'min':
-                        // Verificar se é numérico ou string
+                        // Verificar se é numérico apenas se a regra numeric foi declarada
                         if (!empty($value)) {
-                            if (is_numeric($value)) {
+                            if ($isNumericRule && is_numeric($value)) {
                                 // Validação numérica
                                 if ((float)$value < (float)$ruleValue) {
                                     $errors[$field][] = "O campo {$field} deve ser no mínimo {$ruleValue}";
                                 }
                             } else {
                                 // Validação de string
-                                if (strlen($value) < (int)$ruleValue) {
+                                if (strlen((string)$value) < (int)$ruleValue) {
                                     $errors[$field][] = "O campo {$field} deve ter no mínimo {$ruleValue} caracteres";
                                 }
                             }
@@ -54,16 +57,16 @@ class Validator
                         break;
 
                     case 'max':
-                        // Verificar se é numérico ou string
+                        // Verificar se é numérico apenas se a regra numeric foi declarada
                         if (!empty($value)) {
-                            if (is_numeric($value)) {
+                            if ($isNumericRule && is_numeric($value)) {
                                 // Validação numérica
                                 if ((float)$value > (float)$ruleValue) {
                                     $errors[$field][] = "O campo {$field} deve ser no máximo {$ruleValue}";
                                 }
                             } else {
                                 // Validação de string
-                                if (strlen($value) > (int)$ruleValue) {
+                                if (strlen((string)$value) > (int)$ruleValue) {
                                     $errors[$field][] = "O campo {$field} deve ter no máximo {$ruleValue} caracteres";
                                 }
                             }

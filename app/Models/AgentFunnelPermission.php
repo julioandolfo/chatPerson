@@ -151,6 +151,17 @@ class AgentFunnelPermission extends Model
         if ($user && ($user['role'] === 'admin' || \App\Services\PermissionService::isSuperAdmin($userId))) {
             return null; // NULL = todos os funis
         }
+
+        // Se existir permissão de visualizar TODOS os funis (funnel_id NULL), conceder acesso total
+        $sqlAll = "SELECT COUNT(*) AS count 
+                   FROM agent_funnel_permissions 
+                   WHERE user_id = ? 
+                     AND permission_type = 'view' 
+                     AND funnel_id IS NULL";
+        $allResult = Database::fetch($sqlAll, [$userId]);
+        if (($allResult['count'] ?? 0) > 0) {
+            return null; // NULL = todos os funis
+        }
         
         // Buscar funis com permissão 'view'
         $sql = "SELECT DISTINCT funnel_id 

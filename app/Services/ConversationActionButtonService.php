@@ -48,9 +48,13 @@ class ConversationActionButtonService
             $buttons = array_values(array_filter($buttons, function($btn) use ($userId) {
                 $vis = $btn['visibility'];
                 if (empty($vis)) return true; // sem restrição
+                
+                // Lista de agentes explicitamente permitidos
                 if (!empty($vis['agents']) && is_array($vis['agents'])) {
-                    return in_array($userId, $vis['agents']);
+                    return in_array((int)$userId, array_map('intval', $vis['agents']), true);
                 }
+                
+                // Futuro: outros filtros (cargos, departamentos) poderiam entrar aqui
                 return true;
             }));
         }

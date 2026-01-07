@@ -6,6 +6,338 @@ $pageTitle = 'Botões de Ações';
 ob_start();
 ?>
 
+<!-- SCRIPT PRIMEIRO - Antes do HTML para garantir que funções existam quando o HTML for renderizado -->
+<script>
+// ===== VARIÁVEIS E FUNÇÕES GLOBAIS (DEFINIDAS IMEDIATAMENTE) =====
+(function() {
+    let stepCount = 0;
+    const stepTypes = [
+        { value: 'set_funnel_stage', label: 'Mover para etapa' },
+        { value: 'assign_agent', label: 'Atribuir agente' },
+        { value: 'add_participant', label: 'Adicionar participante' },
+        { value: 'close_conversation', label: 'Encerrar conversa' },
+        { value: 'add_tag', label: 'Adicionar tag' },
+        { value: 'remove_tag', label: 'Remover tag' }
+    ];
+
+    const iconOptions = [
+        'ki-bolt','ki-check','ki-check-circle','ki-close-circle','ki-cross','ki-user','ki-user-tick','ki-user-add',
+        'ki-call','ki-call-calling','ki-whatsapp','ki-send','ki-send-right','ki-double-check','ki-shield-check',
+        'ki-star','ki-like','ki-dislike','ki-filter','ki-filter-edit','ki-setting','ki-gear','ki-rocket','ki-flash',
+        'ki-timer','ki-calendar','ki-time','ki-refresh','ki-loop','ki-repeat','ki-upload','ki-download','ki-cloud',
+        'ki-tag','ki-bookmark','ki-chat','ki-message','ki-bell','ki-graph','ki-chart-simple','ki-chart-line',
+        'ki-chart-pie','ki-folder','ki-file','ki-document','ki-link','ki-lock','ki-unlock','ki-shield-cross',
+        'ki-magnifier','ki-search-list','ki-emoji-happy','ki-emoji-sad','ki-emoji-neutral','ki-smile','ki-happy',
+        'ki-menu','ki-dots-circle','ki-dots-square','ki-dots-vertical','ki-dots-horizontal','ki-exit-right-corner'
+    ];
+
+    // Caches para selects dinâmicos
+    let cacheFunnels = [];
+    let cacheStagesByFunnel = {};
+    let cacheAgents = [];
+    let cacheTags = [];
+
+    // Expor caches globalmente
+    window.cacheFunnels = cacheFunnels;
+    window.cacheStagesByFunnel = cacheStagesByFunnel;
+    window.cacheAgents = cacheAgents;
+    window.cacheTags = cacheTags;
+
+    // Cores
+    window.syncColorInput = function(colorValue) {
+        const input = document.getElementById('ab_color');
+        if (input) input.value = colorValue;
+    };
+
+    window.syncColorPicker = function(hexValue) {
+        const picker = document.getElementById('ab_color_picker');
+        if (picker) picker.value = hexValue;
+    };
+
+    // Ícones
+    window.syncIconPreview = function(val) {
+        const preview = document.getElementById('ab_icon_preview');
+        if (preview) preview.innerHTML = `<i class="ki-duotone ${val} fs-3"><span class="path1"></span><span class="path2"></span></i>`;
+    };
+
+    window.toggleIconSelect = function() {
+        const wrap = document.getElementById('icon-select-wrapper');
+        if (wrap) wrap.style.display = wrap.style.display === 'none' ? 'block' : 'none';
+    };
+
+    window.selectIcon = function(val) {
+        const input = document.getElementById('ab_icon');
+        if (input) {
+            input.value = val;
+            window.syncIconPreview(val);
+        }
+    };
+
+    window.populateIconSelect = function(selected) {
+        const sel = document.getElementById('ab_icon_select');
+        if (!sel) return;
+        sel.innerHTML = iconOptions.map(ic => `<option value="${ic}" ${ic === selected ? 'selected' : ''}>${ic}</option>`).join('');
+    };
+
+    // Escape HTML
+    window.escapeHtml = function(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    };
+
+    // Steps (etapas)
+    window.addStepRow = function(type = '', payload = '{}') {
+        const container = document.getElementById('stepsContainer');
+        if (!container) return;
+        const idx = stepCount++;
+        let parsed = payload;
+        if (typeof payload === 'string') {
+            try { parsed = JSON.parse(payload); } catch(e) { parsed = {}; }
+        }
+        const html = `
+            <div class="border rounded p-3 mb-2" data-step-index="${idx}">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong>Etapa</strong>
+                    <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="window.removeStepRow(${idx})">
+                        <i class="ki-duotone ki-cross fs-6"></i>
+                    </button>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Tipo</label>
+                        <select class="form-select" name="steps[${idx}][type]" onchange="window.updatePayloadPlaceholders(${idx})">
+                            ${stepTypes.map(s => `<option value="${s.value}" ${type===s.value?'selected':''}>${s.label}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label">Configuração da etapa</label>
+                        <div id="payload_fields_${idx}" class="d-flex flex-column gap-2"></div>
+                        <input type="hidden" name="steps[${idx}][payload]" id="payload_${idx}" value='${JSON.stringify(parsed || {})}'>
+                        <div class="text-muted fs-8" id="hint_${idx}"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+        window.updatePayloadPlaceholders(idx, parsed || {});
+    };
+
+    window.addStepRowFromData = function(step) {
+        window.addStepRow(step.type, step.payload);
+    };
+
+    window.removeStepRow = function(idx) {
+        const el = document.querySelector(`[data-step-index="${idx}"]`);
+        if (el) el.remove();
+    };
+
+    window.updatePayloadPlaceholders = function(idx, payload = {}) {
+        const select = document.querySelector(`[name="steps[${idx}][type]"]`);
+        const container = document.getElementById(`payload_fields_${idx}`);
+        const hidden = document.getElementById(`payload_${idx}`);
+        const hint = document.getElementById(`hint_${idx}`);
+        if (!select || !container || !hidden) return;
+        
+        const type = select.value;
+        const p = payload || {};
+        container.innerHTML = '';
+        
+        if (type === 'set_funnel_stage') {
+            container.innerHTML = `
+                <div class="mb-2">
+                    <label class="form-label fs-8">Funil</label>
+                    <select class="form-select form-select-sm" data-field="funnel_id" onchange="window.onPayloadFieldChange(${idx}); window.onFunnelChange(${idx});">
+                        <option value="">Selecione</option>
+                        ${window.cacheFunnels.map(f => `<option value="${f.id}" ${p.funnel_id==f.id?'selected':''}>${window.escapeHtml(f.name || 'Funil')}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label fs-8">Etapa</label>
+                    <select class="form-select form-select-sm" data-field="stage_id" onchange="window.onPayloadFieldChange(${idx});">
+                        <option value="">Selecione o funil primeiro</option>
+                    </select>
+                </div>
+            `;
+            if (p.funnel_id) {
+                window.fetchStagesForFunnel(p.funnel_id).then(() => {
+                    const stageSelect = container.querySelector('[data-field="stage_id"]');
+                    if (stageSelect) stageSelect.innerHTML = `<option value="">Selecione</option>` + window.getStagesOptions(p.funnel_id, p.stage_id);
+                });
+            }
+            if (hint) hint.textContent = 'Selecione funil e etapa';
+        } else if (type === 'assign_agent') {
+            container.innerHTML = `
+                <label class="form-label fs-8">Agente</label>
+                <select class="form-select form-select-sm" data-field="agent_id" onchange="window.onPayloadFieldChange(${idx});">
+                    <option value="">Selecione</option>
+                    ${window.cacheAgents.map(a => `<option value="${a.id}" ${p.agent_id==a.id?'selected':''}>${window.escapeHtml(a.name || a.email)}</option>`).join('')}
+                </select>
+            `;
+            if (hint) hint.textContent = 'Selecione o agente';
+        } else if (type === 'add_participant') {
+            container.innerHTML = `
+                <label class="form-label fs-8">Participante</label>
+                <select class="form-select form-select-sm" data-field="participant_id" onchange="window.onPayloadFieldChange(${idx});">
+                    <option value="">Selecione</option>
+                    ${window.cacheAgents.map(a => `<option value="${a.id}" ${p.participant_id==a.id?'selected':''}>${window.escapeHtml(a.name || a.email)}</option>`).join('')}
+                </select>
+            `;
+            if (hint) hint.textContent = 'Selecione o participante';
+        } else if (type === 'add_tag' || type === 'remove_tag') {
+            container.innerHTML = `
+                <label class="form-label fs-8">Tag</label>
+                <select class="form-select form-select-sm" data-field="tag_id" onchange="window.onPayloadFieldChange(${idx});">
+                    <option value="">Selecione</option>
+                    ${window.cacheTags.map(t => `<option value="${t.id}" ${p.tag_id==t.id?'selected':''}>${window.escapeHtml(t.name)}</option>`).join('')}
+                </select>
+            `;
+            if (hint) hint.textContent = 'Selecione a tag';
+        } else if (type === 'close_conversation') {
+            container.innerHTML = '<div class="text-muted fs-8">Sem configuração necessária.</div>';
+            if (hint) hint.textContent = '';
+        }
+        
+        window.onPayloadFieldChange(idx);
+    };
+
+    window.onFunnelChange = function(idx) {
+        const container = document.getElementById(`payload_fields_${idx}`);
+        if (!container) return;
+        const funnelSelect = container.querySelector('[data-field="funnel_id"]');
+        const stageSelect = container.querySelector('[data-field="stage_id"]');
+        if (!funnelSelect || !stageSelect) return;
+        const funnelId = funnelSelect.value;
+        if (!funnelId) {
+            stageSelect.innerHTML = '<option value="">Selecione o funil primeiro</option>';
+            return;
+        }
+        window.fetchStagesForFunnel(funnelId).then(() => {
+            stageSelect.innerHTML = `<option value="">Selecione</option>` + window.getStagesOptions(funnelId, '');
+        });
+    };
+
+    window.onPayloadFieldChange = function(idx) {
+        const container = document.getElementById(`payload_fields_${idx}`);
+        const hidden = document.getElementById(`payload_${idx}`);
+        if (!container || !hidden) return;
+        const selects = container.querySelectorAll('select[data-field]');
+        const obj = {};
+        selects.forEach(sel => {
+            const key = sel.getAttribute('data-field');
+            const val = sel.value;
+            if (val !== '') obj[key] = isNaN(Number(val)) ? val : Number(val);
+        });
+        hidden.value = JSON.stringify(obj);
+    };
+
+    window.getStagesOptions = function(funnelId, selectedId) {
+        if (!funnelId || !window.cacheStagesByFunnel[funnelId]) return '';
+        return window.cacheStagesByFunnel[funnelId].map(s => `<option value="${s.id}" ${selectedId==s.id?'selected':''}>${window.escapeHtml(s.name || 'Etapa')}</option>`).join('');
+    };
+
+    // Ações principais
+    window.submitActionButton = function() {
+        const id = document.getElementById('ab_id').value;
+        const form = document.getElementById('actionButtonForm');
+        form.action = id ? '<?= Url::to('/settings/action-buttons') ?>/' + id : '<?= Url::to('/settings/action-buttons') ?>';
+        form.method = 'POST';
+        form.submit();
+    };
+
+    window.deleteActionButton = function(id) {
+        if (!confirm('Excluir este botão?')) return;
+        fetch('<?= Url::to('/settings/action-buttons') ?>/' + id, {
+            method: 'DELETE',
+            headers: {'X-Requested-With': 'XMLHttpRequest'}
+        }).then(r => r.json()).then(() => location.reload());
+    };
+
+    window.fetchStagesForFunnel = function(funnelId) {
+        if (!funnelId || window.cacheStagesByFunnel[funnelId]) return Promise.resolve();
+        return fetch('<?= Url::to('/funnels') ?>/' + funnelId + '/stages?format=json', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(data => { window.cacheStagesByFunnel[funnelId] = data.stages || data || []; })
+            .catch(() => { window.cacheStagesByFunnel[funnelId] = []; });
+    };
+
+    window.openActionButtonModal = function(button, steps) {
+        button = button || null;
+        steps = steps || [];
+        const form = document.getElementById('actionButtonForm');
+        if (!form) return;
+        form.action = '<?= Url::to('/settings/action-buttons') ?>';
+        form.reset();
+        stepCount = 0;
+        const stepsContainer = document.getElementById('stepsContainer');
+        if (stepsContainer) stepsContainer.innerHTML = '';
+        const labelEl = document.getElementById('actionButtonModalLabel');
+        if (labelEl) labelEl.textContent = button ? 'Editar Botão' : 'Novo Botão';
+        document.getElementById('ab_id').value = button ? button.id : '';
+        document.getElementById('ab_name').value = button ? button.name : '';
+        document.getElementById('ab_description').value = button ? (button.description || '') : '';
+        const colorVal = button ? (button.color || '#009ef7') : '#009ef7';
+        document.getElementById('ab_color').value = colorVal;
+        window.syncColorPicker(colorVal);
+        const iconVal = button ? (button.icon || 'ki-bolt') : 'ki-bolt';
+        document.getElementById('ab_icon').value = iconVal;
+        window.syncIconPreview(iconVal);
+        document.getElementById('ab_sort_order').value = button ? (button.sort_order || 0) : 0;
+        document.getElementById('ab_is_active').value = button ? button.is_active : 1;
+
+        if (steps && steps.length) {
+            steps.forEach(s => window.addStepRow(s.type, s.payload));
+        } else {
+            window.addStepRow();
+        }
+
+        window.populateIconSelect(iconVal);
+        const iconWrapper = document.getElementById('icon-select-wrapper');
+        if (iconWrapper) iconWrapper.style.display = 'none';
+    };
+
+    // Preload de dados para os selects dinâmicos
+    window.preloadActionData = function() {
+        // Funis
+        fetch('<?= Url::to('/funnels?format=json') ?>', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(data => {
+                window.cacheFunnels = data.funnels || data || [];
+                if (data.stagesByFunnel) {
+                    window.cacheStagesByFunnel = data.stagesByFunnel;
+                }
+            })
+            .catch(() => {});
+
+        // Agentes
+        fetch('<?= Url::to('/agents?format=json') ?>', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(data => { window.cacheAgents = data.agents || data || []; })
+            .catch(() => {});
+
+        // Tags
+        fetch('<?= Url::to('/tags?format=json') ?>', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(data => { window.cacheTags = data.tags || data || []; })
+            .catch(() => {});
+    };
+
+    // Log de debug
+    console.log('✅ Funções globais registradas (action-buttons)');
+
+    // Inicializar ao carregar a página
+    document.addEventListener('DOMContentLoaded', function() {
+        const currentIcon = document.getElementById('ab_icon')?.value || 'ki-bolt';
+        window.populateIconSelect(currentIcon);
+        window.syncIconPreview(currentIcon);
+        const currentColor = document.getElementById('ab_color')?.value || '#009ef7';
+        window.syncColorPicker(currentColor);
+        window.preloadActionData();
+    });
+})();
+</script>
+
 <div class="container-fluid">
     <div class="d-flex align-items-center justify-content-between mb-5">
         <div>
@@ -168,499 +500,6 @@ ob_start();
     </div>
   </div>
 </div>
-
-<script>
-// ===== VARIÁVEIS GLOBAIS =====
-let stepCount = 0;
-const stepTypes = [
-    { value: 'set_funnel_stage', label: 'Mover para etapa' },
-    { value: 'assign_agent', label: 'Atribuir agente' },
-    { value: 'add_participant', label: 'Adicionar participante' },
-    { value: 'close_conversation', label: 'Encerrar conversa' },
-    { value: 'add_tag', label: 'Adicionar tag' },
-    { value: 'remove_tag', label: 'Remover tag' }
-];
-
-const iconOptions = [
-    'ki-bolt','ki-check','ki-check-circle','ki-close-circle','ki-cross','ki-user','ki-user-tick','ki-user-add',
-    'ki-call','ki-call-calling','ki-whatsapp','ki-send','ki-send-right','ki-double-check','ki-shield-check',
-    'ki-star','ki-like','ki-dislike','ki-filter','ki-filter-edit','ki-setting','ki-gear','ki-rocket','ki-flash',
-    'ki-timer','ki-calendar','ki-time','ki-refresh','ki-loop','ki-repeat','ki-upload','ki-download','ki-cloud',
-    'ki-tag','ki-bookmark','ki-chat','ki-message','ki-bell','ki-graph','ki-chart-simple','ki-chart-line',
-    'ki-chart-pie','ki-folder','ki-file','ki-document','ki-link','ki-lock','ki-unlock','ki-shield-cross',
-    'ki-magnifier','ki-search-list','ki-emoji-happy','ki-emoji-sad','ki-emoji-neutral','ki-smile','ki-happy',
-    'ki-menu','ki-dots-circle','ki-dots-square','ki-dots-vertical','ki-dots-horizontal','ki-exit-right-corner'
-];
-
-// Caches para selects dinâmicos
-let cacheFunnels = [];
-let cacheStagesByFunnel = {};
-let cacheAgents = [];
-let cacheTags = [];
-
-// ===== FUNÇÕES GLOBAIS EXPOSTAS NO WINDOW (IMEDIATAMENTE) =====
-// Cores
-window.syncColorInput = function(colorValue) {
-    const input = document.getElementById('ab_color');
-    if (input) input.value = colorValue;
-};
-
-window.syncColorPicker = function(hexValue) {
-    const picker = document.getElementById('ab_color_picker');
-    if (picker) picker.value = hexValue;
-};
-
-// Ícones
-window.syncIconPreview = function(val) {
-    const preview = document.getElementById('ab_icon_preview');
-    if (preview) preview.innerHTML = `<i class="ki-duotone ${val} fs-3"><span class="path1"></span><span class="path2"></span></i>`;
-};
-
-window.toggleIconSelect = function() {
-    const wrap = document.getElementById('icon-select-wrapper');
-    if (wrap) wrap.style.display = wrap.style.display === 'none' ? 'block' : 'none';
-};
-
-window.selectIcon = function(val) {
-    const input = document.getElementById('ab_icon');
-    if (input) {
-        input.value = val;
-        window.syncIconPreview(val);
-    }
-};
-
-window.populateIconSelect = function(selected) {
-    const sel = document.getElementById('ab_icon_select');
-    if (!sel) return;
-    sel.innerHTML = iconOptions.map(ic => `<option value="${ic}" ${ic === selected ? 'selected' : ''}>${ic}</option>`).join('');
-};
-
-// Steps (etapas)
-window.addStepRow = function(type = '', payload = '{}') {
-    const container = document.getElementById('stepsContainer');
-    const idx = stepCount++;
-    let parsed = payload;
-    if (typeof payload === 'string') {
-        try { parsed = JSON.parse(payload); } catch(e) { parsed = {}; }
-    }
-    const html = `
-        <div class="border rounded p-3 mb-2" data-step-index="${idx}">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <strong>Etapa</strong>
-                <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="window.removeStepRow(${idx})">
-                    <i class="ki-duotone ki-cross fs-6"></i>
-                </button>
-            </div>
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <label class="form-label">Tipo</label>
-                    <select class="form-select" name="steps[${idx}][type]" onchange="window.updatePayloadPlaceholders(${idx})">
-                        ${stepTypes.map(s => `<option value="${s.value}" ${type===s.value?'selected':''}>${s.label}</option>`).join('')}
-                    </select>
-                </div>
-                <div class="col-md-8">
-                    <label class="form-label">Configuração da etapa</label>
-                    <div id="payload_fields_${idx}" class="d-flex flex-column gap-2"></div>
-                    <input type="hidden" name="steps[${idx}][payload]" id="payload_${idx}" value='${JSON.stringify(parsed || {})}'>
-                    <div class="text-muted fs-8" id="hint_${idx}"></div>
-                </div>
-            </div>
-        </div>
-    `;
-    container.insertAdjacentHTML('beforeend', html);
-    window.updatePayloadPlaceholders(idx, parsed || {});
-};
-
-window.addStepRowFromData = function(step) {
-    window.addStepRow(step.type, step.payload);
-};
-
-window.removeStepRow = function(idx) {
-    const el = document.querySelector(`[data-step-index="${idx}"]`);
-    if (el) el.remove();
-};
-
-window.updatePayloadPlaceholders = function(idx, payload = {}) {
-    const select = document.querySelector(`[name="steps[${idx}][type]"]`);
-    const container = document.getElementById(`payload_fields_${idx}`);
-    const hidden = document.getElementById(`payload_${idx}`);
-    const hint = document.getElementById(`hint_${idx}`);
-    if (!select || !container || !hidden) return;
-    
-    const type = select.value;
-    const p = payload;
-    container.innerHTML = '';
-    
-    if (type === 'set_funnel_stage') {
-        container.innerHTML = `
-            <div class="mb-2">
-                <label class="form-label fs-8">Funil</label>
-                <select class="form-select form-select-sm" data-field="funnel_id" onchange="window.onPayloadFieldChange(${idx}); window.onFunnelChange(${idx});">
-                    <option value="">Selecione</option>
-                    ${cacheFunnels.map(f => `<option value="${f.id}" ${p.funnel_id==f.id?'selected':''}>${window.escapeHtml(f.name || 'Funil')}</option>`).join('')}
-                </select>
-            </div>
-            <div class="mb-2">
-                <label class="form-label fs-8">Etapa</label>
-                <select class="form-select form-select-sm" data-field="stage_id" onchange="window.onPayloadFieldChange(${idx});">
-                    <option value="">Selecione o funil primeiro</option>
-                </select>
-            </div>
-        `;
-        if (p.funnel_id) {
-            window.fetchStagesForFunnel(p.funnel_id).then(() => {
-                const stageSelect = container.querySelector('[data-field="stage_id"]');
-                if (stageSelect) stageSelect.innerHTML = `<option value="">Selecione</option>` + window.getStagesOptions(p.funnel_id, p.stage_id);
-            });
-        }
-    } else if (type === 'assign_agent' || type === 'add_participant') {
-        const field = type === 'assign_agent' ? 'agent_id' : 'participant_id';
-        container.innerHTML = `
-            <label class="form-label fs-8">Selecione</label>
-            <select class="form-select form-select-sm" data-field="${field}" onchange="window.onPayloadFieldChange(${idx});">
-                <option value="">Selecione</option>
-                ${cacheAgents.map(a => `<option value="${a.id}" ${p[field]==a.id?'selected':''}>${window.escapeHtml(a.name || a.email)}</option>`).join('')}
-            </select>
-        `;
-    } else if (type === 'add_tag' || type === 'remove_tag') {
-        container.innerHTML = `
-            <label class="form-label fs-8">Selecione</label>
-            <select class="form-select form-select-sm" data-field="tag_id" onchange="window.onPayloadFieldChange(${idx});">
-                <option value="">Selecione</option>
-                ${cacheTags.map(t => `<option value="${t.id}" ${p.tag_id==t.id?'selected':''}>${window.escapeHtml(t.name)}</option>`).join('')}
-            </select>
-        `;
-    } else if (type === 'close_conversation') {
-        hint.textContent = 'Sem configuração necessária';
-    }
-    
-    window.onPayloadFieldChange(idx);
-};
-
-window.onFunnelChange = function(idx) {
-    const container = document.getElementById(`payload_fields_${idx}`);
-    if (!container) return;
-    const funnelSelect = container.querySelector('[data-field="funnel_id"]');
-    const stageSelect = container.querySelector('[data-field="stage_id"]');
-    if (!funnelSelect || !stageSelect) return;
-    const funnelId = funnelSelect.value;
-    if (!funnelId) {
-        stageSelect.innerHTML = '<option value="">Selecione o funil primeiro</option>';
-        return;
-    }
-    window.fetchStagesForFunnel(funnelId).then(() => {
-        stageSelect.innerHTML = `<option value="">Selecione</option>` + window.getStagesOptions(funnelId, '');
-    });
-};
-
-window.onPayloadFieldChange = function(idx) {
-    const container = document.getElementById(`payload_fields_${idx}`);
-    const hidden = document.getElementById(`payload_${idx}`);
-    if (!container || !hidden) return;
-    const selects = container.querySelectorAll('select[data-field]');
-    const obj = {};
-    selects.forEach(sel => {
-        const key = sel.getAttribute('data-field');
-        const val = sel.value;
-        if (val !== '') obj[key] = isNaN(Number(val)) ? val : Number(val);
-    });
-    hidden.value = JSON.stringify(obj);
-};
-
-window.getStagesOptions = function(funnelId, selectedId) {
-    if (!funnelId || !cacheStagesByFunnel[funnelId]) return '';
-    return cacheStagesByFunnel[funnelId].map(s => `<option value="${s.id}" ${selectedId==s.id?'selected':''}>${window.escapeHtml(s.name || 'Etapa')}</option>`).join('');
-};
-
-window.escapeHtml = function(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-};
-
-// Ações principais
-window.submitActionButton = function() {
-    const id = document.getElementById('ab_id').value;
-    const form = document.getElementById('actionButtonForm');
-    form.action = id ? '<?= Url::to('/settings/action-buttons') ?>/' + id : '<?= Url::to('/settings/action-buttons') ?>';
-    form.method = 'POST';
-    form.submit();
-};
-
-window.deleteActionButton = function(id) {
-    if (!confirm('Excluir este botão?')) return;
-    fetch('<?= Url::to('/settings/action-buttons') ?>/' + id, {
-        method: 'DELETE',
-        headers: {'X-Requested-With': 'XMLHttpRequest'}
-    }).then(r => r.json()).then(() => location.reload());
-};
-
-window.fetchStagesForFunnel = function(funnelId) {
-    if (!funnelId || cacheStagesByFunnel[funnelId]) return Promise.resolve();
-    return fetch('<?= Url::to('/funnels') ?>/' + funnelId + '/stages?format=json', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(r => r.json())
-        .then(data => { cacheStagesByFunnel[funnelId] = data.stages || data || []; })
-        .catch(() => { cacheStagesByFunnel[funnelId] = []; });
-};
-
-window.openActionButtonModal = function(button = null, steps = []) {
-    const form = document.getElementById('actionButtonForm');
-    form.action = '<?= Url::to('/settings/action-buttons') ?>';
-    form.reset();
-    stepCount = 0;
-    document.getElementById('stepsContainer').innerHTML = '';
-    document.getElementById('actionButtonModalLabel').textContent = button ? 'Editar Botão' : 'Novo Botão';
-    document.getElementById('ab_id').value = button ? button.id : '';
-    document.getElementById('ab_name').value = button ? button.name : '';
-    document.getElementById('ab_description').value = button ? (button.description || '') : '';
-    const colorVal = button ? (button.color || '#009ef7') : '#009ef7';
-    document.getElementById('ab_color').value = colorVal;
-    window.syncColorPicker(colorVal);
-    const iconVal = button ? (button.icon || 'ki-bolt') : 'ki-bolt';
-    document.getElementById('ab_icon').value = iconVal;
-    window.syncIconPreview(iconVal);
-    document.getElementById('ab_sort_order').value = button ? (button.sort_order || 0) : 0;
-    document.getElementById('ab_is_active').value = button ? button.is_active : 1;
-
-    if (steps && steps.length) {
-        steps.forEach(s => window.addStepRow(s.type, s.payload));
-    } else {
-        window.addStepRow();
-    }
-
-    window.populateIconSelect(iconVal);
-    document.getElementById('icon-select-wrapper').style.display = 'none';
-};
-
-// ===== FUNÇÕES INTERNAS (não usadas em onclick) =====
-
-function addStepRowFromData(step) {
-    addStepRow(step.type, step.payload);
-}
-
-function addStepRow(type = '', payload = '{}') {
-    const container = document.getElementById('stepsContainer');
-    const idx = stepCount++;
-    let parsed = payload;
-    if (typeof payload === 'string') {
-        try { parsed = JSON.parse(payload); } catch(e) { parsed = {}; }
-    }
-    const html = `
-        <div class="border rounded p-3 mb-2" data-step-index="${idx}">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <strong>Etapa</strong>
-                <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeStepRow(${idx})">
-                    <i class="ki-duotone ki-cross fs-6"></i>
-                </button>
-            </div>
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <label class="form-label">Tipo</label>
-                    <select class="form-select" name="steps[${idx}][type]" onchange="updatePayloadPlaceholders(${idx})">
-                        ${stepTypes.map(s => `<option value="${s.value}" ${type===s.value?'selected':''}>${s.label}</option>`).join('')}
-                    </select>
-                </div>
-                <div class="col-md-8">
-                    <label class="form-label">Configuração da etapa</label>
-                    <div id="payload_fields_${idx}" class="d-flex flex-column gap-2"></div>
-                    <input type="hidden" name="steps[${idx}][payload]" id="payload_${idx}" value='${JSON.stringify(parsed || {})}'>
-                    <div class="text-muted fs-8" id="hint_${idx}"></div>
-                </div>
-            </div>
-        </div>
-    `;
-    container.insertAdjacentHTML('beforeend', html);
-    updatePayloadPlaceholders(idx, parsed || {});
-}
-
-function removeStepRow(idx) {
-    const el = document.querySelector(`[data-step-index="${idx}"]`);
-    if (el) el.remove();
-}
-
-function updatePayloadPlaceholders(idx, payload = {}) {
-    const select = document.querySelector(`[name="steps[${idx}][type]"]`);
-    const hint = document.getElementById(`hint_${idx}`);
-    if (!select || !hint) return;
-    const value = select.value;
-    const hints = {
-        set_funnel_stage: 'Selecione funil e etapa',
-        assign_agent: 'Selecione o agente',
-        add_participant: 'Selecione o participante',
-        close_conversation: 'Sem configuração',
-        add_tag: 'Selecione a tag',
-        remove_tag: 'Selecione a tag'
-    };
-    hint.textContent = hints[value] || '';
-    renderPayloadFields(idx, value, payload);
-}
-
-function renderPayloadFields(idx, type, payload = {}) {
-    const wrap = document.getElementById(`payload_fields_${idx}`);
-    const hidden = document.getElementById(`payload_${idx}`);
-    if (!wrap || !hidden) return;
-    const p = payload || {};
-    const controls = {
-        set_funnel_stage: () => `
-            <div class="row g-2">
-                <div class="col-6">
-                    <label class="form-label">Funil</label>
-                    <select class="form-select" data-field="funnel_id" onchange="onPayloadFieldChange(${idx}); onFunnelChange(${idx});">
-                        <option value="">Selecione</option>
-                        ${cacheFunnels.map(f => `<option value="${f.id}" ${p.funnel_id==f.id?'selected':''}>${escapeHtml(f.name || 'Funil')}</option>`).join('')}
-                    </select>
-                </div>
-                <div class="col-6">
-                    <label class="form-label">Etapa</label>
-                    <select class="form-select" data-field="stage_id" onchange="onPayloadFieldChange(${idx})">
-                        <option value="">Selecione</option>
-                        ${getStagesOptions(p.funnel_id, p.stage_id)}
-                    </select>
-                </div>
-            </div>
-        `,
-        assign_agent: () => `
-            <label class="form-label">Agente</label>
-            <select class="form-select" data-field="agent_id" onchange="onPayloadFieldChange(${idx})">
-                <option value="">Selecione</option>
-                ${cacheAgents.map(a => `<option value="${a.id}" ${p.agent_id==a.id?'selected':''}>${escapeHtml(a.name || a.email || 'Agente')}</option>`).join('')}
-            </select>
-        `,
-        add_participant: () => `
-            <label class="form-label">Participante</label>
-            <select class="form-select" data-field="participant_id" onchange="onPayloadFieldChange(${idx})">
-                <option value="">Selecione</option>
-                ${cacheAgents.map(a => `<option value="${a.id}" ${p.participant_id==a.id?'selected':''}>${escapeHtml(a.name || a.email || 'Usuário')}</option>`).join('')}
-            </select>
-        `,
-        close_conversation: () => `<div class="text-muted fs-8">Sem configuração necessária.</div>`,
-        add_tag: () => `
-            <label class="form-label">Tag</label>
-            <select class="form-select" data-field="tag_id" onchange="onPayloadFieldChange(${idx})">
-                <option value="">Selecione</option>
-                ${cacheTags.map(t => `<option value="${t.id}" ${p.tag_id==t.id?'selected':''}>${escapeHtml(t.name || 'Tag')}</option>`).join('')}
-            </select>
-        `,
-        remove_tag: () => `
-            <label class="form-label">Tag</label>
-            <select class="form-select" data-field="tag_id" onchange="onPayloadFieldChange(${idx})">
-                <option value="">Selecione</option>
-                ${cacheTags.map(t => `<option value="${t.id}" ${p.tag_id==t.id?'selected':''}>${escapeHtml(t.name || 'Tag')}</option>`).join('')}
-            </select>
-        `
-    };
-    wrap.innerHTML = (controls[type] || (() => '<div class="text-muted fs-8">Selecione o tipo.</div>'))();
-    onPayloadFieldChange(idx);
-}
-
-function onFunnelChange(idx) {
-    const wrap = document.getElementById(`payload_fields_${idx}`);
-    if (!wrap) return;
-    const funnelSelect = wrap.querySelector('[data-field="funnel_id"]');
-    if (!funnelSelect) return;
-    const funnelId = funnelSelect.value;
-    if (!funnelId) return;
-    fetchStagesForFunnel(funnelId).then(() => {
-        const stageSelect = wrap.querySelector('[data-field="stage_id"]');
-        if (stageSelect) {
-            stageSelect.innerHTML = '<option value="">Selecione</option>' + getStagesOptions(funnelId, stageSelect.value || '');
-        }
-    });
-}
-
-function onPayloadFieldChange(idx) {
-    const wrap = document.getElementById(`payload_fields_${idx}`);
-    const hidden = document.getElementById(`payload_${idx}`);
-    if (!wrap || !hidden) return;
-    const selects = wrap.querySelectorAll('[data-field]');
-    const obj = {};
-    selects.forEach(sel => {
-        const key = sel.getAttribute('data-field');
-        const val = sel.value;
-        if (val !== '') obj[key] = isNaN(Number(val)) ? val : Number(val);
-    });
-    hidden.value = JSON.stringify(obj);
-}
-
-function getStagesOptions(funnelId, selectedId) {
-    if (!funnelId || !cacheStagesByFunnel[funnelId]) return '';
-    return cacheStagesByFunnel[funnelId].map(s => `<option value="${s.id}" ${selectedId==s.id?'selected':''}>${escapeHtml(s.name || 'Etapa')}</option>`).join('');
-}
-
-// Log de debug - verificar se as funções estão disponíveis
-console.log('✅ Funções globais registradas:', {
-    syncColorInput: typeof window.syncColorInput,
-    syncColorPicker: typeof window.syncColorPicker,
-    toggleIconSelect: typeof window.toggleIconSelect,
-    selectIcon: typeof window.selectIcon,
-    syncIconPreview: typeof window.syncIconPreview,
-    addStepRow: typeof window.addStepRow,
-    removeStepRow: typeof window.removeStepRow,
-    updatePayloadPlaceholders: typeof window.updatePayloadPlaceholders,
-    submitActionButton: typeof window.submitActionButton,
-    deleteActionButton: typeof window.deleteActionButton,
-    openActionButtonModal: typeof window.openActionButtonModal
-});
-
-// Inicializar ao carregar a página
-document.addEventListener('DOMContentLoaded', () => {
-    const currentIcon = document.getElementById('ab_icon')?.value || 'ki-bolt';
-    window.populateIconSelect(currentIcon);
-    window.syncIconPreview(currentIcon);
-    const currentColor = document.getElementById('ab_color')?.value || '#009ef7';
-    window.syncColorPicker(currentColor);
-    preloadActionData();
-});
-
-// Caches para selects dinâmicos
-let cacheFunnels = [];
-let cacheStagesByFunnel = {};
-let cacheAgents = [];
-let cacheTags = [];
-
-function preloadActionData() {
-    fetchFunis();
-    fetchAgentes();
-    fetchTags();
-}
-
-function fetchFunis() {
-    if (cacheFunnels.length) return;
-    fetch('<?= Url::to('/funnels?format=json') ?>', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(r => r.json())
-        .then(data => {
-            cacheFunnels = data.funnels || data || [];
-            if (data.stagesByFunnel) {
-                cacheStagesByFunnel = data.stagesByFunnel;
-            }
-        })
-        .catch(() => {});
-}
-
-function fetchStagesForFunnel(funnelId) {
-    if (!funnelId || cacheStagesByFunnel[funnelId]) return Promise.resolve();
-    return fetch('<?= Url::to('/funnels') ?>/' + funnelId + '/stages?format=json', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(r => r.json())
-        .then(data => { cacheStagesByFunnel[funnelId] = data.stages || data || []; })
-        .catch(() => { cacheStagesByFunnel[funnelId] = []; });
-}
-
-function fetchAgentes() {
-    if (cacheAgents.length) return;
-    fetch('<?= Url::to('/agents?format=json') ?>', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(r => r.json())
-        .then(data => { cacheAgents = data.agents || data || []; })
-        .catch(() => {});
-}
-
-function fetchTags() {
-    if (cacheTags.length) return;
-    fetch('<?= Url::to('/tags?format=json') ?>', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(r => r.json())
-        .then(data => { cacheTags = data.tags || data || []; })
-        .catch(() => {});
-}
-</script>
 
 <?php
 $content = ob_get_clean();

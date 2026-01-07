@@ -18198,14 +18198,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Validar telefone (deve ter pelo menos 10 dígitos - DDD + número)
-            if (phone.length < 10 || phone.length > 11) {
+            // Normalizar telefone (remover caracteres não numéricos)
+            let normalizedPhone = phone.replace(/\D/g, '');
+            
+            // Remover +55 ou 55 do início se já estiver presente
+            normalizedPhone = normalizedPhone.replace(/^(55)?/, '');
+            
+            // Validar telefone (deve ter 10 ou 11 dígitos - DDD + número)
+            if (normalizedPhone.length < 10 || normalizedPhone.length > 11) {
                 alert('Telefone inválido. Digite DDD + número (ex: 11987654321)');
                 return;
             }
             
-            // Formatar telefone completo (+55 + DDD + número)
-            const fullPhone = '55' + phone;
+            // Formatar telefone completo (55 + DDD + número)
+            const fullPhone = '55' + normalizedPhone;
             console.log('📞 Telefone formatado:', fullPhone);
             
             const submitBtn = newConversationForm.querySelector('button[type="submit"]');

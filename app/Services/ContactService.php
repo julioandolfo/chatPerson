@@ -16,7 +16,12 @@ class ContactService
      */
     public static function createOrUpdate(array $data): array
     {
-        // Validar dados
+        // Normalizar número de telefone ANTES de validar
+        if (!empty($data['phone'])) {
+            $data['phone'] = Contact::normalizePhoneNumber($data['phone']);
+        }
+        
+        // Validar dados (após normalização)
         $errors = Validator::validate($data, [
             'name' => 'required|string|max:255',
             'last_name' => 'nullable|string|max:255',
@@ -41,11 +46,6 @@ class ContactService
         
         if (!empty($flatErrors)) {
             throw new \Exception('Dados inválidos: ' . implode(', ', $flatErrors));
-        }
-
-        // Normalizar número de telefone se fornecido
-        if (!empty($data['phone'])) {
-            $data['phone'] = Contact::normalizePhoneNumber($data['phone']);
         }
 
         // Buscar ou criar contato (usar busca normalizada para evitar duplicatas)
@@ -223,22 +223,12 @@ class ContactService
      */
     public static function update(int $id, array $data): array
     {
-        // Validar dados
-        $errors = Validator::validate($data, [
-            'name' => 'nullable|string|max:255',
-            'last_name' => 'nullable|string|max:255',
-            'email' => 'nullable|email|max:255',
-            'phone' => 'nullable|string|max:50',
-            'whatsapp_id' => 'nullable|string|max:255',
-            'city' => 'nullable|string|max:255',
-            'country' => 'nullable|string|max:100',
-            'bio' => 'nullable|string',
-            'company' => 'nullable|string|max:255',
-            'social_media' => 'nullable|array',
-            'avatar' => 'nullable|string|max:255'
-        ]);
+        // Normalizar número de telefone ANTES de validar
+        if (!empty($data['phone'])) {
+            $data['phone'] = Contact::normalizePhoneNumber($data['phone']);
+        }
         
-        // Processar social_media se for array ou string JSON
+        // Processar social_media antes da validação
         if (isset($data['social_media'])) {
             if (is_array($data['social_media'])) {
                 $data['social_media'] = json_encode($data['social_media']);
@@ -252,6 +242,21 @@ class ContactService
         } else {
             $data['social_media'] = json_encode([]);
         }
+        
+        // Validar dados (após normalização e processamento)
+        $errors = Validator::validate($data, [
+            'name' => 'nullable|string|max:255',
+            'last_name' => 'nullable|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'phone' => 'nullable|string|max:50',
+            'whatsapp_id' => 'nullable|string|max:255',
+            'city' => 'nullable|string|max:255',
+            'country' => 'nullable|string|max:100',
+            'bio' => 'nullable|string',
+            'company' => 'nullable|string|max:255',
+            'social_media' => 'nullable|array',
+            'avatar' => 'nullable|string|max:255'
+        ]);
 
         // Converter erros para array simples
         $flatErrors = [];
@@ -263,11 +268,6 @@ class ContactService
         
         if (!empty($flatErrors)) {
             throw new \Exception('Dados inválidos: ' . implode(', ', $flatErrors));
-        }
-
-        // Normalizar número de telefone se fornecido
-        if (!empty($data['phone'])) {
-            $data['phone'] = Contact::normalizePhoneNumber($data['phone']);
         }
 
         // Obter contato antes da atualização para detectar mudanças

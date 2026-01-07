@@ -8,6 +8,7 @@ use App\Models\ConversationActionLog;
 use App\Models\ConversationActionStep;
 use App\Models\ConversationParticipant;
 use App\Helpers\Permission;
+use App\Helpers\Log;
 
 class ConversationActionButtonService
 {
@@ -71,6 +72,13 @@ class ConversationActionButtonService
         }
 
         $executed = [];
+        // Log detalhado antes da execução
+        try {
+            Log::info("[ActionButton] Iniciando execução. conversation_id={$conversationId}, button_id={$buttonId}, user_id={$userId}, steps=" . json_encode($steps), 'automacao.log');
+        } catch (\Throwable $t) {
+            // não interromper a execução se o log falhar
+        }
+
         try {
             foreach ($steps as $step) {
                 self::executeStep($conversationId, $step, $userId);
@@ -85,6 +93,10 @@ class ConversationActionButtonService
                 'steps_executed' => json_encode($executed)
             ]);
 
+            try {
+                Log::info("[ActionButton] Sucesso. conversation_id={$conversationId}, button_id={$buttonId}, executed=" . json_encode($executed), 'automacao.log');
+            } catch (\Throwable $t) {}
+
             return ['success' => true, 'message' => 'Ação executada', 'executed' => $executed];
         } catch (\Exception $e) {
             ConversationActionLog::create([
@@ -95,6 +107,11 @@ class ConversationActionButtonService
                 'steps_executed' => json_encode($executed),
                 'error_message' => $e->getMessage()
             ]);
+
+            try {
+                Log::error("[ActionButton] Erro. conversation_id={$conversationId}, button_id={$buttonId}, executed=" . json_encode($executed) . ", erro=" . $e->getMessage(), 'automacao.log');
+            } catch (\Throwable $t) {}
+
             throw $e;
         }
     }
@@ -106,6 +123,10 @@ class ConversationActionButtonService
         if (is_string($payload)) {
             $payload = json_decode($payload, true) ?: [];
         }
+        try {
+            Log::info("[ActionButton] Executando step={$type}, payload=" . json_encode($payload) . ", conversation_id={$conversationId}, user_id={$userId}", 'automacao.log');
+        } catch (\Throwable $t) {}
+
         switch ($type) {
             case 'set_funnel_stage':
                 Permission::abortIfCannot('conversations.edit.own');

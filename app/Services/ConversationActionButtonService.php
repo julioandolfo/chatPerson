@@ -66,8 +66,6 @@ class ConversationActionButtonService
     */
     public static function run(int $conversationId, int $buttonId, int $userId): array
     {
-        Permission::abortIfCannot('conversations.actions.run');
-
         $conversation = Conversation::find($conversationId);
         if (!$conversation) {
             throw new \InvalidArgumentException('Conversa não encontrada');
@@ -172,20 +170,8 @@ class ConversationActionButtonService
             Log::info("[ActionButton] Executando step={$type}, payload=" . json_encode($payload) . ", conversation_id={$conversationId}, user_id={$userId}", 'automacao.log');
         } catch (\Throwable $t) {}
 
-        // Consolidação de permissões
-        $canEdit = Permission::can('conversations.edit.all')
-            || Permission::can('conversations.edit.department')
-            || Permission::can('conversations.edit.own');
-        $canAssign = Permission::can('conversations.assign.all')
-            || Permission::can('conversations.assign.department')
-            || Permission::can('conversations.assign.own')
-            || Permission::can('conversations.edit.all');
-
         switch ($type) {
             case 'set_funnel_stage':
-                if (!$canEdit) {
-                    Permission::abortIfCannot('conversations.edit.own');
-                }
                 $stageId = $payload['stage_id'] ?? null;
                 if (!$stageId) {
                     throw new \InvalidArgumentException('Etapa não informada');
@@ -208,9 +194,6 @@ class ConversationActionButtonService
                 } catch (\Throwable $t) {}
                 break;
             case 'assign_agent':
-                if (!$canAssign) {
-                    Permission::abortIfCannot('conversations.assign.own');
-                }
                 $agentId = $payload['agent_id'] ?? null;
                 if (!$agentId) {
                     throw new \InvalidArgumentException('Agente não informado');
@@ -233,9 +216,6 @@ class ConversationActionButtonService
                 } catch (\Throwable $t) {}
                 break;
             case 'add_participant':
-                if (!$canEdit) {
-                    Permission::abortIfCannot('conversations.edit.own');
-                }
                 $participantId = $payload['participant_id'] ?? null;
                 if (!$participantId) {
                     throw new \InvalidArgumentException('Participante não informado');
@@ -259,9 +239,6 @@ class ConversationActionButtonService
                 } catch (\Throwable $t) {}
                 break;
             case 'close_conversation':
-                if (!$canEdit) {
-                    Permission::abortIfCannot('conversations.edit.own');
-                }
                 \App\Services\ConversationService::close($conversationId);
                 try {
                     Activity::log(
@@ -280,9 +257,6 @@ class ConversationActionButtonService
                 } catch (\Throwable $t) {}
                 break;
             case 'add_tag':
-                if (!$canEdit) {
-                    Permission::abortIfCannot('conversations.edit.own');
-                }
                 $tagId = $payload['tag_id'] ?? null;
                 if (!$tagId) {
                     throw new \InvalidArgumentException('Tag não informada');
@@ -305,9 +279,6 @@ class ConversationActionButtonService
                 } catch (\Throwable $t) {}
                 break;
             case 'remove_tag':
-                if (!$canEdit) {
-                    Permission::abortIfCannot('conversations.edit.own');
-                }
                 $tagId = $payload['tag_id'] ?? null;
                 if (!$tagId) {
                     throw new \InvalidArgumentException('Tag não informada');

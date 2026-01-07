@@ -57,11 +57,10 @@ class ConversationsController
     /**
      * Criar conversa
      * POST /api/v1/conversations
+     * Qualquer usuário autenticado via API pode criar conversas
      */
     public function store(): void
     {
-        ApiAuthMiddleware::requirePermission('conversations.create');
-        
         $input = json_decode(file_get_contents('php://input'), true) ?: [];
         
         try {

@@ -539,11 +539,10 @@ class ConversationController
 
     /**
      * Criar nova conversa com contato e mensagem
+     * Qualquer agente autenticado pode criar conversas
      */
     public function newConversation(): void
     {
-        Permission::abortIfCannot('conversations.create');
-        
         try {
             // Aceitar tanto JSON quanto form-data (Request::post já trata JSON)
             $data = \App\Helpers\Request::post();

@@ -106,10 +106,20 @@ class ConversationActionButtonController
             if (empty($step['type'])) {
                 continue;
             }
+            
+            // Processar payload - pode vir como string JSON ou array
+            $payload = $step['payload'] ?? [];
+            if (is_string($payload)) {
+                $decoded = json_decode($payload, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $payload = $decoded;
+                }
+            }
+            
             ConversationActionStep::create([
                 'button_id' => $buttonId,
                 'type' => $step['type'],
-                'payload' => json_encode($step['payload'] ?? []),
+                'payload' => json_encode($payload),
                 'sort_order' => $order++
             ]);
         }

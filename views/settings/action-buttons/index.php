@@ -307,20 +307,27 @@ ob_start();
                 if (data.stagesByFunnel) {
                     window.cacheStagesByFunnel = data.stagesByFunnel;
                 }
+                console.log('Funis carregados:', window.cacheFunnels.length);
             })
-            .catch(() => {});
+            .catch(err => { console.error('Erro ao carregar funis:', err); });
 
         // Agentes
         fetch('<?= Url::to('/agents?format=json') ?>', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(r => r.json())
-            .then(data => { window.cacheAgents = data.agents || data || []; })
-            .catch(() => {});
+            .then(data => { 
+                window.cacheAgents = data.agents || data || []; 
+                console.log('Agentes carregados:', window.cacheAgents.length);
+            })
+            .catch(err => { console.error('Erro ao carregar agentes:', err); });
 
         // Tags
-        fetch('<?= Url::to('/tags?format=json') ?>', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        fetch('<?= Url::to('/tags/all') ?>', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(r => r.json())
-            .then(data => { window.cacheTags = data.tags || data || []; })
-            .catch(() => {});
+            .then(data => { 
+                window.cacheTags = data.tags || data || []; 
+                console.log('Tags carregadas:', window.cacheTags.length);
+            })
+            .catch(err => { console.error('Erro ao carregar tags:', err); });
     };
 
     // Log de debug

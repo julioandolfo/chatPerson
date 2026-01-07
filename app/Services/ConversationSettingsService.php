@@ -415,9 +415,16 @@ class ConversationSettingsService
     /**
      * Distribuição Round-Robin
      */
-    public static function assignRoundRobin(?int $departmentId = null, ?int $funnelId = null, ?int $stageId = null, bool $includeAI = false): ?int
+    public static function assignRoundRobin(
+        ?int $departmentId = null, 
+        ?int $funnelId = null, 
+        ?int $stageId = null, 
+        bool $includeAI = false,
+        bool $considerAvailability = true,
+        bool $considerMaxConversations = true
+    ): ?int
     {
-        $agents = self::getAvailableAgents($departmentId, $funnelId, $stageId, $includeAI);
+        $agents = self::getAvailableAgents($departmentId, $funnelId, $stageId, $includeAI, $considerAvailability, $considerMaxConversations);
         
         if (empty($agents)) {
             return null;
@@ -446,9 +453,16 @@ class ConversationSettingsService
     /**
      * Distribuição por carga (menor carga primeiro)
      */
-    public static function assignByLoad(?int $departmentId = null, ?int $funnelId = null, ?int $stageId = null, bool $includeAI = false): ?int
+    public static function assignByLoad(
+        ?int $departmentId = null, 
+        ?int $funnelId = null, 
+        ?int $stageId = null, 
+        bool $includeAI = false,
+        bool $considerAvailability = true,
+        bool $considerMaxConversations = true
+    ): ?int
     {
-        $agents = self::getAvailableAgents($departmentId, $funnelId, $stageId, $includeAI);
+        $agents = self::getAvailableAgents($departmentId, $funnelId, $stageId, $includeAI, $considerAvailability, $considerMaxConversations);
         
         if (empty($agents)) {
             return null;
@@ -477,18 +491,32 @@ class ConversationSettingsService
     /**
      * Distribuição por especialidade (simplificado - pode ser expandido)
      */
-    public static function assignBySpecialty(?int $departmentId = null, ?int $funnelId = null, ?int $stageId = null, bool $includeAI = false): ?int
+    public static function assignBySpecialty(
+        ?int $departmentId = null, 
+        ?int $funnelId = null, 
+        ?int $stageId = null, 
+        bool $includeAI = false,
+        bool $considerAvailability = true,
+        bool $considerMaxConversations = true
+    ): ?int
     {
         // Por enquanto, usar round-robin dentro do setor
-        return self::assignRoundRobin($departmentId, $funnelId, $stageId, $includeAI);
+        return self::assignRoundRobin($departmentId, $funnelId, $stageId, $includeAI, $considerAvailability, $considerMaxConversations);
     }
 
     /**
      * Distribuição por performance (melhor performance primeiro)
      */
-    public static function assignByPerformance(?int $departmentId = null, ?int $funnelId = null, ?int $stageId = null, bool $includeAI = false): ?int
+    public static function assignByPerformance(
+        ?int $departmentId = null, 
+        ?int $funnelId = null, 
+        ?int $stageId = null, 
+        bool $includeAI = false,
+        bool $considerAvailability = true,
+        bool $considerMaxConversations = true
+    ): ?int
     {
-        $agents = self::getAvailableAgents($departmentId, $funnelId, $stageId, $includeAI);
+        $agents = self::getAvailableAgents($departmentId, $funnelId, $stageId, $includeAI, $considerAvailability, $considerMaxConversations);
         
         if (empty($agents)) {
             return null;
@@ -568,7 +596,14 @@ class ConversationSettingsService
     /**
      * Obter agentes disponíveis para atribuição (humanos e IA)
      */
-    private static function getAvailableAgents(?int $departmentId = null, ?int $funnelId = null, ?int $stageId = null, bool $includeAI = false): array
+    private static function getAvailableAgents(
+        ?int $departmentId = null, 
+        ?int $funnelId = null, 
+        ?int $stageId = null, 
+        bool $includeAI = false,
+        bool $considerAvailability = true,
+        bool $considerMaxConversations = true
+    ): array
     {
         $settings = self::getSettings();
         $agents = [];
@@ -579,8 +614,12 @@ class ConversationSettingsService
                 FROM users u
                 LEFT JOIN conversations c ON u.id = c.agent_id AND c.status IN ('open', 'pending')
                 WHERE u.status = 'active' 
-                AND u.availability_status = 'online'
-                AND u.role IN ('agent', 'admin', 'supervisor')";
+                AND u.role IN ('agent', 'admin', 'supervisor', 'senior_agent', 'junior_agent')";
+        
+        // Filtrar por disponibilidade apenas se considerAvailability = true
+        if ($considerAvailability) {
+            $sql .= " AND u.availability_status = 'online'";
+        }
         
         $params = [];
         
@@ -591,8 +630,12 @@ class ConversationSettingsService
             $params[] = $departmentId;
         }
         
-        $sql .= " GROUP BY u.id
-                  HAVING (u.max_conversations IS NULL OR u.current_conversations < u.max_conversations)";
+        $sql .= " GROUP BY u.id";
+        
+        // Filtrar por limite de conversas apenas se considerMaxConversations = true
+        if ($considerMaxConversations) {
+            $sql .= " HAVING (u.max_conversations IS NULL OR u.current_conversations < u.max_conversations)";
+        }
         
         $humanAgents = Database::fetchAll($sql, $params);
         $agents = array_merge($agents, $humanAgents);

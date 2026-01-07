@@ -972,6 +972,9 @@ class AutomationService
                     $allowAI = (bool)($nodeData['allow_ai_agents'] ?? false);
                     
                     \App\Helpers\Logger::automation("executeAssignAdvanced - Método personalizado: {$method}, Setor filtro: {$filterDepartmentId}");
+                    \App\Helpers\Logger::automation("executeAssignAdvanced - Considerar disponibilidade: " . ($considerAvailability ? 'SIM' : 'NÃO'));
+                    \App\Helpers\Logger::automation("executeAssignAdvanced - Considerar limite máximo: " . ($considerMaxConversations ? 'SIM' : 'NÃO'));
+                    \App\Helpers\Logger::automation("executeAssignAdvanced - Permitir agentes IA: " . ($allowAI ? 'SIM' : 'NÃO'));
                     
                     // Se método é por porcentagem, processar regras
                     if ($method === 'percentage') {
@@ -1008,7 +1011,10 @@ class AutomationService
                     }
                     
                     if ($agentId) {
+                        \App\Helpers\Logger::automation("executeAssignAdvanced - ✅ Agente selecionado: {$agentId}");
                         \App\Services\ConversationService::assignToAgent($conversationId, $agentId, false);
+                    } else {
+                        \App\Helpers\Logger::automation("executeAssignAdvanced - ⚠️ Nenhum agente encontrado com os critérios especificados");
                     }
                     break;
                     
@@ -1165,19 +1171,19 @@ class AutomationService
      */
     private static function selectAgentByMethod(string $method, ?int $departmentId, ?int $funnelId, ?int $stageId, bool $considerAvailability, bool $considerMaxConversations, bool $allowAI): ?int
     {
-        \App\Helpers\Logger::automation("selectAgentByMethod - Método: {$method}, Setor: {$departmentId}");
+        \App\Helpers\Logger::automation("selectAgentByMethod - Método: {$method}, Setor: {$departmentId}, ConsiderarDisp: " . ($considerAvailability ? 'SIM' : 'NÃO') . ", ConsiderarLimite: " . ($considerMaxConversations ? 'SIM' : 'NÃO'));
         
         switch ($method) {
             case 'round_robin':
-                return \App\Services\ConversationSettingsService::assignRoundRobin($departmentId, $funnelId, $stageId, $allowAI);
+                return \App\Services\ConversationSettingsService::assignRoundRobin($departmentId, $funnelId, $stageId, $allowAI, $considerAvailability, $considerMaxConversations);
             case 'by_load':
-                return \App\Services\ConversationSettingsService::assignByLoad($departmentId, $funnelId, $stageId, $allowAI);
+                return \App\Services\ConversationSettingsService::assignByLoad($departmentId, $funnelId, $stageId, $allowAI, $considerAvailability, $considerMaxConversations);
             case 'by_performance':
-                return \App\Services\ConversationSettingsService::assignByPerformance($departmentId, $funnelId, $stageId, $allowAI);
+                return \App\Services\ConversationSettingsService::assignByPerformance($departmentId, $funnelId, $stageId, $allowAI, $considerAvailability, $considerMaxConversations);
             case 'by_specialty':
-                return \App\Services\ConversationSettingsService::assignBySpecialty($departmentId, $funnelId, $stageId, $allowAI);
+                return \App\Services\ConversationSettingsService::assignBySpecialty($departmentId, $funnelId, $stageId, $allowAI, $considerAvailability, $considerMaxConversations);
             default:
-                return \App\Services\ConversationSettingsService::assignRoundRobin($departmentId, $funnelId, $stageId, $allowAI);
+                return \App\Services\ConversationSettingsService::assignRoundRobin($departmentId, $funnelId, $stageId, $allowAI, $considerAvailability, $considerMaxConversations);
         }
     }
     

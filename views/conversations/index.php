@@ -4372,6 +4372,31 @@ function getChannelInfo(channel) {
                     </div>
                     
                     <div class="mb-5">
+                        <label class="form-label fw-semibold mb-2">Funil:</label>
+                        <select class="form-select form-select-solid" id="new_conversation_funnel" name="funnel_id">
+                            <option value="">Selecione um funil...</option>
+                            <?php if (empty($funnelsForNewConversation)): ?>
+                                <option value="" disabled>Nenhum funil disponível para você</option>
+                            <?php else: ?>
+                                <?php foreach ($funnelsForNewConversation as $funnel): ?>
+                                    <option value="<?= $funnel['id'] ?>">
+                                        <?= htmlspecialchars($funnel['name'] ?? 'Funil sem nome') ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </select>
+                        <div class="form-text">Opcional: escolha o funil (apenas os que você tem permissão)</div>
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold mb-2">Etapa:</label>
+                        <select class="form-select form-select-solid" id="new_conversation_stage" name="stage_id" disabled>
+                            <option value="">Selecione um funil primeiro</option>
+                        </select>
+                        <div class="form-text">Opcional: etapas disponíveis no funil selecionado</div>
+                    </div>
+                    
+                    <div class="mb-5">
                         <label class="form-label fw-semibold mb-2">Nome do Contato:</label>
                         <input type="text" class="form-control form-control-solid" id="new_contact_name" name="name" placeholder="Nome completo" required>
                     </div>
@@ -18135,6 +18160,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const channelSelect = document.getElementById('new_conversation_channel');
     const whatsappAccountContainer = document.getElementById('new_conversation_whatsapp_account_container');
     const whatsappAccountSelect = document.getElementById('new_conversation_whatsapp_account');
+    const funnelSelect = document.getElementById('new_conversation_funnel');
+    const stageSelect = document.getElementById('new_conversation_stage');
     
     if (channelSelect && whatsappAccountContainer) {
         // Função para atualizar visibilidade
@@ -18169,6 +18196,67 @@ document.addEventListener('DOMContentLoaded', function() {
         // Atualizar inicialmente
         updateWhatsAppAccountVisibility();
     }
+
+    // Funil / Etapa - carregar etapas conforme o funil e permissões do agente
+    if (funnelSelect && stageSelect) {
+        function resetStageSelect() {
+            stageSelect.innerHTML = '<option value=\"\">Selecione um funil primeiro</option>';
+            stageSelect.disabled = true;
+        }
+
+        async function loadStagesForFunnel(funnelId) {
+            if (!funnelId) {
+                resetStageSelect();
+                return;
+            }
+
+            stageSelect.disabled = true;
+            stageSelect.innerHTML = '<option value=\"\">Carregando etapas...</option>';
+
+            try {
+                const response = await fetch(`<?= \App\Helpers\Url::to('/funnels') ?>/${funnelId}/stages/json`, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                if (!data.success || !data.stages) {
+                    resetStageSelect();
+                    return;
+                }
+
+                let options = '<option value=\"\">Selecione uma etapa...</option>';
+                data.stages.forEach(stage => {
+                    options += `<option value=\"${stage.id}\">${escapeHtml(stage.name || 'Etapa')}</option>`;
+                });
+
+                stageSelect.innerHTML = options;
+                stageSelect.disabled = false;
+            } catch (error) {
+                console.error('Erro ao carregar etapas do funil:', error);
+                resetStageSelect();
+            }
+        }
+
+        funnelSelect.addEventListener('change', function() {
+            const funnelId = this.value;
+            loadStagesForFunnel(funnelId);
+        });
+
+        // Resetar etapas ao abrir modal
+        const modal = document.getElementById('kt_modal_new_conversation');
+        if (modal) {
+            modal.addEventListener('show.bs.modal', function() {
+                resetStageSelect();
+                const currentFunnel = funnelSelect.value;
+                if (currentFunnel) {
+                    loadStagesForFunnel(currentFunnel);
+                }
+            });
+        }
+    }
     
     // Formulírio de nova conversa
     const newConversationForm = document.getElementById('newConversationForm');
@@ -18183,6 +18271,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const name = document.getElementById('new_contact_name').value.trim();
             const phone = document.getElementById('new_contact_phone').value.trim();
             const message = document.getElementById('new_conversation_message').value.trim();
+            const funnelId = document.getElementById('new_conversation_funnel')?.value.trim() || '';
+            const stageId = document.getElementById('new_conversation_stage')?.value.trim() || '';
             
             console.log('👔 Dados do formulírio:', { channel, whatsappAccountId, name, phone, message });
             
@@ -18232,6 +18322,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     phone: fullPhone,
                     message: message
                 };
+                
+                if (funnelId) {
+                    requestData.funnel_id = parseInt(funnelId, 10);
+                }
+                if (stageId) {
+                    requestData.stage_id = parseInt(stageId, 10);
+                }
                 
                 // Adicionar whatsapp_account_id apenas se canal for WhatsApp
                 if (channel === 'whatsapp' && whatsappAccountId) {

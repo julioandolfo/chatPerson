@@ -89,6 +89,47 @@ ob_start();
     };
 
     // Visibilidade (agentes)
+    window.renderVisibilityCheckboxes = function(selected = []) {
+        const list = document.getElementById('ab_visibility_list');
+        const allBox = document.getElementById('ab_visibility_all');
+        if (!list) return;
+        const selectedSet = new Set((selected || []).map(v => String(v)));
+        const agents = window.cacheAgents || [];
+        if (!agents.length) {
+            list.innerHTML = '<div class="text-muted fs-8">Carregando agentes...</div>';
+            if (allBox) { allBox.checked = false; allBox.indeterminate = false; }
+            return;
+        }
+        list.innerHTML = agents.map(a => {
+            const id = String(a.id);
+            const isSel = selectedSet.has(id);
+            return `
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="visibility[agents][]" value="${id}" id="vis_agent_${id}" ${isSel ? 'checked' : ''} onchange="window.updateVisibilityAllState()">
+                    <label class="form-check-label" for="vis_agent_${id}">${window.escapeHtml(a.name || a.email || 'Agente')}</label>
+                </div>
+            `;
+        }).join('');
+        window.updateVisibilityAllState();
+    };
+
+    window.toggleVisibilityAll = function(cb) {
+        const boxes = document.querySelectorAll('#ab_visibility_list input[type="checkbox"]');
+        boxes.forEach(b => { b.checked = cb.checked; });
+        cb.indeterminate = false;
+    };
+
+    window.updateVisibilityAllState = function() {
+        const allBox = document.getElementById('ab_visibility_all');
+        const boxes = document.querySelectorAll('#ab_visibility_list input[type="checkbox"]');
+        if (!allBox || !boxes.length) return;
+        const total = boxes.length;
+        const checked = Array.from(boxes).filter(b => b.checked).length;
+        allBox.checked = checked === total && total > 0;
+        allBox.indeterminate = checked > 0 && checked < total;
+    };
+
+    // Visibilidade (agentes)
     window.populateVisibilitySelect = function(selected = []) {
         const sel = document.getElementById('ab_visibility_agents');
         if (!sel) return;
@@ -118,7 +159,7 @@ ob_start();
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <strong>Etapa</strong>
                     <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="window.removeStepRow(${idx})">
-                        <i class="ki-duotone ki-cross fs-6"></i>
+                    <i class="ki-duotone ki-cross fs-6"><span class="path1"></span><span class="path2"></span></i>
                     </button>
                 </div>
                 <div class="row g-3">
@@ -302,7 +343,7 @@ ob_start();
         const visibilityAgents = button && button.visibility && Array.isArray(button.visibility.agents)
             ? button.visibility.agents
             : [];
-        window.populateVisibilitySelect(visibilityAgents);
+        window.renderVisibilityCheckboxes(visibilityAgents);
         const colorVal = button ? (button.color || '#009ef7') : '#009ef7';
         document.getElementById('ab_color').value = colorVal;
         window.syncColorPicker(colorVal);
@@ -343,7 +384,7 @@ ob_start();
             .then(data => { 
                 window.cacheAgents = data.agents || data || []; 
                 console.log('Agentes carregados:', window.cacheAgents.length);
-                window.populateVisibilitySelect(window.visibilitySelected || []);
+                window.renderVisibilityCheckboxes(window.visibilitySelected || []);
             })
             .catch(err => { console.error('Erro ao carregar agentes:', err); });
 
@@ -378,7 +419,7 @@ ob_start();
             <h1 class="fw-bold mb-1">Botões de Ações</h1>
             <p class="text-muted mb-0">Crie atalhos para executar ações rápidas nas conversas.</p>
         </div>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#actionButtonModal" onclick="window.openActionButtonModal()">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#actionButtonModal" onclick="window.openActionButtonModal()">
             <i class="ki-duotone ki-plus fs-2"></i>
             Novo Botão
         </button>
@@ -391,7 +432,7 @@ ob_start();
                     <i class="ki-duotone ki-bolt fs-2x text-muted mb-3"><span class="path1"></span><span class="path2"></span></i>
                     <div class="fw-semibold mb-1">Nenhum botão configurado ainda.</div>
                     <div class="text-muted fs-7 mb-3">Crie seu primeiro botão de ação para acelerar os fluxos.</div>
-                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#actionButtonModal" onclick="window.openActionButtonModal()">Criar botão</button>
+                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#actionButtonModal" onclick="window.openActionButtonModal()">Criar botão</button>
                 </div>
             <?php else: ?>
                 <div class="table-responsive">
@@ -438,7 +479,7 @@ ob_start();
                                         <?php endif; ?>
                                     </td>
                                     <td class="text-end">
-                                        <button class="btn btn-sm btn-light" onclick='window.openActionButtonModal(<?= json_encode($btn) ?>, <?= json_encode($stepsByButton[$btn["id"]] ?? []) ?>)'>
+                                        <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#actionButtonModal" onclick='window.openActionButtonModal(<?= json_encode($btn) ?>, <?= json_encode($stepsByButton[$btn["id"]] ?? []) ?>)'>
                                             Editar
                                         </button>
                                         <button class="btn btn-sm btn-light-danger" onclick="window.deleteActionButton(<?= (int)$btn['id'] ?>)">
@@ -521,11 +562,15 @@ ob_start();
             <div class="mb-3">
                 <label class="form-label d-flex align-items-center justify-content-between">
                     <span>Visibilidade (agentes)</span>
-                    <small class="text-muted">Deixe vazio para todos</small>
+                    <small class="text-muted">Vazio = todos</small>
                 </label>
-                <select class="form-select" name="visibility[agents][]" id="ab_visibility_agents" multiple>
-                    <!-- opções preenchidas via JS -->
-                </select>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="ab_visibility_all" onchange="window.toggleVisibilityAll(this)">
+                    <label class="form-check-label" for="ab_visibility_all">Selecionar todos</label>
+                </div>
+                <div id="ab_visibility_list" class="d-flex flex-column gap-1">
+                    <!-- checkboxes via JS -->
+                </div>
             </div>
 
             <div class="mb-3">

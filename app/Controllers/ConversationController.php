@@ -11,6 +11,9 @@ use App\Services\ConversationService;
 use App\Services\Api4ComService;
 use App\Models\User;
 use App\Models\Conversation;
+use App\Models\Funnel;
+use App\Models\FunnelStage;
+use App\Models\AgentFunnelPermission;
 
 class ConversationController
 {
@@ -166,6 +169,29 @@ class ConversationController
             $departments = \App\Models\Department::all();
             $tags = \App\Models\Tag::all();
             $whatsappAccounts = \App\Models\WhatsAppAccount::getActive();
+            // Obter funis permitidos para o agente (usado no modal de nova conversa)
+            $funnelsForNewConversation = [];
+            try {
+                $allowedFunnels = AgentFunnelPermission::getAllowedFunnelIds($userId);
+                $allFunnels = Funnel::all();
+                
+                if ($allowedFunnels === null) {
+                    // Admin/SuperAdmin: todos os funis
+                    $funnelsForNewConversation = $allFunnels;
+                } elseif (!empty($allowedFunnels)) {
+                    foreach ($allFunnels as $funnel) {
+                        if (in_array((int)$funnel['id'], $allowedFunnels, true)) {
+                            $funnelsForNewConversation[] = $funnel;
+                        }
+                    }
+                } else {
+                    // Sem permissões específicas: nenhum funil disponível
+                    $funnelsForNewConversation = [];
+                }
+            } catch (\Exception $e) {
+                // Se der erro, apenas não carregar funis (não bloquear a página)
+                $funnelsForNewConversation = [];
+            }
             
             // Se houver ID de conversa na URL, carregar para exibir no chat
             $selectedConversationId = $_GET['id'] ?? null;
@@ -233,6 +259,7 @@ class ConversationController
                 'departments' => $departments ?? [],
                 'tags' => $tags ?? [],
                 'whatsappAccounts' => $whatsappAccounts ?? [],
+                'funnelsForNewConversation' => $funnelsForNewConversation ?? [],
                 'filters' => $filters,
                 'selectedConversation' => $selectedConversation,
                 'selectedConversationId' => $selectedConversationId,
@@ -552,6 +579,8 @@ class ConversationController
             $name = trim($data['name'] ?? '');
             $phone = trim($data['phone'] ?? '');
             $message = trim($data['message'] ?? '');
+            $funnelId = !empty($data['funnel_id']) ? (int)$data['funnel_id'] : null;
+            $stageId = !empty($data['stage_id']) ? (int)$data['stage_id'] : null;
             
             if (empty($channel) || empty($name) || empty($phone) || empty($message)) {
                 Response::json(['success' => false, 'message' => 'Preencha todos os campos obrigatórios'], 400);
@@ -616,6 +645,37 @@ class ConversationController
             
             $currentUserId = \App\Helpers\Auth::id();
             
+            // Validar permissão de funil/etapa selecionados
+            if ($stageId) {
+                // Etapa define o funil, então sincronizar funnelId se não vier
+                $stage = FunnelStage::find($stageId);
+                if (!$stage) {
+                    Response::json(['success' => false, 'message' => 'Etapa selecionada não encontrada'], 400);
+                    return;
+                }
+                
+                // Se usuário não puder ver a etapa, bloquear
+                if (!AgentFunnelPermission::canViewStage($currentUserId, $stageId)) {
+                    Response::json(['success' => false, 'message' => 'Sem permissão para a etapa selecionada'], 403);
+                    return;
+                }
+                
+                // Garantir que funnelId corresponda ao da etapa
+                $funnelId = $funnelId ?: (int)$stage['funnel_id'];
+                if ($funnelId && (int)$stage['funnel_id'] !== $funnelId) {
+                    Response::json(['success' => false, 'message' => 'Etapa não pertence ao funil selecionado'], 400);
+                    return;
+                }
+            }
+            
+            if ($funnelId) {
+                $allowedFunnels = AgentFunnelPermission::getAllowedFunnelIds($currentUserId);
+                if ($allowedFunnels !== null && !in_array($funnelId, $allowedFunnels, true)) {
+                    Response::json(['success' => false, 'message' => 'Sem permissão para o funil selecionado'], 403);
+                    return;
+                }
+            }
+            
             // Verificar se já existe conversa com esse contato e canal
             $whatsappAccountIdForSearch = ($channel === 'whatsapp') ? $whatsappAccountId : null;
             $existingConversation = \App\Models\Conversation::findByContactAndChannel(
@@ -664,12 +724,20 @@ class ConversationController
                     'agent_id' => $currentUserId
                 ];
                 
+                if ($funnelId) {
+                    $conversationData['funnel_id'] = $funnelId;
+                }
+                if ($stageId) {
+                    $conversationData['stage_id'] = $stageId;
+                }
+                
                 // Adicionar whatsapp_account_id apenas se canal for WhatsApp
                 if ($channel === 'whatsapp' && $whatsappAccountId) {
                     $conversationData['whatsapp_account_id'] = $whatsappAccountId;
                 }
                 
-                $conversation = \App\Services\ConversationService::create($conversationData);
+                // Criar sem executar automações (manual)
+                $conversation = \App\Services\ConversationService::create($conversationData, false);
                 
                 $conversationId = $conversation['id'];
             }

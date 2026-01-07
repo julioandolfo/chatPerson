@@ -381,39 +381,55 @@ class AutomationService
             
             if ($timeDiff <= 15) { // Se mensagem foi criada dentro de 15s da conversa (cobre delay + processamento)
                 // Contar mensagens do contato antes desta (por ID, não por timestamp)
-                $result = \App\Helpers\Database::query(
-                    "SELECT COUNT(*) as count FROM messages 
-                     WHERE conversation_id = ? 
-                     AND sender_type = 'contact' 
-                     AND id < ?",
-                    [$conversation['id'], $messageId]
-                );
-                
-                $contactMessagesBefore = isset($result[0]['count']) ? (int)$result[0]['count'] : 0;
+                try {
+                    $result = \App\Helpers\Database::fetchAll(
+                        "SELECT COUNT(*) as count FROM messages 
+                         WHERE conversation_id = ? 
+                         AND sender_type = 'contact' 
+                         AND id < ?",
+                        [$conversation['id'], $messageId]
+                    );
+                    
+                    $contactMessagesBefore = isset($result[0]['count']) ? (int)$result[0]['count'] : 0;
+                    \App\Helpers\Logger::automation("  contactMessagesBefore: {$contactMessagesBefore}");
+                } catch (\Exception $e) {
+                    \App\Helpers\Logger::automation("  ERRO ao contar mensagens do contato: " . $e->getMessage());
+                    $contactMessagesBefore = 0;
+                }
                 
                 // Também contar mensagens do bot/agente (usar ID para evitar race condition)
                 // Conta mensagens do bot com ID menor (que foram inseridas antes)
-                $botMessagesResult = \App\Helpers\Database::query(
-                    "SELECT COUNT(*) as count FROM messages 
-                     WHERE conversation_id = ? 
-                     AND sender_type = 'agent' 
-                     AND id < ?",
-                    [$conversation['id'], $messageId]
-                );
-                
-                $botMessagesBefore = isset($botMessagesResult[0]['count']) ? (int)$botMessagesResult[0]['count'] : 0;
+                try {
+                    $botMessagesResult = \App\Helpers\Database::fetchAll(
+                        "SELECT COUNT(*) as count FROM messages 
+                         WHERE conversation_id = ? 
+                         AND sender_type = 'agent' 
+                         AND id < ?",
+                        [$conversation['id'], $messageId]
+                    );
+                    
+                    $botMessagesBefore = isset($botMessagesResult[0]['count']) ? (int)$botMessagesResult[0]['count'] : 0;
+                    \App\Helpers\Logger::automation("  botMessagesBefore: {$botMessagesBefore}");
+                } catch (\Exception $e) {
+                    \App\Helpers\Logger::automation("  ERRO ao contar mensagens do bot: " . $e->getMessage());
+                    $botMessagesBefore = 0;
+                }
                 
                 // Debug: listar IDs das mensagens do bot para entender a ordem
                 if ($botMessagesBefore == 0) {
-                    $allBotMessages = \App\Helpers\Database::query(
-                        "SELECT id, created_at, LEFT(content, 30) as content_preview 
-                         FROM messages 
-                         WHERE conversation_id = ? 
-                         AND sender_type = 'agent' 
-                         ORDER BY id",
-                        [$conversation['id']]
-                    );
-                    \App\Helpers\Logger::automation("DEBUG: Não há mensagens do bot antes. Todas mensagens agent na conversa: " . json_encode($allBotMessages));
+                    try {
+                        $allBotMessages = \App\Helpers\Database::fetchAll(
+                            "SELECT id, created_at, LEFT(content, 30) as content_preview 
+                             FROM messages 
+                             WHERE conversation_id = ? 
+                             AND sender_type = 'agent' 
+                             ORDER BY id",
+                            [$conversation['id']]
+                        );
+                        \App\Helpers\Logger::automation("DEBUG: Não há mensagens do bot antes. Todas mensagens agent na conversa: " . json_encode($allBotMessages));
+                    } catch (\Exception $e) {
+                        \App\Helpers\Logger::automation("DEBUG: Erro ao buscar mensagens do bot: " . $e->getMessage());
+                    }
                 }
                 
                 \App\Helpers\Logger::automation("Verificação primeira mensagem: messageId={$messageId}, conversationId={$conversation['id']}, timeDiff={$timeDiff}s, contactMessagesBefore={$contactMessagesBefore}, botMessagesBefore={$botMessagesBefore}");

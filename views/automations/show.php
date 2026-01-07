@@ -2059,6 +2059,14 @@ function openNodeConfig(nodeId) {
                         <div class="form-text">Inclui agentes de IA na seleção</div>
                     </div>
                     
+                    <div class="fv-row mb-7">
+                        <label class="d-flex align-items-center">
+                            <input type="checkbox" name="force_reassign" class="form-check-input me-2" ${node.node_data.force_reassign ? 'checked' : ''} />
+                            <span class="fw-semibold fs-6">Forçar reatribuição</span>
+                        </label>
+                        <div class="form-text">Reatribui mesmo se já houver um agente atribuído (ignora limites)</div>
+                    </div>
+                    
                     <!-- Container: Distribuição por Porcentagem -->
                     <div id="percentage_container" style="display: none;">
                         <div class="alert alert-info d-flex align-items-center p-5 mb-7">
@@ -3398,7 +3406,8 @@ document.addEventListener("DOMContentLoaded", function() {
                 'consider_availability',
                 'consider_max_conversations',
                 'allow_ai_agents',
-                'force_assign'
+                'force_assign',
+                'force_reassign'
             ];
             checkboxKeys.forEach(k => {
                 if (!formData.has(k)) {

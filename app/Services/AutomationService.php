@@ -951,7 +951,10 @@ class AutomationService
             
             $assignmentType = $nodeData['assignment_type'] ?? 'auto';
             $agentId = null;
+            $currentAgentId = $conversation['agent_id'] ?? null;
+            
             \App\Helpers\Logger::automation("executeAssignAdvanced - Tipo: {$assignmentType}, Conversa: {$conversationId}");
+            \App\Helpers\Logger::automation("executeAssignAdvanced - Agente atual na conversa: " . ($currentAgentId ? $currentAgentId : 'NENHUM'));
             
             switch ($assignmentType) {
                 case 'specific_agent':
@@ -961,7 +964,16 @@ class AutomationService
                     \App\Helpers\Logger::automation("executeAssignAdvanced - Agente específico: {$agentId}, Forçar: " . ($forceAssign ? 'SIM' : 'NÃO'));
                     
                     if ($agentId) {
-                        \App\Services\ConversationService::assignToAgent($conversationId, $agentId, $forceAssign);
+                        if ($currentAgentId && $currentAgentId == $agentId && !$forceAssign) {
+                            \App\Helpers\Logger::automation("executeAssignAdvanced - ⚠️ Agente {$agentId} já está atribuído. Pulando (force_assign=false)");
+                        } else {
+                            try {
+                                \App\Services\ConversationService::assignToAgent($conversationId, $agentId, $forceAssign);
+                                \App\Helpers\Logger::automation("executeAssignAdvanced - ✅ Conversa atribuída ao agente {$agentId}");
+                            } catch (\Exception $e) {
+                                \App\Helpers\Logger::automation("executeAssignAdvanced - ❌ ERRO: " . $e->getMessage());
+                            }
+                        }
                     }
                     break;
                     
@@ -977,6 +989,23 @@ class AutomationService
                             $conversation['funnel_id'] ?? null,
                             $conversation['funnel_stage_id'] ?? null
                         );
+                        
+                        if ($agentId) {
+                            \App\Helpers\Logger::automation("executeAssignAdvanced - ✅ Agente {$agentId} selecionado do setor {$departmentId}");
+                            if ($currentAgentId && $currentAgentId == $agentId) {
+                                \App\Helpers\Logger::automation("executeAssignAdvanced - ⚠️ Agente {$agentId} já está atribuído. Mantendo.");
+                            } else {
+                                try {
+                                    \App\Services\ConversationService::assignToAgent($conversationId, $agentId, false);
+                                    \App\Helpers\Logger::automation("executeAssignAdvanced - ✅ Conversa atribuída ao agente {$agentId}");
+                                } catch (\Exception $e) {
+                                    \App\Helpers\Logger::automation("executeAssignAdvanced - ❌ ERRO: " . $e->getMessage());
+                                    $agentId = null; // Para tentar fallback
+                                }
+                            }
+                        } else {
+                            \App\Helpers\Logger::automation("executeAssignAdvanced - ⚠️ Nenhum agente disponível no setor {$departmentId}");
+                        }
                     }
                     break;
                     
@@ -986,11 +1015,13 @@ class AutomationService
                     $considerAvailability = (bool)($nodeData['consider_availability'] ?? true);
                     $considerMaxConversations = (bool)($nodeData['consider_max_conversations'] ?? true);
                     $allowAI = (bool)($nodeData['allow_ai_agents'] ?? false);
+                    $forceReassign = (bool)($nodeData['force_reassign'] ?? false);
                     
                     \App\Helpers\Logger::automation("executeAssignAdvanced - Método personalizado: {$method}, Setor filtro: {$filterDepartmentId}");
                     \App\Helpers\Logger::automation("executeAssignAdvanced - Considerar disponibilidade: " . ($considerAvailability ? 'SIM' : 'NÃO'));
                     \App\Helpers\Logger::automation("executeAssignAdvanced - Considerar limite máximo: " . ($considerMaxConversations ? 'SIM' : 'NÃO'));
                     \App\Helpers\Logger::automation("executeAssignAdvanced - Permitir agentes IA: " . ($allowAI ? 'SIM' : 'NÃO'));
+                    \App\Helpers\Logger::automation("executeAssignAdvanced - Forçar reatribuição: " . ($forceReassign ? 'SIM' : 'NÃO'));
                     
                     // Se método é por porcentagem, processar regras
                     if ($method === 'percentage') {
@@ -1028,7 +1059,20 @@ class AutomationService
                     
                     if ($agentId) {
                         \App\Helpers\Logger::automation("executeAssignAdvanced - ✅ Agente selecionado: {$agentId}");
-                        \App\Services\ConversationService::assignToAgent($conversationId, $agentId, false);
+                        
+                        // Verificar se já tem este agente atribuído
+                        if ($currentAgentId && $currentAgentId == $agentId && !$forceReassign) {
+                            \App\Helpers\Logger::automation("executeAssignAdvanced - ⚠️ Agente {$agentId} já está atribuído. Pulando reatribuição (force_reassign=false)");
+                        } else {
+                            try {
+                                // Usar forceReassign como parâmetro para ignorar limites se necessário
+                                \App\Services\ConversationService::assignToAgent($conversationId, $agentId, $forceReassign);
+                                \App\Helpers\Logger::automation("executeAssignAdvanced - ✅ Conversa atribuída ao agente {$agentId} com sucesso");
+                            } catch (\Exception $e) {
+                                \App\Helpers\Logger::automation("executeAssignAdvanced - ❌ ERRO ao atribuir: " . $e->getMessage());
+                                // Não relançar exceção para não quebrar fluxo
+                            }
+                        }
                     } else {
                         \App\Helpers\Logger::automation("executeAssignAdvanced - ⚠️ Nenhum agente encontrado com os critérios especificados");
                     }
@@ -1043,8 +1087,22 @@ class AutomationService
                         $conversation['funnel_id'] ?? null,
                         $conversation['funnel_stage_id'] ?? null
                     );
+                    
                     if ($agentId) {
-                        \App\Services\ConversationService::assignToAgent($conversationId, $agentId, false);
+                        \App\Helpers\Logger::automation("executeAssignAdvanced - ✅ Agente {$agentId} selecionado automaticamente");
+                        if ($currentAgentId && $currentAgentId == $agentId) {
+                            \App\Helpers\Logger::automation("executeAssignAdvanced - ⚠️ Agente {$agentId} já está atribuído. Mantendo.");
+                        } else {
+                            try {
+                                \App\Services\ConversationService::assignToAgent($conversationId, $agentId, false);
+                                \App\Helpers\Logger::automation("executeAssignAdvanced - ✅ Conversa atribuída ao agente {$agentId}");
+                            } catch (\Exception $e) {
+                                \App\Helpers\Logger::automation("executeAssignAdvanced - ❌ ERRO: " . $e->getMessage());
+                                $agentId = null;
+                            }
+                        }
+                    } else {
+                        \App\Helpers\Logger::automation("executeAssignAdvanced - ⚠️ Nenhum agente disponível");
                     }
                     break;
             }

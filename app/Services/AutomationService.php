@@ -1065,12 +1065,16 @@ class AutomationService
                             \App\Helpers\Logger::automation("executeAssignAdvanced - ⚠️ Agente {$agentId} já está atribuído. Pulando reatribuição (force_reassign=false)");
                         } else {
                             try {
-                                // Usar forceReassign como parâmetro para ignorar limites se necessário
-                                \App\Services\ConversationService::assignToAgent($conversationId, $agentId, $forceReassign);
+                                // Se não está considerando limites/disponibilidade OU force_reassign, forçar atribuição
+                                $shouldForce = $forceReassign || !$considerMaxConversations || !$considerAvailability;
+                                \App\Helpers\Logger::automation("executeAssignAdvanced - Parâmetro forceAssign para assignToAgent: " . ($shouldForce ? 'TRUE (ignorará limites)' : 'FALSE'));
+                                
+                                \App\Services\ConversationService::assignToAgent($conversationId, $agentId, $shouldForce);
                                 \App\Helpers\Logger::automation("executeAssignAdvanced - ✅ Conversa atribuída ao agente {$agentId} com sucesso");
                             } catch (\Exception $e) {
                                 \App\Helpers\Logger::automation("executeAssignAdvanced - ❌ ERRO ao atribuir: " . $e->getMessage());
                                 // Não relançar exceção para não quebrar fluxo
+                                $agentId = null; // Para tentar fallback
                             }
                         }
                     } else {

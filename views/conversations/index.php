@@ -18290,8 +18290,10 @@ document.addEventListener('DOMContentLoaded', function() {
             // Normalizar telefone (remover caracteres não numéricos)
             let normalizedPhone = phone.replace(/\D/g, '');
             
-            // Remover +55 ou 55 do início se já estiver presente
-            normalizedPhone = normalizedPhone.replace(/^(55)?/, '');
+            // Remover código do país 55 SOMENTE se vier com comprimento > 11 (ou seja, incluía o país)
+            if (normalizedPhone.startsWith('55') && normalizedPhone.length > 11) {
+                normalizedPhone = normalizedPhone.slice(2);
+            }
             
             // Validar telefone (deve ter 10 ou 11 dígitos - DDD + número)
             if (normalizedPhone.length < 10 || normalizedPhone.length > 11) {

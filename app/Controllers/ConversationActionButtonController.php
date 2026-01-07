@@ -86,15 +86,14 @@ class ConversationActionButtonController
 
     public function listForConversation(int $conversationId): void
     {
-        Permission::abortIfCannot('conversations.actions.run');
+        // Não bloquear por permissão geral; cada step fará sua própria checagem
         $buttons = ConversationActionButtonService::listWithSteps(\App\Helpers\Auth::id());
         Response::json(['success' => true, 'buttons' => $buttons]);
     }
 
     public function run(int $conversationId, int $buttonId): void
     {
-        Permission::abortIfCannot('conversations.actions.run');
-
+        // Permissões serão verificadas dentro de cada step executado
         try {
             $result = ConversationActionButtonService::run($conversationId, $buttonId, Auth::id());
             Response::json($result);

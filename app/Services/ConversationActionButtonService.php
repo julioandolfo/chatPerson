@@ -176,7 +176,8 @@ class ConversationActionButtonService
                 if (!$stageId) {
                     throw new \InvalidArgumentException('Etapa não informada');
                 }
-                \App\Services\FunnelService::moveConversation($conversationId, (int)$stageId, $userId);
+                // Botões criados pelo admin devem executar sem bloquear permissão de estágio
+                \App\Services\FunnelService::moveConversation($conversationId, (int)$stageId, $userId, true);
                 try {
                     Activity::log(
                         'action_button_step',
@@ -198,6 +199,7 @@ class ConversationActionButtonService
                 if (!$agentId) {
                     throw new \InvalidArgumentException('Agente não informado');
                 }
+                // Execução via botão: não bloquear por permissão de atribuição
                 \App\Services\ConversationService::assignToAgent($conversationId, (int)$agentId, true);
                 try {
                     Activity::log(
@@ -220,6 +222,7 @@ class ConversationActionButtonService
                 if (!$participantId) {
                     throw new \InvalidArgumentException('Participante não informado');
                 }
+                // Execução via botão: permitir adicionar sem checar permissão extra
                 ConversationParticipant::addParticipant($conversationId, (int)$participantId, $userId);
                 \App\Services\ConversationService::invalidateCache($conversationId);
                 try {

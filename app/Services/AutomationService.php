@@ -350,24 +350,67 @@ class AutomationService
         if (!empty($metadata['ai_branching_active'])) {
             \App\Helpers\Logger::automation("🤖 Ramificação de IA ATIVA detectada! (fallback)");
             
-            // Se for mensagem do contato, não verificar aqui (será verificado após IA responder)
-            if ($message['sender_type'] === 'contact') {
-                \App\Helpers\Logger::automation("⚠️ Mensagem do contato - verificação será feita após IA responder. Pulando...");
-            } else {
-                // Mensagens da IA podem ser verificadas aqui como fallback
-                \App\Helpers\Logger::automation("Analisando intent na mensagem da IA (fallback)...");
-                $handled = self::handleAIBranchingResponse($conversation, $message);
+            // ✅ Verificar se agente humano já interveio
+            $agentHasIntervened = self::hasAgentIntervened($conversationId);
+            if ($agentHasIntervened) {
+                \App\Helpers\Logger::automation("🛑 Agente humano JÁ INTERVEIO na conversa. Limpando ramificação IA.");
                 
-                if ($handled) {
-                    \App\Helpers\Logger::automation("✅ Ramificação tratou a mensagem. Roteou para nó específico.");
-                    return;
+                // Limpar estado de ramificação IA
+                $metadata['ai_branching_active'] = false;
+                $metadata['ai_intents'] = [];
+                $metadata['ai_fallback_node_id'] = null;
+                $metadata['ai_max_interactions'] = 0;
+                $metadata['ai_interaction_count'] = 0;
+                $metadata['ai_branching_automation_id'] = null;
+                
+                \App\Models\Conversation::update($conversationId, [
+                    'metadata' => json_encode($metadata)
+                ]);
+                
+                \App\Helpers\Logger::automation("✅ Ramificação IA desativada. Seguindo fluxo normal.");
+                // Continuar para processar normalmente
+            } else {
+                // Se for mensagem do contato, não verificar aqui (será verificado após IA responder)
+                if ($message['sender_type'] === 'contact') {
+                    \App\Helpers\Logger::automation("⚠️ Mensagem do contato - verificação será feita após IA responder. Pulando...");
+                } else {
+                    // Mensagens da IA podem ser verificadas aqui como fallback
+                    \App\Helpers\Logger::automation("Analisando intent na mensagem da IA (fallback)...");
+                    $handled = self::handleAIBranchingResponse($conversation, $message);
+                    
+                    if ($handled) {
+                        \App\Helpers\Logger::automation("✅ Ramificação tratou a mensagem. Roteou para nó específico.");
+                        return;
+                    }
+                    \App\Helpers\Logger::automation("⚠️ handleAIBranchingResponse retornou false. Continuando...");
                 }
-                \App\Helpers\Logger::automation("⚠️ handleAIBranchingResponse retornou false. Continuando...");
             }
         }
         
         if (!empty($metadata['chatbot_active'])) {
             \App\Helpers\Logger::automation("🤖 Chatbot ATIVO detectado!");
+            
+            // ✅ Verificar se agente humano já interveio (enviou alguma mensagem)
+            $agentHasIntervened = self::hasAgentIntervened($conversationId);
+            if ($agentHasIntervened) {
+                \App\Helpers\Logger::automation("🛑 Agente humano JÁ INTERVEIO na conversa. Ignorando chatbot e limpando estado.");
+                
+                // Limpar estado do chatbot
+                $metadata['chatbot_active'] = false;
+                $metadata['chatbot_type'] = null;
+                $metadata['chatbot_options'] = [];
+                $metadata['chatbot_next_nodes'] = [];
+                $metadata['chatbot_automation_id'] = null;
+                $metadata['chatbot_node_id'] = null;
+                
+                \App\Models\Conversation::update($conversationId, [
+                    'metadata' => json_encode($metadata)
+                ]);
+                
+                \App\Helpers\Logger::automation("✅ Estado do chatbot limpo. Seguindo para automações normais.");
+                // Continuar para processar automações normais (message_received)
+            } else {
+                // Continuar processamento normal do chatbot
             
             // Verificar se esta é a primeira mensagem do contato (que pode ter disparado new_conversation)
             // Se o chatbot foi ativado recentemente, pode ser que esta mensagem tenha CRIADO a conversa
@@ -461,6 +504,7 @@ class AutomationService
             }
                 \App\Helpers\Logger::automation("⚠️ handleChatbotResponse retornou false. Continuando com automações normais...");
             }
+            } // Fechamento do else do hasAgentIntervened
         } else {
             \App\Helpers\Logger::automation("Chatbot NÃO está ativo. Buscando automações normais...");
         }
@@ -2836,6 +2880,33 @@ class AutomationService
         self::executeNodeForContact($startNode, $contactId, $automation['nodes']);
     }
 
+    /**
+     * Verificar se algum agente humano já interveio na conversa
+     */
+    private static function hasAgentIntervened(int $conversationId): bool
+    {
+        try {
+            // Buscar mensagens de agentes humanos (sender_type = 'agent' e sender_id > 0)
+            // Excluir mensagens do chatbot (que têm metadata com chatbot_message = true)
+            $sql = "SELECT COUNT(*) as count 
+                    FROM messages 
+                    WHERE conversation_id = ? 
+                    AND sender_type = 'agent' 
+                    AND sender_id > 0
+                    AND (metadata IS NULL OR metadata NOT LIKE '%chatbot_message%')";
+            
+            $result = \App\Helpers\Database::fetchAll($sql, [$conversationId]);
+            $count = isset($result[0]['count']) ? (int)$result[0]['count'] : 0;
+            
+            \App\Helpers\Logger::automation("hasAgentIntervened - Conversa {$conversationId}: {$count} mensagens de agente humano encontradas");
+            
+            return $count > 0;
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::automation("ERRO em hasAgentIntervened: " . $e->getMessage());
+            return false; // Em caso de erro, não bloquear
+        }
+    }
+    
     /**
      * Executar nó para contato
      */

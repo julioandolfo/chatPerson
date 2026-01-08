@@ -700,6 +700,71 @@ class ConversationService
 
         return $conversation;
     }
+    
+    /**
+     * Parar automações ativas quando agente humano assumir conversa
+     */
+    private static function stopActiveAutomations(int $conversationId): void
+    {
+        try {
+            $conversation = Conversation::find($conversationId);
+            if (!$conversation) {
+                return;
+            }
+            
+            $metadata = json_decode($conversation['metadata'] ?? '{}', true);
+            if (!is_array($metadata)) {
+                $metadata = [];
+            }
+            
+            $hadAutomationActive = false;
+            
+            // Verificar se chatbot estava ativo
+            if (!empty($metadata['chatbot_active'])) {
+                \App\Helpers\Logger::automation("  🤖 Chatbot estava ATIVO - desativando...");
+                $hadAutomationActive = true;
+                
+                // Limpar estado do chatbot
+                $metadata['chatbot_active'] = false;
+                $metadata['chatbot_type'] = null;
+                $metadata['chatbot_options'] = [];
+                $metadata['chatbot_next_nodes'] = [];
+                $metadata['chatbot_automation_id'] = null;
+                $metadata['chatbot_node_id'] = null;
+                $metadata['chatbot_invalid_attempts'] = 0;
+                $metadata['chatbot_timeout_at'] = null;
+            }
+            
+            // Verificar se IA branching estava ativo
+            if (!empty($metadata['ai_branching_active'])) {
+                \App\Helpers\Logger::automation("  🤖 IA Branching estava ATIVO - desativando...");
+                $hadAutomationActive = true;
+                
+                // Limpar estado de ramificação IA
+                $metadata['ai_branching_active'] = false;
+                $metadata['ai_intents'] = [];
+                $metadata['ai_fallback_node_id'] = null;
+                $metadata['ai_max_interactions'] = 0;
+                $metadata['ai_interaction_count'] = 0;
+                $metadata['ai_branching_automation_id'] = null;
+            }
+            
+            if ($hadAutomationActive) {
+                // Salvar metadata limpo
+                Conversation::update($conversationId, [
+                    'metadata' => json_encode($metadata)
+                ]);
+                
+                \App\Helpers\Logger::automation("  ✅ Automações PARADAS com sucesso! Agente humano assumiu a conversa.");
+            } else {
+                \App\Helpers\Logger::automation("  ℹ️  Nenhuma automação ativa para parar.");
+            }
+            
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::automation("  ❌ ERRO ao parar automações: " . $e->getMessage());
+            error_log("Erro ao parar automações: " . $e->getMessage());
+        }
+    }
 
     /**
      * Remover atribuição de agente (deixar sem atribuição)
@@ -1285,6 +1350,12 @@ class ConversationService
         $messageId = Message::createMessage($messageData);
         
         \App\Helpers\Logger::info("ConversationService::sendMessage - Mensagem criada no banco: messageId={$messageId}");
+        
+        // ✅ NOVO: Se agente HUMANO enviou mensagem, PARAR todas as automações ativas (chatbot, IA, etc)
+        if ($senderType === 'agent' && $senderId > 0) {
+            \App\Helpers\Logger::automation("🛑 Agente humano (ID: {$senderId}) enviou mensagem - PARANDO automações ativas...");
+            self::stopActiveAutomations($conversationId);
+        }
 
         // ✅ NOVO: Transcrever áudio automaticamente se for mensagem do contato com áudio
         if ($senderType === 'contact' && $messageType === 'audio' && !empty($attachmentsData)) {

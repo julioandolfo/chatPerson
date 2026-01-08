@@ -387,11 +387,15 @@ class AutomationService
             }
         }
         
+        \App\Helpers\Logger::automation("DEBUG 0: Verificando chatbot_active... Valor: " . (isset($metadata['chatbot_active']) ? ($metadata['chatbot_active'] ? '1' : '0') : 'null'));
+        
         if (!empty($metadata['chatbot_active'])) {
             \App\Helpers\Logger::automation("🤖 Chatbot ATIVO detectado!");
+            \App\Helpers\Logger::automation("DEBUG 1: Antes de chamar hasAgentIntervened");
             
             // ✅ Verificar se agente humano já interveio (enviou alguma mensagem)
             $agentHasIntervened = self::hasAgentIntervened($conversationId);
+            \App\Helpers\Logger::automation("DEBUG 2: Após chamar hasAgentIntervened. Resultado: " . ($agentHasIntervened ? 'TRUE' : 'FALSE'));
             if ($agentHasIntervened) {
                 \App\Helpers\Logger::automation("🛑 Agente humano JÁ INTERVEIO na conversa. Ignorando chatbot e limpando estado.");
                 

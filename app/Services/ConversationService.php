@@ -1609,9 +1609,20 @@ class ConversationService
         // Se é primeira mensagem do agente, atualizar first_response_at
         if ($senderType === 'agent' || $senderType === 'ai_agent') {
             $conv = Conversation::find($conversationId);
+            
+            // Atualizar first_response_at (qualquer agente)
             if ($conv && empty($conv['first_response_at'])) {
                 Conversation::update($conversationId, [
                     'first_response_at' => date('Y-m-d H:i:s')
+                ]);
+            }
+            
+            // Atualizar first_human_response_at (apenas agentes humanos)
+            // Verificar se é mensagem de agente humano (ai_agent_id NULL)
+            if ($conv && empty($conv['first_human_response_at']) && empty($aiAgentId)) {
+                Conversation::update($conversationId, [
+                    'first_human_response_at' => date('Y-m-d H:i:s'),
+                    'sla_warning_sent' => 0 // Reset warning para novo ciclo
                 ]);
             }
         }

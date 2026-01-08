@@ -64,69 +64,96 @@ class SLAMonitoringService
 
     /**
      * Obter conversas que precisam verificação de SLA
+     * ATUALIZADO: Ordena por urgência de SLA (mais crítico primeiro), não por data
      */
     private static function getConversationsToCheck(): array
     {
-        $sql = "SELECT c.*, ct.name as contact_name
+        // Buscar conversas abertas que não estão com SLA pausado
+        $sql = "SELECT c.*, 
+                       ct.name as contact_name,
+                       TIMESTAMPDIFF(MINUTE, c.created_at, NOW()) as minutes_open,
+                       c.sla_paused_at IS NULL as sla_active
                 FROM conversations c
                 INNER JOIN contacts ct ON c.contact_id = ct.id
                 WHERE c.status IN ('open', 'pending')
                 AND c.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-                ORDER BY c.created_at ASC
-                LIMIT 100";
+                ORDER BY 
+                    CASE WHEN c.priority = 'urgent' THEN 1
+                         WHEN c.priority = 'high' THEN 2
+                         WHEN c.priority = 'normal' THEN 3
+                         ELSE 4 END ASC,
+                    minutes_open DESC
+                LIMIT 500";
         
         return Database::fetchAll($sql);
     }
 
     /**
      * Processar SLA de uma conversa específica
+     * ATUALIZADO: Agora implementa ongoing response, notificações únicas, incrementa contador
      */
     public static function processConversationSLA(int $conversationId): array
     {
         $result = [
             'reassigned' => false,
-            'alerted' => false
+            'alerted' => false,
+            'type' => null
         ];
 
         $conversation = Conversation::find($conversationId);
         if (!$conversation || $conversation['status'] === 'closed') {
             return $result;
         }
+        
+        // Ignorar conversas com SLA pausado
+        if ($conversation['sla_paused_at']) {
+            return $result;
+        }
 
         $settings = ConversationSettingsService::getSettings();
+        $slaConfig = \App\Models\SLARule::getSLAForConversation($conversation);
         
-        // Verificar SLA de primeira resposta
+        // ========== VERIFICAR SLA DE PRIMEIRA RESPOSTA ==========
         $firstResponseOK = ConversationSettingsService::checkFirstResponseSLA($conversationId);
         
         if (!$firstResponseOK && $settings['sla']['auto_reassign_on_sla_breach']) {
-            // Verificar se deve reatribuir
             if (ConversationSettingsService::shouldReassign($conversationId)) {
-                // Reatribuir conversa
+                // Reatribuir conversa (EXCLUINDO agente atual para não reatribuir para o mesmo)
+                $currentAgentId = $conversation['agent_id'] ?? null;
+                
                 $newAgentId = ConversationSettingsService::autoAssignConversation(
                     $conversationId,
                     $conversation['department_id'] ?? null,
                     $conversation['funnel_id'] ?? null,
-                    $conversation['funnel_stage_id'] ?? null
+                    $conversation['funnel_stage_id'] ?? null,
+                    $currentAgentId // Excluir agente atual
                 );
                 
-                if ($newAgentId) {
+                if ($newAgentId && $newAgentId != $currentAgentId) {
                     try {
+                        // Incrementar contador de reatribuições
+                        $reassignmentCount = (int)($conversation['reassignment_count'] ?? 0) + 1;
+                        
+                        Conversation::update($conversationId, [
+                            'reassignment_count' => $reassignmentCount,
+                            'last_reassignment_at' => date('Y-m-d H:i:s')
+                        ]);
+                        
                         // Se ID for negativo, é agente de IA
                         if ($newAgentId < 0) {
                             $aiAgentId = abs($newAgentId);
-                            // Atribuir a agente de IA (já implementado em ConversationService)
-                            // Por enquanto, apenas logar
                             error_log("Conversa {$conversationId} deveria ser reatribuída a agente de IA {$aiAgentId}");
                         } else {
                             ConversationService::assignToAgent($conversationId, $newAgentId, false);
                             $result['reassigned'] = true;
+                            $result['type'] = 'first_response';
                             
                             // Criar notificação
                             if (class_exists('\App\Services\NotificationService')) {
                                 \App\Services\NotificationService::notifyConversationReassigned(
                                     $newAgentId,
                                     $conversationId,
-                                    'Conversa reatribuída automaticamente após SLA excedido'
+                                    "Reatribuída automaticamente após SLA (tentativa #{$reassignmentCount})"
                                 );
                             }
                         }
@@ -136,34 +163,89 @@ class SLAMonitoringService
                 }
             }
         }
+        
+        // ========== VERIFICAR SLA DE RESPOSTA CONTÍNUA (ONGOING) ==========
+        // Verifica se já houve primeira resposta e agora está aguardando nova resposta do agente
+        if ($firstResponseOK && !$settings['sla']['enable_resolution_sla']) {
+            // Verificar última mensagem do contato vs última do agente
+            $lastMessages = Database::fetch(
+                "SELECT 
+                    MAX(CASE WHEN sender_type = 'contact' THEN created_at END) as last_contact,
+                    MAX(CASE WHEN sender_type = 'agent' THEN created_at END) as last_agent
+                 FROM messages 
+                 WHERE conversation_id = ?",
+                [$conversationId]
+            );
+            
+            if ($lastMessages && $lastMessages['last_contact'] && $lastMessages['last_agent']) {
+                $lastContact = new \DateTime($lastMessages['last_contact']);
+                $lastAgent = new \DateTime($lastMessages['last_agent']);
+                
+                // Se última mensagem do contato é mais recente, verificar SLA de resposta
+                if ($lastContact > $lastAgent) {
+                    $elapsedMinutes = \App\Helpers\WorkingHoursCalculator::calculateMinutes($lastContact, new \DateTime());
+                    $ongoingSLA = $slaConfig['ongoing_response_time'];
+                    
+                    if ($elapsedMinutes > $ongoingSLA) {
+                        // SLA de resposta contínua excedido - pode reatribuir
+                        if ($settings['sla']['auto_reassign_on_sla_breach']) {
+                            $currentAgentId = $conversation['agent_id'] ?? null;
+                            
+                            $newAgentId = ConversationSettingsService::autoAssignConversation(
+                                $conversationId,
+                                $conversation['department_id'] ?? null,
+                                $conversation['funnel_id'] ?? null,
+                                $conversation['funnel_stage_id'] ?? null,
+                                $currentAgentId
+                            );
+                            
+                            if ($newAgentId && $newAgentId != $currentAgentId && $newAgentId > 0) {
+                                $reassignmentCount = (int)($conversation['reassignment_count'] ?? 0) + 1;
+                                
+                                Conversation::update($conversationId, [
+                                    'reassignment_count' => $reassignmentCount,
+                                    'last_reassignment_at' => date('Y-m-d H:i:s')
+                                ]);
+                                
+                                ConversationService::assignToAgent($conversationId, $newAgentId, false);
+                                $result['reassigned'] = true;
+                                $result['type'] = 'ongoing_response';
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
-        // Verificar se SLA está próximo de vencer (80% do tempo)
-        $slaMinutes = $settings['sla']['first_response_time'];
-        $warningThreshold = $slaMinutes * 0.8; // 80% do SLA
-        
-        $createdAt = strtotime($conversation['created_at']);
-        $now = time();
-        $minutesElapsed = ($now - $createdAt) / 60;
-        
-        if ($minutesElapsed >= $warningThreshold && $minutesElapsed < $slaMinutes) {
-            // Criar alerta
-            $agentId = $conversation['agent_id'] ?? null;
-            if ($agentId && class_exists('\App\Services\NotificationService')) {
-                try {
-                    \App\Services\NotificationService::notifyUser($agentId, 'sla_warning', [
-                        'type' => 'sla_warning',
-                        'title' => 'SLA próximo de vencer',
-                        'message' => "Conversa #{$conversationId} está próxima de exceder o SLA de primeira resposta",
-                        'link' => '/conversations/' . $conversationId,
-                        'data' => [
-                            'conversation_id' => $conversationId,
-                            'minutes_elapsed' => round($minutesElapsed, 1),
-                            'sla_minutes' => $slaMinutes
-                        ]
-                    ]);
-                    $result['alerted'] = true;
-                } catch (\Exception $e) {
-                    error_log("Erro ao criar alerta de SLA: " . $e->getMessage());
+        // ========== ALERTAS DE SLA (EVITAR SPAM) ==========
+        // Só enviar alerta se ainda não foi enviado
+        if (!$conversation['sla_warning_sent']) {
+            $elapsedMinutes = ConversationSettingsService::getElapsedSLAMinutes($conversationId);
+            $slaMinutes = $slaConfig['first_response_time'];
+            $warningThreshold = $slaMinutes * 0.8; // 80% do SLA
+            
+            if ($elapsedMinutes >= $warningThreshold && $elapsedMinutes < $slaMinutes) {
+                $agentId = $conversation['agent_id'] ?? null;
+                if ($agentId && class_exists('\App\Services\NotificationService')) {
+                    try {
+                        \App\Services\NotificationService::notifyUser($agentId, 'sla_warning', [
+                            'type' => 'sla_warning',
+                            'title' => 'SLA próximo de vencer',
+                            'message' => "Conversa #{$conversationId} está próxima de exceder o SLA de primeira resposta",
+                            'link' => '/conversations/' . $conversationId,
+                            'data' => [
+                                'conversation_id' => $conversationId,
+                                'minutes_elapsed' => round($elapsedMinutes, 1),
+                                'sla_minutes' => $slaMinutes
+                            ]
+                        ]);
+                        
+                        // Marcar como alertado para não spammar
+                        Conversation::update($conversationId, ['sla_warning_sent' => 1]);
+                        $result['alerted'] = true;
+                    } catch (\Exception $e) {
+                        error_log("Erro ao criar alerta de SLA: " . $e->getMessage());
+                    }
                 }
             }
         }

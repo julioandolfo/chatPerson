@@ -10,7 +10,9 @@ use App\Models\Setting;
 use App\Models\User;
 use App\Models\Department;
 use App\Models\Funnel;
+use App\Models\SLARule;
 use App\Helpers\Database;
+use App\Helpers\WorkingHoursCalculator;
 
 class ConversationSettingsService
 {
@@ -384,8 +386,15 @@ class ConversationSettingsService
 
     /**
      * Distribuir conversa automaticamente usando método configurado
+     * ATUALIZADO: Agora aceita excludeAgentId para evitar reatribuir para o mesmo agente
      */
-    public static function autoAssignConversation(int $conversationId, ?int $departmentId = null, ?int $funnelId = null, ?int $stageId = null): ?int
+    public static function autoAssignConversation(
+        int $conversationId, 
+        ?int $departmentId = null, 
+        ?int $funnelId = null, 
+        ?int $stageId = null,
+        ?int $excludeAgentId = null
+    ): ?int
     {
         $settings = self::getSettings();
         
@@ -398,22 +407,23 @@ class ConversationSettingsService
         
         switch ($method) {
             case 'round_robin':
-                return self::assignRoundRobin($departmentId, $funnelId, $stageId, $includeAI);
+                return self::assignRoundRobin($departmentId, $funnelId, $stageId, $includeAI, true, true, $excludeAgentId);
             case 'by_load':
-                return self::assignByLoad($departmentId, $funnelId, $stageId, $includeAI);
+                return self::assignByLoad($departmentId, $funnelId, $stageId, $includeAI, true, true, $excludeAgentId);
             case 'by_specialty':
-                return self::assignBySpecialty($departmentId, $funnelId, $stageId, $includeAI);
+                return self::assignBySpecialty($departmentId, $funnelId, $stageId, $includeAI, $excludeAgentId);
             case 'by_performance':
-                return self::assignByPerformance($departmentId, $funnelId, $stageId, $includeAI);
+                return self::assignByPerformance($departmentId, $funnelId, $stageId, $includeAI, true, true, $excludeAgentId);
             case 'percentage':
-                return self::assignByPercentage($departmentId, $funnelId, $stageId, $includeAI);
+                return self::assignByPercentage($departmentId, $funnelId, $stageId, $includeAI, $excludeAgentId);
             default:
-                return self::assignRoundRobin($departmentId, $funnelId, $stageId, $includeAI);
+                return self::assignRoundRobin($departmentId, $funnelId, $stageId, $includeAI, true, true, $excludeAgentId);
         }
     }
 
     /**
      * Distribuição Round-Robin
+     * ATUALIZADO: Agora aceita excludeAgentId
      */
     public static function assignRoundRobin(
         ?int $departmentId = null, 
@@ -421,10 +431,18 @@ class ConversationSettingsService
         ?int $stageId = null, 
         bool $includeAI = false,
         bool $considerAvailability = true,
-        bool $considerMaxConversations = true
+        bool $considerMaxConversations = true,
+        ?int $excludeAgentId = null
     ): ?int
     {
         $agents = self::getAvailableAgents($departmentId, $funnelId, $stageId, $includeAI, $considerAvailability, $considerMaxConversations);
+        
+        // Filtrar agente excluído
+        if ($excludeAgentId !== null) {
+            $agents = array_filter($agents, function($agent) use ($excludeAgentId) {
+                return ($agent['id'] ?? null) != $excludeAgentId;
+            });
+        }
         
         if (empty($agents)) {
             return null;
@@ -452,6 +470,7 @@ class ConversationSettingsService
 
     /**
      * Distribuição por carga (menor carga primeiro)
+     * ATUALIZADO: Agora aceita excludeAgentId
      */
     public static function assignByLoad(
         ?int $departmentId = null, 
@@ -459,10 +478,18 @@ class ConversationSettingsService
         ?int $stageId = null, 
         bool $includeAI = false,
         bool $considerAvailability = true,
-        bool $considerMaxConversations = true
+        bool $considerMaxConversations = true,
+        ?int $excludeAgentId = null
     ): ?int
     {
         $agents = self::getAvailableAgents($departmentId, $funnelId, $stageId, $includeAI, $considerAvailability, $considerMaxConversations);
+        
+        // Filtrar agente excluído
+        if ($excludeAgentId !== null) {
+            $agents = array_filter($agents, function($agent) use ($excludeAgentId) {
+                return ($agent['id'] ?? null) != $excludeAgentId;
+            });
+        }
         
         if (empty($agents)) {
             return null;
@@ -490,22 +517,23 @@ class ConversationSettingsService
 
     /**
      * Distribuição por especialidade (simplificado - pode ser expandido)
+     * ATUALIZADO: Agora aceita excludeAgentId
      */
     public static function assignBySpecialty(
         ?int $departmentId = null, 
         ?int $funnelId = null, 
         ?int $stageId = null, 
         bool $includeAI = false,
-        bool $considerAvailability = true,
-        bool $considerMaxConversations = true
+        ?int $excludeAgentId = null
     ): ?int
     {
         // Por enquanto, usar round-robin dentro do setor
-        return self::assignRoundRobin($departmentId, $funnelId, $stageId, $includeAI, $considerAvailability, $considerMaxConversations);
+        return self::assignRoundRobin($departmentId, $funnelId, $stageId, $includeAI, true, true, $excludeAgentId);
     }
 
     /**
      * Distribuição por performance (melhor performance primeiro)
+     * ATUALIZADO: Agora aceita excludeAgentId
      */
     public static function assignByPerformance(
         ?int $departmentId = null, 
@@ -513,10 +541,18 @@ class ConversationSettingsService
         ?int $stageId = null, 
         bool $includeAI = false,
         bool $considerAvailability = true,
-        bool $considerMaxConversations = true
+        bool $considerMaxConversations = true,
+        ?int $excludeAgentId = null
     ): ?int
     {
         $agents = self::getAvailableAgents($departmentId, $funnelId, $stageId, $includeAI, $considerAvailability, $considerMaxConversations);
+        
+        // Filtrar agente excluído
+        if ($excludeAgentId !== null) {
+            $agents = array_filter($agents, function($agent) use ($excludeAgentId) {
+                return ($agent['id'] ?? null) != $excludeAgentId;
+            });
+        }
         
         if (empty($agents)) {
             return null;
@@ -554,16 +590,30 @@ class ConversationSettingsService
 
     /**
      * Distribuição por porcentagem
+     * ATUALIZADO: Agora aceita excludeAgentId
      */
-    public static function assignByPercentage(?int $departmentId = null, ?int $funnelId = null, ?int $stageId = null, bool $includeAI = false): ?int
+    public static function assignByPercentage(
+        ?int $departmentId = null, 
+        ?int $funnelId = null, 
+        ?int $stageId = null, 
+        bool $includeAI = false,
+        ?int $excludeAgentId = null
+    ): ?int
     {
         $settings = self::getSettings();
         
         if (!$settings['percentage_distribution']['enabled']) {
-            return self::assignRoundRobin($departmentId, $funnelId, $stageId, $includeAI);
+            return self::assignRoundRobin($departmentId, $funnelId, $stageId, $includeAI, true, true, $excludeAgentId);
         }
         
         $rules = $settings['percentage_distribution']['rules'] ?? [];
+        
+        // Filtrar agente excluído das regras
+        if ($excludeAgentId !== null) {
+            $rules = array_filter($rules, function($rule) use ($excludeAgentId) {
+                return ($rule['agent_id'] ?? null) != $excludeAgentId;
+            });
+        }
         
         // Calcular probabilidades e escolher agente aleatoriamente baseado nas porcentagens
         $totalPercentage = array_sum(array_column($rules, 'percentage'));
@@ -662,8 +712,9 @@ class ConversationSettingsService
 
     /**
      * Verificar SLA de primeira resposta
+     * ATUALIZADO: Agora considera working hours e SLA por contexto
      */
-    public static function checkFirstResponseSLA(int $conversationId): bool
+    public static function checkFirstResponseSLA(int $conversationId, bool $humanOnly = false): bool
     {
         $settings = self::getSettings();
         
@@ -677,27 +728,49 @@ class ConversationSettingsService
         }
         
         // Verificar se já houve primeira resposta do agente
-        $firstAgentMessage = Database::fetch(
-            "SELECT MIN(created_at) as first_response 
-             FROM messages 
-             WHERE conversation_id = ? AND sender_type = 'agent'",
-            [$conversationId]
-        );
+        if ($humanOnly) {
+            // Apenas respostas de agentes humanos
+            $firstAgentMessage = Database::fetch(
+                "SELECT MIN(created_at) as first_response 
+                 FROM messages 
+                 WHERE conversation_id = ? AND sender_type = 'agent' AND ai_agent_id IS NULL",
+                [$conversationId]
+            );
+        } else {
+            // Qualquer resposta (IA ou humano)
+            $firstAgentMessage = Database::fetch(
+                "SELECT MIN(created_at) as first_response 
+                 FROM messages 
+                 WHERE conversation_id = ? AND sender_type = 'agent'",
+                [$conversationId]
+            );
+        }
         
         if ($firstAgentMessage && $firstAgentMessage['first_response']) {
             return true; // Já respondeu
         }
         
-        // Verificar se passou do SLA
-        $createdAt = strtotime($conversation['created_at']);
-        $slaMinutes = $settings['sla']['first_response_time'];
-        $now = time();
+        // Obter SLA aplicável (pode ser personalizado por prioridade/canal/setor)
+        $slaConfig = SLARule::getSLAForConversation($conversation);
+        $slaMinutes = $slaConfig['first_response_time'];
         
-        return ($now - $createdAt) < ($slaMinutes * 60);
+        // Calcular tempo decorrido considerando working hours e pausas
+        $createdAt = new \DateTime($conversation['created_at']);
+        $now = new \DateTime();
+        
+        // Descontar tempo pausado
+        $pausedDuration = (int)($conversation['sla_paused_duration'] ?? 0);
+        
+        // Calcular minutos considerando working hours
+        $elapsedMinutes = WorkingHoursCalculator::calculateMinutes($createdAt, $now);
+        $elapsedMinutes -= $pausedDuration;
+        
+        return $elapsedMinutes < $slaMinutes;
     }
 
     /**
      * Verificar SLA de resolução
+     * ATUALIZADO: Agora considera working hours, pausas e SLA por contexto
      */
     public static function checkResolutionSLA(int $conversationId): bool
     {
@@ -712,14 +785,86 @@ class ConversationSettingsService
             return true; // Já resolvida
         }
         
-        // Verificar se passou do SLA
-        $createdAt = strtotime($conversation['created_at']);
-        $slaMinutes = $settings['sla']['resolution_time'];
-        $now = time();
+        // Obter SLA aplicável
+        $slaConfig = SLARule::getSLAForConversation($conversation);
+        $slaMinutes = $slaConfig['resolution_time'];
         
-        return ($now - $createdAt) < ($slaMinutes * 60);
+        // Calcular tempo decorrido considerando working hours e pausas
+        $createdAt = new \DateTime($conversation['created_at']);
+        $now = new \DateTime();
+        
+        // Descontar tempo pausado
+        $pausedDuration = (int)($conversation['sla_paused_duration'] ?? 0);
+        
+        // Calcular minutos considerando working hours
+        $elapsedMinutes = WorkingHoursCalculator::calculateMinutes($createdAt, $now);
+        $elapsedMinutes -= $pausedDuration;
+        
+        return $elapsedMinutes < $slaMinutes;
     }
 
+    /**
+     * Pausar SLA (quando conversa está em snooze, aguardando cliente, etc)
+     */
+    public static function pauseSLA(int $conversationId): bool
+    {
+        $conversation = \App\Models\Conversation::find($conversationId);
+        if (!$conversation || $conversation['sla_paused_at']) {
+            return false; // Já pausado ou não existe
+        }
+        
+        return \App\Models\Conversation::update($conversationId, [
+            'sla_paused_at' => date('Y-m-d H:i:s')
+        ]);
+    }
+    
+    /**
+     * Retomar SLA (despausar)
+     */
+    public static function resumeSLA(int $conversationId): bool
+    {
+        $conversation = \App\Models\Conversation::find($conversationId);
+        if (!$conversation || !$conversation['sla_paused_at']) {
+            return false; // Não está pausado
+        }
+        
+        // Calcular duração da pausa
+        $pausedAt = new \DateTime($conversation['sla_paused_at']);
+        $now = new \DateTime();
+        
+        $pauseDuration = WorkingHoursCalculator::calculateMinutes($pausedAt, $now);
+        $totalPaused = (int)($conversation['sla_paused_duration'] ?? 0) + $pauseDuration;
+        
+        return \App\Models\Conversation::update($conversationId, [
+            'sla_paused_at' => null,
+            'sla_paused_duration' => $totalPaused
+        ]);
+    }
+    
+    /**
+     * Obter tempo de SLA decorrido (em minutos)
+     */
+    public static function getElapsedSLAMinutes(int $conversationId): int
+    {
+        $conversation = \App\Models\Conversation::find($conversationId);
+        if (!$conversation) {
+            return 0;
+        }
+        
+        $createdAt = new \DateTime($conversation['created_at']);
+        $now = new \DateTime();
+        
+        // Se está pausado, usar o tempo até a pausa
+        if ($conversation['sla_paused_at']) {
+            $now = new \DateTime($conversation['sla_paused_at']);
+        }
+        
+        $elapsed = WorkingHoursCalculator::calculateMinutes($createdAt, $now);
+        $paused = (int)($conversation['sla_paused_duration'] ?? 0);
+        
+        return max(0, $elapsed - $paused);
+    }
+    
     /**
      * Verificar se deve reatribuir conversa
      */

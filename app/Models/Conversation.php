@@ -28,6 +28,13 @@ class Conversation extends Model
         'spam_marked_by', 
         'metadata', 
         'priority',
+        'first_response_at',
+        'first_human_response_at',
+        'sla_paused_at',
+        'sla_paused_duration',
+        'sla_warning_sent',
+        'reassignment_count',
+        'last_reassignment_at',
         'assigned_at',
         'resolved_at',
         'moved_at'

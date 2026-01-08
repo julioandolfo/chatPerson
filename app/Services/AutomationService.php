@@ -411,8 +411,8 @@ class AutomationService
                 // Continuar para processar automações normais (message_received)
             } else {
                 // Continuar processamento normal do chatbot
-            
-            // Verificar se esta é a primeira mensagem do contato (que pode ter disparado new_conversation)
+                
+                // Verificar se esta é a primeira mensagem do contato (que pode ter disparado new_conversation)
             // Se o chatbot foi ativado recentemente, pode ser que esta mensagem tenha CRIADO a conversa
             // e o chatbot ainda não enviou a mensagem inicial (considerar delay + processamento)
             $isFirstContactMessage = false;
@@ -492,18 +492,18 @@ class AutomationService
                 \App\Helpers\Logger::automation("TimeDiff {$timeDiff}s > 15s - não verificar se é primeira mensagem");
             }
             
-            if ($isFirstContactMessage) {
-                \App\Helpers\Logger::automation("⚠️ Esta é a PRIMEIRA mensagem do contato (que criou a conversa). Chatbot ainda não enviou mensagem inicial. Ignorando processamento pelo chatbot.");
-                // Não processar pelo chatbot, deixar automações normais tratarem
-            } else {
-                \App\Helpers\Logger::automation("Chamando handleChatbotResponse...");
-            $handled = self::handleChatbotResponse($conversation, $message);
-            if ($handled) {
-                    \App\Helpers\Logger::automation("✅ Chatbot tratou a mensagem. Não disparar outras automações.");
-                return; // Já roteou para o próximo nó do chatbot, não disparar outras automações aqui
-            }
-                \App\Helpers\Logger::automation("⚠️ handleChatbotResponse retornou false. Continuando com automações normais...");
-            }
+                if ($isFirstContactMessage) {
+                    \App\Helpers\Logger::automation("⚠️ Esta é a PRIMEIRA mensagem do contato (que criou a conversa). Chatbot ainda não enviou mensagem inicial. Ignorando processamento pelo chatbot.");
+                    // Não processar pelo chatbot, deixar automações normais tratarem
+                } else {
+                    \App\Helpers\Logger::automation("Chamando handleChatbotResponse...");
+                    $handled = self::handleChatbotResponse($conversation, $message);
+                    if ($handled) {
+                        \App\Helpers\Logger::automation("✅ Chatbot tratou a mensagem. Não disparar outras automações.");
+                        return; // Já roteou para o próximo nó do chatbot, não disparar outras automações aqui
+                    }
+                    \App\Helpers\Logger::automation("⚠️ handleChatbotResponse retornou false. Continuando com automações normais...");
+                }
             } // Fechamento do else do hasAgentIntervened
         } else {
             \App\Helpers\Logger::automation("Chatbot NÃO está ativo. Buscando automações normais...");

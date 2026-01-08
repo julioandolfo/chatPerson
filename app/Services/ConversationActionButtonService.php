@@ -174,9 +174,7 @@ class ConversationActionButtonService
             case 'set_funnel_stage':
                 $stageId = $payload['stage_id'] ?? null;
                 if (!$stageId) {
-                    // Se etapa não foi configurada no botão, ignore este step silenciosamente
-                    try { Log::info("[ActionButton] set_funnel_stage ignorado: etapa não informada", 'automacao.log'); } catch (\Throwable $t) {}
-                    break;
+                    throw new \InvalidArgumentException('Etapa não informada');
                 }
                 // Botões criados pelo admin devem executar sem bloquear permissão de estágio
                 \App\Services\FunnelService::moveConversation($conversationId, (int)$stageId, $userId, true);

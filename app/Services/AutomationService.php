@@ -351,7 +351,7 @@ class AutomationService
             \App\Helpers\Logger::automation("🤖 Ramificação de IA ATIVA detectada! (fallback)");
             
             // ✅ Verificar se agente humano já interveio
-            $agentHasIntervened = self::hasAgentIntervened($conversationId);
+            $agentHasIntervened = self::hasAgentIntervened($conversation['id']);
             if ($agentHasIntervened) {
                 \App\Helpers\Logger::automation("🛑 Agente humano JÁ INTERVEIO na conversa. Limpando ramificação IA.");
                 
@@ -363,7 +363,7 @@ class AutomationService
                 $metadata['ai_interaction_count'] = 0;
                 $metadata['ai_branching_automation_id'] = null;
                 
-                \App\Models\Conversation::update($conversationId, [
+                \App\Models\Conversation::update($conversation['id'], [
                     'metadata' => json_encode($metadata)
                 ]);
                 
@@ -394,7 +394,7 @@ class AutomationService
             \App\Helpers\Logger::automation("DEBUG 1: Antes de chamar hasAgentIntervened");
             
             // ✅ Verificar se agente humano já interveio (enviou alguma mensagem)
-            $agentHasIntervened = self::hasAgentIntervened($conversationId);
+            $agentHasIntervened = self::hasAgentIntervened($conversation['id']);
             \App\Helpers\Logger::automation("DEBUG 2: Após chamar hasAgentIntervened. Resultado: " . ($agentHasIntervened ? 'TRUE' : 'FALSE'));
             if ($agentHasIntervened) {
                 \App\Helpers\Logger::automation("🛑 Agente humano JÁ INTERVEIO na conversa. Ignorando chatbot e limpando estado.");
@@ -407,7 +407,7 @@ class AutomationService
                 $metadata['chatbot_automation_id'] = null;
                 $metadata['chatbot_node_id'] = null;
                 
-                \App\Models\Conversation::update($conversationId, [
+                \App\Models\Conversation::update($conversation['id'], [
                     'metadata' => json_encode($metadata)
                 ]);
                 

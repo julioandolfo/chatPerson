@@ -45,15 +45,21 @@ class Message extends Model
     /**
      * Obter mensagens com detalhes do remetente (agent ou contact)
      */
-    public static function getMessagesWithSenderDetails(int $conversationId, ?int $limit = null, ?int $offset = null, ?int $beforeId = null): array
+    public static function getMessagesWithSenderDetails(int $conversationId, ?int $limit = null, ?int $offset = null, ?int $beforeId = null, ?int $afterId = null): array
     {
         $params = [$conversationId];
         $whereConditions = ["m.conversation_id = ?"];
         
-        // Se beforeId for fornecido, buscar apenas mensagens anteriores a esse ID
+        // Se beforeId for fornecido, buscar apenas mensagens anteriores a esse ID (paginação infinita)
         if ($beforeId !== null) {
             $whereConditions[] = "m.id < ?";
             $params[] = $beforeId;
+        }
+        
+        // Se afterId for fornecido, buscar apenas mensagens APÓS esse ID (polling de novas mensagens)
+        if ($afterId !== null) {
+            $whereConditions[] = "m.id > ?";
+            $params[] = $afterId;
         }
         
         $sql = "SELECT m.*, 

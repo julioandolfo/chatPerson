@@ -1987,6 +1987,7 @@ class ConversationController
         try {
             $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 50;
             $beforeId = isset($_GET['before_id']) ? (int)$_GET['before_id'] : null;
+            $lastMessageId = isset($_GET['last_message_id']) ? (int)$_GET['last_message_id'] : null;
             
             // Validar limit
             if ($limit < 1 || $limit > 100) {
@@ -1994,7 +1995,9 @@ class ConversationController
             }
             
             // Buscar mensagens
-            $messages = \App\Models\Message::getMessagesWithSenderDetails($id, $limit, null, $beforeId);
+            // Se lastMessageId foi fornecido (polling), buscar apenas mensagens APÓS esse ID
+            // Se beforeId foi fornecido (paginação), buscar apenas mensagens ANTES desse ID
+            $messages = \App\Models\Message::getMessagesWithSenderDetails($id, $limit, null, $beforeId, $lastMessageId);
             
             // Adicionar campos type e direction para cada mensagem
             foreach ($messages as &$msg) {
@@ -2021,8 +2024,14 @@ class ConversationController
             
             // Log para debug
             if (!empty($messages)) {
-                \App\Helpers\Logger::info("📤 getMessages: Retornando " . count($messages) . " mensagens com direction", 'conversas.log');
-                \App\Helpers\Logger::info("📤 getMessages: Primeira mensagem - id={$messages[0]['id']}, sender_type={$messages[0]['sender_type']}, direction={$messages[0]['direction']}", 'conversas.log');
+                $logContext = $lastMessageId ? "polling (after ID {$lastMessageId})" : ($beforeId ? "paginação (before ID {$beforeId})" : "carregamento inicial");
+                \App\Helpers\Logger::info("📤 getMessages [{$logContext}]: Retornando " . count($messages) . " mensagens", 'conversas.log');
+                if (count($messages) > 0) {
+                    \App\Helpers\Logger::info("📤 getMessages: Primeira msg - id={$messages[0]['id']}, sender_type={$messages[0]['sender_type']}, direction={$messages[0]['direction']}", 'conversas.log');
+                }
+            } else {
+                $logContext = $lastMessageId ? "polling (after ID {$lastMessageId})" : ($beforeId ? "paginação (before ID {$beforeId})" : "carregamento inicial");
+                \App\Helpers\Logger::info("📤 getMessages [{$logContext}]: Nenhuma mensagem nova encontrada", 'conversas.log');
             }
             
             // Limpar output buffer novamente antes de retornar JSON

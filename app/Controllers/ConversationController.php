@@ -88,7 +88,7 @@ class ConversationController
             'pinned' => isset($_GET['pinned']) ? ($_GET['pinned'] === '1' ? true : false) : null,
             'order_by' => $_GET['order_by'] ?? null,
             'order_dir' => $_GET['order_dir'] ?? null,
-            'limit' => $_GET['limit'] ?? 50,
+            'limit' => $_GET['limit'] ?? 150,
             'offset' => $_GET['offset'] ?? 0
         ];
 

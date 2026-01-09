@@ -2589,7 +2589,13 @@ function getChannelInfo(channel) {
                     </div>
                 <?php endforeach; ?>
                                                     <?php endif; ?>
-                                                </div>
+        </div>
+        <div class="text-center py-3">
+            <button class="btn btn-light btn-sm" id="loadMoreConversationsBtn" style="display:none;">
+                <span class="spinner-border spinner-border-sm align-middle me-2" role="status" aria-hidden="true" style="display:none;"></span>
+                Carregar mais
+            </button>
+        </div>
                                             </div>
     
     <!-- COLUNA 2: üREA DE CHAT -->
@@ -6653,6 +6659,11 @@ let hasMoreMessages = true;
 let oldestMessageId = null;
 let currentConversationId = null;
 let currentContactAvatar = null; // Avatar do contato da conversa atual
+let conversationPageSize = 150;
+let conversationOffset = 0;
+let conversationHasMore = true;
+let isLoadingConversations = false;
+let lastConversationsParams = null;
 
 // Helper para converter valores vindos do PHP em JSON válido
 function parsePhpJson(value) {
@@ -9935,6 +9946,23 @@ function loadFunnelsFilter() {
 document.addEventListener('DOMContentLoaded', function() {
     loadFunnelsFilter();
     updateActiveFiltersCount(); // Atualizar contador inicial
+    
+    // Botão "Carregar mais" e scroll para carregar mais conversas
+    const loadMoreBtn = document.getElementById('loadMoreConversationsBtn');
+    if (loadMoreBtn) {
+        loadMoreBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            loadMoreConversations();
+        });
+    }
+    const conversationsListEl = document.querySelector('.conversations-list-items');
+    if (conversationsListEl) {
+        conversationsListEl.addEventListener('scroll', () => {
+            if (conversationsListEl.scrollTop + conversationsListEl.clientHeight >= conversationsListEl.scrollHeight - 80) {
+                loadMoreConversations();
+            }
+        });
+    }
 });
 
 // Tambêm carregar imediatamente se DOM já estiver pronto
@@ -10021,7 +10049,7 @@ function applyFilters() {
     refreshConversationList(params);
 }
 
-function refreshConversationList(params = null) {
+function refreshConversationList(params = null, append = false) {
     console.debug('[TAGS_DEBUG] refreshConversationList start', params instanceof URLSearchParams ? Object.fromEntries(params.entries()) : params);
     const conversationsList = document.querySelector('.conversations-list-items');
     if (!conversationsList) {
@@ -10033,6 +10061,9 @@ function refreshConversationList(params = null) {
     if (!params) {
         params = new URLSearchParams(window.location.search);
     }
+
+    // Persistir últimos parâmetros para uso no "Carregar mais"
+    lastConversationsParams = params instanceof URLSearchParams ? new URLSearchParams(params.toString()) : new URLSearchParams(window.location.search);
     
     // Evitar flicker: só mostra spinner no primeiro carregamento OU quando hí filtros aplicados E ainda não renderizou
     const isFirstLoad = conversationsList.dataset.loaded !== '1';
@@ -10074,20 +10105,25 @@ function refreshConversationList(params = null) {
     
     // Construir URL preservando TODOS os filtros
     let url = '<?= \App\Helpers\Url::to('/conversations') ?>';
-    
-    // Se params é URLSearchParams, converter para string
+    let effectiveParams;
     if (params instanceof URLSearchParams) {
-        const paramsString = params.toString();
-        if (paramsString) {
-            url += '?' + paramsString;
-        }
+        effectiveParams = new URLSearchParams(params.toString());
     } else if (params && typeof params === 'string') {
-        url += '?' + params;
+        effectiveParams = new URLSearchParams(params);
     } else if (params) {
-        url += '?' + params.toString();
+        effectiveParams = new URLSearchParams(params.toString());
     } else {
-        // Usar parâmetros da URL atual
-        url += window.location.search;
+        effectiveParams = new URLSearchParams(window.location.search);
+    }
+
+    // Forçar limit dinâmico e offset zero (carrega tudo até o tamanho atual)
+    effectiveParams.set('limit', conversationPageSize);
+    effectiveParams.set('offset', 0);
+    lastConversationsParams = new URLSearchParams(effectiveParams.toString());
+
+    const paramsString = effectiveParams.toString();
+    if (paramsString) {
+        url += '?' + paramsString;
     }
     
     // Adicionar header para retornar JSON (sem sobrescrever filtros existentes) + cache buster
@@ -10325,9 +10361,24 @@ function refreshConversationList(params = null) {
             `;
         });
         
-        conversationsList.innerHTML = html;
+        // Renderização (suporta append para "Carregar mais")
+        if (append) {
+            conversationsList.insertAdjacentHTML('beforeend', html);
+        } else {
+            conversationsList.innerHTML = html;
+        }
         conversationsList.dataset.loaded = '1';
         conversationsList.dataset.rendering = '0';
+        
+        const loadMoreBtn = document.getElementById('loadMoreConversationsBtn');
+        if (loadMoreBtn) {
+            if (conversations.length >= conversationPageSize) {
+                loadMoreBtn.style.display = '';
+                loadMoreBtn.disabled = false;
+            } else {
+                loadMoreBtn.style.display = 'none';
+            }
+        }
     })
     .catch(error => {
         console.error('Erro ao buscar conversas:', error);
@@ -10339,6 +10390,12 @@ function refreshConversationList(params = null) {
             </div>
         `;
     });
+}
+
+function loadMoreConversations() {
+    conversationPageSize += 150;
+    const params = lastConversationsParams ? new URLSearchParams(lastConversationsParams.toString()) : new URLSearchParams(window.location.search);
+    refreshConversationList(params, false);
 }
 
 function escapeHtml(text) {

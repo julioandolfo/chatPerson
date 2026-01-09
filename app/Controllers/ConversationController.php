@@ -1989,6 +1989,9 @@ class ConversationController
             $beforeId = isset($_GET['before_id']) ? (int)$_GET['before_id'] : null;
             $lastMessageId = isset($_GET['last_message_id']) ? (int)$_GET['last_message_id'] : null;
             
+            // Log de entrada para diagnosticar inconsistência entre lista e chat
+            \App\Helpers\Logger::info("📥 getMessages: id={$id}, limit={$limit}, beforeId=" . ($beforeId ?? 'null') . ", lastMessageId=" . ($lastMessageId ?? 'null'), 'conversas.log');
+            
             // Validar limit
             if ($limit < 1 || $limit > 100) {
                 $limit = 50;
@@ -2023,14 +2026,15 @@ class ConversationController
             $total = \App\Models\Message::countByConversation($id);
             
             // Log para debug
+            $logContext = $lastMessageId ? "polling (after ID {$lastMessageId})" : ($beforeId ? "paginação (before ID {$beforeId})" : "carregamento inicial");
             if (!empty($messages)) {
-                $logContext = $lastMessageId ? "polling (after ID {$lastMessageId})" : ($beforeId ? "paginação (before ID {$beforeId})" : "carregamento inicial");
-                \App\Helpers\Logger::info("📤 getMessages [{$logContext}]: Retornando " . count($messages) . " mensagens", 'conversas.log');
-                if (count($messages) > 0) {
-                    \App\Helpers\Logger::info("📤 getMessages: Primeira msg - id={$messages[0]['id']}, sender_type={$messages[0]['sender_type']}, direction={$messages[0]['direction']}", 'conversas.log');
-                }
+                $firstId = $messages[0]['id'] ?? 'null';
+                $lastIdx = count($messages) - 1;
+                $lastId = $messages[$lastIdx]['id'] ?? 'null';
+                $firstAt = $messages[0]['created_at'] ?? 'null';
+                $lastAt = $messages[$lastIdx]['created_at'] ?? 'null';
+                \App\Helpers\Logger::info("📤 getMessages [{$logContext}]: Retornando " . count($messages) . " msgs | firstId={$firstId} ({$firstAt}) | lastId={$lastId} ({$lastAt})", 'conversas.log');
             } else {
-                $logContext = $lastMessageId ? "polling (after ID {$lastMessageId})" : ($beforeId ? "paginação (before ID {$beforeId})" : "carregamento inicial");
                 \App\Helpers\Logger::info("📤 getMessages [{$logContext}]: Nenhuma mensagem nova encontrada", 'conversas.log');
             }
             

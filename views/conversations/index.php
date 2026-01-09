@@ -16411,13 +16411,16 @@ const currentConversationId = parsePhpJson('<?= json_encode($selectedConversatio
         // Se a conversa foi aberta diretamente por URL, remover badge na lista
         removeConversationBadge(currentConversationId);
 
-        if (window.wsClient.connected && window.wsClient.currentMode === 'websocket') {
-            window.wsClient.subscribe(currentConversationId);
-            stopPolling(); // Parar polling apenas se WebSocket estiver conectado
-        } else {
-            // Se WebSocket não estiver conectado, usar polling
-            startPolling(currentConversationId);
+        // Sempre inscrever no WebSocket (quando disponível) e manter polling como fallback
+        if (window.wsClient && typeof window.wsClient.subscribe === 'function') {
+            try {
+                window.wsClient.subscribe(currentConversationId);
+            } catch (e) {
+                console.error('Erro ao inscrever conversa inicial no WebSocket:', e);
+            }
         }
+        // Manter polling ativo para garantir entrega imediata mesmo com WS
+        startPolling(currentConversationId);
     }
     // Inscrever todas as conversas visíveis (modo polling)
     subscribeVisibleConversations();

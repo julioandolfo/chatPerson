@@ -7038,6 +7038,9 @@ function startPolling(conversationId) {
         return;
     }
     
+    // Rodada imediata para zerar delay inicial
+    checkForNewMessages(conversationId);
+    
     // Verificar novas mensagens a cada 3 segundos
     pollingInterval = setInterval(() => {
         checkForNewMessages(conversationId);
@@ -7340,15 +7343,19 @@ function selectConversation(id) {
             // Adicionar listener de scroll para paginação infinita
             setupInfiniteScroll();
             
-            // Inscrever no WebSocket para esta conversa
-            if (typeof window.wsClient !== 'undefined' && window.wsClient.connected && window.wsClient.currentMode === 'websocket') {
-                window.wsClient.subscribe(id);
-                // Parar polling apenas se o modo for websocket
-                stopPolling();
-            } else {
-                // Se WebSocket não estiver disponível, iniciar polling
-                startPolling(id);
+            // Inscrever no WebSocket para esta conversa (quando disponível) e manter polling como fallback
+            if (typeof window.wsClient !== 'undefined') {
+                try {
+                    window.wsClient.subscribe(id);
+                } catch (e) {
+                    console.error('Erro ao inscrever conversa no WebSocket:', e);
+                }
             }
+            // Manter polling ativo como fallback para garantir entrega imediata mesmo se o WS falhar
+            startPolling(id);
+            
+            // Rodada imediata para garantir que nada ficou pendente entre a carga inicial e o início do loop
+            checkForNewMessages(id);
             
             // Atualizar último ID de mensagem conhecido
             if (data.messages && data.messages.length > 0) {

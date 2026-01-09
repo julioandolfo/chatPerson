@@ -753,11 +753,11 @@ function getActionConfigHTML(actionData, index) {
         case 'add_tag':
         case 'remove_tag':
             const tagsOptions = (systemData.tags || []).map(t => 
-                `<option value="${t.id}" ${(Array.isArray(config.tag_ids) && config.tag_ids.includes(t.id.toString())) ? 'selected' : ''}>${t.name}</option>`
+                `<option value="${t.id}" ${(Array.isArray(config.tags) && config.tags.includes(t.id.toString())) ? 'selected' : ''}>${t.name}</option>`
             ).join('');
             return `
                 <label class="form-label">Tags</label>
-                <select class="form-select action-config-tag_ids" multiple size="5">
+                <select class="form-select action-config-tags" multiple size="5">
                     ${tagsOptions}
                 </select>
                 <div class="form-text mt-1">Segure Ctrl/Cmd para selecionar múltiplas tags</div>
@@ -874,10 +874,12 @@ function collectActions() {
                 config.stage_id = parseInt(input.value) || null;
             } else if (className.includes('action-config-agent_id')) {
                 config.agent_id = parseInt(input.value) || null;
+            } else if (className.includes('action-config-ai_agent_id')) {
+                config.ai_agent_id = parseInt(input.value) || null;
             } else if (className.includes('action-config-department_id')) {
                 config.department_id = parseInt(input.value) || null;
-            } else if (className.includes('action-config-tag_ids')) {
-                config.tag_ids = Array.from(input.selectedOptions).map(opt => opt.value);
+            } else if (className.includes('action-config-tags')) {
+                config.tags = Array.from(input.selectedOptions).map(opt => parseInt(opt.value));
             } else if (className.includes('action-config-priority')) {
                 config.priority = input.value;
             } else if (className.includes('action-config-status')) {

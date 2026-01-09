@@ -427,14 +427,6 @@ async function loadSystemData() {
                     icon: 'ki-note-edit' 
                 }
             };
-            
-            // Recarregar condições e ações se já existirem
-            if (conditions.length > 0) {
-                loadConditions();
-            }
-            if (actions.length > 0) {
-                loadActions();
-            }
         }
     } catch (error) {
         console.error('Erro ao carregar dados do sistema:', error);
@@ -472,12 +464,6 @@ function getAllStagesLabels() {
     });
     return labels;
 }
-    'move_to_next_stage': { label: 'Mover para Próxima Etapa', icon: 'ki-arrow-right' },
-    'assign_to_agent': { label: 'Atribuir a Agente', icon: 'ki-user' },
-    'add_tag': { label: 'Adicionar Tag', icon: 'ki-tag' },
-    'create_summary': { label: 'Criar Resumo', icon: 'ki-document' },
-    'create_note': { label: 'Criar Nota', icon: 'ki-note-edit' }
-};
 
 // Carregar condições existentes
 function loadConditions() {
@@ -780,11 +766,11 @@ function getActionConfigHTML(actionData, index) {
         case 'add_tag':
         case 'remove_tag':
             const tagsOptions = (systemData.tags || []).map(t => 
-                `<option value="${t.id}" ${(Array.isArray(config.tag_ids) && config.tag_ids.includes(t.id.toString())) ? 'selected' : ''}>${t.name}</option>`
+                `<option value="${t.id}" ${(Array.isArray(config.tags) && config.tags.includes(t.id.toString())) ? 'selected' : ''}>${t.name}</option>`
             ).join('');
             return `
                 <label class="form-label">Tags</label>
-                <select class="form-select action-config-tag_ids" multiple size="5">
+                <select class="form-select action-config-tags" multiple size="5">
                     ${tagsOptions}
                 </select>
                 <div class="form-text mt-1">Segure Ctrl/Cmd para selecionar múltiplas tags</div>
@@ -967,10 +953,12 @@ function collectActions() {
                 config.stage_id = parseInt(input.value) || null;
             } else if (className.includes('action-config-agent_id')) {
                 config.agent_id = parseInt(input.value) || null;
+            } else if (className.includes('action-config-ai_agent_id')) {
+                config.ai_agent_id = parseInt(input.value) || null;
             } else if (className.includes('action-config-department_id')) {
                 config.department_id = parseInt(input.value) || null;
-            } else if (className.includes('action-config-tag_ids')) {
-                config.tag_ids = Array.from(input.selectedOptions).map(opt => opt.value);
+            } else if (className.includes('action-config-tags')) {
+                config.tags = Array.from(input.selectedOptions).map(opt => parseInt(opt.value));
             } else if (className.includes('action-config-priority')) {
                 config.priority = input.value;
             } else if (className.includes('action-config-status')) {
@@ -1004,9 +992,19 @@ function collectActions() {
 
 // Inicializar ao carregar página
 document.addEventListener('DOMContentLoaded', async function() {
+    // Carregar etapas inicialmente (antes do systemData para que o select apareça)
+    updateStages();
+    
+    // Carregar dados do sistema e depois carregar condições e ações
     await loadSystemData();
-    loadConditions();
-    loadActions();
+    
+    // Após carregar systemData, recarregar condições e ações existentes
+    if (conditions.length > 0) {
+        loadConditions();
+    }
+    if (actions.length > 0) {
+        loadActions();
+    }
 });
 
 // Atualizar condições quando operador mudar

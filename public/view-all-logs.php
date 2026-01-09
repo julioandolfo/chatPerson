@@ -11,6 +11,8 @@ $logFiles = [
     'Automação' => __DIR__ . '/../logs/automacao.log',
     'AI Agent' => __DIR__ . '/../logs/ai_agent.log',
     'AI Tools' => __DIR__ . '/../logs/ai_tools.log',
+    'Kanban Agents' => __DIR__ . '/../logs/kanban_agents.log',
+    'Kanban Agents Cron' => __DIR__ . '/../storage/logs/kanban-agents-cron.log',
     'Erros PHP' => __DIR__ . '/../logs/error.log',
 ];
 
@@ -101,12 +103,14 @@ $logFiles = [
     
     <div class="controls">
         <button onclick="location.reload()">🔄 Atualizar</button>
-        <button class="nav-btn" onclick="document.getElementById('app-log').scrollIntoView({behavior: 'smooth'})">Aplicação</button>
+        <button class="nav-btn" onclick="document.getElementById('aplicacao-log').scrollIntoView({behavior: 'smooth'})">Aplicação</button>
         <button class="nav-btn" onclick="document.getElementById('conversas-log').scrollIntoView({behavior: 'smooth'})">Conversas</button>
         <button class="nav-btn" onclick="document.getElementById('quepasa-log').scrollIntoView({behavior: 'smooth'})">Quepasa</button>
         <button class="nav-btn" onclick="document.getElementById('automacao-log').scrollIntoView({behavior: 'smooth'})">Automação</button>
         <button class="nav-btn" onclick="document.getElementById('ai-agent-log').scrollIntoView({behavior: 'smooth'})">AI Agent</button>
         <button class="nav-btn" onclick="document.getElementById('ai-tools-log').scrollIntoView({behavior: 'smooth'})">AI Tools</button>
+        <button class="nav-btn" onclick="document.getElementById('kanban-agents-log').scrollIntoView({behavior: 'smooth'})">Kanban Agents</button>
+        <button class="nav-btn" onclick="document.getElementById('kanban-agents-cron-log').scrollIntoView({behavior: 'smooth'})">Cron</button>
         <button onclick="window.history.back()">← Voltar</button>
     </div>
     

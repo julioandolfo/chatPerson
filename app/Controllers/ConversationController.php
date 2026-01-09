@@ -1371,10 +1371,13 @@ class ConversationController
             
             // Usar o FunnelService para mover (já tem validações e logs)
             $userId = \App\Helpers\Auth::id();
+            \App\Helpers\Logger::info("🔀 moveStage: userId={$userId}, conversationId={$id}, stageId={$stageId}", 'conversas.log');
             \App\Services\FunnelService::moveConversation($id, $stageId, $userId);
             
             Response::json(['success' => true, 'message' => 'Conversa movida com sucesso']);
         } catch (\Exception $e) {
+            \App\Helpers\Logger::error("❌ moveStage erro: {$e->getMessage()}", 'conversas.log');
+            \App\Helpers\Logger::error($e->getTraceAsString(), 'conversas.log');
             Response::json(['success' => false, 'message' => $e->getMessage()], 400);
         }
     }

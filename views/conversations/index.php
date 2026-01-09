@@ -6642,7 +6642,9 @@ window.addEventListener('error', function(e) {
 // Sistema de Polling (fallback quando WebSocket não está disponível)
 // Declarar variíveis e funçÁes ANTES de serem usadas
 let pollingInterval = null;
-let lastMessageId = null;
+// Controlar último ID de mensagem por conversa para evitar "vazar" valor entre conversas
+const lastMessageIds = {};
+let lastMessageId = null; // mantém o valor da conversa atual para uso rápido
 let currentPollingConversationId = null;
 
 // Sistema de Paginação Infinita
@@ -7025,6 +7027,32 @@ function applyConversationUpdate(conv) {
 /**
  * Iniciar polling (verificação periódica de novas mensagens)
  */
+// Helpers para lastMessageId por conversa
+function setLastMessageIdForConversation(conversationId, messageId) {
+    if (!conversationId || !messageId) return;
+    const idNum = parseInt(messageId);
+    if (isNaN(idNum)) return;
+    const key = String(conversationId);
+    const prev = lastMessageIds[key] || 0;
+    lastMessageIds[key] = Math.max(prev, idNum);
+    if (currentConversationId && String(currentConversationId) === key) {
+        lastMessageId = lastMessageIds[key];
+    }
+}
+
+function getLastMessageIdForConversation(conversationId) {
+    if (!conversationId) return 0;
+    const key = String(conversationId);
+    return lastMessageIds[key] || 0;
+}
+
+function resetConversationState(conversationId) {
+    currentConversationId = conversationId ? parseInt(conversationId) : null;
+    lastMessageId = getLastMessageIdForConversation(conversationId);
+    oldestMessageId = null;
+    hasMoreMessages = true;
+}
+
 function startPolling(conversationId) {
     // Parar polling anterior se existir
     if (pollingInterval) {
@@ -7069,7 +7097,7 @@ function checkForNewMessages(conversationId) {
     
     // Buscar apenas mensagens novas
     const conversationIdNum = parseInt(conversationId);
-    const lastMessageIdNum = parseInt(lastMessageId) || 0;
+    const lastMessageIdNum = parseInt(getLastMessageIdForConversation(conversationId)) || 0;
     if (isNaN(conversationIdNum)) {
         console.error('ID de conversa inválido:', conversationId);
         return;
@@ -7170,8 +7198,8 @@ function updateConversationListPreview(conversationId, lastMessage) {
 }
 
 function selectConversation(id) {
-    // Atualizar conversa selecionada globalmente
-    currentConversationId = parseInt(id);
+    // Atualizar conversa selecionada globalmente e resetar estado local
+    resetConversationState(id);
     window.currentConversationId = currentConversationId;
 
     // Marcar conversa como ativa na lista
@@ -7302,11 +7330,13 @@ function selectConversation(id) {
         const lastMsg = messages[messages.length - 1];
         if (lastMsg && lastMsg.id) {
             lastMessageId = lastMsg.id;
+            setLastMessageIdForConversation(currentConversationId, lastMsg.id);
         }
     } else {
         // Sem mensagens, zera controles
         oldestMessageId = null;
         lastMessageId = 0;
+        setLastMessageIdForConversation(currentConversationId, 0);
     }
     updateChatMessages(messages, true);
             
@@ -7362,6 +7392,7 @@ function selectConversation(id) {
                 const lastMsg = data.messages[data.messages.length - 1];
                 if (lastMsg.id) {
                     lastMessageId = lastMsg.id;
+                    setLastMessageIdForConversation(currentConversationId, lastMsg.id);
                 }
             }
 
@@ -8107,6 +8138,14 @@ async function loadMoreMessages() {
             
             // Atualizar flag hasMoreMessages
             hasMoreMessages = data.has_more !== false;
+            
+            // Atualizar lastMessageId desta conversa com a mais nova retornada
+            const lastIdx = data.messages.length - 1;
+            const newest = data.messages[lastIdx];
+            if (newest && newest.id && currentConversationId) {
+                setLastMessageIdForConversation(currentConversationId, newest.id);
+                lastMessageId = getLastMessageIdForConversation(currentConversationId);
+            }
             
             // Restaurar posição do scroll
             const scrollHeightAfter = chatMessages.scrollHeight;
@@ -11638,6 +11677,9 @@ function addMessageToChat(message) {
         if (message.id) {
             messageDiv.setAttribute('data-message-id', message.id);
             lastMessageId = Math.max(lastMessageId || 0, message.id);
+            if (currentConversationId) {
+                setLastMessageIdForConversation(currentConversationId, message.id);
+            }
         }
         
         // Verificar se é mensagem de IA

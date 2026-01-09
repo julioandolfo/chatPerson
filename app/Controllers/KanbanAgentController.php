@@ -90,7 +90,7 @@ class KanbanAgentController
                 return;
             }
             
-            $executions = AIKanbanAgentExecution::getExecutions($id, 20);
+            $executions = AIKanbanAgent::getExecutions($id, 20);
             $actionLogs = AIKanbanAgent::getActionLogs($id, 50);
             
             // Buscar funis e etapas para exibição

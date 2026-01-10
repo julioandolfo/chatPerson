@@ -1187,7 +1187,6 @@ class KanbanAgentService
         $systemUserId = self::getSystemUserId();
 
         // Criar mensagem interna (is_internal = 1) diretamente na tabela messages
-        $db = Database::getInstance();
         $sql = "INSERT INTO messages (
             conversation_id, 
             sender_id, 
@@ -1200,7 +1199,7 @@ class KanbanAgentService
         ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
         
         try {
-            $db->execute($sql, [
+            $messageId = Database::insert($sql, [
                 $conversation['id'],
                 $systemUserId,
                 'agent',
@@ -1209,8 +1208,6 @@ class KanbanAgentService
                 1, // is_internal = true
                 'sent'
             ]);
-            
-            $messageId = (int) $db->lastInsertId();
             
             Logger::info("KanbanAgentService::actionSendInternalMessage - Mensagem interna criada com sucesso (ID: $messageId)");
             

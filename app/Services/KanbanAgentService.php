@@ -1079,7 +1079,7 @@ class KanbanAgentService
      */
     private static function actionCreateSummary(array $conversation, array $analysis, array $config): array
     {
-        $summaryType = $config['summary_type'] ?? 'internal';
+        $summaryType = $config['summary_type'] ?? 'public'; // Padrão: público
         $summary = $analysis['summary'] ?? 'Resumo não disponível';
         $includeRecommendations = $config['include_recommendations'] ?? false;
 
@@ -1117,7 +1117,7 @@ class KanbanAgentService
     private static function actionCreateNote(array $conversation, array $analysis, array $config): array
     {
         $note = $config['note'] ?? '';
-        $isInternal = $config['is_internal'] ?? true;
+        $isInternal = $config['is_internal'] ?? false; // Padrão: nota pública
 
         if (empty(trim($note))) {
             throw new \Exception('Conteúdo da nota não pode estar vazio');

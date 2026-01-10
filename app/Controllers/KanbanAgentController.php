@@ -504,5 +504,75 @@ class KanbanAgentController
             ], 500);
         }
     }
+
+    /**
+     * Obter detalhes de uma execução específica (conversas processadas)
+     */
+    public function getExecutionDetails(int $executionId): void
+    {
+        Permission::abortIfCannot('ai_agents.view');
+        
+        try {
+            // Buscar dados da execução
+            $execution = \App\Models\AIKanbanAgentExecution::find($executionId);
+            
+            if (!$execution) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Execução não encontrada'
+                ], 404);
+                return;
+            }
+            
+            // Buscar logs de ações desta execução com informações das conversas
+            $sql = "SELECT 
+                        al.*,
+                        c.id as conversation_id,
+                        ct.name as contact_name,
+                        ct.phone as contact_phone,
+                        fs.name as stage_name,
+                        f.name as funnel_name
+                    FROM ai_kanban_agent_actions_log al
+                    LEFT JOIN conversations c ON al.conversation_id = c.id
+                    LEFT JOIN contacts ct ON c.contact_id = ct.id
+                    LEFT JOIN funnel_stages fs ON c.funnel_stage_id = fs.id
+                    LEFT JOIN funnels f ON c.funnel_id = f.id
+                    WHERE al.execution_id = ?
+                    ORDER BY al.executed_at DESC";
+            
+            $logs = \App\Helpers\Database::fetchAll($sql, [$executionId]);
+            
+            // Processar logs para adicionar análise de sentimento
+            foreach ($logs as &$log) {
+                // Decodificar JSON se necessário
+                if (!empty($log['conditions_details']) && is_string($log['conditions_details'])) {
+                    $log['conditions_details'] = json_decode($log['conditions_details'], true);
+                }
+                if (!empty($log['actions_executed']) && is_string($log['actions_executed'])) {
+                    $log['actions_executed'] = json_decode($log['actions_executed'], true);
+                }
+                
+                // Extrair sentimento do summary (formato: {"sentiment":"neutral",...})
+                $log['analysis_sentiment'] = null;
+                if (!empty($log['analysis_summary'])) {
+                    // Tentar extrair sentimento do JSON se estiver no formato estruturado
+                    if (preg_match('/"sentiment":"(\w+)"/', $log['analysis_summary'], $matches)) {
+                        $log['analysis_sentiment'] = $matches[1];
+                    }
+                }
+            }
+            
+            Response::json([
+                'success' => true,
+                'execution' => $execution,
+                'logs' => $logs
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao buscar detalhes: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
 

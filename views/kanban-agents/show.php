@@ -224,12 +224,13 @@ ob_start();
                         <th>Status</th>
                         <th>Conversas Analisadas</th>
                         <th>Ações Executadas</th>
+                        <th class="text-end">Ações</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($executions)): ?>
                         <tr>
-                            <td colspan="5" class="text-center text-muted py-10">Nenhuma execução ainda</td>
+                            <td colspan="6" class="text-center text-muted py-10">Nenhuma execução ainda</td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($executions as $execution): ?>
@@ -249,6 +250,20 @@ ob_start();
                                 </td>
                                 <td><?= $execution['conversations_analyzed'] ?? 0 ?></td>
                                 <td><?= $execution['actions_executed'] ?? 0 ?></td>
+                                <td class="text-end">
+                                    <?php if (($execution['conversations_analyzed'] ?? 0) > 0): ?>
+                                        <button type="button" class="btn btn-sm btn-light-primary" onclick="viewExecutionDetails(<?= $execution['id'] ?>)">
+                                            <i class="ki-duotone ki-eye fs-4">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                                <span class="path3"></span>
+                                            </i>
+                                            Ver
+                                        </button>
+                                    <?php else: ?>
+                                        <span class="text-muted fs-7">-</span>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -258,6 +273,86 @@ ob_start();
     </div>
 </div>
 <!--end::Card-->
+
+<!-- Modal de Detalhes da Execução -->
+<div class="modal fade" id="executionDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Detalhes da Execução</h3>
+                <div class="btn btn-icon btn-sm btn-active-light-primary ms-2" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <!-- Loading -->
+                <div id="execution-loading" class="text-center py-10">
+                    <span class="spinner-border spinner-border-lg text-primary" role="status"></span>
+                    <div class="text-muted mt-3">Carregando detalhes...</div>
+                </div>
+                
+                <!-- Conteúdo -->
+                <div id="execution-content" style="display: none;">
+                    <!-- Resumo -->
+                    <div class="card mb-5">
+                        <div class="card-body p-5">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="d-flex flex-column">
+                                        <span class="text-muted fs-7 mb-1">Conversas Encontradas</span>
+                                        <span class="fw-bold fs-2 text-gray-800" id="exec-total-found">-</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="d-flex flex-column">
+                                        <span class="text-muted fs-7 mb-1">Analisadas com IA</span>
+                                        <span class="fw-bold fs-2 text-primary" id="exec-analyzed">-</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="d-flex flex-column">
+                                        <span class="text-muted fs-7 mb-1">Com Ações Executadas</span>
+                                        <span class="fw-bold fs-2 text-success" id="exec-acted">-</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="d-flex flex-column">
+                                        <span class="text-muted fs-7 mb-1">Erros</span>
+                                        <span class="fw-bold fs-2 text-danger" id="exec-errors">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tabela de Conversas -->
+                    <div class="table-responsive">
+                        <table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
+                            <thead>
+                                <tr class="fw-bold text-muted">
+                                    <th class="min-w-50px">ID</th>
+                                    <th class="min-w-150px">Contato</th>
+                                    <th class="min-w-100px">Etapa</th>
+                                    <th class="min-w-80px">Score</th>
+                                    <th class="min-w-100px">Sentimento</th>
+                                    <th class="min-w-100px">Condições</th>
+                                    <th class="min-w-100px">Ações</th>
+                                    <th class="min-w-80px text-end">Ver</th>
+                                </tr>
+                            </thead>
+                            <tbody id="conversations-list">
+                                <!-- Preenchido via JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script>
 function executeAgent(agentId, force = false) {
@@ -300,6 +395,123 @@ function executeAgent(agentId, force = false) {
             });
         }
     });
+}
+
+// Ver detalhes da execução
+function viewExecutionDetails(executionId) {
+    const modal = new bootstrap.Modal(document.getElementById('executionDetailsModal'));
+    modal.show();
+    
+    // Mostrar loading
+    document.getElementById('execution-loading').style.display = 'block';
+    document.getElementById('execution-content').style.display = 'none';
+    
+    // Buscar dados
+    fetch(`/kanban-agents/executions/${executionId}/details`, {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Preencher resumo
+            document.getElementById('exec-total-found').textContent = data.execution.conversations_found || 0;
+            document.getElementById('exec-analyzed').textContent = data.execution.conversations_analyzed || 0;
+            document.getElementById('exec-acted').textContent = data.execution.conversations_acted_upon || 0;
+            document.getElementById('exec-errors').textContent = data.execution.errors_count || 0;
+            
+            // Preencher tabela de conversas
+            const tbody = document.getElementById('conversations-list');
+            tbody.innerHTML = '';
+            
+            if (data.logs && data.logs.length > 0) {
+                data.logs.forEach(log => {
+                    const row = document.createElement('tr');
+                    
+                    // Badge de sentimento
+                    const sentimentBadges = {
+                        'positive': 'badge-light-success',
+                        'neutral': 'badge-light-secondary',
+                        'negative': 'badge-light-danger'
+                    };
+                    const sentimentBadge = sentimentBadges[log.analysis_sentiment] || 'badge-light-secondary';
+                    
+                    // Badge de condições
+                    const conditionsBadge = log.conditions_met ? 'badge-light-success' : 'badge-light-warning';
+                    const conditionsText = log.conditions_met ? 'Atendidas' : 'Não atendidas';
+                    
+                    // Contagem de ações
+                    const actionsExecuted = log.actions_executed ? JSON.parse(log.actions_executed).length : 0;
+                    
+                    row.innerHTML = `
+                        <td class="fw-bold">#${log.conversation_id}</td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="d-flex flex-column">
+                                    <span class="text-gray-800 fw-semibold">${escapeHtml(log.contact_name || 'Sem nome')}</span>
+                                    <span class="text-muted fs-7">${escapeHtml(log.contact_phone || '-')}</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge badge-light-info">${escapeHtml(log.stage_name || '-')}</span>
+                        </td>
+                        <td>
+                            <span class="badge badge-light-primary">${log.analysis_score || '-'}</span>
+                        </td>
+                        <td>
+                            <span class="badge ${sentimentBadge}">${escapeHtml(log.analysis_sentiment || '-')}</span>
+                        </td>
+                        <td>
+                            <span class="badge ${conditionsBadge}">${conditionsText}</span>
+                        </td>
+                        <td>
+                            <span class="badge badge-light-success">${actionsExecuted} ação(ões)</span>
+                        </td>
+                        <td class="text-end">
+                            <a href="/conversations/${log.conversation_id}" class="btn btn-sm btn-light-primary" target="_blank">
+                                <i class="ki-duotone ki-arrow-right fs-4">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                            </a>
+                        </td>
+                    `;
+                    
+                    tbody.appendChild(row);
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-5">Nenhuma conversa processada</td></tr>';
+            }
+            
+            // Esconder loading, mostrar conteúdo
+            document.getElementById('execution-loading').style.display = 'none';
+            document.getElementById('execution-content').style.display = 'block';
+        } else {
+            Swal.fire('Erro!', data.message || 'Erro ao carregar detalhes', 'error');
+            modal.hide();
+        }
+    })
+    .catch(error => {
+        Swal.fire('Erro!', 'Erro ao carregar detalhes da execução', 'error');
+        modal.hide();
+    });
+}
+
+// Helper para escapar HTML
+function escapeHtml(text) {
+    if (!text) return '';
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.toString().replace(/[&<>"']/g, m => map[m]);
 }
 </script>
 

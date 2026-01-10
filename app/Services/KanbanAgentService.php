@@ -115,9 +115,10 @@ class KanbanAgentService
 
             self::logInfo("KanbanAgentService::executeAgent - Iniciando análise de " . count($conversations) . " conversas");
 
-            foreach ($conversations as $conversation) {
+            foreach ($conversations as $index => $conversation) {
                 try {
                     $stats['conversations_analyzed']++;
+                    self::logInfo("KanbanAgentService::executeAgent - ===== Conversa " . ($index + 1) . "/" . count($conversations) . " =====");
                     self::logInfo("KanbanAgentService::executeAgent - Analisando conversa {$conversation['id']} (total analisadas: {$stats['conversations_analyzed']})");
                     
                     // Analisar conversa com IA
@@ -168,28 +169,44 @@ class KanbanAgentService
                             'success' => true
                         ]);
                     }
-                } catch (\Exception $e) {
-                    $stats['errors_count']++;
-                    self::logError("KanbanAgentService::executeAgent - Erro ao processar conversa {$conversation['id']}: " . $e->getMessage());
-                    self::logError("KanbanAgentService::executeAgent - Stack trace: " . $e->getTraceAsString());
                 } catch (\Throwable $e) {
+                    // Captura TODOS os erros (Exception, Error, ParseError, etc)
                     $stats['errors_count']++;
-                    self::logError("KanbanAgentService::executeAgent - Erro CRÍTICO ao processar conversa {$conversation['id']}: " . $e->getMessage());
+                    self::logError("KanbanAgentService::executeAgent - ERRO ao processar conversa {$conversation['id']}");
                     self::logError("KanbanAgentService::executeAgent - Tipo: " . get_class($e));
+                    self::logError("KanbanAgentService::executeAgent - Mensagem: " . $e->getMessage());
+                    self::logError("KanbanAgentService::executeAgent - Arquivo: " . $e->getFile() . " (linha " . $e->getLine() . ")");
                     self::logError("KanbanAgentService::executeAgent - Stack trace: " . $e->getTraceAsString());
                 }
+                
+                self::logInfo("KanbanAgentService::executeAgent - Fim do processamento da conversa {$conversation['id']}");
             }
+            
+            self::logInfo("KanbanAgentService::executeAgent - Loop de conversas finalizado. Total processadas: " . count($conversations));
 
             // Finalizar execução
             self::logInfo("KanbanAgentService::executeAgent - Finalizando execução $executionId: {$stats['conversations_analyzed']} analisadas, {$stats['conversations_acted_upon']} com ações, {$stats['actions_executed']} ações executadas, {$stats['errors_count']} erros");
-            AIKanbanAgentExecution::completeExecution($executionId, $stats);
+            
+            try {
+                AIKanbanAgentExecution::completeExecution($executionId, $stats);
+                self::logInfo("KanbanAgentService::executeAgent - Execução completada com sucesso no banco");
+            } catch (\Throwable $e) {
+                self::logError("KanbanAgentService::executeAgent - Erro ao completar execução no banco: " . $e->getMessage());
+                throw $e;
+            }
             
             // Atualizar próxima execução
-            AIKanbanAgent::updateNextExecution($agentId);
-            self::logInfo("KanbanAgentService::executeAgent - Próxima execução agendada para o agente $agentId");
+            try {
+                AIKanbanAgent::updateNextExecution($agentId);
+                self::logInfo("KanbanAgentService::executeAgent - Próxima execução agendada para o agente $agentId");
+            } catch (\Throwable $e) {
+                self::logError("KanbanAgentService::executeAgent - Erro ao agendar próxima execução: " . $e->getMessage());
+                throw $e;
+            }
 
             $message = "Agente executado com sucesso. {$stats['conversations_analyzed']} conversas analisadas, {$stats['conversations_acted_upon']} com ações executadas.";
             self::logInfo("KanbanAgentService::executeAgent - $message");
+            self::logInfo("KanbanAgentService::executeAgent - ===== EXECUÇÃO FINALIZADA COM SUCESSO =====");
 
             return [
                 'success' => true,
@@ -197,16 +214,20 @@ class KanbanAgentService
                 'stats' => $stats
             ];
 
-        } catch (\Exception $e) {
-            self::logError("KanbanAgentService::executeAgent - ERRO CRÍTICO na execução do agente $agentId: " . $e->getMessage());
-            self::logError("KanbanAgentService::executeAgent - Stack trace: " . $e->getTraceAsString());
-            AIKanbanAgentExecution::completeExecution($executionId, [], $e->getMessage());
-            throw $e;
         } catch (\Throwable $e) {
-            self::logError("KanbanAgentService::executeAgent - ERRO FATAL na execução do agente $agentId: " . $e->getMessage());
+            // Captura TODOS os erros possíveis
+            self::logError("KanbanAgentService::executeAgent - ERRO FATAL na execução do agente $agentId");
             self::logError("KanbanAgentService::executeAgent - Tipo: " . get_class($e));
+            self::logError("KanbanAgentService::executeAgent - Mensagem: " . $e->getMessage());
+            self::logError("KanbanAgentService::executeAgent - Arquivo: " . $e->getFile() . " (linha " . $e->getLine() . ")");
             self::logError("KanbanAgentService::executeAgent - Stack trace: " . $e->getTraceAsString());
-            AIKanbanAgentExecution::completeExecution($executionId, [], $e->getMessage());
+            
+            try {
+                AIKanbanAgentExecution::completeExecution($executionId, [], $e->getMessage());
+            } catch (\Throwable $completionError) {
+                self::logError("KanbanAgentService::executeAgent - Erro ao completar execução: " . $completionError->getMessage());
+            }
+            
             throw $e;
         }
     }

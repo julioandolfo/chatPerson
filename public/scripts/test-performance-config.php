@@ -26,17 +26,31 @@ if (isset($settings['agent_performance_analysis'])) {
     echo "Min Agent Messages: " . ($perf['min_agent_messages'] ?? 'não definido') . "\n";
     echo "Cost Limit: $" . ($perf['cost_limit_per_day'] ?? 'não definido') . "/dia\n";
     
-    echo "\nGamificação:\n";
-    echo "  Enabled: " . (isset($perf['gamification']['enabled']) && $perf['gamification']['enabled'] ? 'SIM' : 'NÃO') . "\n";
-    echo "  Auto Award Badges: " . (isset($perf['gamification']['auto_award_badges']) && $perf['gamification']['auto_award_badges'] ? 'SIM' : 'NÃO') . "\n";
+    echo "\n🎮 Gamificação:\n";
+    echo "  Enabled: " . (isset($perf['gamification']['enabled']) && $perf['gamification']['enabled'] ? '✅ SIM' : '❌ NÃO') . "\n";
+    echo "  Auto Award Badges: " . (isset($perf['gamification']['auto_award_badges']) && $perf['gamification']['auto_award_badges'] ? '✅ SIM' : '❌ NÃO') . "\n";
     
-    echo "\nCoaching:\n";
-    echo "  Enabled: " . (isset($perf['coaching']['enabled']) && $perf['coaching']['enabled'] ? 'SIM' : 'NÃO') . "\n";
-    echo "  Auto Create Goals: " . (isset($perf['coaching']['auto_create_goals']) && $perf['coaching']['auto_create_goals'] ? 'SIM' : 'NÃO') . "\n";
+    echo "\n🎯 Coaching:\n";
+    echo "  Enabled: " . (isset($perf['coaching']['enabled']) && $perf['coaching']['enabled'] ? '✅ SIM' : '❌ NÃO') . "\n";
+    echo "  Auto Create Goals: " . (isset($perf['coaching']['auto_create_goals']) && $perf['coaching']['auto_create_goals'] ? '✅ SIM' : '❌ NÃO') . "\n";
+    echo "  Save Best Practices: " . (isset($perf['coaching']['save_best_practices']) && $perf['coaching']['save_best_practices'] ? '✅ SIM' : '❌ NÃO') . "\n";
+    echo "  Min Score: " . ($perf['coaching']['min_score_for_best_practice'] ?? 'não definido') . "\n";
     
-    echo "\nMelhores Práticas:\n";
-    echo "  Enabled: " . (isset($perf['best_practices']['enabled']) && $perf['best_practices']['enabled'] ? 'SIM' : 'NÃO') . "\n";
-    echo "  Auto Save: " . (isset($perf['best_practices']['auto_save']) && $perf['best_practices']['auto_save'] ? 'SIM' : 'NÃO') . "\n";
+    echo "\n📚 Melhores Práticas:\n";
+    echo "  Enabled: " . (isset($perf['best_practices']['enabled']) && $perf['best_practices']['enabled'] ? '✅ SIM' : '❌ NÃO') . "\n";
+    echo "  Auto Save: " . (isset($perf['best_practices']['auto_save']) && $perf['best_practices']['auto_save'] ? '✅ SIM' : '❌ NÃO') . "\n";
+    
+    echo "\n📊 Dimensões:\n";
+    if (isset($perf['dimensions']) && is_array($perf['dimensions'])) {
+        echo "  Total: " . count($perf['dimensions']) . "\n";
+        foreach ($perf['dimensions'] as $key => $dim) {
+            $enabled = isset($dim['enabled']) && $dim['enabled'] ? '✅' : '❌';
+            $weight = $dim['weight'] ?? 1.0;
+            echo "  {$enabled} " . ucfirst(str_replace('_', ' ', $key)) . ": peso {$weight}\n";
+        }
+    } else {
+        echo "  ❌ Nenhuma dimensão configurada\n";
+    }
     
 } else {
     echo "❌ Seção 'agent_performance_analysis' NÃO encontrada!\n";
@@ -69,6 +83,18 @@ $testSettings['agent_performance_analysis'] = [
         'follow_up' => 1.0,
         'professionalism' => 1.0,
     ],
+    'dimensions' => [
+        'proactivity' => ['enabled' => true, 'weight' => 1.5],
+        'objection_handling' => ['enabled' => true, 'weight' => 2.0],
+        'rapport' => ['enabled' => true, 'weight' => 1.0],
+        'closing_techniques' => ['enabled' => true, 'weight' => 2.0],
+        'qualification' => ['enabled' => true, 'weight' => 1.0],
+        'clarity' => ['enabled' => true, 'weight' => 1.0],
+        'value_proposition' => ['enabled' => true, 'weight' => 1.5],
+        'response_time' => ['enabled' => true, 'weight' => 1.0],
+        'follow_up' => ['enabled' => true, 'weight' => 1.0],
+        'professionalism' => ['enabled' => true, 'weight' => 1.0],
+    ],
     'gamification' => [
         'enabled' => true,
         'auto_award_badges' => true,
@@ -77,6 +103,8 @@ $testSettings['agent_performance_analysis'] = [
         'enabled' => true,
         'auto_create_goals' => true,
         'goal_threshold' => 3.5,
+        'save_best_practices' => true,
+        'min_score_for_best_practice' => 4.5,
     ],
     'best_practices' => [
         'enabled' => true,
@@ -97,11 +125,38 @@ if (ConversationSettingsService::saveSettings($testSettings)) {
     echo "Recarregando configurações...\n";
     $reloaded = ConversationSettingsService::getSettings();
     
-    if (isset($reloaded['agent_performance_analysis']['enabled']) && $reloaded['agent_performance_analysis']['enabled']) {
-        echo "✅ Configuração 'enabled' persistiu corretamente!\n";
+    $perf = $reloaded['agent_performance_analysis'] ?? [];
+    
+    echo "\n📋 Verificando persistência:\n";
+    
+    $checks = [
+        ['field' => 'enabled', 'path' => $perf['enabled'] ?? false, 'expected' => true, 'label' => 'Análise Habilitada'],
+        ['field' => 'gamification.enabled', 'path' => $perf['gamification']['enabled'] ?? false, 'expected' => true, 'label' => '🎮 Gamificação'],
+        ['field' => 'coaching.enabled', 'path' => $perf['coaching']['enabled'] ?? false, 'expected' => true, 'label' => '🎯 Coaching'],
+        ['field' => 'coaching.save_best_practices', 'path' => $perf['coaching']['save_best_practices'] ?? false, 'expected' => true, 'label' => '📚 Save Best Practices'],
+        ['field' => 'dimensions.proactivity.weight', 'path' => $perf['dimensions']['proactivity']['weight'] ?? 1.0, 'expected' => 1.5, 'label' => '🚀 Peso Proatividade'],
+        ['field' => 'dimensions.objection_handling.weight', 'path' => $perf['dimensions']['objection_handling']['weight'] ?? 1.0, 'expected' => 2.0, 'label' => '💪 Peso Objeções'],
+    ];
+    
+    $passed = 0;
+    $failed = 0;
+    
+    foreach ($checks as $check) {
+        if ($check['path'] == $check['expected']) {
+            echo "  ✅ {$check['label']}: OK (valor: {$check['path']})\n";
+            $passed++;
+        } else {
+            echo "  ❌ {$check['label']}: FALHOU (esperado: {$check['expected']}, obtido: {$check['path']})\n";
+            $failed++;
+        }
+    }
+    
+    echo "\n📊 Resultado: {$passed} passou, {$failed} falhou\n";
+    
+    if ($failed === 0) {
+        echo "🎉 TODOS OS TESTES PASSARAM!\n";
     } else {
-        echo "❌ Configuração 'enabled' NÃO persistiu!\n";
-        echo "Valor atual: " . var_export($reloaded['agent_performance_analysis']['enabled'] ?? null, true) . "\n";
+        echo "⚠️ Alguns testes falharam. Verifique a implementação.\n";
     }
 } else {
     echo "❌ Erro ao salvar!\n";

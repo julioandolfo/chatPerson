@@ -1,6 +1,5 @@
 <?php
-$settings = $data['settings'] ?? [];
-$coachingSettings = $settings['realtime_coaching'] ?? [];
+$coachingSettings = ($conversationSettings ?? [])['realtime_coaching'] ?? [];
 ?>
 
 <div class="card mb-5">

@@ -31,7 +31,9 @@ class AIKanbanAgent extends Model
         'conditions',
         'actions',
         'settings',
-        'max_conversations_per_execution'
+        'max_conversations_per_execution',
+        'cooldown_hours',
+        'allow_reexecution_on_change'
     ];
     protected bool $timestamps = true;
 

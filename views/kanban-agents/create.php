@@ -82,6 +82,42 @@ ob_start();
                 </div>
             </div>
             
+            <!-- Configurações de Cooldown -->
+            <div class="separator separator-dashed my-8"></div>
+            
+            <div class="d-flex align-items-center mb-5">
+                <i class="ki-duotone ki-time fs-2x text-primary me-3">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                <div>
+                    <h3 class="mb-1">Controle de Re-execução</h3>
+                    <div class="text-muted fs-7">Evite processar a mesma conversa repetidamente</div>
+                </div>
+            </div>
+            
+            <div class="row mb-5">
+                <div class="col-md-6">
+                    <label class="form-label required">Cooldown (horas)</label>
+                    <input type="number" name="cooldown_hours" class="form-control" value="24" min="1" max="168" required>
+                    <div class="form-text">
+                        Tempo mínimo entre execuções na mesma conversa (padrão: 24h, máx: 7 dias)
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-switch mt-8">
+                        <input class="form-check-input" type="checkbox" name="allow_reexecution_on_change" id="allow_reexecution_on_change" checked>
+                        <label class="form-check-label" for="allow_reexecution_on_change">
+                            Permitir re-execução se houver mudanças
+                        </label>
+                    </div>
+                    <div class="form-text mt-2">
+                        <i class="ki-duotone ki-information-5 fs-2 text-info"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                        Se habilitado, permite executar novamente antes do cooldown se a conversa mudou de etapa, recebeu mensagens, mudou de agente, etc.
+                    </div>
+                </div>
+            </div>
+            
             <div class="separator separator-dashed my-10"></div>
             
             <h4 class="fw-bold mb-5">Funis e Etapas Alvo</h4>
@@ -405,8 +441,12 @@ async function loadSystemData() {
                     icon: 'ki-document' 
                 },
                 'create_note': { 
-                    label: 'Criar Nota', 
+                    label: 'Criar Nota (Timeline)', 
                     icon: 'ki-note-edit' 
+                },
+                'send_internal_message': { 
+                    label: 'Mensagem Interna (Chat)', 
+                    icon: 'ki-message-text-2' 
                 }
             };
             
@@ -793,6 +833,22 @@ function getActionConfigHTML(actionData, index) {
                     <label class="form-check-label" for="is_internal_${index}">Nota interna (privada)</label>
                 </div>
             `;
+        case 'send_internal_message':
+            return `
+                <label class="form-label">Conteúdo da Mensagem Interna</label>
+                <textarea class="form-control action-config-message" rows="3" placeholder="Ex: 🔔 Lead parado há mais de {{stage_duration}} horas na etapa {{stage_name}}. Favor acompanhar!">${config.message || ''}</textarea>
+                <div class="form-text mt-2">
+                    <i class="ki-duotone ki-information-5 fs-2 text-primary"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                    Esta mensagem aparecerá como nota interna no chat da conversa (visível apenas para agentes).
+                </div>
+                <div class="alert alert-info d-flex align-items-center p-3 mt-3 mb-0">
+                    <i class="ki-duotone ki-information fs-2x text-info me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                    <div class="fs-7">
+                        <strong>Variáveis disponíveis:</strong><br>
+                        {{contact_name}}, {{agent_name}}, {{score}}, {{sentiment}}, {{stage_name}}, {{stage_duration}}
+                    </div>
+                </div>
+            `;
         default:
             return '<div class="text-muted">Selecione um tipo de ação</div>';
     }
@@ -888,6 +944,8 @@ function collectActions() {
                 config.method = input.value;
             } else if (className.includes('action-config-note')) {
                 config.note = input.value;
+            } else if (className.includes('action-config-message')) {
+                config.message = input.value;
             }
         });
         

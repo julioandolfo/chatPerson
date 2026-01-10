@@ -1,16 +1,16 @@
 <?php
 /**
- * Debug: Verificar salvamento de Coaching (modo verboso)
+ * Debug: Verificar salvamento de Coaching (modo independente, sem autoload)
  */
 
 header('Content-Type: text/plain; charset=utf-8');
-
-// Mostrar erros para diagnosticar 500
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-// Log dedicado
-$logFile = __DIR__ . '/../storage/logs/coaching_debug.log';
+// Caminhos esperados
+$base = dirname(__DIR__);
+$configPath = $base . '/config/database.php';
+$logFile = $base . '/storage/logs/coaching_debug.log';
 
 function log_debug($msg) {
     global $logFile;
@@ -19,23 +19,33 @@ function log_debug($msg) {
 
 log_debug('--- debug-coaching-save.php iniciado ---');
 
-try {
-    require_once __DIR__ . '/../vendor/autoload.php';
-    require_once __DIR__ . '/../config/bootstrap.php';
-    log_debug('Bootstrap carregado com sucesso');
-} catch (\Exception $e) {
-    log_debug('Erro ao carregar bootstrap: ' . $e->getMessage());
-    echo "ERRO AO CARREGAR: " . $e->getMessage() . "\n";
+// Carregar config do banco (sem autoload)
+if (!file_exists($configPath)) {
+    log_debug("Config database.php não encontrado em {$configPath}");
+    echo "ERRO: config/database.php não encontrado.\n";
     exit;
 }
 
-use App\Helpers\Database;
-
-echo "=== DEBUG: COACHING CONFIG ===\n\n";
+$dbConfig = require $configPath;
 
 try {
-    $sql = "SELECT * FROM settings WHERE `key` = 'conversation_settings' LIMIT 1";
-    $result = Database::fetchOne($sql);
+    $dsn = sprintf(
+        'mysql:host=%s;port=%s;dbname=%s;charset=%s',
+        $dbConfig['host'],
+        $dbConfig['port'],
+        $dbConfig['database'],
+        $dbConfig['charset'] ?? 'utf8mb4'
+    );
+
+    $pdo = new PDO($dsn, $dbConfig['username'], $dbConfig['password'], [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    ]);
+
+    log_debug('Conexão PDO criada com sucesso');
+
+    $stmt = $pdo->query("SELECT * FROM settings WHERE `key` = 'conversation_settings' ORDER BY id DESC LIMIT 1");
+    $result = $stmt->fetch();
 
     if (!$result) {
         log_debug('Nenhum registro conversation_settings encontrado');
@@ -84,7 +94,7 @@ try {
     echo json_encode($coaching, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
 
 } catch (\Throwable $e) {
-    log_debug('Erro ao consultar: ' . $e->getMessage() . ' | Trace: ' . $e->getTraceAsString());
-    echo "ERRO AO CONSULTAR: " . $e->getMessage() . "\n";
+    log_debug('Erro: ' . $e->getMessage());
+    echo "ERRO: " . $e->getMessage() . "\n";
     echo "Trace: " . $e->getTraceAsString() . "\n";
 }

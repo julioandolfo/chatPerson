@@ -150,8 +150,27 @@ class KanbanAgentService
 
             self::logInfo("KanbanAgentService::executeAgent - Iniciando análise de " . count($conversationsToAnalyze) . " conversas com IA");
 
-            // PASSO 4: Analisar conversas filtradas com IA
-            foreach ($conversationsToAnalyze as $index => $conversation) {
+            // PASSO 4: Aplicar filtro de cooldown
+            $forceExecution = $trigger === 'manual_force'; // Permitir forçar execução
+            $conversationsAfterCooldown = [];
+            $skippedByCooldown = 0;
+            
+            foreach ($conversationsToAnalyze as $conversation) {
+                [$shouldSkip, $reason] = self::shouldSkipConversation($agent, $conversation, $forceExecution);
+                
+                if ($shouldSkip) {
+                    $skippedByCooldown++;
+                    self::logInfo("Conversa {$conversation['id']}: PULADA - motivo: $reason");
+                    continue;
+                }
+                
+                $conversationsAfterCooldown[] = $conversation;
+            }
+            
+            self::logInfo("KanbanAgentService::executeAgent - Conversas após filtro de cooldown: " . count($conversationsAfterCooldown) . " de " . count($conversationsToAnalyze) . " (puladas: $skippedByCooldown)");
+
+            // PASSO 5: Analisar conversas que passaram pelo cooldown com IA
+            foreach ($conversationsAfterCooldown as $index => $conversation) {
                 try {
                     $stats['conversations_analyzed']++;
                     self::logInfo("KanbanAgentService::executeAgent - ===== Conversa " . ($index + 1) . "/" . count($conversationsToAnalyze) . " =====");
@@ -187,10 +206,10 @@ class KanbanAgentService
                         
                         self::logInfo("KanbanAgentService::executeAgent - Ações executadas para conversa {$conversation['id']}: {$actionsResult['executed']} sucesso(s), {$actionsResult['errors']} erro(s)");
                         
-                        // Registrar log de ação (DESABILITADO TEMPORARIAMENTE - causando erro)
-                        self::logInfo("KanbanAgentService::executeAgent - LOG de ação desabilitado temporariamente");
+                        // Criar snapshot do estado atual da conversa
+                        $conversationSnapshot = self::createConversationSnapshot($conversation);
                         
-                        /* DESABILITADO - causando fatal error
+                        // Registrar log de ação com snapshot
                         try {
                             $logData = [
                                 'ai_kanban_agent_id' => $agentId,
@@ -204,7 +223,8 @@ class KanbanAgentService
                                     $aiConditionsMet['details'] ?? []
                                 ),
                                 'actions_executed' => $actionsResult['actions'] ?? [],
-                                'success' => $actionsResult['errors'] === 0
+                                'success' => $actionsResult['errors'] === 0,
+                                'conversation_snapshot' => $conversationSnapshot
                             ];
                             
                             $logId = AIKanbanAgentActionLog::createLog($logData);
@@ -213,15 +233,14 @@ class KanbanAgentService
                             self::logError("KanbanAgentService::executeAgent - ERRO ao registrar log no banco: " . $e->getMessage());
                             // Não interromper execução por erro de log
                         }
-                        */
                     } else {
                         // Condições NÃO atendidas
                         self::logInfo("KanbanAgentService::executeAgent - Condições NÃO atendidas para conversa {$conversation['id']} - nenhuma ação será executada");
                         
-                        // LOG de ação desabilitado temporariamente
-                        self::logInfo("KanbanAgentService::executeAgent - LOG de condições não atendidas desabilitado temporariamente");
+                        // Criar snapshot do estado atual da conversa
+                        $conversationSnapshot = self::createConversationSnapshot($conversation);
                         
-                        /* DESABILITADO - causando fatal error
+                        // Registrar log mesmo sem ações executadas (para cooldown funcionar)
                         try {
                             $logData = [
                                 'ai_kanban_agent_id' => $agentId,
@@ -235,7 +254,8 @@ class KanbanAgentService
                                     $aiConditionsMet['details'] ?? []
                                 ),
                                 'actions_executed' => [],
-                                'success' => true
+                                'success' => true,
+                                'conversation_snapshot' => $conversationSnapshot
                             ];
                             
                             $logId = AIKanbanAgentActionLog::createLog($logData);
@@ -244,7 +264,6 @@ class KanbanAgentService
                             self::logError("KanbanAgentService::executeAgent - ERRO ao registrar log: " . $e->getMessage());
                             // Não interromper execução por erro de log
                         }
-                        */
                     }
                 } catch (\Throwable $e) {
                     // Captura TODOS os erros (Exception, Error, ParseError, etc)
@@ -859,6 +878,10 @@ class KanbanAgentService
                 Logger::info("KanbanAgentService::executeSingleAction - Ação 'create_note': criando nota para conversa {$conversation['id']}");
                 return self::actionCreateNote($conversation, $analysis, $config);
             
+            case 'send_internal_message':
+                Logger::info("KanbanAgentService::executeSingleAction - Ação 'send_internal_message': enviando mensagem interna para conversa {$conversation['id']}");
+                return self::actionSendInternalMessage($conversation, $analysis, $config);
+            
             default:
                 Logger::error("KanbanAgentService::executeSingleAction - Tipo de ação desconhecido: $type");
                 throw new \Exception("Tipo de ação desconhecido: $type");
@@ -1145,6 +1168,68 @@ class KanbanAgentService
     }
 
     /**
+     * Ação: Enviar mensagem interna (nota no chat)
+     */
+    private static function actionSendInternalMessage(array $conversation, array $analysis, array $config): array
+    {
+        $message = $config['message'] ?? '';
+        
+        if (empty(trim($message))) {
+            throw new \Exception('Conteúdo da mensagem interna não pode estar vazio');
+        }
+
+        // Processar template da mensagem
+        $messageContent = self::processTemplate($message, $conversation, $analysis);
+
+        Logger::info("KanbanAgentService::actionSendInternalMessage - Criando mensagem interna na conversa {$conversation['id']}");
+
+        // Buscar usuário do sistema
+        $systemUserId = self::getSystemUserId();
+
+        // Criar mensagem interna (is_internal = 1) diretamente na tabela messages
+        $db = Database::getInstance();
+        $sql = "INSERT INTO messages (
+            conversation_id, 
+            sender_id, 
+            sender_type, 
+            content, 
+            type,
+            is_internal,
+            status,
+            created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
+        
+        try {
+            $db->execute($sql, [
+                $conversation['id'],
+                $systemUserId,
+                'agent',
+                $messageContent,
+                'text',
+                1, // is_internal = true
+                'sent'
+            ]);
+            
+            $messageId = (int) $db->lastInsertId();
+            
+            Logger::info("KanbanAgentService::actionSendInternalMessage - Mensagem interna criada com sucesso (ID: $messageId)");
+            
+            // Notificar via WebSocket se disponível
+            try {
+                \App\Helpers\WebSocket::notifyConversationUpdated($conversation['id']);
+            } catch (\Exception $e) {
+                // WebSocket pode não estar disponível, ignorar erro
+                Logger::warning("KanbanAgentService::actionSendInternalMessage - WebSocket não disponível: " . $e->getMessage());
+            }
+            
+            return ['message' => 'Mensagem interna enviada', 'message_id' => $messageId, 'content' => $messageContent];
+        } catch (\Exception $e) {
+            Logger::error("KanbanAgentService::actionSendInternalMessage - Erro: " . $e->getMessage());
+            throw new \Exception('Erro ao criar mensagem interna: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Gerar mensagem de followup com IA
      */
     private static function generateFollowupMessage(array $conversation, array $analysis): string
@@ -1224,6 +1309,177 @@ class KanbanAgentService
         
         // Fallback: retornar 1 (usuário ID 1 geralmente é admin)
         return 1;
+    }
+
+    /**
+     * Obter última execução com ações para uma conversa específica
+     */
+    private static function getLastExecutionLog(int $agentId, int $conversationId): ?array
+    {
+        $sql = "SELECT * FROM ai_kanban_agent_action_logs 
+                WHERE ai_kanban_agent_id = ? 
+                AND conversation_id = ? 
+                ORDER BY created_at DESC 
+                LIMIT 1";
+        
+        $logs = Database::fetchAll($sql, [$agentId, $conversationId]);
+        return !empty($logs) ? $logs[0] : null;
+    }
+
+    /**
+     * Calcular diferença em horas entre duas datas
+     */
+    private static function calculateHoursDiff(string $datetime): float
+    {
+        $executionTime = new \DateTime($datetime);
+        $now = new \DateTime();
+        $diff = $now->getTimestamp() - $executionTime->getTimestamp();
+        return round($diff / 3600, 2); // Converter segundos para horas
+    }
+
+    /**
+     * Criar snapshot do estado atual da conversa
+     */
+    private static function createConversationSnapshot(array $conversation): array
+    {
+        // Buscar última mensagem
+        $lastMessage = Message::getLastByConversation($conversation['id']);
+        
+        // Buscar tags da conversa
+        $tags = [];
+        $tagsData = Database::fetchAll(
+            "SELECT tag_id FROM conversation_tags WHERE conversation_id = ?",
+            [$conversation['id']]
+        );
+        foreach ($tagsData as $tag) {
+            $tags[] = (int)$tag['tag_id'];
+        }
+        
+        return [
+            'funnel_stage_id' => (int)($conversation['funnel_stage_id'] ?? 0),
+            'agent_id' => (int)($conversation['agent_id'] ?? 0),
+            'last_message_id' => (int)($lastMessage['id'] ?? 0),
+            'last_message_at' => $lastMessage['created_at'] ?? null,
+            'status' => $conversation['status'] ?? 'open',
+            'tags' => $tags,
+            'updated_at' => $conversation['updated_at'] ?? null
+        ];
+    }
+
+    /**
+     * Detectar mudanças significativas na conversa
+     */
+    private static function hasSignificantChanges(array $conversation, ?array $snapshot): bool
+    {
+        if (!$snapshot) {
+            return true; // Sem snapshot anterior, considerar mudança
+        }
+        
+        // Mudou de etapa?
+        if ((int)($conversation['funnel_stage_id'] ?? 0) != (int)($snapshot['funnel_stage_id'] ?? 0)) {
+            self::logInfo("Mudança detectada: etapa alterada (de {$snapshot['funnel_stage_id']} para {$conversation['funnel_stage_id']})");
+            return true;
+        }
+        
+        // Nova mensagem?
+        $lastMessage = Message::getLastByConversation($conversation['id']);
+        $currentLastMessageId = (int)($lastMessage['id'] ?? 0);
+        $snapshotLastMessageId = (int)($snapshot['last_message_id'] ?? 0);
+        
+        if ($currentLastMessageId != $snapshotLastMessageId) {
+            self::logInfo("Mudança detectada: nova mensagem (ID atual: $currentLastMessageId, snapshot: $snapshotLastMessageId)");
+            return true;
+        }
+        
+        // Agente mudou?
+        if ((int)($conversation['agent_id'] ?? 0) != (int)($snapshot['agent_id'] ?? 0)) {
+            self::logInfo("Mudança detectada: agente alterado (de {$snapshot['agent_id']} para {$conversation['agent_id']})");
+            return true;
+        }
+        
+        // Status mudou?
+        if (($conversation['status'] ?? 'open') != ($snapshot['status'] ?? 'open')) {
+            self::logInfo("Mudança detectada: status alterado (de {$snapshot['status']} para {$conversation['status']})");
+            return true;
+        }
+        
+        // Tags mudaram?
+        $currentTags = [];
+        $tagsData = Database::fetchAll(
+            "SELECT tag_id FROM conversation_tags WHERE conversation_id = ?",
+            [$conversation['id']]
+        );
+        foreach ($tagsData as $tag) {
+            $currentTags[] = (int)$tag['tag_id'];
+        }
+        sort($currentTags);
+        
+        $snapshotTags = $snapshot['tags'] ?? [];
+        sort($snapshotTags);
+        
+        if ($currentTags != $snapshotTags) {
+            self::logInfo("Mudança detectada: tags alteradas");
+            return true;
+        }
+        
+        self::logInfo("Nenhuma mudança significativa detectada");
+        return false;
+    }
+
+    /**
+     * Verificar se deve pular conversa por cooldown
+     * Retorna [shouldSkip, reason]
+     */
+    private static function shouldSkipConversation(array $agent, array $conversation, bool $forceExecution = false): array
+    {
+        // Se forçar execução, não pular
+        if ($forceExecution) {
+            self::logInfo("Conversa {$conversation['id']}: execução forçada, ignorando cooldown");
+            return [false, 'forced'];
+        }
+        
+        // Verificar última execução
+        $lastExecution = self::getLastExecutionLog($agent['id'], $conversation['id']);
+        
+        if (!$lastExecution) {
+            self::logInfo("Conversa {$conversation['id']}: sem execução anterior, processando");
+            return [false, 'no_previous_execution'];
+        }
+        
+        // Calcular tempo desde última execução
+        $hoursSinceLastExecution = self::calculateHoursDiff($lastExecution['created_at']);
+        $cooldownHours = (int)($agent['cooldown_hours'] ?? 24);
+        
+        self::logInfo("Conversa {$conversation['id']}: última execução há {$hoursSinceLastExecution}h (cooldown: {$cooldownHours}h)");
+        
+        // Se ainda está dentro do cooldown
+        if ($hoursSinceLastExecution < $cooldownHours) {
+            $allowReexecution = (bool)($agent['allow_reexecution_on_change'] ?? true);
+            
+            if ($allowReexecution) {
+                // Verificar mudanças significativas
+                $snapshot = null;
+                if (!empty($lastExecution['conversation_snapshot'])) {
+                    $snapshot = json_decode($lastExecution['conversation_snapshot'], true);
+                }
+                
+                $hasChanges = self::hasSignificantChanges($conversation, $snapshot);
+                
+                if (!$hasChanges) {
+                    self::logInfo("Conversa {$conversation['id']}: PULANDO - cooldown ativo e sem mudanças");
+                    return [true, 'cooldown_no_changes'];
+                }
+                
+                self::logInfo("Conversa {$conversation['id']}: PROCESSANDO - mudanças detectadas durante cooldown");
+                return [false, 'changes_detected'];
+            } else {
+                self::logInfo("Conversa {$conversation['id']}: PULANDO - cooldown ativo e re-execução desabilitada");
+                return [true, 'cooldown_strict'];
+            }
+        }
+        
+        self::logInfo("Conversa {$conversation['id']}: PROCESSANDO - cooldown expirado");
+        return [false, 'cooldown_expired'];
     }
 }
 

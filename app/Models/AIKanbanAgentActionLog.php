@@ -23,7 +23,8 @@ class AIKanbanAgentActionLog extends Model
         'actions_executed',
         'success',
         'error_message',
-        'executed_at'
+        'executed_at',
+        'conversation_snapshot'
     ];
     protected bool $timestamps = false; // Usa executed_at ao invés de created_at/updated_at
 
@@ -38,6 +39,9 @@ class AIKanbanAgentActionLog extends Model
         }
         if (isset($data['actions_executed'])) {
             $data['actions_executed'] = !empty($data['actions_executed']) ? json_encode($data['actions_executed'], JSON_UNESCAPED_UNICODE) : json_encode([], JSON_UNESCAPED_UNICODE);
+        }
+        if (isset($data['conversation_snapshot'])) {
+            $data['conversation_snapshot'] = !empty($data['conversation_snapshot']) ? json_encode($data['conversation_snapshot'], JSON_UNESCAPED_UNICODE) : null;
         }
 
         if (!isset($data['executed_at'])) {

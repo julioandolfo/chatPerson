@@ -357,7 +357,11 @@ class KanbanAgentController
         Permission::abortIfCannot('ai_agents.edit');
         
         try {
-            $result = KanbanAgentService::executeAgent($id, 'manual');
+            $data = Request::post();
+            $force = $data['force'] ?? false;
+            
+            $trigger = $force ? 'manual_force' : 'manual';
+            $result = KanbanAgentService::executeAgent($id, $trigger);
             
             Response::json([
                 'success' => true,

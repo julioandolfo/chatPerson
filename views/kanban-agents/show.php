@@ -15,8 +15,19 @@ ob_start();
             <a href="<?= \App\Helpers\Url::to('/kanban-agents/' . $agent['id'] . '/edit') ?>" class="btn btn-light-info me-2">
                 Editar
             </a>
-            <button type="button" class="btn btn-primary" onclick="executeAgent(<?= $agent['id'] ?>)">
+            <button type="button" class="btn btn-primary me-2" onclick="executeAgent(<?= $agent['id'] ?>, false)">
+                <i class="ki-duotone ki-double-right fs-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
                 Executar Agora
+            </button>
+            <button type="button" class="btn btn-warning" onclick="executeAgent(<?= $agent['id'] ?>, true)">
+                <i class="ki-duotone ki-flash fs-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                Forçar Re-execução
             </button>
             <?php endif; ?>
         </div>
@@ -97,6 +108,27 @@ ob_start();
                     <span class="text-gray-800 fw-semibold">
                         <?= $agent['max_conversations_per_execution'] ?? 50 ?> por execução
                     </span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mb-10">
+            <div class="col-md-6">
+                <div class="d-flex flex-column">
+                    <span class="text-muted fs-7 mb-1">Cooldown</span>
+                    <span class="text-gray-800 fw-semibold">
+                        <?= $agent['cooldown_hours'] ?? 24 ?> hora(s)
+                    </span>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="d-flex flex-column">
+                    <span class="text-muted fs-7 mb-1">Re-execução em Mudanças</span>
+                    <?php if ($agent['allow_reexecution_on_change'] ?? true): ?>
+                        <span class="badge badge-light-success">Habilitado</span>
+                    <?php else: ?>
+                        <span class="badge badge-light-secondary">Desabilitado</span>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -228,14 +260,21 @@ ob_start();
 <!--end::Card-->
 
 <script>
-function executeAgent(agentId) {
+function executeAgent(agentId, force = false) {
+    const title = force ? 'Forçar Re-execução?' : 'Executar Agente?';
+    const text = force 
+        ? 'Isso irá ignorar o cooldown e executar em TODAS as conversas novamente. Deseja continuar?' 
+        : 'Deseja executar este agente agora respeitando o cooldown configurado?';
+    const icon = force ? 'warning' : 'question';
+    
     Swal.fire({
-        title: 'Executar Agente?',
-        text: 'Deseja executar este agente agora?',
-        icon: 'question',
+        title: title,
+        text: text,
+        icon: icon,
         showCancelButton: true,
-        confirmButtonText: 'Sim, executar',
-        cancelButtonText: 'Cancelar'
+        confirmButtonText: force ? 'Sim, forçar' : 'Sim, executar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: force ? '#f1416c' : '#009ef7'
     }).then((result) => {
         if (result.isConfirmed) {
             fetch(`/kanban-agents/${agentId}/execute`, {
@@ -243,7 +282,8 @@ function executeAgent(agentId) {
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest'
-                }
+                },
+                body: JSON.stringify({ force: force })
             })
             .then(response => response.json())
             .then(data => {

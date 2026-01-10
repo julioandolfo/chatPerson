@@ -1946,6 +1946,9 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
 <!-- SLA Indicator CSS -->
 <link rel="stylesheet" href="<?= \App\Helpers\Url::asset('css/custom/sla-indicator.css') ?>">
 
+<!-- Realtime Coaching CSS -->
+<link rel="stylesheet" href="<?= \App\Helpers\Url::asset('css/realtime-coaching.css') ?>">
+
 <!-- Script inline para definir função ANTES do HTML do botão -->
 <script>
 // 🔐 Permissões de Funil do Usuário (para filtrar conversas em tempo real)
@@ -19779,6 +19782,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- SLA Indicator JavaScript -->
 <script src="<?= \App\Helpers\Url::asset('js/custom/sla-indicator.js') ?>"></script>
+
+<!-- Realtime Coaching Container -->
+<div id="coaching-hints-container" class="coaching-hints-container"></div>
+
+<!-- Realtime Coaching JS -->
+<script src="<?= \App\Helpers\Url::asset('js/realtime-coaching.js') ?>"></script>
+<script>
+// Inicializar Coaching em Tempo Real
+if (typeof RealtimeCoaching !== 'undefined') {
+    window.realtimeCoaching = new RealtimeCoaching();
+    console.log('✅ Coaching em Tempo Real inicializado');
+} else {
+    console.error('❌ RealtimeCoaching não encontrado');
+}
+</script>
 
 <!-- WooCommerce Sidebar Bootstrap -->
 <script>

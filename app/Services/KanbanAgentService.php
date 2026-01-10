@@ -1211,7 +1211,11 @@ class KanbanAgentService
             
             // Notificar via WebSocket se disponível
             try {
-                \App\Helpers\WebSocket::notifyConversationUpdated($conversation['id']);
+                // Enviar conversa mínima para evitar erro de argumentos
+                \App\Helpers\WebSocket::notifyConversationUpdated(
+                    (int)$conversation['id'],
+                    $conversation
+                );
             } catch (\Exception $e) {
                 // WebSocket pode não estar disponível, ignorar erro
                 Logger::warning("KanbanAgentService::actionSendInternalMessage - WebSocket não disponível: " . $e->getMessage());

@@ -97,6 +97,13 @@ class KanbanAgentService
             $conversations = self::getTargetConversations($agent);
             self::logInfo("KanbanAgentService::executeAgent - Total de conversas encontradas: " . count($conversations));
             
+            // DEBUG: Ver campos da primeira conversa
+            if (!empty($conversations)) {
+                self::logInfo("KanbanAgentService::executeAgent - [DEBUG] Campos da primeira conversa: " . implode(', ', array_keys($conversations[0])));
+                self::logInfo("KanbanAgentService::executeAgent - [DEBUG] moved_at: " . ($conversations[0]['moved_at'] ?? 'NULL'));
+                self::logInfo("KanbanAgentService::executeAgent - [DEBUG] updated_at: " . ($conversations[0]['updated_at'] ?? 'NULL'));
+            }
+            
             $stats = [
                 'conversations_found' => count($conversations),
                 'conversations_filtered' => 0,
@@ -702,11 +709,28 @@ class KanbanAgentService
                 return self::compare($minutes, $operator, $value);
             
             case 'stage_duration_hours':
-                if (!$conversation['moved_at']) {
+                self::logInfo("KanbanAgentService::evaluateSingleCondition - Avaliando stage_duration_hours para conversa {$conversation['id']}");
+                self::logInfo("KanbanAgentService::evaluateSingleCondition - moved_at: " . ($conversation['moved_at'] ?? 'NULL'));
+                self::logInfo("KanbanAgentService::evaluateSingleCondition - updated_at: " . ($conversation['updated_at'] ?? 'NULL'));
+                self::logInfo("KanbanAgentService::evaluateSingleCondition - created_at: " . ($conversation['created_at'] ?? 'NULL'));
+                
+                // Usar moved_at se existir, senão updated_at, senão created_at
+                $dateField = $conversation['moved_at'] ?? $conversation['updated_at'] ?? $conversation['created_at'] ?? null;
+                
+                if (!$dateField) {
+                    self::logInfo("KanbanAgentService::evaluateSingleCondition - Nenhum campo de data encontrado, retornando false");
                     return false;
                 }
-                $hours = (time() - strtotime($conversation['moved_at'])) / 3600;
-                return self::compare($hours, $operator, $value);
+                
+                $hours = (time() - strtotime($dateField)) / 3600;
+                self::logInfo("KanbanAgentService::evaluateSingleCondition - Data utilizada: {$dateField}");
+                self::logInfo("KanbanAgentService::evaluateSingleCondition - Horas na etapa: {$hours}");
+                self::logInfo("KanbanAgentService::evaluateSingleCondition - Operador: {$operator}, Valor esperado: {$value}");
+                
+                $result = self::compare($hours, $operator, $value);
+                self::logInfo("KanbanAgentService::evaluateSingleCondition - Resultado da comparação: " . ($result ? 'TRUE' : 'FALSE'));
+                
+                return $result;
             
             case 'ai_analysis_score':
                 return self::compare($analysis['score'] ?? 0, $operator, $value);

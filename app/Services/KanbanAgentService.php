@@ -1193,10 +1193,9 @@ class KanbanAgentService
             sender_type, 
             content, 
             message_type,
-            is_internal,
             status,
             created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
+        ) VALUES (?, ?, ?, ?, ?, ?, NOW())";
         
         try {
             $messageId = Database::insert($sql, [
@@ -1204,8 +1203,7 @@ class KanbanAgentService
                 $systemUserId,
                 'agent',
                 $messageContent,
-                'text',
-                1, // is_internal = true
+                'note', // mensagem interna
                 'sent'
             ]);
             

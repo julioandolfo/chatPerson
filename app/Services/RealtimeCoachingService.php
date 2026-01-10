@@ -134,8 +134,8 @@ class RealtimeCoachingService
             return false;
         }
         
-        $bodyLength = mb_strlen($message['body']);
-        self::log("📝 Mensagem: \"{$message['body']}\" (tamanho: {$bodyLength} chars)");
+        $bodyLength = mb_strlen($message['content']);
+        self::log("📝 Mensagem: \"{$message['content']}\" (tamanho: {$bodyLength} chars)");
         
         // 1. Verificar se é mensagem do cliente
         if ($settings['analyze_only_client_messages'] && $message['sender_type'] !== 'contact') {
@@ -566,8 +566,8 @@ class RealtimeCoachingService
             }
             
             $similarity = self::calculateSimilarity(
-                $message['body'],
-                $hintMessage['body']
+                $message['content'],
+                $hintMessage['content']
             );
             
             if ($similarity >= $settings['cache_similarity_threshold']) {
@@ -651,11 +651,11 @@ class RealtimeCoachingService
         $prompt .= "### CONTEXTO DA CONVERSA (últimas mensagens):\n";
         foreach ($context as $msg) {
             $sender = $msg['sender_type'] === 'contact' ? 'Cliente' : 'Vendedor';
-            $prompt .= "{$sender}: {$msg['body']}\n";
+            $prompt .= "{$sender}: {$msg['content']}\n";
         }
         
         $prompt .= "\n### MENSAGEM ATUAL DO CLIENTE:\n";
-        $prompt .= $message['body'] . "\n\n";
+        $prompt .= $message['content'] . "\n\n";
         
         $prompt .= "### TIPOS DE SITUAÇÕES A DETECTAR:\n";
         $hintTypeDescriptions = [
@@ -825,7 +825,7 @@ class RealtimeCoachingService
      */
     public static function getPendingHintsForAgent(int $agentId, int $conversationId, int $seconds = 10): array
     {
-        $sql = "SELECT rch.*, m.body as message_body
+        $sql = "SELECT rch.*, m.content as message_body
                 FROM realtime_coaching_hints rch
                 LEFT JOIN messages m ON rch.message_id = m.id
                 WHERE rch.agent_id = :agent_id

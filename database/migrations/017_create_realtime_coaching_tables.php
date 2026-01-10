@@ -3,7 +3,7 @@
  * Migration: Criar tabelas para Coaching em Tempo Real
  */
 
-function up_realtime_coaching() {
+function up_create_realtime_coaching_tables() {
     global $pdo;
     
     $sql = "CREATE TABLE IF NOT EXISTS realtime_coaching_hints (
@@ -62,7 +62,7 @@ function up_realtime_coaching() {
     echo "✅ Tabela 'realtime_coaching_cache' criada com sucesso!\n";
 }
 
-function down_realtime_coaching() {
+function down_create_realtime_coaching_tables() {
     global $pdo;
     
     $sql1 = "DROP TABLE IF EXISTS realtime_coaching_hints";

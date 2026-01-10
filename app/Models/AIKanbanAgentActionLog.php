@@ -82,9 +82,9 @@ class AIKanbanAgentActionLog extends Model
     /**
      * Obter todos os logs (com decodificação JSON)
      */
-    public static function all(): array
+    public static function all(array $columns = ['*']): array
     {
-        $logs = parent::all();
+        $logs = parent::all($columns);
         foreach ($logs as &$log) {
             $log['conditions_details'] = $log['conditions_details'] ? json_decode($log['conditions_details'], true) : null;
             $log['actions_executed'] = $log['actions_executed'] ? json_decode($log['actions_executed'], true) : [];

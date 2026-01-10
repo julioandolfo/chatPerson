@@ -151,7 +151,7 @@ class KanbanAgentService
             self::logInfo("KanbanAgentService::executeAgent - Iniciando análise de " . count($conversationsToAnalyze) . " conversas com IA");
 
             // PASSO 4: Aplicar filtro de cooldown
-            $forceExecution = $trigger === 'manual_force'; // Permitir forçar execução
+            $forceExecution = $executionType === 'manual_force'; // Permitir forçar execução
             $conversationsAfterCooldown = [];
             $skippedByCooldown = 0;
             
@@ -1192,7 +1192,7 @@ class KanbanAgentService
             sender_id, 
             sender_type, 
             content, 
-            type,
+            message_type,
             is_internal,
             status,
             created_at

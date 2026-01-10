@@ -3,9 +3,25 @@
  * Script de diagnóstico completo do Coaching em Tempo Real
  */
 
-require_once __DIR__ . '/../vendor/autoload.php';
+// Ativar exibição de erros
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
 
 header('Content-Type: text/html; charset=utf-8');
+
+// Tentar carregar autoload
+try {
+    if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+        require_once __DIR__ . '/../vendor/autoload.php';
+    } else {
+        echo "❌ Autoload não encontrado. Execute: composer install";
+        exit;
+    }
+} catch (Exception $e) {
+    echo "❌ Erro ao carregar autoload: " . $e->getMessage();
+    exit;
+}
 
 ?>
 <!DOCTYPE html>
@@ -142,7 +158,16 @@ header('Content-Type: text/html; charset=utf-8');
         echo "<h2>2️⃣ Configurações no Banco de Dados</h2>";
         
         try {
+            // Tentar obter conexão
+            if (!class_exists('\App\Helpers\Database')) {
+                throw new Exception('Classe Database não encontrada');
+            }
+            
             $db = \App\Helpers\Database::getInstance();
+            
+            if (!$db) {
+                throw new Exception('Não foi possível conectar ao banco de dados');
+            }
             $stmt = $db->query("SELECT * FROM settings WHERE `key` = 'conversation_settings' ORDER BY id DESC LIMIT 1");
             $setting = $stmt->fetch(PDO::FETCH_ASSOC);
             

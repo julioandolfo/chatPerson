@@ -26,7 +26,7 @@ ob_start();
                 </div>
                 <div class="text-end">
                     <div class="fs-2x fw-bold text-primary">
-                        <?= number_format($report['overall_score'] ?? 0, 2) ?>
+                        <?= number_format($report['averages']['avg_overall'] ?? 0, 2) ?>
                         <span class="fs-6 text-muted">/5.00</span>
                     </div>
                     <div class="text-muted">Nota Geral</div>
@@ -71,8 +71,9 @@ ob_start();
         ];
         
         foreach ($dimensions as $key => $dim):
-            $score = $report['dimensions'][$key] ?? 0;
-            $evolution = $report['evolution'][$key] ?? 0;
+            $score = $report['averages']['avg_' . $key] ?? 0;
+            $evolutionData = $report['evolution'][$key] ?? [];
+            $evolution = $evolutionData['change'] ?? 0;
             $trend = $evolution > 0 ? 'up' : ($evolution < 0 ? 'down' : 'neutral');
             $trendIcon = $evolution > 0 ? 'arrow-up' : ($evolution < 0 ? 'arrow-down' : 'minus');
             $trendColor = $evolution > 0 ? 'success' : ($evolution < 0 ? 'danger' : 'muted');

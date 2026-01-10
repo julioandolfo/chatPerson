@@ -24,6 +24,24 @@ use App\Services\ConversationNoteService;
 class KanbanAgentService
 {
     /**
+     * Helper para log com arquivo correto
+     */
+    private static function logInfo(string $message): void
+    {
+        Logger::info($message, 'kanban_agents.log');
+    }
+    
+    private static function logError(string $message): void
+    {
+        Logger::error($message, 'kanban_agents.log');
+    }
+    
+    private static function logWarning(string $message): void
+    {
+        Logger::warning($message, 'kanban_agents.log');
+    }
+    
+    /**
      * Executar todos os agentes prontos para execução
      */
     public static function executeReadyAgents(): array
@@ -41,7 +59,7 @@ class KanbanAgentService
                     'message' => $result['message'] ?? ''
                 ];
             } catch (\Exception $e) {
-                Logger::error("KanbanAgentService::executeReadyAgents - Erro ao executar agente {$agent['id']}: " . $e->getMessage());
+                self::logError("KanbanAgentService::executeReadyAgents - Erro ao executar agente {$agent['id']}: " . $e->getMessage());
                 $results[] = [
                     'agent_id' => $agent['id'],
                     'agent_name' => $agent['name'],
@@ -59,25 +77,25 @@ class KanbanAgentService
      */
     public static function executeAgent(int $agentId, string $executionType = 'manual'): array
     {
-        Logger::info("KanbanAgentService::executeAgent - Iniciando execução do agente $agentId (tipo: $executionType)");
+        self::logInfo("KanbanAgentService::executeAgent - Iniciando execução do agente $agentId (tipo: $executionType)");
         
         $agent = AIKanbanAgent::find($agentId);
         if (!$agent || !$agent['enabled']) {
-            Logger::warning("KanbanAgentService::executeAgent - Agente $agentId não encontrado ou inativo");
+            self::logWarning("KanbanAgentService::executeAgent - Agente $agentId não encontrado ou inativo");
             throw new \Exception('Agente não encontrado ou inativo');
         }
 
-        Logger::info("KanbanAgentService::executeAgent - Agente '{$agent['name']}' (ID: $agentId) carregado com sucesso");
+        self::logInfo("KanbanAgentService::executeAgent - Agente '{$agent['name']}' (ID: $agentId) carregado com sucesso");
 
         // Criar registro de execução
         $executionId = AIKanbanAgentExecution::createExecution($agentId, $executionType);
-        Logger::info("KanbanAgentService::executeAgent - Registro de execução criado (ID: $executionId)");
+        self::logInfo("KanbanAgentService::executeAgent - Registro de execução criado (ID: $executionId)");
 
         try {
             // Buscar conversas alvo
-            Logger::info("KanbanAgentService::executeAgent - Buscando conversas alvo (funis: " . json_encode($agent['target_funnel_ids']) . ", etapas: " . json_encode($agent['target_stage_ids']) . ")");
+            self::logInfo("KanbanAgentService::executeAgent - Buscando conversas alvo (funis: " . json_encode($agent['target_funnel_ids']) . ", etapas: " . json_encode($agent['target_stage_ids']) . ")");
             $conversations = self::getTargetConversations($agent);
-            Logger::info("KanbanAgentService::executeAgent - Total de conversas encontradas: " . count($conversations));
+            self::logInfo("KanbanAgentService::executeAgent - Total de conversas encontradas: " . count($conversations));
             
             $stats = [
                 'conversations_analyzed' => 0,
@@ -92,10 +110,10 @@ class KanbanAgentService
             $conversations = array_slice($conversations, 0, $maxConversations);
             
             if ($totalBeforeLimit > $maxConversations) {
-                Logger::info("KanbanAgentService::executeAgent - Limitando análise a $maxConversations conversas (total disponível: $totalBeforeLimit)");
+                self::logInfo("KanbanAgentService::executeAgent - Limitando análise a $maxConversations conversas (total disponível: $totalBeforeLimit)");
             }
 
-            Logger::info("KanbanAgentService::executeAgent - Iniciando análise de " . count($conversations) . " conversas");
+            self::logInfo("KanbanAgentService::executeAgent - Iniciando análise de " . count($conversations) . " conversas");
 
             foreach ($conversations as $conversation) {
                 try {

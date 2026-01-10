@@ -58,6 +58,24 @@ class PerformanceReportService
         // Obter metas
         $goals = \App\Services\CoachingService::checkGoalsProgress($agentId);
         
+        // Extrair pontos fortes e fracos mais comuns
+        $allStrengths = [];
+        $allWeaknesses = [];
+        foreach ($analyses as $analysis) {
+            $strengths = json_decode($analysis['strengths'] ?? '[]', true);
+            $weaknesses = json_decode($analysis['weaknesses'] ?? '[]', true);
+            $allStrengths = array_merge($allStrengths, $strengths);
+            $allWeaknesses = array_merge($allWeaknesses, $weaknesses);
+        }
+        
+        // Contar frequência e pegar top 5
+        $strengthsCount = array_count_values($allStrengths);
+        $weaknessesCount = array_count_values($allWeaknesses);
+        arsort($strengthsCount);
+        arsort($weaknessesCount);
+        $topStrengths = array_slice(array_keys($strengthsCount), 0, 5);
+        $topWeaknesses = array_slice(array_keys($weaknessesCount), 0, 5);
+        
         return [
             'agent' => $agent,
             'period' => ['from' => $dateFrom, 'to' => $dateTo],
@@ -66,7 +84,9 @@ class PerformanceReportService
             'evolution' => $evolution,
             'badges' => $badges,
             'goals' => $goals,
-            'total_analyses' => count($analyses)
+            'total_analyses' => count($analyses),
+            'top_strengths' => $topStrengths,
+            'top_weaknesses' => $topWeaknesses
         ];
     }
     
@@ -192,17 +212,29 @@ class PerformanceReportService
             $averages = AgentPerformanceAnalysis::getAgentAverages($agentId, $dateFrom, $dateTo);
             
             if ($agent && $averages) {
+                // Estruturar dimensões
+                $dimensions = [
+                    'proactivity' => $averages['avg_proactivity'] ?? 0,
+                    'objection_handling' => $averages['avg_objection_handling'] ?? 0,
+                    'rapport' => $averages['avg_rapport'] ?? 0,
+                    'closing_techniques' => $averages['avg_closing_techniques'] ?? 0,
+                    'qualification' => $averages['avg_qualification'] ?? 0,
+                    'clarity' => $averages['avg_clarity'] ?? 0,
+                    'value_proposition' => $averages['avg_value_proposition'] ?? 0,
+                    'response_time' => $averages['avg_response_time'] ?? 0,
+                    'follow_up' => $averages['avg_follow_up'] ?? 0,
+                    'professionalism' => $averages['avg_professionalism'] ?? 0
+                ];
+                
                 $comparison[] = [
-                    'agent_id' => $agentId,
-                    'agent_name' => $agent['name'],
-                    'averages' => $averages
+                    'agent' => $agent,
+                    'overall_score' => $averages['avg_overall'] ?? 0,
+                    'dimensions' => $dimensions,
+                    'total_analyses' => $averages['total_analyses'] ?? 0
                 ];
             }
         }
         
-        return [
-            'agents' => $comparison,
-            'period' => ['from' => $dateFrom, 'to' => $dateTo]
-        ];
+        return $comparison;
     }
 }

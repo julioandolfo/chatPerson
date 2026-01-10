@@ -223,7 +223,7 @@ class KanbanAgentService
                                     $aiConditionsMet['details'] ?? []
                                 ),
                                 'actions_executed' => $actionsResult['actions'] ?? [],
-                                'success' => $actionsResult['errors'] === 0,
+                                'success' => (int)($actionsResult['errors'] === 0),
                                 'conversation_snapshot' => $conversationSnapshot
                             ];
                             
@@ -254,7 +254,7 @@ class KanbanAgentService
                                     $aiConditionsMet['details'] ?? []
                                 ),
                                 'actions_executed' => [],
-                                'success' => true,
+                                'success' => 1,
                                 'conversation_snapshot' => $conversationSnapshot
                             ];
                             

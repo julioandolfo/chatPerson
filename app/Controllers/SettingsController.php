@@ -787,20 +787,23 @@ class SettingsController
                 ],
             ];
             
-            // Debug: Log antes de salvar
-            error_log("=== SALVANDO COACHING ===");
-            error_log("enabled: " . ($settings['realtime_coaching']['enabled'] ? 'true' : 'false'));
-            error_log("JSON: " . json_encode($settings['realtime_coaching']));
-            error_log("========================");
+            // Debug: Log antes/depois de salvar em arquivo dedicado
+            $logFile = __DIR__ . '/../../storage/logs/coaching_save.log';
+            $logMsg = [
+                'datetime' => date('Y-m-d H:i:s'),
+                'enabled' => $settings['realtime_coaching']['enabled'] ?? false,
+                'payload' => $settings['realtime_coaching'] ?? [],
+            ];
+            @file_put_contents($logFile, json_encode($logMsg) . PHP_EOL, FILE_APPEND);
             
             if (ConversationSettingsService::saveSettings($settings)) {
-                error_log("✅ Settings salvos com sucesso!");
+                @file_put_contents($logFile, '[' . date('Y-m-d H:i:s') . "] OK: settings salvos\n", FILE_APPEND);
                 Response::successOrRedirect(
                     'Configurações de conversas salvas com sucesso!',
                     '/settings?tab=conversations'
                 );
             } else {
-                error_log("❌ ERRO ao salvar settings!");
+                @file_put_contents($logFile, '[' . date('Y-m-d H:i:s') . "] ERRO: falha ao salvar\n", FILE_APPEND);
 
                 if (Request::isAjax()) {
                     Response::json([

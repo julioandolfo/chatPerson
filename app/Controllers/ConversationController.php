@@ -1690,13 +1690,19 @@ class ConversationController
         
         try {
             $userId = \App\Helpers\Auth::id();
+            error_log("[getNotes] conversationId=$id, userId=$userId");
+            
             $notes = \App\Services\ConversationNoteService::list($id, $userId);
+            
+            error_log("[getNotes] Total de notas retornadas: " . count($notes));
+            error_log("[getNotes] Notas: " . json_encode($notes));
             
             Response::json([
                 'success' => true,
                 'notes' => $notes
             ]);
         } catch (\Exception $e) {
+            error_log("[getNotes] ERRO: " . $e->getMessage());
             Response::json([
                 'success' => false,
                 'message' => $e->getMessage()

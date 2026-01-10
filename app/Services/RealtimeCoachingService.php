@@ -21,6 +21,24 @@ class RealtimeCoachingService
     private static array $costTracking = []; // [hour => cost, day => cost]
     
     /**
+     * Log helper
+     */
+    private static function log(string $message, string $level = 'info'): void
+    {
+        $logFile = __DIR__ . '/../../logs/coaching.log';
+        $timestamp = date('Y-m-d H:i:s');
+        $icon = match($level) {
+            'error' => '❌',
+            'success' => '✅',
+            'warning' => '⚠️',
+            'info' => 'ℹ️',
+            'debug' => '🔍',
+            default => '•'
+        };
+        @file_put_contents($logFile, "[{$timestamp}] {$icon} {$message}\n", FILE_APPEND);
+    }
+    
+    /**
      * Obter configurações de coaching em tempo real
      */
     public static function getSettings(): array
@@ -73,21 +91,31 @@ class RealtimeCoachingService
     {
         $settings = self::getSettings();
         
+        self::log("🎯 queueMessageForAnalysis() - Msg #{$messageId}, Conv #{$conversationId}, Agent #{$agentId}");
+        
         if (!$settings['enabled']) {
+            self::log("❌ Coaching DESABILITADO nas configurações - enabled=false", 'warning');
             return false;
         }
+        
+        self::log("✅ Coaching está HABILITADO - Prosseguindo com verificações...", 'success');
         
         // Verificar se deve analisar
         if (!self::shouldAnalyze($messageId, $agentId, $settings)) {
+            self::log("⏭️ Mensagem NÃO será analisada (bloqueada por filtros)", 'warning');
             return false;
         }
         
+        self::log("✅ Mensagem PASSOU em todos os filtros!");
+        
         // Adicionar na fila
         if ($settings['use_queue']) {
+            self::log("📋 Modo FILA ativado - Adicionando mensagem na fila");
             self::addToQueue($messageId, $conversationId, $agentId);
+            self::log("✅ Mensagem adicionada na fila com sucesso!", 'success');
             return true;
         } else {
-            // Análise síncrona (não recomendado)
+            self::log("⚡ Modo SÍNCRONO ativado - Analisando IMEDIATAMENTE");
             return self::analyzeMessageNow($messageId, $conversationId, $agentId);
         }
     }
@@ -97,45 +125,78 @@ class RealtimeCoachingService
      */
     private static function shouldAnalyze(int $messageId, int $agentId, array $settings): bool
     {
+        self::log("🔍 === INICIANDO VERIFICAÇÃO DE FILTROS ===");
+        
         // Obter mensagem
         $message = Message::find($messageId);
         if (!$message) {
+            self::log("❌ FILTRO 0: Mensagem não encontrada no banco", 'error');
             return false;
         }
+        
+        $bodyLength = mb_strlen($message['body']);
+        self::log("📝 Mensagem: \"{$message['body']}\" (tamanho: {$bodyLength} chars)");
         
         // 1. Verificar se é mensagem do cliente
         if ($settings['analyze_only_client_messages'] && $message['sender_type'] !== 'contact') {
+            self::log("❌ FILTRO 1: Mensagem do tipo '{$message['sender_type']}' (config: apenas clientes)", 'warning');
             return false;
         }
+        self::log("✅ FILTRO 1: OK - É mensagem de cliente");
         
         // 2. Verificar tamanho mínimo
-        if (mb_strlen($message['body']) < $settings['min_message_length']) {
+        $minLength = $settings['min_message_length'];
+        if ($bodyLength < $minLength) {
+            self::log("❌ FILTRO 2: Mensagem muito curta ({$bodyLength} < {$minLength} chars)", 'warning');
             return false;
         }
+        self::log("✅ FILTRO 2: OK - Tamanho adequado ({$bodyLength} >= {$minLength})");
         
         // 3. Verificar rate limit global (análises/minuto)
-        if (!self::checkGlobalRateLimit($settings['max_analyses_per_minute'])) {
+        $maxPerMinute = $settings['max_analyses_per_minute'];
+        $currentCount = self::$analysisCount[date('Y-m-d H:i')] ?? 0;
+        if (!self::checkGlobalRateLimit($maxPerMinute)) {
+            self::log("❌ FILTRO 3: Rate limit global excedido ({$currentCount}/{$maxPerMinute} análises/min)", 'warning');
             return false;
         }
+        self::log("✅ FILTRO 3: OK - Rate limit global ({$currentCount}/{$maxPerMinute})");
         
         // 4. Verificar intervalo mínimo entre análises do mesmo agente
-        if (!self::checkAgentInterval($agentId, $settings['min_interval_between_analyses'])) {
+        $minInterval = $settings['min_interval_between_analyses'];
+        $lastTime = self::$lastAnalysis[$agentId] ?? 0;
+        $elapsed = time() - $lastTime;
+        if (!self::checkAgentInterval($agentId, $minInterval)) {
+            self::log("❌ FILTRO 4: Agente #{$agentId} analisado há {$elapsed}s (min: {$minInterval}s)", 'warning');
             return false;
         }
+        self::log("✅ FILTRO 4: OK - Intervalo agente ({$elapsed}s >= {$minInterval}s)");
         
         // 5. Verificar tamanho da fila
         if ($settings['use_queue']) {
             $queueSize = self::getQueueSize();
-            if ($queueSize >= $settings['max_queue_size']) {
+            $maxQueueSize = $settings['max_queue_size'];
+            if ($queueSize >= $maxQueueSize) {
+                self::log("❌ FILTRO 5: Fila cheia ({$queueSize}/{$maxQueueSize})", 'warning');
                 return false;
             }
+            self::log("✅ FILTRO 5: OK - Fila disponível ({$queueSize}/{$maxQueueSize})");
         }
         
         // 6. Verificar limite de custo
+        $currentHour = date('Y-m-d H');
+        $currentDay = date('Y-m-d');
+        $hourCost = self::$costTracking['hour_' . $currentHour] ?? 0;
+        $dayCost = self::$costTracking['day_' . $currentDay] ?? 0;
+        $hourLimit = $settings['cost_limit_per_hour'];
+        $dayLimit = $settings['cost_limit_per_day'];
+        
         if (!self::checkCostLimits($settings)) {
+            self::log("❌ FILTRO 6: Limite de custo excedido (Hora: \${$hourCost}/\${$hourLimit}, Dia: \${$dayCost}/\${$dayLimit})", 'error');
             return false;
         }
+        self::log("✅ FILTRO 6: OK - Dentro do limite (Hora: \${$hourCost}/\${$hourLimit}, Dia: \${$dayCost}/\${$dayLimit})");
         
+        self::log("✅✅✅ TODOS OS FILTROS PASSARAM! Mensagem será analisada!", 'success');
         return true;
     }
     
@@ -284,6 +345,8 @@ class RealtimeCoachingService
      */
     public static function processQueue(): array
     {
+        self::log("⚙️ === PROCESSANDO FILA DE COACHING ===", 'info');
+        
         $settings = self::getSettings();
         $processed = 0;
         $errors = 0;
@@ -296,20 +359,26 @@ class RealtimeCoachingService
                 ORDER BY added_at ASC 
                 LIMIT 10";
         
-        $items = Database::fetchAll($sql, [
-            'delay' => $settings['queue_processing_delay'] ?? 3
-        ]);
+        $delay = $settings['queue_processing_delay'] ?? 3;
+        $items = Database::fetchAll($sql, ['delay' => $delay]);
+        
+        $queueSize = self::getQueueSize();
         
         if (empty($items)) {
+            self::log("ℹ️ Fila vazia (total pendente: {$queueSize})");
             return [
                 'processed' => 0,
                 'errors' => 0,
                 'skipped' => 0,
-                'queue_size' => self::getQueueSize()
+                'queue_size' => $queueSize
             ];
         }
         
+        self::log("📋 Encontrados " . count($items) . " itens na fila (delay: {$delay}s)");
+        
         foreach ($items as $item) {
+            self::log("🔄 Processando item #{$item['id']} - Msg #{$item['message_id']}, Conv #{$item['conversation_id']}");
+            
             // Marcar como processando
             self::updateQueueStatus($item['id'], 'processing');
             
@@ -323,25 +392,32 @@ class RealtimeCoachingService
                 if ($success) {
                     // Marcar como completado
                     self::updateQueueStatus($item['id'], 'completed');
+                    self::log("✅ Item #{$item['id']} processado com sucesso!", 'success');
                     $processed++;
                 } else {
                     // Marcar como falho
                     self::updateQueueStatus($item['id'], 'failed', 'Análise retornou false');
+                    self::log("⏭️ Item #{$item['id']} pulado (análise não gerou hint)", 'warning');
                     $skipped++;
                 }
             } catch (\Exception $e) {
+                self::log("❌ ERRO ao processar item #{$item['id']}: " . $e->getMessage(), 'error');
                 error_log("Erro ao processar coaching: " . $e->getMessage());
                 self::updateQueueStatus($item['id'], 'failed', $e->getMessage());
                 $errors++;
             }
         }
         
-        return [
+        $result = [
             'processed' => $processed,
             'errors' => $errors,
             'skipped' => $skipped,
             'queue_size' => self::getQueueSize()
         ];
+        
+        self::log("📊 Resultado: {$processed} processados, {$errors} erros, {$skipped} pulados, {$result['queue_size']} na fila", 'info');
+        
+        return $result;
     }
     
     /**
@@ -368,38 +444,60 @@ class RealtimeCoachingService
      */
     private static function analyzeMessageNow(int $messageId, int $conversationId, int $agentId): bool
     {
+        self::log("🤖 === ANÁLISE COM IA INICIADA ===");
+        self::log("📝 Msg #{$messageId}, Conv #{$conversationId}, Agent #{$agentId}");
+        
         $settings = self::getSettings();
         
         // Verificar cache primeiro
         if ($settings['use_cache']) {
+            self::log("💾 Verificando cache...");
             $cached = self::checkCache($messageId, $conversationId, $settings);
             if ($cached) {
+                self::log("✅ CACHE HIT! Reutilizando hint anterior (economizou 1 chamada de API)", 'success');
                 self::sendHintToAgent($cached, $agentId);
                 return true;
             }
+            self::log("❌ Cache miss - Precisa fazer análise nova");
         }
         
         // Obter mensagem e contexto
         $message = Message::find($messageId);
         if (!$message) {
+            self::log("❌ Mensagem não encontrada", 'error');
             return false;
         }
         
         $conversation = Conversation::find($conversationId);
         if (!$conversation) {
+            self::log("❌ Conversa não encontrada", 'error');
             return false;
         }
         
         // Obter contexto (últimas 10 mensagens)
+        self::log("📜 Buscando contexto da conversa (últimas 10 mensagens)...");
         $context = self::getConversationContext($conversationId, 10);
+        self::log("📜 Contexto carregado: " . count($context) . " mensagens");
         
         // Analisar com IA
         try {
+            self::log("🧠 Chamando OpenAI (model: {$settings['model']}, temp: {$settings['temperature']})...");
+            $startTime = microtime(true);
+            
             $analysis = self::analyzeWithAI($message, $context, $settings);
             
+            $duration = round(microtime(true) - $startTime, 2);
+            self::log("⏱️ Resposta da IA recebida em {$duration}s");
+            
             if (!$analysis || empty($analysis['hint_text'])) {
+                self::log("⏭️ IA não identificou situação relevante (has_hint: false)", 'warning');
                 return false;
             }
+            
+            self::log("✅ HINT GERADO!", 'success');
+            self::log("   Tipo: {$analysis['hint_type']}");
+            self::log("   Texto: {$analysis['hint_text']}");
+            self::log("   Tokens: {$analysis['tokens_used']}, Custo: \$" . number_format($analysis['cost'], 4));
             
             // Salvar hint
             $hintId = RealtimeCoachingHint::create([
@@ -414,6 +512,8 @@ class RealtimeCoachingService
                 'cost' => $analysis['cost'] ?? 0,
             ]);
             
+            self::log("💾 Hint salvo no banco (ID: {$hintId})");
+            
             // Tracking
             self::incrementAnalysisCount();
             self::updateAgentLastAnalysis($agentId);
@@ -426,6 +526,7 @@ class RealtimeCoachingService
             return true;
             
         } catch (\Exception $e) {
+            self::log("❌ ERRO CRÍTICO ao analisar: " . $e->getMessage(), 'error');
             error_log("Erro ao analisar com IA: " . $e->getMessage());
             return false;
         }
@@ -690,6 +791,8 @@ class RealtimeCoachingService
      */
     private static function sendHintToAgent(array $hint, int $agentId): void
     {
+        self::log("📤 Enviando hint para agente #{$agentId}...");
+        
         // Tentar WebSocket primeiro
         try {
             $wsData = [
@@ -704,12 +807,17 @@ class RealtimeCoachingService
             // Enviar via WebSocket (se disponível)
             if (class_exists('\App\Helpers\WebSocket')) {
                 \App\Helpers\WebSocket::notifyUser($agentId, 'coaching_hint', $wsData);
+                self::log("✅ Hint enviado via WebSocket para agente #{$agentId}!", 'success');
+            } else {
+                self::log("⚠️ WebSocket não disponível - Hint ficará disponível via polling", 'warning');
             }
         } catch (\Exception $e) {
+            self::log("❌ Erro ao enviar WebSocket: " . $e->getMessage(), 'error');
             error_log("Erro ao enviar WebSocket: " . $e->getMessage());
         }
         
         // Hint fica disponível para polling automaticamente (já está no banco)
+        self::log("💾 Hint disponível no banco para polling (agente pode buscar quando abrir conversa)");
     }
     
     /**

@@ -1351,6 +1351,15 @@ class ConversationService
         
         \App\Helpers\Logger::info("ConversationService::sendMessage - Mensagem criada no banco: messageId={$messageId}");
         
+        // ✅ Disparar Coaching em Tempo Real (se habilitado)
+        try {
+            if (class_exists('\App\Listeners\MessageReceivedListener')) {
+                \App\Listeners\MessageReceivedListener::handle($messageId);
+            }
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error("Erro ao disparar MessageReceivedListener: " . $e->getMessage());
+        }
+        
         // ✅ NOVO: Se agente HUMANO enviou mensagem, PARAR todas as automações ativas (chatbot, IA, etc)
         if ($senderType === 'agent' && $senderId > 0) {
             \App\Helpers\Logger::automation("🛑 Agente humano (ID: {$senderId}) enviou mensagem - PARANDO automações ativas...");

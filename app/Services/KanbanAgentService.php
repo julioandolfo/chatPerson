@@ -1340,7 +1340,7 @@ class KanbanAgentService
     private static function createConversationSnapshot(array $conversation): array
     {
         // Buscar última mensagem
-        $lastMessage = Message::getLastByConversation($conversation['id']);
+        $lastMessage = Message::getLastMessage($conversation['id']);
         
         // Buscar tags da conversa
         $tags = [];
@@ -1379,7 +1379,7 @@ class KanbanAgentService
         }
         
         // Nova mensagem?
-        $lastMessage = Message::getLastByConversation($conversation['id']);
+        $lastMessage = Message::getLastMessage($conversation['id']);
         $currentLastMessageId = (int)($lastMessage['id'] ?? 0);
         $snapshotLastMessageId = (int)($snapshot['last_message_id'] ?? 0);
         

@@ -1316,10 +1316,10 @@ class KanbanAgentService
      */
     private static function getLastExecutionLog(int $agentId, int $conversationId): ?array
     {
-        $sql = "SELECT * FROM ai_kanban_agent_action_logs 
+        $sql = "SELECT * FROM ai_kanban_agent_actions_log 
                 WHERE ai_kanban_agent_id = ? 
                 AND conversation_id = ? 
-                ORDER BY created_at DESC 
+                ORDER BY executed_at DESC 
                 LIMIT 1";
         
         $logs = Database::fetchAll($sql, [$agentId, $conversationId]);
@@ -1447,7 +1447,7 @@ class KanbanAgentService
         }
         
         // Calcular tempo desde última execução
-        $hoursSinceLastExecution = self::calculateHoursDiff($lastExecution['created_at']);
+        $hoursSinceLastExecution = self::calculateHoursDiff($lastExecution['executed_at']);
         $cooldownHours = (int)($agent['cooldown_hours'] ?? 24);
         
         self::logInfo("Conversa {$conversation['id']}: última execução há {$hoursSinceLastExecution}h (cooldown: {$cooldownHours}h)");

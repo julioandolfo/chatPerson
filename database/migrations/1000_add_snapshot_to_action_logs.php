@@ -9,7 +9,7 @@ function up_add_snapshot_to_action_logs() {
     global $pdo;
     
     $sql = "
-        ALTER TABLE ai_kanban_agent_action_logs
+        ALTER TABLE ai_kanban_agent_actions_log
         ADD COLUMN IF NOT EXISTS conversation_snapshot JSON DEFAULT NULL COMMENT 'Estado da conversa no momento da execução'
     ";
     
@@ -19,14 +19,14 @@ function up_add_snapshot_to_action_logs() {
         \App\Helpers\Database::getInstance()->exec($sql);
     }
     
-    echo "✅ Campo conversation_snapshot adicionado à tabela 'ai_kanban_agent_action_logs'!\n";
+    echo "✅ Campo conversation_snapshot adicionado à tabela 'ai_kanban_agent_actions_log'!\n";
 }
 
 function down_add_snapshot_to_action_logs() {
     global $pdo;
     
     $sql = "
-        ALTER TABLE ai_kanban_agent_action_logs
+        ALTER TABLE ai_kanban_agent_actions_log
         DROP COLUMN IF EXISTS conversation_snapshot
     ";
     
@@ -36,5 +36,5 @@ function down_add_snapshot_to_action_logs() {
         \App\Helpers\Database::getInstance()->exec($sql);
     }
     
-    echo "✅ Campo conversation_snapshot removido da tabela 'ai_kanban_agent_action_logs'!\n";
+    echo "✅ Campo conversation_snapshot removido da tabela 'ai_kanban_agent_actions_log'!\n";
 }

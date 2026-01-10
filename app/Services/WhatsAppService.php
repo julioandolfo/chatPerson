@@ -2406,6 +2406,7 @@ class WhatsAppService
                     }
                 } else {
                     Logger::quepasa("🔍 DEBUG: Não vai executar automações (conversa existente ou erro)");
+                }
             } catch (\Exception $e) {
                 \App\Helpers\Logger::error("WhatsAppService::processWebhook - EXCEÇÃO: " . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
                 Logger::quepasa("Erro ao criar mensagem via ConversationService: " . $e->getMessage());

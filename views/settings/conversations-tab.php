@@ -472,6 +472,12 @@ $tts = $cs['text_to_speech'] ?? [];
     
     <div class="separator separator-dashed my-10"></div>
     
+    <!--begin::Análise de Performance-->
+    <?php include __DIR__ . '/action-buttons/performance-config.php'; ?>
+    <!--end::Análise de Performance-->
+    
+    <div class="separator separator-dashed my-10"></div>
+    
     <!--begin::Transcrição de Áudio-->
     <div class="mb-10">
         <h4 class="fw-bold mb-4">Transcrição de Áudio (OpenAI Whisper)</h4>
@@ -930,6 +936,15 @@ document.addEventListener("DOMContentLoaded", function() {
     if (sentimentEnabled && sentimentContainer) {
         sentimentEnabled.addEventListener("change", function() {
             sentimentContainer.style.display = this.checked ? "block" : "none";
+        });
+    }
+    
+    // Toggle análise de performance
+    const performanceEnabled = document.querySelector('input[name="agent_performance_analysis[enabled]"]');
+    const performanceContainer = document.getElementById("agent_performance_analysis_settings");
+    if (performanceEnabled && performanceContainer) {
+        performanceEnabled.addEventListener("change", function() {
+            performanceContainer.style.display = this.checked ? "block" : "none";
         });
     }
     

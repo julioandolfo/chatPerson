@@ -22,6 +22,7 @@ $perfSettings = $conversationSettings['agent_performance_analysis'] ?? [];
             <div class="form-text">Analisa automaticamente a performance dos vendedores em conversas fechadas usando OpenAI</div>
         </div>
         
+        <div id="agent_performance_analysis_settings" style="display: <?= !empty($perfSettings['enabled']) ? 'block' : 'none' ?>;">
         <div class="row">
             <!-- Modelo -->
             <div class="col-md-6 mb-5">
@@ -222,6 +223,7 @@ $perfSettings = $conversationSettings['agent_performance_analysis'] ?? [];
                 </div>
             </div>
         </div>
+        </div><!-- Fecha #agent_performance_analysis_settings -->
         
     </div>
 </div>

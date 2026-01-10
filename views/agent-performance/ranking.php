@@ -112,5 +112,5 @@ ob_start();
 
 <?php
 $content = ob_get_clean();
-require __DIR__ . '/../layouts/metronic/layout.php';
+include __DIR__ . '/../layouts/metronic/app.php';
 ?>

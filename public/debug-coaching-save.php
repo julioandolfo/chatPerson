@@ -3,8 +3,16 @@
  * Debug: Verificar salvamento de Coaching
  */
 
-require_once __DIR__ . '/../vendor/autoload.php';
-require_once __DIR__ . '/../config/bootstrap.php';
+// Desabilitar exibição de erros para não quebrar output
+ini_set('display_errors', 0);
+error_reporting(0);
+
+try {
+    require_once __DIR__ . '/../vendor/autoload.php';
+    require_once __DIR__ . '/../config/bootstrap.php';
+} catch (\Exception $e) {
+    die("ERRO AO CARREGAR: " . $e->getMessage());
+}
 
 use App\Helpers\Database;
 

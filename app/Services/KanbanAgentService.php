@@ -144,30 +144,64 @@ class KanbanAgentService
                         self::logInfo("KanbanAgentService::executeAgent - Ações executadas para conversa {$conversation['id']}: {$actionsResult['executed']} sucesso(s), {$actionsResult['errors']} erro(s)");
                         
                         // Registrar log de ação
-                        AIKanbanAgentActionLog::createLog([
-                            'ai_kanban_agent_id' => $agentId,
-                            'execution_id' => $executionId,
-                            'conversation_id' => $conversation['id'],
-                            'analysis_summary' => $analysis['summary'] ?? null,
-                            'analysis_score' => $analysis['score'] ?? null,
-                            'conditions_met' => true,
-                            'conditions_details' => $conditionsMet['details'] ?? [],
-                            'actions_executed' => $actionsResult['actions'] ?? [],
-                            'success' => $actionsResult['errors'] === 0
-                        ]);
+                        self::logInfo("KanbanAgentService::executeAgent - Registrando log de ações no banco");
+                        
+                        try {
+                            $logData = [
+                                'ai_kanban_agent_id' => $agentId,
+                                'execution_id' => $executionId,
+                                'conversation_id' => $conversation['id'],
+                                'analysis_summary' => $analysis['summary'] ?? null,
+                                'analysis_score' => $analysis['score'] ?? null,
+                                'conditions_met' => true,
+                                'conditions_details' => $conditionsMet['details'] ?? [],
+                                'actions_executed' => $actionsResult['actions'] ?? [],
+                                'success' => $actionsResult['errors'] === 0
+                            ];
+                            
+                            self::logInfo("KanbanAgentService::executeAgent - Dados do log: " . json_encode($logData));
+                            
+                            AIKanbanAgentActionLog::createLog($logData);
+                            
+                            self::logInfo("KanbanAgentService::executeAgent - Log registrado com sucesso no banco");
+                        } catch (\Throwable $e) {
+                            self::logError("KanbanAgentService::executeAgent - ERRO ao registrar log no banco");
+                            self::logError("KanbanAgentService::executeAgent - Tipo: " . get_class($e));
+                            self::logError("KanbanAgentService::executeAgent - Mensagem: " . $e->getMessage());
+                            self::logError("KanbanAgentService::executeAgent - Arquivo: " . $e->getFile() . " (linha " . $e->getLine() . ")");
+                            self::logError("KanbanAgentService::executeAgent - Stack trace: " . $e->getTraceAsString());
+                            throw $e;
+                        }
                     } else {
                         // Registrar que condições não foram atendidas
-                        AIKanbanAgentActionLog::createLog([
-                            'ai_kanban_agent_id' => $agentId,
-                            'execution_id' => $executionId,
-                            'conversation_id' => $conversation['id'],
-                            'analysis_summary' => $analysis['summary'] ?? null,
-                            'analysis_score' => $analysis['score'] ?? null,
-                            'conditions_met' => false,
-                            'conditions_details' => $conditionsMet['details'] ?? [],
-                            'actions_executed' => [],
-                            'success' => true
-                        ]);
+                        self::logInfo("KanbanAgentService::executeAgent - Registrando log de condições NÃO atendidas no banco");
+                        
+                        try {
+                            $logData = [
+                                'ai_kanban_agent_id' => $agentId,
+                                'execution_id' => $executionId,
+                                'conversation_id' => $conversation['id'],
+                                'analysis_summary' => $analysis['summary'] ?? null,
+                                'analysis_score' => $analysis['score'] ?? null,
+                                'conditions_met' => false,
+                                'conditions_details' => $conditionsMet['details'] ?? [],
+                                'actions_executed' => [],
+                                'success' => true
+                            ];
+                            
+                            self::logInfo("KanbanAgentService::executeAgent - Dados do log: " . json_encode($logData));
+                            
+                            AIKanbanAgentActionLog::createLog($logData);
+                            
+                            self::logInfo("KanbanAgentService::executeAgent - Log registrado com sucesso no banco");
+                        } catch (\Throwable $e) {
+                            self::logError("KanbanAgentService::executeAgent - ERRO ao registrar log no banco");
+                            self::logError("KanbanAgentService::executeAgent - Tipo: " . get_class($e));
+                            self::logError("KanbanAgentService::executeAgent - Mensagem: " . $e->getMessage());
+                            self::logError("KanbanAgentService::executeAgent - Arquivo: " . $e->getFile() . " (linha " . $e->getLine() . ")");
+                            self::logError("KanbanAgentService::executeAgent - Stack trace: " . $e->getTraceAsString());
+                            throw $e;
+                        }
                     }
                 } catch (\Throwable $e) {
                     // Captura TODOS os erros (Exception, Error, ParseError, etc)

@@ -8258,6 +8258,11 @@ function updateConversationSidebar(conversation, tags) {
         loadConversationSentiment(conversation.id);
     }
     
+    // Carregar performance do agente (se houver análise disponível)
+    if (conversation.id) {
+        loadAgentPerformance(conversation.id);
+    }
+    
     const conversationChannelEl = sidebar.querySelector('[data-field="channel"]');
     if (conversationChannelEl) {
         if (conversation.channel === 'whatsapp') {
@@ -8894,6 +8899,110 @@ function loadConversationSentiment(conversationId) {
     .catch(error => {
         console.error('Erro ao carregar sentimento:', error);
         sentimentInfo.style.display = 'none';
+    });
+}
+
+// Carregar performance do agente na conversa
+function loadAgentPerformance(conversationId) {
+    if (!conversationId) return;
+    
+    const performanceInfo = document.getElementById('agent-performance-info');
+    const analyzedState = document.getElementById('performance-analyzed-state');
+    const pendingState = document.getElementById('performance-pending-state');
+    const pendingReason = document.getElementById('performance-pending-reason');
+    const overallBadge = document.getElementById('performance-overall-badge');
+    const progressBar = document.getElementById('performance-progress');
+    const detailsEl = document.getElementById('performance-details');
+    const viewLink = document.getElementById('performance-view-link');
+    
+    if (!performanceInfo) return;
+    
+    fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/performance`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) {
+            performanceInfo.style.display = 'none';
+            return;
+        }
+        
+        // Se tem análise, mostrar dados
+        if (data.analysis && data.analysis.overall_score) {
+            const analysis = data.analysis;
+            const score = parseFloat(analysis.overall_score || 0);
+            const percentage = (score / 5) * 100;
+            
+            // Determinar cor baseado na nota
+            let colorClass = 'danger';
+            let emoji = '😟';
+            if (score >= 4.5) {
+                colorClass = 'success';
+                emoji = '🌟';
+            } else if (score >= 3.5) {
+                colorClass = 'primary';
+                emoji = '😊';
+            } else if (score >= 2.5) {
+                colorClass = 'warning';
+                emoji = '😐';
+            }
+            
+            // Atualizar badge
+            if (overallBadge) {
+                overallBadge.className = `badge badge-lg badge-light-${colorClass}`;
+                overallBadge.textContent = `${emoji} ${score.toFixed(2)}/5.00`;
+            }
+            
+            // Atualizar barra de progresso
+            if (progressBar) {
+                progressBar.className = `progress-bar bg-${colorClass}`;
+                progressBar.style.width = `${percentage}%`;
+            }
+            
+            // Atualizar detalhes
+            if (detailsEl) {
+                const topStrengths = analysis.strengths ? JSON.parse(analysis.strengths).slice(0, 2) : [];
+                const topWeaknesses = analysis.weaknesses ? JSON.parse(analysis.weaknesses).slice(0, 2) : [];
+                
+                let html = '<div class="fs-8">';
+                if (topStrengths.length > 0) {
+                    html += `<div class="text-success mb-1">✓ ${topStrengths[0]}</div>`;
+                }
+                if (topWeaknesses.length > 0) {
+                    html += `<div class="text-warning">⚠ ${topWeaknesses[0]}</div>`;
+                }
+                html += '</div>';
+                detailsEl.innerHTML = html;
+            }
+            
+            // Atualizar link
+            if (viewLink) {
+                viewLink.href = `<?= \App\Helpers\Url::to('/agent-performance/conversation') ?>/${conversationId}`;
+            }
+            
+            // Mostrar estado analisado
+            if (analyzedState) analyzedState.style.display = 'block';
+            if (pendingState) pendingState.style.display = 'none';
+            
+        } else {
+            // Sem análise ainda, mostrar estado pendente
+            const reason = data.pending_reason || 'A análise será processada em breve';
+            if (pendingReason) {
+                pendingReason.textContent = reason;
+            }
+            
+            if (analyzedState) analyzedState.style.display = 'none';
+            if (pendingState) pendingState.style.display = 'block';
+        }
+        
+        performanceInfo.style.display = 'block';
+    })
+    .catch(error => {
+        console.error('Erro ao carregar performance:', error);
+        performanceInfo.style.display = 'none';
     });
 }
 

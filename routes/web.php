@@ -98,6 +98,7 @@ Router::put('/conversations/{id}/notes/{noteId}', [ConversationController::class
 Router::delete('/conversations/{id}/notes/{noteId}', [ConversationController::class, 'deleteNote'], ['Authentication']);
 Router::get('/conversations/{id}/timeline', [ConversationController::class, 'getTimeline'], ['Authentication']);
 Router::get('/conversations/{id}/sentiment', [ConversationController::class, 'getSentiment'], ['Authentication']);
+Router::get('/conversations/{id}/performance', [ConversationController::class, 'getPerformance'], ['Authentication']);
 Router::post('/conversations/{id}/messages', [ConversationController::class, 'sendMessage'], ['Authentication']);
 Router::post('/conversations/{id}/forward', [ConversationController::class, 'forwardMessage'], ['Authentication']);
 

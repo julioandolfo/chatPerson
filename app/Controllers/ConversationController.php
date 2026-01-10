@@ -2150,6 +2150,86 @@ class ConversationController
     }
 
     /**
+     * Obter análise de performance de uma conversa
+     */
+    public function getPerformance($id): void
+    {
+        $config = $this->prepareJsonResponse();
+        
+        try {
+            $conversationId = (int)$id;
+            if ($conversationId <= 0) {
+                ob_end_clean();
+                Response::json(['success' => false, 'message' => 'ID inválido'], 400);
+                return;
+            }
+            
+            // Verificar permissão
+            if (!Permission::can('conversations.view.own') && !Permission::can('conversations.view.all') && !Permission::can('agent_performance.view.own')) {
+                ob_end_clean();
+                Response::json([
+                    'success' => false,
+                    'message' => 'Sem permissão para visualizar performance'
+                ], 403);
+                return;
+            }
+            
+            // Verificar se o usuário tem acesso à conversa específica
+            $conversation = \App\Models\Conversation::find($conversationId);
+            if (!$conversation) {
+                ob_end_clean();
+                Response::json(['success' => false, 'message' => 'Conversa não encontrada'], 404);
+                return;
+            }
+            
+            // Se não tem permissão para ver todas, verificar se tem acesso à conversa específica
+            if (!Permission::can('conversations.view.all') && !Permission::can('agent_performance.view.team')) {
+                if (!Permission::canViewConversation($conversation)) {
+                    ob_end_clean();
+                    Response::json([
+                        'success' => false,
+                        'message' => 'Você não tem permissão para ver esta conversa'
+                    ], 403);
+                    return;
+                }
+            }
+            
+            // Buscar análise de performance
+            $analysis = \App\Models\AgentPerformanceAnalysis::getByConversation($conversationId);
+            
+            // Se não tem análise, determinar o motivo
+            $pendingReason = null;
+            if (!$analysis) {
+                $settings = \App\Services\ConversationSettingsService::getSettings();
+                $perfSettings = $settings['agent_performance_analysis'] ?? [];
+                $enabled = $perfSettings['enabled'] ?? false;
+                $analyzeOnClose = $perfSettings['analyze_on_close'] ?? true;
+                
+                if (!$enabled) {
+                    $pendingReason = 'Análise de performance desabilitada';
+                } elseif ($analyzeOnClose && $conversation['status'] !== 'closed') {
+                    $pendingReason = 'Análise será feita quando a conversa for fechada';
+                } elseif ($conversation['status'] === 'closed') {
+                    $pendingReason = 'Aguardando processamento da análise';
+                } else {
+                    $pendingReason = 'Conversa em andamento - análise periódica habilitada';
+                }
+            }
+            
+            $this->restoreAfterJsonResponse($config);
+            
+            Response::json([
+                'success' => true,
+                'analysis' => $analysis,
+                'pending_reason' => $pendingReason
+            ]);
+        } catch (\Exception $e) {
+            $this->restoreAfterJsonResponse($config);
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Listar participantes de uma conversa
      */
     public function getParticipants($id): void

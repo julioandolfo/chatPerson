@@ -548,6 +548,55 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     </div>
                     
+                    <!-- Performance do Agente -->
+                    <div class="sidebar-info-item" id="agent-performance-info" style="display: none;">
+                        <span class="sidebar-info-label">
+                            <i class="ki-duotone ki-chart-line-up fs-5 text-primary me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Performance:
+                        </span>
+                        <div class="mt-2">
+                            <!-- Estado: Analisado -->
+                            <div id="performance-analyzed-state" style="display: none;">
+                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                    <span class="fs-7 text-muted">Nota Geral:</span>
+                                    <span class="badge badge-lg" id="performance-overall-badge">-</span>
+                                </div>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar" id="performance-progress" role="progressbar" style="width: 0%;"></div>
+                                </div>
+                                <div class="fs-8 text-muted mt-2" id="performance-details"></div>
+                                <a href="#" id="performance-view-link" class="btn btn-sm btn-light-primary w-100 mt-2">
+                                    <i class="ki-duotone ki-eye fs-5">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    Ver Análise Completa
+                                </a>
+                            </div>
+                            
+                            <!-- Estado: Aguardando Análise -->
+                            <div id="performance-pending-state" style="display: none;">
+                                <div class="d-flex align-items-center justify-content-center py-3">
+                                    <div class="text-center">
+                                        <i class="ki-duotone ki-timer fs-3x text-warning mb-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        <div class="fs-7 text-muted">Aguardando análise</div>
+                                        <div class="fs-8 text-muted mt-1" id="performance-pending-reason">
+                                            A análise será processada em breve
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="sidebar-info-item">
                         <span class="sidebar-info-label">Canal:</span>
                         <span class="sidebar-info-value" data-field="channel">-</span>

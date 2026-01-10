@@ -121,28 +121,39 @@ $logFiles = [
         <div>
             <?php
             if (file_exists($logFile)) {
-                $lines = file($logFile);
-                $lines = array_reverse(array_slice($lines, -100)); // Últimas 100 linhas, mais recentes primeiro
-                
-                foreach ($lines as $line) {
-                    $line = htmlspecialchars($line);
-                    $cssClass = 'log-entry';
+                $content = file_get_contents($logFile);
+                if (trim($content) === '') {
+                    echo "<div class='warning' style='padding: 20px; text-align: center;'>";
+                    echo "📋 Log vazio - Nenhuma atividade registrada ainda<br>";
+                    echo "<small style='color: #888;'>O log será preenchido automaticamente quando houver atividade</small>";
+                    echo "</div>";
+                } else {
+                    $lines = file($logFile);
+                    $lines = array_reverse(array_slice($lines, -100)); // Últimas 100 linhas, mais recentes primeiro
                     
-                    if (stripos($line, 'erro') !== false || stripos($line, 'error') !== false || stripos($line, 'exception') !== false) {
-                        $cssClass .= ' error';
-                    } elseif (stripos($line, 'sucesso') !== false || stripos($line, 'success') !== false || stripos($line, '✅') !== false) {
-                        $cssClass .= ' success';
-                    } elseif (stripos($line, 'warning') !== false || stripos($line, '⚠️') !== false) {
-                        $cssClass .= ' warning';
+                    foreach ($lines as $line) {
+                        $line = htmlspecialchars($line);
+                        $cssClass = 'log-entry';
+                        
+                        if (stripos($line, 'erro') !== false || stripos($line, 'error') !== false || stripos($line, 'exception') !== false) {
+                            $cssClass .= ' error';
+                        } elseif (stripos($line, 'sucesso') !== false || stripos($line, 'success') !== false || stripos($line, '✅') !== false) {
+                            $cssClass .= ' success';
+                        } elseif (stripos($line, 'warning') !== false || stripos($line, '⚠️') !== false) {
+                            $cssClass .= ' warning';
+                        }
+                        
+                        // Destacar timestamp
+                        $line = preg_replace('/\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]/', '<span class="timestamp">[$1]</span>', $line);
+                        
+                        echo "<div class='{$cssClass}'>{$line}</div>";
                     }
-                    
-                    // Destacar timestamp
-                    $line = preg_replace('/\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]/', '<span class="timestamp">[$1]</span>', $line);
-                    
-                    echo "<div class='{$cssClass}'>{$line}</div>";
                 }
             } else {
-                echo "<div class='file-not-found'>Arquivo não encontrado: {$logFile}</div>";
+                echo "<div class='file-not-found'>";
+                echo "❌ Arquivo não encontrado: {$logFile}<br>";
+                echo "<small>Crie o arquivo executando: touch {$logFile}</small>";
+                echo "</div>";
             }
             ?>
         </div>

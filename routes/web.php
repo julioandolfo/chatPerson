@@ -39,6 +39,7 @@ use App\Controllers\Api4ComController;
 use App\Controllers\Api4ComCallController;
 use App\Controllers\WooCommerceController;
 use App\Controllers\AgentPerformanceController;
+use App\Controllers\RealtimeCoachingController;
 
 // Rotas públicas
 Router::get('/', function() {
@@ -99,6 +100,15 @@ Router::delete('/conversations/{id}/notes/{noteId}', [ConversationController::cl
 Router::get('/conversations/{id}/timeline', [ConversationController::class, 'getTimeline'], ['Authentication']);
 Router::get('/conversations/{id}/sentiment', [ConversationController::class, 'getSentiment'], ['Authentication']);
 Router::get('/conversations/{id}/performance', [ConversationController::class, 'getPerformance'], ['Authentication']);
+
+// Rotas de Coaching em Tempo Real
+Router::group('/coaching', ['Authentication'], function () {
+    Router::get('/pending-hints', [RealtimeCoachingController::class, 'getPendingHints']); // Polling
+    Router::get('/stats', [RealtimeCoachingController::class, 'getStats']); // Estatísticas
+    Router::post('/mark-viewed', [RealtimeCoachingController::class, 'markAsViewed']); // Marcar como visto
+    Router::post('/feedback', [RealtimeCoachingController::class, 'provideFeedback']); // Feedback (útil/não)
+});
+
 Router::post('/conversations/{id}/messages', [ConversationController::class, 'sendMessage'], ['Authentication']);
 Router::post('/conversations/{id}/forward', [ConversationController::class, 'forwardMessage'], ['Authentication']);
 

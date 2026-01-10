@@ -1,0 +1,265 @@
+/**
+ * Estilos para Sistema de Coaching em Tempo Real
+ */
+
+/* Container de hints (canto inferior direito) */
+.coaching-hints-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9999;
+    max-width: 400px;
+    width: 100%;
+    pointer-events: none;
+}
+
+/* Card de hint individual */
+.coaching-hint {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    margin-bottom: 15px;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateX(100%);
+    transition: all 0.3s ease-in-out;
+    pointer-events: all;
+    animation: slideIn 0.3s ease-out forwards;
+}
+
+.coaching-hint.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* Animação de entrada */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Header do hint */
+.coaching-hint-header {
+    padding: 12px 15px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.coaching-hint-header i:first-child {
+    font-size: 20px;
+}
+
+.coaching-hint-title {
+    flex: 1;
+}
+
+.coaching-hint-close {
+    background: transparent;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.coaching-hint-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Body do hint */
+.coaching-hint-body {
+    padding: 15px;
+    background: #fff;
+}
+
+.coaching-hint-text {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    color: #3f4254;
+    line-height: 1.5;
+}
+
+.coaching-hint-suggestions {
+    background: #f9f9f9;
+    border-left: 3px solid #009ef7;
+    padding: 12px;
+    border-radius: 6px;
+    margin-top: 12px;
+}
+
+.coaching-hint-suggestions strong {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: #181c32;
+}
+
+.coaching-hint-suggestions ul {
+    margin: 0;
+    padding-left: 20px;
+    list-style: none;
+}
+
+.coaching-hint-suggestions li {
+    position: relative;
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: #5e6278;
+    line-height: 1.5;
+    padding-left: 0;
+}
+
+.coaching-hint-suggestions li:before {
+    content: "→";
+    position: absolute;
+    left: -20px;
+    color: #009ef7;
+    font-weight: bold;
+}
+
+.coaching-hint-suggestions li:last-child {
+    margin-bottom: 0;
+}
+
+/* Footer do hint */
+.coaching-hint-footer {
+    padding: 12px 15px;
+    background: #f5f8fa;
+    border-top: 1px solid #eff2f5;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.coaching-hint-footer .btn {
+    font-size: 12px;
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* Tipos de hint (cores específicas) */
+.coaching-hint[data-hint-type="objection"] .coaching-hint-header {
+    background: linear-gradient(135deg, #f1416c 0%, #d63384 100%);
+}
+
+.coaching-hint[data-hint-type="opportunity"] .coaching-hint-header {
+    background: linear-gradient(135deg, #50cd89 0%, #17c653 100%);
+}
+
+.coaching-hint[data-hint-type="question"] .coaching-hint-header {
+    background: linear-gradient(135deg, #009ef7 0%, #0077c2 100%);
+}
+
+.coaching-hint[data-hint-type="negative_sentiment"] .coaching-hint-header {
+    background: linear-gradient(135deg, #ffc700 0%, #f1a200 100%);
+}
+
+.coaching-hint[data-hint-type="buying_signal"] .coaching-hint-header {
+    background: linear-gradient(135deg, #7239ea 0%, #5014d0 100%);
+}
+
+.coaching-hint[data-hint-type="closing_opportunity"] .coaching-hint-header {
+    background: linear-gradient(135deg, #00a3ff 0%, #0077c2 100%);
+}
+
+.coaching-hint[data-hint-type="escalation_needed"] .coaching-hint-header {
+    background: linear-gradient(135deg, #f1416c 0%, #d63384 100%);
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+    .coaching-hints-container {
+        bottom: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+    
+    .coaching-hint {
+        margin-bottom: 10px;
+    }
+}
+
+/* Animação de pulso para novos hints */
+@keyframes pulse {
+    0% {
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    }
+    50% {
+        box-shadow: 0 8px 32px rgba(0, 158, 247, 0.4);
+    }
+    100% {
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    }
+}
+
+.coaching-hint.new {
+    animation: pulse 1s ease-in-out 3;
+}
+
+/* Badge contador de hints (opcional) */
+.coaching-hints-badge {
+    position: fixed;
+    bottom: 80px;
+    right: 30px;
+    background: #009ef7;
+    color: #fff;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: bold;
+    box-shadow: 0 4px 12px rgba(0, 158, 247, 0.4);
+    z-index: 9998;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.coaching-hints-badge:hover {
+    transform: scale(1.1);
+}
+
+/* Indicador de coaching ativo (opcional - na sidebar) */
+.coaching-active-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    background: #e8fff3;
+    color: #50cd89;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 8px;
+}
+
+.coaching-active-indicator i {
+    font-size: 14px;
+    animation: blink 2s infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}

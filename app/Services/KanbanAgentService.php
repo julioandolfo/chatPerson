@@ -160,10 +160,12 @@ class KanbanAgentService
                             ];
                             
                             self::logInfo("KanbanAgentService::executeAgent - Dados do log: " . json_encode($logData));
+                            self::logInfo("KanbanAgentService::executeAgent - Verificando se classe AIKanbanAgentActionLog existe: " . (class_exists('App\\Models\\AIKanbanAgentActionLog') ? 'SIM' : 'NÃO'));
+                            self::logInfo("KanbanAgentService::executeAgent - Prestes a chamar AIKanbanAgentActionLog::createLog()");
                             
-                            AIKanbanAgentActionLog::createLog($logData);
+                            $logId = \App\Models\AIKanbanAgentActionLog::createLog($logData);
                             
-                            self::logInfo("KanbanAgentService::executeAgent - Log registrado com sucesso no banco");
+                            self::logInfo("KanbanAgentService::executeAgent - Log registrado com sucesso no banco (ID: $logId)");
                         } catch (\Throwable $e) {
                             self::logError("KanbanAgentService::executeAgent - ERRO ao registrar log no banco");
                             self::logError("KanbanAgentService::executeAgent - Tipo: " . get_class($e));
@@ -190,10 +192,12 @@ class KanbanAgentService
                             ];
                             
                             self::logInfo("KanbanAgentService::executeAgent - Dados do log: " . json_encode($logData));
+                            self::logInfo("KanbanAgentService::executeAgent - Verificando se classe AIKanbanAgentActionLog existe: " . (class_exists('App\\Models\\AIKanbanAgentActionLog') ? 'SIM' : 'NÃO'));
+                            self::logInfo("KanbanAgentService::executeAgent - Prestes a chamar AIKanbanAgentActionLog::createLog()");
                             
-                            AIKanbanAgentActionLog::createLog($logData);
+                            $logId = \App\Models\AIKanbanAgentActionLog::createLog($logData);
                             
-                            self::logInfo("KanbanAgentService::executeAgent - Log registrado com sucesso no banco");
+                            self::logInfo("KanbanAgentService::executeAgent - Log registrado com sucesso no banco (ID: $logId)");
                         } catch (\Throwable $e) {
                             self::logError("KanbanAgentService::executeAgent - ERRO ao registrar log no banco");
                             self::logError("KanbanAgentService::executeAgent - Tipo: " . get_class($e));

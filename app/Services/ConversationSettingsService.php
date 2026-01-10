@@ -240,6 +240,51 @@ class ConversationSettingsService
             ],
             
             // Análise de Performance de Vendedores
+            'realtime_coaching' => [
+                'enabled' => false,
+                'model' => 'gpt-3.5-turbo', // Modelo para coaching (mais rápido e barato)
+                'temperature' => 0.5,
+                
+                // ⚡ Rate Limiting (Controle de análises)
+                'max_analyses_per_minute' => 10, // Máximo 10 análises por minuto
+                'min_interval_between_analyses' => 10, // Mínimo 10 segundos entre análises do mesmo agente
+                
+                // 📋 Fila e Processamento
+                'use_queue' => true, // Usar fila (recomendado para alto volume)
+                'queue_processing_delay' => 3, // Delay de 3 segundos antes de processar (debouncing)
+                'max_queue_size' => 100, // Máximo 100 itens na fila por vez
+                
+                // 🎯 Filtros (Quando analisar)
+                'analyze_only_client_messages' => true, // Só mensagens do cliente
+                'min_message_length' => 10, // Mínimo 10 caracteres
+                'skip_if_agent_typing' => true, // Pular se agente está digitando
+                
+                // 💾 Cache (Evitar análises duplicadas)
+                'use_cache' => true,
+                'cache_ttl_minutes' => 60, // Cache válido por 60 minutos
+                'cache_similarity_threshold' => 0.85, // 85% similar = usa cache
+                
+                // 💰 Custo e Limites
+                'cost_limit_per_hour' => 1.00, // Máx $1/hora
+                'cost_limit_per_day' => 10.00, // Máx $10/dia
+                
+                // 🎯 Tipos de Dica (Quais situações detectar)
+                'hint_types' => [
+                    'objection' => true, // Detectar objeções
+                    'opportunity' => true, // Detectar oportunidades
+                    'question' => true, // Pergunta importante
+                    'negative_sentiment' => true, // Cliente insatisfeito
+                    'buying_signal' => true, // Sinais de compra
+                    'closing_opportunity' => true, // Momento de fechar
+                    'escalation_needed' => true, // Precisa escalar
+                ],
+                
+                // 🎨 Apresentação
+                'auto_show_hint' => true, // Mostrar automaticamente
+                'hint_display_duration' => 30, // Mostrar por 30 segundos
+                'play_sound' => false, // Tocar som ao receber dica
+            ],
+            
             'agent_performance_analysis' => [
                 'enabled' => false,
                 'model' => 'gpt-4-turbo', // gpt-4o, gpt-4-turbo, gpt-4, gpt-3.5-turbo

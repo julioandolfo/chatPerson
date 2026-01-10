@@ -476,6 +476,10 @@ $tts = $cs['text_to_speech'] ?? [];
     <?php include __DIR__ . '/action-buttons/performance-config.php'; ?>
     <!--end::Análise de Performance-->
     
+    <!--begin::Coaching em Tempo Real-->
+    <?php include __DIR__ . '/action-buttons/realtime-coaching-config.php'; ?>
+    <!--end::Coaching em Tempo Real-->
+    
     <div class="separator separator-dashed my-10"></div>
     
     <!--begin::Transcrição de Áudio-->

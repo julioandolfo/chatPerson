@@ -242,6 +242,10 @@
     <!-- WebSocket Client -->
     <script src="<?= \App\Helpers\Url::asset('js/realtime-client.js') ?>"></script>
     <script src="<?= \App\Helpers\Url::asset('js/activity-tracker.js') ?>"></script>
+    
+    <!-- Coaching em Tempo Real -->
+    <link rel="stylesheet" href="<?= \App\Helpers\Url::asset('css/realtime-coaching.css') ?>">
+    <script src="<?= \App\Helpers\Url::asset('js/realtime-coaching.js') ?>"></script>
     <script>
         // Passar configurações de disponibilidade para o JavaScript
         <?php if (\App\Helpers\Auth::check()): ?>

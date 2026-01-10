@@ -102,12 +102,10 @@ Router::get('/conversations/{id}/sentiment', [ConversationController::class, 'ge
 Router::get('/conversations/{id}/performance', [ConversationController::class, 'getPerformance'], ['Authentication']);
 
 // Rotas de Coaching em Tempo Real
-Router::group('/coaching', ['Authentication'], function () {
-    Router::get('/pending-hints', [RealtimeCoachingController::class, 'getPendingHints']); // Polling
-    Router::get('/stats', [RealtimeCoachingController::class, 'getStats']); // Estatísticas
-    Router::post('/mark-viewed', [RealtimeCoachingController::class, 'markAsViewed']); // Marcar como visto
-    Router::post('/feedback', [RealtimeCoachingController::class, 'provideFeedback']); // Feedback (útil/não)
-});
+Router::get('/coaching/pending-hints', [RealtimeCoachingController::class, 'getPendingHints'], ['Authentication']); // Polling
+Router::get('/coaching/stats', [RealtimeCoachingController::class, 'getStats'], ['Authentication']); // Estatísticas
+Router::post('/coaching/mark-viewed', [RealtimeCoachingController::class, 'markAsViewed'], ['Authentication']); // Marcar como visto
+Router::post('/coaching/feedback', [RealtimeCoachingController::class, 'provideFeedback'], ['Authentication']); // Feedback (útil/não)
 
 Router::post('/conversations/{id}/messages', [ConversationController::class, 'sendMessage'], ['Authentication']);
 Router::post('/conversations/{id}/forward', [ConversationController::class, 'forwardMessage'], ['Authentication']);

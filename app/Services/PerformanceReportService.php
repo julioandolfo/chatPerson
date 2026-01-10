@@ -108,8 +108,9 @@ class PerformanceReportService
         $start = new \DateTime($dateFrom);
         $end = new \DateTime($dateTo);
         $diff = $start->diff($end)->days;
+        $halfDiff = (int)($diff / 2);
         $midpoint = clone $start;
-        $midpoint->modify("+{$diff} days / 2");
+        $midpoint->modify("+{$halfDiff} days");
         
         $firstHalfEnd = $midpoint->format('Y-m-d');
         $secondHalfStart = $midpoint->modify('+1 day')->format('Y-m-d');

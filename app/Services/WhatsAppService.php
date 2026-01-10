@@ -1282,7 +1282,15 @@ class WhatsAppService
             }
             
             // Media / arquivos (vários formatos possíveis)
-            $mediaUrl = $quepasaData['url'] ?? $payload['media_url'] ?? $payload['mediaUrl'] ?? $payload['url'] ?? null;
+            // ⚠️ IMPORTANTE: $payload['url'] pode ser um array com metadados de link, não uma URL de mídia!
+            // Primeiro, tentar extrair de campos específicos de mídia
+            $mediaUrl = $quepasaData['url'] ?? $payload['media_url'] ?? $payload['mediaUrl'] ?? null;
+            
+            // Se ainda não encontrou, verificar $payload['url'] mas APENAS se for string (não array de metadados de link)
+            if (!$mediaUrl && isset($payload['url']) && is_string($payload['url'])) {
+                $mediaUrl = $payload['url'];
+            }
+            
             $mimetype = $quepasaData['mimeType'] ?? $payload['mimetype'] ?? $payload['mime_type'] ?? null;
             $filename = $quepasaData['fileName'] ?? $quepasaData['filename'] ?? $payload['filename'] ?? $payload['media_name'] ?? null;
             $size = $quepasaData['size'] ?? $payload['size'] ?? null;
@@ -1473,7 +1481,9 @@ class WhatsAppService
                 }
             }
 
-            Logger::quepasa("processWebhook - media detect: url=" . ($mediaUrl ?: 'NULL') . ", mimetype=" . ($mimetype ?: 'NULL') . ", filename=" . ($filename ?: 'NULL') . ", size=" . ($size ?: 'NULL') . ", messageType={$messageType}");
+            // Formatar $mediaUrl para log (pode ser array se for metadados de link)
+            $mediaUrlForLog = is_string($mediaUrl) ? $mediaUrl : (is_array($mediaUrl) ? 'ARRAY[' . implode(',', array_keys($mediaUrl)) . ']' : 'NULL');
+            Logger::quepasa("processWebhook - media detect: url=" . $mediaUrlForLog . ", mimetype=" . ($mimetype ?: 'NULL') . ", filename=" . ($filename ?: 'NULL') . ", size=" . ($size ?: 'NULL') . ", messageType={$messageType}");
             $quotedMsg = $quepasaData['quotedMsg'] ?? null;
             $quotedExternalId = $quotedMsg['id']
                 ?? ($payload['quoted'] ?? $payload['quoted_message_id'] ?? null)
@@ -2311,17 +2321,22 @@ class WhatsAppService
                         $attachments[] = $attachment;
                     } else {
                         // Arquivo externo (não baixado ainda), usar saveFromUrl
-                        $attachment = \App\Services\AttachmentService::saveFromUrl(
-                            $mediaUrl, 
-                            $conversation['id'], 
-                            $filename
-                        );
-                        // Enriquecer metadados do attachment se possível
-                        if (!empty($attachment)) {
-                            if ($mimetype) $attachment['mime_type'] = $mimetype;
-                            if ($size) $attachment['size'] = $size;
+                        // ⚠️ Verificar se $mediaUrl é uma string válida (não array de metadados de link)
+                        if (is_string($mediaUrl) && !empty($mediaUrl)) {
+                            $attachment = \App\Services\AttachmentService::saveFromUrl(
+                                $mediaUrl, 
+                                $conversation['id'], 
+                                $filename
+                            );
+                            // Enriquecer metadados do attachment se possível
+                            if (!empty($attachment)) {
+                                if ($mimetype) $attachment['mime_type'] = $mimetype;
+                                if ($size) $attachment['size'] = $size;
+                            }
+                            $attachments[] = $attachment;
+                        } else {
+                            Logger::quepasa("processWebhook - ⚠️ mediaUrl inválido (array ou vazio), não é possível criar attachment: " . json_encode($mediaUrl));
                         }
-                        $attachments[] = $attachment;
                     }
                 } catch (\Exception $e) {
                     Logger::quepasa("Erro ao salvar mídia do WhatsApp: " . $e->getMessage());

@@ -318,10 +318,3 @@ $coachingSettings = $settings['realtime_coaching'] ?? [];
         </div>
     </div>
 </div>
-
-<script>
-// Toggle de visibilidade das configurações
-document.getElementById('realtime_coaching_enabled').addEventListener('change', function() {
-    document.getElementById('realtime-coaching-settings').style.display = this.checked ? 'block' : 'none';
-});
-</script>

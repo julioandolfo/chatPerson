@@ -596,6 +596,13 @@ class SettingsController
         try {
             $data = Request::post();
             
+            // Debug: Log dados recebidos para coaching
+            if (isset($data['realtime_coaching'])) {
+                error_log("DEBUG COACHING: " . json_encode($data['realtime_coaching']));
+            } else {
+                error_log("DEBUG COACHING: Nenhum dado de realtime_coaching recebido");
+            }
+            
             // Salvar configuração de nome do agente no chat
             SettingService::set('chat_agent_name_enabled', isset($data['chat_agent_name_enabled']), 'boolean', 'general');
             

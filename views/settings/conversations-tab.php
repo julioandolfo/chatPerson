@@ -952,6 +952,15 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
     
+    // Toggle coaching em tempo real
+    const coachingEnabled = document.getElementById("realtime_coaching_enabled");
+    const coachingContainer = document.getElementById("realtime-coaching-settings");
+    if (coachingEnabled && coachingContainer) {
+        coachingEnabled.addEventListener("change", function() {
+            coachingContainer.style.display = this.checked ? "block" : "none";
+        });
+    }
+    
     // Toggle transcrição de áudio
     const transcriptionEnabled = document.getElementById("audio_transcription_enabled");
     const transcriptionContainer = document.getElementById("audio_transcription_settings");
@@ -1232,6 +1241,15 @@ document.addEventListener("DOMContentLoaded", function() {
         submitBtn.disabled = true;
         
         const formData = new FormData(form);
+        
+        // Debug: Log dados de coaching
+        console.log('=== DEBUG COACHING ===');
+        for (let [key, value] of formData.entries()) {
+            if (key.includes('realtime_coaching')) {
+                console.log(key + ': ' + value);
+            }
+        }
+        console.log('======================');
         
         fetch("<?= \App\Helpers\Url::to('/settings/conversations') ?>", {
             method: "POST",

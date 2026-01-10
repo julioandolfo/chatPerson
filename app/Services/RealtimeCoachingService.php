@@ -15,8 +15,7 @@ use App\Helpers\Database;
  */
 class RealtimeCoachingService
 {
-    // Fila em memória (Redis seria melhor em produção)
-    private static array $queue = [];
+    // Tracking em memória
     private static array $lastAnalysis = []; // [agent_id => timestamp]
     private static array $analysisCount = []; // [minute => count]
     private static array $costTracking = []; // [hour => cost, day => cost]
@@ -125,8 +124,11 @@ class RealtimeCoachingService
         }
         
         // 5. Verificar tamanho da fila
-        if ($settings['use_queue'] && count(self::$queue) >= $settings['max_queue_size']) {
-            return false;
+        if ($settings['use_queue']) {
+            $queueSize = self::getQueueSize();
+            if ($queueSize >= $settings['max_queue_size']) {
+                return false;
+            }
         }
         
         // 6. Verificar limite de custo
@@ -220,20 +222,65 @@ class RealtimeCoachingService
     }
     
     /**
-     * Adicionar na fila
+     * Adicionar na fila (banco de dados)
      */
     private static function addToQueue(int $messageId, int $conversationId, int $agentId): void
     {
-        self::$queue[] = [
+        $sql = "INSERT INTO coaching_queue (message_id, conversation_id, agent_id, status) 
+                VALUES (:message_id, :conversation_id, :agent_id, 'pending')";
+        
+        Database::query($sql, [
             'message_id' => $messageId,
             'conversation_id' => $conversationId,
-            'agent_id' => $agentId,
-            'added_at' => time(),
-        ];
+            'agent_id' => $agentId
+        ]);
+        
+        // Processar fila automaticamente em background (sem bloquear)
+        self::triggerBackgroundProcessing();
     }
     
     /**
-     * Processar fila (chamado pelo worker)
+     * Obter tamanho da fila
+     */
+    private static function getQueueSize(): int
+    {
+        $sql = "SELECT COUNT(*) as total FROM coaching_queue WHERE status = 'pending'";
+        $result = Database::fetchOne($sql);
+        return (int)($result['total'] ?? 0);
+    }
+    
+    /**
+     * Disparar processamento em background (não bloqueia)
+     */
+    private static function triggerBackgroundProcessing(): void
+    {
+        static $lastTrigger = 0;
+        
+        // Só disparar a cada 3 segundos (debouncing)
+        if (time() - $lastTrigger < 3) {
+            return;
+        }
+        
+        $lastTrigger = time();
+        
+        try {
+            // Executar em background (não espera responder)
+            $scriptPath = __DIR__ . '/../../public/scripts/process-coaching-queue.php';
+            
+            if (PHP_OS_FAMILY === 'Windows') {
+                // Windows
+                pclose(popen("start /B php \"$scriptPath\" > NUL 2>&1", 'r'));
+            } else {
+                // Linux/Unix
+                exec("php \"$scriptPath\" > /dev/null 2>&1 &");
+            }
+        } catch (\Exception $e) {
+            error_log("Erro ao disparar processamento: " . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Processar fila (chamado pelo worker/cron)
      */
     public static function processQueue(): array
     {
@@ -242,24 +289,30 @@ class RealtimeCoachingService
         $errors = 0;
         $skipped = 0;
         
-        if (empty(self::$queue)) {
-            return ['processed' => 0, 'errors' => 0, 'skipped' => 0];
+        // Buscar itens pendentes da fila (até 10 por vez)
+        $sql = "SELECT * FROM coaching_queue 
+                WHERE status = 'pending' 
+                AND added_at <= DATE_SUB(NOW(), INTERVAL :delay SECOND)
+                ORDER BY added_at ASC 
+                LIMIT 10";
+        
+        $items = Database::fetchAll($sql, [
+            'delay' => $settings['queue_processing_delay'] ?? 3
+        ]);
+        
+        if (empty($items)) {
+            return [
+                'processed' => 0,
+                'errors' => 0,
+                'skipped' => 0,
+                'queue_size' => self::getQueueSize()
+            ];
         }
         
-        // Processar até 10 itens por vez
-        $batch = array_splice(self::$queue, 0, 10);
-        
-        foreach ($batch as $item) {
-            // Debouncing: esperar delay configurado
-            $elapsed = time() - $item['added_at'];
-            if ($elapsed < $settings['queue_processing_delay']) {
-                // Recolocar na fila
-                self::$queue[] = $item;
-                $skipped++;
-                continue;
-            }
+        foreach ($items as $item) {
+            // Marcar como processando
+            self::updateQueueStatus($item['id'], 'processing');
             
-            // Processar
             try {
                 $success = self::analyzeMessageNow(
                     $item['message_id'],
@@ -268,12 +321,17 @@ class RealtimeCoachingService
                 );
                 
                 if ($success) {
+                    // Marcar como completado
+                    self::updateQueueStatus($item['id'], 'completed');
                     $processed++;
                 } else {
+                    // Marcar como falho
+                    self::updateQueueStatus($item['id'], 'failed', 'Análise retornou false');
                     $skipped++;
                 }
             } catch (\Exception $e) {
                 error_log("Erro ao processar coaching: " . $e->getMessage());
+                self::updateQueueStatus($item['id'], 'failed', $e->getMessage());
                 $errors++;
             }
         }
@@ -282,8 +340,27 @@ class RealtimeCoachingService
             'processed' => $processed,
             'errors' => $errors,
             'skipped' => $skipped,
-            'queue_size' => count(self::$queue)
+            'queue_size' => self::getQueueSize()
         ];
+    }
+    
+    /**
+     * Atualizar status do item na fila
+     */
+    private static function updateQueueStatus(int $id, string $status, ?string $error = null): void
+    {
+        $sql = "UPDATE coaching_queue 
+                SET status = :status,
+                    attempts = attempts + 1,
+                    last_error = :error,
+                    processed_at = NOW()
+                WHERE id = :id";
+        
+        Database::query($sql, [
+            'id' => $id,
+            'status' => $status,
+            'error' => $error
+        ]);
     }
     
     /**

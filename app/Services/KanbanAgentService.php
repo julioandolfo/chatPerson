@@ -118,21 +118,21 @@ class KanbanAgentService
             foreach ($conversations as $conversation) {
                 try {
                     $stats['conversations_analyzed']++;
-                    Logger::info("KanbanAgentService::executeAgent - Analisando conversa {$conversation['id']} (total analisadas: {$stats['conversations_analyzed']})");
+                    self::logInfo("KanbanAgentService::executeAgent - Analisando conversa {$conversation['id']} (total analisadas: {$stats['conversations_analyzed']})");
                     
                     // Analisar conversa com IA
-                    Logger::info("KanbanAgentService::executeAgent - Chamando OpenAI para análise da conversa {$conversation['id']}");
+                    self::logInfo("KanbanAgentService::executeAgent - Chamando OpenAI para análise da conversa {$conversation['id']}");
                     $analysis = self::analyzeConversation($agent, $conversation);
-                    Logger::info("KanbanAgentService::executeAgent - Análise concluída para conversa {$conversation['id']}: Score={$analysis['score']}, Sentiment={$analysis['sentiment']}, Urgency={$analysis['urgency']}");
+                    self::logInfo("KanbanAgentService::executeAgent - Análise concluída para conversa {$conversation['id']}: Score={$analysis['score']}, Sentiment={$analysis['sentiment']}, Urgency={$analysis['urgency']}");
                     
                     // Avaliar condições
-                    Logger::info("KanbanAgentService::executeAgent - Avaliando condições para conversa {$conversation['id']}");
+                    self::logInfo("KanbanAgentService::executeAgent - Avaliando condições para conversa {$conversation['id']}");
                     $conditionsMet = self::evaluateConditions($agent['conditions'], $conversation, $analysis);
-                    Logger::info("KanbanAgentService::executeAgent - Condições " . ($conditionsMet['met'] ? 'ATENDIDAS' : 'NÃO ATENDIDAS') . " para conversa {$conversation['id']}");
+                    self::logInfo("KanbanAgentService::executeAgent - Condições " . ($conditionsMet['met'] ? 'ATENDIDAS' : 'NÃO ATENDIDAS') . " para conversa {$conversation['id']}");
                     
                     if ($conditionsMet['met']) {
                         $stats['conversations_acted_upon']++;
-                        Logger::info("KanbanAgentService::executeAgent - Executando ações para conversa {$conversation['id']} (total com ações: {$stats['conversations_acted_upon']})");
+                        self::logInfo("KanbanAgentService::executeAgent - Executando ações para conversa {$conversation['id']} (total com ações: {$stats['conversations_acted_upon']})");
                         
                         // Executar ações
                         $actionsResult = self::executeActions($agent['actions'], $conversation, $analysis, $agentId, $executionId);
@@ -140,7 +140,7 @@ class KanbanAgentService
                         $stats['actions_executed'] += $actionsResult['executed'];
                         $stats['errors_count'] += $actionsResult['errors'];
                         
-                        Logger::info("KanbanAgentService::executeAgent - Ações executadas para conversa {$conversation['id']}: {$actionsResult['executed']} sucesso(s), {$actionsResult['errors']} erro(s)");
+                        self::logInfo("KanbanAgentService::executeAgent - Ações executadas para conversa {$conversation['id']}: {$actionsResult['executed']} sucesso(s), {$actionsResult['errors']} erro(s)");
                         
                         // Registrar log de ação
                         AIKanbanAgentActionLog::createLog([
@@ -170,20 +170,26 @@ class KanbanAgentService
                     }
                 } catch (\Exception $e) {
                     $stats['errors_count']++;
-                    Logger::error("KanbanAgentService::executeAgent - Erro ao processar conversa {$conversation['id']}: " . $e->getMessage());
+                    self::logError("KanbanAgentService::executeAgent - Erro ao processar conversa {$conversation['id']}: " . $e->getMessage());
+                    self::logError("KanbanAgentService::executeAgent - Stack trace: " . $e->getTraceAsString());
+                } catch (\Throwable $e) {
+                    $stats['errors_count']++;
+                    self::logError("KanbanAgentService::executeAgent - Erro CRÍTICO ao processar conversa {$conversation['id']}: " . $e->getMessage());
+                    self::logError("KanbanAgentService::executeAgent - Tipo: " . get_class($e));
+                    self::logError("KanbanAgentService::executeAgent - Stack trace: " . $e->getTraceAsString());
                 }
             }
 
             // Finalizar execução
-            Logger::info("KanbanAgentService::executeAgent - Finalizando execução $executionId: {$stats['conversations_analyzed']} analisadas, {$stats['conversations_acted_upon']} com ações, {$stats['actions_executed']} ações executadas, {$stats['errors_count']} erros");
+            self::logInfo("KanbanAgentService::executeAgent - Finalizando execução $executionId: {$stats['conversations_analyzed']} analisadas, {$stats['conversations_acted_upon']} com ações, {$stats['actions_executed']} ações executadas, {$stats['errors_count']} erros");
             AIKanbanAgentExecution::completeExecution($executionId, $stats);
             
             // Atualizar próxima execução
             AIKanbanAgent::updateNextExecution($agentId);
-            Logger::info("KanbanAgentService::executeAgent - Próxima execução agendada para o agente $agentId");
+            self::logInfo("KanbanAgentService::executeAgent - Próxima execução agendada para o agente $agentId");
 
             $message = "Agente executado com sucesso. {$stats['conversations_analyzed']} conversas analisadas, {$stats['conversations_acted_upon']} com ações executadas.";
-            Logger::info("KanbanAgentService::executeAgent - $message");
+            self::logInfo("KanbanAgentService::executeAgent - $message");
 
             return [
                 'success' => true,
@@ -192,8 +198,14 @@ class KanbanAgentService
             ];
 
         } catch (\Exception $e) {
-            Logger::error("KanbanAgentService::executeAgent - ERRO CRÍTICO na execução do agente $agentId: " . $e->getMessage());
-            Logger::error("KanbanAgentService::executeAgent - Stack trace: " . $e->getTraceAsString());
+            self::logError("KanbanAgentService::executeAgent - ERRO CRÍTICO na execução do agente $agentId: " . $e->getMessage());
+            self::logError("KanbanAgentService::executeAgent - Stack trace: " . $e->getTraceAsString());
+            AIKanbanAgentExecution::completeExecution($executionId, [], $e->getMessage());
+            throw $e;
+        } catch (\Throwable $e) {
+            self::logError("KanbanAgentService::executeAgent - ERRO FATAL na execução do agente $agentId: " . $e->getMessage());
+            self::logError("KanbanAgentService::executeAgent - Tipo: " . get_class($e));
+            self::logError("KanbanAgentService::executeAgent - Stack trace: " . $e->getTraceAsString());
             AIKanbanAgentExecution::completeExecution($executionId, [], $e->getMessage());
             throw $e;
         }
@@ -244,37 +256,53 @@ class KanbanAgentService
      */
     private static function analyzeConversation(array $agent, array $conversation): array
     {
-        // Buscar mensagens da conversa
-        $messages = Message::where('conversation_id', '=', $conversation['id']);
-        $messages = array_slice($messages, -20); // Últimas 20 mensagens
-
-        // Buscar informações do contato
-        $contact = Contact::find($conversation['contact_id']);
-
-        // Buscar informações do funil/etapa
-        $funnel = null;
-        $stage = null;
-        if ($conversation['funnel_id']) {
-            $funnel = Funnel::find($conversation['funnel_id']);
-        }
-        if ($conversation['funnel_stage_id']) {
-            $stage = FunnelStage::find($conversation['funnel_stage_id']);
-        }
-
-        // Montar contexto
-        $context = self::buildConversationContext($conversation, $messages, $contact, $funnel, $stage);
-
-        // Montar prompt de análise
-        $prompt = self::buildAnalysisPrompt($agent['prompt'], $context);
-
         try {
+            self::logInfo("KanbanAgentService::analyzeConversation - Iniciando análise da conversa {$conversation['id']}");
+            
+            // Buscar mensagens da conversa
+            $messages = Message::where('conversation_id', '=', $conversation['id']);
+            self::logInfo("KanbanAgentService::analyzeConversation - Total de mensagens encontradas: " . count($messages));
+            $messages = array_slice($messages, -20); // Últimas 20 mensagens
+            self::logInfo("KanbanAgentService::analyzeConversation - Usando " . count($messages) . " mensagens para análise");
+
+            // Buscar informações do contato
+            $contact = Contact::find($conversation['contact_id']);
+            self::logInfo("KanbanAgentService::analyzeConversation - Contato: " . ($contact ? $contact['name'] : 'N/A'));
+
+            // Buscar informações do funil/etapa
+            $funnel = null;
+            $stage = null;
+            if ($conversation['funnel_id']) {
+                $funnel = Funnel::find($conversation['funnel_id']);
+                self::logInfo("KanbanAgentService::analyzeConversation - Funil: " . ($funnel ? $funnel['name'] : 'N/A'));
+            }
+            if ($conversation['funnel_stage_id']) {
+                $stage = FunnelStage::find($conversation['funnel_stage_id']);
+                self::logInfo("KanbanAgentService::analyzeConversation - Etapa: " . ($stage ? $stage['name'] : 'N/A'));
+            }
+
+            // Montar contexto
+            self::logInfo("KanbanAgentService::analyzeConversation - Montando contexto da conversa");
+            $context = self::buildConversationContext($conversation, $messages, $contact, $funnel, $stage);
+            self::logInfo("KanbanAgentService::analyzeConversation - Contexto montado (tamanho: " . strlen($context) . " caracteres)");
+
+            // Montar prompt de análise
+            $prompt = self::buildAnalysisPrompt($agent['prompt'], $context);
+            self::logInfo("KanbanAgentService::analyzeConversation - Prompt montado (tamanho: " . strlen($prompt) . " caracteres)");
+
             // Chamar OpenAI
+            self::logInfo("KanbanAgentService::analyzeConversation - Chamando OpenAI API...");
             $response = self::callOpenAI($agent, $prompt);
+            self::logInfo("KanbanAgentService::analyzeConversation - Resposta recebida da OpenAI (tamanho: " . strlen($response) . " caracteres)");
             
             // Parsear resposta
-            return self::parseAnalysisResponse($response);
+            $analysis = self::parseAnalysisResponse($response);
+            self::logInfo("KanbanAgentService::analyzeConversation - Análise parseada com sucesso");
+            
+            return $analysis;
         } catch (\Exception $e) {
-            Logger::error("KanbanAgentService::analyzeConversation - Erro: " . $e->getMessage());
+            self::logError("KanbanAgentService::analyzeConversation - Erro: " . $e->getMessage());
+            self::logError("KanbanAgentService::analyzeConversation - Stack trace: " . $e->getTraceAsString());
             return [
                 'summary' => 'Erro ao analisar conversa: ' . $e->getMessage(),
                 'score' => 0,

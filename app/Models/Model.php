@@ -49,53 +49,32 @@ abstract class Model
     {
         $instance = new static();
         
-        \App\Helpers\Logger::info("Model::create - Tabela: {$instance->table}", 'kanban_agents.log');
-        \App\Helpers\Logger::info("Model::create - Dados antes do filtro: " . json_encode($data), 'kanban_agents.log');
+        // Filtrar apenas campos fillable
+        $data = array_intersect_key($data, array_flip($instance->fillable));
         
-        try {
-            // Filtrar apenas campos fillable
-            $data = array_intersect_key($data, array_flip($instance->fillable));
-            
-            \App\Helpers\Logger::info("Model::create - Dados após filtro fillable: " . json_encode($data), 'kanban_agents.log');
-            
-            // Adicionar timestamps (somente se não foram fornecidos)
-            if ($instance->timestamps) {
-                if (!isset($data['created_at'])) {
-                    $data['created_at'] = date('Y-m-d H:i:s');
-                }
-                if (!isset($data['updated_at'])) {
-                    $data['updated_at'] = date('Y-m-d H:i:s');
-                }
+        // Adicionar timestamps (somente se não foram fornecidos)
+        if ($instance->timestamps) {
+            if (!isset($data['created_at'])) {
+                $data['created_at'] = date('Y-m-d H:i:s');
             }
-
-            $fields = array_keys($data);
-            $values = array_values($data);
-            $placeholders = array_fill(0, count($values), '?');
-            
-            // Escapar nomes de campos com backticks
-            $fieldsEscaped = array_map(function($field) {
-                return "`{$field}`";
-            }, $fields);
-
-            $sql = "INSERT INTO `{$instance->table}` (" . implode(', ', $fieldsEscaped) . ") 
-                    VALUES (" . implode(', ', $placeholders) . ")";
-
-            \App\Helpers\Logger::info("Model::create - SQL: {$sql}", 'kanban_agents.log');
-            \App\Helpers\Logger::info("Model::create - Values: " . json_encode($values), 'kanban_agents.log');
-            
-            $id = Database::insert($sql, $values);
-            
-            \App\Helpers\Logger::info("Model::create - Registro criado com sucesso (ID: $id)", 'kanban_agents.log');
-            
-            return $id;
-        } catch (\Throwable $e) {
-            \App\Helpers\Logger::error("Model::create - ERRO ao criar registro na tabela {$instance->table}", 'kanban_agents.log');
-            \App\Helpers\Logger::error("Model::create - Tipo: " . get_class($e), 'kanban_agents.log');
-            \App\Helpers\Logger::error("Model::create - Mensagem: " . $e->getMessage(), 'kanban_agents.log');
-            \App\Helpers\Logger::error("Model::create - Arquivo: " . $e->getFile() . " (linha " . $e->getLine() . ")", 'kanban_agents.log');
-            \App\Helpers\Logger::error("Model::create - Stack trace: " . $e->getTraceAsString(), 'kanban_agents.log');
-            throw $e;
+            if (!isset($data['updated_at'])) {
+                $data['updated_at'] = date('Y-m-d H:i:s');
+            }
         }
+
+        $fields = array_keys($data);
+        $values = array_values($data);
+        $placeholders = array_fill(0, count($values), '?');
+        
+        // Escapar nomes de campos com backticks
+        $fieldsEscaped = array_map(function($field) {
+            return "`{$field}`";
+        }, $fields);
+
+        $sql = "INSERT INTO `{$instance->table}` (" . implode(', ', $fieldsEscaped) . ") 
+                VALUES (" . implode(', ', $placeholders) . ")";
+
+        return Database::insert($sql, $values);
     }
 
     /**

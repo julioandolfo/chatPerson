@@ -32,40 +32,19 @@ class AIKanbanAgentActionLog extends Model
      */
     public static function createLog(array $data): int
     {
-        \App\Helpers\Logger::info("AIKanbanAgentActionLog::createLog - Iniciando criação de log", 'kanban_agents.log');
-        \App\Helpers\Logger::info("AIKanbanAgentActionLog::createLog - Dados recebidos: " . json_encode($data), 'kanban_agents.log');
-        
-        try {
-            // Codificar campos JSON
-            if (isset($data['conditions_details'])) {
-                \App\Helpers\Logger::info("AIKanbanAgentActionLog::createLog - Codificando conditions_details", 'kanban_agents.log');
-                $data['conditions_details'] = !empty($data['conditions_details']) ? json_encode($data['conditions_details'], JSON_UNESCAPED_UNICODE) : null;
-            }
-            if (isset($data['actions_executed'])) {
-                \App\Helpers\Logger::info("AIKanbanAgentActionLog::createLog - Codificando actions_executed", 'kanban_agents.log');
-                $data['actions_executed'] = !empty($data['actions_executed']) ? json_encode($data['actions_executed'], JSON_UNESCAPED_UNICODE) : json_encode([], JSON_UNESCAPED_UNICODE);
-            }
-
-            if (!isset($data['executed_at'])) {
-                $data['executed_at'] = date('Y-m-d H:i:s');
-            }
-
-            \App\Helpers\Logger::info("AIKanbanAgentActionLog::createLog - Dados após codificação: " . json_encode($data), 'kanban_agents.log');
-            \App\Helpers\Logger::info("AIKanbanAgentActionLog::createLog - Chamando parent::create()", 'kanban_agents.log');
-            
-            $id = parent::create($data);
-            
-            \App\Helpers\Logger::info("AIKanbanAgentActionLog::createLog - Log criado com sucesso (ID: $id)", 'kanban_agents.log');
-            
-            return $id;
-        } catch (\Throwable $e) {
-            \App\Helpers\Logger::error("AIKanbanAgentActionLog::createLog - ERRO ao criar log", 'kanban_agents.log');
-            \App\Helpers\Logger::error("AIKanbanAgentActionLog::createLog - Tipo: " . get_class($e), 'kanban_agents.log');
-            \App\Helpers\Logger::error("AIKanbanAgentActionLog::createLog - Mensagem: " . $e->getMessage(), 'kanban_agents.log');
-            \App\Helpers\Logger::error("AIKanbanAgentActionLog::createLog - Arquivo: " . $e->getFile() . " (linha " . $e->getLine() . ")", 'kanban_agents.log');
-            \App\Helpers\Logger::error("AIKanbanAgentActionLog::createLog - Stack trace: " . $e->getTraceAsString(), 'kanban_agents.log');
-            throw $e;
+        // Codificar campos JSON
+        if (isset($data['conditions_details'])) {
+            $data['conditions_details'] = !empty($data['conditions_details']) ? json_encode($data['conditions_details'], JSON_UNESCAPED_UNICODE) : null;
         }
+        if (isset($data['actions_executed'])) {
+            $data['actions_executed'] = !empty($data['actions_executed']) ? json_encode($data['actions_executed'], JSON_UNESCAPED_UNICODE) : json_encode([], JSON_UNESCAPED_UNICODE);
+        }
+
+        if (!isset($data['executed_at'])) {
+            $data['executed_at'] = date('Y-m-d H:i:s');
+        }
+
+        return parent::create($data);
     }
 
     /**

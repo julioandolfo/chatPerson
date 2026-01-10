@@ -98,6 +98,8 @@ class KanbanAgentService
             self::logInfo("KanbanAgentService::executeAgent - Total de conversas encontradas: " . count($conversations));
             
             $stats = [
+                'conversations_found' => count($conversations),
+                'conversations_filtered' => 0,
                 'conversations_analyzed' => 0,
                 'conversations_acted_upon' => 0,
                 'actions_executed' => 0,
@@ -105,20 +107,54 @@ class KanbanAgentService
                 'results' => []
             ];
 
-            $maxConversations = $agent['max_conversations_per_execution'] ?? 50;
-            $totalBeforeLimit = count($conversations);
-            $conversations = array_slice($conversations, 0, $maxConversations);
+            // PASSO 1: Separar condições (com e sem IA)
+            self::logInfo("KanbanAgentService::executeAgent - Separando condições (com e sem IA)");
+            $separatedConditions = self::separateConditions($agent['conditions']);
+            $hasConditionsWithoutAI = !empty($separatedConditions['without_ai']['conditions']);
+            $hasConditionsWithAI = !empty($separatedConditions['with_ai']['conditions']);
             
-            if ($totalBeforeLimit > $maxConversations) {
-                self::logInfo("KanbanAgentService::executeAgent - Limitando análise a $maxConversations conversas (total disponível: $totalBeforeLimit)");
+            self::logInfo("KanbanAgentService::executeAgent - Condições sem IA: " . count($separatedConditions['without_ai']['conditions']));
+            self::logInfo("KanbanAgentService::executeAgent - Condições com IA: " . count($separatedConditions['with_ai']['conditions']));
+
+            // PASSO 2: Filtrar conversas com condições simples (SEM IA)
+            $filteredConversations = [];
+            
+            if ($hasConditionsWithoutAI) {
+                self::logInfo("KanbanAgentService::executeAgent - Filtrando conversas com condições básicas (sem IA)...");
+                
+                foreach ($conversations as $conversation) {
+                    $basicConditionsMet = self::evaluateConditionsWithoutAI($separatedConditions['without_ai'], $conversation);
+                    
+                    if ($basicConditionsMet['met']) {
+                        $filteredConversations[] = $conversation;
+                    }
+                }
+                
+                self::logInfo("KanbanAgentService::executeAgent - Conversas que passaram no filtro básico: " . count($filteredConversations) . " de " . count($conversations));
+                $stats['conversations_filtered'] = count($filteredConversations);
+            } else {
+                // Se não há condições básicas, todas passam
+                $filteredConversations = $conversations;
+                $stats['conversations_filtered'] = count($conversations);
+                self::logInfo("KanbanAgentService::executeAgent - Sem condições básicas, todas as conversas serão analisadas");
             }
 
-            self::logInfo("KanbanAgentService::executeAgent - Iniciando análise de " . count($conversations) . " conversas");
+            // PASSO 3: Limitar conversas para análise com IA
+            $maxConversations = $agent['max_conversations_per_execution'] ?? 50;
+            $totalBeforeLimit = count($filteredConversations);
+            $conversationsToAnalyze = array_slice($filteredConversations, 0, $maxConversations);
+            
+            if ($totalBeforeLimit > $maxConversations) {
+                self::logInfo("KanbanAgentService::executeAgent - Limitando análise a $maxConversations conversas (total filtradas: $totalBeforeLimit)");
+            }
 
-            foreach ($conversations as $index => $conversation) {
+            self::logInfo("KanbanAgentService::executeAgent - Iniciando análise de " . count($conversationsToAnalyze) . " conversas com IA");
+
+            // PASSO 4: Analisar conversas filtradas com IA
+            foreach ($conversationsToAnalyze as $index => $conversation) {
                 try {
                     $stats['conversations_analyzed']++;
-                    self::logInfo("KanbanAgentService::executeAgent - ===== Conversa " . ($index + 1) . "/" . count($conversations) . " =====");
+                    self::logInfo("KanbanAgentService::executeAgent - ===== Conversa " . ($index + 1) . "/" . count($conversationsToAnalyze) . " =====");
                     self::logInfo("KanbanAgentService::executeAgent - Analisando conversa {$conversation['id']} (total analisadas: {$stats['conversations_analyzed']})");
                     
                     // Analisar conversa com IA
@@ -126,12 +162,20 @@ class KanbanAgentService
                     $analysis = self::analyzeConversation($agent, $conversation);
                     self::logInfo("KanbanAgentService::executeAgent - Análise concluída para conversa {$conversation['id']}: Score={$analysis['score']}, Sentiment={$analysis['sentiment']}, Urgency={$analysis['urgency']}");
                     
-                    // Avaliar condições
-                    self::logInfo("KanbanAgentService::executeAgent - Avaliando condições para conversa {$conversation['id']}");
-                    $conditionsMet = self::evaluateConditions($agent['conditions'], $conversation, $analysis);
-                    self::logInfo("KanbanAgentService::executeAgent - Condições " . ($conditionsMet['met'] ? 'ATENDIDAS' : 'NÃO ATENDIDAS') . " para conversa {$conversation['id']}");
+                    // PASSO 5: Avaliar condições de IA
+                    $aiConditionsMet = ['met' => true, 'details' => []];
                     
-                    if ($conditionsMet['met']) {
+                    if ($hasConditionsWithAI) {
+                        self::logInfo("KanbanAgentService::executeAgent - Avaliando condições de IA para conversa {$conversation['id']}");
+                        $aiConditionsMet = self::evaluateConditions($separatedConditions['with_ai'], $conversation, $analysis);
+                        self::logInfo("KanbanAgentService::executeAgent - Condições de IA " . ($aiConditionsMet['met'] ? 'ATENDIDAS' : 'NÃO ATENDIDAS') . " para conversa {$conversation['id']}");
+                    }
+                    
+                    // Todas as condições foram atendidas?
+                    $allConditionsMet = $aiConditionsMet['met'];
+                    
+                    // PASSO 6: Executar ações se todas as condições foram atendidas
+                    if ($allConditionsMet) {
                         $stats['conversations_acted_upon']++;
                         self::logInfo("KanbanAgentService::executeAgent - Executando ações para conversa {$conversation['id']} (total com ações: {$stats['conversations_acted_upon']})");
                         
@@ -143,9 +187,10 @@ class KanbanAgentService
                         
                         self::logInfo("KanbanAgentService::executeAgent - Ações executadas para conversa {$conversation['id']}: {$actionsResult['executed']} sucesso(s), {$actionsResult['errors']} erro(s)");
                         
-                        // Registrar log de ação
-                        self::logInfo("KanbanAgentService::executeAgent - Registrando log de ações no banco");
+                        // Registrar log de ação (DESABILITADO TEMPORARIAMENTE - causando erro)
+                        self::logInfo("KanbanAgentService::executeAgent - LOG de ação desabilitado temporariamente");
                         
+                        /* DESABILITADO - causando fatal error
                         try {
                             $logData = [
                                 'ai_kanban_agent_id' => $agentId,
@@ -154,30 +199,29 @@ class KanbanAgentService
                                 'analysis_summary' => $analysis['summary'] ?? null,
                                 'analysis_score' => $analysis['score'] ?? null,
                                 'conditions_met' => true,
-                                'conditions_details' => $conditionsMet['details'] ?? [],
+                                'conditions_details' => array_merge(
+                                    $separatedConditions['without_ai']['conditions'] ?? [],
+                                    $aiConditionsMet['details'] ?? []
+                                ),
                                 'actions_executed' => $actionsResult['actions'] ?? [],
                                 'success' => $actionsResult['errors'] === 0
                             ];
                             
-                            self::logInfo("KanbanAgentService::executeAgent - Dados do log: " . json_encode($logData));
-                            self::logInfo("KanbanAgentService::executeAgent - Verificando se classe AIKanbanAgentActionLog existe: " . (class_exists('App\\Models\\AIKanbanAgentActionLog') ? 'SIM' : 'NÃO'));
-                            self::logInfo("KanbanAgentService::executeAgent - Prestes a chamar AIKanbanAgentActionLog::createLog()");
-                            
-                            $logId = \App\Models\AIKanbanAgentActionLog::createLog($logData);
-                            
+                            $logId = AIKanbanAgentActionLog::createLog($logData);
                             self::logInfo("KanbanAgentService::executeAgent - Log registrado com sucesso no banco (ID: $logId)");
                         } catch (\Throwable $e) {
-                            self::logError("KanbanAgentService::executeAgent - ERRO ao registrar log no banco");
-                            self::logError("KanbanAgentService::executeAgent - Tipo: " . get_class($e));
-                            self::logError("KanbanAgentService::executeAgent - Mensagem: " . $e->getMessage());
-                            self::logError("KanbanAgentService::executeAgent - Arquivo: " . $e->getFile() . " (linha " . $e->getLine() . ")");
-                            self::logError("KanbanAgentService::executeAgent - Stack trace: " . $e->getTraceAsString());
-                            throw $e;
+                            self::logError("KanbanAgentService::executeAgent - ERRO ao registrar log no banco: " . $e->getMessage());
+                            // Não interromper execução por erro de log
                         }
+                        */
                     } else {
-                        // Registrar que condições não foram atendidas
-                        self::logInfo("KanbanAgentService::executeAgent - Registrando log de condições NÃO atendidas no banco");
+                        // Condições NÃO atendidas
+                        self::logInfo("KanbanAgentService::executeAgent - Condições NÃO atendidas para conversa {$conversation['id']} - nenhuma ação será executada");
                         
+                        // LOG de ação desabilitado temporariamente
+                        self::logInfo("KanbanAgentService::executeAgent - LOG de condições não atendidas desabilitado temporariamente");
+                        
+                        /* DESABILITADO - causando fatal error
                         try {
                             $logData = [
                                 'ai_kanban_agent_id' => $agentId,
@@ -186,29 +230,21 @@ class KanbanAgentService
                                 'analysis_summary' => $analysis['summary'] ?? null,
                                 'analysis_score' => $analysis['score'] ?? null,
                                 'conditions_met' => false,
-                                'conditions_details' => $conditionsMet['details'] ?? [],
+                                'conditions_details' => array_merge(
+                                    $separatedConditions['without_ai']['conditions'] ?? [],
+                                    $aiConditionsMet['details'] ?? []
+                                ),
                                 'actions_executed' => [],
                                 'success' => true
                             ];
                             
-                            // DEBUG: Logs detalhados para identificar onde o erro ocorre
-                            self::logInfo("KanbanAgentService::executeAgent - [DEBUG 1] Após criar array logData");
-                            self::logInfo("KanbanAgentService::executeAgent - [DEBUG 2] Dados: " . json_encode($logData));
-                            self::logInfo("KanbanAgentService::executeAgent - [DEBUG 3] Antes de chamar createLog");
-                            
-                            // Não vou criar o log ainda - vou apenas simular
-                            self::logInfo("KanbanAgentService::executeAgent - [DEBUG 4] PULANDO createLog temporariamente");
-                            $logId = 9999; // Fake ID
-                            
-                            self::logInfo("KanbanAgentService::executeAgent - [DEBUG 5] Após createLog (ID: $logId)");
+                            $logId = AIKanbanAgentActionLog::createLog($logData);
+                            self::logInfo("KanbanAgentService::executeAgent - Log registrado (ID: $logId)");
                         } catch (\Throwable $e) {
-                            self::logError("KanbanAgentService::executeAgent - ERRO ao registrar log no banco");
-                            self::logError("KanbanAgentService::executeAgent - Tipo: " . get_class($e));
-                            self::logError("KanbanAgentService::executeAgent - Mensagem: " . $e->getMessage());
-                            self::logError("KanbanAgentService::executeAgent - Arquivo: " . $e->getFile() . " (linha " . $e->getLine() . ")");
-                            self::logError("KanbanAgentService::executeAgent - Stack trace: " . $e->getTraceAsString());
-                            throw $e;
+                            self::logError("KanbanAgentService::executeAgent - ERRO ao registrar log: " . $e->getMessage());
+                            // Não interromper execução por erro de log
                         }
+                        */
                     }
                 } catch (\Throwable $e) {
                     // Captura TODOS os erros (Exception, Error, ParseError, etc)
@@ -245,7 +281,7 @@ class KanbanAgentService
                 throw $e;
             }
 
-            $message = "Agente executado com sucesso. {$stats['conversations_analyzed']} conversas analisadas, {$stats['conversations_acted_upon']} com ações executadas.";
+            $message = "Agente executado com sucesso. {$stats['conversations_found']} conversas encontradas, {$stats['conversations_filtered']} passaram no filtro básico, {$stats['conversations_analyzed']} analisadas com IA, {$stats['conversations_acted_upon']} com ações executadas.";
             self::logInfo("KanbanAgentService::executeAgent - $message");
             self::logInfo("KanbanAgentService::executeAgent - ===== EXECUÇÃO FINALIZADA COM SUCESSO =====");
 
@@ -502,6 +538,77 @@ class KanbanAgentService
             'sentiment' => 'neutral',
             'urgency' => 'low',
             'recommendations' => []
+        ];
+    }
+
+    /**
+     * Separar condições em dois grupos: com e sem necessidade de IA
+     */
+    private static function separateConditions(array $conditions): array
+    {
+        $conditionsWithoutAI = [];
+        $conditionsWithAI = [];
+        
+        $conditionList = $conditions['conditions'] ?? [];
+        
+        foreach ($conditionList as $condition) {
+            $type = $condition['type'] ?? '';
+            
+            // Condições que NÃO precisam de IA
+            if (in_array($type, ['stage_duration_hours', 'has_tag', 'no_tag', 'assigned_to', 'unassigned', 'has_messages'])) {
+                $conditionsWithoutAI[] = $condition;
+            } else {
+                // Condições que PRECISAM de IA (sentiment, score, urgency)
+                $conditionsWithAI[] = $condition;
+            }
+        }
+        
+        return [
+            'without_ai' => [
+                'operator' => $conditions['operator'] ?? 'AND',
+                'conditions' => $conditionsWithoutAI
+            ],
+            'with_ai' => [
+                'operator' => $conditions['operator'] ?? 'AND',
+                'conditions' => $conditionsWithAI
+            ]
+        ];
+    }
+    
+    /**
+     * Avaliar condições sem IA (filtro rápido)
+     */
+    private static function evaluateConditionsWithoutAI(array $conditions, array $conversation): array
+    {
+        if (empty($conditions['conditions'])) {
+            return ['met' => true, 'details' => []];
+        }
+
+        $operator = $conditions['operator'] ?? 'AND';
+        $conditionList = $conditions['conditions'] ?? [];
+
+        $results = [];
+        foreach ($conditionList as $condition) {
+            // Passar análise vazia pois não precisa de IA
+            $result = self::evaluateSingleCondition($condition, $conversation, []);
+            $results[] = [
+                'condition' => $condition,
+                'result' => $result
+            ];
+        }
+
+        // Aplicar operador lógico
+        if ($operator === 'AND') {
+            $met = !in_array(false, array_column($results, 'result'));
+        } elseif ($operator === 'OR') {
+            $met = in_array(true, array_column($results, 'result'));
+        } else {
+            $met = !in_array(false, array_column($results, 'result'));
+        }
+
+        return [
+            'met' => $met,
+            'details' => $results
         ];
     }
 

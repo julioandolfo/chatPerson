@@ -106,42 +106,10 @@ class Database
      */
     public static function insert(string $sql, array $params = []): int
     {
-        \App\Helpers\Logger::info("Database::insert - Preparando SQL", 'kanban_agents.log');
-        \App\Helpers\Logger::info("Database::insert - SQL: {$sql}", 'kanban_agents.log');
-        \App\Helpers\Logger::info("Database::insert - Params: " . json_encode($params), 'kanban_agents.log');
-        
-        try {
-            $db = self::getInstance();
-            \App\Helpers\Logger::info("Database::insert - Conexão obtida com sucesso", 'kanban_agents.log');
-            
-            $stmt = $db->prepare($sql);
-            \App\Helpers\Logger::info("Database::insert - Statement preparado com sucesso", 'kanban_agents.log');
-            
-            $result = $stmt->execute($params);
-            \App\Helpers\Logger::info("Database::insert - Execute retornou: " . ($result ? 'true' : 'false'), 'kanban_agents.log');
-            
-            $lastId = (int) $db->lastInsertId();
-            \App\Helpers\Logger::info("Database::insert - LastInsertId: {$lastId}", 'kanban_agents.log');
-            
-            return $lastId;
-        } catch (\Throwable $e) {
-            \App\Helpers\Logger::error("Database::insert - ERRO ao executar INSERT", 'kanban_agents.log');
-            \App\Helpers\Logger::error("Database::insert - Tipo: " . get_class($e), 'kanban_agents.log');
-            \App\Helpers\Logger::error("Database::insert - Mensagem: " . $e->getMessage(), 'kanban_agents.log');
-            
-            // Capturar errorInfo se $db estiver definido
-            if (isset($db)) {
-                try {
-                    \App\Helpers\Logger::error("Database::insert - PDO ErrorInfo: " . json_encode($db->errorInfo()), 'kanban_agents.log');
-                } catch (\Throwable $errorInfoException) {
-                    \App\Helpers\Logger::error("Database::insert - Não foi possível obter errorInfo", 'kanban_agents.log');
-                }
-            }
-            
-            \App\Helpers\Logger::error("Database::insert - Arquivo: " . $e->getFile() . " (linha " . $e->getLine() . ")", 'kanban_agents.log');
-            \App\Helpers\Logger::error("Database::insert - Stack trace: " . $e->getTraceAsString(), 'kanban_agents.log');
-            throw $e;
-        }
+        $db = self::getInstance();
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        return (int) $db->lastInsertId();
     }
 
     /**

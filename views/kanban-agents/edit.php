@@ -802,8 +802,8 @@ function getActionConfigHTML(actionData, index) {
                 <label class="form-label">Conteúdo da Nota</label>
                 <textarea class="form-control action-config-note" rows="2" placeholder="Conteúdo da nota...">${config.note || ''}</textarea>
                 <div class="form-check mt-2">
-                    <input class="form-check-input" type="checkbox" id="is_internal_${index}" ${config.is_internal !== false ? 'checked' : ''}>
-                    <label class="form-check-label" for="is_internal_${index}">Nota interna</label>
+                    <input class="form-check-input" type="checkbox" id="is_internal_${index}" ${config.is_internal === true ? 'checked' : ''}>
+                    <label class="form-check-label" for="is_internal_${index}">Nota interna (privada)</label>
                 </div>
             `;
         default:

@@ -32,15 +32,15 @@ class Setting extends Model
      */
     public static function set(string $key, $value, string $type = 'string', string $group = 'general'): bool
     {
-        $sql = "INSERT INTO settings (`key`, `value`, `type`, `group`) 
-                VALUES (?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE 
-                    `value` = VALUES(`value`),
-                    `type` = VALUES(`type`),
-                    `group` = VALUES(`group`),
-                    `updated_at` = NOW()";
-        
         $valueStr = self::serializeValue($value, $type);
+
+        // Para evitar múltiplos registros quando não há UNIQUE em `key`,
+        // removemos qualquer registro anterior e inserimos um novo.
+        \App\Helpers\Database::execute("DELETE FROM settings WHERE `key` = ?", [$key]);
+
+        $sql = "INSERT INTO settings (`key`, `value`, `type`, `group`, `updated_at`, `created_at`)
+                VALUES (?, ?, ?, ?, NOW(), NOW())";
+
         return \App\Helpers\Database::execute($sql, [$key, $valueStr, $type, $group]) > 0;
     }
 

@@ -43,23 +43,16 @@ class ConversationSettingsService
      */
     public static function saveSettings(array $settings): bool
     {
-        $existing = Setting::whereFirst('key', '=', self::SETTINGS_KEY);
-        
-        $data = [
-            'key' => self::SETTINGS_KEY,
-            'value' => json_encode($settings, JSON_UNESCAPED_UNICODE),
-            'type' => 'json',
-            'group' => 'conversations',
-            'label' => 'Configurações Avançadas de Conversas',
-            'description' => 'Configurações de limites, SLA, distribuição e reatribuição de conversas'
-        ];
-        
-        if ($existing) {
-            return Setting::update($existing['id'], $data);
-        } else {
-            Setting::create($data);
-            return true;
-        }
+        // Usa upsert simples (insert on duplicate) para reduzir risco de falha quando nada muda
+        // Setting::set já serializa o valor como JSON quando o tipo é 'json'
+        // e faz ON DUPLICATE KEY UPDATE internamente.
+        Setting::set(
+            self::SETTINGS_KEY,
+            $settings,            // array será serializado como json
+            'json',
+            'conversations'
+        );
+        return true;
     }
 
     /**

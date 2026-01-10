@@ -7,6 +7,7 @@ namespace App\Controllers;
 
 use App\Helpers\Response;
 use App\Helpers\Permission;
+use App\Helpers\Request;
 use App\Services\ConversationService;
 use App\Services\Api4ComService;
 use App\Models\User;
@@ -88,7 +89,7 @@ class ConversationController
             'pinned' => isset($_GET['pinned']) ? ($_GET['pinned'] === '1' ? true : false) : null,
             'order_by' => $_GET['order_by'] ?? null,
             'order_dir' => $_GET['order_dir'] ?? null,
-            'limit' => $_GET['limit'] ?? 150,
+            'limit' => $_GET['limit'] ?? 200,
             'offset' => $_GET['offset'] ?? 0
         ];
 
@@ -683,6 +684,17 @@ class ConversationController
                 $channel, 
                 $whatsappAccountIdForSearch
             );
+            
+            // Se existe conversa, bloquear criação se houver conversa ABERTA para o mesmo contato/canal
+            if ($existingConversation && ($existingConversation['status'] ?? '') === 'open') {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Já existe uma conversa aberta para este contato.',
+                    'existing_conversation_id' => $existingConversation['id'],
+                    'existing_agent_id' => $existingConversation['agent_id'] ?? null
+                ], 400);
+                return;
+            }
             
             // Se existe conversa, verificar se está atribuída a outro agente humano
             if ($existingConversation) {
@@ -1345,12 +1357,27 @@ class ConversationController
      */
     public function moveStage(int $id): void
     {
+        // Limpar qualquer output buffer para garantir resposta JSON limpa
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
+        \App\Helpers\Logger::info("🔀 moveStage INICIADO: conversationId={$id}, userId=" . \App\Helpers\Auth::id(), 'conversas.log');
+        \App\Helpers\Logger::info("🔀 Headers: " . json_encode([
+            'X-Requested-With' => $_SERVER['HTTP_X_REQUESTED_WITH'] ?? 'not set',
+            'Accept' => $_SERVER['HTTP_ACCEPT'] ?? 'not set',
+            'Content-Type' => $_SERVER['CONTENT_TYPE'] ?? 'not set',
+        ]), 'conversas.log');
+        
         Permission::abortIfCannot('conversations.edit.own');
         
         try {
             $stageId = Request::post('stage_id');
             
+            \App\Helpers\Logger::info("🔀 moveStage stage_id recebido: {$stageId}", 'conversas.log');
+            
             if (!$stageId) {
+                \App\Helpers\Logger::error("❌ moveStage: stage_id não fornecido", 'conversas.log');
                 Response::json(['success' => false, 'message' => 'ID da etapa não fornecido'], 400);
                 return;
             }

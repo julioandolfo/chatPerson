@@ -238,6 +238,73 @@ class ConversationSettingsService
                     'default_mode' => 'audio_only', // Modo padrão quando não há regras aplicáveis
                 ],
             ],
+            
+            // Análise de Performance de Vendedores
+            'agent_performance_analysis' => [
+                'enabled' => false,
+                'model' => 'gpt-4-turbo', // gpt-4o, gpt-4-turbo, gpt-4, gpt-3.5-turbo
+                'temperature' => 0.3,
+                'check_interval_hours' => 24, // Intervalo para análise automática
+                'max_conversation_age_days' => 7, // Idade máxima da conversa para analisar
+                'min_messages_to_analyze' => 5, // Mínimo de mensagens totais
+                'min_agent_messages' => 3, // Mínimo de mensagens do agente
+                'analyze_closed_only' => true, // Analisar apenas conversas fechadas
+                'cost_limit_per_day' => 10.00, // Limite de custo diário em USD
+                
+                // Dimensões ativas (podem ser habilitadas/desabilitadas individualmente)
+                'dimensions' => [
+                    'proactivity' => ['enabled' => true, 'weight' => 1.0],
+                    'objection_handling' => ['enabled' => true, 'weight' => 1.5],
+                    'rapport' => ['enabled' => true, 'weight' => 1.0],
+                    'closing_techniques' => ['enabled' => true, 'weight' => 1.5],
+                    'qualification' => ['enabled' => true, 'weight' => 1.2],
+                    'clarity' => ['enabled' => true, 'weight' => 1.0],
+                    'value_proposition' => ['enabled' => true, 'weight' => 1.3],
+                    'response_time' => ['enabled' => true, 'weight' => 0.8],
+                    'follow_up' => ['enabled' => true, 'weight' => 1.0],
+                    'professionalism' => ['enabled' => true, 'weight' => 1.0]
+                ],
+                
+                // Filtros (quais conversas analisar)
+                'filters' => [
+                    'only_sales_funnels' => false, // Analisar apenas conversas de funis de vendas
+                    'funnel_ids' => [], // IDs específicos de funis (vazio = todos)
+                    'only_sales_stages' => [], // Estágios específicos (ex: ['negociacao', 'proposta'])
+                    'exclude_agents' => [], // IDs de agentes a excluir
+                    'only_agents' => [], // IDs específicos de agentes (vazio = todos)
+                    'min_conversation_value' => 0, // Valor mínimo da conversa
+                    'tags_to_include' => [], // Tags que devem estar presentes
+                    'tags_to_exclude' => [] // Tags que NÃO devem estar presentes
+                ],
+                
+                // Relatórios
+                'reports' => [
+                    'generate_individual_report' => true, // Relatório de cada conversa
+                    'generate_agent_ranking' => true, // Ranking de agentes
+                    'generate_team_average' => true, // Média do time
+                    'send_to_agent' => false, // Enviar análise para o próprio agente
+                    'send_to_supervisor' => true, // Enviar para supervisor
+                    'auto_tag_low_performance' => true, // Adicionar tag em conversas com baixa performance
+                    'low_performance_threshold' => 2.5 // Nota considerada baixa
+                ],
+                
+                // Gamificação
+                'gamification' => [
+                    'enabled' => true,
+                    'award_badges' => true, // Premiar badges automaticamente
+                    'show_ranking' => true, // Exibir ranking público
+                    'celebrate_achievements' => true // Comemorar conquistas
+                ],
+                
+                // Coaching
+                'coaching' => [
+                    'enabled' => true,
+                    'auto_create_goals' => true, // Criar metas automaticamente
+                    'auto_send_feedback' => false, // Enviar feedback automaticamente
+                    'save_best_practices' => true, // Salvar melhores práticas
+                    'min_score_for_best_practice' => 4.5 // Nota mínima para melhor prática
+                ]
+            ],
         ];
     }
 

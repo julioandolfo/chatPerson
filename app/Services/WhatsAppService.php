@@ -2067,6 +2067,8 @@ class WhatsAppService
             $shouldReopenAsNew = false;
             $db = \App\Helpers\Database::getInstance();
             $usedLock = false;
+            
+            Logger::quepasa("🔍 DEBUG: Iniciando criação/busca de conversa para fromPhone={$fromPhone}, message length=" . strlen($message));
             try {
                 if (method_exists($db, 'beginTransaction')) {
                     $db->beginTransaction();
@@ -2098,13 +2100,16 @@ class WhatsAppService
             // Se ainda não existir, criar (usar transação se lock ativo, senão criar direto)
             if (!$conversation) {
                 // Trava: não criar conversa se a primeira mensagem for exatamente o nome do contato (caso sem mídia)
+                Logger::quepasa("🔍 DEBUG: Verificando se deve ignorar mensagem... messageType={$messageType}, mediaUrl=" . ($mediaUrl ? 'EXISTS' : 'NULL') . ", message='" . substr($message, 0, 50) . "', contact_name='" . ($contact['name'] ?? 'NULL') . "'");
                 $shouldIgnoreFirstMessage = $messageType === 'text'
                     && empty($mediaUrl)
                     && \App\Services\ConversationService::isFirstMessageContactName((string)$message, $contact['name'] ?? null);
 
+                Logger::quepasa("🔍 DEBUG: shouldIgnoreFirstMessage=" . ($shouldIgnoreFirstMessage ? 'TRUE' : 'FALSE'));
+                
                 if ($shouldIgnoreFirstMessage) {
                     $contactName = trim((string)($contact['name'] ?? ''));
-                    Logger::quepasa("processWebhook - Ignorando criação de conversa: primeira mensagem igual ao nome do contato ({$contactName})");
+                    Logger::quepasa("processWebhook - ❌ Ignorando criação de conversa: primeira mensagem igual ao nome do contato ({$contactName})");
                     if ($usedLock && $db->inTransaction()) {
                         $db->rollBack();
                     }
@@ -2134,7 +2139,7 @@ class WhatsAppService
                     
                     $conversation = \App\Services\ConversationService::create($conversationData, false);
                     $isNewConversation = true;
-                    Logger::quepasa("processWebhook - Conversa criada via ConversationService: ID={$conversation['id']} (automações serão executadas após salvar mensagem)");
+                    Logger::quepasa("processWebhook - 🆕 CONVERSA CRIADA via ConversationService: ID={$conversation['id']}, isNewConversation=TRUE (automações serão executadas após salvar mensagem)");
                 } catch (\Exception $e) {
                     Logger::quepasa("Erro ao criar conversa via ConversationService: " . $e->getMessage());
                     Logger::quepasa("Stack trace: " . $e->getTraceAsString());
@@ -2390,15 +2395,17 @@ class WhatsAppService
                 Logger::quepasa("processWebhook - ✅ Mensagem criada com sucesso: messageId={$messageId}");
                 
                 // Se foi uma nova conversa, executar automações AGORA (após mensagem estar salva)
+                Logger::quepasa("🔍 DEBUG: Verificando se deve executar automações... isNewConversation=" . ($isNewConversation ? 'TRUE' : 'FALSE'));
                 if ($isNewConversation) {
                     try {
-                        Logger::quepasa("processWebhook - Executando automações para nova conversa (após salvar mensagem)...");
+                        Logger::quepasa("processWebhook - 🚀 Executando automações para nova conversa (após salvar mensagem)...");
                         \App\Services\AutomationService::executeForNewConversation($conversation['id']);
                         Logger::quepasa("processWebhook - ✅ Automações executadas com sucesso");
                     } catch (\Exception $e) {
                         Logger::quepasa("processWebhook - ⚠️ Erro ao executar automações: " . $e->getMessage());
                     }
-                }
+                } else {
+                    Logger::quepasa("🔍 DEBUG: Não vai executar automações (conversa existente ou erro)");
             } catch (\Exception $e) {
                 \App\Helpers\Logger::error("WhatsAppService::processWebhook - EXCEÇÃO: " . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
                 Logger::quepasa("Erro ao criar mensagem via ConversationService: " . $e->getMessage());

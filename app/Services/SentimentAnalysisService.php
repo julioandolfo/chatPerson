@@ -133,9 +133,15 @@ class SentimentAnalysisService
                 return null;
             }
 
+            // Contar apenas mensagens do cliente para validação
+            $clientMessages = array_filter($messages, function($msg) {
+                return ($msg['sender_type'] ?? '') === 'contact';
+            });
+            $clientMessageCount = count($clientMessages);
+            
             $minMessages = (int)($settings['min_messages_to_analyze'] ?? 3);
-            if (count($messages) < $minMessages) {
-                Logger::log("SentimentAnalysisService::analyzeConversation - Mensagens insuficientes ({count($messages)} < {$minMessages})");
+            if ($clientMessageCount < $minMessages) {
+                Logger::log("SentimentAnalysisService::analyzeConversation - Mensagens do cliente insuficientes ({$clientMessageCount} < {$minMessages})");
                 return null;
             }
 
@@ -180,19 +186,17 @@ class SentimentAnalysisService
         $analyzeLast = $settings['analyze_last_messages'] ?? null;
 
         if ($analyzeLast && is_numeric($analyzeLast)) {
-            // Analisar apenas últimas X mensagens
+            // Analisar apenas últimas X mensagens (de TODAS as partes para ter contexto)
             $sql = "SELECT * FROM messages 
                     WHERE conversation_id = ? 
-                    AND sender_type = 'contact'
                     ORDER BY created_at DESC 
                     LIMIT ?";
             $messages = Database::fetchAll($sql, [$conversationId, (int)$analyzeLast]);
             return array_reverse($messages); // Reverter para ordem cronológica
         } else {
-            // Analisar toda a conversa
+            // Analisar toda a conversa (incluindo mensagens do agente para contexto)
             $sql = "SELECT * FROM messages 
                     WHERE conversation_id = ? 
-                    AND sender_type = 'contact'
                     ORDER BY created_at ASC";
             return Database::fetchAll($sql, [$conversationId]);
         }
@@ -205,7 +209,11 @@ class SentimentAnalysisService
     {
         $history = self::formatMessagesForAnalysis($messages);
         
-        $prompt = "Analise o sentimento e emoções expressas na seguinte conversa de atendimento:\n\n";
+        $prompt = "Analise o sentimento e emoções do CLIENTE na seguinte conversa de atendimento.\n\n";
+        $prompt .= "IMPORTANTE: Analise o sentimento do CLIENTE (não do agente), mas use o contexto completo da conversa para entender melhor:\n";
+        $prompt .= "- Como o cliente está se sentindo ao longo da conversa\n";
+        $prompt .= "- Se o atendimento melhorou ou piorou o sentimento\n";
+        $prompt .= "- O estado emocional final do cliente\n\n";
         $prompt .= "Histórico da conversa:\n{$history}\n\n";
         $prompt .= "Retorne APENAS um JSON válido com a seguinte estrutura:\n";
         $prompt .= "{\n";
@@ -244,7 +252,11 @@ class SentimentAnalysisService
         foreach ($messages as $msg) {
             $content = $msg['content'] ?? '';
             $date = date('d/m/Y H:i', strtotime($msg['created_at']));
-            $formatted[] = "[{$date}] Cliente: {$content}";
+            
+            // Identificar quem enviou a mensagem
+            $sender = ($msg['sender_type'] === 'contact') ? 'Cliente' : 'Agente';
+            
+            $formatted[] = "[{$date}] {$sender}: {$content}";
         }
         return implode("\n", $formatted);
     }

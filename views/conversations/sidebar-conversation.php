@@ -104,9 +104,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/move-stage`, {
                         method: 'POST',
                         body: formData,
-                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        }
                     })
-                    .then(r => r.json())
+                    .then(response => {
+                        if (!response.ok) {
+                            return response.text().then(text => {
+                                console.error('Erro HTTP:', response.status, text);
+                                throw new Error(`HTTP ${response.status}: ${text}`);
+                            });
+                        }
+                        return response.json();
+                    })
                     .then(data => {
                         if (data.success) {
                             Swal.fire({ icon: 'success', title: 'Sucesso!', text: 'Conversa movida com sucesso', timer: 2000, showConfirmButton: false });
@@ -116,6 +127,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     })
                     .catch(error => {
+                        console.error('Erro ao mover conversa:', error);
                         Swal.fire({ icon: 'error', title: 'Erro', text: error.message });
                     });
                 }
@@ -913,7 +925,15 @@ window.moveConversationStage = function() {
                         'Accept': 'application/json'
                     }
                 })
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            console.error('Erro HTTP:', response.status, text);
+                            throw new Error(`HTTP ${response.status}: ${text.substring(0, 200)}`);
+                        });
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     if (data.success) {
                         Swal.fire({
@@ -933,6 +953,7 @@ window.moveConversationStage = function() {
                     }
                 })
                 .catch(error => {
+                    console.error('Erro ao mover conversa (2):', error);
                     Swal.fire({
                         icon: 'error',
                         title: 'Erro',

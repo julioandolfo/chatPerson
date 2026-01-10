@@ -38,6 +38,7 @@ use App\Controllers\ProfileController;
 use App\Controllers\Api4ComController;
 use App\Controllers\Api4ComCallController;
 use App\Controllers\WooCommerceController;
+use App\Controllers\AgentPerformanceController;
 
 // Rotas públicas
 Router::get('/', function() {
@@ -318,6 +319,20 @@ Router::get('/api4com-calls/conversation/{conversationId}', [Api4ComCallControll
 Router::get('/api4com-calls/statistics', [Api4ComCallController::class, 'statistics'], ['Authentication']);
 // Webhook público para Api4Com (sem autenticação)
 Router::post('/api4com-calls/webhook', [Api4ComCallController::class, 'webhook']);
+
+// Rotas de Performance de Vendedores
+Router::get('/agent-performance', [AgentPerformanceController::class, 'index'], ['Authentication', 'Permission:agent_performance.view.all']);
+Router::get('/agent-performance/agent', [AgentPerformanceController::class, 'agent'], ['Authentication', 'Permission:agent_performance.view.own']);
+Router::get('/agent-performance/ranking', [AgentPerformanceController::class, 'ranking'], ['Authentication', 'Permission:agent_performance.view.all']);
+Router::get('/agent-performance/conversation', [AgentPerformanceController::class, 'conversation'], ['Authentication', 'Permission:agent_performance.view.own']);
+Router::post('/agent-performance/analyze', [AgentPerformanceController::class, 'analyze'], ['Authentication', 'Permission:agent_performance.analyze']);
+Router::get('/agent-performance/best-practices', [AgentPerformanceController::class, 'bestPractices'], ['Authentication', 'Permission:agent_performance.best_practices']);
+Router::get('/agent-performance/practice', [AgentPerformanceController::class, 'viewPractice'], ['Authentication', 'Permission:agent_performance.best_practices']);
+Router::post('/agent-performance/practice/vote', [AgentPerformanceController::class, 'voteHelpful'], ['Authentication', 'Permission:agent_performance.best_practices']);
+Router::get('/agent-performance/goals', [AgentPerformanceController::class, 'goals'], ['Authentication', 'Permission:agent_performance.goals.view']);
+Router::post('/agent-performance/goals', [AgentPerformanceController::class, 'createGoal'], ['Authentication', 'Permission:agent_performance.goals.manage']);
+Router::get('/agent-performance/compare', [AgentPerformanceController::class, 'compare'], ['Authentication', 'Permission:agent_performance.view.all']);
+Router::get('/agent-performance/chart-data', [AgentPerformanceController::class, 'chartData'], ['Authentication', 'Permission:agent_performance.view.all']);
 
 // Rota para iniciar chamada a partir de conversa
 Router::post('/conversations/{id}/api4com-call', [ConversationController::class, 'startApi4ComCall'], ['Authentication']);

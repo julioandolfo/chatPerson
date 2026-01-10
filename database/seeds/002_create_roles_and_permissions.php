@@ -161,6 +161,14 @@ function seed_roles_and_permissions() {
         
         // Administração
         ['name' => 'Ver logs do sistema', 'slug' => 'admin.logs', 'description' => 'Visualizar logs do sistema', 'module' => 'admin'],
+        
+        // Performance de Vendedores
+        ['name' => 'Ver própria performance', 'slug' => 'agent_performance.view.own', 'description' => 'Ver análises da própria performance', 'module' => 'agent_performance'],
+        ['name' => 'Ver todas as performances', 'slug' => 'agent_performance.view.all', 'description' => 'Ver análises de todos os agentes', 'module' => 'agent_performance'],
+        ['name' => 'Forçar análise', 'slug' => 'agent_performance.analyze', 'description' => 'Forçar análise de conversa manualmente', 'module' => 'agent_performance'],
+        ['name' => 'Acessar biblioteca de práticas', 'slug' => 'agent_performance.best_practices', 'description' => 'Acessar biblioteca de melhores práticas', 'module' => 'agent_performance'],
+        ['name' => 'Ver metas', 'slug' => 'agent_performance.goals.view', 'description' => 'Ver metas de performance', 'module' => 'agent_performance'],
+        ['name' => 'Gerenciar metas', 'slug' => 'agent_performance.goals.manage', 'description' => 'Criar e gerenciar metas de outros', 'module' => 'agent_performance'],
     ];
     
     $permissionIds = [];
@@ -213,6 +221,9 @@ function seed_roles_and_permissions() {
         'api4com_calls.view',  // Ver chamadas Api4Com
         'api4com_calls.create', // Criar chamadas Api4Com
         'api4com_calls.end',   // Encerrar chamadas Api4Com
+        'agent_performance.view.own',  // Ver própria performance
+        'agent_performance.best_practices', // Acessar biblioteca
+        'agent_performance.goals.view',  // Ver próprias metas
     ];
     foreach ($agentPermissions as $slug) {
         if (isset($permissionIds[$slug])) {

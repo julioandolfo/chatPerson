@@ -3158,6 +3158,7 @@ function getChannelInfo(channel) {
                 
                 <div class="position-relative">
                     <textarea id="messageInput" class="chat-input-textarea" placeholder="Digite sua mensagem..." rows="2"></textarea>
+                    <div id="pendingAttachmentsContainer" class="d-flex gap-3 flex-wrap mt-3"></div>
                     
                     <!-- Dropdown rípido de templates -->
                     <div id="templateQuickSelect" class="template-quick-select d-none">
@@ -4411,7 +4412,7 @@ function getChannelInfo(channel) {
                         <label class="form-label fw-semibold mb-2">Telefone:</label>
                         <div class="input-group">
                             <span class="input-group-text">+55</span>
-                            <input type="text" class="form-control form-control-solid" id="new_contact_phone" name="phone" placeholder="DDD + Número (ex: 11987654321)" maxlength="11" required>
+                            <input type="text" class="form-control form-control-solid" id="new_contact_phone" name="phone" placeholder="DDD + Número (ex: 11 98765-4321)" maxlength="20" required>
                         </div>
                         <div class="form-text">Digite apenas DDD e número (ex: 11987654321)</div>
                     </div>
@@ -6652,6 +6653,7 @@ let pollingInterval = null;
 const lastMessageIds = {};
 let lastMessageId = null; // mantém o valor da conversa atual para uso rápido
 let currentPollingConversationId = null;
+let pendingAttachments = []; // anexos aguardando envio (clipboard/drag/drop/file picker)
 
 // Sistema de Paginação Infinita
 let isLoadingMessages = false;
@@ -9754,7 +9756,7 @@ document.getElementById('messageInput')?.addEventListener('keypress', function(e
     }
 });
 
-// Colar imagem (clipboard) como anexo
+// Colar imagem (clipboard) como anexo (fica na fila para permitir legenda antes de enviar)
 document.getElementById('messageInput')?.addEventListener('paste', function(e) {
     const clipboard = e.clipboardData || window.clipboardData;
     if (!clipboard || !clipboard.items) return;
@@ -9778,9 +9780,39 @@ document.getElementById('messageInput')?.addEventListener('paste', function(e) {
         if (!hasText) {
             e.preventDefault();
         }
-        imageFiles.forEach(file => uploadFile(file));
+        imageFiles.forEach(file => addPendingAttachment(file));
     }
 });
+
+// Drag & drop de arquivos/imagens para a área do input
+(function() {
+    const input = document.getElementById('messageInput');
+    const container = input ? input.closest('.position-relative') : null;
+    const dropTarget = container || input;
+    if (!dropTarget) return;
+    
+    ['dragenter', 'dragover'].forEach(evt => {
+        dropTarget.addEventListener(evt, function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dropTarget.classList.add('border', 'border-dashed', 'border-primary', 'rounded');
+        });
+    });
+    
+    ['dragleave', 'drop'].forEach(evt => {
+        dropTarget.addEventListener(evt, function(e) {
+            dropTarget.classList.remove('border', 'border-dashed', 'border-primary', 'rounded');
+        });
+    });
+    
+    dropTarget.addEventListener('drop', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const files = Array.from(e.dataTransfer?.files || []);
+        if (!files.length) return;
+        files.forEach(file => addPendingAttachment(file));
+    });
+})();
 
 // Busca com debounce para AJAX
 let conversationsSearchDebounce = null;
@@ -12630,9 +12662,10 @@ function sendMessage() {
     const input = document.getElementById('messageInput');
     const isNote = document.getElementById('noteToggle').checked;
     let message = input.value.trim();
+    const hasAttachments = pendingAttachments.length > 0;
     
-    // Não permitir enviar mensagem vazia (mesmo com reply deve ter algum texto)
-    if (!message) {
+    // Não permitir enviar vazio sem anexos
+    if (!message && !hasAttachments) {
         return;
     }
     
@@ -12660,7 +12693,7 @@ function sendMessage() {
     } : null;
     
     // Preparar mensagem com reply se houver
-    // IMPORTANTE: Enviar apenas o texto digitado pelo usuírio
+    // IMPORTANTE: Enviar apenas o texto digitado pelo usuário
     // O backend processa o quoted_message_id separadamente
     let finalMessage = message; // Texto que será enviado ao backend (apenas o digitado)
     
@@ -12701,7 +12734,20 @@ function sendMessage() {
         messageDiv.setAttribute('data-temp-id', tempId);
     }
     
-    // Limpar input e reply
+    // Preparar payload (FormData para suportar anexos e legenda)
+    const formData = new FormData();
+    formData.append('message', finalMessage);
+    formData.append('is_note', isNote ? '1' : '0');
+    if (replyContext) {
+        formData.append('quoted_message_id', replyContext.id);
+    }
+    if (pendingAttachments.length) {
+        pendingAttachments.forEach(att => {
+            formData.append('attachments[]', att.file);
+        });
+    }
+    
+    // Limpar input e reply (anexos serão limpos após sucesso)
     input.value = '';
     input.style.height = 'auto';
     document.getElementById('noteToggle').checked = false;
@@ -12710,15 +12756,10 @@ function sendMessage() {
     fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/messages`, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
             'Accept': 'application/json'
         },
-        body: JSON.stringify({
-            message: finalMessage, // Enviar apenas o texto digitado (sem formatação de reply)
-            is_note: isNote,
-            quoted_message_id: replyContext ? replyContext.id : null
-        })
+        body: formData
     })
     .then(response => {
         if (!response.ok) {
@@ -12767,6 +12808,9 @@ function sendMessage() {
     .finally(() => {
         btn.disabled = false;
         btn.innerHTML = originalHTML;
+        // Limpar anexos apenas depois da resposta (sucesso ou erro já removeu temp)
+        pendingAttachments = [];
+        renderPendingAttachments();
     });
 }
 
@@ -15727,7 +15771,67 @@ function addParticipant() {
     sendParticipantInvite();
 }
 
-// Upload de arquivo
+// Helpers de anexos (fila antes de enviar)
+const ALLOWED_ATTACHMENT_TYPES = [
+    'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+    'video/mp4', 'video/webm', 'video/ogg',
+    'audio/mp3', 'audio/wav', 'audio/ogg',
+    'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/plain', 'text/csv'
+];
+
+function renderPendingAttachments() {
+    const container = document.getElementById('pendingAttachmentsContainer');
+    if (!container) return;
+    if (!pendingAttachments.length) {
+        container.innerHTML = '';
+        return;
+    }
+    let html = '';
+    pendingAttachments.forEach((item, idx) => {
+        const url = item.file.type.startsWith('image/') ? URL.createObjectURL(item.file) : null;
+        html += `
+            <div class="d-flex align-items-center gap-3 p-2 rounded border" data-attachment-idx="${idx}" style="background: rgba(255,255,255,0.03);">
+                ${url ? `<div class="rounded overflow-hidden" style="width:64px;height:64px;background:#111;"><img src="${url}" style="width:64px;height:64px;object-fit:cover;" onload="URL.revokeObjectURL('${url}')"></div>` : `
+                <div class="d-flex align-items-center justify-content-center rounded" style="width:64px;height:64px;background:#111;">
+                    <i class="ki-duotone ki-file fs-2"></i>
+                </div>`}
+                <div class="flex-grow-1 min-w-0">
+                    <div class="fw-semibold text-truncate">${escapeHtml(item.file.name)}</div>
+                    <div class="text-muted fs-7">${formatFileSize(item.file.size)}</div>
+                </div>
+                <button type="button" class="btn btn-sm btn-icon btn-light-danger" title="Remover" onclick="removePendingAttachment(${idx})">
+                    <i class="ki-duotone ki-cross fs-2"><span class="path1"></span><span class="path2"></span></i>
+                </button>
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+}
+
+function removePendingAttachment(idx) {
+    pendingAttachments = pendingAttachments.filter((_, i) => i !== idx);
+    renderPendingAttachments();
+}
+
+function addPendingAttachment(file) {
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+        alert('Arquivo muito grande. Tamanho máximo: 10MB');
+        return;
+    }
+    const isAllowed = ALLOWED_ATTACHMENT_TYPES.includes(file.type) ||
+        /\.(jpg|jpeg|png|gif|webp|mp4|webm|ogg|mp3|wav|pdf|doc|docx|xls|xlsx|txt|csv)$/i.test(file.name);
+    if (!isAllowed) {
+        alert('Tipo de arquivo não permitido');
+        return;
+    }
+    pendingAttachments.push({ file });
+    renderPendingAttachments();
+}
+
+// Upload de arquivo (file picker) adiciona à fila
 function attachFile() {
     const input = document.createElement('input');
     input.type = 'file';
@@ -15737,13 +15841,14 @@ function attachFile() {
     input.onchange = function(e) {
         const files = Array.from(e.target.files);
         files.forEach(file => {
-            uploadFile(file);
+            addPendingAttachment(file);
         });
     };
     
     input.click();
 }
 
+// Upload imediato legado (mantido para compatibilidade, não usado no fluxo atual)
 function uploadFile(file) {
     // Usar variível JavaScript global que é atualizada dinamicamente
     const conversationId = currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
@@ -18835,13 +18940,21 @@ document.addEventListener('DOMContentLoaded', function() {
         return div.innerHTML;
     }
     
-    // Míscara de telefone brasileiro (DDD + número)
+    // Máscara de telefone brasileiro (DDD + número)
     const phoneInput = document.getElementById('new_contact_phone');
     if (phoneInput) {
+        const formatPhone = (digits) => {
+            const v = digits.slice(0, 11);
+            if (v.length <= 2) return `(${v}`;
+            if (v.length <= 6) return `(${v.slice(0, 2)}) ${v.slice(2)}`;
+            if (v.length <= 10) return `(${v.slice(0, 2)}) ${v.slice(2, 6)}-${v.slice(6, 10)}`;
+            return `(${v.slice(0, 2)}) ${v.slice(2, 3)} ${v.slice(3, 7)}-${v.slice(7, 11)}`;
+        };
+        
         phoneInput.addEventListener('input', function(e) {
             let value = e.target.value.replace(/\D/g, ''); // Remove tudo que não é dígito
-            if (value.length > 11) value = value.substring(0, 11); // Limita a 11 dígitos
-            e.target.value = value;
+            value = value.substring(0, 11); // Limita a 11 dígitos
+            e.target.value = formatPhone(value);
         });
     }
     

@@ -167,6 +167,81 @@
                 </div>
                 <!--end:Menu item-->
                 
+                <!--begin:Menu item - Performance de Vendedores-->
+                <?php if (\App\Helpers\Permission::can('agent_performance.view.own') || \App\Helpers\Permission::can('agent_performance.view.all')): ?>
+                <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= isActive('/agent-performance', $currentUri) ? 'here show' : '' ?>">
+                    <span class="menu-link" data-title="Performance">
+                        <span class="menu-icon">
+                            <i class="ki-duotone ki-chart-line-up fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                        </span>
+                        <span class="menu-title">Performance</span>
+                        <span class="menu-arrow"></span>
+                    </span>
+                    <!--begin:Menu sub-->
+                    <div class="menu-sub menu-sub-accordion">
+                        <?php if (\App\Helpers\Permission::can('agent_performance.view.all')): ?>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/agent-performance', $currentUri, true) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/agent-performance') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Dashboard</span>
+                            </a>
+                        </div>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/agent-performance/ranking', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/agent-performance/ranking') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Ranking</span>
+                            </a>
+                        </div>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/agent-performance/compare', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/agent-performance/compare') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Comparar</span>
+                            </a>
+                        </div>
+                        <?php endif; ?>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/agent-performance/agent', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/agent-performance/agent?id=' . \App\Helpers\Auth::user()['id']) ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Minha Performance</span>
+                            </a>
+                        </div>
+                        <?php if (\App\Helpers\Permission::can('agent_performance.best_practices')): ?>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/agent-performance/best-practices', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/agent-performance/best-practices') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Melhores Práticas</span>
+                            </a>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (\App\Helpers\Permission::can('agent_performance.goals.view')): ?>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/agent-performance/goals', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/agent-performance/goals?agent_id=' . \App\Helpers\Auth::user()['id']) ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Minhas Metas</span>
+                            </a>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    <!--end:Menu sub-->
+                </div>
+                <?php endif; ?>
+                <!--end:Menu item-->
+                
                 <!--begin:Menu item-->
                 <?php if (\App\Helpers\Permission::can('tags.view')): ?>
                 <div class="menu-item">

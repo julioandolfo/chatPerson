@@ -235,6 +235,11 @@ class Response
      */
     public static function forbidden(string $message = 'Acesso negado'): void
     {
+        // Limpar qualquer output buffer
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
         http_response_code(403);
         
         // Se for requisição AJAX ou JSON, retornar JSON

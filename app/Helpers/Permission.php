@@ -120,6 +120,13 @@ class Permission
     public static function abortIfCannot(string $permissionSlug, string $message = 'Acesso negado'): void
     {
         if (!self::can($permissionSlug)) {
+            $userId = Auth::id();
+            \App\Helpers\Logger::error("🚫 Permission denied: userId={$userId}, permission={$permissionSlug}, message={$message}", 'conversas.log');
+            \App\Helpers\Logger::error("🚫 Headers: " . json_encode([
+                'X-Requested-With' => $_SERVER['HTTP_X_REQUESTED_WITH'] ?? 'not set',
+                'Accept' => $_SERVER['HTTP_ACCEPT'] ?? 'not set',
+                'Content-Type' => $_SERVER['CONTENT_TYPE'] ?? 'not set',
+            ]), 'conversas.log');
             Response::forbidden($message);
         }
     }

@@ -262,37 +262,46 @@ class Conversation extends Model
             }
         }
         
-        // Filtro: Sem resposta (última mensagem é do contato e não foi respondida)
+        // Filtro: Sem resposta (última mensagem relevante do contato é mais recente que a última mensagem de agente humano)
         if (!empty($filters['unanswered'])) {
             $sql .= " AND EXISTS (
-                SELECT 1 FROM messages m1 
-                WHERE m1.conversation_id = c.id 
-                AND m1.sender_type = 'contact'
-                AND m1.created_at = (
-                    SELECT MAX(m2.created_at) 
-                    FROM messages m2 
+                SELECT 1
+                FROM messages m_contact
+                WHERE m_contact.conversation_id = c.id
+                  AND m_contact.sender_type = 'contact'
+                  AND m_contact.created_at = (
+                    SELECT MAX(m2.created_at)
+                    FROM messages m2
                     WHERE m2.conversation_id = c.id
-                )
-                AND NOT EXISTS (
-                    SELECT 1 FROM messages m3 
-                    WHERE m3.conversation_id = c.id 
-                    AND m3.sender_type = 'agent'
-                    AND m3.created_at > m1.created_at
-                )
+                      AND m2.sender_type = 'contact'
+                  )
+                  AND (
+                    SELECT COALESCE(MAX(m3.created_at), '1970-01-01')
+                    FROM messages m3
+                    WHERE m3.conversation_id = c.id
+                      AND m3.sender_type = 'agent'
+                      AND m3.ai_agent_id IS NULL -- apenas agente humano
+                  ) < m_contact.created_at
             )";
         }
         
-        // Filtro: Respondido (última mensagem é do agente)
+        // Filtro: Respondido (última mensagem relevante é de agente humano, não contar bot/IA)
         if (!empty($filters['answered'])) {
             $sql .= " AND EXISTS (
-                SELECT 1 FROM messages m1 
-                WHERE m1.conversation_id = c.id 
-                AND m1.sender_type = 'agent'
-                AND m1.created_at = (
-                    SELECT MAX(m2.created_at) 
-                    FROM messages m2 
+                SELECT 1
+                FROM messages m_agent
+                WHERE m_agent.conversation_id = c.id
+                  AND m_agent.sender_type = 'agent'
+                  AND m_agent.ai_agent_id IS NULL -- apenas agente humano
+                  AND m_agent.created_at = (
+                    SELECT MAX(m2.created_at)
+                    FROM messages m2
                     WHERE m2.conversation_id = c.id
-                )
+                      AND (
+                        (m2.sender_type = 'agent' AND m2.ai_agent_id IS NULL) -- agente humano
+                        OR m2.sender_type = 'contact'
+                      )
+                  )
             )";
         }
         

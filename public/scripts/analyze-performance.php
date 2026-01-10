@@ -1,0 +1,106 @@
+<?php
+/**
+ * Script para análise periódica de performance de vendedores
+ * Executar via cron:
+ * 0 */6 * * * cd /var/www/html && php public/scripts/analyze-performance.php >> logs/performance-analysis.log 2>&1
+ */
+
+// Mudar para diretório raiz do projeto
+chdir(__DIR__ . '/../../');
+
+// Autoloader
+require_once __DIR__ . '/../../app/Helpers/autoload.php';
+
+// Configurar timezone
+date_default_timezone_set('America/Sao_Paulo');
+
+// Configurar error reporting
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
+
+// Garantir que o diretório de logs existe
+$logsDir = __DIR__ . '/../../logs';
+if (!is_dir($logsDir)) {
+    mkdir($logsDir, 0755, true);
+}
+
+use App\Services\AgentPerformanceAnalysisService;
+use App\Services\ConversationSettingsService;
+use App\Services\CoachingService;
+use App\Helpers\Database;
+
+try {
+    echo "[" . date('Y-m-d H:i:s') . "] Iniciando análise de performance de vendedores...\n";
+    
+    // Verificar se está habilitado
+    $settings = ConversationSettingsService::getSettings();
+    $perfSettings = $settings['agent_performance_analysis'] ?? [];
+    
+    if (empty($perfSettings['enabled'])) {
+        echo "[" . date('Y-m-d H:i:s') . "] ⚠️ AVISO: Análise de performance está DESABILITADA nas configurações!\n";
+        echo "[" . date('Y-m-d H:i:s') . "] Acesse: Configurações > Botões de Ação > Análise de Performance\n\n";
+        exit(0);
+    }
+    
+    echo "[" . date('Y-m-d H:i:s') . "] ✅ Análise habilitada\n";
+    echo "[" . date('Y-m-d H:i:s') . "] 📊 Configurações:\n";
+    echo "[" . date('Y-m-d H:i:s') . "]    - Modelo: " . ($perfSettings['model'] ?? 'N/A') . "\n";
+    echo "[" . date('Y-m-d H:i:s') . "]    - Intervalo: " . ($perfSettings['check_interval_hours'] ?? 'N/A') . " horas\n";
+    echo "[" . date('Y-m-d H:i:s') . "]    - Idade máxima: " . ($perfSettings['max_conversation_age_days'] ?? 'N/A') . " dias\n";
+    echo "[" . date('Y-m-d H:i:s') . "]    - Mín. mensagens: " . ($perfSettings['min_messages_to_analyze'] ?? 'N/A') . "\n";
+    echo "[" . date('Y-m-d H:i:s') . "]    - Apenas fechadas: " . ($perfSettings['analyze_closed_only'] ? 'Sim' : 'Não') . "\n\n";
+    
+    // Verificar conversas elegíveis
+    $sql = "SELECT COUNT(*) as total 
+            FROM conversations c
+            LEFT JOIN agent_performance_analysis apa ON c.id = apa.conversation_id
+            WHERE c.status IN ('closed', 'resolved')
+            AND c.agent_id IS NOT NULL
+            AND apa.id IS NULL
+            AND (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND sender_type = 'agent') >= ?";
+    
+    $minAgentMessages = (int)($perfSettings['min_agent_messages'] ?? 3);
+    $eligible = Database::fetch($sql, [$minAgentMessages]);
+    $eligibleCount = $eligible['total'] ?? 0;
+    
+    echo "[" . date('Y-m-d H:i:s') . "] 🔍 Conversas elegíveis para análise: {$eligibleCount}\n";
+    
+    if ($eligibleCount == 0) {
+        echo "[" . date('Y-m-d H:i:s') . "] ℹ️ Nenhuma conversa precisa ser analisada no momento.\n";
+        echo "[" . date('Y-m-d H:i:s') . "] Motivos possíveis:\n";
+        echo "[" . date('Y-m-d H:i:s') . "]    - Não há conversas fechadas com agente atribuído\n";
+        echo "[" . date('Y-m-d H:i:s') . "]    - Conversas não têm mensagens suficientes do agente (mín: {$minAgentMessages})\n";
+        echo "[" . date('Y-m-d H:i:s') . "]    - Todas as conversas já foram analisadas\n\n";
+        exit(0);
+    }
+    
+    echo "[" . date('Y-m-d H:i:s') . "] 🚀 Processando conversas...\n\n";
+    
+    $result = AgentPerformanceAnalysisService::processPendingConversations();
+    
+    echo "[" . date('Y-m-d H:i:s') . "] ✅ Análises processadas: " . $result['processed'] . "\n";
+    echo "[" . date('Y-m-d H:i:s') . "] ⚠️ Erros: " . $result['errors'] . "\n";
+    echo "[" . date('Y-m-d H:i:s') . "] 💰 Custo total: $" . number_format($result['cost'], 4) . "\n\n";
+    
+    // Atualizar status de metas dos agentes analisados
+    if ($result['processed'] > 0 && $perfSettings['coaching']['enabled'] ?? false) {
+        echo "[" . date('Y-m-d H:i:s') . "] 🎯 Atualizando metas dos agentes...\n";
+        
+        $agents = Database::fetchAll("SELECT DISTINCT agent_id FROM agent_performance_analysis WHERE DATE(analyzed_at) = CURDATE()");
+        $goalsUpdated = 0;
+        
+        foreach ($agents as $agent) {
+            $updated = CoachingService::updateGoalsStatus($agent['agent_id']);
+            $goalsUpdated += count($updated);
+        }
+        
+        echo "[" . date('Y-m-d H:i:s') . "] ✅ Metas atualizadas: {$goalsUpdated}\n";
+    }
+    
+    echo "[" . date('Y-m-d H:i:s') . "] Concluído.\n\n";
+    
+} catch (\Exception $e) {
+    echo "[" . date('Y-m-d H:i:s') . "] ❌ ERRO: " . $e->getMessage() . "\n";
+    echo "[" . date('Y-m-d H:i:s') . "] Stack trace: " . $e->getTraceAsString() . "\n\n";
+    exit(1);
+}

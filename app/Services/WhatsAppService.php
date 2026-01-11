@@ -1809,8 +1809,8 @@ class WhatsAppService
                                 ORDER BY last_conversation DESC
                                 LIMIT 10";
                         
-                        $lidContacts = \App\Helpers\Database::query($sql, [
-                            'account_id' => $account['id']
+                        $lidContacts = \App\Helpers\Database::fetchAll($sql, [
+                            $account['id']
                         ]);
                         
                         if (!empty($lidContacts)) {

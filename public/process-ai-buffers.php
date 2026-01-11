@@ -16,7 +16,10 @@
  */
 
 // Saída silenciosa por padrão (CLI ou web)
-header('Content-Type: text/plain; charset=utf-8');
+// ✅ Só enviar header se não estamos sendo incluídos (para evitar "headers already sent")
+if (!headers_sent()) {
+    @header('Content-Type: text/plain; charset=utf-8');
+}
 
 try {
     $autoloadCandidates = [

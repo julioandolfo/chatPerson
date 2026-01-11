@@ -43,19 +43,26 @@ class AgentConversionService
         // 2. Total de conversas do agente no período
         $totalConversations = self::getTotalConversations($agentId, $dateFrom, $dateTo);
         
-        // 3. Buscar pedidos do WooCommerce
-        $orders = WooCommerceIntegrationService::getOrdersBySeller($sellerId, null, $dateFrom, $dateTo);
+        // 3. Buscar pedidos do CACHE (sincronizados pelo CRON)
+        $orders = self::getOrdersFromCache($sellerId, $dateFrom, $dateTo);
         
-        // 4. Calcular métricas
-        $totalOrders = count($orders);
+        // 4. Filtrar apenas pedidos válidos (não cancelados, não reembolsados, não falhados)
+        $validStatuses = ['completed', 'processing', 'on-hold', 'pending'];
+        $validOrders = array_filter($orders, function($order) use ($validStatuses) {
+            $status = $order['order_status'] ?? 'pending';
+            return in_array($status, $validStatuses);
+        });
+        
+        // 5. Calcular métricas
+        $totalOrders = count($validOrders);
         $totalRevenue = 0;
         $ordersByStatus = [];
         
-        foreach ($orders as $order) {
-            $total = floatval($order['total'] ?? 0);
+        foreach ($validOrders as $order) {
+            $total = floatval($order['order_total'] ?? 0);
             $totalRevenue += $total;
             
-            $status = $order['status'] ?? 'unknown';
+            $status = $order['order_status'] ?? 'unknown';
             $ordersByStatus[$status] = ($ordersByStatus[$status] ?? 0) + 1;
         }
         
@@ -180,7 +187,55 @@ class AgentConversionService
         $dateFrom = $dateFrom ?? date('Y-m-01');
         $dateTo = $dateTo ?? date('Y-m-d H:i:s');
         
-        return WooCommerceIntegrationService::getOrdersBySeller($sellerId, null, $dateFrom, $dateTo);
+        // Buscar do cache e processar para formato compatível com a view
+        $cachedOrders = self::getOrdersFromCache($sellerId, $dateFrom, $dateTo);
+        
+        // Processar cada pedido do cache
+        $processedOrders = [];
+        foreach ($cachedOrders as $cached) {
+            // Decodificar JSON do pedido completo
+            $orderData = json_decode($cached['order_data'], true);
+            
+            if (!$orderData) {
+                continue;
+            }
+            
+            // Montar estrutura compatível com a view
+            $processedOrders[] = [
+                'order_id' => $cached['order_id'],
+                'status' => $cached['order_status'],
+                'total' => $cached['order_total'],
+                'order_date' => $cached['order_date'],
+                'order_status' => $cached['order_status'],
+                'order_total' => $cached['order_total'],
+                'customer_name' => trim(($orderData['billing']['first_name'] ?? '') . ' ' . ($orderData['billing']['last_name'] ?? '')),
+                'customer_email' => $orderData['billing']['email'] ?? '',
+                'customer_phone' => $orderData['billing']['phone'] ?? '',
+                'woocommerce_url' => $orderData['_links']['self'][0]['href'] ?? '#',
+                'conversation_id' => null, // TODO: Implementar correlação com conversas
+                'full_data' => $orderData // Dados completos do pedido
+            ];
+        }
+        
+        return $processedOrders;
+    }
+    
+    /**
+     * Buscar pedidos do cache por seller_id
+     */
+    private static function getOrdersFromCache(int $sellerId, string $dateFrom, string $dateTo): array
+    {
+        // Garantir que dateTo inclui o dia inteiro
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
+        
+        $sql = "SELECT * FROM woocommerce_order_cache 
+                WHERE seller_id = ? 
+                AND order_date BETWEEN ? AND ?
+                ORDER BY order_date DESC";
+        
+        return Database::fetchAll($sql, [$sellerId, $dateFrom, $dateTo]);
     }
     
     /**

@@ -15,6 +15,7 @@ use App\Jobs\FollowupJob;
 use App\Jobs\AICostMonitoringJob;
 use App\Jobs\AutomationDelayJob;
 use App\Jobs\AIFallbackMonitoringJob;
+use App\Jobs\WooCommerceSyncJob;
 
 try {
     // Executar monitoramento de SLA
@@ -52,6 +53,13 @@ try {
     echo "[" . date('Y-m-d H:i:s') . "] Executando AIFallbackMonitoringJob...\n";
     AIFallbackMonitoringJob::run();
     echo "[" . date('Y-m-d H:i:s') . "] AIFallbackMonitoringJob concluído\n";
+    
+    // Executar sincronização de pedidos WooCommerce (a cada hora)
+    if ($currentMinute % 60 === 0 || isset($_GET['force_wc_sync'])) {
+        echo "[" . date('Y-m-d H:i:s') . "] Executando WooCommerceSyncJob...\n";
+        WooCommerceSyncJob::run();
+        echo "[" . date('Y-m-d H:i:s') . "] WooCommerceSyncJob concluído\n";
+    }
     
     echo "[" . date('Y-m-d H:i:s') . "] Todos os jobs executados com sucesso\n";
 } catch (\Exception $e) {

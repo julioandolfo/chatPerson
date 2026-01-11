@@ -367,6 +367,9 @@ Router::post('/conversations/{id}/api4com-call', [ConversationController::class,
 // Webhook público para WhatsApp (sem autenticação)
 Router::post('/whatsapp-webhook', [WebhookController::class, 'whatsapp']);
 
+// Webhook público para WooCommerce (sem autenticação)
+Router::post('/webhooks/woocommerce', [WebhookController::class, 'woocommerce']);
+
 // Rotas de Webhooks (públicas para receber eventos)
 Router::post('/webhooks/{webhookId}', [\App\Controllers\WebhookController::class, 'receive']);
 Router::get('/webhooks', [\App\Controllers\WebhookController::class, 'index'], ['Authentication']);

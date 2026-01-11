@@ -57,6 +57,13 @@ class AgentConversionController
             $dateFrom = Request::get('date_from', date('Y-m-01'));
             $dateTo = Request::get('date_to', date('Y-m-d'));
             
+            // Buscar agente
+            $agent = \App\Models\User::find($agentId);
+            if (!$agent) {
+                Response::redirect('/agent-conversion', 'error', 'Agente não encontrado');
+                return;
+            }
+            
             // Métricas do agente
             $metrics = AgentConversionService::getConversionMetrics($agentId, $dateFrom, $dateTo);
             
@@ -64,11 +71,12 @@ class AgentConversionController
             $orders = AgentConversionService::getAgentOrders($agentId, $dateFrom, $dateTo);
             
             Response::view('agent-conversion/show', [
+                'agent' => $agent,
                 'metrics' => $metrics,
                 'orders' => $orders,
                 'dateFrom' => $dateFrom,
                 'dateTo' => $dateTo,
-                'title' => 'Conversão: ' . ($metrics['agent_name'] ?? 'Agente')
+                'title' => 'Conversão: ' . ($agent['name'] ?? 'Agente')
             ]);
         } catch (\Exception $e) {
             error_log("Erro ao carregar detalhes de conversão: " . $e->getMessage());

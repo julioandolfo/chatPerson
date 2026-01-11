@@ -34,6 +34,14 @@ class WooCommerceIntegration extends Model
     {
         return self::where('status', '=', 'active');
     }
+    
+    /**
+     * Alias para getActive() - Obter todas as integrações ativas
+     */
+    public static function getAllActive(): array
+    {
+        return self::getActive();
+    }
 
     /**
      * Obter configuração de mapeamento de campos

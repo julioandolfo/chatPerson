@@ -396,7 +396,7 @@ ob_start();
 <!--end::Row-->
 
 <!--begin::Row - Estatísticas Detalhadas-->
-<div class="row gy-5 g-xl-10">
+<div class="row g-5 g-xl-10 mb-5 mb-xl-10">
     <!--begin::Col - Top Agentes-->
     <?php if (!empty($topAgents)): ?>
     <div class="col-xl-6">
@@ -1043,8 +1043,14 @@ ob_start();
                                 <th class="min-w-80px text-center">Membros</th>
                                 <th class="min-w-100px text-center">Conversas</th>
                                 <th class="min-w-100px text-center">Resolvidas</th>
-                                <th class="min-w-120px text-center">Taxa Resolução</th>
+                                <th class="min-w-100px text-center">Taxa Resolução</th>
                                 <th class="min-w-120px text-center">TM Resposta</th>
+                                <?php if (\App\Helpers\Permission::can('conversion.view')): ?>
+                                <th class="min-w-100px text-center">Vendas</th>
+                                <th class="min-w-100px text-center">Taxa Conversão</th>
+                                <th class="min-w-120px text-end">Faturamento</th>
+                                <th class="min-w-100px text-end">Ticket Médio</th>
+                                <?php endif; ?>
                                 <th class="text-end min-w-100px">Ações</th>
                             </tr>
                         </thead>
@@ -1102,6 +1108,35 @@ ob_start();
                                         <?= \App\Services\TeamPerformanceService::formatTime($team['avg_first_response_time'] ?? null) ?>
                                     </span>
                                 </td>
+                                <?php if (\App\Helpers\Permission::can('conversion.view')): ?>
+                                <td class="text-center">
+                                    <span class="badge badge-light-success"><?= $team['total_orders'] ?? 0 ?></span>
+                                </td>
+                                <td class="text-center">
+                                    <?php
+                                    $convRate = $team['conversion_rate_sales'] ?? 0;
+                                    $convColor = 'danger';
+                                    if ($convRate >= 30) $convColor = 'success';
+                                    elseif ($convRate >= 15) $convColor = 'warning';
+                                    ?>
+                                    <div class="d-flex flex-column align-items-center">
+                                        <span class="fw-bold text-gray-800 fs-7 mb-1"><?= number_format($convRate, 1) ?>%</span>
+                                        <div class="progress h-5px w-60px">
+                                            <div class="progress-bar bg-<?= $convColor ?>" style="width: <?= min(100, $convRate) ?>%"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-end">
+                                    <span class="fw-bold text-success">
+                                        <?= \App\Services\AgentConversionService::formatCurrency($team['total_revenue'] ?? 0) ?>
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    <span class="fw-bold text-gray-800">
+                                        <?= \App\Services\AgentConversionService::formatCurrency($team['avg_ticket'] ?? 0) ?>
+                                    </span>
+                                </td>
+                                <?php endif; ?>
                                 <td class="text-end">
                                     <a href="/teams/show?id=<?= $team['team_id'] ?>&date_from=<?= $dateFrom ?>&date_to=<?= date('Y-m-d', strtotime($dateTo)) ?>" class="btn btn-sm btn-light btn-active-light-primary">
                                         <i class="ki-duotone ki-eye fs-4">
@@ -1234,8 +1269,160 @@ ob_start();
 <!--end::Row-->
 <?php endif; ?>
 
+<?php if (!empty($rankingByRevenue) || !empty($rankingByConversion) || !empty($rankingByTicket)): ?>
+<!--begin::Row - Rankings de Vendas-->
+<div class="row g-5 g-xl-10 mb-5 mb-xl-10">
+    
+    <?php if (!empty($rankingByRevenue)): ?>
+    <!--begin::Col - Ranking por Faturamento-->
+    <div class="col-xl-4">
+        <div class="card h-100">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-4 mb-1">
+                        <i class="ki-duotone ki-dollar fs-2 text-success me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        Top Faturamento
+                    </span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">Maiores faturamentos</span>
+                </h3>
+            </div>
+            <div class="card-body pt-3">
+                <div class="d-flex flex-column gap-3">
+                    <?php foreach ($rankingByRevenue as $index => $seller): ?>
+                    <div class="d-flex align-items-center">
+                        <div class="symbol symbol-40px me-3">
+                            <span class="symbol-label bg-light-<?= $index === 0 ? 'warning' : ($index === 1 ? 'info' : 'primary') ?>">
+                                <span class="fw-bold fs-4 text-<?= $index === 0 ? 'warning' : ($index === 1 ? 'info' : 'primary') ?>">
+                                    #<?= $index + 1 ?>
+                                </span>
+                            </span>
+                        </div>
+                        <div class="flex-grow-1">
+                            <a href="/agent-conversion/agent?id=<?= $seller['agent_id'] ?>" class="text-gray-800 text-hover-primary fw-bold fs-6">
+                                <?= htmlspecialchars($seller['agent_name']) ?>
+                            </a>
+                            <div class="text-muted fs-7"><?= $seller['total_orders'] ?> vendas</div>
+                        </div>
+                        <div class="text-end">
+                            <span class="fw-bold text-success fs-5">
+                                <?= \App\Services\AgentConversionService::formatCurrency($seller['total_revenue']) ?>
+                            </span>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!--end::Col-->
+    <?php endif; ?>
+    
+    <?php if (!empty($rankingByConversion)): ?>
+    <!--begin::Col - Ranking por Taxa de Conversão-->
+    <div class="col-xl-4">
+        <div class="card h-100">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-4 mb-1">
+                        <i class="ki-duotone ki-chart-line-up fs-2 text-primary me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Top Conversão
+                    </span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">Melhores taxas de conversão</span>
+                </h3>
+            </div>
+            <div class="card-body pt-3">
+                <div class="d-flex flex-column gap-3">
+                    <?php foreach ($rankingByConversion as $index => $seller): ?>
+                    <div class="d-flex align-items-center">
+                        <div class="symbol symbol-40px me-3">
+                            <span class="symbol-label bg-light-<?= $index === 0 ? 'warning' : ($index === 1 ? 'info' : 'primary') ?>">
+                                <span class="fw-bold fs-4 text-<?= $index === 0 ? 'warning' : ($index === 1 ? 'info' : 'primary') ?>">
+                                    #<?= $index + 1 ?>
+                                </span>
+                            </span>
+                        </div>
+                        <div class="flex-grow-1">
+                            <a href="/agent-conversion/agent?id=<?= $seller['agent_id'] ?>" class="text-gray-800 text-hover-primary fw-bold fs-6">
+                                <?= htmlspecialchars($seller['agent_name']) ?>
+                            </a>
+                            <div class="text-muted fs-7"><?= $seller['total_conversations'] ?> conversas → <?= $seller['total_orders'] ?> vendas</div>
+                        </div>
+                        <div class="text-end">
+                            <span class="fw-bold text-primary fs-4">
+                                <?= number_format($seller['conversion_rate'], 1) ?>%
+                            </span>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!--end::Col-->
+    <?php endif; ?>
+    
+    <?php if (!empty($rankingByTicket)): ?>
+    <!--begin::Col - Ranking por Ticket Médio-->
+    <div class="col-xl-4">
+        <div class="card h-100">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-4 mb-1">
+                        <i class="ki-duotone ki-chart-simple fs-2 text-warning me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                            <span class="path4"></span>
+                        </i>
+                        Top Ticket Médio
+                    </span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">Maiores tickets médios</span>
+                </h3>
+            </div>
+            <div class="card-body pt-3">
+                <div class="d-flex flex-column gap-3">
+                    <?php foreach ($rankingByTicket as $index => $seller): ?>
+                    <div class="d-flex align-items-center">
+                        <div class="symbol symbol-40px me-3">
+                            <span class="symbol-label bg-light-<?= $index === 0 ? 'warning' : ($index === 1 ? 'info' : 'primary') ?>">
+                                <span class="fw-bold fs-4 text-<?= $index === 0 ? 'warning' : ($index === 1 ? 'info' : 'primary') ?>">
+                                    #<?= $index + 1 ?>
+                                </span>
+                            </span>
+                        </div>
+                        <div class="flex-grow-1">
+                            <a href="/agent-conversion/agent?id=<?= $seller['agent_id'] ?>" class="text-gray-800 text-hover-primary fw-bold fs-6">
+                                <?= htmlspecialchars($seller['agent_name']) ?>
+                            </a>
+                            <div class="text-muted fs-7"><?= $seller['total_orders'] ?> vendas</div>
+                        </div>
+                        <div class="text-end">
+                            <span class="fw-bold text-warning fs-5">
+                                <?= \App\Services\AgentConversionService::formatCurrency($seller['avg_ticket']) ?>
+                            </span>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!--end::Col-->
+    <?php endif; ?>
+    
+</div>
+<!--end::Row-->
+<?php endif; ?>
+
 <!--begin::Row - Gráficos-->
-<div class="row g-5 mb-5 mt-5">
+<div class="row g-5 mb-5">
     <!--begin::Col - Gráfico de Conversas ao Longo do Tempo-->
     <div class="col-xl-12">
         <div class="card">

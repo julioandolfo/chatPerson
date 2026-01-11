@@ -52,6 +52,17 @@ class DashboardController
             if (\App\Helpers\Permission::can('teams.view')) {
                 try {
                     $teamsMetrics = \App\Services\TeamPerformanceService::getTeamsRanking($dateFrom, $dateTo, 10);
+                    
+                    // Adicionar métricas de conversão WooCommerce por time
+                    if (\App\Helpers\Permission::can('conversion.view')) {
+                        foreach ($teamsMetrics as &$team) {
+                            $conversionMetrics = self::getTeamConversionMetrics($team['team_id'], $dateFrom, str_replace(' 23:59:59', '', $dateTo));
+                            $team['conversion_rate_sales'] = $conversionMetrics['conversion_rate'];
+                            $team['total_revenue'] = $conversionMetrics['total_revenue'];
+                            $team['avg_ticket'] = $conversionMetrics['avg_ticket'];
+                            $team['total_orders'] = $conversionMetrics['total_orders'];
+                        }
+                    }
                 } catch (\Exception $e) {
                     error_log("Erro ao carregar métricas de times: " . $e->getMessage());
                 }
@@ -91,11 +102,39 @@ class DashboardController
                         return $b['conversion_rate'] <=> $a['conversion_rate'];
                     });
                     
-                    // Pegar apenas os top 5
-                    $conversionRanking = array_slice($ranking, 0, 5);
+                    // Criar 3 rankings diferentes
+                    $conversionRanking = $ranking; // Todos para criar os rankings
                 } catch (\Exception $e) {
                     error_log("Erro ao carregar métricas de conversão: " . $e->getMessage());
                 }
+            }
+            
+            // Rankings de vendas
+            $rankingByRevenue = [];
+            $rankingByConversion = [];
+            $rankingByTicket = [];
+            
+            if (!empty($conversionRanking)) {
+                // Ranking por Faturamento
+                $rankingByRevenue = $conversionRanking;
+                usort($rankingByRevenue, function($a, $b) {
+                    return $b['total_revenue'] <=> $a['total_revenue'];
+                });
+                $rankingByRevenue = array_slice($rankingByRevenue, 0, 5);
+                
+                // Ranking por Taxa de Conversão
+                $rankingByConversion = $conversionRanking;
+                usort($rankingByConversion, function($a, $b) {
+                    return $b['conversion_rate'] <=> $a['conversion_rate'];
+                });
+                $rankingByConversion = array_slice($rankingByConversion, 0, 5);
+                
+                // Ranking por Ticket Médio
+                $rankingByTicket = $conversionRanking;
+                usort($rankingByTicket, function($a, $b) {
+                    return $b['avg_ticket'] <=> $a['avg_ticket'];
+                });
+                $rankingByTicket = array_slice($rankingByTicket, 0, 5);
             }
             
             // Conversas recentes (apenas 5)
@@ -113,6 +152,9 @@ class DashboardController
                 'allAgentsMetrics' => $allAgentsMetrics,
                 'teamsMetrics' => $teamsMetrics,
                 'conversionRanking' => $conversionRanking,
+                'rankingByRevenue' => $rankingByRevenue,
+                'rankingByConversion' => $rankingByConversion,
+                'rankingByTicket' => $rankingByTicket,
                 'recentConversations' => $recentConversations,
                 'recentActivity' => $recentActivity,
                 'dateFrom' => $dateFrom,
@@ -277,6 +319,74 @@ class DashboardController
     /**
      * Log para arquivo logs/dash.log
      */
+    /**
+     * Obter métricas de conversão de um time
+     */
+    private static function getTeamConversionMetrics(int $teamId, string $dateFrom, string $dateTo): array
+    {
+        try {
+            // Buscar membros do time que são vendedores
+            $members = \App\Services\TeamService::getMembers($teamId);
+            $sellers = array_filter($members, function($member) {
+                return !empty($member['woocommerce_seller_id']);
+            });
+            
+            if (empty($sellers)) {
+                return [
+                    'total_orders' => 0,
+                    'conversion_rate' => 0,
+                    'total_revenue' => 0,
+                    'avg_ticket' => 0
+                ];
+            }
+            
+            $totalOrders = 0;
+            $totalRevenue = 0;
+            
+            foreach ($sellers as $seller) {
+                $metrics = \App\Services\AgentConversionService::getConversionMetrics(
+                    $seller['id'],
+                    $dateFrom,
+                    $dateTo
+                );
+                
+                $totalOrders += $metrics['total_orders'];
+                $totalRevenue += $metrics['total_revenue'];
+            }
+            
+            $avgTicket = $totalOrders > 0 ? round($totalRevenue / $totalOrders, 2) : 0;
+            
+            // Taxa de conversão baseada nas conversas do time
+            $teamConversations = Database::fetch(
+                "SELECT COUNT(*) as total FROM conversations c
+                 INNER JOIN team_members tm ON c.agent_id = tm.user_id
+                 WHERE tm.team_id = ?
+                 AND c.created_at BETWEEN ? AND ?",
+                [$teamId, $dateFrom, $dateTo . ' 23:59:59']
+            );
+            
+            $totalConversations = $teamConversations['total'] ?? 0;
+            $conversionRate = $totalConversations > 0 
+                ? round(($totalOrders / $totalConversations) * 100, 2) 
+                : 0;
+            
+            return [
+                'total_orders' => $totalOrders,
+                'conversion_rate' => $conversionRate,
+                'total_revenue' => $totalRevenue,
+                'avg_ticket' => $avgTicket
+            ];
+        } catch (\Exception $e) {
+            error_log("Erro ao calcular métricas de conversão do time: " . $e->getMessage());
+            return [
+                'total_orders' => 0,
+                'conversion_rate' => 0,
+                'total_revenue' => 0,
+                'avg_ticket' => 0
+            ];
+        }
+    }
+    
     private static function logDash(string $message): void
     {
         $logDir = __DIR__ . '/../../logs';

@@ -206,7 +206,7 @@ class CoachingService
     /**
      * Criar meta manual
      */
-    public static function createGoal(int $agentId, string $dimension, float $targetScore, string $deadline, ?int $createdBy = null, ?string $notes = null): ?int
+    public static function createGoal(int $agentId, string $dimension, float $targetScore, string $deadline, ?int $createdBy = null, ?string $notes = null, ?string $startDate = null): ?int
     {
         try {
             // Buscar score atual
@@ -222,10 +222,11 @@ class CoachingService
                 'dimension' => $dimension,
                 'current_score' => $currentScore,
                 'target_score' => $targetScore,
-                'deadline' => $deadline,
+                'start_date' => $startDate ?: date('Y-m-d'),
+                'end_date' => $deadline,
                 'status' => 'active',
                 'created_by' => $createdBy,
-                'notes' => $notes
+                'feedback' => $notes
             ];
             
             return AgentPerformanceGoal::create($goalData);

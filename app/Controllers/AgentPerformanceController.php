@@ -280,17 +280,36 @@ class AgentPerformanceController
         $agentId = (int)Request::post('agent_id');
         $dimension = Request::post('dimension');
         $targetScore = (float)Request::post('target_score');
-        $deadline = Request::post('deadline');
-        $notes = Request::post('notes');
+        $startDate = Request::post('start_date');
+        $endDate = Request::post('end_date');
+        $feedback = Request::post('feedback');
+        
+        // Validações
+        if (!$agentId || !$dimension || !$targetScore || !$endDate) {
+            Response::json([
+                'success' => false,
+                'message' => 'Preencha todos os campos obrigatórios'
+            ], 400);
+            return;
+        }
+        
+        if ($targetScore < 0 || $targetScore > 5) {
+            Response::json([
+                'success' => false,
+                'message' => 'A nota alvo deve estar entre 0 e 5'
+            ], 400);
+            return;
+        }
         
         try {
             $goalId = CoachingService::createGoal(
                 $agentId,
                 $dimension,
                 $targetScore,
-                $deadline,
+                $endDate,
                 Auth::user()['id'],
-                $notes
+                $feedback,
+                $startDate
             );
             
             if ($goalId) {

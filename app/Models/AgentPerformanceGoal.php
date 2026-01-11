@@ -17,10 +17,11 @@ class AgentPerformanceGoal extends Model
         'dimension',
         'current_score',
         'target_score',
-        'deadline',
+        'start_date',
+        'end_date',
         'status',
         'created_by',
-        'notes',
+        'feedback',
         'completed_at'
     ];
     protected bool $timestamps = true;
@@ -33,7 +34,7 @@ class AgentPerformanceGoal extends Model
         $sql = "SELECT * FROM agent_performance_goals 
                 WHERE agent_id = ? 
                 AND status = 'active'
-                ORDER BY deadline ASC";
+                ORDER BY end_date ASC";
         return Database::fetchAll($sql, [$agentId]);
     }
     

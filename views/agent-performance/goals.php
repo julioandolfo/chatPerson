@@ -238,6 +238,161 @@ ob_start();
 
 </div>
 
+<!-- Modal Nova Meta -->
+<div class="modal fade" id="kt_modal_new_goal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-650px">
+        <div class="modal-content">
+            <form id="kt_modal_new_goal_form" class="form" method="POST" action="<?= \App\Helpers\Url::to('/agent-performance/goals') ?>">
+                <div class="modal-header">
+                    <h2 class="fw-bold">Nova Meta de Performance</h2>
+                    <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                        <i class="ki-duotone ki-cross fs-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                    </div>
+                </div>
+                
+                <div class="modal-body py-10 px-lg-17">
+                    <!-- Agente (se supervisor) -->
+                    <?php if (isset($agents) && count($agents) > 1): ?>
+                    <div class="mb-7">
+                        <label class="required fs-6 fw-semibold mb-2">Agente</label>
+                        <select name="agent_id" class="form-select" required>
+                            <option value="">Selecione...</option>
+                            <?php foreach ($agents as $agent): ?>
+                            <option value="<?= $agent['id'] ?>"><?= htmlspecialchars($agent['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php else: ?>
+                    <input type="hidden" name="agent_id" value="<?= $agentId ?? \App\Helpers\Auth::user()['id'] ?>">
+                    <?php endif; ?>
+                    
+                    <!-- Dimensão -->
+                    <div class="mb-7">
+                        <label class="required fs-6 fw-semibold mb-2">Dimensão</label>
+                        <select name="dimension" class="form-select" required>
+                            <option value="">Selecione...</option>
+                            <option value="proactivity">🚀 Proatividade</option>
+                            <option value="objection_handling">💪 Quebra de Objeções</option>
+                            <option value="rapport">🤝 Rapport</option>
+                            <option value="closing_techniques">🎯 Fechamento</option>
+                            <option value="qualification">🎓 Qualificação (BANT)</option>
+                            <option value="clarity">💬 Clareza</option>
+                            <option value="value_proposition">💎 Proposta de Valor</option>
+                            <option value="response_time">⚡ Tempo de Resposta</option>
+                            <option value="follow_up">📅 Follow-up</option>
+                            <option value="professionalism">🎩 Profissionalismo</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Nota Alvo -->
+                    <div class="mb-7">
+                        <label class="required fs-6 fw-semibold mb-2">Nota Alvo (0-5)</label>
+                        <input type="number" name="target_score" class="form-control" 
+                               min="0" max="5" step="0.1" value="4.0" required>
+                        <div class="form-text">Meta de nota que deve ser alcançada</div>
+                    </div>
+                    
+                    <!-- Período -->
+                    <div class="row mb-7">
+                        <div class="col-md-6">
+                            <label class="required fs-6 fw-semibold mb-2">Data Início</label>
+                            <input type="date" name="start_date" class="form-control" 
+                                   value="<?= date('Y-m-d') ?>" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="required fs-6 fw-semibold mb-2">Data Fim</label>
+                            <input type="date" name="end_date" class="form-control" 
+                                   value="<?= date('Y-m-d', strtotime('+30 days')) ?>" required>
+                        </div>
+                    </div>
+                    
+                    <!-- Feedback -->
+                    <div class="mb-7">
+                        <label class="fs-6 fw-semibold mb-2">Feedback/Orientações</label>
+                        <textarea name="feedback" class="form-control" rows="3" 
+                                  placeholder="Dicas e orientações para alcançar esta meta..."></textarea>
+                    </div>
+                </div>
+                
+                <div class="modal-footer flex-center">
+                    <button type="reset" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="indicator-label">Criar Meta</span>
+                        <span class="indicator-progress">Aguarde...
+                        <span class="spinner-border spinner-border-sm align-middle ms-2"></span></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('kt_modal_new_goal_form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const submitBtn = form.querySelector('[type="submit"]');
+            submitBtn.setAttribute('data-kt-indicator', 'on');
+            submitBtn.disabled = true;
+            
+            const formData = new FormData(form);
+            
+            fetch(form.action, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        text: "Meta criada com sucesso!",
+                        icon: "success",
+                        buttonsStyling: false,
+                        confirmButtonText: "Ok!",
+                        customClass: {
+                            confirmButton: "btn btn-primary"
+                        }
+                    }).then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire({
+                        text: data.message || "Erro ao criar meta",
+                        icon: "error",
+                        buttonsStyling: false,
+                        confirmButtonText: "Ok",
+                        customClass: {
+                            confirmButton: "btn btn-primary"
+                        }
+                    });
+                }
+            })
+            .catch(error => {
+                Swal.fire({
+                    text: "Erro ao criar meta: " + error.message,
+                    icon: "error",
+                    buttonsStyling: false,
+                    confirmButtonText: "Ok",
+                    customClass: {
+                        confirmButton: "btn btn-primary"
+                    }
+                });
+            })
+            .finally(() => {
+                submitBtn.removeAttribute('data-kt-indicator');
+                submitBtn.disabled = false;
+            });
+        });
+    }
+});
+</script>
+
 <?php
 $content = ob_get_clean();
 include __DIR__ . '/../layouts/metronic/app.php';

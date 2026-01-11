@@ -1536,6 +1536,166 @@ ob_start();
 
 <!-- Cards "Ações Rápidas" e "Funcionalidades" removidos -->
 
+<!-- Modal: Configurar Webhook WooCommerce -->
+<div class="modal fade" id="modal_wc_webhook" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-650px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">
+                    <i class="ki-duotone ki-setting-2 fs-2 text-primary me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Configurar Webhook WooCommerce
+                </h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                <div class="alert alert-info d-flex align-items-center mb-5">
+                    <i class="ki-duotone ki-information-5 fs-2x text-info me-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div class="d-flex flex-column">
+                        <h4 class="mb-1 text-dark">Configure o Webhook no WooCommerce</h4>
+                        <span>Vá em <strong>WooCommerce → Configurações → Avançado → Webhooks</strong> e adicione um novo webhook com a URL abaixo.</span>
+                    </div>
+                </div>
+                
+                <div class="mb-7">
+                    <label class="form-label fw-bold fs-6 mb-2">URL do Webhook</label>
+                    <div class="input-group">
+                        <input type="text" id="webhook_url" class="form-control form-control-solid" 
+                               value="<?= rtrim(\App\Helpers\Url::to('/'), '/') ?>/webhooks/woocommerce" readonly>
+                        <button class="btn btn-primary" type="button" onclick="copyWebhookUrl()">
+                            <i class="ki-duotone ki-copy fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Copiar
+                        </button>
+                    </div>
+                    <div class="form-text">Esta é a URL que deve ser configurada no WooCommerce</div>
+                </div>
+                
+                <div class="separator separator-dashed my-7"></div>
+                
+                <div class="mb-5">
+                    <h4 class="fw-bold mb-4">Configurações do Webhook</h4>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="fw-semibold">Nome:</label>
+                            <p class="text-gray-600">Chat System - Pedidos</p>
+                        </div>
+                        <div class="col-6">
+                            <label class="fw-semibold">Status:</label>
+                            <p class="text-gray-600">Ativo</p>
+                        </div>
+                        <div class="col-6">
+                            <label class="fw-semibold">Tópico:</label>
+                            <p class="text-gray-600">Pedido criado / Pedido atualizado</p>
+                        </div>
+                        <div class="col-6">
+                            <label class="fw-semibold">API Version:</label>
+                            <p class="text-gray-600">WP REST API Integration v3</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-warning d-flex align-items-center">
+                    <i class="ki-duotone ki-shield-tick fs-2x text-warning me-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    <div class="d-flex flex-column">
+                        <span><strong>Importante:</strong> Configure webhooks para os eventos <strong>"Order created"</strong> e <strong>"Order updated"</strong> para receber atualizações em tempo real.</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Sincronizar Pedidos WooCommerce -->
+<div class="modal fade" id="modal_wc_sync" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-650px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">
+                    <i class="ki-duotone ki-arrows-circle fs-2 text-primary me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Sincronizar Pedidos WooCommerce
+                </h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                <div class="alert alert-info d-flex align-items-center mb-7">
+                    <i class="ki-duotone ki-information-5 fs-2x text-info me-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div class="d-flex flex-column">
+                        <h4 class="mb-1 text-dark">Sincronização Manual</h4>
+                        <span>Esta sincronização irá buscar os pedidos mais recentes do WooCommerce e atualizar o cache local.</span>
+                    </div>
+                </div>
+                
+                <div class="mb-7">
+                    <label class="form-label fw-bold fs-6 required">Limite de Pedidos</label>
+                    <input type="number" class="form-control form-control-solid" id="orders_limit" 
+                           value="100" min="1" max="500" placeholder="Ex: 100">
+                    <div class="form-text">Quantidade máxima de pedidos a sincronizar (máx: 500)</div>
+                </div>
+                
+                <div class="mb-7">
+                    <label class="form-label fw-bold fs-6 required">Período (dias)</label>
+                    <input type="number" class="form-control form-control-solid" id="days_back" 
+                           value="7" min="1" max="90" placeholder="Ex: 7">
+                    <div class="form-text">Buscar pedidos dos últimos X dias (máx: 90 dias)</div>
+                </div>
+                
+                <div class="alert alert-warning d-flex align-items-center">
+                    <i class="ki-duotone ki-information-4 fs-2x text-warning me-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div class="d-flex flex-column">
+                        <span><strong>Atenção:</strong> Sincronizações com muitos pedidos podem levar alguns minutos. O sistema irá processar todas as integrações WooCommerce ativas.</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btn_sync_wc" onclick="syncWooCommerceOrders()">
+                    <i class="ki-duotone ki-arrows-circle fs-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Sincronizar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <?php 
 $content = ob_get_clean(); 
 
@@ -1946,165 +2106,5 @@ function syncWooCommerceOrders() {
 </script>
 ';
 ?>
-
-<!-- Modal: Configurar Webhook WooCommerce -->
-<div class="modal fade" id="modal_wc_webhook" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered mw-650px">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="fw-bold">
-                    <i class="ki-duotone ki-setting-2 fs-2 text-primary me-2">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                    </i>
-                    Configurar Webhook WooCommerce
-                </h2>
-                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
-                    <i class="ki-duotone ki-cross fs-1">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                    </i>
-                </div>
-            </div>
-            <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
-                <div class="alert alert-info d-flex align-items-center mb-5">
-                    <i class="ki-duotone ki-information-5 fs-2x text-info me-3">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                        <span class="path3"></span>
-                    </i>
-                    <div class="d-flex flex-column">
-                        <h4 class="mb-1 text-dark">Configure o Webhook no WooCommerce</h4>
-                        <span>Vá em <strong>WooCommerce → Configurações → Avançado → Webhooks</strong> e adicione um novo webhook com a URL abaixo.</span>
-                    </div>
-                </div>
-                
-                <div class="mb-7">
-                    <label class="form-label fw-bold fs-6 mb-2">URL do Webhook</label>
-                    <div class="input-group">
-                        <input type="text" id="webhook_url" class="form-control form-control-solid" 
-                               value="<?= rtrim(\App\Helpers\Url::to('/'), '/') ?>/webhooks/woocommerce" readonly>
-                        <button class="btn btn-primary" type="button" onclick="copyWebhookUrl()">
-                            <i class="ki-duotone ki-copy fs-2">
-                                <span class="path1"></span>
-                                <span class="path2"></span>
-                            </i>
-                            Copiar
-                        </button>
-                    </div>
-                    <div class="form-text">Esta é a URL que deve ser configurada no WooCommerce</div>
-                </div>
-                
-                <div class="separator separator-dashed my-7"></div>
-                
-                <div class="mb-5">
-                    <h4 class="fw-bold mb-4">Configurações do Webhook</h4>
-                    <div class="row g-3">
-                        <div class="col-6">
-                            <label class="fw-semibold">Nome:</label>
-                            <p class="text-gray-600">Chat System - Pedidos</p>
-                        </div>
-                        <div class="col-6">
-                            <label class="fw-semibold">Status:</label>
-                            <p class="text-gray-600">Ativo</p>
-                        </div>
-                        <div class="col-6">
-                            <label class="fw-semibold">Tópico:</label>
-                            <p class="text-gray-600">Pedido criado / Pedido atualizado</p>
-                        </div>
-                        <div class="col-6">
-                            <label class="fw-semibold">API Version:</label>
-                            <p class="text-gray-600">WP REST API Integration v3</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="alert alert-warning d-flex align-items-center">
-                    <i class="ki-duotone ki-shield-tick fs-2x text-warning me-3">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                    </i>
-                    <div class="d-flex flex-column">
-                        <span><strong>Importante:</strong> Configure webhooks para os eventos <strong>"Order created"</strong> e <strong>"Order updated"</strong> para receber atualizações em tempo real.</span>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal: Sincronizar Pedidos WooCommerce -->
-<div class="modal fade" id="modal_wc_sync" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered mw-650px">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="fw-bold">
-                    <i class="ki-duotone ki-arrows-circle fs-2 text-primary me-2">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                    </i>
-                    Sincronizar Pedidos WooCommerce
-                </h2>
-                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
-                    <i class="ki-duotone ki-cross fs-1">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                    </i>
-                </div>
-            </div>
-            <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
-                <div class="alert alert-info d-flex align-items-center mb-7">
-                    <i class="ki-duotone ki-information-5 fs-2x text-info me-3">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                        <span class="path3"></span>
-                    </i>
-                    <div class="d-flex flex-column">
-                        <h4 class="mb-1 text-dark">Sincronização Manual</h4>
-                        <span>Esta sincronização irá buscar os pedidos mais recentes do WooCommerce e atualizar o cache local.</span>
-                    </div>
-                </div>
-                
-                <div class="mb-7">
-                    <label class="form-label fw-bold fs-6 required">Limite de Pedidos</label>
-                    <input type="number" class="form-control form-control-solid" id="orders_limit" 
-                           value="100" min="1" max="500" placeholder="Ex: 100">
-                    <div class="form-text">Quantidade máxima de pedidos a sincronizar (máx: 500)</div>
-                </div>
-                
-                <div class="mb-7">
-                    <label class="form-label fw-bold fs-6 required">Período (dias)</label>
-                    <input type="number" class="form-control form-control-solid" id="days_back" 
-                           value="7" min="1" max="90" placeholder="Ex: 7">
-                    <div class="form-text">Buscar pedidos dos últimos X dias (máx: 90 dias)</div>
-                </div>
-                
-                <div class="alert alert-warning d-flex align-items-center">
-                    <i class="ki-duotone ki-information-4 fs-2x text-warning me-3">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                        <span class="path3"></span>
-                    </i>
-                    <div class="d-flex flex-column">
-                        <span><strong>Atenção:</strong> Sincronizações com muitos pedidos podem levar alguns minutos. O sistema irá processar todas as integrações WooCommerce ativas.</span>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="btn_sync_wc" onclick="syncWooCommerceOrders()">
-                    <i class="ki-duotone ki-arrows-circle fs-2">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                    </i>
-                    Sincronizar
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <?php include __DIR__ . '/../layouts/metronic/app.php'; ?>

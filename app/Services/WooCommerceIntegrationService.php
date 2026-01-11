@@ -351,7 +351,8 @@ class WooCommerceIntegrationService
             'consumer_key' => 'required|string|max:255',
             'consumer_secret' => 'required|string|max:500',
             'contact_field_mapping' => 'required|array',
-            'search_settings' => 'nullable|array'
+            'search_settings' => 'nullable|array',
+            'seller_meta_key' => 'nullable|string|max:255'
         ]);
         
         if (!empty($errors)) {
@@ -366,6 +367,7 @@ class WooCommerceIntegrationService
             'consumer_secret' => $data['consumer_secret'],
             'contact_field_mapping' => json_encode($data['contact_field_mapping']),
             'search_settings' => json_encode($data['search_settings'] ?? []),
+            'seller_meta_key' => $data['seller_meta_key'] ?? '_vendor_id',
             'status' => 'active',
             'cache_enabled' => $data['cache_enabled'] ?? true,
             'cache_ttl_minutes' => $data['cache_ttl_minutes'] ?? 5,
@@ -386,7 +388,8 @@ class WooCommerceIntegrationService
             'consumer_key' => 'nullable|string|max:255',
             'consumer_secret' => 'nullable|string|max:500',
             'contact_field_mapping' => 'nullable|array',
-            'search_settings' => 'nullable|array'
+            'search_settings' => 'nullable|array',
+            'seller_meta_key' => 'nullable|string|max:255'
         ]);
         
         if (!empty($errors)) {
@@ -424,6 +427,9 @@ class WooCommerceIntegrationService
         }
         if (isset($data['sync_frequency_minutes'])) {
             $updateData['sync_frequency_minutes'] = (int)$data['sync_frequency_minutes'];
+        }
+        if (isset($data['seller_meta_key'])) {
+            $updateData['seller_meta_key'] = $data['seller_meta_key'];
         }
         
         return WooCommerceIntegration::update($id, $updateData);

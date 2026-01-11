@@ -149,7 +149,12 @@ class RealtimeCoaching {
         // Marcar como exibido
         this.displayedHints.add(hint.id);
         
-        // Exibir hint
+        // Adicionar hint inline (abaixo da mensagem)
+        if (window.coachingInline) {
+            window.coachingInline.addHintRealtime(hint);
+        }
+        
+        // Exibir hint (toast antigo - pode ser desabilitado)
         if (this.settings.auto_show_hint) {
             this.showHint(hint);
         }

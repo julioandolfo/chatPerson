@@ -480,7 +480,7 @@ function viewExecutionDetails(executionId) {
                             <span class="badge badge-light-success">${actionsExecuted} ação(ões)</span>
                         </td>
                         <td class="text-end">
-                            <a href="/conversations/${log.conversation_id}" class="btn btn-sm btn-light-primary" target="_blank">
+                            <a href="/conversations?id=${log.conversation_id}" class="btn btn-sm btn-light-primary" target="_blank">
                                 <i class="ki-duotone ki-arrow-right fs-4">
                                     <span class="path1"></span>
                                     <span class="path2"></span>

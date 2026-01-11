@@ -245,7 +245,9 @@
     
     <!-- Coaching em Tempo Real -->
     <link rel="stylesheet" href="<?= \App\Helpers\Url::asset('css/realtime-coaching.css') ?>">
+    <link rel="stylesheet" href="<?= \App\Helpers\Url::asset('css/coaching-inline.css') ?>">
     <script src="<?= \App\Helpers\Url::asset('js/realtime-coaching.js') ?>"></script>
+    <script src="<?= \App\Helpers\Url::asset('js/coaching-inline.js') ?>"></script>
     <script>
         // Passar configurações de disponibilidade para o JavaScript
         <?php if (\App\Helpers\Auth::check()): ?>

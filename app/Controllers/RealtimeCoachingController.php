@@ -1,135 +1,158 @@
 <?php
+/**
+ * Controller de Coaching em Tempo Real
+ */
 
 namespace App\Controllers;
 
+use App\Helpers\Response;
 use App\Helpers\Auth;
 use App\Helpers\Request;
-use App\Helpers\Response;
-use App\Helpers\Permission;
 use App\Services\RealtimeCoachingService;
 use App\Models\RealtimeCoachingHint;
 
-/**
- * Controller para Coaching em Tempo Real
- */
 class RealtimeCoachingController
 {
     /**
-     * Obter hints pendentes para o agente (polling)
+     * Buscar hints de uma conversa
+     * GET /api/coaching/hints/:conversationId
+     */
+    public function getHintsByConversation(int $conversationId): void
+    {
+        $userId = Auth::user()['id'];
+        
+        // Buscar hints da conversa
+        $hints = RealtimeCoachingHint::where('conversation_id', '=', $conversationId)
+            ->where('agent_id', '=', $userId)
+            ->orderBy('created_at', 'DESC')
+            ->get();
+        
+        // Agrupar hints por message_id
+        $hintsByMessage = [];
+        foreach ($hints as $hint) {
+            $messageId = $hint['message_id'];
+            if ($messageId) {
+                if (!isset($hintsByMessage[$messageId])) {
+                    $hintsByMessage[$messageId] = [];
+                }
+                $hintsByMessage[$messageId][] = $hint;
+            }
+        }
+        
+        Response::json([
+            'success' => true,
+            'hints' => $hints,
+            'hints_by_message' => $hintsByMessage
+        ]);
+    }
+    
+    /**
+     * Buscar hints pendentes (não visualizados)
+     * GET /api/coaching/hints/pending
      */
     public function getPendingHints(): void
     {
-        $conversationId = Request::input('conversation_id');
-        $seconds = Request::input('seconds', 10);
+        $userId = Auth::user()['id'];
+        $conversationId = Request::get('conversation_id');
         
         if (!$conversationId) {
             Response::json(['error' => 'conversation_id é obrigatório'], 400);
             return;
         }
         
-        $agentId = Auth::id();
-        
         $hints = RealtimeCoachingService::getPendingHintsForAgent(
-            $agentId,
+            $userId,
             (int)$conversationId,
-            (int)$seconds
+            30 // Últimos 30 segundos
         );
         
         Response::json([
             'success' => true,
-            'hints' => $hints,
-            'count' => count($hints)
-        ]);
-    }
-    
-    /**
-     * Obter estatísticas de coaching do agente
-     */
-    public function getStats(): void
-    {
-        $agentId = Request::input('agent_id', Auth::id());
-        $period = Request::input('period', '24h');
-        
-        // Verificar permissão (só pode ver próprias stats ou se for admin/supervisor)
-        if ($agentId != Auth::id() && !Permission::can('agent_performance.view.team')) {
-            Response::json(['error' => 'Sem permissão'], 403);
-            return;
-        }
-        
-        $stats = RealtimeCoachingService::getStats((int)$agentId, $period);
-        
-        Response::json([
-            'success' => true,
-            'stats' => $stats
+            'hints' => $hints
         ]);
     }
     
     /**
      * Marcar hint como visualizado
+     * POST /api/coaching/hints/:hintId/view
      */
-    public function markAsViewed(): void
+    public function markAsViewed(int $hintId): void
     {
-        $hintId = Request::input('hint_id');
+        $userId = Auth::user()['id'];
         
-        if (!$hintId) {
-            Response::json(['error' => 'hint_id é obrigatório'], 400);
-            return;
-        }
+        // Verificar se o hint pertence ao agente
+        $hint = RealtimeCoachingHint::find($hintId);
         
-        $hint = RealtimeCoachingHint::find((int)$hintId);
-        
-        if (!$hint) {
+        if (!$hint || $hint['agent_id'] != $userId) {
             Response::json(['error' => 'Hint não encontrado'], 404);
             return;
         }
         
-        // Verificar se é o agente correto
-        if ($hint['agent_id'] != Auth::id()) {
-            Response::json(['error' => 'Sem permissão'], 403);
-            return;
-        }
-        
-        // Atualizar (adicionar campo viewed_at se necessário)
-        // Por enquanto, apenas retornar sucesso
+        $success = RealtimeCoachingHint::markAsViewed($hintId);
         
         Response::json([
-            'success' => true,
-            'message' => 'Hint marcado como visualizado'
+            'success' => $success
         ]);
     }
     
     /**
-     * Marcar hint como útil/não útil (feedback)
+     * Enviar feedback do hint
+     * POST /api/coaching/hints/:hintId/feedback
      */
-    public function provideFeedback(): void
+    public function sendFeedback(int $hintId): void
     {
-        $hintId = Request::input('hint_id');
-        $helpful = Request::input('helpful'); // true/false
+        $userId = Auth::user()['id'];
+        $feedback = Request::post('feedback'); // 'helpful' ou 'not_helpful'
         
-        if (!$hintId || !isset($helpful)) {
-            Response::json(['error' => 'hint_id e helpful são obrigatórios'], 400);
+        if (!in_array($feedback, ['helpful', 'not_helpful'])) {
+            Response::json(['error' => 'Feedback inválido'], 400);
             return;
         }
         
-        $hint = RealtimeCoachingHint::find((int)$hintId);
+        // Verificar se o hint pertence ao agente
+        $hint = RealtimeCoachingHint::find($hintId);
         
-        if (!$hint) {
+        if (!$hint || $hint['agent_id'] != $userId) {
             Response::json(['error' => 'Hint não encontrado'], 404);
             return;
         }
         
-        // Verificar se é o agente correto
-        if ($hint['agent_id'] != Auth::id()) {
-            Response::json(['error' => 'Sem permissão'], 403);
+        $success = RealtimeCoachingHint::setFeedback($hintId, $feedback);
+        
+        Response::json([
+            'success' => $success
+        ]);
+    }
+    
+    /**
+     * Usar sugestão (copiar para área de transferência)
+     * POST /api/coaching/hints/:hintId/use-suggestion
+     */
+    public function useSuggestion(int $hintId): void
+    {
+        $userId = Auth::user()['id'];
+        $suggestionIndex = Request::post('suggestion_index');
+        
+        // Verificar se o hint pertence ao agente
+        $hint = RealtimeCoachingHint::find($hintId);
+        
+        if (!$hint || $hint['agent_id'] != $userId) {
+            Response::json(['error' => 'Hint não encontrado'], 404);
             return;
         }
         
-        // Salvar feedback (adicionar campo feedback se necessário)
-        // Por enquanto, apenas retornar sucesso
+        // Marcar como visualizado se ainda não foi
+        if (!$hint['viewed_at']) {
+            RealtimeCoachingHint::markAsViewed($hintId);
+        }
+        
+        // Retornar a sugestão
+        $suggestions = json_decode($hint['suggestions'], true) ?? [];
+        $suggestion = $suggestions[$suggestionIndex] ?? null;
         
         Response::json([
             'success' => true,
-            'message' => 'Feedback registrado'
+            'suggestion' => $suggestion
         ]);
     }
 }

@@ -343,6 +343,13 @@ Router::post('/agent-performance/goals', [AgentPerformanceController::class, 'cr
 Router::get('/agent-performance/compare', [AgentPerformanceController::class, 'compare'], ['Authentication', 'Permission:agent_performance.view.all']);
 Router::get('/agent-performance/chart-data', [AgentPerformanceController::class, 'chartData'], ['Authentication', 'Permission:agent_performance.view.all']);
 
+// Rotas de Coaching em Tempo Real (IA)
+Router::get('/api/coaching/hints/conversation/{conversationId}', [RealtimeCoachingController::class, 'getHintsByConversation'], ['Authentication']);
+Router::get('/api/coaching/hints/pending', [RealtimeCoachingController::class, 'getPendingHints'], ['Authentication']);
+Router::post('/api/coaching/hints/{hintId}/view', [RealtimeCoachingController::class, 'markAsViewed'], ['Authentication']);
+Router::post('/api/coaching/hints/{hintId}/feedback', [RealtimeCoachingController::class, 'sendFeedback'], ['Authentication']);
+Router::post('/api/coaching/hints/{hintId}/use-suggestion', [RealtimeCoachingController::class, 'useSuggestion'], ['Authentication']);
+
 // Rota para iniciar chamada a partir de conversa
 Router::post('/conversations/{id}/api4com-call', [ConversationController::class, 'startApi4ComCall'], ['Authentication']);
 

@@ -2074,9 +2074,9 @@ function syncWooCommerceOrders() {
                 html: `<div class="text-start">
                     <p><strong>Sincronização concluída:</strong></p>
                     <ul class="mb-0">
-                        <li>Integrações processadas: ${data.integrations_processed || 0}</li>
-                        <li>Pedidos processados: ${data.orders_processed || 0}</li>
-                        <li>Novos contatos: ${data.new_contacts || 0}</li>
+                        <li>Integrações processadas: \${data.integrations_processed || 0}</li>
+                        <li>Pedidos processados: \${data.orders_processed || 0}</li>
+                        <li>Novos contatos: \${data.new_contacts || 0}</li>
                     </ul>
                 </div>`,
                 confirmButtonText: "Recarregar Dashboard"

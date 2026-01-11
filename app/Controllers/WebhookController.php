@@ -34,6 +34,34 @@ class WebhookController
     }
     
     /**
+     * Gera um pequeno resumo do payload para debug sem expor demais
+     */
+    private static function summarizePayload(string $payload, int $max = 1200): string
+    {
+        $len = strlen($payload);
+        $snippet = $len > $max ? substr($payload, 0, $max) . '... [truncado]' : $payload;
+        return "len={$len} bytes | preview=" . $snippet;
+    }
+    
+    /**
+     * Mascara email/telefone no log
+     */
+    private static function mask(string $value): string
+    {
+        if (filter_var($value, FILTER_VALIDATE_EMAIL)) {
+            $parts = explode('@', $value);
+            $name = $parts[0] ?? '';
+            $domain = $parts[1] ?? '';
+            $maskedName = strlen($name) > 2 ? substr($name, 0, 2) . '***' : '***';
+            return $maskedName . '@' . $domain;
+        }
+        // telefone: manter últimos 4
+        $clean = preg_replace('/\D+/', '', $value);
+        $last = substr($clean, -4);
+        return '***' . $last;
+    }
+    
+    /**
      * Webhook do WooCommerce
      * Recebe eventos de criação e atualização de pedidos
      * 
@@ -47,7 +75,7 @@ class WebhookController
             $data = json_decode($payload, true);
             
             self::log("=== WEBHOOK RECEBIDO ===");
-            self::log("Payload size: " . strlen($payload) . " bytes");
+            self::log("Payload size: " . strlen($payload) . " bytes | " . self::summarizePayload($payload, 600));
             
             if (empty($data)) {
                 self::log("ERRO: Payload vazio ou inválido", 'ERROR');
@@ -63,6 +91,10 @@ class WebhookController
             $event = $headers['X-WC-Webhook-Event'] ?? $headers['x-wc-webhook-event'] ?? null;
             $source = $headers['X-WC-Webhook-Source'] ?? $headers['x-wc-webhook-source'] ?? null;
             $orderId = $data['id'] ?? 'N/A';
+            $topic = $headers['X-WC-Webhook-Topic'] ?? $headers['x-wc-webhook-topic'] ?? null;
+            $contentType = $headers['Content-Type'] ?? $headers['content-type'] ?? '';
+            
+            self::log("Headers: event={$event} | topic={$topic} | source={$source} | content-type={$contentType}");
             
             self::log("Event: {$event} | Source: {$source} | Order ID: {$orderId}");
             
@@ -144,7 +176,7 @@ class WebhookController
         $orderTotal = $orderData['total'];
         $orderDate = $orderData['date_created'] ?? date('Y-m-d H:i:s');
         
-        self::log("Pedido #{$orderId}: Status={$orderStatus}, Total={$orderTotal}");
+        self::log("Pedido #{$orderId}: Status={$orderStatus}, Total={$orderTotal}, Data={$orderDate}");
         
         // 3. Extrair seller_id do meta_data
         $sellerId = null;
@@ -165,7 +197,9 @@ class WebhookController
         $email = $orderData['billing']['email'] ?? null;
         $phone = $orderData['billing']['phone'] ?? null;
         
-        self::log("Buscando contato: email={$email}, phone={$phone}");
+        $maskEmail = $email ? self::mask($email) : 'null';
+        $maskPhone = $phone ? self::mask($phone) : 'null';
+        self::log("Buscando contato: email={$maskEmail}, phone={$maskPhone}");
         
         $contact = null;
         if ($email) {

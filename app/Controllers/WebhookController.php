@@ -34,6 +34,18 @@ class WebhookController
     }
     
     /**
+     * Normaliza headers para lowercase (chaves)
+     */
+    private static function normalizeHeaders(array $headers): array
+    {
+        $normalized = [];
+        foreach ($headers as $key => $value) {
+            $normalized[strtolower($key)] = $value;
+        }
+        return $normalized;
+    }
+    
+    /**
      * Gera um pequeno resumo do payload para debug sem expor demais
      */
     private static function summarizePayload(string $payload, int $max = 1200): string
@@ -77,6 +89,16 @@ class WebhookController
             self::log("=== WEBHOOK RECEBIDO ===");
             self::log("Payload size: " . strlen($payload) . " bytes | " . self::summarizePayload($payload, 600));
             
+            // Caso seja apenas um ping do WooCommerce (webhook_id=XX) e não JSON
+            if (stripos($payload, 'webhook_id=') === 0 && empty($data)) {
+                self::log("PING recebido (webhook_id), ignorando e retornando sucesso.", 'INFO');
+                Response::json([
+                    'success' => true,
+                    'message' => 'Ping recebido'
+                ]);
+                return;
+            }
+            
             if (empty($data)) {
                 self::log("ERRO: Payload vazio ou inválido", 'ERROR');
                 Response::json([
@@ -87,19 +109,21 @@ class WebhookController
             }
             
             // Headers do WooCommerce
-            $headers = function_exists('getallheaders') ? getallheaders() : self::getRequestHeaders();
-            $event = $headers['X-WC-Webhook-Event'] ?? $headers['x-wc-webhook-event'] ?? null;
-            $source = $headers['X-WC-Webhook-Source'] ?? $headers['x-wc-webhook-source'] ?? null;
+            $headersRaw = function_exists('getallheaders') ? getallheaders() : self::getRequestHeaders();
+            $headers = self::normalizeHeaders($headersRaw);
+            
+            $event = $headers['x-wc-webhook-event'] ?? null;
+            $source = $headers['x-wc-webhook-source'] ?? null;
             $orderId = $data['id'] ?? 'N/A';
-            $topic = $headers['X-WC-Webhook-Topic'] ?? $headers['x-wc-webhook-topic'] ?? null;
-            $contentType = $headers['Content-Type'] ?? $headers['content-type'] ?? '';
+            $topic = $headers['x-wc-webhook-topic'] ?? null;
+            $contentType = $headers['content-type'] ?? '';
             
             self::log("Headers: event={$event} | topic={$topic} | source={$source} | content-type={$contentType}");
             
             self::log("Event: {$event} | Source: {$source} | Order ID: {$orderId}");
             
             // Validar evento
-            if (!in_array($event, ['created', 'updated'])) {
+            if (!in_array(strtolower((string)$event), ['created', 'updated'])) {
                 self::log("Evento ignorado: {$event} (não é created/updated)", 'WARNING');
                 Response::json([
                     'success' => true,

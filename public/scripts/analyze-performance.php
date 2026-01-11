@@ -1,28 +1,32 @@
+#!/usr/bin/env php
 <?php
 /**
- * Script para análise periódica de performance de vendedores
- * Executar via cron:
- * 0 */6 * * * cd /var/www/html && php public/scripts/analyze-performance.php >> logs/performance-analysis.log 2>&1
+ * Script para análise periódica de performance de vendedores (standalone)
+ * Exemplo de cron: 0 */6 * * * cd /var/www/html && php public/scripts/analyze-performance.php >> storage/logs/performance-analysis.log 2>&1
  */
 
-// Mudar para diretório raiz do projeto
-chdir(__DIR__ . '/../../');
+// Ajustar diretório raiz
+$rootDir = dirname(__DIR__, 2);
+chdir($rootDir);
 
-// Autoloader
-require_once __DIR__ . '/../../app/Helpers/autoload.php';
-
-// Configurar timezone
+// Erros verbosos para evitar 500 silencioso
 date_default_timezone_set('America/Sao_Paulo');
-
-// Configurar error reporting
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
-// Garantir que o diretório de logs existe
-$logsDir = __DIR__ . '/../../logs';
-if (!is_dir($logsDir)) {
-    mkdir($logsDir, 0755, true);
+// Log
+$logDir = $rootDir . '/storage/logs';
+if (!is_dir($logDir)) {
+    mkdir($logDir, 0755, true);
 }
+
+// Bootstrap (autoload + env)
+$bootstrapPath = $rootDir . '/config/bootstrap.php';
+if (!file_exists($bootstrapPath)) {
+    echo "[", date('Y-m-d H:i:s'), "] ERRO: config/bootstrap.php não encontrado em {$bootstrapPath}\n";
+    exit(1);
+}
+require_once $bootstrapPath;
 
 use App\Services\AgentPerformanceAnalysisService;
 use App\Services\ConversationSettingsService;
@@ -37,7 +41,7 @@ try {
     $perfSettings = $settings['agent_performance_analysis'] ?? [];
     
     if (empty($perfSettings['enabled'])) {
-        echo "[" . date('Y-m-d H:i:s') . "] ⚠️ AVISO: Análise de performance está DESABILITADA nas configurações!\n";
+        echo "[" . date('Y-m-d H:i:s') . "] ⚠️ Análise de performance DESABILITADA nas configurações.\n";
         echo "[" . date('Y-m-d H:i:s') . "] Acesse: Configurações > Botões de Ação > Análise de Performance\n\n";
         exit(0);
     }
@@ -48,19 +52,26 @@ try {
     echo "[" . date('Y-m-d H:i:s') . "]    - Intervalo: " . ($perfSettings['check_interval_hours'] ?? 'N/A') . " horas\n";
     echo "[" . date('Y-m-d H:i:s') . "]    - Idade máxima: " . ($perfSettings['max_conversation_age_days'] ?? 'N/A') . " dias\n";
     echo "[" . date('Y-m-d H:i:s') . "]    - Mín. mensagens: " . ($perfSettings['min_messages_to_analyze'] ?? 'N/A') . "\n";
-    echo "[" . date('Y-m-d H:i:s') . "]    - Apenas fechadas: " . ($perfSettings['analyze_closed_only'] ? 'Sim' : 'Não') . "\n\n";
+    echo "[" . date('Y-m-d H:i:s') . "]    - Apenas fechadas: " . (($perfSettings['analyze_closed_only'] ?? true) ? 'Sim' : 'Não') . "\n\n";
     
-    // Verificar conversas elegíveis
+    // Status respeitando configuração (fechadas apenas ou também abertas)
+    $statuses = ($perfSettings['analyze_closed_only'] ?? true)
+        ? ['closed', 'resolved']
+        : ['open', 'pending', 'in_progress', 'waiting', 'assigned', 'closed', 'resolved'];
+    $placeholders = implode(',', array_fill(0, count($statuses), '?'));
+
+    // Contar elegíveis
     $sql = "SELECT COUNT(*) as total 
             FROM conversations c
             LEFT JOIN agent_performance_analysis apa ON c.id = apa.conversation_id
-            WHERE c.status IN ('closed', 'resolved')
+            WHERE c.status IN ({$placeholders})
             AND c.agent_id IS NOT NULL
             AND apa.id IS NULL
             AND (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND sender_type = 'agent') >= ?";
     
     $minAgentMessages = (int)($perfSettings['min_agent_messages'] ?? 3);
-    $eligible = Database::fetch($sql, [$minAgentMessages]);
+    $params = array_merge($statuses, [$minAgentMessages]);
+    $eligible = Database::fetch($sql, $params);
     $eligibleCount = $eligible['total'] ?? 0;
     
     echo "[" . date('Y-m-d H:i:s') . "] 🔍 Conversas elegíveis para análise: {$eligibleCount}\n";
@@ -68,7 +79,7 @@ try {
     if ($eligibleCount == 0) {
         echo "[" . date('Y-m-d H:i:s') . "] ℹ️ Nenhuma conversa precisa ser analisada no momento.\n";
         echo "[" . date('Y-m-d H:i:s') . "] Motivos possíveis:\n";
-        echo "[" . date('Y-m-d H:i:s') . "]    - Não há conversas fechadas com agente atribuído\n";
+        echo "[" . date('Y-m-d H:i:s') . "]    - Não há conversas no status configurado com agente atribuído\n";
         echo "[" . date('Y-m-d H:i:s') . "]    - Conversas não têm mensagens suficientes do agente (mín: {$minAgentMessages})\n";
         echo "[" . date('Y-m-d H:i:s') . "]    - Todas as conversas já foram analisadas\n\n";
         exit(0);
@@ -78,12 +89,12 @@ try {
     
     $result = AgentPerformanceAnalysisService::processPendingConversations();
     
-    echo "[" . date('Y-m-d H:i:s') . "] ✅ Análises processadas: " . $result['processed'] . "\n";
-    echo "[" . date('Y-m-d H:i:s') . "] ⚠️ Erros: " . $result['errors'] . "\n";
-    echo "[" . date('Y-m-d H:i:s') . "] 💰 Custo total: $" . number_format($result['cost'], 4) . "\n\n";
+    echo "[" . date('Y-m-d H:i:s') . "] ✅ Análises processadas: " . ($result['processed'] ?? 0) . "\n";
+    echo "[" . date('Y-m-d H:i:s') . "] ⚠️ Erros: " . ($result['errors'] ?? 0) . "\n";
+    echo "[" . date('Y-m-d H:i:s') . "] 💰 Custo total: $" . number_format($result['cost'] ?? 0, 4) . "\n\n";
     
     // Atualizar status de metas dos agentes analisados
-    if ($result['processed'] > 0 && $perfSettings['coaching']['enabled'] ?? false) {
+    if (($result['processed'] ?? 0) > 0 && ($perfSettings['coaching']['enabled'] ?? false)) {
         echo "[" . date('Y-m-d H:i:s') . "] 🎯 Atualizando metas dos agentes...\n";
         
         $agents = Database::fetchAll("SELECT DISTINCT agent_id FROM agent_performance_analysis WHERE DATE(analyzed_at) = CURDATE()");
@@ -99,7 +110,7 @@ try {
     
     echo "[" . date('Y-m-d H:i:s') . "] Concluído.\n\n";
     
-} catch (\Exception $e) {
+} catch (\Throwable $e) {
     echo "[" . date('Y-m-d H:i:s') . "] ❌ ERRO: " . $e->getMessage() . "\n";
     echo "[" . date('Y-m-d H:i:s') . "] Stack trace: " . $e->getTraceAsString() . "\n\n";
     exit(1);

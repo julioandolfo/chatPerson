@@ -2774,7 +2774,9 @@ function getChannelInfo(channel) {
         </div>
         
         <!-- Mensagens (sempre presente) -->
-        <div class="chat-messages <?= !empty($accessRestricted) ? 'access-restricted' : '' ?>" id="chatMessages">
+        <div class="chat-messages <?= !empty($accessRestricted) ? 'access-restricted' : '' ?>" 
+             id="chatMessages" 
+             data-conversation-id="<?= $selectedConversation['id'] ?? '' ?>">
             <?php if (!empty($selectedConversation) && !empty($accessRestricted)): ?>
                 <!-- ======================================== -->
                 <!-- ACESSO RESTRITO - TELA OFUSCADA -->
@@ -7260,6 +7262,9 @@ function selectConversation(id) {
     if (noteToggle) {
         noteToggle.checked = false;
     }
+    
+    // Atualizar data-conversation-id para o coaching inline detectar
+    chatMessages.setAttribute('data-conversation-id', id);
     
     chatMessages.innerHTML = `
         <div class="d-flex align-items-center justify-content-center" style="height: 100%;">

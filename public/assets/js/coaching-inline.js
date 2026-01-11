@@ -14,14 +14,17 @@ class CoachingInline {
         
         // Observar mudanças na conversa
         this.observeConversationChanges();
+        
+        // Polling a cada 10 segundos para buscar novos hints
+        this.startPolling();
     }
 
     observeConversationChanges() {
-        // Verificar quando a conversa muda
+        // Verificar quando a conversa muda no #chatMessages
         const checkInterval = setInterval(() => {
-            const conversationIdElement = document.querySelector('[data-conversation-id]');
-            if (conversationIdElement) {
-                const newConversationId = conversationIdElement.dataset.conversationId;
+            const chatMessages = document.getElementById('chatMessages');
+            if (chatMessages) {
+                const newConversationId = chatMessages.dataset.conversationId;
                 if (newConversationId && newConversationId !== this.conversationId) {
                     this.conversationId = newConversationId;
                     console.log('[CoachingInline] Nova conversa detectada:', this.conversationId);
@@ -29,6 +32,16 @@ class CoachingInline {
                 }
             }
         }, 1000);
+    }
+
+    startPolling() {
+        // Polling a cada 10 segundos para buscar novos hints
+        setInterval(() => {
+            if (this.conversationId) {
+                console.log('[CoachingInline] Polling - buscando novos hints...');
+                this.loadHints();
+            }
+        }, 10000); // 10 segundos
     }
 
     async loadHints() {

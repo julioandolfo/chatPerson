@@ -22,10 +22,15 @@ class RealtimeCoachingController
         $userId = Auth::user()['id'];
         
         // Buscar hints da conversa
-        $hints = RealtimeCoachingHint::where('conversation_id', '=', $conversationId)
-            ->where('agent_id', '=', $userId)
-            ->orderBy('created_at', 'DESC')
-            ->get();
+        $sql = "SELECT * FROM realtime_coaching_hints 
+                WHERE conversation_id = :conversation_id 
+                AND agent_id = :agent_id 
+                ORDER BY created_at DESC";
+        
+        $hints = \App\Helpers\Database::fetchAll($sql, [
+            'conversation_id' => $conversationId,
+            'agent_id' => $userId
+        ]);
         
         // Agrupar hints por message_id
         $hintsByMessage = [];

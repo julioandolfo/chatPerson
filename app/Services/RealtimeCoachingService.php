@@ -306,7 +306,7 @@ class RealtimeCoachingService
     private static function getQueueSize(): int
     {
         $sql = "SELECT COUNT(*) as total FROM coaching_queue WHERE status = 'pending'";
-        $result = Database::fetchOne($sql);
+        $result = Database::fetch($sql);
         return (int)($result['total'] ?? 0);
     }
     
@@ -782,7 +782,7 @@ class RealtimeCoachingService
     private static function getApiKey(): ?string
     {
         $sql = "SELECT value FROM settings WHERE `key` = 'openai_api_key' LIMIT 1";
-        $result = Database::fetchOne($sql);
+        $result = Database::fetch($sql);
         return $result['value'] ?? null;
     }
     

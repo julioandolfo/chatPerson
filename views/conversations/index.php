@@ -1946,8 +1946,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
 <!-- SLA Indicator CSS -->
 <link rel="stylesheet" href="<?= \App\Helpers\Url::asset('css/custom/sla-indicator.css') ?>">
 
-<!-- Realtime Coaching CSS -->
-<link rel="stylesheet" href="<?= \App\Helpers\Url::asset('css/realtime-coaching.css') ?>">
+<!-- Realtime Coaching CSS já incluído no layout principal (app.php) -->
 
 <!-- Script inline para definir função ANTES do HTML do botão -->
 <script>
@@ -19786,17 +19785,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- Realtime Coaching Container -->
 <div id="coaching-hints-container" class="coaching-hints-container"></div>
 
-<!-- Realtime Coaching JS -->
-<script src="<?= \App\Helpers\Url::asset('js/realtime-coaching.js') ?>"></script>
-<script>
-// Inicializar Coaching em Tempo Real
-if (typeof RealtimeCoaching !== 'undefined') {
-    window.realtimeCoaching = new RealtimeCoaching();
-    console.log('✅ Coaching em Tempo Real inicializado');
-} else {
-    console.error('❌ RealtimeCoaching não encontrado');
-}
-</script>
+<!-- Realtime Coaching já incluído no layout principal (app.php) -->
 
 <!-- WooCommerce Sidebar Bootstrap -->
 <script>

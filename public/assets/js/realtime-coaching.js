@@ -5,6 +5,11 @@
  * Usa WebSocket (primário) + Polling (fallback).
  */
 
+// Proteger contra redeclaração
+if (typeof RealtimeCoaching !== 'undefined') {
+    console.warn('[Coaching] RealtimeCoaching já está definido, pulando redeclaração');
+} else {
+
 class RealtimeCoaching {
     constructor() {
         this.currentConversationId = null;
@@ -406,7 +411,14 @@ class RealtimeCoaching {
     }
 }
 
-// Inicializar quando DOM estiver pronto
-document.addEventListener('DOMContentLoaded', () => {
-    window.realtimeCoaching = new RealtimeCoaching();
-});
+} // Fim da proteção contra redeclaração
+
+// Inicializar quando DOM estiver pronto (apenas se ainda não existe instância)
+if (typeof window.realtimeCoaching === 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        if (typeof RealtimeCoaching !== 'undefined') {
+            window.realtimeCoaching = new RealtimeCoaching();
+            console.log('[Coaching] ✅ Instância criada e atribuída a window.realtimeCoaching');
+        }
+    });
+}

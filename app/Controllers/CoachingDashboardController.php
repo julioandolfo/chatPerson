@@ -10,6 +10,7 @@ use App\Helpers\Response;
 use App\Helpers\Auth;
 use App\Helpers\Request;
 use App\Helpers\Permission;
+use App\Helpers\Database;
 use App\Services\CoachingMetricsService;
 use App\Services\CoachingLearningService;
 use App\Models\CoachingAnalyticsSummary;
@@ -25,8 +26,9 @@ class CoachingDashboardController
     {
         Permission::abortIfCannot('coaching.view');
         
-        $userId = Auth::user()['id'];
-        $userRole = Auth::user()['role_id'];
+        $user = Auth::user();
+        $userId = $user['id'];
+        $userRole = $user['role_id'] ?? $user['role'] ?? 4;
         
         // Se não for admin/supervisor, mostrar apenas seus próprios dados
         $agentId = null;
@@ -57,7 +59,8 @@ class CoachingDashboardController
         // Buscar todos os agentes para filtro (apenas admins)
         $agents = [];
         if (in_array($userRole, [1, 2, 3])) {
-            $agents = User::where('role_id', '>=', 4)->get(); // Apenas agentes
+            $sql = "SELECT id, name FROM users WHERE role_id >= 4 AND status = 'active' ORDER BY name ASC";
+            $agents = Database::fetchAll($sql);
         }
         
         // Estatísticas globais do período
@@ -93,8 +96,9 @@ class CoachingDashboardController
     {
         Permission::abortIfCannot('coaching.view');
         
-        $userId = Auth::user()['id'];
-        $userRole = Auth::user()['role_id'];
+        $user = Auth::user();
+        $userId = $user['id'];
+        $userRole = $user['role_id'] ?? $user['role'] ?? 4;
         
         // Se não forneceu agentId, usar o próprio
         if (!$agentId) {
@@ -152,8 +156,9 @@ class CoachingDashboardController
     {
         Permission::abortIfCannot('coaching.view');
         
-        $userId = Auth::user()['id'];
-        $userRole = Auth::user()['role_id'];
+        $user = Auth::user();
+        $userId = $user['id'];
+        $userRole = $user['role_id'] ?? $user['role'] ?? 4;
         
         $agentId = null;
         if (!in_array($userRole, [1, 2, 3])) {
@@ -183,8 +188,9 @@ class CoachingDashboardController
     {
         Permission::abortIfCannot('coaching.view');
         
-        $userId = Auth::user()['id'];
-        $userRole = Auth::user()['role_id'];
+        $user = Auth::user();
+        $userId = $user['id'];
+        $userRole = $user['role_id'] ?? $user['role'] ?? 4;
         
         $agentId = Request::get('agent_id');
         $period = Request::get('period', 'week');
@@ -212,8 +218,9 @@ class CoachingDashboardController
     {
         Permission::abortIfCannot('coaching.view');
         
-        $userId = Auth::user()['id'];
-        $userRole = Auth::user()['role_id'];
+        $user = Auth::user();
+        $userId = $user['id'];
+        $userRole = $user['role_id'] ?? $user['role'] ?? 4;
         
         $agentId = Request::get('agent_id');
         $period = Request::get('period', 'weekly');
@@ -277,8 +284,9 @@ class CoachingDashboardController
     {
         Permission::abortIfCannot('coaching.view');
         
-        $userId = Auth::user()['id'];
-        $userRole = Auth::user()['role_id'];
+        $user = Auth::user();
+        $userId = $user['id'];
+        $userRole = $user['role_id'] ?? $user['role'] ?? 4;
         
         $agentId = Request::get('agent_id');
         $period = Request::get('period', 'week');

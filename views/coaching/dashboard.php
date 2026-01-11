@@ -3,13 +3,19 @@
  * View: Dashboard de Coaching - Visão Geral
  */
 
+$layout = 'layouts.metronic.app';
+$title = $title ?? 'Dashboard de Coaching';
+
 use App\Helpers\Url;
 
-$acceptanceRate = $dashboard['acceptance_rate'];
-$roi = $dashboard['roi'];
-$conversionImpact = $dashboard['conversion_impact'];
-$hintQuality = $dashboard['hint_quality'];
-$suggestionUsage = $dashboard['suggestion_usage'];
+// Content
+ob_start();
+
+$acceptanceRate = $dashboard['acceptance_rate'] ?? [];
+$roi = $dashboard['roi'] ?? [];
+$conversionImpact = $dashboard['conversion_impact'] ?? [];
+$hintQuality = $dashboard['hint_quality'] ?? [];
+$suggestionUsage = $dashboard['suggestion_usage'] ?? [];
 ?>
 
 <!-- Cabeçalho -->
@@ -394,3 +400,11 @@ document.getElementById('agentFilter')?.addEventListener('change', function() {
     window.location.href = `<?= Url::to('/coaching/dashboard') ?>?period=${period}${agentId ? '&agent_id=' + agentId : ''}`;
 });
 </script>
+
+<?php
+// Fim do conteúdo
+$content = ob_get_clean();
+
+// Incluir layout
+include __DIR__ . '/../' . str_replace('.', '/', $layout) . '.php';
+?>

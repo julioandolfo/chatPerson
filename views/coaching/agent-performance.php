@@ -3,10 +3,16 @@
  * View: Performance Detalhada de Agente - Coaching
  */
 
+$layout = 'layouts.metronic.app';
+$title = $title ?? 'Performance de Coaching';
+
 use App\Helpers\Url;
 
-$acceptanceRate = $dashboard['acceptance_rate'];
-$learningSpeed = $dashboard['learning_speed'];
+// Content
+ob_start();
+
+$acceptanceRate = $dashboard['acceptance_rate'] ?? [];
+$learningSpeed = $dashboard['learning_speed'] ?? [];
 ?>
 
 <!-- Cabeçalho -->
@@ -261,3 +267,11 @@ document.getElementById('periodFilter')?.addEventListener('change', function() {
     window.location.href = `<?= Url::to('/coaching/agent/' . $agent['id']) ?>?period=${period}`;
 });
 </script>
+
+<?php
+// Fim do conteúdo
+$content = ob_get_clean();
+
+// Incluir layout
+include __DIR__ . '/../' . str_replace('.', '/', $layout) . '.php';
+?>

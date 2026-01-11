@@ -51,14 +51,8 @@ class TeamService
             Team::addMember($teamId, $data['leader_id']);
         }
         
-        // Log de atividade
-        if (class_exists('\App\Services\ActivityService')) {
-            try {
-                ActivityService::logTeamCreated($teamId, $data['name'], \App\Helpers\Auth::id());
-            } catch (\Exception $e) {
-                error_log("Erro ao logar atividade: " . $e->getMessage());
-            }
-        }
+        // TODO: Adicionar log de atividade quando método existir
+        // ActivityService::logTeamCreated($teamId, $data['name'], \App\Helpers\Auth::id());
         
         return $teamId;
     }
@@ -102,14 +96,8 @@ class TeamService
         
         $result = Team::update($id, $data);
         
-        // Log de atividade
-        if (class_exists('\App\Services\ActivityService')) {
-            try {
-                ActivityService::logTeamUpdated($id, $data['name'] ?? $team['name'], \App\Helpers\Auth::id());
-            } catch (\Exception $e) {
-                error_log("Erro ao logar atividade: " . $e->getMessage());
-            }
-        }
+        // TODO: Adicionar log de atividade quando método existir
+        // ActivityService::logTeamUpdated($id, $data['name'] ?? $team['name'], \App\Helpers\Auth::id());
         
         return $result;
     }
@@ -129,14 +117,8 @@ class TeamService
         
         $result = Team::delete($id);
         
-        // Log de atividade
-        if (class_exists('\App\Services\ActivityService')) {
-            try {
-                ActivityService::logTeamDeleted($id, $team['name'], \App\Helpers\Auth::id());
-            } catch (\Exception $e) {
-                error_log("Erro ao logar atividade: " . $e->getMessage());
-            }
-        }
+        // TODO: Adicionar log de atividade quando método existir
+        // ActivityService::logTeamDeleted($id, $team['name'], \App\Helpers\Auth::id());
         
         return $result;
     }

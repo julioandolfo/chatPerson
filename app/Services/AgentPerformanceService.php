@@ -79,17 +79,16 @@ class AgentPerformanceService
     }
 
     /**
-     * Total de conversas atribuídas ao agente
+     * Total de conversas atribuídas ao agente (com histórico)
      */
     private static function getTotalConversations(int $agentId, string $dateFrom, string $dateTo): int
     {
-        $sql = "SELECT COUNT(*) as count FROM conversations 
-                WHERE agent_id = ? 
-                AND created_at >= ? 
-                AND created_at <= ?";
-        
-        $result = \App\Helpers\Database::fetch($sql, [$agentId, $dateFrom, $dateTo]);
-        return (int)($result['count'] ?? 0);
+        // Usar histórico de atribuições para contar todas as conversas que passaram pelo agente
+        return \App\Models\ConversationAssignment::countAgentConversations(
+            $agentId,
+            $dateFrom,
+            $dateTo
+        );
     }
 
     /**

@@ -235,7 +235,7 @@ class TeamController
                 try {
                     foreach ($teams as $team) {
                         // Buscar membros do time que são vendedores (têm woocommerce_seller_id)
-                        $members = TeamService::getMembers($team['id']);
+                        $members = \App\Models\Team::getMembers($team['id']);
                         $sellerMembers = array_filter($members, function($member) {
                             return !empty($member['woocommerce_seller_id']);
                         });

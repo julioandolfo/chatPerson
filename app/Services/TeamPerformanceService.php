@@ -34,9 +34,18 @@ class TeamPerformanceService
         $placeholders = implode(',', array_fill(0, count($memberIds), '?'));
         $params = array_merge($memberIds, [$dateFrom, $dateTo]);
         
+        // Total de conversas usando histórico de atribuições
+        $totalConversationsFromHistory = 0;
+        foreach ($memberIds as $memberId) {
+            $totalConversationsFromHistory += \App\Models\ConversationAssignment::countAgentConversations(
+                $memberId,
+                $dateFrom,
+                $dateTo
+            );
+        }
+        
         // Estatísticas agregadas do time
         $sql = "SELECT 
-                    COUNT(DISTINCT c.id) as total_conversations,
                     COUNT(DISTINCT CASE WHEN c.status IN ('closed', 'resolved') THEN c.id END) as closed_conversations,
                     COUNT(DISTINCT CASE WHEN c.status IN ('open', 'pending') THEN c.id END) as open_conversations,
                     COUNT(DISTINCT m.id) as total_messages,
@@ -56,8 +65,10 @@ class TeamPerformanceService
         $paramsForQuery = array_merge($memberIds, [$dateFrom, $dateTo], $memberIds, [$dateFrom, $dateTo]);
         $stats = Database::fetch($sql, $paramsForQuery);
         
-        // Calcular métricas adicionais
-        $totalConversations = (int)($stats['total_conversations'] ?? 0);
+        // Usar total de conversas do histórico
+        $totalConversations = $totalConversationsFromHistory;
+        
+        // Calcular métricas adicionais (totalConversations já foi definido acima do histórico)
         $closedConversations = (int)($stats['closed_conversations'] ?? 0);
         $openConversations = (int)($stats['open_conversations'] ?? 0);
         $totalMessages = (int)($stats['total_messages'] ?? 0);

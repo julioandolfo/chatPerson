@@ -27,7 +27,7 @@ function up_create_conversation_assignments_history() {
     
     // Popular com dados existentes (conversas já atribuídas)
     $sql = "INSERT INTO conversation_assignments (conversation_id, agent_id, assigned_at)
-            SELECT id, agent_id, COALESCE(assigned_at, created_at, NOW())
+            SELECT id, agent_id, COALESCE(created_at, NOW())
             FROM conversations
             WHERE agent_id IS NOT NULL
             AND id NOT IN (SELECT conversation_id FROM conversation_assignments)";

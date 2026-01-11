@@ -191,9 +191,17 @@ class AgentConversionService
         // Buscar do cache e processar para formato compatível com a view
         $cachedOrders = self::getOrdersFromCache($sellerId, $dateFrom, $dateTo);
         
+        // Status válidos para conversão
+        $validStatuses = ['processing', 'completed', 'producao', 'designer', 'pedido-enviado', 'pedido-entregue'];
+        
         // Processar cada pedido do cache
         $processedOrders = [];
         foreach ($cachedOrders as $cached) {
+            // Filtrar apenas pedidos com status válido
+            if (!in_array($cached['order_status'], $validStatuses)) {
+                continue; // Pular pedidos cancelados, pendentes, etc
+            }
+            
             // Decodificar JSON do pedido completo
             $orderData = json_decode($cached['order_data'], true);
             

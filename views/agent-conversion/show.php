@@ -183,6 +183,10 @@ ob_start();
                                         $statusColors = [
                                             'completed' => 'success',
                                             'processing' => 'primary',
+                                            'producao' => 'info',
+                                            'designer' => 'info',
+                                            'pedido-enviado' => 'primary',
+                                            'pedido-entregue' => 'success',
                                             'pending' => 'warning',
                                             'on-hold' => 'info',
                                             'cancelled' => 'danger',
@@ -192,6 +196,10 @@ ob_start();
                                         $statusLabels = [
                                             'completed' => 'Concluído',
                                             'processing' => 'Processando',
+                                            'producao' => 'Em Produção',
+                                            'designer' => 'No Designer',
+                                            'pedido-enviado' => 'Enviado',
+                                            'pedido-entregue' => 'Entregue',
                                             'pending' => 'Pendente',
                                             'on-hold' => 'Em espera',
                                             'cancelled' => 'Cancelado',

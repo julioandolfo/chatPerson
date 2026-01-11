@@ -356,16 +356,17 @@ class DashboardController
             
             $avgTicket = $totalOrders > 0 ? round($totalRevenue / $totalOrders, 2) : 0;
             
-            // Taxa de conversão baseada nas conversas do time
-            $teamConversations = Database::fetch(
-                "SELECT COUNT(*) as total FROM conversations c
-                 INNER JOIN team_members tm ON c.agent_id = tm.user_id
-                 WHERE tm.team_id = ?
-                 AND c.created_at BETWEEN ? AND ?",
-                [$teamId, $dateFrom, $dateTo . ' 23:59:59']
-            );
+            // Taxa de conversão baseada no histórico de conversas do time
+            $memberIds = array_column($members, 'id');
+            $totalConversations = 0;
             
-            $totalConversations = $teamConversations['total'] ?? 0;
+            foreach ($memberIds as $memberId) {
+                $totalConversations += \App\Models\ConversationAssignment::countAgentConversations(
+                    $memberId,
+                    $dateFrom,
+                    $dateTo . ' 23:59:59'
+                );
+            }
             $conversionRate = $totalConversations > 0 
                 ? round(($totalOrders / $totalConversations) * 100, 2) 
                 : 0;

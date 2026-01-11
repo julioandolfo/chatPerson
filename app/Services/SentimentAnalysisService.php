@@ -161,7 +161,10 @@ class SentimentAnalysisService
             $analysis = self::parseOpenAIResponse($response, $conversationId, $messageId, count($messages), $settings['model']);
 
             // Salvar análise
-            $sentiment = ConversationSentiment::create($analysis);
+            $sentimentId = ConversationSentiment::create($analysis);
+            
+            // Adicionar ID ao array de análise
+            $analysis['id'] = $sentimentId;
 
             // Adicionar tag automática se negativo
             if ($settings['auto_tag_negative'] && $analysis['sentiment_label'] === 'negative' && !empty($settings['negative_tag_id'])) {
@@ -170,7 +173,7 @@ class SentimentAnalysisService
 
             Logger::log("SentimentAnalysisService::analyzeConversation - ✅ Análise concluída para conversa {$conversationId}: {$analysis['sentiment_label']} (score: {$analysis['sentiment_score']})");
 
-            return $sentiment;
+            return $analysis;
 
         } catch (\Exception $e) {
             Logger::error("SentimentAnalysisService::analyzeConversation - Erro: " . $e->getMessage());

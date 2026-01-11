@@ -326,7 +326,7 @@ class DashboardController
     {
         try {
             // Buscar membros do time que são vendedores
-            $members = \App\Services\TeamService::getMembers($teamId);
+            $members = \App\Models\Team::getMembers($teamId);
             $sellers = array_filter($members, function($member) {
                 return !empty($member['woocommerce_seller_id']);
             });

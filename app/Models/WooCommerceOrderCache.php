@@ -20,6 +20,7 @@ class WooCommerceOrderCache extends Model
         'order_status',
         'order_total',
         'order_date',
+        'seller_id',
         'cached_at',
         'expires_at'
     ];
@@ -76,7 +77,10 @@ class WooCommerceOrderCache extends Model
     /**
      * Salvar pedido no cache
      */
-    public static function cacheOrder(int $integrationId, int $contactId, array $order, int $ttlMinutes = 5): int
+    /**
+     * Salvar pedido no cache, incluindo seller_id quando disponível
+     */
+    public static function cacheOrder(int $integrationId, int $contactId, array $order, int $ttlMinutes = 5, ?int $sellerId = null): int
     {
         $expiresAt = date('Y-m-d H:i:s', time() + ($ttlMinutes * 60));
         
@@ -88,6 +92,7 @@ class WooCommerceOrderCache extends Model
             'order_status' => $order['status'] ?? 'pending',
             'order_total' => $order['total'] ?? '0.00',
             'order_date' => $order['date_created'] ?? date('Y-m-d H:i:s'),
+            'seller_id' => $sellerId,
             'expires_at' => $expiresAt
         ];
 

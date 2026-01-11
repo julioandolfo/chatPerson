@@ -8,6 +8,7 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Models\Conversation;
+use App\Models\Contact;
 use App\Helpers\Database;
 
 class AgentConversionService
@@ -199,6 +200,9 @@ class AgentConversionService
             if (!$orderData) {
                 continue;
             }
+
+            // Tentar correlacionar conversa pelo contact_id do cache ou telefone do pedido
+            $conversationId = self::findConversationForOrder($cached, $orderData, $agentId);
             
             // Montar estrutura compatível com a view
             $processedOrders[] = [
@@ -212,7 +216,7 @@ class AgentConversionService
                 'customer_email' => $orderData['billing']['email'] ?? '',
                 'customer_phone' => $orderData['billing']['phone'] ?? '',
                 'woocommerce_url' => $orderData['_links']['self'][0]['href'] ?? '#',
-                'conversation_id' => null, // TODO: Implementar correlação com conversas
+                'conversation_id' => $conversationId,
                 'full_data' => $orderData // Dados completos do pedido
             ];
         }
@@ -236,6 +240,57 @@ class AgentConversionService
                 ORDER BY order_date DESC";
         
         return Database::fetchAll($sql, [$sellerId, $dateFrom, $dateTo]);
+    }
+
+    /**
+     * Encontrar conversa relacionada ao pedido:
+     * 1) Usa contact_id salvo no cache, se existir
+     * 2) Caso contrário, tenta pelo telefone do billing (normalizado) e busca contato e conversa mais recente
+     */
+    private static function findConversationForOrder(array $cached, array $orderData, int $agentId): ?int
+    {
+        // 1) Se o cache já tem contact_id, buscar conversa mais recente desse contato (priorizando agente)
+        if (!empty($cached['contact_id'])) {
+            $conv = self::findLatestConversation((int)$cached['contact_id'], $agentId);
+            if ($conv) {
+                return $conv;
+            }
+        }
+
+        // 2) Tentar pelo telefone do pedido
+        $phone = $orderData['billing']['phone'] ?? '';
+        if (!empty($phone)) {
+            $contact = Contact::findByPhoneNormalized($phone);
+            if ($contact && !empty($contact['id'])) {
+                $conv = self::findLatestConversation((int)$contact['id'], $agentId);
+                if ($conv) {
+                    return $conv;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Buscar a conversa mais recente de um contato, priorizando o agente atual
+     */
+    private static function findLatestConversation(int $contactId, int $agentId): ?int
+    {
+        // Priorizar conversa do mesmo agente, senão pegar qualquer uma do contato
+        $sql = "SELECT id FROM conversations 
+                WHERE contact_id = ? AND agent_id = ? 
+                ORDER BY updated_at DESC, created_at DESC, id DESC LIMIT 1";
+        $row = Database::fetch($sql, [$contactId, $agentId]);
+        if (!empty($row['id'])) {
+            return (int)$row['id'];
+        }
+
+        $sql = "SELECT id FROM conversations 
+                WHERE contact_id = ? 
+                ORDER BY updated_at DESC, created_at DESC, id DESC LIMIT 1";
+        $row = Database::fetch($sql, [$contactId]);
+        return !empty($row['id']) ? (int)$row['id'] : null;
     }
     
     /**

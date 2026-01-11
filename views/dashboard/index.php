@@ -2062,7 +2062,18 @@ function syncWooCommerceOrders() {
             days_back: parseInt(daysBack)
         })
     })
-    .then(response => response.json())
+    .then(async response => {
+        const text = await response.text();
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            return {
+                success: false,
+                message: "Resposta inválida do servidor",
+                details: text
+            };
+        }
+    })
     .then(data => {
         btnSync.disabled = false;
         btnSync.innerHTML = "<i class=\"ki-duotone ki-arrows-circle fs-2\"><span class=\"path1\"></span><span class=\"path2\"></span></i> Sincronizar";
@@ -2092,7 +2103,7 @@ function syncWooCommerceOrders() {
             Swal.fire({
                 icon: "error",
                 title: "Erro",
-                text: data.message || "Erro ao sincronizar pedidos"
+                html: (data.message || "Erro ao sincronizar pedidos") + (data.details ? "<br><small>" + data.details + "</small>" : "")
             });
         }
     })

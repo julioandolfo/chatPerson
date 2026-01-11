@@ -74,8 +74,8 @@ class Notification extends Model
      */
     public static function createNotification(array $data): int
     {
-        // Garantir valores padrão
-        $data['is_read'] = $data['is_read'] ?? false;
+        // Garantir valores padrão (converter boolean para int)
+        $data['is_read'] = isset($data['is_read']) ? (int)$data['is_read'] : 0;
         $data['read_at'] = $data['read_at'] ?? null;
         
         // Serializar data se for array

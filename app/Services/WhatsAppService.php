@@ -1799,12 +1799,14 @@ class WhatsAppService
                     
                     // Buscar conversas recentes (últimas 24h) desta conta WhatsApp que tenham contatos com @lid
                     try {
-                        $sql = "SELECT DISTINCT c.* FROM contacts c
+                        $sql = "SELECT DISTINCT c.*, MAX(conv.updated_at) as last_conversation 
+                                FROM contacts c
                                 INNER JOIN conversations conv ON conv.contact_id = c.id
                                 WHERE conv.whatsapp_account_id = :account_id
                                 AND c.whatsapp_id LIKE '%@lid'
                                 AND conv.updated_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
-                                ORDER BY conv.updated_at DESC
+                                GROUP BY c.id
+                                ORDER BY last_conversation DESC
                                 LIMIT 10";
                         
                         $lidContacts = \App\Helpers\Database::query($sql, [

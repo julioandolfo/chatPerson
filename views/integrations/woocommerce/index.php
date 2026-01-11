@@ -403,6 +403,36 @@ ob_start();
                             <input type="number" class="form-control" name="cache_ttl_minutes" id="edit_cache_ttl" min="1">
                         </div>
                     </div>
+                    
+                    <div class="separator separator-dashed my-5"></div>
+                    
+                    <h4 class="fw-bold mb-4">
+                        <i class="ki-duotone ki-chart-line-up fs-2 text-success me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Tracking de Conversão
+                    </h4>
+                    <p class="text-muted fs-7 mb-4">Configure o campo onde está o ID do vendedor nos pedidos para métricas de conversão</p>
+                    
+                    <div class="mb-5">
+                        <label class="form-label">Meta Key do Vendedor</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" name="seller_meta_key" id="edit_seller_meta_key" placeholder="_vendor_id">
+                            <button type="button" class="btn btn-light-primary" onclick="testSellerMetaKeyEdit()" id="btn_test_meta_key_edit">
+                                <i class="ki-duotone ki-verify fs-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Testar
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            Campo do <code>meta_data</code> onde está o ID do vendedor.<br>
+                            Exemplos: <code>_vendor_id</code>, <code>_wcfm_vendor_id</code>, <code>_dokan_vendor_id</code>
+                        </div>
+                        <div id="test_meta_key_result_edit" class="mt-3" style="display: none;"></div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
@@ -564,6 +594,9 @@ function editIntegration(id, integration) {
     document.getElementById('edit_phone_variations').checked = phoneVariations;
     document.getElementById('edit_max_results').value = maxResults;
     document.getElementById('edit_cache_ttl').value = integration.cache_ttl_minutes || 5;
+    
+    // Popular campo de seller meta key
+    document.getElementById('edit_seller_meta_key').value = integration.seller_meta_key || '_vendor_id';
     
     const modal = new bootstrap.Modal(document.getElementById('kt_modal_edit_woocommerce'));
     modal.show();
@@ -784,6 +817,150 @@ function testSellerMetaKey() {
     }
     
     const integrationId = integrationIdInput.value;
+    
+    // Loading
+    testBtn.disabled = true;
+    testBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Testando...';
+    resultDiv.style.display = 'none';
+    
+    fetch('<?= \App\Helpers\Url::to('/api/woocommerce/test-meta-key') ?>', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `integration_id=${integrationId}&meta_key=${encodeURIComponent(metaKey)}`
+    })
+    .then(response => response.json())
+    .then(result => {
+        testBtn.disabled = false;
+        testBtn.innerHTML = '<i class="ki-duotone ki-verify fs-2"><span class="path1"></span><span class="path2"></span></i> Testar';
+        
+        resultDiv.style.display = 'block';
+        
+        if (result.success) {
+            // Sucesso - meta key encontrado
+            let detailsHTML = '';
+            if (result.details) {
+                detailsHTML = `
+                    <div class="mt-2">
+                        <strong>Detalhes:</strong>
+                        <ul class="mb-0 mt-1">
+                            <li>Pedidos verificados: ${result.details.total_orders_checked}</li>
+                            <li>Vendedores encontrados: ${result.details.sellers_found}</li>
+                            ${result.details.seller_ids ? `<li>IDs: ${result.details.seller_ids.join(', ')}</li>` : ''}
+                        </ul>
+                        ${result.details.example_order ? `
+                            <div class="alert alert-info mt-2 mb-0">
+                                <strong>Exemplo de pedido:</strong><br>
+                                ID: #${result.details.example_order.id} | 
+                                Vendedor: ${result.details.example_order.seller_id} | 
+                                Total: R$ ${result.details.example_order.total}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+            
+            resultDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <div class="d-flex align-items-center">
+                        <i class="ki-duotone ki-check-circle fs-2x text-success me-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        <div class="flex-grow-1">
+                            <strong>${result.message}</strong>
+                            ${detailsHTML}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Notificar sucesso
+            toastr.success(result.message, 'Meta Key Válido!');
+            
+        } else {
+            // Erro - meta key não encontrado
+            let suggestionHTML = '';
+            if (result.details) {
+                if (result.details.available_meta_keys && result.details.available_meta_keys.length > 0) {
+                    suggestionHTML = `
+                        <div class="mt-2">
+                            <strong>Meta keys disponíveis nos pedidos:</strong>
+                            <div class="mt-1">
+                                ${result.details.available_meta_keys.slice(0, 10).map(key => 
+                                    `<code class="me-2">${key}</code>`
+                                ).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            
+            resultDiv.innerHTML = `
+                <div class="alert alert-warning">
+                    <div class="d-flex align-items-center">
+                        <i class="ki-duotone ki-information fs-2x text-warning me-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div class="flex-grow-1">
+                            <strong>${result.message}</strong>
+                            ${suggestionHTML}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            toastr.warning(result.message, 'Meta Key Não Encontrado');
+        }
+    })
+    .catch(error => {
+        testBtn.disabled = false;
+        testBtn.innerHTML = '<i class="ki-duotone ki-verify fs-2"><span class="path1"></span><span class="path2"></span></i> Testar';
+        
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="ki-duotone ki-cross-circle fs-2x text-danger me-3">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                <strong>Erro ao testar:</strong> ${error.message || 'Erro desconhecido'}
+            </div>
+        `;
+        
+        toastr.error('Erro ao testar meta key', 'Erro');
+    });
+}
+
+// Testar Meta Key do Vendedor (Modal de Edição)
+function testSellerMetaKeyEdit() {
+    const metaKey = document.getElementById('edit_seller_meta_key').value;
+    const resultDiv = document.getElementById('test_meta_key_result_edit');
+    const testBtn = document.getElementById('btn_test_meta_key_edit');
+    
+    if (!metaKey) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Atenção',
+            text: 'Digite um meta key para testar'
+        });
+        return;
+    }
+    
+    // Pegar ID da integração do campo hidden
+    const integrationId = document.getElementById('edit_integration_id').value;
+    
+    if (!integrationId) {
+        Swal.fire({
+            icon: 'info',
+            title: 'Atenção',
+            text: 'ID da integração não encontrado'
+        });
+        return;
+    }
     
     // Loading
     testBtn.disabled = true;

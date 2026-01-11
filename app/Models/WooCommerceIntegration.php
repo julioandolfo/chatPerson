@@ -17,6 +17,7 @@ class WooCommerceIntegration extends Model
         'consumer_secret',
         'contact_field_mapping',
         'search_settings',
+        'seller_meta_key',
         'status',
         'last_sync_at',
         'last_error',

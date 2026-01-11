@@ -188,13 +188,15 @@ class AgentPerformanceAnalysisService
             }
             
             // Verificar status
-            if ($settings['analyze_closed_only'] && !in_array($conversation['status'], ['closed', 'resolved'])) {
+            $analyzeClosedOnly = $settings['analyze_closed_only'] ?? true;
+            if ($analyzeClosedOnly && !in_array($conversation['status'], ['closed', 'resolved'])) {
                 Logger::log("AgentPerformanceAnalysisService::analyzeConversation - Conversa ainda não fechada");
                 return null;
             }
             
             // Verificar filtros
-            if (!self::matchesFilters($conversation, $settings['filters'])) {
+            $filters = $settings['filters'] ?? [];
+            if (!empty($filters) && !self::matchesFilters($conversation, $filters)) {
                 Logger::log("AgentPerformanceAnalysisService::analyzeConversation - Conversa não passa nos filtros");
                 return null;
             }
@@ -257,8 +259,13 @@ class AgentPerformanceAnalysisService
      */
     private static function matchesFilters(array $conversation, array $filters): bool
     {
+        // Se filtros vazios, passa tudo
+        if (empty($filters)) {
+            return true;
+        }
+        
         // Verificar funis
-        if ($filters['only_sales_funnels'] && empty($conversation['funnel_id'])) {
+        if (($filters['only_sales_funnels'] ?? false) && empty($conversation['funnel_id'])) {
             return false;
         }
         

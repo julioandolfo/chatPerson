@@ -15909,7 +15909,7 @@ function renderPendingAttachments() {
         const url = item.file.type.startsWith('image/') ? URL.createObjectURL(item.file) : null;
         html += `
             <div class="d-flex align-items-center gap-3 p-2 rounded border" data-attachment-idx="${idx}" style="background: rgba(255,255,255,0.03);">
-                ${url ? `<div class="rounded overflow-hidden" style="width:64px;height:64px;background:#111;"><img src="${url}" style="width:64px;height:64px;object-fit:cover;" onload="URL.revokeObjectURL('${url}')"></div>` : `
+                ${url ? `<div class="rounded overflow-hidden" style="width:64px;height:64px;background:#111;"><img src="${url}" style="width:64px;height:64px;object-fit:cover;" onload="if (window.URL && window.URL.revokeObjectURL) { window.URL.revokeObjectURL(this.src); }"></div>` : `
                 <div class="d-flex align-items-center justify-content-center rounded" style="width:64px;height:64px;background:#111;">
                     <i class="ki-duotone ki-file fs-2"></i>
                 </div>`}

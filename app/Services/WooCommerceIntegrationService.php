@@ -428,5 +428,224 @@ class WooCommerceIntegrationService
         
         return WooCommerceIntegration::update($id, $updateData);
     }
+    
+    /**
+     * Testar conexão e validar meta_key do vendedor
+     * Retorna feedback sobre a validade do campo configurado
+     */
+    public static function testSellerMetaKey(int $integrationId, string $metaKey): array
+    {
+        try {
+            $integration = WooCommerceIntegration::find($integrationId);
+            if (!$integration) {
+                return [
+                    'success' => false,
+                    'message' => 'Integração não encontrada'
+                ];
+            }
+            
+            $wcUrl = $integration['woocommerce_url'];
+            $consumerKey = $integration['consumer_key'];
+            $consumerSecret = $integration['consumer_secret'];
+            
+            // 1. Buscar últimos 10 pedidos
+            $url = rtrim($wcUrl, '/') . '/wp-json/wc/v3/orders?per_page=10&orderby=date&order=desc';
+            
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_USERPWD => $consumerKey . ':' . $consumerSecret,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_CONNECTTIMEOUT => 10
+            ]);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            if ($error) {
+                return [
+                    'success' => false,
+                    'message' => 'Erro ao conectar com WooCommerce: ' . $error
+                ];
+            }
+            
+            if ($httpCode !== 200) {
+                return [
+                    'success' => false,
+                    'message' => "Erro HTTP {$httpCode}: Verifique as credenciais da API"
+                ];
+            }
+            
+            $orders = json_decode($response, true);
+            
+            if (empty($orders)) {
+                return [
+                    'success' => false,
+                    'message' => 'Nenhum pedido encontrado na loja'
+                ];
+            }
+            
+            // 2. Verificar se o meta_key existe nos pedidos
+            $foundMetaKey = false;
+            $sellersFound = [];
+            $exampleOrder = null;
+            
+            foreach ($orders as $order) {
+                if (!isset($order['meta_data']) || !is_array($order['meta_data'])) {
+                    continue;
+                }
+                
+                foreach ($order['meta_data'] as $meta) {
+                    if ($meta['key'] === $metaKey) {
+                        $foundMetaKey = true;
+                        $sellerId = $meta['value'];
+                        if (!in_array($sellerId, $sellersFound)) {
+                            $sellersFound[] = $sellerId;
+                        }
+                        if (!$exampleOrder) {
+                            $exampleOrder = [
+                                'id' => $order['id'],
+                                'seller_id' => $sellerId,
+                                'total' => $order['total'] ?? '0',
+                                'date' => $order['date_created'] ?? null
+                            ];
+                        }
+                    }
+                }
+            }
+            
+            // 3. Retornar resultado
+            if ($foundMetaKey) {
+                return [
+                    'success' => true,
+                    'message' => "✅ Meta key '{$metaKey}' encontrado com sucesso!",
+                    'details' => [
+                        'total_orders_checked' => count($orders),
+                        'sellers_found' => count($sellersFound),
+                        'seller_ids' => $sellersFound,
+                        'example_order' => $exampleOrder
+                    ]
+                ];
+            } else {
+                // Listar meta_keys disponíveis para ajudar
+                $availableKeys = [];
+                foreach ($orders as $order) {
+                    if (isset($order['meta_data']) && is_array($order['meta_data'])) {
+                        foreach ($order['meta_data'] as $meta) {
+                            $key = $meta['key'];
+                            if (!in_array($key, $availableKeys)) {
+                                $availableKeys[] = $key;
+                            }
+                        }
+                    }
+                }
+                
+                return [
+                    'success' => false,
+                    'message' => "⚠️ Meta key '{$metaKey}' NÃO encontrado nos pedidos",
+                    'details' => [
+                        'total_orders_checked' => count($orders),
+                        'suggestion' => 'Verifique se o campo está correto ou se há pedidos com vendedor associado',
+                        'available_meta_keys' => array_slice($availableKeys, 0, 20) // Primeiros 20
+                    ]
+                ];
+            }
+            
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Erro ao testar: ' . $e->getMessage()
+            ];
+        }
+    }
+    
+    /**
+     * Buscar pedidos por ID do vendedor
+     */
+    public static function getOrdersBySeller(
+        int $sellerId,
+        ?int $integrationId = null,
+        ?string $dateFrom = null,
+        ?string $dateTo = null
+    ): array
+    {
+        $integrations = $integrationId 
+            ? [WooCommerceIntegration::find($integrationId)]
+            : WooCommerceIntegration::getActive();
+        
+        if (empty($integrations)) {
+            return [];
+        }
+        
+        $allOrders = [];
+        
+        foreach ($integrations as $integration) {
+            if (!$integration || ($integration['status'] ?? '') !== 'active') {
+                continue;
+            }
+            
+            try {
+                $wcUrl = $integration['woocommerce_url'];
+                $consumerKey = $integration['consumer_key'];
+                $consumerSecret = $integration['consumer_secret'];
+                $metaKey = $integration['seller_meta_key'] ?? '_vendor_id';
+                
+                // Buscar pedidos com o meta_key do vendedor
+                $url = rtrim($wcUrl, '/') . '/wp-json/wc/v3/orders?per_page=100&orderby=date&order=desc';
+                
+                // Adicionar filtro de data se fornecido
+                if ($dateFrom) {
+                    $url .= '&after=' . urlencode(date('c', strtotime($dateFrom)));
+                }
+                if ($dateTo) {
+                    $url .= '&before=' . urlencode(date('c', strtotime($dateTo)));
+                }
+                
+                $ch = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_USERPWD => $consumerKey . ':' . $consumerSecret,
+                    CURLOPT_TIMEOUT => 30
+                ]);
+                
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                
+                if ($httpCode === 200) {
+                    $orders = json_decode($response, true);
+                    
+                    // Filtrar pedidos do vendedor específico
+                    foreach ($orders as $order) {
+                        if (isset($order['meta_data']) && is_array($order['meta_data'])) {
+                            foreach ($order['meta_data'] as $meta) {
+                                if ($meta['key'] === $metaKey && $meta['value'] == $sellerId) {
+                                    $allOrders[] = $order;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                Logger::error("WooCommerceIntegrationService::getOrdersBySeller - Erro: " . $e->getMessage());
+            }
+        }
+        
+        // Remover duplicatas
+        $uniqueOrders = [];
+        $seenIds = [];
+        foreach ($allOrders as $order) {
+            $orderId = $order['id'] ?? null;
+            if ($orderId && !in_array($orderId, $seenIds)) {
+                $uniqueOrders[] = $order;
+                $seenIds[] = $orderId;
+            }
+        }
+        
+        return $uniqueOrders;
+    }
 }
 

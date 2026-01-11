@@ -42,6 +42,7 @@ use App\Controllers\AgentPerformanceController;
 use App\Controllers\RealtimeCoachingController;
 use App\Controllers\CoachingDashboardController;
 use App\Controllers\TeamController;
+use App\Controllers\AgentConversionController;
 
 // Rotas públicas
 Router::get('/', function() {
@@ -522,6 +523,12 @@ Router::post('/teams/update', [TeamController::class, 'update'], ['Authenticatio
 Router::post('/teams/delete', [TeamController::class, 'delete'], ['Authentication']);
 Router::get('/teams/performance', [TeamController::class, 'getPerformance'], ['Authentication']);
 Router::post('/teams/compare', [TeamController::class, 'compareTeams'], ['Authentication']);
+
+// Conversão WooCommerce (Lead → Venda)
+Router::get('/agent-conversion', [AgentConversionController::class, 'index'], ['Authentication']);
+Router::get('/agent-conversion/agent', [AgentConversionController::class, 'show'], ['Authentication']);
+Router::get('/api/agent-conversion/metrics', [AgentConversionController::class, 'getMetrics'], ['Authentication']);
+Router::post('/api/woocommerce/test-meta-key', [AgentConversionController::class, 'testSellerMetaKey'], ['Authentication']);
 
 // Rotas de Tags
 // IMPORTANTE: Rotas específicas DEVEM vir ANTES de rotas com parâmetros dinâmicos

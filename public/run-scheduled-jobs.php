@@ -1,25 +1,14 @@
+#!/usr/bin/env php
 <?php
-/**
- * Script para executar jobs agendados
- * 
- * ⚠️ IMPORTANTE: Configurar para executar FREQUENTEMENTE (a cada 1 minuto) para processar buffers de IA!
- * 
- * Configurar no cron para executar a cada 1 minuto:
- * Linux (crontab): * * * * * php /caminho/para/public/run-scheduled-jobs.php
- * 
- * Windows (Agendador de Tarefas):
- * - Gatilho: Repetir tarefa a cada 1 minuto
- * - Ação: C:\laragon\bin\php\php-8.3.26-Win32-vs16-x64\php.exe C:\laragon\www\chat\public\run-scheduled-jobs.php
- */
-
-require_once __DIR__ . '/../vendor/autoload.php';
+// Garantir que estamos no diretório correto
+$rootDir = dirname(__DIR__);
+chdir($rootDir);
 
 // ✅ CRÍTICO: Definir timezone ANTES de qualquer operação com data/hora
 date_default_timezone_set('America/Sao_Paulo');
 
-// Carregar configurações
-require_once __DIR__ . '/../config/app.php';
-require_once __DIR__ . '/../config/database.php';
+// Carregar bootstrap (que já tem o autoloader e todas as configurações)
+require_once $rootDir . '/config/bootstrap.php';
 
 use App\Jobs\SLAMonitoringJob;
 use App\Jobs\FollowupJob;

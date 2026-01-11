@@ -1,15 +1,15 @@
+#!/usr/bin/env php
 <?php
-/**
- * Script para processar URLs pendentes do RAG
- * 
- * Execute via cron:
- * */5 * * * * php /caminho/para/public/process-rag-urls.php
- * 
- * Ou execute manualmente:
- * php public/process-rag-urls.php
- */
 
-require_once __DIR__ . '/../app/Helpers/autoload.php';
+// Garantir que estamos no diretório correto
+$rootDir = dirname(__DIR__);
+chdir($rootDir);
+
+// ✅ CRÍTICO: Definir timezone ANTES de qualquer operação com data/hora
+date_default_timezone_set('America/Sao_Paulo');
+
+// Carregar bootstrap (que já tem o autoloader)
+require_once $rootDir . '/config/bootstrap.php';
 
 use App\Jobs\ProcessURLScrapingJob;
 use App\Services\AgentMemoryService;

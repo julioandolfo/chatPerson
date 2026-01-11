@@ -9,7 +9,7 @@ class User extends Model
 {
     protected string $table = 'users';
     protected string $primaryKey = 'id';
-    protected array $fillable = ['name', 'email', 'password', 'role', 'status', 'avatar', 'availability_status', 'max_conversations', 'current_conversations', 'last_seen_at', 'agent_settings'];
+    protected array $fillable = ['name', 'email', 'password', 'role', 'status', 'avatar', 'woocommerce_seller_id', 'availability_status', 'max_conversations', 'current_conversations', 'last_seen_at', 'agent_settings'];
     protected array $hidden = ['password'];
     protected bool $timestamps = true;
 
@@ -266,6 +266,27 @@ class User extends Model
                   AND u.role IN ('agent', 'admin', 'supervisor', 'senior_agent', 'junior_agent')
                 ORDER BY u.name ASC";
         
+        return \App\Helpers\Database::fetchAll($sql);
+    }
+    
+    /**
+     * Buscar agente por ID do WooCommerce Seller
+     */
+    public static function findByWooCommerceSellerId(int $sellerId): ?array
+    {
+        return self::whereFirst('woocommerce_seller_id', '=', $sellerId);
+    }
+    
+    /**
+     * Obter agentes que são vendedores (têm woocommerce_seller_id)
+     */
+    public static function getSellers(): array
+    {
+        $sql = "SELECT u.* 
+                FROM users u
+                WHERE u.woocommerce_seller_id IS NOT NULL 
+                  AND u.status = 'active' 
+                ORDER BY u.name ASC";
         return \App\Helpers\Database::fetchAll($sql);
     }
 }

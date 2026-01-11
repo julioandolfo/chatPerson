@@ -1,18 +1,15 @@
+#!/usr/bin/env php
 <?php
-/**
- * Script para executar agentes Kanban periodicamente
- * Deve ser executado via cron (ex: a cada 5 minutos)
- * 
- * Exemplo de cron:
- * */5 * * * * php /caminho/para/public/run-kanban-agents.php
- */
 
-require_once __DIR__ . '/../vendor/autoload.php';
+// Garantir que estamos no diretório correto
+$rootDir = dirname(__DIR__);
+chdir($rootDir);
 
 // ✅ CRÍTICO: Definir timezone ANTES de qualquer operação com data/hora
 date_default_timezone_set('America/Sao_Paulo');
 
-require_once __DIR__ . '/../config/bootstrap.php';
+// Carregar bootstrap (que já tem o autoloader)
+require_once $rootDir . '/config/bootstrap.php';
 
 use App\Services\KanbanAgentService;
 use App\Helpers\Logger;

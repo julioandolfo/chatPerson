@@ -7,6 +7,7 @@
 $logFiles = [
     'Coaching em Tempo Real' => __DIR__ . '/../logs/coaching.log',
     'Jobs Agendados (Cron)' => __DIR__ . '/../storage/logs/jobs.log',
+    'Webhook WooCommerce' => __DIR__ . '/../logs/webhook.log',
     'Aplicação' => __DIR__ . '/../logs/app.log',
     'Conversas' => __DIR__ . '/../logs/conversas.log',
     'Quepasa' => __DIR__ . '/../logs/quepasa.log',
@@ -107,6 +108,7 @@ $logFiles = [
         <button onclick="location.reload()">🔄 Atualizar</button>
         <button class="nav-btn" onclick="document.getElementById('coaching-em-tempo-real-log').scrollIntoView({behavior: 'smooth'})" style="background: #4ec9b0">⚡ Coaching</button>
         <button class="nav-btn" onclick="document.getElementById('jobs-agendados-cron-log').scrollIntoView({behavior: 'smooth'})" style="background: #dcdcaa">⏰ Jobs Cron</button>
+        <button class="nav-btn" onclick="document.getElementById('webhook-woocommerce-log').scrollIntoView({behavior: 'smooth'})" style="background: #4caf50">🔗 Webhook</button>
         <button class="nav-btn" onclick="document.getElementById('aplicacao-log').scrollIntoView({behavior: 'smooth'})">Aplicação</button>
         <button class="nav-btn" onclick="document.getElementById('conversas-log').scrollIntoView({behavior: 'smooth'})">Conversas</button>
         <button class="nav-btn" onclick="document.getElementById('quepasa-log').scrollIntoView({behavior: 'smooth'})">Quepasa</button>

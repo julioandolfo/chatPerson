@@ -267,5 +267,158 @@ class WooCommerceController
             ], 500);
         }
     }
+    
+    /**
+     * Sincronizar pedidos WooCommerce manualmente
+     */
+    public function syncOrders(): void
+    {
+        Permission::abortIfCannot('conversion.view');
+        
+        try {
+            $data = Request::json();
+            $ordersLimit = (int)($data['orders_limit'] ?? 100);
+            $daysBack = (int)($data['days_back'] ?? 7);
+            
+            // Validações
+            if ($ordersLimit < 1 || $ordersLimit > 500) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Limite de pedidos deve ser entre 1 e 500'
+                ], 400);
+                return;
+            }
+            
+            if ($daysBack < 1 || $daysBack > 90) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Período deve ser entre 1 e 90 dias'
+                ], 400);
+                return;
+            }
+            
+            // Obter todas as integrações ativas
+            $integrations = WooCommerceIntegration::getActive();
+            
+            if (empty($integrations)) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Nenhuma integração WooCommerce ativa encontrada'
+                ], 404);
+                return;
+            }
+            
+            $integrationsProcessed = 0;
+            $ordersProcessed = 0;
+            $newContacts = 0;
+            $errors = [];
+            
+            foreach ($integrations as $integration) {
+                try {
+                    $wcUrl = $integration['woocommerce_url'];
+                    $consumerKey = $integration['consumer_key'];
+                    $consumerSecret = $integration['consumer_secret'];
+                    $sellerMetaKey = $integration['seller_meta_key'] ?? '_vendor_id';
+                    $cacheTtlMinutes = $integration['cache_ttl_minutes'] ?? 60;
+                    
+                    // Buscar pedidos
+                    $dateMin = date('Y-m-d', strtotime("-{$daysBack} days"));
+                    $url = rtrim($wcUrl, '/') . "/wp-json/wc/v3/orders?per_page={$ordersLimit}&orderby=date&order=desc&after={$dateMin}T00:00:00";
+                    
+                    $ch = curl_init($url);
+                    curl_setopt_array($ch, [
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_USERPWD => $consumerKey . ':' . $consumerSecret,
+                        CURLOPT_TIMEOUT => 30,
+                        CURLOPT_CONNECTTIMEOUT => 10
+                    ]);
+                    
+                    $response = curl_exec($ch);
+                    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    curl_close($ch);
+                    
+                    if ($httpCode !== 200) {
+                        $errors[] = "Integração #{$integration['id']}: HTTP {$httpCode}";
+                        continue;
+                    }
+                    
+                    $orders = json_decode($response, true);
+                    
+                    if (!is_array($orders)) {
+                        $errors[] = "Integração #{$integration['id']}: Resposta inválida";
+                        continue;
+                    }
+                    
+                    foreach ($orders as $order) {
+                        // Extrair seller_id
+                        $sellerId = null;
+                        if (isset($order['meta_data']) && is_array($order['meta_data'])) {
+                            foreach ($order['meta_data'] as $meta) {
+                                if (isset($meta['key']) && $meta['key'] === $sellerMetaKey) {
+                                    $sellerId = (int)$meta['value'];
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // Encontrar ou criar contato
+                        $contactId = null;
+                        $customerEmail = $order['billing']['email'] ?? null;
+                        $customerPhone = $order['billing']['phone'] ?? null;
+                        
+                        if ($customerEmail || $customerPhone) {
+                            $contact = \App\Models\Contact::findByEmailOrPhone($customerEmail, $customerPhone);
+                            if (!$contact) {
+                                $contactName = trim(($order['billing']['first_name'] ?? '') . ' ' . ($order['billing']['last_name'] ?? ''));
+                                $contactName = !empty($contactName) ? $contactName : 'Cliente WooCommerce';
+                                $contactId = \App\Models\Contact::create([
+                                    'name' => $contactName,
+                                    'email' => $customerEmail,
+                                    'phone' => $customerPhone,
+                                    'status' => 'active',
+                                    'source' => 'woocommerce_manual_sync'
+                                ]);
+                                $newContacts++;
+                            } else {
+                                $contactId = $contact['id'];
+                            }
+                        }
+                        
+                        if ($contactId) {
+                            \App\Models\WooCommerceOrderCache::cacheOrder(
+                                $integration['id'],
+                                $contactId,
+                                $order,
+                                $cacheTtlMinutes,
+                                $sellerId
+                            );
+                            $ordersProcessed++;
+                        }
+                    }
+                    
+                    $integrationsProcessed++;
+                    WooCommerceIntegration::updateLastSync($integration['id']);
+                    
+                } catch (\Exception $e) {
+                    $errors[] = "Integração #{$integration['id']}: " . $e->getMessage();
+                }
+            }
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Sincronização concluída',
+                'integrations_processed' => $integrationsProcessed,
+                'orders_processed' => $ordersProcessed,
+                'new_contacts' => $newContacts,
+                'errors' => $errors
+            ]);
+            
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao sincronizar pedidos: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
 

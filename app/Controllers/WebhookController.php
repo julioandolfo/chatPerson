@@ -16,6 +16,24 @@ use App\Models\Contact;
 class WebhookController
 {
     /**
+     * Log específico para webhooks
+     */
+    private static function log(string $message, string $level = 'INFO'): void
+    {
+        $logDir = __DIR__ . '/../../logs';
+        if (!is_dir($logDir)) {
+            @mkdir($logDir, 0777, true);
+        }
+        
+        $logFile = $logDir . '/webhook.log';
+        $timestamp = date('Y-m-d H:i:s');
+        $logMessage = "[{$timestamp}] [{$level}] {$message}\n";
+        
+        file_put_contents($logFile, $logMessage, FILE_APPEND);
+        error_log($logMessage); // Também loga no error_log padrão
+    }
+    
+    /**
      * Webhook do WooCommerce
      * Recebe eventos de criação e atualização de pedidos
      * 
@@ -28,9 +46,11 @@ class WebhookController
             $payload = file_get_contents('php://input');
             $data = json_decode($payload, true);
             
-            error_log("WooCommerce Webhook - Recebido: " . $payload);
+            self::log("=== WEBHOOK RECEBIDO ===");
+            self::log("Payload size: " . strlen($payload) . " bytes");
             
             if (empty($data)) {
+                self::log("ERRO: Payload vazio ou inválido", 'ERROR');
                 Response::json([
                     'success' => false,
                     'message' => 'Payload vazio'
@@ -42,11 +62,13 @@ class WebhookController
             $headers = function_exists('getallheaders') ? getallheaders() : self::getRequestHeaders();
             $event = $headers['X-WC-Webhook-Event'] ?? $headers['x-wc-webhook-event'] ?? null;
             $source = $headers['X-WC-Webhook-Source'] ?? $headers['x-wc-webhook-source'] ?? null;
+            $orderId = $data['id'] ?? 'N/A';
             
-            error_log("WooCommerce Webhook - Event: {$event}, Source: {$source}");
+            self::log("Event: {$event} | Source: {$source} | Order ID: {$orderId}");
             
             // Validar evento
             if (!in_array($event, ['created', 'updated'])) {
+                self::log("Evento ignorado: {$event} (não é created/updated)", 'WARNING');
                 Response::json([
                     'success' => true,
                     'message' => 'Evento ignorado: ' . $event
@@ -57,6 +79,8 @@ class WebhookController
             // Processar pedido
             $result = self::processWooCommerceOrder($data, $source);
             
+            self::log("✅ Pedido #{$orderId} processado com sucesso: " . json_encode($result), 'SUCCESS');
+            
             Response::json([
                 'success' => true,
                 'message' => 'Pedido processado com sucesso',
@@ -65,7 +89,8 @@ class WebhookController
             ]);
             
         } catch (\Exception $e) {
-            error_log("WooCommerce Webhook - Erro: " . $e->getMessage());
+            self::log("❌ ERRO: " . $e->getMessage(), 'ERROR');
+            self::log("Stack trace: " . $e->getTraceAsString(), 'ERROR');
             
             Response::json([
                 'success' => false,
@@ -79,13 +104,17 @@ class WebhookController
      */
     private static function processWooCommerceOrder(array $orderData, ?string $source): array
     {
+        $orderId = $orderData['id'] ?? 'N/A';
+        
         // 1. Identificar integração pelo source (URL da loja)
         $integration = null;
         if ($source) {
+            self::log("Buscando integração para source: {$source}");
             $integrations = WooCommerceIntegration::getActive();
             foreach ($integrations as $int) {
                 if (strpos($source, parse_url($int['woocommerce_url'], PHP_URL_HOST)) !== false) {
                     $integration = $int;
+                    self::log("✓ Integração encontrada: #{$int['id']} - {$int['name']}");
                     break;
                 }
             }
@@ -93,11 +122,16 @@ class WebhookController
         
         // Se não encontrou pelo source, pegar a primeira integração ativa
         if (!$integration) {
+            self::log("Buscando primeira integração ativa...");
             $integrations = WooCommerceIntegration::getActive();
             $integration = $integrations[0] ?? null;
+            if ($integration) {
+                self::log("✓ Usando integração padrão: #{$integration['id']} - {$integration['name']}");
+            }
         }
         
         if (!$integration) {
+            self::log("❌ Nenhuma integração WooCommerce ativa encontrada", 'ERROR');
             throw new \Exception('Nenhuma integração WooCommerce ativa encontrada');
         }
         
@@ -106,10 +140,11 @@ class WebhookController
         $ttlMinutes = $integration['cache_ttl_minutes'] ?? 60;
         
         // 2. Extrair dados do pedido
-        $orderId = $orderData['id'];
         $orderStatus = $orderData['status'];
         $orderTotal = $orderData['total'];
         $orderDate = $orderData['date_created'] ?? date('Y-m-d H:i:s');
+        
+        self::log("Pedido #{$orderId}: Status={$orderStatus}, Total={$orderTotal}");
         
         // 3. Extrair seller_id do meta_data
         $sellerId = null;
@@ -117,14 +152,20 @@ class WebhookController
             foreach ($orderData['meta_data'] as $meta) {
                 if ($meta['key'] === $sellerMetaKey) {
                     $sellerId = (int)$meta['value'];
+                    self::log("✓ Seller ID encontrado: {$sellerId} (meta_key: {$sellerMetaKey})");
                     break;
                 }
             }
+        }
+        if (!$sellerId) {
+            self::log("⚠️ Seller ID não encontrado no meta_data (procurado: {$sellerMetaKey})", 'WARNING');
         }
         
         // 4. Buscar ou criar contato
         $email = $orderData['billing']['email'] ?? null;
         $phone = $orderData['billing']['phone'] ?? null;
+        
+        self::log("Buscando contato: email={$email}, phone={$phone}");
         
         $contact = null;
         if ($email) {
@@ -149,8 +190,10 @@ class WebhookController
             ];
             
             $contactId = Contact::create($contactData);
+            self::log("✓ Novo contato criado: ID={$contactId}, Nome={$contactData['name']}");
         } else {
             $contactId = $contact['id'];
+            self::log("✓ Contato existente: ID={$contactId}");
         }
         
         // 5. Cachear ou atualizar pedido
@@ -179,9 +222,11 @@ class WebhookController
         if ($existing) {
             WooCommerceOrderCache::update($existing['id'], $cacheData);
             $action = 'updated';
+            self::log("✓ Pedido atualizado no cache (cache_id: {$existing['id']})");
         } else {
-            WooCommerceOrderCache::create($cacheData);
+            $cacheId = WooCommerceOrderCache::create($cacheData);
             $action = 'created';
+            self::log("✓ Pedido criado no cache (cache_id: {$cacheId})");
         }
         
         return [

@@ -533,6 +533,7 @@ Router::get('/agent-conversion/agent', [AgentConversionController::class, 'show'
 Router::get('/api/agent-conversion/metrics', [AgentConversionController::class, 'getMetrics'], ['Authentication']);
 Router::post('/api/agent-conversion/sync', [AgentConversionController::class, 'syncOrders'], ['Authentication']);
 Router::post('/api/woocommerce/test-meta-key', [WooCommerceController::class, 'testSellerMetaKey'], ['Authentication']);
+Router::post('/api/woocommerce/sync-orders', [WooCommerceController::class, 'syncOrders'], ['Authentication', 'Permission:conversion.view']);
 
 // Rotas de Tags
 // IMPORTANTE: Rotas específicas DEVEM vir ANTES de rotas com parâmetros dinâmicos

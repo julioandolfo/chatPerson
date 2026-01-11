@@ -1184,6 +1184,20 @@ ob_start();
                     <span class="text-muted mt-1 fw-semibold fs-7">Top vendedores por taxa de conversão</span>
                 </h3>
                 <div class="card-toolbar">
+                    <button type="button" class="btn btn-sm btn-light-primary me-2" data-bs-toggle="modal" data-bs-target="#modal_wc_sync">
+                        <i class="ki-duotone ki-arrows-circle fs-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Sincronizar Agora
+                    </button>
+                    <button type="button" class="btn btn-sm btn-light me-2" data-bs-toggle="modal" data-bs-target="#modal_wc_webhook">
+                        <i class="ki-duotone ki-setting-2 fs-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Configurar Webhook
+                    </button>
                     <a href="<?= \App\Helpers\Url::to('/agent-conversion', ['date_from' => $dateFrom, 'date_to' => date('Y-m-d', strtotime($dateTo))]) ?>" class="btn btn-sm btn-primary">
                         <i class="ki-duotone ki-chart-simple fs-2 me-2">
                             <span class="path1"></span>
@@ -1828,8 +1842,269 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     });
 });
+
+// Função para copiar URL do webhook
+function copyWebhookUrl() {
+    const webhookUrl = document.getElementById('webhook_url').value;
+    navigator.clipboard.writeText(webhookUrl).then(() => {
+        Swal.fire({
+            icon: 'success',
+            title: 'Copiado!',
+            text: 'URL do webhook copiada para a área de transferência',
+            timer: 2000,
+            showConfirmButton: false
+        });
+    });
+}
+
+// Função para sincronizar pedidos WooCommerce
+function syncWooCommerceOrders() {
+    const ordersLimit = document.getElementById('orders_limit').value;
+    const daysBack = document.getElementById('days_back').value;
+    const btnSync = document.getElementById('btn_sync_wc');
+    
+    // Validação
+    if (!ordersLimit || ordersLimit < 1 || ordersLimit > 500) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Atenção',
+            text: 'Limite de pedidos deve ser entre 1 e 500'
+        });
+        return;
+    }
+    
+    if (!daysBack || daysBack < 1 || daysBack > 90) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Atenção',
+            text: 'Período deve ser entre 1 e 90 dias'
+        });
+        return;
+    }
+    
+    // Desabilitar botão e mostrar loading
+    btnSync.disabled = true;
+    btnSync.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sincronizando...';
+    
+    // Fazer requisição
+    fetch('/api/woocommerce/sync-orders', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            orders_limit: parseInt(ordersLimit),
+            days_back: parseInt(daysBack)
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        btnSync.disabled = false;
+        btnSync.innerHTML = '<i class="ki-duotone ki-arrows-circle fs-2"><span class="path1"></span><span class="path2"></span></i> Sincronizar';
+        
+        if (data.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso!',
+                html: `<div class="text-start">
+                    <p><strong>Sincronização concluída:</strong></p>
+                    <ul class="mb-0">
+                        <li>Integrações processadas: ${data.integrations_processed || 0}</li>
+                        <li>Pedidos processados: ${data.orders_processed || 0}</li>
+                        <li>Novos contatos: ${data.new_contacts || 0}</li>
+                    </ul>
+                </div>`,
+                confirmButtonText: 'Recarregar Dashboard'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    location.reload();
+                }
+            });
+            
+            // Fechar modal
+            bootstrap.Modal.getInstance(document.getElementById('modal_wc_sync')).hide();
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: data.message || 'Erro ao sincronizar pedidos'
+            });
+        }
+    })
+    .catch(error => {
+        btnSync.disabled = false;
+        btnSync.innerHTML = '<i class="ki-duotone ki-arrows-circle fs-2"><span class="path1"></span><span class="path2"></span></i> Sincronizar';
+        
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Erro na comunicação com o servidor'
+        });
+        console.error('Erro:', error);
+    });
+}
 </script>
 ';
 ?>
+
+<!-- Modal: Configurar Webhook WooCommerce -->
+<div class="modal fade" id="modal_wc_webhook" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-650px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">
+                    <i class="ki-duotone ki-setting-2 fs-2 text-primary me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Configurar Webhook WooCommerce
+                </h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                <div class="alert alert-info d-flex align-items-center mb-5">
+                    <i class="ki-duotone ki-information-5 fs-2x text-info me-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div class="d-flex flex-column">
+                        <h4 class="mb-1 text-dark">Configure o Webhook no WooCommerce</h4>
+                        <span>Vá em <strong>WooCommerce → Configurações → Avançado → Webhooks</strong> e adicione um novo webhook com a URL abaixo.</span>
+                    </div>
+                </div>
+                
+                <div class="mb-7">
+                    <label class="form-label fw-bold fs-6 mb-2">URL do Webhook</label>
+                    <div class="input-group">
+                        <input type="text" id="webhook_url" class="form-control form-control-solid" 
+                               value="<?= rtrim(\App\Helpers\Url::to('/'), '/') ?>/webhooks/woocommerce" readonly>
+                        <button class="btn btn-primary" type="button" onclick="copyWebhookUrl()">
+                            <i class="ki-duotone ki-copy fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Copiar
+                        </button>
+                    </div>
+                    <div class="form-text">Esta é a URL que deve ser configurada no WooCommerce</div>
+                </div>
+                
+                <div class="separator separator-dashed my-7"></div>
+                
+                <div class="mb-5">
+                    <h4 class="fw-bold mb-4">Configurações do Webhook</h4>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="fw-semibold">Nome:</label>
+                            <p class="text-gray-600">Chat System - Pedidos</p>
+                        </div>
+                        <div class="col-6">
+                            <label class="fw-semibold">Status:</label>
+                            <p class="text-gray-600">Ativo</p>
+                        </div>
+                        <div class="col-6">
+                            <label class="fw-semibold">Tópico:</label>
+                            <p class="text-gray-600">Pedido criado / Pedido atualizado</p>
+                        </div>
+                        <div class="col-6">
+                            <label class="fw-semibold">API Version:</label>
+                            <p class="text-gray-600">WP REST API Integration v3</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-warning d-flex align-items-center">
+                    <i class="ki-duotone ki-shield-tick fs-2x text-warning me-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    <div class="d-flex flex-column">
+                        <span><strong>Importante:</strong> Configure webhooks para os eventos <strong>"Order created"</strong> e <strong>"Order updated"</strong> para receber atualizações em tempo real.</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Sincronizar Pedidos WooCommerce -->
+<div class="modal fade" id="modal_wc_sync" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-650px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">
+                    <i class="ki-duotone ki-arrows-circle fs-2 text-primary me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Sincronizar Pedidos WooCommerce
+                </h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                <div class="alert alert-info d-flex align-items-center mb-7">
+                    <i class="ki-duotone ki-information-5 fs-2x text-info me-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div class="d-flex flex-column">
+                        <h4 class="mb-1 text-dark">Sincronização Manual</h4>
+                        <span>Esta sincronização irá buscar os pedidos mais recentes do WooCommerce e atualizar o cache local.</span>
+                    </div>
+                </div>
+                
+                <div class="mb-7">
+                    <label class="form-label fw-bold fs-6 required">Limite de Pedidos</label>
+                    <input type="number" class="form-control form-control-solid" id="orders_limit" 
+                           value="100" min="1" max="500" placeholder="Ex: 100">
+                    <div class="form-text">Quantidade máxima de pedidos a sincronizar (máx: 500)</div>
+                </div>
+                
+                <div class="mb-7">
+                    <label class="form-label fw-bold fs-6 required">Período (dias)</label>
+                    <input type="number" class="form-control form-control-solid" id="days_back" 
+                           value="7" min="1" max="90" placeholder="Ex: 7">
+                    <div class="form-text">Buscar pedidos dos últimos X dias (máx: 90 dias)</div>
+                </div>
+                
+                <div class="alert alert-warning d-flex align-items-center">
+                    <i class="ki-duotone ki-information-4 fs-2x text-warning me-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div class="d-flex flex-column">
+                        <span><strong>Atenção:</strong> Sincronizações com muitos pedidos podem levar alguns minutos. O sistema irá processar todas as integrações WooCommerce ativas.</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btn_sync_wc" onclick="syncWooCommerceOrders()">
+                    <i class="ki-duotone ki-arrows-circle fs-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Sincronizar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php include __DIR__ . '/../layouts/metronic/app.php'; ?>

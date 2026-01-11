@@ -13,6 +13,14 @@ chdir($rootDir);
 date_default_timezone_set('America/Sao_Paulo');
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
+// Dumpa erro fatal no final, se houver
+register_shutdown_function(function () {
+    $error = error_get_last();
+    if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        echo "[", date('Y-m-d H:i:s'), "] ❌ FATAL: {$error['message']} em {$error['file']}:{$error['line']}\n";
+    }
+});
 
 // Log
 $logDir = $rootDir . '/storage/logs';
@@ -27,6 +35,10 @@ if (!file_exists($bootstrapPath)) {
     exit(1);
 }
 require_once $bootstrapPath;
+// Reforça exibição de erros caso o bootstrap mude configs
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
 
 use App\Services\AgentPerformanceAnalysisService;
 use App\Services\ConversationSettingsService;

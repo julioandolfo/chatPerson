@@ -140,7 +140,7 @@ class CoachingInline {
         }
 
         const feedbackHtml = hint.feedback 
-            ? `<span class="coaching-hint-meta-item">Feedback: ${hint.feedback === 'helpful' ? '👍 Útil' : '👎 Não útil'}</span>`
+            ? `<span style="color: #ffffff; font-size: 12px;">Feedback: ${hint.feedback === 'helpful' ? '👍 Útil' : '👎 Não útil'}</span>`
             : `
                 <button class="coaching-hint-btn helpful" onclick="window.coachingInline.sendFeedback(${hint.id}, 'helpful', this)">
                     👍 Útil
@@ -160,11 +160,6 @@ class CoachingInline {
             ${suggestionsHtml}
             <div class="coaching-hint-actions">
                 ${feedbackHtml}
-            </div>
-            <div class="coaching-hint-meta">
-                <span class="coaching-hint-meta-item">🤖 ${hint.model_used || 'IA'}</span>
-                <span class="coaching-hint-meta-item">💰 R$ ${parseFloat(hint.cost || 0).toFixed(4)}</span>
-                ${hint.viewed_at ? '<span class="coaching-hint-meta-item">✓ Visualizado</span>' : ''}
             </div>
         `;
 
@@ -230,7 +225,7 @@ class CoachingInline {
                 // Substituir botões por feedback
                 const icon = feedback === 'helpful' ? '👍' : '👎';
                 const text = feedback === 'helpful' ? 'Útil' : 'Não útil';
-                button.parentElement.innerHTML = `<span class="coaching-hint-meta-item">Feedback: ${icon} ${text}</span>`;
+                button.parentElement.innerHTML = `<span style="color: #ffffff; font-size: 12px;">Feedback: ${icon} ${text}</span>`;
                 
                 this.showNotification('Obrigado pelo feedback! 🙏', 'success');
             }

@@ -1704,8 +1704,13 @@ $chartDataUrl = \App\Helpers\Url::to('/dashboard/chart-data');
 $dashboardUrl = \App\Helpers\Url::to('/dashboard');
 $exportUrl = \App\Helpers\Url::to('/dashboard/export');
 
+// URLs codificadas para uso no JS
+$chartDataUrlJson = json_encode($chartDataUrl);
+$dashboardUrlJson = json_encode($dashboardUrl);
+$exportUrlJson = json_encode($exportUrl);
+
 // Adicionar Chart.js via CDN
-$scripts = '
+$scripts = <<<SCRIPT
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 // Variáveis globais para os gráficos
@@ -1720,7 +1725,7 @@ function loadChartData(chartType, canvasId, configCallback) {
     const dateTo = document.getElementById("kt_dashboard_date_to").value;
     const groupBy = document.querySelector("input[name=\"chart_group_by\"]:checked")?.value || "day";
     
-    const url = new URL(' . json_encode($chartDataUrl) . ', window.location.origin);
+    const url = new URL({$chartDataUrlJson}, window.location.origin);
     url.searchParams.append("type", chartType);
     url.searchParams.append("date_from", dateFrom);
     url.searchParams.append("date_to", dateTo);
@@ -1975,7 +1980,7 @@ function loadDashboard() {
     const dateFrom = document.getElementById("kt_dashboard_date_from").value;
     const dateTo = document.getElementById("kt_dashboard_date_to").value;
     
-    window.location.href = ' . json_encode($dashboardUrl) . ' + \'?date_from=\' + dateFrom + \'&date_to=\' + dateTo;
+    window.location.href = {$dashboardUrlJson} + '?date_from=' + dateFrom + '&date_to=' + dateTo;
 }
 
 // Função para exportar relatório
@@ -1983,7 +1988,7 @@ function exportReport(format) {
     const dateFrom = document.getElementById("kt_dashboard_date_from").value;
     const dateTo = document.getElementById("kt_dashboard_date_to").value;
     
-    const url = new URL(' . json_encode($exportUrl) . ', window.location.origin);
+    const url = new URL({$exportUrlJson}, window.location.origin);
     url.searchParams.append("format", format);
     url.searchParams.append("date_from", dateFrom);
     url.searchParams.append("date_to", dateTo);
@@ -2005,12 +2010,12 @@ document.addEventListener("DOMContentLoaded", function() {
 
 // Função para copiar URL do webhook
 function copyWebhookUrl() {
-    const webhookUrl = document.getElementById('webhook_url').value;
+    const webhookUrl = document.getElementById("webhook_url").value;
     navigator.clipboard.writeText(webhookUrl).then(() => {
         Swal.fire({
-            icon: 'success',
-            title: 'Copiado!',
-            text: 'URL do webhook copiada para a área de transferência',
+            icon: "success",
+            title: "Copiado!",
+            text: "URL do webhook copiada para a área de transferência",
             timer: 2000,
             showConfirmButton: false
         });
@@ -2019,38 +2024,38 @@ function copyWebhookUrl() {
 
 // Função para sincronizar pedidos WooCommerce
 function syncWooCommerceOrders() {
-    const ordersLimit = document.getElementById('orders_limit').value;
-    const daysBack = document.getElementById('days_back').value;
-    const btnSync = document.getElementById('btn_sync_wc');
+    const ordersLimit = document.getElementById("orders_limit").value;
+    const daysBack = document.getElementById("days_back").value;
+    const btnSync = document.getElementById("btn_sync_wc");
     
     // Validação
     if (!ordersLimit || ordersLimit < 1 || ordersLimit > 500) {
         Swal.fire({
-            icon: 'warning',
-            title: 'Atenção',
-            text: 'Limite de pedidos deve ser entre 1 e 500'
+            icon: "warning",
+            title: "Atenção",
+            text: "Limite de pedidos deve ser entre 1 e 500"
         });
         return;
     }
     
     if (!daysBack || daysBack < 1 || daysBack > 90) {
         Swal.fire({
-            icon: 'warning',
-            title: 'Atenção',
-            text: 'Período deve ser entre 1 e 90 dias'
+            icon: "warning",
+            title: "Atenção",
+            text: "Período deve ser entre 1 e 90 dias"
         });
         return;
     }
     
     // Desabilitar botão e mostrar loading
     btnSync.disabled = true;
-    btnSync.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sincronizando...';
+    btnSync.innerHTML = "<span class=\"spinner-border spinner-border-sm me-2\"></span>Sincronizando...";
     
     // Fazer requisição
-    fetch('/api/woocommerce/sync-orders', {
-        method: 'POST',
+    fetch("/api/woocommerce/sync-orders", {
+        method: "POST",
         headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
         },
         body: JSON.stringify({
             orders_limit: parseInt(ordersLimit),
@@ -2060,12 +2065,12 @@ function syncWooCommerceOrders() {
     .then(response => response.json())
     .then(data => {
         btnSync.disabled = false;
-        btnSync.innerHTML = '<i class="ki-duotone ki-arrows-circle fs-2"><span class="path1"></span><span class="path2"></span></i> Sincronizar';
+        btnSync.innerHTML = "<i class=\"ki-duotone ki-arrows-circle fs-2\"><span class=\"path1\"></span><span class=\"path2\"></span></i> Sincronizar";
         
         if (data.success) {
             Swal.fire({
-                icon: 'success',
-                title: 'Sucesso!',
+                icon: "success",
+                title: "Sucesso!",
                 html: `<div class="text-start">
                     <p><strong>Sincronização concluída:</strong></p>
                     <ul class="mb-0">
@@ -2074,7 +2079,7 @@ function syncWooCommerceOrders() {
                         <li>Novos contatos: ${data.new_contacts || 0}</li>
                     </ul>
                 </div>`,
-                confirmButtonText: 'Recarregar Dashboard'
+                confirmButtonText: "Recarregar Dashboard"
             }).then((result) => {
                 if (result.isConfirmed) {
                     location.reload();
@@ -2082,29 +2087,29 @@ function syncWooCommerceOrders() {
             });
             
             // Fechar modal
-            bootstrap.Modal.getInstance(document.getElementById('modal_wc_sync')).hide();
+            bootstrap.Modal.getInstance(document.getElementById("modal_wc_sync")).hide();
         } else {
             Swal.fire({
-                icon: 'error',
-                title: 'Erro',
-                text: data.message || 'Erro ao sincronizar pedidos'
+                icon: "error",
+                title: "Erro",
+                text: data.message || "Erro ao sincronizar pedidos"
             });
         }
     })
     .catch(error => {
         btnSync.disabled = false;
-        btnSync.innerHTML = '<i class="ki-duotone ki-arrows-circle fs-2"><span class="path1"></span><span class="path2"></span></i> Sincronizar';
+        btnSync.innerHTML = "<i class=\"ki-duotone ki-arrows-circle fs-2\"><span class=\"path1\"></span><span class=\"path2\"></span></i> Sincronizar";
         
         Swal.fire({
-            icon: 'error',
-            title: 'Erro',
-            text: 'Erro na comunicação com o servidor'
+            icon: "error",
+            title: "Erro",
+            text: "Erro na comunicação com o servidor"
         });
-        console.error('Erro:', error);
+        console.error("Erro:", error);
     });
 }
 </script>
-';
+SCRIPT;
 ?>
 
 <?php include __DIR__ . '/../layouts/metronic/app.php'; ?>

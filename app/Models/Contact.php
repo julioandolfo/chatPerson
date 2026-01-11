@@ -112,6 +112,30 @@ class Contact extends Model
     }
 
     /**
+     * Buscar por email ou telefone (com normalização)
+     */
+    public static function findByEmailOrPhone(?string $email, ?string $phone): ?array
+    {
+        // Tentar por email primeiro
+        if (!empty($email)) {
+            $found = self::findByEmail($email);
+            if ($found) {
+                return $found;
+            }
+        }
+
+        // Depois tentar por telefone normalizado
+        if (!empty($phone)) {
+            $found = self::findByPhoneNormalized($phone);
+            if ($found) {
+                return $found;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Normalizar número de telefone (mesma lógica do WhatsAppService)
      */
     public static function normalizePhoneNumber(string $phone): string

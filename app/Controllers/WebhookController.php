@@ -74,6 +74,46 @@ class WebhookController
     }
     
     /**
+     * Webhook do WhatsApp (Quepasa)
+     * Recebe mensagens e eventos do WhatsApp
+     * 
+     * URL: /whatsapp-webhook
+     */
+    public function whatsapp(): void
+    {
+        try {
+            // Obter payload bruto
+            $payload = file_get_contents('php://input');
+            $data = json_decode($payload, true);
+            
+            \App\Helpers\Logger::quepasa("=== WEBHOOK WHATSAPP RECEBIDO ===");
+            \App\Helpers\Logger::quepasa("Payload size: " . strlen($payload) . " bytes");
+            \App\Helpers\Logger::quepasa("Data keys: " . (!empty($data) ? implode(', ', array_keys($data)) : 'vazio'));
+            
+            if (!$data) {
+                \App\Helpers\Logger::error("WhatsApp webhook - JSON inválido");
+                Response::json(['error' => 'Invalid JSON'], 400);
+                return;
+            }
+            
+            // Processar webhook via WhatsAppService
+            \App\Services\WhatsAppService::processWebhook($data);
+            
+            // Responder com sucesso
+            Response::json(['success' => true]);
+            
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error("WhatsApp webhook error: " . $e->getMessage());
+            \App\Helpers\Logger::error("Stack trace: " . $e->getTraceAsString());
+            
+            Response::json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
      * Webhook do WooCommerce
      * Recebe eventos de criação e atualização de pedidos
      * 

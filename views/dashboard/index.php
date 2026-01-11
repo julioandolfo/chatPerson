@@ -1572,7 +1572,7 @@ ob_start();
                     <label class="form-label fw-bold fs-6 mb-2">URL do Webhook</label>
                     <div class="input-group">
                         <input type="text" id="webhook_url" class="form-control form-control-solid" 
-                               value="<?= rtrim(\App\Helpers\Url::to('/'), '/') ?>/webhooks/woocommerce" readonly>
+                               value="<?php echo rtrim(\App\Helpers\Url::to('/'), '/'); ?>/webhooks/woocommerce" readonly>
                         <button class="btn btn-primary" type="button" onclick="copyWebhookUrl()">
                             <i class="ki-duotone ki-copy fs-2">
                                 <span class="path1"></span>

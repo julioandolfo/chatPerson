@@ -596,59 +596,185 @@ class AnalyticsController
                 'end_date' => Request::get('end_date') ?: date('Y-m-d'),
             ];
             
-            $days = max(1, (strtotime($filters['end_date']) - strtotime($filters['start_date'])) / 86400);
+            $startDate = $filters['start_date'];
+            $endDate = $filters['end_date'] . ' 23:59:59';
             
-            // Estatísticas gerais do Assistente IA
-            $statsByFeature = AIAssistantLog::getStatsByFeature(null, (int)$days);
+            // ========================================
+            // MÉTRICAS CONSOLIDADAS DE IA
+            // ========================================
             
-            $totalUses = array_sum(array_column($statsByFeature, 'total_uses'));
-            $totalTokens = array_sum(array_column($statsByFeature, 'total_tokens'));
-            $totalCost = array_sum(array_column($statsByFeature, 'total_cost'));
-            $totalSuccessful = array_sum(array_column($statsByFeature, 'successful_uses'));
-            $totalFailed = array_sum(array_column($statsByFeature, 'failed_uses'));
+            // 1. AI Conversations (Agentes de IA)
+            $aiConvMetrics = Database::fetch("
+                SELECT 
+                    COUNT(DISTINCT ac.conversation_id) as total,
+                    COALESCE(SUM(ac.tokens_used), 0) as tokens,
+                    COALESCE(SUM(ac.cost), 0) as cost
+                FROM ai_conversations ac
+                INNER JOIN conversations c ON c.id = ac.conversation_id
+                WHERE c.created_at >= ? AND c.created_at <= ?
+            ", [$startDate, $endDate]);
             
-            // Estatísticas de Agentes de IA
-            $sql = "SELECT 
-                        a.id,
-                        a.name,
-                        a.model,
-                        COUNT(ac.id) as conversations_count,
-                        SUM(ac.tokens_used) as total_tokens,
-                        SUM(ac.cost) as total_cost,
-                        COUNT(CASE WHEN ac.status = 'completed' THEN 1 END) as completed,
-                        COUNT(CASE WHEN ac.status = 'escalated' THEN 1 END) as escalated
-                    FROM ai_agents a
-                    LEFT JOIN ai_conversations ac ON a.id = ac.ai_agent_id
-                        AND ac.created_at >= ? AND ac.created_at <= ?
-                    GROUP BY a.id, a.name, a.model
-                    HAVING conversations_count > 0
-                    ORDER BY conversations_count DESC
-                    LIMIT 20";
+            // 2. Sentiment Analysis
+            $sentimentMetrics = Database::fetch("
+                SELECT 
+                    COUNT(*) as total,
+                    COALESCE(SUM(cs.tokens_used), 0) as tokens,
+                    COALESCE(SUM(cs.cost), 0) as cost
+                FROM conversation_sentiments cs
+                WHERE cs.analyzed_at >= ? AND cs.analyzed_at <= ?
+            ", [$startDate, $endDate]);
             
-            $aiAgentsStats = Database::fetchAll($sql, [$filters['start_date'], $filters['end_date'] . ' 23:59:59']);
+            // 3. Performance Analysis
+            $perfMetrics = Database::fetch("
+                SELECT 
+                    COUNT(*) as total,
+                    COALESCE(SUM(apa.tokens_used), 0) as tokens,
+                    COALESCE(SUM(apa.cost), 0) as cost,
+                    AVG(apa.overall_score) as avg_score
+                FROM agent_performance_analysis apa
+                WHERE apa.analyzed_at >= ? AND apa.analyzed_at <= ?
+            ", [$startDate, $endDate]);
             
-            // Evolução de uso ao longo do tempo
-            $usageOverTime = AIAssistantLog::getUsageOverTime((int)$days, 'day');
+            // 4. Realtime Coaching
+            $coachingMetrics = Database::fetch("
+                SELECT 
+                    COUNT(*) as total,
+                    COALESCE(SUM(rch.tokens_used), 0) as tokens,
+                    COALESCE(SUM(rch.cost), 0) as cost
+                FROM realtime_coaching_hints rch
+                WHERE rch.created_at >= ? AND rch.created_at <= ?
+            ", [$startDate, $endDate]);
             
-            // Custo por modelo
-            $costByModel = AIAssistantLog::getCostByModel((int)$days);
+            // 5. Audio Transcription (se existir)
+            $audioMetrics = ['total' => 0, 'tokens' => 0, 'cost' => 0];
+            try {
+                $audioMetrics = Database::fetch("
+                    SELECT 
+                        COUNT(*) as total,
+                        COALESCE(SUM(at.tokens_used), 0) as tokens,
+                        COALESCE(SUM(at.cost), 0) as cost
+                    FROM audio_transcriptions at
+                    WHERE at.created_at >= ? AND at.created_at <= ?
+                ", [$startDate, $endDate]);
+            } catch (\Exception $e) {
+                // Tabela não existe - ignorar
+            }
+            
+            // Totais consolidados
+            $totalTokens = ($aiConvMetrics['tokens'] ?? 0) + ($sentimentMetrics['tokens'] ?? 0) + 
+                          ($perfMetrics['tokens'] ?? 0) + ($coachingMetrics['tokens'] ?? 0) + 
+                          ($audioMetrics['tokens'] ?? 0);
+                          
+            $totalCost = ($aiConvMetrics['cost'] ?? 0) + ($sentimentMetrics['cost'] ?? 0) + 
+                        ($perfMetrics['cost'] ?? 0) + ($coachingMetrics['cost'] ?? 0) + 
+                        ($audioMetrics['cost'] ?? 0);
+            
+            // ========================================
+            // EVOLUÇÃO DIÁRIA
+            // ========================================
+            $evolution = Database::fetchAll("
+                SELECT 
+                    DATE(c.created_at) as date,
+                    COUNT(DISTINCT CASE WHEN ac.id IS NOT NULL THEN c.id END) as ai_conversations,
+                    COUNT(DISTINCT cs.id) as sentiment_analyses,
+                    COUNT(DISTINCT apa.id) as performance_analyses,
+                    COUNT(DISTINCT rch.id) as coaching_hints
+                FROM conversations c
+                LEFT JOIN ai_conversations ac ON c.id = ac.conversation_id
+                LEFT JOIN conversation_sentiments cs ON c.id = cs.conversation_id 
+                    AND DATE(cs.analyzed_at) = DATE(c.created_at)
+                LEFT JOIN agent_performance_analysis apa ON c.id = apa.conversation_id
+                    AND DATE(apa.analyzed_at) = DATE(c.created_at)
+                LEFT JOIN messages m ON c.id = m.conversation_id
+                LEFT JOIN realtime_coaching_hints rch ON m.id = rch.message_id
+                    AND DATE(rch.created_at) = DATE(c.created_at)
+                WHERE c.created_at >= ? AND c.created_at <= ?
+                GROUP BY DATE(c.created_at)
+                ORDER BY date ASC
+            ", [$startDate, $endDate]);
+            
+            // ========================================
+            // TOP AGENTES DE IA
+            // ========================================
+            $aiAgents = Database::fetchAll("
+                SELECT 
+                    a.id,
+                    a.name,
+                    a.model,
+                    COUNT(ac.id) as conversations,
+                    COALESCE(SUM(ac.tokens_used), 0) as total_tokens,
+                    COALESCE(SUM(ac.cost), 0) as total_cost
+                FROM ai_agents a
+                LEFT JOIN ai_conversations ac ON a.id = ac.ai_agent_id
+                    AND ac.created_at >= ? AND ac.created_at <= ?
+                GROUP BY a.id, a.name, a.model
+                HAVING conversations > 0
+                ORDER BY conversations DESC
+                LIMIT 10
+            ", [$startDate, $endDate]);
+            
+            // ========================================
+            // COACHING HINTS POR TIPO
+            // ========================================
+            $coachingHints = Database::fetchAll("
+                SELECT 
+                    rch.hint_type,
+                    COUNT(*) as count,
+                    COALESCE(SUM(rch.tokens_used), 0) as total_tokens,
+                    COALESCE(SUM(rch.cost), 0) as total_cost
+                FROM realtime_coaching_hints rch
+                WHERE rch.created_at >= ? AND rch.created_at <= ?
+                GROUP BY rch.hint_type
+                ORDER BY count DESC
+            ", [$startDate, $endDate]);
             
             Response::json([
                 'success' => true,
-                'assistant_stats' => [
-                    'total_uses' => $totalUses,
-                    'total_tokens' => $totalTokens,
-                    'total_cost' => $totalCost,
-                    'total_successful' => $totalSuccessful,
-                    'total_failed' => $totalFailed,
-                    'success_rate' => $totalUses > 0 ? round(($totalSuccessful / $totalUses) * 100, 2) : 0,
-                    'avg_cost_per_use' => $totalUses > 0 ? round($totalCost / $totalUses, 4) : 0,
-                    'avg_tokens_per_use' => $totalUses > 0 ? round($totalTokens / $totalUses, 0) : 0,
-                    'by_feature' => $statsByFeature
+                'metrics' => [
+                    'total_ai_conversations' => (int)($aiConvMetrics['total'] ?? 0),
+                    'sentiment_analyses' => (int)($sentimentMetrics['total'] ?? 0),
+                    'performance_analyses' => (int)($perfMetrics['total'] ?? 0),
+                    'coaching_hints' => (int)($coachingMetrics['total'] ?? 0),
+                    'audio_transcriptions' => (int)($audioMetrics['total'] ?? 0),
+                    'total_tokens' => (int)$totalTokens,
+                    'total_cost' => round($totalCost, 4),
+                    'breakdown' => [
+                        'ai_agents' => [
+                            'count' => (int)($aiConvMetrics['total'] ?? 0),
+                            'tokens' => (int)($aiConvMetrics['tokens'] ?? 0),
+                            'cost' => round((float)($aiConvMetrics['cost'] ?? 0), 4)
+                        ],
+                        'sentiment_analysis' => [
+                            'count' => (int)($sentimentMetrics['total'] ?? 0),
+                            'tokens' => (int)($sentimentMetrics['tokens'] ?? 0),
+                            'cost' => round((float)($sentimentMetrics['cost'] ?? 0), 4)
+                        ],
+                        'performance_analysis' => [
+                            'count' => (int)($perfMetrics['total'] ?? 0),
+                            'tokens' => (int)($perfMetrics['tokens'] ?? 0),
+                            'cost' => round((float)($perfMetrics['cost'] ?? 0), 4)
+                        ],
+                        'realtime_coaching' => [
+                            'count' => (int)($coachingMetrics['total'] ?? 0),
+                            'tokens' => (int)($coachingMetrics['tokens'] ?? 0),
+                            'cost' => round((float)($coachingMetrics['cost'] ?? 0), 4)
+                        ],
+                        'audio_transcription' => [
+                            'count' => (int)($audioMetrics['total'] ?? 0),
+                            'tokens' => (int)($audioMetrics['tokens'] ?? 0),
+                            'cost' => round((float)($audioMetrics['cost'] ?? 0), 4)
+                        ]
+                    ]
                 ],
-                'ai_agents_stats' => $aiAgentsStats,
-                'usage_over_time' => $usageOverTime,
-                'cost_by_model' => $costByModel
+                'evolution' => $evolution,
+                'ai_agents' => $aiAgents,
+                'coaching_hints' => $coachingHints,
+                'performance_stats' => [
+                    'total' => (int)($perfMetrics['total'] ?? 0),
+                    'avg_overall_score' => round((float)($perfMetrics['avg_score'] ?? 0), 2),
+                    'total_cost' => round((float)($perfMetrics['cost'] ?? 0), 4),
+                    'total_tokens' => (int)($perfMetrics['tokens'] ?? 0)
+                ]
             ]);
             
         } catch (\Exception $e) {

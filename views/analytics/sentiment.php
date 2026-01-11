@@ -287,11 +287,14 @@ function loadAnalyticsData() {
     })
     .then(response => response.json())
     .then(data => {
+        console.log('Dados recebidos:', data);
+        
         if (!data.success) {
             console.error('Erro ao carregar dados:', data.message);
             return;
         }
         
+        console.log('Stats:', data.stats);
         updateStats(data.stats);
         updateEvolutionChart(data.evolution);
         updateDistributionChart(data.distribution);
@@ -305,9 +308,12 @@ function loadAnalyticsData() {
 }
 
 function updateStats(stats) {
-    document.getElementById('stat-total-analyses').textContent = stats.total_analyses || 0;
+    // Total de análises
+    const totalAnalyses = parseInt(stats.total_analyses) || 0;
+    document.getElementById('stat-total-analyses').textContent = totalAnalyses.toLocaleString('pt-BR');
     
-    const avgSentiment = parseFloat(stats.avg_sentiment || 0);
+    // Sentimento médio
+    const avgSentiment = parseFloat(stats.avg_sentiment) || 0;
     const avgEl = document.getElementById('stat-avg-sentiment');
     if (avgSentiment > 0.2) {
         avgEl.textContent = avgSentiment.toFixed(2);
@@ -320,8 +326,13 @@ function updateStats(stats) {
         avgEl.className = 'fs-2hx fw-bold text-warning';
     }
     
-    document.getElementById('stat-negative-count').textContent = stats.negative_count || 0;
-    document.getElementById('stat-total-cost').textContent = '$' + parseFloat(stats.total_cost || 0).toFixed(2);
+    // Conversas negativas
+    const negativeCount = parseInt(stats.negative_count) || 0;
+    document.getElementById('stat-negative-count').textContent = negativeCount.toLocaleString('pt-BR');
+    
+    // Custo total
+    const totalCost = parseFloat(stats.total_cost) || 0;
+    document.getElementById('stat-total-cost').textContent = '$' + totalCost.toFixed(4);
 }
 
 function updateEvolutionChart(evolution) {

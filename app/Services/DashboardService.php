@@ -651,16 +651,79 @@ class DashboardService
         $aiMessagesResult = \App\Helpers\Database::fetch($sqlAIMessages, [$dateFrom, $dateTo]);
         $totalAIMessages = (int)($aiMessagesResult['total'] ?? 0);
         
-        // Total de tokens e custo
-        $sqlTokensCost = "SELECT 
-                            COALESCE(SUM(ac.tokens_used), 0) as total_tokens,
-                            COALESCE(SUM(ac.cost), 0) as total_cost
+        // =============================================
+        // CUSTOS CONSOLIDADOS DE TODAS AS IAs
+        // =============================================
+        
+        // 1. AI Conversations (Conversas com Agentes de IA)
+        $sqlAIConvCost = "SELECT 
+                            COALESCE(SUM(ac.tokens_used), 0) as tokens,
+                            COALESCE(SUM(ac.cost), 0) as cost
                          FROM ai_conversations ac
                          INNER JOIN conversations c ON c.id = ac.conversation_id
                          WHERE c.created_at >= ? AND c.created_at <= ?";
-        $tokensCostResult = \App\Helpers\Database::fetch($sqlTokensCost, [$dateFrom, $dateTo]);
-        $totalTokens = (int)($tokensCostResult['total_tokens'] ?? 0);
-        $totalCost = round((float)($tokensCostResult['total_cost'] ?? 0), 4);
+        $aiConvCost = \App\Helpers\Database::fetch($sqlAIConvCost, [$dateFrom, $dateTo]);
+        $aiConvTokens = (int)($aiConvCost['tokens'] ?? 0);
+        $aiConvCostTotal = (float)($aiConvCost['cost'] ?? 0);
+        
+        // 2. Sentiment Analysis (Análise de Sentimento)
+        $sqlSentimentCost = "SELECT 
+                                COALESCE(SUM(cs.tokens_used), 0) as tokens,
+                                COALESCE(SUM(cs.cost), 0) as cost,
+                                COUNT(*) as analyses
+                             FROM conversation_sentiments cs
+                             WHERE cs.analyzed_at >= ? AND cs.analyzed_at <= ?";
+        $sentimentCost = \App\Helpers\Database::fetch($sqlSentimentCost, [$dateFrom, $dateTo]);
+        $sentimentTokens = (int)($sentimentCost['tokens'] ?? 0);
+        $sentimentCostTotal = (float)($sentimentCost['cost'] ?? 0);
+        $sentimentAnalyses = (int)($sentimentCost['analyses'] ?? 0);
+        
+        // 3. Agent Performance Analysis (Análise de Performance)
+        $sqlPerfCost = "SELECT 
+                           COALESCE(SUM(apa.tokens_used), 0) as tokens,
+                           COALESCE(SUM(apa.cost), 0) as cost,
+                           COUNT(*) as analyses
+                        FROM agent_performance_analysis apa
+                        WHERE apa.analyzed_at >= ? AND apa.analyzed_at <= ?";
+        $perfCost = \App\Helpers\Database::fetch($sqlPerfCost, [$dateFrom, $dateTo]);
+        $perfTokens = (int)($perfCost['tokens'] ?? 0);
+        $perfCostTotal = (float)($perfCost['cost'] ?? 0);
+        $perfAnalyses = (int)($perfCost['analyses'] ?? 0);
+        
+        // 4. Realtime Coaching (Coaching em Tempo Real)
+        $sqlCoachingCost = "SELECT 
+                               COALESCE(SUM(rch.tokens_used), 0) as tokens,
+                               COALESCE(SUM(rch.cost), 0) as cost,
+                               COUNT(*) as hints
+                            FROM realtime_coaching_hints rch
+                            WHERE rch.created_at >= ? AND rch.created_at <= ?";
+        $coachingCost = \App\Helpers\Database::fetch($sqlCoachingCost, [$dateFrom, $dateTo]);
+        $coachingTokens = (int)($coachingCost['tokens'] ?? 0);
+        $coachingCostTotal = (float)($coachingCost['cost'] ?? 0);
+        $coachingHints = (int)($coachingCost['hints'] ?? 0);
+        
+        // 5. Audio Transcription (Transcrição de Áudio) - se a tabela existir
+        $audioTokens = 0;
+        $audioCostTotal = 0;
+        $audioTranscriptions = 0;
+        try {
+            $sqlAudioCost = "SELECT 
+                                COALESCE(SUM(at.tokens_used), 0) as tokens,
+                                COALESCE(SUM(at.cost), 0) as cost,
+                                COUNT(*) as transcriptions
+                             FROM audio_transcriptions at
+                             WHERE at.created_at >= ? AND at.created_at <= ?";
+            $audioCost = \App\Helpers\Database::fetch($sqlAudioCost, [$dateFrom, $dateTo]);
+            $audioTokens = (int)($audioCost['tokens'] ?? 0);
+            $audioCostTotal = (float)($audioCost['cost'] ?? 0);
+            $audioTranscriptions = (int)($audioCost['transcriptions'] ?? 0);
+        } catch (\Exception $e) {
+            // Tabela não existe ou erro - ignorar
+        }
+        
+        // Total consolidado
+        $totalTokens = $aiConvTokens + $sentimentTokens + $perfTokens + $coachingTokens + $audioTokens;
+        $totalCost = $aiConvCostTotal + $sentimentCostTotal + $perfCostTotal + $coachingCostTotal + $audioCostTotal;
         
         // Conversas resolvidas pela IA (sem escalonar para humano)
         $sqlResolved = "SELECT COUNT(DISTINCT ac.conversation_id) as total
@@ -700,12 +763,41 @@ class DashboardService
             'total_ai_conversations' => $totalAIConversations,
             'total_ai_messages' => $totalAIMessages,
             'total_tokens' => $totalTokens,
-            'total_cost' => $totalCost,
+            'total_cost' => round($totalCost, 4),
             'resolved_by_ai' => $aiResolvedConversations,
             'escalated_to_human' => $aiEscalatedConversations,
             'ai_resolution_rate' => $aiResolutionRate,
             'ai_escalation_rate' => $aiEscalationRate,
-            'active_ai_agents' => $totalActiveAIAgents
+            'active_ai_agents' => $totalActiveAIAgents,
+            
+            // Breakdown detalhado por tipo de IA
+            'breakdown' => [
+                'ai_agents' => [
+                    'tokens' => $aiConvTokens,
+                    'cost' => round($aiConvCostTotal, 4),
+                    'count' => $totalAIConversations
+                ],
+                'sentiment_analysis' => [
+                    'tokens' => $sentimentTokens,
+                    'cost' => round($sentimentCostTotal, 4),
+                    'count' => $sentimentAnalyses
+                ],
+                'performance_analysis' => [
+                    'tokens' => $perfTokens,
+                    'cost' => round($perfCostTotal, 4),
+                    'count' => $perfAnalyses
+                ],
+                'realtime_coaching' => [
+                    'tokens' => $coachingTokens,
+                    'cost' => round($coachingCostTotal, 4),
+                    'count' => $coachingHints
+                ],
+                'audio_transcription' => [
+                    'tokens' => $audioTokens,
+                    'cost' => round($audioCostTotal, 4),
+                    'count' => $audioTranscriptions
+                ]
+            ]
         ];
     }
 

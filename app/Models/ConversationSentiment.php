@@ -103,17 +103,32 @@ class ConversationSentiment extends Model
         // Estatísticas gerais
         $sql = "SELECT 
                     COUNT(*) as total_analyses,
-                    AVG(sentiment_score) as avg_sentiment,
-                    SUM(CASE WHEN sentiment_label = 'positive' THEN 1 ELSE 0 END) as positive_count,
-                    SUM(CASE WHEN sentiment_label = 'neutral' THEN 1 ELSE 0 END) as neutral_count,
-                    SUM(CASE WHEN sentiment_label = 'negative' THEN 1 ELSE 0 END) as negative_count,
-                    SUM(CASE WHEN urgency_level = 'critical' THEN 1 ELSE 0 END) as critical_count,
-                    SUM(cost) as total_cost
+                    AVG(cs.sentiment_score) as avg_sentiment,
+                    SUM(CASE WHEN cs.sentiment_label = 'positive' THEN 1 ELSE 0 END) as positive_count,
+                    SUM(CASE WHEN cs.sentiment_label = 'neutral' THEN 1 ELSE 0 END) as neutral_count,
+                    SUM(CASE WHEN cs.sentiment_label = 'negative' THEN 1 ELSE 0 END) as negative_count,
+                    SUM(CASE WHEN cs.urgency_level = 'critical' THEN 1 ELSE 0 END) as critical_count,
+                    COALESCE(SUM(cs.cost), 0) as total_cost
                 FROM conversation_sentiments cs
                 INNER JOIN conversations c ON cs.conversation_id = c.id
                 WHERE {$whereClause}";
         
-        return Database::fetch($sql, $params) ?: [];
+        $result = Database::fetch($sql, $params);
+        
+        // Garantir valores padrão se resultado vazio
+        if (!$result || $result['total_analyses'] == 0) {
+            return [
+                'total_analyses' => 0,
+                'avg_sentiment' => 0,
+                'positive_count' => 0,
+                'neutral_count' => 0,
+                'negative_count' => 0,
+                'critical_count' => 0,
+                'total_cost' => 0
+            ];
+        }
+        
+        return $result;
     }
 }
 

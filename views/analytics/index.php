@@ -576,6 +576,208 @@ ob_start();
                 </div>
             </div>
 
+            <!-- Tab: Inteligência Artificial -->
+            <div class="tab-pane fade" id="kt_tab_ai" role="tabpanel">
+                <div class="mt-5">
+                    <!-- Cards Principais de IA -->
+                    <div class="row g-5 mb-5">
+                        <div class="col-xl-3">
+                            <div class="card bg-light-primary h-100">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="symbol symbol-50px me-3">
+                                            <div class="symbol-label bg-primary">
+                                                <i class="ki-duotone ki-robot fs-2x text-white">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                            </div>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="text-gray-500 fw-semibold fs-7 mb-1">Conversas com IA</div>
+                                            <div class="fs-2hx fw-bold text-gray-800" id="stat-ai-conversations">-</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-xl-3">
+                            <div class="card bg-light-success h-100">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="symbol symbol-50px me-3">
+                                            <div class="symbol-label bg-success">
+                                                <i class="ki-duotone ki-heart fs-2x text-white">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                            </div>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="text-gray-500 fw-semibold fs-7 mb-1">Análises de Sentimento</div>
+                                            <div class="fs-2hx fw-bold text-gray-800" id="stat-sentiment-analyses">-</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-xl-3">
+                            <div class="card bg-light-info h-100">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="symbol symbol-50px me-3">
+                                            <div class="symbol-label bg-info">
+                                                <i class="ki-duotone ki-chart-line-up fs-2x text-white">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                            </div>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="text-gray-500 fw-semibold fs-7 mb-1">Análises de Performance</div>
+                                            <div class="fs-2hx fw-bold text-gray-800" id="stat-performance-analyses">-</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-xl-3">
+                            <div class="card bg-light-warning h-100">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="symbol symbol-50px me-3">
+                                            <div class="symbol-label bg-warning">
+                                                <i class="ki-duotone ki-dollar fs-2x text-white">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                            </div>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="text-gray-500 fw-semibold fs-7 mb-1">Custo Total de IA</div>
+                                            <div class="fs-2hx fw-bold text-gray-800" id="stat-ai-total-cost">-</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Breakdown de Custos por Serviço -->
+                    <div class="card mb-5">
+                        <div class="card-header">
+                            <h3 class="card-title">💰 Breakdown de Custos por Serviço de IA</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-5" id="ai-cost-breakdown">
+                                <!-- Será preenchido via JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Gráficos de IA -->
+                    <div class="row g-5 mb-5">
+                        <div class="col-xl-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Evolução de Uso de IA</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div id="chart-ai-evolution" style="height: 300px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Distribuição de Custos</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div id="chart-ai-cost-distribution" style="height: 300px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tabelas Detalhadas -->
+                    <div class="row g-5 mb-5">
+                        <div class="col-xl-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Top Agentes de IA</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
+                                            <thead>
+                                                <tr class="fw-bold text-muted">
+                                                    <th class="min-w-50px">#</th>
+                                                    <th class="min-w-150px">Agente</th>
+                                                    <th class="min-w-100px">Conversas</th>
+                                                    <th class="min-w-100px">Tokens</th>
+                                                    <th class="min-w-100px">Custo</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="ai-agents-ranking">
+                                                <tr>
+                                                    <td colspan="5" class="text-center py-5">
+                                                        <p class="text-muted">Carregando...</p>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-xl-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Coaching em Tempo Real</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
+                                            <thead>
+                                                <tr class="fw-bold text-muted">
+                                                    <th class="min-w-150px">Tipo de Dica</th>
+                                                    <th class="min-w-100px">Quantidade</th>
+                                                    <th class="min-w-100px">Tokens</th>
+                                                    <th class="min-w-100px">Custo</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="coaching-hints-stats">
+                                                <tr>
+                                                    <td colspan="4" class="text-center py-5">
+                                                        <p class="text-muted">Carregando...</p>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Análise de Performance de Vendedores -->
+                    <div class="card mb-5">
+                        <div class="card-header">
+                            <h3 class="card-title">📊 Análise de Performance de Vendedores</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-5" id="performance-analysis-stats">
+                                <!-- Será preenchido via JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
@@ -1240,15 +1442,251 @@ function loadAIData() {
             return;
         }
         
-        updateAIStats(data.assistant_stats);
-        updateAIUsageChart(data.usage_over_time);
-        updateAICostModelChart(data.cost_by_model);
-        updateAIFeaturesTable(data.assistant_stats.by_feature);
-        updateAIAgentsTable(data.ai_agents_stats);
+        console.log('Dados de IA:', data);
+        
+        // Atualizar cards principais
+        updateAIMainStats(data.metrics);
+        
+        // Atualizar breakdown de custos
+        updateAICostBreakdown(data.metrics?.breakdown);
+        
+        // Atualizar gráficos
+        updateAIEvolutionChart(data.evolution);
+        updateAICostDistributionChart(data.metrics?.breakdown);
+        
+        // Atualizar tabelas
+        updateAIAgentsRankingTable(data.ai_agents);
+        updateCoachingHintsTable(data.coaching_hints);
+        updatePerformanceAnalysisStats(data.performance_stats);
     })
     .catch(error => {
         console.error('Erro ao carregar dados de IA:', error);
     });
+}
+
+function updateAIMainStats(metrics) {
+    if (!metrics) return;
+    
+    document.getElementById('stat-ai-conversations').textContent = 
+        (metrics.total_ai_conversations || 0).toLocaleString('pt-BR');
+    
+    document.getElementById('stat-sentiment-analyses').textContent = 
+        (metrics.sentiment_analyses || 0).toLocaleString('pt-BR');
+    
+    document.getElementById('stat-performance-analyses').textContent = 
+        (metrics.performance_analyses || 0).toLocaleString('pt-BR');
+    
+    document.getElementById('stat-ai-total-cost').textContent = 
+        '$' + parseFloat(metrics.total_cost || 0).toFixed(4);
+}
+
+function updateAICostBreakdown(breakdown) {
+    const container = document.getElementById('ai-cost-breakdown');
+    if (!container || !breakdown) return;
+    
+    const services = [
+        { key: 'ai_agents', name: 'Agentes de IA', icon: 'robot', color: 'primary', emoji: '🤖' },
+        { key: 'sentiment_analysis', name: 'Análise de Sentimento', icon: 'heart', color: 'danger', emoji: '😊' },
+        { key: 'performance_analysis', name: 'Análise de Performance', icon: 'chart-line-up', color: 'info', emoji: '📊' },
+        { key: 'realtime_coaching', name: 'Coaching Tempo Real', icon: 'teacher', color: 'warning', emoji: '🎯' },
+        { key: 'audio_transcription', name: 'Transcrição de Áudio', icon: 'microphone', color: 'success', emoji: '🎤' }
+    ];
+    
+    let html = '';
+    services.forEach(service => {
+        const data = breakdown[service.key] || {};
+        const cost = parseFloat(data.cost || 0);
+        const count = parseInt(data.count || 0);
+        const tokens = parseInt(data.tokens || 0);
+        
+        if (cost > 0 || count > 0) {
+            html += `
+                <div class="col-xl-4 col-md-6">
+                    <div class="card bg-light-${service.color} h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div class="d-flex align-items-center">
+                                    <i class="ki-duotone ki-${service.icon} fs-2x text-${service.color} me-3">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    <div>
+                                        <div class="fs-6 fw-bold text-gray-800">${service.emoji} ${service.name}</div>
+                                        <div class="text-muted fs-8">${count.toLocaleString('pt-BR')} usos</div>
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fs-4 fw-bold text-${service.color}">$${cost.toFixed(4)}</div>
+                                </div>
+                            </div>
+                            <div class="text-muted fs-8">
+                                <i class="ki-duotone ki-data fs-6 text-${service.color}">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                ${tokens.toLocaleString('pt-BR')} tokens
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    });
+    
+    container.innerHTML = html || '<p class="text-muted text-center">Nenhum dado disponível</p>';
+}
+
+function updateAIEvolutionChart(evolution) {
+    const chartEl = document.querySelector("#chart-ai-evolution");
+    if (!chartEl || !evolution) return;
+    
+    const dates = evolution.map(e => e.date);
+    const conversations = evolution.map(e => parseInt(e.ai_conversations || 0));
+    const sentiments = evolution.map(e => parseInt(e.sentiment_analyses || 0));
+    const performance = evolution.map(e => parseInt(e.performance_analyses || 0));
+    
+    const options = {
+        series: [{
+            name: 'Conversas IA',
+            data: conversations
+        }, {
+            name: 'Análises Sentimento',
+            data: sentiments
+        }, {
+            name: 'Análises Performance',
+            data: performance
+        }],
+        chart: {
+            height: 300,
+            type: 'line',
+            toolbar: { show: false }
+        },
+        stroke: {
+            width: [3, 3, 3],
+            curve: 'smooth'
+        },
+        xaxis: {
+            categories: dates
+        },
+        colors: ['#009EF7', '#F1416C', '#00D9FF'],
+        legend: {
+            position: 'top'
+        }
+    };
+    
+    if (window.aiEvolutionChart) {
+        window.aiEvolutionChart.updateOptions(options);
+    } else {
+        window.aiEvolutionChart = new ApexCharts(chartEl, options);
+        window.aiEvolutionChart.render();
+    }
+}
+
+function updateAICostDistributionChart(breakdown) {
+    const chartEl = document.querySelector("#chart-ai-cost-distribution");
+    if (!chartEl || !breakdown) return;
+    
+    const services = [
+        { key: 'ai_agents', name: 'Agentes IA' },
+        { key: 'sentiment_analysis', name: 'Sentimento' },
+        { key: 'performance_analysis', name: 'Performance' },
+        { key: 'realtime_coaching', name: 'Coaching' },
+        { key: 'audio_transcription', name: 'Transcrição' }
+    ];
+    
+    const series = services.map(s => parseFloat(breakdown[s.key]?.cost || 0)).filter(v => v > 0);
+    const labels = services.map(s => s.name).filter((_, i) => series[i] > 0);
+    
+    const options = {
+        series: series,
+        chart: {
+            type: 'donut',
+            height: 300
+        },
+        labels: labels,
+        colors: ['#009EF7', '#F1416C', '#00D9FF', '#FFC700', '#50CD89'],
+        legend: {
+            position: 'bottom'
+        }
+    };
+    
+    if (window.aiCostDistChart) {
+        window.aiCostDistChart.updateOptions(options);
+    } else {
+        window.aiCostDistChart = new ApexCharts(chartEl, options);
+        window.aiCostDistChart.render();
+    }
+}
+
+function updateAIAgentsRankingTable(agents) {
+    const tbody = document.getElementById('ai-agents-ranking');
+    if (!tbody) return;
+    
+    if (!agents || agents.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-5"><p class="text-muted">Nenhum dado disponível</p></td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = agents.map((agent, index) => `
+        <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(agent.name || '-')}</td>
+            <td>${(agent.conversations || 0).toLocaleString('pt-BR')}</td>
+            <td>${(agent.total_tokens || 0).toLocaleString('pt-BR')}</td>
+            <td>$${parseFloat(agent.total_cost || 0).toFixed(4)}</td>
+        </tr>
+    `).join('');
+}
+
+function updateCoachingHintsTable(hints) {
+    const tbody = document.getElementById('coaching-hints-stats');
+    if (!tbody) return;
+    
+    if (!hints || hints.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center py-5"><p class="text-muted">Nenhum dado disponível</p></td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = hints.map(hint => `
+        <tr>
+            <td>${escapeHtml(hint.hint_type || '-')}</td>
+            <td>${(hint.count || 0).toLocaleString('pt-BR')}</td>
+            <td>${(hint.total_tokens || 0).toLocaleString('pt-BR')}</td>
+            <td>$${parseFloat(hint.total_cost || 0).toFixed(4)}</td>
+        </tr>
+    `).join('');
+}
+
+function updatePerformanceAnalysisStats(stats) {
+    const container = document.getElementById('performance-analysis-stats');
+    if (!container || !stats) return;
+    
+    container.innerHTML = `
+        <div class="col-md-3">
+            <div class="d-flex flex-column">
+                <span class="text-muted fs-7 mb-1">Total de Análises</span>
+                <span class="fw-bold fs-2">${(stats.total || 0).toLocaleString('pt-BR')}</span>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="d-flex flex-column">
+                <span class="text-muted fs-7 mb-1">Nota Média Geral</span>
+                <span class="fw-bold fs-2 text-primary">${parseFloat(stats.avg_overall_score || 0).toFixed(2)}</span>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="d-flex flex-column">
+                <span class="text-muted fs-7 mb-1">Custo Total</span>
+                <span class="fw-bold fs-2 text-success">$${parseFloat(stats.total_cost || 0).toFixed(4)}</span>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="d-flex flex-column">
+                <span class="text-muted fs-7 mb-1">Tokens Utilizados</span>
+                <span class="fw-bold fs-2 text-info">${(stats.total_tokens || 0).toLocaleString('pt-BR')}</span>
+            </div>
+        </div>
+    `;
 }
 
 function loadTimeComparison() {

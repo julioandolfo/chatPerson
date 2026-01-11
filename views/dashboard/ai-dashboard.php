@@ -105,6 +105,191 @@ ob_start();
 </div>
 <!--end::Row-->
 
+<!--begin::Row - Breakdown de Custos de IA-->
+<div class="row g-5 mb-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title fw-bold">
+                    <i class="ki-duotone ki-dollar fs-2x text-success me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    💰 Breakdown de Custos de IA
+                </h3>
+                <div class="card-toolbar">
+                    <div class="d-flex flex-column align-items-end">
+                        <span class="badge badge-light-success fs-5 mb-1">
+                            Total: $<?= number_format($aiMetrics['total_cost'] ?? 0, 4) ?>
+                        </span>
+                        <span class="text-muted fs-8">
+                            <?= number_format($aiMetrics['total_tokens'] ?? 0) ?> tokens
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body pt-5">
+                <div class="row g-5">
+                    
+                    <?php
+                    $breakdown = $aiMetrics['breakdown'] ?? [];
+                    $breakdownItems = [
+                        'ai_agents' => [
+                            'title' => 'Agentes de IA',
+                            'icon' => 'ki-robot',
+                            'color' => 'primary',
+                            'emoji' => '🤖'
+                        ],
+                        'sentiment_analysis' => [
+                            'title' => 'Análise de Sentimento',
+                            'icon' => 'ki-heart',
+                            'color' => 'danger',
+                            'emoji' => '😊'
+                        ],
+                        'performance_analysis' => [
+                            'title' => 'Análise de Performance',
+                            'icon' => 'ki-chart-line-up',
+                            'color' => 'info',
+                            'emoji' => '📊'
+                        ],
+                        'realtime_coaching' => [
+                            'title' => 'Coaching Tempo Real',
+                            'icon' => 'ki-teacher',
+                            'color' => 'warning',
+                            'emoji' => '🎯'
+                        ],
+                        'audio_transcription' => [
+                            'title' => 'Transcrição de Áudio',
+                            'icon' => 'ki-microphone',
+                            'color' => 'success',
+                            'emoji' => '🎤'
+                        ]
+                    ];
+                    
+                    foreach ($breakdownItems as $key => $item):
+                        $data = $breakdown[$key] ?? [];
+                        $cost = $data['cost'] ?? 0;
+                        $tokens = $data['tokens'] ?? 0;
+                        $count = $data['count'] ?? 0;
+                        
+                        // Pular se custo for zero
+                        if ($cost == 0 && $count == 0) continue;
+                        
+                        // Calcular percentual do custo total
+                        $totalCost = $aiMetrics['total_cost'] ?? 0;
+                        $percentage = $totalCost > 0 ? round(($cost / $totalCost) * 100, 1) : 0;
+                    ?>
+                    
+                    <!-- Item -->
+                    <div class="col-xl-4 col-md-6">
+                        <div class="card bg-light-<?= $item['color'] ?> h-100">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                    <div class="d-flex align-items-center">
+                                        <i class="ki-duotone <?= $item['icon'] ?> fs-2x text-<?= $item['color'] ?> me-3">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        <div>
+                                            <div class="fs-6 fw-bold text-gray-800"><?= $item['emoji'] ?> <?= $item['title'] ?></div>
+                                            <div class="text-muted fs-8"><?= number_format($count) ?> <?= $count == 1 ? 'uso' : 'usos' ?></div>
+                                        </div>
+                                    </div>
+                                    <div class="text-end">
+                                        <div class="fs-4 fw-bold text-<?= $item['color'] ?>">$<?= number_format($cost, 4) ?></div>
+                                        <div class="badge badge-light-<?= $item['color'] ?> fs-9"><?= $percentage ?>%</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Barra de progresso -->
+                                <div class="progress h-6px w-100 mb-2">
+                                    <div class="progress-bar bg-<?= $item['color'] ?>" 
+                                         style="width: <?= $percentage ?>%"></div>
+                                </div>
+                                
+                                <!-- Tokens -->
+                                <div class="text-muted fs-8">
+                                    <i class="ki-duotone ki-data fs-6 text-<?= $item['color'] ?>">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    <?= number_format($tokens) ?> tokens
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <?php endforeach; ?>
+                    
+                </div>
+                
+                <!-- Resumo consolidado -->
+                <div class="separator my-5"></div>
+                <div class="row g-5">
+                    <div class="col-md-3">
+                        <div class="d-flex flex-column">
+                            <span class="text-muted fs-7 mb-1">Custo Total</span>
+                            <span class="fw-bold text-success fs-3">$<?= number_format($aiMetrics['total_cost'] ?? 0, 4) ?></span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="d-flex flex-column">
+                            <span class="text-muted fs-7 mb-1">Tokens Totais</span>
+                            <span class="fw-bold text-info fs-3"><?= number_format($aiMetrics['total_tokens'] ?? 0) ?></span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="d-flex flex-column">
+                            <span class="text-muted fs-7 mb-1">Custo Médio / Conversa</span>
+                            <span class="fw-bold text-primary fs-3">
+                                <?php
+                                $totalConv = $aiMetrics['total_ai_conversations'] ?? 0;
+                                $avgCost = $totalConv > 0 ? ($aiMetrics['total_cost'] ?? 0) / $totalConv : 0;
+                                echo '$' . number_format($avgCost, 4);
+                                ?>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="d-flex flex-column">
+                            <span class="text-muted fs-7 mb-1">Custo Médio / Token</span>
+                            <span class="fw-bold text-warning fs-3">
+                                <?php
+                                $totalTokens = $aiMetrics['total_tokens'] ?? 0;
+                                $avgTokenCost = $totalTokens > 0 ? ($aiMetrics['total_cost'] ?? 0) / $totalTokens : 0;
+                                echo '$' . number_format($avgTokenCost, 6);
+                                ?>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Alerta de custo alto -->
+                <?php if (($aiMetrics['total_cost'] ?? 0) > 10): ?>
+                <div class="alert alert-warning d-flex align-items-center mt-5">
+                    <i class="ki-duotone ki-information fs-2x text-warning me-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div>
+                        <h4 class="mb-1">⚠️ Custo Elevado Detectado</h4>
+                        <p class="mb-0">
+                            O custo total de IA no período está acima de $10.00. 
+                            Considere revisar as configurações de uso e limites diários.
+                        </p>
+                    </div>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+<!--end::Row-->
+
 <!--begin::Row - Métricas de Fallback de IA-->
 <?php if (isset($fallbackStats)): ?>
 <div class="row g-5 mb-5">

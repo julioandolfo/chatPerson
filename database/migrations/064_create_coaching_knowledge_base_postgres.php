@@ -13,7 +13,7 @@ function up_create_coaching_knowledge_base_postgres() {
     }
     
     try {
-        $pgsql = \App\Helpers\PostgreSQL::getInstance();
+        $pgsql = \App\Helpers\PostgreSQL::getConnection();
         
         // Criar tabela
         $sql = "CREATE TABLE IF NOT EXISTS coaching_knowledge_base (
@@ -94,7 +94,7 @@ function down_create_coaching_knowledge_base_postgres() {
     }
     
     try {
-        $pgsql = \App\Helpers\PostgreSQL::getInstance();
+        $pgsql = \App\Helpers\PostgreSQL::getConnection();
         
         $sql = "DROP TABLE IF EXISTS coaching_knowledge_base CASCADE";
         $pgsql->exec($sql);

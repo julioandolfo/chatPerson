@@ -92,6 +92,13 @@ function seed_roles_and_permissions() {
         ['name' => 'Editar setores', 'slug' => 'departments.edit', 'description' => 'Editar setores', 'module' => 'departments'],
         ['name' => 'Atribuir agentes a setores', 'slug' => 'departments.assign_agents', 'description' => 'Atribuir agentes a setores', 'module' => 'departments'],
         
+        // Times/Equipes
+        ['name' => 'Ver times', 'slug' => 'teams.view', 'description' => 'Ver times/equipes', 'module' => 'teams'],
+        ['name' => 'Criar times', 'slug' => 'teams.create', 'description' => 'Criar times/equipes', 'module' => 'teams'],
+        ['name' => 'Editar times', 'slug' => 'teams.edit', 'description' => 'Editar times/equipes', 'module' => 'teams'],
+        ['name' => 'Deletar times', 'slug' => 'teams.delete', 'description' => 'Deletar times/equipes', 'module' => 'teams'],
+        ['name' => 'Gerenciar membros de times', 'slug' => 'teams.manage_members', 'description' => 'Adicionar/remover membros de times', 'module' => 'teams'],
+        
         // Agentes de IA
         ['name' => 'Ver agentes de IA', 'slug' => 'ai_agents.view', 'description' => 'Ver agentes de IA', 'module' => 'ai_agents'],
         ['name' => 'Criar agentes de IA', 'slug' => 'ai_agents.create', 'description' => 'Criar agentes de IA', 'module' => 'ai_agents'],

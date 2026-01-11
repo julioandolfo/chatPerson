@@ -576,6 +576,143 @@ ob_start();
                 </div>
             </div>
 
+            <!-- Tab: Automações -->
+            <div class="tab-pane fade" id="kt_tab_automations" role="tabpanel">
+                <div class="mt-5">
+                    <!-- Cards Principais -->
+                    <div class="row g-5 mb-5">
+                        <div class="col-xl-3">
+                            <div class="card bg-light-primary h-100">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="symbol symbol-50px me-3">
+                                            <div class="symbol-label bg-primary">
+                                                <i class="ki-duotone ki-gear fs-2x text-white">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                            </div>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="text-gray-500 fw-semibold fs-7 mb-1">Total de Execuções</div>
+                                            <div class="fs-2hx fw-bold text-gray-800" id="stat-automations-total">-</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-xl-3">
+                            <div class="card bg-light-success h-100">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="symbol symbol-50px me-3">
+                                            <div class="symbol-label bg-success">
+                                                <i class="ki-duotone ki-check-circle fs-2x text-white">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                            </div>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="text-gray-500 fw-semibold fs-7 mb-1">Taxa de Sucesso</div>
+                                            <div class="fs-2hx fw-bold text-gray-800" id="stat-automations-success-rate">-</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-xl-3">
+                            <div class="card bg-light-danger h-100">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="symbol symbol-50px me-3">
+                                            <div class="symbol-label bg-danger">
+                                                <i class="ki-duotone ki-cross-circle fs-2x text-white">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                            </div>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="text-gray-500 fw-semibold fs-7 mb-1">Falhas</div>
+                                            <div class="fs-2hx fw-bold text-gray-800" id="stat-automations-failed">-</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-xl-3">
+                            <div class="card bg-light-info h-100">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center">
+                                        <div class="symbol symbol-50px me-3">
+                                            <div class="symbol-label bg-info">
+                                                <i class="ki-duotone ki-time fs-2x text-white">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                            </div>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="text-gray-500 fw-semibold fs-7 mb-1">Tempo Médio</div>
+                                            <div class="fs-2hx fw-bold text-gray-800" id="stat-automations-avg-time">-</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Gráfico de Evolução -->
+                    <div class="row g-5 mb-5">
+                        <div class="col-xl-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Evolução de Execuções de Automações</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div id="chart-automations-evolution" style="height: 300px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Top Automações -->
+                    <div class="card mb-5">
+                        <div class="card-header">
+                            <h3 class="card-title">Top 20 Automações Mais Executadas</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
+                                    <thead>
+                                        <tr class="fw-bold text-muted">
+                                            <th class="min-w-50px">#</th>
+                                            <th class="min-w-200px">Automação</th>
+                                            <th class="min-w-100px">Execuções</th>
+                                            <th class="min-w-100px">Sucesso</th>
+                                            <th class="min-w-100px">Falhas</th>
+                                            <th class="min-w-100px">Tempo Médio</th>
+                                            <th class="min-w-100px">Taxa</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="automations-ranking-table">
+                                        <tr>
+                                            <td colspan="7" class="text-center py-5">
+                                                <p class="text-muted">Carregando...</p>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Tab: Inteligência Artificial -->
             <div class="tab-pane fade" id="kt_tab_ai" role="tabpanel">
                 <div class="mt-5">
@@ -1774,11 +1911,11 @@ function updateAutomationsEvolutionChart(evolution) {
 }
 
 function updateTopAutomationsTable(automations) {
-    const tbody = document.getElementById('top-automations-table');
+    const tbody = document.getElementById('automations-ranking-table');
     if (!tbody) return;
     
     if (!automations || automations.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5"><p class="text-muted">Nenhum dado disponível</p></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-5"><p class="text-muted">Nenhum dado disponível</p></td></tr>';
         return;
     }
     
@@ -1786,13 +1923,15 @@ function updateTopAutomationsTable(automations) {
         const successRate = auto.execution_count > 0 
             ? ((auto.completed_count / auto.execution_count) * 100).toFixed(1) 
             : '0.0';
+        const avgTime = auto.avg_time_seconds > 0 ? auto.avg_time_seconds.toFixed(1) + 's' : '-';
         return `
             <tr>
                 <td>${index + 1}</td>
                 <td>${escapeHtml(auto.name || '-')}</td>
-                <td>${auto.execution_count || 0}</td>
-                <td>${auto.completed_count || 0}</td>
-                <td>${auto.failed_count || 0}</td>
+                <td>${(auto.execution_count || 0).toLocaleString('pt-BR')}</td>
+                <td>${(auto.completed_count || 0).toLocaleString('pt-BR')}</td>
+                <td>${(auto.failed_count || 0).toLocaleString('pt-BR')}</td>
+                <td>${avgTime}</td>
                 <td><span class="badge badge-light-success">${successRate}%</span></td>
             </tr>
         `;

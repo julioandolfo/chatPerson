@@ -40,6 +40,8 @@ use App\Controllers\Api4ComCallController;
 use App\Controllers\WooCommerceController;
 use App\Controllers\AgentPerformanceController;
 use App\Controllers\RealtimeCoachingController;
+use App\Controllers\CoachingDashboardController;
+use App\Controllers\TeamController;
 
 // Rotas públicas
 Router::get('/', function() {
@@ -350,6 +352,14 @@ Router::post('/api/coaching/hints/{hintId}/view', [RealtimeCoachingController::c
 Router::post('/api/coaching/hints/{hintId}/feedback', [RealtimeCoachingController::class, 'sendFeedback'], ['Authentication']);
 Router::post('/api/coaching/hints/{hintId}/use-suggestion', [RealtimeCoachingController::class, 'useSuggestion'], ['Authentication']);
 
+// Rotas de Dashboard de Coaching
+Router::get('/coaching/dashboard', [CoachingDashboardController::class, 'index'], ['Authentication', 'Permission:coaching.view']);
+Router::get('/coaching/agent/{agentId}', [CoachingDashboardController::class, 'agentPerformance'], ['Authentication', 'Permission:coaching.view']);
+Router::get('/coaching/top-conversations', [CoachingDashboardController::class, 'topConversations'], ['Authentication', 'Permission:coaching.view']);
+Router::get('/api/coaching/dashboard/data', [CoachingDashboardController::class, 'getDashboardData'], ['Authentication', 'Permission:coaching.view']);
+Router::get('/api/coaching/dashboard/history', [CoachingDashboardController::class, 'getPerformanceHistory'], ['Authentication', 'Permission:coaching.view']);
+Router::get('/coaching/export/csv', [CoachingDashboardController::class, 'exportCSV'], ['Authentication', 'Permission:coaching.view']);
+
 // Rota para iniciar chamada a partir de conversa
 Router::post('/conversations/{id}/api4com-call', [ConversationController::class, 'startApi4ComCall'], ['Authentication']);
 
@@ -500,6 +510,18 @@ Router::post('/departments/{id}', [DepartmentController::class, 'update'], ['Aut
 Router::delete('/departments/{id}', [DepartmentController::class, 'destroy'], ['Authentication']);
 Router::post('/departments/{id}/agents', [DepartmentController::class, 'addAgent'], ['Authentication']);
 Router::post('/departments/{id}/agents/remove', [DepartmentController::class, 'removeAgent'], ['Authentication']);
+
+// Times/Equipes
+Router::get('/teams', [TeamController::class, 'index'], ['Authentication']);
+Router::get('/teams/create', [TeamController::class, 'create'], ['Authentication']);
+Router::post('/teams', [TeamController::class, 'store'], ['Authentication']);
+Router::get('/teams/dashboard', [TeamController::class, 'dashboard'], ['Authentication']);
+Router::get('/teams/show', [TeamController::class, 'show'], ['Authentication']);
+Router::get('/teams/edit', [TeamController::class, 'edit'], ['Authentication']);
+Router::post('/teams/update', [TeamController::class, 'update'], ['Authentication']);
+Router::post('/teams/delete', [TeamController::class, 'delete'], ['Authentication']);
+Router::get('/teams/performance', [TeamController::class, 'getPerformance'], ['Authentication']);
+Router::post('/teams/compare', [TeamController::class, 'compareTeams'], ['Authentication']);
 
 // Rotas de Tags
 // IMPORTANTE: Rotas específicas DEVEM vir ANTES de rotas com parâmetros dinâmicos

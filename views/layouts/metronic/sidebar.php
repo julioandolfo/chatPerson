@@ -341,6 +341,25 @@
                 <!--end:Menu item-->
                 <?php endif; ?>
                 
+                <!--begin:Menu item - Coaching Dashboard -->
+                <?php if (\App\Helpers\Permission::can('coaching.view')): ?>
+                <div class="menu-item">
+                    <a class="menu-link <?= isActive('/coaching', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/coaching/dashboard') ?>">
+                        <span class="menu-icon">
+                            <i class="ki-duotone ki-rocket fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                        </span>
+                        <span class="menu-title">Coaching IA</span>
+                        <span class="menu-badge">
+                            <span class="badge badge-success badge-circle pulse pulse-success" style="width: 8px; height: 8px;"></span>
+                        </span>
+                    </a>
+                </div>
+                <!--end:Menu item-->
+                <?php endif; ?>
+                
                 <!--begin:Menu item-->
                 <div data-kt-menu-trigger="click" class="menu-item menu-accordion">
                     <span class="menu-link <?= isActive('/integrations', $currentUri) || isActive('/whatsapp', $currentUri) || isActive('/integrations/notificame', $currentUri) || isActive('/integrations/woocommerce', $currentUri) ? 'active' : '' ?>" data-title="Integrações">
@@ -454,6 +473,16 @@
                                       <span class="menu-title">Setores</span>
                                   </a>
                               </div>
+                              <?php if (\App\Helpers\Permission::can('teams.view')): ?>
+                              <div class="menu-item">
+                                  <a class="menu-link <?= isActive('/teams', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/teams') ?>">
+                                      <span class="menu-bullet">
+                                          <span class="bullet bullet-dot"></span>
+                                      </span>
+                                      <span class="menu-title">Times</span>
+                                  </a>
+                              </div>
+                              <?php endif; ?>
                               <?php if (\App\Helpers\Permission::can('admin.logs')): ?>
                               <div class="menu-item">
                                   <a class="menu-link <?= isActive('/logs', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/logs') ?>">

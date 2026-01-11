@@ -430,6 +430,16 @@
                             </a>
                         </div>
                         <?php endif; ?>
+                        <?php if (\App\Helpers\Permission::can('conversion.view')): ?>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/agent-conversion', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/agent-conversion') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Conversão WooCommerce</span>
+                            </a>
+                        </div>
+                        <?php endif; ?>
                         <div class="menu-item">
                             <a class="menu-link" href="<?= \App\Helpers\Url::to('/integrations') ?>">
                                 <span class="menu-bullet">

@@ -22,6 +22,9 @@ class UserService
         if (isset($data['max_conversations']) && $data['max_conversations'] === '') {
             $data['max_conversations'] = null;
         }
+        if (isset($data['woocommerce_seller_id']) && $data['woocommerce_seller_id'] === '') {
+            $data['woocommerce_seller_id'] = null;
+        }
         
         // Definir valores padrão
         $data['availability_status'] = $data['availability_status'] ?? 'offline';
@@ -34,7 +37,8 @@ class UserService
             'role' => 'nullable|string|max:50',
             'status' => 'nullable|string|in:active,inactive',
             'availability_status' => 'nullable|string|in:online,offline,away,busy',
-            'max_conversations' => 'nullable|integer|min:1'
+            'max_conversations' => 'nullable|integer|min:1',
+            'woocommerce_seller_id' => 'nullable|integer|min:1'
         ]);
 
         if (!empty($errors)) {
@@ -100,6 +104,9 @@ class UserService
         if (isset($data['current_conversations']) && $data['current_conversations'] === '') {
             $data['current_conversations'] = null;
         }
+        if (isset($data['woocommerce_seller_id']) && $data['woocommerce_seller_id'] === '') {
+            $data['woocommerce_seller_id'] = null;
+        }
 
         $errors = Validator::validate($data, [
             'name' => 'nullable|string|max:255',
@@ -110,7 +117,8 @@ class UserService
             'availability_status' => 'nullable|string|in:online,offline,away,busy',
             'max_conversations' => 'nullable|integer|min:1',
             'current_conversations' => 'nullable|integer|min:0',
-            'avatar' => 'nullable|string|max:255'
+            'avatar' => 'nullable|string|max:255',
+            'woocommerce_seller_id' => 'nullable|integer|min:1'
         ]);
 
         if (!empty($errors)) {

@@ -229,9 +229,73 @@ class TeamController
             // Times ativos
             $teams = TeamService::list(true);
             
+            // Métricas de conversão WooCommerce por time (se usuário tiver permissão)
+            $conversionByTeam = [];
+            if (Permission::can('conversion.view')) {
+                try {
+                    foreach ($teams as $team) {
+                        // Buscar membros do time que são vendedores (têm woocommerce_seller_id)
+                        $members = TeamService::getMembers($team['id']);
+                        $sellerMembers = array_filter($members, function($member) {
+                            return !empty($member['woocommerce_seller_id']);
+                        });
+                        
+                        if (empty($sellerMembers)) {
+                            continue; // Pular times sem vendedores
+                        }
+                        
+                        $totalConversations = 0;
+                        $totalOrders = 0;
+                        $totalRevenue = 0;
+                        
+                        foreach ($sellerMembers as $seller) {
+                            $metrics = \App\Services\AgentConversionService::getConversionMetrics(
+                                $seller['id'],
+                                $dateFrom,
+                                $dateTo
+                            );
+                            
+                            $totalConversations += $metrics['total_conversations'];
+                            $totalOrders += $metrics['total_orders'];
+                            $totalRevenue += $metrics['total_revenue'];
+                        }
+                        
+                        if ($totalConversations > 0 || $totalOrders > 0) {
+                            $conversionRate = $totalConversations > 0 
+                                ? round(($totalOrders / $totalConversations) * 100, 2) 
+                                : 0;
+                            
+                            $avgTicket = $totalOrders > 0 
+                                ? round($totalRevenue / $totalOrders, 2) 
+                                : 0;
+                            
+                            $conversionByTeam[] = [
+                                'team_id' => $team['id'],
+                                'team_name' => $team['name'],
+                                'team_color' => $team['color'],
+                                'sellers_count' => count($sellerMembers),
+                                'total_conversations' => $totalConversations,
+                                'total_orders' => $totalOrders,
+                                'conversion_rate' => $conversionRate,
+                                'total_revenue' => $totalRevenue,
+                                'avg_ticket' => $avgTicket
+                            ];
+                        }
+                    }
+                    
+                    // Ordenar por taxa de conversão (decrescente)
+                    usort($conversionByTeam, function($a, $b) {
+                        return $b['conversion_rate'] <=> $a['conversion_rate'];
+                    });
+                } catch (\Exception $e) {
+                    error_log("Erro ao carregar métricas de conversão por time: " . $e->getMessage());
+                }
+            }
+            
             Response::view('teams/dashboard', [
                 'teamsRanking' => $teamsRanking,
                 'teams' => $teams,
+                'conversionByTeam' => $conversionByTeam,
                 'dateFrom' => $dateFrom,
                 'dateTo' => $dateTo,
                 'title' => 'Dashboard de Times'

@@ -257,6 +257,102 @@ ob_start();
 </div>
 <!--end::Row-->
 
+<?php if (!empty($conversionByTeam) && \App\Helpers\Permission::can('conversion.view')): ?>
+<!--begin::Row - Conversão WooCommerce por Time-->
+<div class="row g-5 g-xl-10 mb-5 mb-xl-10">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-3 mb-1">
+                        <i class="ki-duotone ki-chart-line-up fs-2 text-success me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Conversão WooCommerce por Time
+                    </span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">Métricas de vendas dos membros de cada time</span>
+                </h3>
+            </div>
+            <div class="card-body pt-3">
+                <div class="table-responsive">
+                    <table class="table align-middle table-row-dashed fs-6 gy-5">
+                        <thead>
+                            <tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">
+                                <th class="min-w-200px">Time</th>
+                                <th class="min-w-80px text-center">Vendedores</th>
+                                <th class="min-w-100px text-center">Conversas</th>
+                                <th class="min-w-80px text-center">Vendas</th>
+                                <th class="min-w-120px text-center">Taxa Conversão</th>
+                                <th class="min-w-120px text-end">Valor Total</th>
+                                <th class="min-w-120px text-end">Ticket Médio</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-600 fw-semibold">
+                            <?php foreach ($conversionByTeam as $teamData): ?>
+                                <?php
+                                    $conversionRate = $teamData['conversion_rate'] ?? 0;
+                                    $progressColor = 'danger';
+                                    if ($conversionRate >= 30) {
+                                        $progressColor = 'success';
+                                    } elseif ($conversionRate >= 15) {
+                                        $progressColor = 'warning';
+                                    }
+                                ?>
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="symbol symbol-circle symbol-35px me-3" style="background-color: <?= htmlspecialchars($teamData['team_color'] ?? '#000000') ?>;">
+                                                <span class="symbol-label text-inverse-light fw-bold fs-7">
+                                                    <?= mb_substr(htmlspecialchars($teamData['team_name'] ?? 'T'), 0, 1) ?>
+                                                </span>
+                                            </div>
+                                            <div class="d-flex flex-column">
+                                                <a href="/teams/show?id=<?= $teamData['team_id'] ?>&date_from=<?= $dateFrom ?>&date_to=<?= $dateTo ?>" class="text-gray-800 text-hover-primary fs-6 fw-bold">
+                                                    <?= htmlspecialchars($teamData['team_name']) ?>
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge badge-light"><?= $teamData['sellers_count'] ?? 0 ?></span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="fw-bold text-gray-800"><?= $teamData['total_conversations'] ?? 0 ?></span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge badge-light-success"><?= $teamData['total_orders'] ?? 0 ?></span>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="d-flex flex-column align-items-center">
+                                            <span class="fw-bold text-gray-800 fs-6 mb-1"><?= number_format($conversionRate, 1) ?>%</span>
+                                            <div class="progress h-6px w-100px">
+                                                <div class="progress-bar bg-<?= $progressColor ?>" role="progressbar" style="width: <?= min(100, $conversionRate) ?>%" aria-valuenow="<?= $conversionRate ?>" aria-valuemin="0" aria-valuemax="100"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="text-end">
+                                        <span class="text-success fw-bold">
+                                            <?= \App\Services\AgentConversionService::formatCurrency($teamData['total_revenue'] ?? 0) ?>
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <span class="text-gray-800 fw-bold">
+                                            <?= \App\Services\AgentConversionService::formatCurrency($teamData['avg_ticket'] ?? 0) ?>
+                                        </span>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!--end::Row-->
+<?php endif; ?>
+
 <script>
 // Filtrar por data
 function filterByDate() {

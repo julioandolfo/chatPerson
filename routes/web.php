@@ -528,7 +528,8 @@ Router::post('/teams/compare', [TeamController::class, 'compareTeams'], ['Authen
 Router::get('/agent-conversion', [AgentConversionController::class, 'index'], ['Authentication']);
 Router::get('/agent-conversion/agent', [AgentConversionController::class, 'show'], ['Authentication']);
 Router::get('/api/agent-conversion/metrics', [AgentConversionController::class, 'getMetrics'], ['Authentication']);
-Router::post('/api/woocommerce/test-meta-key', [AgentConversionController::class, 'testSellerMetaKey'], ['Authentication']);
+Router::post('/api/agent-conversion/sync', [AgentConversionController::class, 'syncOrders'], ['Authentication']);
+Router::post('/api/woocommerce/test-meta-key', [WooCommerceController::class, 'testSellerMetaKey'], ['Authentication']);
 
 // Rotas de Tags
 // IMPORTANTE: Rotas específicas DEVEM vir ANTES de rotas com parâmetros dinâmicos

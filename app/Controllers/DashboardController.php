@@ -57,6 +57,47 @@ class DashboardController
                 }
             }
             
+            // Métricas de conversão WooCommerce (se usuário tiver permissão)
+            $conversionRanking = [];
+            if (\App\Helpers\Permission::can('conversion.view')) {
+                try {
+                    // Buscar apenas vendedores que têm woocommerce_seller_id cadastrado
+                    $sellers = \App\Models\User::getSellers();
+                    $ranking = [];
+                    
+                    foreach ($sellers as $seller) {
+                        $metrics = \App\Services\AgentConversionService::getConversionMetrics(
+                            $seller['id'],
+                            $dateFrom,
+                            str_replace(' 23:59:59', '', $dateTo)
+                        );
+                        
+                        if ($metrics['total_conversations'] > 0 || $metrics['total_orders'] > 0) {
+                            $ranking[] = [
+                                'agent_id' => $seller['id'],
+                                'agent_name' => $seller['name'],
+                                'seller_id' => $seller['woocommerce_seller_id'],
+                                'total_conversations' => $metrics['total_conversations'],
+                                'total_orders' => $metrics['total_orders'],
+                                'conversion_rate' => $metrics['conversion_rate'],
+                                'total_revenue' => $metrics['total_revenue'],
+                                'avg_ticket' => $metrics['avg_ticket']
+                            ];
+                        }
+                    }
+                    
+                    // Ordenar por taxa de conversão (decrescente)
+                    usort($ranking, function($a, $b) {
+                        return $b['conversion_rate'] <=> $a['conversion_rate'];
+                    });
+                    
+                    // Pegar apenas os top 5
+                    $conversionRanking = array_slice($ranking, 0, 5);
+                } catch (\Exception $e) {
+                    error_log("Erro ao carregar métricas de conversão: " . $e->getMessage());
+                }
+            }
+            
             // Conversas recentes (apenas 5)
             $recentConversations = \App\Services\DashboardService::getRecentConversations(5);
             
@@ -71,6 +112,7 @@ class DashboardController
                 'topAgents' => $topAgents,
                 'allAgentsMetrics' => $allAgentsMetrics,
                 'teamsMetrics' => $teamsMetrics,
+                'conversionRanking' => $conversionRanking,
                 'recentConversations' => $recentConversations,
                 'recentActivity' => $recentActivity,
                 'dateFrom' => $dateFrom,

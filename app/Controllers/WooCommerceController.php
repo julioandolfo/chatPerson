@@ -224,5 +224,48 @@ class WooCommerceController
             ], 500);
         }
     }
+    
+    /**
+     * Testar meta_key do vendedor (API)
+     */
+    public function testSellerMetaKey(): void
+    {
+        Permission::abortIfCannot('integrations.view');
+        
+        try {
+            $integrationId = Request::post('integration_id');
+            $metaKey = Request::post('meta_key');
+            
+            if (!$integrationId || !$metaKey) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Parâmetros inválidos'
+                ], 400);
+                return;
+            }
+            
+            // Buscar um vendedor de teste (primeiro usuário com woocommerce_seller_id)
+            $testSeller = \App\Helpers\Database::fetch(
+                "SELECT woocommerce_seller_id FROM users 
+                 WHERE woocommerce_seller_id IS NOT NULL 
+                 LIMIT 1"
+            );
+            
+            $testSellerId = $testSeller['woocommerce_seller_id'] ?? 1;
+            
+            $result = \App\Services\WooCommerceIntegrationService::testSellerMetaKey(
+                (int)$integrationId,
+                $metaKey,
+                $testSellerId
+            );
+            
+            Response::json($result);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao testar meta key: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
 

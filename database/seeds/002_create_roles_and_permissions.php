@@ -99,6 +99,10 @@ function seed_roles_and_permissions() {
         ['name' => 'Deletar times', 'slug' => 'teams.delete', 'description' => 'Deletar times/equipes', 'module' => 'teams'],
         ['name' => 'Gerenciar membros de times', 'slug' => 'teams.manage_members', 'description' => 'Adicionar/remover membros de times', 'module' => 'teams'],
         
+        // Conversão WooCommerce
+        ['name' => 'Ver métricas de conversão', 'slug' => 'conversion.view', 'description' => 'Ver métricas de conversão WooCommerce', 'module' => 'conversion'],
+        ['name' => 'Gerenciar conversões', 'slug' => 'conversion.manage', 'description' => 'Sincronizar e gerenciar dados de conversão', 'module' => 'conversion'],
+        
         // Agentes de IA
         ['name' => 'Ver agentes de IA', 'slug' => 'ai_agents.view', 'description' => 'Ver agentes de IA', 'module' => 'ai_agents'],
         ['name' => 'Criar agentes de IA', 'slug' => 'ai_agents.create', 'description' => 'Criar agentes de IA', 'module' => 'ai_agents'],

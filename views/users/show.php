@@ -677,6 +677,29 @@ ob_start();
                                min="1" placeholder="Deixe vazio para ilimitado" />
                         <div class="form-text">Número máximo de conversas que este agente pode atender simultaneamente</div>
                     </div>
+                    
+                    <div class="separator separator-dashed my-7"></div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2 d-flex align-items-center">
+                            <i class="ki-duotone ki-shop fs-2 text-success me-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                                <span class="path4"></span>
+                                <span class="path5"></span>
+                            </i>
+                            ID do WooCommerce
+                        </label>
+                        <input type="number" name="woocommerce_seller_id" class="form-control form-control-solid" 
+                               value="<?= htmlspecialchars($user['woocommerce_seller_id'] ?? '') ?>" 
+                               min="1" placeholder="Ex: 1" />
+                        <div class="form-text">
+                            <strong>Métricas de Conversão:</strong> Informe o ID do vendedor no WooCommerce para rastrear conversões e vendas.<br>
+                            Este ID deve corresponder ao valor salvo no campo <code>meta_key</code> configurado na integração WooCommerce.<br>
+                            <a href="/integrations/woocommerce" target="_blank" class="text-primary">Configurar integração →</a>
+                        </div>
+                    </div>
                     <?php endif; ?>
                 </div>
                 <div class="modal-footer flex-center">

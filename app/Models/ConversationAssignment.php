@@ -12,8 +12,29 @@ class ConversationAssignment extends Model
 {
     protected string $table = 'conversation_assignments';
     protected string $primaryKey = 'id';
-    protected array $fillable = ['conversation_id', 'agent_id', 'assigned_by', 'assigned_at'];
+    protected array $fillable = ['conversation_id', 'agent_id', 'assigned_by', 'assigned_at', 'removed_at'];
     protected bool $timestamps = false;
+
+    /**
+     * Verificar se a tabela existe
+     */
+    private static function tableExists(): bool
+    {
+        static $exists = null;
+        
+        if ($exists === null) {
+            try {
+                $result = Database::fetch("SHOW TABLES LIKE 'conversation_assignments'");
+                $exists = !empty($result);
+                \App\Helpers\Logger::info("ConversationAssignment::tableExists - Tabela " . ($exists ? 'EXISTE' : 'NÃO EXISTE'));
+            } catch (\Exception $e) {
+                \App\Helpers\Logger::error("ConversationAssignment::tableExists - Erro ao verificar: " . $e->getMessage());
+                $exists = false;
+            }
+        }
+        
+        return $exists;
+    }
 
     /**
      * Registrar atribuição de conversa
@@ -23,19 +44,72 @@ class ConversationAssignment extends Model
         ?int $agentId,
         ?int $assignedBy = null
     ): int {
-        // Se não há agente, não registrar
-        if (!$agentId) {
+        try {
+            \App\Helpers\Logger::info("ConversationAssignment::recordAssignment - INÍCIO: conversation_id={$conversationId}, agent_id={$agentId}, assigned_by={$assignedBy}");
+            
+            // Verificar se a tabela existe
+            if (!self::tableExists()) {
+                \App\Helpers\Logger::warning("ConversationAssignment::recordAssignment - Tabela não existe, pulando registro");
+                return 0;
+            }
+            
+            // Se não há agente, não registrar
+            if (!$agentId) {
+                \App\Helpers\Logger::info("ConversationAssignment::recordAssignment - Agente vazio, pulando registro");
+                return 0;
+            }
+            
+            $data = [
+                'conversation_id' => $conversationId,
+                'agent_id' => $agentId,
+                'assigned_by' => $assignedBy,
+                'assigned_at' => date('Y-m-d H:i:s')
+            ];
+            
+            \App\Helpers\Logger::info("ConversationAssignment::recordAssignment - Dados preparados: " . json_encode($data));
+            
+            $id = self::create($data);
+            
+            \App\Helpers\Logger::info("ConversationAssignment::recordAssignment - Registro criado com ID: {$id}");
+            
+            return $id;
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error("ConversationAssignment::recordAssignment - EXCEÇÃO CAPTURADA: " . $e->getMessage());
+            \App\Helpers\Logger::error("ConversationAssignment::recordAssignment - Stack trace: " . $e->getTraceAsString());
+            // NÃO re-lançar - apenas logar e retornar 0 para não quebrar o fluxo
             return 0;
         }
-        
-        $data = [
-            'conversation_id' => $conversationId,
-            'agent_id' => $agentId,
-            'assigned_by' => $assignedBy,
-            'assigned_at' => date('Y-m-d H:i:s')
-        ];
-        
-        return self::create($data);
+    }
+
+    /**
+     * Marcar atribuição como removida
+     */
+    public static function recordRemoval(int $conversationId, int $agentId): bool
+    {
+        try {
+            \App\Helpers\Logger::info("ConversationAssignment::recordRemoval - INÍCIO: conversation_id={$conversationId}, agent_id={$agentId}");
+            
+            // Verificar se a tabela existe
+            if (!self::tableExists()) {
+                \App\Helpers\Logger::warning("ConversationAssignment::recordRemoval - Tabela não existe, pulando remoção");
+                return false;
+            }
+            
+            $result = Database::query(
+                "UPDATE conversation_assignments SET removed_at = NOW() 
+                 WHERE conversation_id = ? AND agent_id = ? AND removed_at IS NULL",
+                [$conversationId, $agentId]
+            );
+            
+            \App\Helpers\Logger::info("ConversationAssignment::recordRemoval - Resultado: " . ($result !== false ? 'sucesso' : 'falha'));
+            
+            return $result !== false;
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error("ConversationAssignment::recordRemoval - ERRO: " . $e->getMessage());
+            \App\Helpers\Logger::error("ConversationAssignment::recordRemoval - Stack trace: " . $e->getTraceAsString());
+            // NÃO re-lançar - apenas logar e retornar false
+            return false;
+        }
     }
 
     /**

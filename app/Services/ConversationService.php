@@ -263,14 +263,20 @@ class ConversationService
         // Registrar atribuição inicial no histórico (se houver agente)
         if ($agentId) {
             try {
+                Logger::info("ConversationService::create - Tentando registrar histórico de atribuição: conversation_id={$id}, agent_id={$agentId}");
                 \App\Models\ConversationAssignment::recordAssignment(
                     $id,
                     $agentId,
                     null // sistema/automação
                 );
+                Logger::info("ConversationService::create - Histórico de atribuição registrado com sucesso");
             } catch (\Exception $e) {
+                Logger::error("ConversationService::create - ERRO ao registrar histórico de atribuição: " . $e->getMessage());
+                Logger::error("ConversationService::create - Stack trace: " . $e->getTraceAsString());
                 error_log("Erro ao registrar histórico de atribuição inicial: " . $e->getMessage());
             }
+        } else {
+            Logger::debug("ConversationService::create - Nenhum agente para registrar no histórico (agentId=null)");
         }
         
         // Verificar se foi salvo corretamente
@@ -640,13 +646,32 @@ class ConversationService
         
         // Registrar no histórico de atribuições
         try {
+            $currentUserId = \App\Helpers\Auth::user()['id'] ?? null;
+            Logger::info("ConversationService::assignToAgent - Tentando registrar histórico: conversation_id={$conversationId}, agent_id={$agentId}, assigned_by={$currentUserId}");
+            
             \App\Models\ConversationAssignment::recordAssignment(
                 $conversationId,
                 $agentId,
-                \App\Helpers\Auth::user()['id'] ?? null
+                $currentUserId
             );
+            
+            Logger::info("ConversationService::assignToAgent - Histórico registrado com sucesso");
         } catch (\Exception $e) {
+            Logger::error("ConversationService::assignToAgent - ERRO ao registrar histórico: " . $e->getMessage());
+            Logger::error("ConversationService::assignToAgent - Stack trace: " . $e->getTraceAsString());
             error_log("Erro ao registrar histórico de atribuição: " . $e->getMessage());
+        }
+        
+        // Marcar atribuição antiga como removida
+        if ($oldAgentId && $oldAgentId != $agentId) {
+            try {
+                Logger::info("ConversationService::assignToAgent - Marcando remoção do agente anterior: old_agent_id={$oldAgentId}");
+                \App\Models\ConversationAssignment::recordRemoval($conversationId, $oldAgentId);
+                Logger::info("ConversationService::assignToAgent - Remoção marcada com sucesso");
+            } catch (\Exception $e) {
+                Logger::error("ConversationService::assignToAgent - ERRO ao marcar remoção: " . $e->getMessage());
+                error_log("Erro ao marcar remoção no histórico: " . $e->getMessage());
+            }
         }
         
         // Definir agente do contato APENAS na PRIMEIRA atribuição

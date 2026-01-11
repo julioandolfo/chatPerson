@@ -12,7 +12,10 @@ ob_start();
     </div>
     <div class="d-flex align-items-center my-1">
         <a href="/teams" class="btn btn-sm btn-light me-2">
-            <i class="ki-duotone ki-arrow-left fs-2"></i>
+            <i class="ki-duotone ki-arrow-left fs-2">
+                <span class="path1"></span>
+                <span class="path2"></span>
+            </i>
             Voltar para Times
         </a>
         <!--begin::Filter-->
@@ -21,7 +24,10 @@ ob_start();
             <span class="mx-2">até</span>
             <input type="date" id="filter-date-to" class="form-control form-control-sm me-2" value="<?= $dateTo ?>" />
             <button type="button" class="btn btn-sm btn-primary" onclick="filterByDate()">
-                <i class="ki-duotone ki-filter fs-2"></i>
+                <i class="ki-duotone ki-filter fs-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
                 Filtrar
             </button>
         </div>
@@ -139,7 +145,10 @@ ob_start();
                 </h3>
                 <div class="card-toolbar">
                     <button type="button" class="btn btn-sm btn-light" data-bs-toggle="collapse" data-bs-target="#ranking-filters">
-                        <i class="ki-duotone ki-filter fs-2"></i>
+                        <i class="ki-duotone ki-filter fs-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
                         Filtros
                     </button>
                 </div>

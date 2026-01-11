@@ -1255,13 +1255,17 @@ function updateTopAgentsTable(agents) {
     }
     
     tbody.innerHTML = agents.slice(0, 10).map((agent, index) => {
+        const totalConversations = parseInt(agent.total_conversations) || 0;
+        const closedConversations = parseInt(agent.closed_conversations) || 0;
+        const resolutionRate = parseFloat(agent.resolution_rate) || 0;
+        
         return `
             <tr>
                 <td>${index + 1}</td>
                 <td>${escapeHtml(agent.name || '-')}</td>
-                <td>${agent.total_conversations || 0}</td>
-                <td>${agent.closed_conversations || 0}</td>
-                <td><span class="badge badge-light-success">${(agent.resolution_rate || 0).toFixed(1)}%</span></td>
+                <td>${totalConversations.toLocaleString('pt-BR')}</td>
+                <td>${closedConversations.toLocaleString('pt-BR')}</td>
+                <td><span class="badge badge-light-success">${resolutionRate.toFixed(1)}%</span></td>
             </tr>
         `;
     }).join('');
@@ -1363,16 +1367,20 @@ function updateTopTagsTable(tags) {
     }
     
     tbody.innerHTML = tags.map((tag, index) => {
-        const avgHours = tag.avg_resolution_hours ? tag.avg_resolution_hours.toFixed(1) + 'h' : '-';
+        const avgResolutionHours = parseFloat(tag.avg_resolution_hours) || 0;
+        const avgHours = avgResolutionHours > 0 ? avgResolutionHours.toFixed(1) + 'h' : '-';
         const color = tag.color || '#009ef7';
+        const usageCount = parseInt(tag.usage_count) || 0;
+        const closedCount = parseInt(tag.closed_count) || 0;
+        
         return `
             <tr>
                 <td>${index + 1}</td>
                 <td>
                     <span class="badge" style="background-color: ${color}">${escapeHtml(tag.name || '-')}</span>
                 </td>
-                <td>${tag.usage_count || 0}</td>
-                <td>${tag.closed_count || 0}</td>
+                <td>${usageCount.toLocaleString('pt-BR')}</td>
+                <td>${closedCount.toLocaleString('pt-BR')}</td>
                 <td>${avgHours}</td>
             </tr>
         `;
@@ -1479,16 +1487,20 @@ function updateFunnelStagesTable(stages) {
     }
     
     tbody.innerHTML = stages.map((stage, index) => {
-        const avgHours = stage.avg_time_hours ? stage.avg_time_hours.toFixed(1) + 'h' : '-';
+        const avgTimeHours = parseFloat(stage.avg_time_hours) || 0;
+        const avgHours = avgTimeHours > 0 ? avgTimeHours.toFixed(1) + 'h' : '-';
         const color = stage.color || '#009ef7';
+        const conversationsCount = parseInt(stage.conversations_count) || 0;
+        const closedCount = parseInt(stage.closed_count) || 0;
+        
         return `
             <tr>
                 <td>${stage.position || index + 1}</td>
                 <td>
                     <span class="badge" style="background-color: ${color}">${escapeHtml(stage.name || '-')}</span>
                 </td>
-                <td>${stage.conversations_count || 0}</td>
-                <td>${stage.closed_count || 0}</td>
+                <td>${conversationsCount.toLocaleString('pt-BR')}</td>
+                <td>${closedCount.toLocaleString('pt-BR')}</td>
                 <td>${avgHours}</td>
             </tr>
         `;
@@ -1547,10 +1559,15 @@ function loadAutomationsData() {
     })
     .then(response => response.json())
     .then(data => {
+        console.log('Dados de automações recebidos:', data);
+        
         if (!data.success) {
             console.error('Erro ao carregar dados de automações:', data.message);
             return;
         }
+        
+        console.log('general_stats:', data.general_stats);
+        console.log('success_rate:', data.success_rate);
         
         updateAutomationsStats(data.general_stats, data.success_rate);
         updateAutomationsEvolutionChart(data.evolution);
@@ -1558,6 +1575,7 @@ function loadAutomationsData() {
     })
     .catch(error => {
         console.error('Erro ao carregar dados de automações:', error);
+        console.error('Stack:', error.stack);
     });
 }
 
@@ -1857,10 +1875,11 @@ function updateAutomationsStats(stats, successRate) {
     const failedEl = document.getElementById('stat-automations-failed');
     const avgTimeEl = document.getElementById('stat-automations-avg-time');
     
-    if (totalEl) totalEl.textContent = stats?.total_executions || 0;
-    if (successRateEl) successRateEl.textContent = (successRate || 0).toFixed(1) + '%';
-    if (failedEl) failedEl.textContent = stats?.failed || 0;
-    const avgTime = stats?.avg_execution_time_seconds || 0;
+    if (totalEl) totalEl.textContent = (stats?.total_executions || 0).toLocaleString('pt-BR');
+    if (successRateEl) successRateEl.textContent = parseFloat(successRate || 0).toFixed(1) + '%';
+    if (failedEl) failedEl.textContent = (stats?.failed || 0).toLocaleString('pt-BR');
+    
+    const avgTime = parseFloat(stats?.avg_execution_time_seconds) || 0;
     if (avgTimeEl) avgTimeEl.textContent = avgTime > 0 ? avgTime.toFixed(1) + 's' : '-';
 }
 
@@ -1920,17 +1939,24 @@ function updateTopAutomationsTable(automations) {
     }
     
     tbody.innerHTML = automations.map((auto, index) => {
-        const successRate = auto.execution_count > 0 
-            ? ((auto.completed_count / auto.execution_count) * 100).toFixed(1) 
+        const executionCount = parseInt(auto.execution_count) || 0;
+        const completedCount = parseInt(auto.completed_count) || 0;
+        const failedCount = parseInt(auto.failed_count) || 0;
+        
+        const successRate = executionCount > 0 
+            ? ((completedCount / executionCount) * 100).toFixed(1) 
             : '0.0';
-        const avgTime = auto.avg_time_seconds > 0 ? auto.avg_time_seconds.toFixed(1) + 's' : '-';
+        
+        const avgTimeSeconds = parseFloat(auto.avg_time_seconds) || 0;
+        const avgTime = avgTimeSeconds > 0 ? avgTimeSeconds.toFixed(1) + 's' : '-';
+        
         return `
             <tr>
                 <td>${index + 1}</td>
                 <td>${escapeHtml(auto.name || '-')}</td>
-                <td>${(auto.execution_count || 0).toLocaleString('pt-BR')}</td>
-                <td>${(auto.completed_count || 0).toLocaleString('pt-BR')}</td>
-                <td>${(auto.failed_count || 0).toLocaleString('pt-BR')}</td>
+                <td>${executionCount.toLocaleString('pt-BR')}</td>
+                <td>${completedCount.toLocaleString('pt-BR')}</td>
+                <td>${failedCount.toLocaleString('pt-BR')}</td>
                 <td>${avgTime}</td>
                 <td><span class="badge badge-light-success">${successRate}%</span></td>
             </tr>

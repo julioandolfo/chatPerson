@@ -1,53 +1,77 @@
+#!/usr/bin/env php
 <?php
 /**
- * Job: Processar aprendizado contínuo do coaching
- * Extrai conhecimento de hints bem-sucedidos para RAG
+ * Script: Processar Aprendizado de Coaching (RAG) - STANDALONE
+ * Execução: Diária via cron (01:00)
+ * Função: Extrair conhecimento de hints bem-sucedidos para RAG
  * 
- * Executar diariamente via cron (ex: às 3h da manhã)
- * Crontab: 0 3 * * * cd /var/www/html && php public/scripts/process-coaching-learning.php >> storage/logs/coaching-learning.log 2>&1
+ * Versão standalone que não depende do Composer.
+ * Usa o autoloader nativo do sistema.
+ * 
+ * Uso: php public/scripts/process-coaching-learning.php
+ * Cron: 0 1 * * * cd /var/www/html && php public/scripts/process-coaching-learning.php >> logs/coaching-learning.log 2>&1
  */
 
-require_once __DIR__ . '/../../bootstrap.php';
+// Garantir que estamos no diretório correto
+$rootDir = dirname(dirname(__DIR__));
+chdir($rootDir);
+
+// Carregar bootstrap (que já tem o autoloader)
+require_once $rootDir . '/config/bootstrap.php';
 
 use App\Services\CoachingLearningService;
 
-echo "[" . date('Y-m-d H:i:s') . "] 🧠 Iniciando processamento de aprendizado de coaching...\n";
+// Garantir que o diretório de logs existe
+$logDir = $rootDir . '/logs';
+if (!is_dir($logDir)) {
+    mkdir($logDir, 0755, true);
+}
+
+echo "🧠 === PROCESSAMENTO DE APRENDIZADO DE COACHING ===\n";
+echo "📅 Data: " . date('Y-m-d H:i:s') . "\n";
+echo "📁 Root Dir: {$rootDir}\n\n";
 
 try {
     // Processar hints de ontem
+    echo "📊 Processando hints de ontem...\n";
     $result = CoachingLearningService::processSuccessfulHints(1);
     
-    echo "[" . date('Y-m-d H:i:s') . "] 📊 Resultados do processamento:\n";
-    echo "  • Data: {$result['date']}\n";
-    echo "  • Total de hints: {$result['total_hints']}\n";
-    echo "  • Processados (adicionados ao RAG): {$result['processed']}\n";
-    echo "  • Pulados (score < 4): {$result['skipped']}\n";
-    echo "  • Erros: {$result['errors']}\n";
-    
-    if ($result['processed'] > 0) {
-        echo "[" . date('Y-m-d H:i:s') . "] ✅ {$result['processed']} novos conhecimentos adicionados à base!\n";
-    } else {
-        echo "[" . date('Y-m-d H:i:s') . "] ℹ️  Nenhum novo conhecimento adicionado hoje\n";
+    if (isset($result['error'])) {
+        echo "❌ ERRO: {$result['error']}\n";
+        exit(1);
     }
     
-    // Aos domingos, descobrir padrões
-    if (date('w') == 0) {
-        echo "[" . date('Y-m-d H:i:s') . "] 🔍 Descobrindo novos padrões (execução semanal)...\n";
+    echo "✅ Processamento concluído!\n\n";
+    echo "📈 Estatísticas:\n";
+    echo "   Data: {$result['date']}\n";
+    echo "   Total de hints: {$result['total_hints']}\n";
+    echo "   Processados: {$result['processed']}\n";
+    echo "   Pulados: {$result['skipped']}\n";
+    echo "   Erros: {$result['errors']}\n\n";
+    
+    // Descobrir padrões (semanal - apenas domingo)
+    if (date('w') == 0) { // Domingo
+        echo "🔍 Descobrindo padrões (executado semanalmente)...\n";
         $patterns = CoachingLearningService::discoverPatterns();
         
+        echo "✅ Padrões descobertos: " . count($patterns) . "\n";
+        
         if (!empty($patterns)) {
-            echo "[" . date('Y-m-d H:i:s') . "] 📊 Padrões encontrados:\n";
-            foreach ($patterns as $pattern) {
-                echo "  • {$pattern['situation_type']}: {$pattern['count']} casos (Score: " . 
-                     round($pattern['avg_score'], 2) . ")\n";
+            echo "\n📊 Top 5 Padrões:\n";
+            foreach (array_slice($patterns, 0, 5) as $pattern) {
+                echo "   • {$pattern['situation_type']}: ";
+                echo "{$pattern['count']} ocorrências, ";
+                echo "Score médio: " . number_format($pattern['avg_score'], 2) . ", ";
+                echo "Taxa sucesso: " . number_format($pattern['avg_success_rate'] * 100, 1) . "%\n";
             }
         }
     }
     
-    echo "[" . date('Y-m-d H:i:s') . "] ✅ Processamento concluído com sucesso!\n";
+    echo "\n✅ Script finalizado com sucesso!\n";
+    exit(0);
     
 } catch (\Exception $e) {
-    echo "[" . date('Y-m-d H:i:s') . "] ❌ ERRO: " . $e->getMessage() . "\n";
-    echo $e->getTraceAsString() . "\n";
+    echo "❌ ERRO CRÍTICO: " . $e->getMessage() . "\n";
+    echo "Stack trace:\n" . $e->getTraceAsString() . "\n";
     exit(1);
 }

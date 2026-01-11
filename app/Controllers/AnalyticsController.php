@@ -417,6 +417,23 @@ class AnalyticsController
             
             $tagsByStatus = Database::fetchAll($sql, $params);
             
+            // Normalizar valores de topTags
+            foreach ($topTags as &$tag) {
+                $tag['usage_count'] = (int)($tag['usage_count'] ?? 0);
+                $tag['closed_count'] = (int)($tag['closed_count'] ?? 0);
+                $tag['avg_resolution_hours'] = round((float)($tag['avg_resolution_hours'] ?? 0), 2);
+            }
+            
+            // Normalizar tags_over_time
+            foreach ($tagsOverTime as &$item) {
+                $item['count'] = (int)($item['count'] ?? 0);
+            }
+            
+            // Normalizar tags_by_status
+            foreach ($tagsByStatus as &$item) {
+                $item['count'] = (int)($item['count'] ?? 0);
+            }
+            
             Response::json([
                 'success' => true,
                 'top_tags' => $topTags,
@@ -483,6 +500,14 @@ class AnalyticsController
                     ORDER BY fs.position ASC";
             
             $stagesData = Database::fetchAll($sql, array_merge($params, $funnelParams));
+            
+            // Normalizar valores
+            foreach ($stagesData as &$stage) {
+                $stage['conversations_count'] = (int)($stage['conversations_count'] ?? 0);
+                $stage['closed_count'] = (int)($stage['closed_count'] ?? 0);
+                $stage['avg_time_hours'] = round((float)($stage['avg_time_hours'] ?? 0), 2);
+                $stage['position'] = (int)($stage['position'] ?? 0);
+            }
             
             // Taxa de conversão entre estágios (simplificado - apenas estágios com conversas)
             $stageMovements = [];
@@ -561,15 +586,47 @@ class AnalyticsController
             
             $evolution = Database::fetchAll($sql, [$filters['start_date'], $filters['end_date'] . ' 23:59:59']);
             
-            // Calcular taxa de sucesso
+            // Calcular taxa de sucesso e normalizar valores
             $successRate = 0;
             if ($generalStats && $generalStats['total_executions'] > 0) {
                 $successRate = round(($generalStats['completed'] / $generalStats['total_executions']) * 100, 2);
             }
             
+            // Normalizar stats
+            if ($generalStats) {
+                $generalStats['total_executions'] = (int)($generalStats['total_executions'] ?? 0);
+                $generalStats['completed'] = (int)($generalStats['completed'] ?? 0);
+                $generalStats['failed'] = (int)($generalStats['failed'] ?? 0);
+                $generalStats['running'] = (int)($generalStats['running'] ?? 0);
+                $generalStats['pending'] = (int)($generalStats['pending'] ?? 0);
+                $generalStats['avg_execution_time_seconds'] = round((float)($generalStats['avg_execution_time_seconds'] ?? 0), 2);
+            }
+            
+            // Normalizar top automations
+            foreach ($topAutomations as &$auto) {
+                $auto['execution_count'] = (int)($auto['execution_count'] ?? 0);
+                $auto['completed_count'] = (int)($auto['completed_count'] ?? 0);
+                $auto['failed_count'] = (int)($auto['failed_count'] ?? 0);
+                $auto['avg_time_seconds'] = round((float)($auto['avg_time_seconds'] ?? 0), 2);
+            }
+            
+            // Normalizar evolution
+            foreach ($evolution as &$ev) {
+                $ev['total'] = (int)($ev['total'] ?? 0);
+                $ev['completed'] = (int)($ev['completed'] ?? 0);
+                $ev['failed'] = (int)($ev['failed'] ?? 0);
+            }
+            
             Response::json([
                 'success' => true,
-                'general_stats' => $generalStats,
+                'general_stats' => $generalStats ?: [
+                    'total_executions' => 0,
+                    'completed' => 0,
+                    'failed' => 0,
+                    'running' => 0,
+                    'pending' => 0,
+                    'avg_execution_time_seconds' => 0
+                ],
                 'top_automations' => $topAutomations,
                 'evolution' => $evolution,
                 'success_rate' => $successRate

@@ -13,13 +13,22 @@ ob_start();
     <div class="d-flex align-items-center my-1">
         <?php if (\App\Helpers\Permission::can('teams.create')): ?>
         <a href="/teams/create" class="btn btn-sm btn-primary">
-            <i class="ki-duotone ki-plus fs-2"></i>
+            <i class="ki-duotone ki-plus fs-2">
+                <span class="path1"></span>
+                <span class="path2"></span>
+                <span class="path3"></span>
+            </i>
             Novo Time
         </a>
         <?php endif; ?>
         <?php if (\App\Helpers\Permission::can('teams.view')): ?>
         <a href="/teams/dashboard" class="btn btn-sm btn-light ms-2">
-            <i class="ki-duotone ki-chart-simple fs-2"></i>
+            <i class="ki-duotone ki-chart-simple fs-2">
+                <span class="path1"></span>
+                <span class="path2"></span>
+                <span class="path3"></span>
+                <span class="path4"></span>
+            </i>
             Dashboard de Times
         </a>
         <?php endif; ?>
@@ -54,7 +63,11 @@ ob_start();
                 <div class="text-gray-500 fs-6 mb-7">Comece criando um novo time.</div>
                 <?php if (\App\Helpers\Permission::can('teams.create')): ?>
                 <a href="/teams/create" class="btn btn-primary">
-                    <i class="ki-duotone ki-plus fs-2"></i>
+                    <i class="ki-duotone ki-plus fs-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
                     Criar Time
                 </a>
                 <?php endif; ?>
@@ -111,17 +124,30 @@ ob_start();
                             
                             <div class="d-flex justify-content-end">
                                 <a href="/teams/show?id=<?= $team['id'] ?>" class="btn btn-sm btn-light btn-active-light-primary me-2">
-                                    <i class="ki-duotone ki-eye fs-4 me-1"></i>
+                                    <i class="ki-duotone ki-eye fs-4 me-1">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
                                     Detalhes
                                 </a>
                                 <?php if (\App\Helpers\Permission::can('teams.edit')): ?>
                                 <a href="/teams/edit?id=<?= $team['id'] ?>" class="btn btn-sm btn-light btn-active-light-primary me-2">
-                                    <i class="ki-duotone ki-pencil fs-4"></i>
+                                    <i class="ki-duotone ki-pencil fs-4">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
                                 </a>
                                 <?php endif; ?>
                                 <?php if (\App\Helpers\Permission::can('teams.delete')): ?>
                                 <button class="btn btn-sm btn-light btn-active-light-danger" onclick="deleteTeam(<?= $team['id'] ?>, '<?= htmlspecialchars($team['name']) ?>')">
-                                    <i class="ki-duotone ki-trash fs-4"></i>
+                                    <i class="ki-duotone ki-trash fs-4">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                        <span class="path4"></span>
+                                        <span class="path5"></span>
+                                    </i>
                                 </button>
                                 <?php endif; ?>
                             </div>

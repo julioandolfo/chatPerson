@@ -161,6 +161,95 @@ class ContactService
     }
 
     /**
+     * Listar contatos com busca e retornar total
+     */
+    public static function listWithTotal(array $filters = []): array
+    {
+        $whereClause = "WHERE 1=1";
+        $params = [];
+
+        if (!empty($filters['search'])) {
+            $search = trim($filters['search']);
+            
+            // Verificar se é uma busca por número (contém apenas dígitos e caracteres comuns de telefone)
+            $isPhoneSearch = preg_match('/^[\d\s\+\-\(\)\.]+$/', $search);
+            
+            if ($isPhoneSearch) {
+                // Normalizar o número de busca
+                $normalizedSearch = Contact::normalizePhoneNumber($search);
+                
+                if (!empty($normalizedSearch)) {
+                    // Gerar variantes do número de busca (com/sem 9º dígito, com/sem código do país)
+                    $searchVariants = self::generatePhoneVariants($normalizedSearch);
+                    
+                    // Buscar por nome, email, empresa normalmente
+                    $whereClause .= " AND (name LIKE ? OR last_name LIKE ? OR email LIKE ? OR company LIKE ?";
+                    
+                    // Adicionar busca por telefone com todas as variantes
+                    $phoneConditions = [];
+                    foreach ($searchVariants as $variant) {
+                        $phoneConditions[] = "phone LIKE ?";
+                        $params[] = "%{$variant}%";
+                    }
+                    
+                    if (!empty($phoneConditions)) {
+                        $whereClause .= " OR (" . implode(" OR ", $phoneConditions) . ")";
+                    }
+                    
+                    $whereClause .= ")";
+                    
+                    // Adicionar parâmetros para busca de texto
+                    $textSearch = "%{$search}%";
+                    $params[] = $textSearch;
+                    $params[] = $textSearch;
+                    $params[] = $textSearch;
+                    $params[] = $textSearch;
+                } else {
+                    // Se não conseguiu normalizar, busca simples
+                    $whereClause .= " AND (name LIKE ? OR last_name LIKE ? OR email LIKE ? OR phone LIKE ? OR company LIKE ?)";
+                    $textSearch = "%{$search}%";
+                    $params[] = $textSearch;
+                    $params[] = $textSearch;
+                    $params[] = $textSearch;
+                    $params[] = $textSearch;
+                    $params[] = $textSearch;
+                }
+            } else {
+                // Busca de texto normal
+                $whereClause .= " AND (name LIKE ? OR last_name LIKE ? OR email LIKE ? OR phone LIKE ? OR company LIKE ?)";
+                $textSearch = "%{$search}%";
+                $params[] = $textSearch;
+                $params[] = $textSearch;
+                $params[] = $textSearch;
+                $params[] = $textSearch;
+                $params[] = $textSearch;
+            }
+        }
+
+        // Contar total
+        $countSql = "SELECT COUNT(*) as total FROM contacts {$whereClause}";
+        $totalResult = \App\Helpers\Database::fetch($countSql, $params);
+        $total = (int)($totalResult['total'] ?? 0);
+
+        // Buscar registros paginados
+        $sql = "SELECT * FROM contacts {$whereClause} ORDER BY name ASC";
+        
+        if (!empty($filters['limit'])) {
+            $sql .= " LIMIT " . (int)$filters['limit'];
+            if (!empty($filters['offset'])) {
+                $sql .= " OFFSET " . (int)$filters['offset'];
+            }
+        }
+
+        $contacts = \App\Helpers\Database::fetchAll($sql, $params);
+
+        return [
+            'contacts' => $contacts,
+            'total' => $total
+        ];
+    }
+
+    /**
      * Gerar variantes de número de telefone para busca flexível
      * Considera variações com/sem 9º dígito e com/sem código do país
      */

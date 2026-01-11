@@ -1,12 +1,23 @@
+#!/usr/bin/env php
 <?php
 /**
- * Job: Agregar métricas de coaching em sumários diários
- * Executar diariamente via cron (ex: às 2h da manhã)
+ * Script: Agregar métricas de coaching em sumários diários - STANDALONE
+ * Execução: Diária via cron (02:00)
+ * Função: Agregar hints, conversões e métricas em sumários diários/semanais/mensais
  * 
- * Crontab: 0 2 * * * cd /var/www/html && php public/scripts/aggregate-coaching-metrics.php >> storage/logs/coaching-metrics.log 2>&1
+ * Versão standalone que não depende do Composer.
+ * Usa o autoloader nativo do sistema.
+ * 
+ * Uso: php public/scripts/aggregate-coaching-metrics.php
+ * Cron: 0 2 * * * cd /var/www/html && php public/scripts/aggregate-coaching-metrics.php >> logs/coaching-metrics.log 2>&1
  */
 
-require_once __DIR__ . '/../../bootstrap.php';
+// Garantir que estamos no diretório correto
+$rootDir = dirname(dirname(__DIR__));
+chdir($rootDir);
+
+// Carregar bootstrap (que já tem o autoloader)
+require_once $rootDir . '/config/bootstrap.php';
 
 use App\Models\RealtimeCoachingHint;
 use App\Models\CoachingAnalyticsSummary;
@@ -15,7 +26,14 @@ use App\Models\Conversation;
 use App\Models\User;
 use App\Helpers\Database;
 
+// Garantir que o diretório de logs existe
+$logDir = $rootDir . '/logs';
+if (!is_dir($logDir)) {
+    mkdir($logDir, 0755, true);
+}
+
 echo "[" . date('Y-m-d H:i:s') . "] ⚙️  Iniciando agregação de métricas de coaching...\n";
+echo "📁 Root Dir: {$rootDir}\n";
 
 try {
     // Processar ontem (pode ser ajustado para hoje se rodar no final do dia)

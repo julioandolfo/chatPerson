@@ -13,7 +13,10 @@ ob_start();
     </div>
     <div class="d-flex align-items-center my-1">
         <a href="/teams" class="btn btn-sm btn-light">
-            <i class="ki-duotone ki-arrow-left fs-2"></i>
+            <i class="ki-duotone ki-arrow-left fs-2">
+                <span class="path1"></span>
+                <span class="path2"></span>
+            </i>
             Voltar
         </a>
     </div>
@@ -144,11 +147,17 @@ ob_start();
             <div class="card">
                 <div class="card-body">
                     <button type="submit" class="btn btn-primary w-100 mb-3">
-                        <i class="ki-duotone ki-check fs-2"></i>
+                        <i class="ki-duotone ki-check fs-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
                         <?= $isEdit ? 'Atualizar Time' : 'Criar Time' ?>
                     </button>
                     <a href="/teams" class="btn btn-light w-100">
-                        <i class="ki-duotone ki-cross fs-2"></i>
+                        <i class="ki-duotone ki-cross fs-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
                         Cancelar
                     </a>
                 </div>

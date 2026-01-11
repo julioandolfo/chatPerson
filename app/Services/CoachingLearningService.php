@@ -190,7 +190,7 @@ class CoachingLearningService
             }
             
             // Inserir no PostgreSQL
-            $pgsql = PostgreSQL::getInstance();
+            $pgsql = PostgreSQL::getConnection();
             
             $insertSql = "INSERT INTO coaching_knowledge_base (
                             situation_type, client_message, conversation_context,
@@ -253,7 +253,7 @@ class CoachingLearningService
             $embeddingStr = '[' . implode(',', $embedding) . ']';
             
             // Busca vetorial com cosine similarity
-            $pgsql = PostgreSQL::getInstance();
+            $pgsql = PostgreSQL::getConnection();
             
             $sql = "SELECT 
                         id, situation_type, client_message, successful_response,
@@ -294,7 +294,7 @@ class CoachingLearningService
         }
         
         try {
-            $pgsql = PostgreSQL::getInstance();
+            $pgsql = PostgreSQL::getConnection();
             
             // Agrupar por tipo de situação e analisar
             $sql = "SELECT 
@@ -330,7 +330,7 @@ class CoachingLearningService
         if (!PostgreSQL::isAvailable()) return;
         
         try {
-            $pgsql = PostgreSQL::getInstance();
+            $pgsql = PostgreSQL::getConnection();
             
             $sql = "UPDATE coaching_knowledge_base 
                     SET times_reused = times_reused + 1,

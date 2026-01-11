@@ -15,12 +15,18 @@ ob_start();
     </div>
     <div class="d-flex align-items-center my-1">
         <a href="/teams" class="btn btn-sm btn-light me-2">
-            <i class="ki-duotone ki-arrow-left fs-2"></i>
+            <i class="ki-duotone ki-arrow-left fs-2">
+                <span class="path1"></span>
+                <span class="path2"></span>
+            </i>
             Voltar
         </a>
         <?php if (\App\Helpers\Permission::can('teams.edit')): ?>
         <a href="/teams/edit?id=<?= $team['id'] ?>" class="btn btn-sm btn-primary">
-            <i class="ki-duotone ki-pencil fs-2"></i>
+            <i class="ki-duotone ki-pencil fs-2">
+                <span class="path1"></span>
+                <span class="path2"></span>
+            </i>
             Editar
         </a>
         <?php endif; ?>

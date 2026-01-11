@@ -137,6 +137,43 @@ ob_start();
                 </table>
             </div>
             <!--end::Table-->
+
+            <!--begin::Pagination-->
+            <?php if (isset($pagination) && $pagination['pages'] > 1): ?>
+            <div class="d-flex flex-stack flex-wrap pt-10">
+                <div class="fs-6 fw-semibold text-gray-700">
+                    Mostrando <?= ($pagination['page'] - 1) * $pagination['limit'] + 1 ?> a <?= min($pagination['page'] * $pagination['limit'], $pagination['total']) ?> de <?= $pagination['total'] ?> contatos
+                </div>
+                <ul class="pagination">
+                    <?php if ($pagination['page'] > 1): ?>
+                        <li class="page-item previous">
+                            <a href="?page=<?= $pagination['page'] - 1 ?><?= !empty($filters['search']) ? '&search=' . urlencode($filters['search']) : '' ?>" class="page-link">
+                                <i class="previous"></i>
+                            </a>
+                        </li>
+                    <?php endif; ?>
+                    <?php for ($i = max(1, $pagination['page'] - 2); $i <= min($pagination['pages'], $pagination['page'] + 2); $i++): ?>
+                        <li class="page-item <?= $i == $pagination['page'] ? 'active' : '' ?>">
+                            <a href="?page=<?= $i ?><?= !empty($filters['search']) ? '&search=' . urlencode($filters['search']) : '' ?>" class="page-link"><?= $i ?></a>
+                        </li>
+                    <?php endfor; ?>
+                    <?php if ($pagination['page'] < $pagination['pages']): ?>
+                        <li class="page-item next">
+                            <a href="?page=<?= $pagination['page'] + 1 ?><?= !empty($filters['search']) ? '&search=' . urlencode($filters['search']) : '' ?>" class="page-link">
+                                <i class="next"></i>
+                            </a>
+                        </li>
+                    <?php endif; ?>
+                </ul>
+            </div>
+            <?php elseif (isset($pagination) && $pagination['total'] > 0): ?>
+            <div class="d-flex flex-stack flex-wrap pt-10">
+                <div class="fs-6 fw-semibold text-gray-700">
+                    Mostrando <?= $pagination['total'] ?> contato<?= $pagination['total'] > 1 ? 's' : '' ?>
+                </div>
+            </div>
+            <?php endif; ?>
+            <!--end::Pagination-->
         <?php endif; ?>
     </div>
 </div>
@@ -339,11 +376,24 @@ ob_start();
 function performSearch() {
     const searchInput = document.getElementById('kt_contacts_search');
     const search = searchInput?.value.trim() || '';
+    
+    let url = '<?= \App\Helpers\Url::to('/contacts') ?>';
+    const params = [];
+    
     if (search) {
-        window.location.href = '<?= \App\Helpers\Url::to('/contacts') ?>?search=' + encodeURIComponent(search);
+        params.push('search=' + encodeURIComponent(search));
+        // Resetar para página 1 ao buscar
+        params.push('page=1');
     } else {
-        window.location.href = '<?= \App\Helpers\Url::to('/contacts') ?>';
+        // Se não há busca, remover parâmetros de busca e voltar para página 1
+        url = '<?= \App\Helpers\Url::to('/contacts') ?>';
     }
+    
+    if (params.length > 0) {
+        url += '?' + params.join('&');
+    }
+    
+    window.location.href = url;
 }
 
 // Busca de contatos - Enter no input

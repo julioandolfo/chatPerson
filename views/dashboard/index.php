@@ -1012,6 +1012,126 @@ ob_start();
 <!--end::Row-->
 <?php endif; ?>
 
+<!--begin::Row - Métricas de Times-->
+<?php if (!empty($teamsMetrics)): ?>
+<div class="row g-5 mb-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-3 mb-1">Performance dos Times</span>
+                    <span class="text-muted mt-1 fw-semibold fs-7"><?= count($teamsMetrics) ?> time(s) - Período: <?= date('d/m', strtotime($dateFrom)) ?> a <?= date('d/m/Y', strtotime($dateTo)) ?></span>
+                </h3>
+                <div class="card-toolbar">
+                    <a href="/teams/dashboard?date_from=<?= $dateFrom ?>&date_to=<?= date('Y-m-d', strtotime($dateTo)) ?>" class="btn btn-sm btn-primary">
+                        <i class="ki-duotone ki-chart-simple fs-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                            <span class="path4"></span>
+                        </i>
+                        Dashboard Completo
+                    </a>
+                </div>
+            </div>
+            <div class="card-body pt-3">
+                <div class="table-responsive">
+                    <table class="table table-row-dashed align-middle fs-6 gy-4">
+                        <thead>
+                            <tr class="text-start text-gray-400 fw-bold fs-7 text-uppercase gs-0">
+                                <th class="min-w-200px">Time</th>
+                                <th class="min-w-80px text-center">Membros</th>
+                                <th class="min-w-100px text-center">Conversas</th>
+                                <th class="min-w-100px text-center">Resolvidas</th>
+                                <th class="min-w-120px text-center">Taxa Resolução</th>
+                                <th class="min-w-120px text-center">TM Resposta</th>
+                                <th class="text-end min-w-100px">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody class="fw-semibold text-gray-600">
+                            <?php foreach ($teamsMetrics as $index => $team): ?>
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="symbol symbol-40px me-3" style="background-color: <?= htmlspecialchars($team['team_color'] ?? '#009ef7') ?>20;">
+                                            <span class="symbol-label" style="color: <?= htmlspecialchars($team['team_color'] ?? '#009ef7') ?>;">
+                                                <i class="ki-duotone ki-people fs-2x">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                    <span class="path3"></span>
+                                                    <span class="path4"></span>
+                                                    <span class="path5"></span>
+                                                </i>
+                                            </span>
+                                        </div>
+                                        <div class="d-flex flex-column">
+                                            <a href="/teams/show?id=<?= $team['team_id'] ?>&date_from=<?= $dateFrom ?>&date_to=<?= date('Y-m-d', strtotime($dateTo)) ?>" class="text-gray-800 text-hover-primary fw-bold fs-6">
+                                                <?= htmlspecialchars($team['team_name']) ?>
+                                            </a>
+                                            <?php if (!empty($team['leader_name'])): ?>
+                                            <span class="text-muted fs-7">Líder: <?= htmlspecialchars($team['leader_name']) ?></span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge badge-light fs-7"><?= $team['members_count'] ?? 0 ?></span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="fw-bold text-gray-800 fs-6"><?= $team['total_conversations'] ?? 0 ?></span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge badge-light-success fs-7"><?= $team['closed_conversations'] ?? 0 ?></span>
+                                </td>
+                                <td class="text-center">
+                                    <div class="d-flex flex-column align-items-center">
+                                        <span class="fw-bold text-gray-800 fs-6 mb-1"><?= number_format($team['resolution_rate'] ?? 0, 1) ?>%</span>
+                                        <div class="progress h-6px w-100px">
+                                            <div class="progress-bar bg-<?= ($team['resolution_rate'] ?? 0) >= 80 ? 'success' : (($team['resolution_rate'] ?? 0) >= 50 ? 'warning' : 'danger') ?>" 
+                                                 role="progressbar" 
+                                                 style="width: <?= min(100, $team['resolution_rate'] ?? 0) ?>%" 
+                                                 aria-valuenow="<?= $team['resolution_rate'] ?? 0 ?>" 
+                                                 aria-valuemin="0" 
+                                                 aria-valuemax="100">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="fw-bold text-gray-800">
+                                        <?= \App\Services\TeamPerformanceService::formatTime($team['avg_first_response_time'] ?? null) ?>
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    <a href="/teams/show?id=<?= $team['team_id'] ?>&date_from=<?= $dateFrom ?>&date_to=<?= date('Y-m-d', strtotime($dateTo)) ?>" class="btn btn-sm btn-light btn-active-light-primary">
+                                        <i class="ki-duotone ki-eye fs-4">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        Ver Detalhes
+                                    </a>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <?php if (count($teamsMetrics) >= 10): ?>
+                <div class="text-center mt-5">
+                    <a href="/teams/dashboard?date_from=<?= $dateFrom ?>&date_to=<?= date('Y-m-d', strtotime($dateTo)) ?>" class="btn btn-link">
+                        Ver todos os times →
+                    </a>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+<!--end::Row-->
+<?php endif; ?>
+
 <!--begin::Row - Gráficos-->
 <div class="row g-5 mb-5 mt-5">
     <!--begin::Col - Gráfico de Conversas ao Longo do Tempo-->

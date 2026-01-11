@@ -17,29 +17,44 @@ class ContactController
     public function index(): void
     {
         Permission::abortIfCannot('contacts.view');
+        
         // Obter filtros da requisição
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $limit = min(100, max(10, (int)($_GET['limit'] ?? 50)));
+        $offset = ($page - 1) * $limit;
+        
         $filters = [
-            'search' => $_GET['search'] ?? null,
-            'limit' => $_GET['limit'] ?? 50,
-            'offset' => $_GET['offset'] ?? 0
+            'search' => !empty($_GET['search']) ? trim($_GET['search']) : null,
+            'limit' => $limit,
+            'offset' => $offset
         ];
 
-        // Remover filtros vazios
-        $filters = array_filter($filters, function($value) {
-            return $value !== null && $value !== '';
-        });
-
         try {
-            $contacts = ContactService::list($filters);
+            // Obter contatos e total
+            $result = ContactService::listWithTotal($filters);
+            $contacts = $result['contacts'];
+            $total = $result['total'];
             
             Response::view('contacts/index', [
                 'contacts' => $contacts,
-                'filters' => $filters
+                'filters' => $filters,
+                'pagination' => [
+                    'page' => $page,
+                    'limit' => $limit,
+                    'total' => $total,
+                    'pages' => ceil($total / $limit)
+                ]
             ]);
         } catch (\Exception $e) {
             Response::view('contacts/index', [
                 'contacts' => [],
                 'filters' => $filters,
+                'pagination' => [
+                    'page' => $page,
+                    'limit' => $limit,
+                    'total' => 0,
+                    'pages' => 0
+                ],
                 'error' => $e->getMessage()
             ]);
         }

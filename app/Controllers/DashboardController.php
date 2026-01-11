@@ -47,6 +47,16 @@ class DashboardController
             // Métricas individuais de todos os agentes (para cards)
             $allAgentsMetrics = \App\Services\DashboardService::getAllAgentsMetrics($dateFrom, $dateTo);
             
+            // Métricas de times (se usuário tiver permissão)
+            $teamsMetrics = [];
+            if (\App\Helpers\Permission::can('teams.view')) {
+                try {
+                    $teamsMetrics = \App\Services\TeamPerformanceService::getTeamsRanking($dateFrom, $dateTo, 10);
+                } catch (\Exception $e) {
+                    error_log("Erro ao carregar métricas de times: " . $e->getMessage());
+                }
+            }
+            
             // Conversas recentes (apenas 5)
             $recentConversations = \App\Services\DashboardService::getRecentConversations(5);
             
@@ -60,6 +70,7 @@ class DashboardController
                 'funnelStats' => $funnelStats,
                 'topAgents' => $topAgents,
                 'allAgentsMetrics' => $allAgentsMetrics,
+                'teamsMetrics' => $teamsMetrics,
                 'recentConversations' => $recentConversations,
                 'recentActivity' => $recentActivity,
                 'dateFrom' => $dateFrom,

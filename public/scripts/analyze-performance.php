@@ -5,6 +5,8 @@
  * Exemplo de cron: 0 */6 * * * cd /var/www/html && php public/scripts/analyze-performance.php >> storage/logs/performance-analysis.log 2>&1
  */
 
+@header('Content-Type: text/plain; charset=utf-8');
+
 // Ajustar diretório raiz
 $rootDir = dirname(__DIR__, 2);
 chdir($rootDir);
@@ -14,12 +16,27 @@ date_default_timezone_set('America/Sao_Paulo');
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 ini_set('display_startup_errors', '1');
+ini_set('html_errors', '0');
+ini_set('log_errors', '1');
+// Evitar buffers silenciosos (especialmente se rodar via web)
+while (ob_get_level() > 0) {
+    ob_end_flush();
+}
 // Dumpa erro fatal no final, se houver
 register_shutdown_function(function () {
     $error = error_get_last();
     if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
         echo "[", date('Y-m-d H:i:s'), "] ❌ FATAL: {$error['message']} em {$error['file']}:{$error['line']}\n";
     }
+});
+// Handlers explícitos para mostrar erros/exceções
+set_error_handler(function ($severity, $message, $file, $line) {
+    echo "[", date('Y-m-d H:i:s'), "] ⚠️ ERRO: {$message} em {$file}:{$line}\n";
+    return false; // permite que o handler padrão também atue
+});
+set_exception_handler(function ($e) {
+    echo "[", date('Y-m-d H:i:s'), "] ❌ EXCEPTION: " . $e->getMessage() . "\n";
+    echo $e->getTraceAsString() . "\n";
 });
 
 // Log
@@ -39,6 +56,8 @@ require_once $bootstrapPath;
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 ini_set('display_startup_errors', '1');
+ini_set('html_errors', '0');
+ini_set('log_errors', '1');
 
 use App\Services\AgentPerformanceAnalysisService;
 use App\Services\ConversationSettingsService;

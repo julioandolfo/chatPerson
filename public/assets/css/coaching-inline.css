@@ -6,10 +6,11 @@
 .coaching-hint-inline {
     margin: 8px 0 8px 40px; /* Alinhado com as mensagens (espaço do avatar) */
     padding: 12px 16px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #1e1e2d 0%, #2a2a3e 100%);
     border-radius: 12px;
+    border: 1px solid rgba(255, 193, 7, 0.3);
     border-left: 4px solid #ffc107;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     animation: slideInHint 0.3s ease-out;
     position: relative;
 }
@@ -20,14 +21,14 @@
     left: -10px;
     top: -10px;
     font-size: 20px;
-    background: #ffc107;
+    background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
     width: 32px;
     height: 32px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 6px rgba(255, 193, 7, 0.4);
+    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.6);
 }
 
 @keyframes slideInHint {
@@ -52,14 +53,15 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #ffffff;
-    background: rgba(255, 255, 255, 0.2);
+    font-size: 11px;
+    font-weight: 700;
+    color: #ffc107;
+    background: rgba(255, 193, 7, 0.15);
     padding: 4px 12px;
     border-radius: 20px;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
+    border: 1px solid rgba(255, 193, 7, 0.3);
 }
 
 .coaching-hint-type::before {
@@ -69,10 +71,11 @@
     background: #ffc107;
     border-radius: 50%;
     display: inline-block;
+    box-shadow: 0 0 6px #ffc107;
 }
 
 .coaching-hint-content {
-    color: #ffffff;
+    color: #e0e0e0;
     font-size: 14px;
     line-height: 1.5;
     margin-bottom: 12px;
@@ -81,17 +84,19 @@
 .coaching-hint-suggestions {
     margin-top: 12px;
     padding-top: 12px;
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    border-top: 1px solid rgba(255, 193, 7, 0.2);
 }
 
 .coaching-hint-suggestions-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    color: #ffc107;
     margin-bottom: 8px;
     display: flex;
     align-items: center;
     gap: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .coaching-hint-suggestions-title::before {
@@ -100,13 +105,13 @@
 }
 
 .coaching-hint-suggestion {
-    background: rgba(255, 255, 255, 0.25);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 193, 7, 0.1);
+    border: 1px solid rgba(255, 193, 7, 0.25);
     border-radius: 8px;
-    padding: 8px 12px;
+    padding: 10px 14px;
     margin-bottom: 6px;
     font-size: 13px;
-    color: #1e1e2d;
+    color: #e0e0e0;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -116,9 +121,10 @@
 }
 
 .coaching-hint-suggestion:hover {
-    background: rgba(255, 255, 255, 0.35);
-    border-color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 193, 7, 0.2);
+    border-color: rgba(255, 193, 7, 0.4);
     transform: translateX(4px);
+    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
 }
 
 .coaching-hint-suggestion::before {
@@ -126,7 +132,7 @@
     font-size: 16px;
     font-weight: bold;
     flex-shrink: 0;
-    color: #667eea;
+    color: #ffc107;
 }
 
 .coaching-hint-suggestion:last-child {
@@ -138,18 +144,18 @@
     gap: 8px;
     margin-top: 12px;
     padding-top: 12px;
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    border-top: 1px solid rgba(255, 193, 7, 0.2);
 }
 
 .coaching-hint-btn {
     flex: 1;
-    padding: 6px 12px;
+    padding: 8px 12px;
     font-size: 12px;
-    font-weight: 500;
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    font-weight: 600;
+    border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 6px;
-    background: rgba(255, 255, 255, 0.1);
-    color: #ffffff;
+    background: rgba(255, 255, 255, 0.05);
+    color: #e0e0e0;
     cursor: pointer;
     transition: all 0.2s ease;
     display: inline-flex;
@@ -159,26 +165,31 @@
 }
 
 .coaching-hint-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-    border-color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
 }
 
 .coaching-hint-btn.helpful {
-    background: rgba(76, 175, 80, 0.3);
-    border-color: #4caf50;
+    background: rgba(76, 175, 80, 0.15);
+    border-color: rgba(76, 175, 80, 0.3);
+    color: #4caf50;
 }
 
 .coaching-hint-btn.helpful:hover {
-    background: rgba(76, 175, 80, 0.5);
+    background: rgba(76, 175, 80, 0.25);
+    border-color: rgba(76, 175, 80, 0.5);
 }
 
 .coaching-hint-btn.not-helpful {
-    background: rgba(244, 67, 54, 0.3);
-    border-color: #f44336;
+    background: rgba(244, 67, 54, 0.15);
+    border-color: rgba(244, 67, 54, 0.3);
+    color: #f44336;
 }
 
 .coaching-hint-btn.not-helpful:hover {
-    background: rgba(244, 67, 54, 0.5);
+    background: rgba(244, 67, 54, 0.25);
+    border-color: rgba(244, 67, 54, 0.5);
 }
 
 .coaching-hint-btn.active {
@@ -188,11 +199,12 @@
 
 /* Indicador de hint visualizado */
 .coaching-hint-inline.viewed {
-    opacity: 0.85;
+    opacity: 0.75;
+    filter: saturate(0.8);
 }
 
 .coaching-hint-inline.viewed::before {
-    background: #90caf9;
+    background: linear-gradient(135deg, #90caf9 0%, #64b5f6 100%);
 }
 
 /* Responsivo */

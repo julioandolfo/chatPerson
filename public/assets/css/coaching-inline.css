@@ -105,13 +105,13 @@
 }
 
 .coaching-hint-suggestion {
-    background: rgba(255, 193, 7, 0.1);
-    border: 1px solid rgba(255, 193, 7, 0.25);
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 193, 7, 0.3);
     border-radius: 8px;
     padding: 10px 14px;
     margin-bottom: 6px;
     font-size: 13px;
-    color: #e0e0e0;
+    color: #ffffff;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -121,10 +121,11 @@
 }
 
 .coaching-hint-suggestion:hover {
-    background: rgba(255, 193, 7, 0.2);
-    border-color: rgba(255, 193, 7, 0.4);
+    background: rgba(255, 193, 7, 0.15);
+    border-color: rgba(255, 193, 7, 0.5);
     transform: translateX(4px);
-    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.3);
+    color: #ffffff;
 }
 
 .coaching-hint-suggestion::before {

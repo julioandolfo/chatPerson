@@ -2,7 +2,7 @@
 <?php
 /**
  * Script para análise periódica de performance de vendedores (standalone)
- * Exemplo de cron: 0 */6 * * * cd /var/www/html && php public/scripts/analyze-performance.php >> storage/logs/performance-analysis.log 2>&1
+ * Exemplo de cron: 0 (estrela)/6 * * * cd /var/www/html && php public/scripts/analyze-performance.php >> storage/logs/performance-analysis.log 2>&1
  */
 
 @header('Content-Type: text/plain; charset=utf-8');

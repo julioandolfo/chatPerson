@@ -608,7 +608,7 @@ class AgentPerformanceAnalysisService
     {
         try {
             // Tag de baixa performance
-            if ($settings['reports']['auto_tag_low_performance']) {
+            if ($settings['reports']['auto_tag_low_performance'] ?? false) {
                 $threshold = (float)($settings['reports']['low_performance_threshold'] ?? 2.5);
                 if ($analysis['overall_score'] < $threshold) {
                     // Adicionar tag (implementar se necessário)
@@ -617,14 +617,14 @@ class AgentPerformanceAnalysisService
             }
             
             // Gamificação
-            if ($settings['gamification']['enabled'] && $settings['gamification']['award_badges']) {
+            if (($settings['gamification']['enabled'] ?? false) && ($settings['gamification']['award_badges'] ?? false)) {
                 GamificationService::checkAndAwardBadges($analysis);
             }
             
             // Coaching
-            if ($settings['coaching']['enabled']) {
+            if ($settings['coaching']['enabled'] ?? false) {
                 // Salvar melhores práticas
-                if ($settings['coaching']['save_best_practices']) {
+                if ($settings['coaching']['save_best_practices'] ?? false) {
                     $minScore = (float)($settings['coaching']['min_score_for_best_practice'] ?? 4.5);
                     if ($analysis['overall_score'] >= $minScore) {
                         BestPracticesService::saveBestPractice($analysis, $conversation);
@@ -632,12 +632,12 @@ class AgentPerformanceAnalysisService
                 }
                 
                 // Auto-criar metas
-                if ($settings['coaching']['auto_create_goals']) {
+                if ($settings['coaching']['auto_create_goals'] ?? false) {
                     CoachingService::autoCreateGoals($analysis);
                 }
                 
                 // Enviar feedback
-                if ($settings['coaching']['auto_send_feedback']) {
+                if ($settings['coaching']['auto_send_feedback'] ?? false) {
                     CoachingService::sendFeedback($analysis, $conversation);
                 }
             }

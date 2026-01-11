@@ -260,6 +260,19 @@ class ConversationService
         
         Logger::notificame("[INFO] ConversationService::create - Conversa criada ID: {$id}");
         
+        // Registrar atribuição inicial no histórico (se houver agente)
+        if ($agentId) {
+            try {
+                \App\Models\ConversationAssignment::recordAssignment(
+                    $id,
+                    $agentId,
+                    null // sistema/automação
+                );
+            } catch (\Exception $e) {
+                error_log("Erro ao registrar histórico de atribuição inicial: " . $e->getMessage());
+            }
+        }
+        
         // Verificar se foi salvo corretamente
         $savedConversation = Conversation::find($id);
         Logger::notificame("[INFO] ConversationService::create - Verificação pós-criação:");
@@ -624,6 +637,17 @@ class ConversationService
         // Atribuir
         $oldAgentId = $conversation['agent_id'] ?? null;
         Conversation::update($conversationId, ['agent_id' => $agentId]);
+        
+        // Registrar no histórico de atribuições
+        try {
+            \App\Models\ConversationAssignment::recordAssignment(
+                $conversationId,
+                $agentId,
+                \App\Helpers\Auth::user()['id'] ?? null
+            );
+        } catch (\Exception $e) {
+            error_log("Erro ao registrar histórico de atribuição: " . $e->getMessage());
+        }
         
         // Definir agente do contato APENAS na PRIMEIRA atribuição
         // Agentes adicionais só podem ser adicionados manualmente via modal de gerenciamento

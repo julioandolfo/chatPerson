@@ -47,8 +47,9 @@ class AgentConversionService
         // 3. Buscar pedidos do CACHE (sincronizados pelo CRON)
         $orders = self::getOrdersFromCache($sellerId, $dateFrom, $dateTo);
         
-        // 4. Filtrar apenas pedidos válidos (não cancelados, não reembolsados, não falhados)
-        $validStatuses = ['completed', 'processing', 'on-hold', 'pending'];
+        // 4. Filtrar apenas pedidos válidos para conversão
+        // Valem: processing, completed, producao, designer, pedido-enviado, pedido-entregue
+        $validStatuses = ['processing', 'completed', 'producao', 'designer', 'pedido-enviado', 'pedido-entregue'];
         $validOrders = array_filter($orders, function($order) use ($validStatuses) {
             $status = $order['order_status'] ?? 'pending';
             return in_array($status, $validStatuses);
@@ -120,14 +121,13 @@ class AgentConversionService
      */
     private static function getTotalConversations(int $agentId, string $dateFrom, string $dateTo): int
     {
-        $sql = "SELECT COUNT(*) as count 
-                FROM conversations 
-                WHERE agent_id = ? 
-                  AND created_at >= ? 
-                  AND created_at <= ?";
-        
-        $result = Database::fetch($sql, [$agentId, $dateFrom, $dateTo]);
-        return (int)($result['count'] ?? 0);
+        // Usar tabela de histórico de atribuições para contar todas as conversas
+        // que foram atribuídas ao agente no período, mesmo que tenham sido reatribuídas
+        return \App\Models\ConversationAssignment::countAgentConversations(
+            $agentId,
+            $dateFrom,
+            $dateTo
+        );
     }
     
     /**

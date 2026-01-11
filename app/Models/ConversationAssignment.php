@@ -23,6 +23,11 @@ class ConversationAssignment extends Model
         ?int $agentId,
         ?int $assignedBy = null
     ): int {
+        // Se não há agente, não registrar
+        if (!$agentId) {
+            return 0;
+        }
+        
         $data = [
             'conversation_id' => $conversationId,
             'agent_id' => $agentId,

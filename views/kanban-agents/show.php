@@ -443,8 +443,16 @@ function viewExecutionDetails(executionId) {
                     const conditionsBadge = log.conditions_met ? 'badge-light-success' : 'badge-light-warning';
                     const conditionsText = log.conditions_met ? 'Atendidas' : 'Não atendidas';
                     
-                    // Contagem de ações
-                    const actionsExecuted = log.actions_executed ? JSON.parse(log.actions_executed).length : 0;
+                    // Contagem de ações (vem como array ou JSON string)
+                    let actionsExecuted = 0;
+                    try {
+                        const actionsValue = Array.isArray(log.actions_executed)
+                            ? log.actions_executed
+                            : (log.actions_executed ? JSON.parse(log.actions_executed) : []);
+                        actionsExecuted = Array.isArray(actionsValue) ? actionsValue.length : 0;
+                    } catch (e) {
+                        actionsExecuted = 0;
+                    }
                     
                     row.innerHTML = `
                         <td class="fw-bold">#${log.conversation_id}</td>

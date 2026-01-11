@@ -14,20 +14,17 @@ class RealtimeCoachingHint extends Model
     protected array $fillable = [
         'conversation_id',
         'agent_id',
-        'client_message',
+        'message_id',
         'hint_type',
-        'hint_title',
-        'hint_message',
+        'hint_text',
         'suggestions',
-        'context_summary',
         'model_used',
         'tokens_used',
         'cost',
-        'shown_at',
-        'dismissed_at',
-        'used_suggestion'
+        'viewed_at',
+        'feedback'
     ];
-    protected bool $timestamps = true;
+    protected bool $timestamps = false; // Tabela só tem created_at (automático)
     
     /**
      * Obter dicas de uma conversa
@@ -59,37 +56,25 @@ class RealtimeCoachingHint extends Model
     /**
      * Marcar dica como visualizada
      */
-    public static function markAsShown(int $hintId): bool
+    public static function markAsViewed(int $hintId): bool
     {
         $sql = "UPDATE realtime_coaching_hints 
-                SET shown_at = NOW() 
-                WHERE id = ? AND shown_at IS NULL";
+                SET viewed_at = NOW() 
+                WHERE id = ? AND viewed_at IS NULL";
         
         return Database::execute($sql, [$hintId]);
     }
     
     /**
-     * Marcar dica como descartada
+     * Marcar feedback da dica
      */
-    public static function markAsDismissed(int $hintId): bool
+    public static function setFeedback(int $hintId, string $feedback): bool
     {
         $sql = "UPDATE realtime_coaching_hints 
-                SET dismissed_at = NOW() 
+                SET feedback = ? 
                 WHERE id = ?";
         
-        return Database::execute($sql, [$hintId]);
-    }
-    
-    /**
-     * Marcar que sugestão foi usada
-     */
-    public static function markAsUsed(int $hintId): bool
-    {
-        $sql = "UPDATE realtime_coaching_hints 
-                SET used_suggestion = 1 
-                WHERE id = ?";
-        
-        return Database::execute($sql, [$hintId]);
+        return Database::execute($sql, [$feedback, $hintId]);
     }
     
     /**
@@ -99,9 +84,9 @@ class RealtimeCoachingHint extends Model
     {
         $sql = "SELECT 
                     COUNT(*) as total_hints,
-                    SUM(CASE WHEN shown_at IS NOT NULL THEN 1 ELSE 0 END) as shown_hints,
-                    SUM(CASE WHEN used_suggestion = 1 THEN 1 ELSE 0 END) as used_hints,
-                    SUM(CASE WHEN dismissed_at IS NOT NULL THEN 1 ELSE 0 END) as dismissed_hints,
+                    SUM(CASE WHEN viewed_at IS NOT NULL THEN 1 ELSE 0 END) as viewed_hints,
+                    SUM(CASE WHEN feedback = 'helpful' THEN 1 ELSE 0 END) as helpful_hints,
+                    SUM(CASE WHEN feedback = 'not_helpful' THEN 1 ELSE 0 END) as not_helpful_hints,
                     SUM(cost) as total_cost,
                     hint_type,
                     COUNT(*) as type_count

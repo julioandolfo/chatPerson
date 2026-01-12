@@ -78,10 +78,10 @@ const SLAIndicator = {
         // Atualizar todos os indicadores
         this.updateAllIndicators();
         
-        // Atualizar a cada 10 segundos para resposta mais rápida
+        // Atualizar a cada 60 segundos (SLA é medido em horas, não precisa ser tão frequente)
         setInterval(() => {
             this.updateAllIndicators();
-        }, 10000);
+        }, 60000); // 60 segundos ao invés de 10 (recomendação de performance)
         
         slaLog('[SLA] Sistema inicializado com sucesso');
         

@@ -58,13 +58,13 @@ class CoachingInline {
     }
 
     startPolling() {
-        // Polling a cada 10 segundos para buscar novos hints
+        // Polling a cada 60 segundos para buscar novos hints (coaching não é tempo-real crítico)
         setInterval(() => {
             if (this.conversationId) {
                 console.log('[CoachingInline] Polling - buscando novos hints...');
                 this.loadHints();
             }
-        }, 10000); // 10 segundos
+        }, 60000); // 60 segundos ao invés de 10 (recomendação de performance)
     }
 
     async loadHints() {

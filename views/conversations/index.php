@@ -5763,8 +5763,13 @@ function loadPendingInvitesCount() {
 document.addEventListener('DOMContentLoaded', function() {
     loadPendingInvitesCount();
     
-    // Atualizar a cada 30 segundos (fallback caso WebSocket não funcione)
-    setInterval(loadPendingInvitesCount, 30000);
+    // Atualizar a cada 30 segundos (apenas se não estiver em modo WebSocket exclusivo)
+    if (!window.realtimeConfig || window.realtimeConfig.connectionType !== 'websocket') {
+        console.log('[Convites] Iniciando polling de convites a cada 30 segundos');
+        setInterval(loadPendingInvitesCount, 30000);
+    } else {
+        console.log('[Convites] WebSocket ativo, polling de convites desabilitado');
+    }
     
     // Configurar listeners WebSocket para convites em tempo real
     setupInviteWebSocketListeners();
@@ -7083,13 +7088,26 @@ function startPolling(conversationId) {
         return;
     }
     
+    // Verificar se deve usar polling (respeitar configuração)
+    if (window.realtimeConfig && window.realtimeConfig.connectionType === 'websocket') {
+        console.log('[Polling] Sistema configurado para WebSocket apenas, polling desabilitado');
+        return;
+    }
+    
+    // Obter intervalo configurado (padrão: 30 segundos - mais eficiente que 3s)
+    const pollingInterval_ms = (window.realtimeConfig && window.realtimeConfig.pollingInterval) 
+        ? Math.max(window.realtimeConfig.pollingInterval, 10000) // Mínimo 10 segundos
+        : 30000; // Padrão 30 segundos (recomendação de performance)
+    
+    console.log(`[Polling] Iniciando polling de mensagens a cada ${pollingInterval_ms/1000} segundos`);
+    
     // Rodada imediata para zerar delay inicial
     checkForNewMessages(conversationId);
     
-    // Verificar novas mensagens a cada 3 segundos
+    // Verificar novas mensagens no intervalo configurado
     pollingInterval = setInterval(() => {
         checkForNewMessages(conversationId);
-    }, 3000);
+    }, pollingInterval_ms);
 }
 
 /**
@@ -16746,10 +16764,16 @@ const currentConversationId = parsePhpJson('<?= json_encode($selectedConversatio
     subscribeVisibleConversations();
     
     // Sistema de atualização periódica da lista de conversas (para badges de não lidas)
-    // Atualizar a cada 10 segundos para verificar novas mensagens em todas as conversas
-    let conversationListUpdateInterval = setInterval(() => {
-        refreshConversationBadges();
-    }, 10000);
+    // Apenas se WebSocket não estiver disponível ou se estiver em modo polling/auto
+    if (!window.realtimeConfig || window.realtimeConfig.connectionType !== 'websocket') {
+        // Intervalo de 60 segundos (mais eficiente que 10s, badges não precisam ser tão tempo-real)
+        console.log('[Badges] Iniciando polling de badges a cada 60 segundos');
+        let conversationListUpdateInterval = setInterval(() => {
+            refreshConversationBadges();
+        }, 60000); // 60 segundos ao invés de 10
+    } else {
+        console.log('[Badges] WebSocket ativo, polling de badges desabilitado');
+    }
     
     // Atualizar tempos relativos a cada 30 segundos
     let timeUpdateInterval = setInterval(() => {
@@ -16771,9 +16795,11 @@ const currentConversationId = parsePhpJson('<?= json_encode($selectedConversatio
     }
     
     // Sistema de atualização periódica da lista de conversas (para badges de não lidas)
+    // Intervalo de 60 segundos (mais eficiente que 10s)
+    console.log('[Badges] Iniciando polling de badges a cada 60 segundos (modo fallback)');
     let conversationListUpdateInterval = setInterval(() => {
         refreshConversationBadges();
-    }, 10000); // 10 segundos
+    }, 60000); // 60 segundos ao invés de 10
 
     // Atualizar tempos relativos a cada 30 segundos (modo polling)
     let timeUpdateInterval = setInterval(() => {

@@ -26,7 +26,7 @@ class ConversationService
     /**
      * TTL do cache em segundos (5 minutos)
      */
-    private static int $cacheTTL = 300;
+    private static int $cacheTTL = 900; // ✅ OTIMIZADO: 15 minutos (antes: 5 minutos)
     
     /**
      * Criar nova conversa
@@ -411,8 +411,9 @@ class ConversationService
      */
     private static function canUseCache(array $filters): bool
     {
-        // Não usar cache se houver filtros complexos que mudam frequentemente
-        $excludedFilters = ['date_from', 'date_to', 'search', 'message_search'];
+        // ✅ OTIMIZAÇÃO: Cache agressivo - apenas desabilitar para busca em mensagens
+        // Busca por nome/email de contato e filtros de data são cacheáveis
+        $excludedFilters = ['message_search']; // Apenas message_search é muito específico
         
         foreach ($excludedFilters as $filter) {
             if (!empty($filters[$filter])) {

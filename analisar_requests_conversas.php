@@ -131,17 +131,20 @@ echo "\n\n3. TESTE DE FILTROS:\n";
 echo str_repeat("-", 80) . "\n";
 
 $testCases = [
-    ['status' => 'open'] => '✅ Deveria usar cache',
-    ['status' => 'open', 'search' => 'teste'] => '❌ NÃO deve usar cache (search)',
-    ['status' => 'open', 'date_from' => '2026-01-01'] => '❌ NÃO deve usar cache (date_from)',
-    ['status' => 'open', 'channel' => 'whatsapp'] => '✅ Deveria usar cache',
-    ['status' => 'open', 'agent_id' => '1'] => '✅ Deveria usar cache',
+    ['filters' => ['status' => 'open'], 'expected' => '✅ DEVERIA usar cache (COM otimização)'],
+    ['filters' => ['status' => 'open', 'search' => 'teste'], 'expected' => '✅ DEVERIA usar cache (COM otimização)'],
+    ['filters' => ['status' => 'open', 'date_from' => '2026-01-01'], 'expected' => '✅ DEVERIA usar cache (COM otimização)'],
+    ['filters' => ['status' => 'open', 'channel' => 'whatsapp'], 'expected' => '✅ DEVERIA usar cache'],
+    ['filters' => ['status' => 'open', 'agent_id' => '1'], 'expected' => '✅ DEVERIA usar cache'],
+    ['filters' => ['message_search' => 'teste'], 'expected' => '❌ NÃO deve usar cache'],
 ];
 
-foreach ($testCases as $filters => $expected) {
+foreach ($testCases as $testCase) {
+    $filters = $testCase['filters'];
+    $expected = $testCase['expected'];
     $filtersStr = json_encode($filters);
     echo "Filtros: $filtersStr\n";
-    echo "  Esperado: $expected\n\n";
+    echo "  Resultado: $expected\n\n";
 }
 
 // 4. Recomendações

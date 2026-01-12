@@ -453,45 +453,51 @@ class DashboardService
      * Obter tempo médio geral de resposta (em minutos)
      * Calcula o tempo médio entre TODAS as mensagens do cliente e as respostas do agente
      * NOTA: Usa SEGUNDOS internamente e converte para minutos para maior precisão
+     * ✅ Com cache de 5 minutos para evitar query pesada repetida
      */
     private static function getAverageResponseTime(string $dateFrom, string $dateTo): ?array
     {
-        // Usar SEGUNDOS para maior precisão (IA responde em segundos)
-        $sql = "SELECT AVG(response_time_seconds) as avg_seconds
-                FROM (
-                    SELECT 
-                        TIMESTAMPDIFF(SECOND, m1.created_at, m2.created_at) as response_time_seconds
-                    FROM messages m1
-                    INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
-                        AND m2.sender_type = 'agent'
-                        AND m2.created_at > m1.created_at
-                        AND m2.created_at = (
-                            SELECT MIN(m3.created_at)
-                            FROM messages m3
-                            WHERE m3.conversation_id = m1.conversation_id
-                            AND m3.sender_type = 'agent'
-                            AND m3.created_at > m1.created_at
-                        )
-                    INNER JOIN conversations c ON c.id = m1.conversation_id
-                    WHERE m1.sender_type = 'contact'
-                    AND c.created_at >= ?
-                    AND c.created_at <= ?
-                    HAVING response_time_seconds IS NOT NULL AND response_time_seconds > 0
-                ) as response_times";
+        // ✅ CACHE DE 5 MINUTOS (300 segundos)
+        $cacheKey = "avg_response_time_{$dateFrom}_{$dateTo}";
         
-        $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
-        
-        self::logDash("getAverageResponseTime result: " . json_encode($result));
-        
-        // Retornar segundos e minutos
-        if ($result && isset($result['avg_seconds']) && $result['avg_seconds'] !== null) {
-            $seconds = (float)$result['avg_seconds'];
-            $minutes = $seconds / 60;
-            self::logDash("getAverageResponseTime: {$seconds}s = {$minutes}min");
-            return ['seconds' => round($seconds, 2), 'minutes' => round($minutes, 2)];
-        }
-        
-        return ['seconds' => 0, 'minutes' => 0];
+        return \App\Helpers\Cache::remember($cacheKey, 300, function() use ($dateFrom, $dateTo) {
+            // Usar SEGUNDOS para maior precisão (IA responde em segundos)
+            $sql = "SELECT AVG(response_time_seconds) as avg_seconds
+                    FROM (
+                        SELECT 
+                            TIMESTAMPDIFF(SECOND, m1.created_at, m2.created_at) as response_time_seconds
+                        FROM messages m1
+                        INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
+                            AND m2.sender_type = 'agent'
+                            AND m2.created_at > m1.created_at
+                            AND m2.created_at = (
+                                SELECT MIN(m3.created_at)
+                                FROM messages m3
+                                WHERE m3.conversation_id = m1.conversation_id
+                                AND m3.sender_type = 'agent'
+                                AND m3.created_at > m1.created_at
+                            )
+                        INNER JOIN conversations c ON c.id = m1.conversation_id
+                        WHERE m1.sender_type = 'contact'
+                        AND c.created_at >= ?
+                        AND c.created_at <= ?
+                        HAVING response_time_seconds IS NOT NULL AND response_time_seconds > 0
+                    ) as response_times";
+            
+            $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
+            
+            self::logDash("getAverageResponseTime result: " . json_encode($result));
+            
+            // Retornar segundos e minutos
+            if ($result && isset($result['avg_seconds']) && $result['avg_seconds'] !== null) {
+                $seconds = (float)$result['avg_seconds'];
+                $minutes = $seconds / 60;
+                self::logDash("getAverageResponseTime: {$seconds}s = {$minutes}min");
+                return ['seconds' => round($seconds, 2), 'minutes' => round($minutes, 2)];
+            }
+            
+            return ['seconds' => 0, 'minutes' => 0];
+        });
     }
 
     /**

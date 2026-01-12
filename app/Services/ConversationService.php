@@ -361,8 +361,8 @@ class ConversationService
         }
         
         try {
-            // 🐛 TEMPORÁRIO: Desabilitar cache para debug de permissões de funil
-            $canUseCache = false; // self::canUseCache($filters);
+            // ✅ Cache reabilitado para performance
+            $canUseCache = self::canUseCache($filters);
             
             if ($canUseCache) {
                 $cacheKey = "user_{$userId}_conversations_" . md5(json_encode($filters));
@@ -372,10 +372,13 @@ class ConversationService
                 }
             }
             
-            // Obter todas as conversas
+            // ✅ CORREÇÃO: Passar userId para aplicar filtro de permissões no SQL
+            $filters['current_user_id'] = $userId;
+            
+            // Obter conversas já filtradas por permissões no SQL
             $conversations = Conversation::getAll($filters);
             
-            \App\Helpers\Log::debug("🔍 [ConversationService::list] Total conversas do banco: " . count($conversations) . ", userId={$userId}", 'conversas.log');
+            \App\Helpers\Log::debug("🔍 [ConversationService::list] Total conversas (já filtradas no SQL): " . count($conversations) . ", userId={$userId}", 'conversas.log');
         } catch (\Exception $e) {
             \App\Helpers\Log::error("Erro em ConversationService::list: " . $e->getMessage(), 'conversas.log');
             \App\Helpers\Log::context("Filtros", $filters, 'conversas.log', 'ERROR');
@@ -383,43 +386,16 @@ class ConversationService
             throw $e;
         }
         
-        // Filtrar por permissões e participantes
-        $filtered = [];
-        $participantConversationIds = [];
-        
-        // Obter IDs de conversas onde o usuário é participante
-        if (class_exists('\App\Models\ConversationParticipant')) {
-            $participantConversationIds = \App\Models\ConversationParticipant::getConversationsByParticipant($userId);
-        }
-        
-        $blocked = 0;
-        foreach ($conversations as $conversation) {
-            // Verificar se é participante
-            $isParticipant = in_array($conversation['id'], $participantConversationIds);
-            
-            // Se for participante, sempre pode ver
-            if ($isParticipant) {
-                $filtered[] = $conversation;
-                continue;
-            }
-            
-            // Caso contrário, verificar permissões normais
-            if (\App\Services\PermissionService::canViewConversation($userId, $conversation)) {
-                $filtered[] = $conversation;
-            } else {
-                $blocked++;
-            }
-        }
-        
-        \App\Helpers\Log::debug("🔍 [ConversationService::list] Conversas filtradas: " . count($filtered) . ", bloqueadas={$blocked}", 'conversas.log');
+        // ✅ CORREÇÃO: Filtro de permissões agora é aplicado no SQL, não precisamos mais filtrar aqui
+        // As conversas retornadas já são apenas aquelas que o usuário pode ver
         
         // Salvar no cache se aplicável
         if ($canUseCache) {
             $cacheKey = "user_{$userId}_conversations_" . md5(json_encode($filters));
-            self::setCache($cacheKey, $filtered);
+            self::setCache($cacheKey, $conversations);
         }
         
-        return $filtered;
+        return $conversations;
     }
 
     /**

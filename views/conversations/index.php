@@ -10169,6 +10169,11 @@ function applyFilters() {
     
     console.log('👔 Filtros aplicados:', {funnel, stage, search, status, channel, department, tag, agent});
     
+    // ✅ CORREÇÃO: Resetar paginação ao aplicar filtros
+    conversationOffset = 0;
+    conversationHasMore = true;
+    isLoadingConversations = false;
+    
     // Resetar cache para forçar novo carregamento
     window.lastConversationListSignature = null;
     const conversationsList = document.querySelector('.conversations-list-items');
@@ -10282,9 +10287,18 @@ function refreshConversationList(params = null, append = false) {
         effectiveParams = new URLSearchParams(window.location.search);
     }
 
-    // Forçar limit dinâmico e offset zero (carrega tudo até o tamanho atual)
-    effectiveParams.set('limit', conversationPageSize);
-    effectiveParams.set('offset', 0);
+    // ✅ CORREÇÃO: Usar paginação incremental correta
+    // Se não é append, resetar offset (primeiro carregamento ou novos filtros)
+    if (!append) {
+        conversationOffset = 0;
+        isLoadingConversations = false;
+        conversationHasMore = true;
+    }
+    
+    // Usar limit fixo e offset incremental
+    const pageLimit = 150;
+    effectiveParams.set('limit', pageLimit);
+    effectiveParams.set('offset', conversationOffset);
     lastConversationsParams = new URLSearchParams(effectiveParams.toString());
 
     const paramsString = effectiveParams.toString();
@@ -10536,9 +10550,21 @@ function refreshConversationList(params = null, append = false) {
         conversationsList.dataset.loaded = '1';
         conversationsList.dataset.rendering = '0';
         
+        // ✅ CORREÇÃO: Controlar flag de "tem mais conversas"
+        const pageLimit = 150;
+        conversationHasMore = conversations.length >= pageLimit;
+        isLoadingConversations = false;
+        
         const loadMoreBtn = document.getElementById('loadMoreConversationsBtn');
         if (loadMoreBtn) {
-            if (conversations.length >= conversationPageSize) {
+            // Atualizar spinner do botão
+            const spinner = loadMoreBtn.querySelector('.spinner-border');
+            if (spinner) {
+                spinner.style.display = 'none';
+            }
+            
+            // Mostrar/ocultar botão baseado em se há mais conversas
+            if (conversationHasMore) {
                 loadMoreBtn.style.display = '';
                 loadMoreBtn.disabled = false;
             } else {
@@ -10559,9 +10585,28 @@ function refreshConversationList(params = null, append = false) {
 }
 
 function loadMoreConversations() {
-    conversationPageSize += 150;
+    // ✅ CORREÇÃO: Usar paginação incremental em vez de recarregar tudo
+    if (isLoadingConversations || !conversationHasMore) {
+        console.log('loadMoreConversations: já está carregando ou não há mais conversas');
+        return;
+    }
+    
+    isLoadingConversations = true;
+    conversationOffset += 150;  // Incrementar offset para próxima página
+    
     const params = lastConversationsParams ? new URLSearchParams(lastConversationsParams.toString()) : new URLSearchParams(window.location.search);
-    refreshConversationList(params, false);
+    
+    // Mostrar spinner no botão
+    const loadMoreBtn = document.getElementById('loadMoreConversationsBtn');
+    if (loadMoreBtn) {
+        const spinner = loadMoreBtn.querySelector('.spinner-border');
+        if (spinner) {
+            spinner.style.display = 'inline-block';
+        }
+        loadMoreBtn.disabled = true;
+    }
+    
+    refreshConversationList(params, true);  // ✅ append=true para não zerar a lista
 }
 
 function escapeHtml(text) {
@@ -17037,6 +17082,11 @@ function refreshConversationBadges() {
     
     // Preservar todos os parâmetros da URL atual (incluindo arrays)
     urlParams.forEach((value, key) => {
+        // Pular limit e offset - vamos forçar valores otimizados
+        if (key === 'limit' || key === 'offset') {
+            return;
+        }
+        
         // Para arrays (channels[], tag_ids[], whatsapp_account_ids[]), adicionar cada valor
         if (key.endsWith('[]')) {
             // Se já existe, adicionar mais um valor
@@ -17046,6 +17096,11 @@ function refreshConversationBadges() {
             params.set(key, value);
         }
     });
+    
+    // ✅ ESCALABILIDADE: Limitar máximo de conversas para não sobrecarregar
+    // Mesmo se usuário carregou 150+ conversas, só atualiza badges das primeiras 70
+    params.set('limit', 70);  // Máximo 70 conversas
+    params.set('offset', 0);  // Sempre da primeira página
     
     // Garantir que filtros bísicos tambêm sejam preservados se não estiverem na URL
     const filters = {

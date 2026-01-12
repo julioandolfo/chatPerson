@@ -294,6 +294,8 @@ class ContactController
 
     /**
      * Métricas de histórico do contato (para aba Histórico no sidebar)
+     * ✅ NOVA ABORDAGEM: Busca dados pré-calculados via CRON
+     * Não calcula em tempo real, apenas retorna dados já processados
      */
     public function getHistoryMetrics(int $id): void
     {
@@ -310,36 +312,30 @@ class ContactController
                 return;
             }
 
-            // Calcular métricas baseadas em TODAS as conversas do contato
-            // Tempo médio de resposta = tempo entre mensagem do cliente e resposta do agente
-            $stats = \App\Helpers\Database::fetch("
-                SELECT 
-                    COUNT(DISTINCT c.id) AS total_conversations,
-                    AVG(response_times.response_time_minutes) AS avg_response_time_minutes
-                FROM conversations c
-                LEFT JOIN (
-                    SELECT 
-                        m1.conversation_id,
-                        AVG(TIMESTAMPDIFF(MINUTE, m1.created_at, m2.created_at)) as response_time_minutes
-                    FROM messages m1
-                    INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
-                        AND m2.sender_type = 'agent'
-                        AND m2.created_at > m1.created_at
-                        AND m2.created_at = (
-                            SELECT MIN(m3.created_at)
-                            FROM messages m3
-                            WHERE m3.conversation_id = m1.conversation_id
-                            AND m3.sender_type = 'agent'
-                            AND m3.created_at > m1.created_at
-                        )
-                    WHERE m1.sender_type = 'contact'
-                    GROUP BY m1.conversation_id
-                ) response_times ON response_times.conversation_id = c.id
-                WHERE c.contact_id = ?
-            ", [$id]);
+            // ✅ Buscar métricas pré-calculadas (SUPER RÁPIDO - apenas SELECT simples)
+            $metrics = \App\Models\ContactMetric::getByContact($id);
             
-            // Log para debug
-            error_log("Histórico do contato {$id}: " . json_encode($stats));
+            // Se não existir, marcar para cálculo e retornar dados básicos
+            if (!$metrics) {
+                // Marcar para cálculo urgente (prioridade 3)
+                \App\Services\ContactMetricsService::onNewMessage($id, true);
+                
+                // Retornar dados básicos temporários
+                $metrics = [
+                    'total_conversations' => 0,
+                    'open_conversations' => 0,
+                    'closed_conversations' => 0,
+                    'avg_response_time_minutes' => null,
+                    'last_message_at' => null
+                ];
+                
+                error_log("Métricas do contato {$id} não calculadas ainda. Marcado para cálculo urgente.");
+            }
+            
+            $stats = [
+                'total_conversations' => (int)($metrics['total_conversations'] ?? 0),
+                'avg_response_time_minutes' => $metrics['avg_response_time_minutes']
+            ];
 
             // Conversas anteriores (últimas 5 conversas, priorizando fechadas/resolvidas)
             $previous = \App\Helpers\Database::fetchAll("

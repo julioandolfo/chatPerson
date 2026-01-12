@@ -64,26 +64,29 @@ class SLAMonitoringService
 
     /**
      * Obter conversas que precisam verificação de SLA
-     * ATUALIZADO: Ordena por urgência de SLA (mais crítico primeiro), não por data
+     * OTIMIZADO: Reduz limite e prioriza conversas mais críticas
      */
     private static function getConversationsToCheck(): array
     {
-        // Buscar conversas abertas que não estão com SLA pausado
-        $sql = "SELECT c.*, 
-                       ct.name as contact_name,
-                       TIMESTAMPDIFF(MINUTE, c.created_at, NOW()) as minutes_open,
-                       c.sla_paused_at IS NULL as sla_active
+        // ✅ OTIMIZAÇÃO: Reduzido de 500 para 100 conversas por execução
+        // ✅ Foca apenas em conversas abertas recentes (últimas 48h)
+        // ✅ Ignora conversas com SLA pausado diretamente na query
+        $sql = "SELECT c.id, c.status, c.priority, c.agent_id, c.department_id, 
+                       c.funnel_id, c.funnel_stage_id, c.created_at,
+                       c.sla_paused_at, c.sla_warning_sent, c.reassignment_count,
+                       c.last_reassignment_at, c.metadata,
+                       TIMESTAMPDIFF(MINUTE, c.created_at, NOW()) as minutes_open
                 FROM conversations c
-                INNER JOIN contacts ct ON c.contact_id = ct.id
                 WHERE c.status IN ('open', 'pending')
-                AND c.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                AND c.sla_paused_at IS NULL
+                AND c.created_at >= DATE_SUB(NOW(), INTERVAL 2 DAY)
                 ORDER BY 
                     CASE WHEN c.priority = 'urgent' THEN 1
                          WHEN c.priority = 'high' THEN 2
                          WHEN c.priority = 'normal' THEN 3
                          ELSE 4 END ASC,
                     minutes_open DESC
-                LIMIT 500";
+                LIMIT 100";
         
         return Database::fetchAll($sql);
     }

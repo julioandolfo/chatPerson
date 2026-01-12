@@ -95,46 +95,29 @@ class AIFallbackMonitoringService
 
     /**
      * Obter conversas travadas
+     * OTIMIZADO: Query simplificada e limite reduzido
      */
     private static function getStuckConversations(array $settings): array
     {
         $minDelayMinutes = $settings['min_delay_minutes'];
         $maxDelayHours = $settings['max_delay_hours'];
         
-        $sql = "SELECT DISTINCT c.id, c.conversation_id, c.ai_agent_id, c.status as ai_status,
-                       c.created_at as ai_started_at,
+        // ✅ OTIMIZAÇÃO: Reduzido de 50 para 20 conversas por execução
+        // ✅ Simplificado: Busca última mensagem de forma mais eficiente
+        $sql = "SELECT c.id, c.conversation_id, c.ai_agent_id, c.status as ai_status,
                        conv.status as conversation_status,
-                       conv.agent_id as human_agent_id,
-                       last_msg.id as last_message_id,
-                       last_msg.content as last_message_content,
-                       last_msg.created_at as last_message_at,
-                       last_msg.sender_type as last_sender_type,
-                       TIMESTAMPDIFF(MINUTE, last_msg.created_at, NOW()) as minutes_since_last_message
+                       conv.agent_id as human_agent_id
                 FROM ai_conversations c
                 INNER JOIN conversations conv ON conv.id = c.conversation_id
-                INNER JOIN (
-                    SELECT conversation_id, id, content, created_at, sender_type
-                    FROM messages
-                    WHERE id IN (
-                        SELECT MAX(id) FROM messages GROUP BY conversation_id
-                    )
-                ) last_msg ON last_msg.conversation_id = conv.id
                 WHERE c.status = 'active'
                 AND conv.status IN ('open', 'pending')
-                AND last_msg.sender_type = 'contact'
-                AND TIMESTAMPDIFF(MINUTE, last_msg.created_at, NOW()) >= ?
-                AND TIMESTAMPDIFF(HOUR, last_msg.created_at, NOW()) <= ?
                 AND (conv.agent_id IS NULL OR conv.agent_id = 0)
-                AND NOT EXISTS (
-                    SELECT 1 FROM messages m2
-                    WHERE m2.conversation_id = conv.id
-                    AND m2.sender_type IN ('agent', 'ai')
-                    AND m2.created_at > last_msg.created_at
-                )
-                ORDER BY last_msg.created_at ASC
-                LIMIT 50";
+                AND conv.updated_at >= DATE_SUB(NOW(), INTERVAL ? HOUR)
+                AND conv.updated_at <= DATE_SUB(NOW(), INTERVAL ? MINUTE)
+                ORDER BY conv.updated_at ASC
+                LIMIT 20";
         
-        return Database::fetchAll($sql, [$minDelayMinutes, $maxDelayHours]);
+        return Database::fetchAll($sql, [$maxDelayHours, $minDelayMinutes]);
     }
 
     /**

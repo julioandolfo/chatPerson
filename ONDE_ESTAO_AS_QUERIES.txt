@@ -1,0 +1,176 @@
+═══════════════════════════════════════════════════════════════════════════════
+  🎯 ONDE ESTÃO AS QUERIES MAIS PESADAS - GUIA VISUAL RÁPIDO
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 🥇 QUERY #1 - HISTÓRICO DO CONTATO (3+ segundos)                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  📁 C:\laragon\www\chat\app\Controllers\ContactController.php
+     └─ Linha 315-339
+     └─ Método: public function getHistoryMetrics(int $id): void
+     
+  🔍 Procure por: "AVG(response_times.response_time_minutes)"
+  
+  ⚡ Chamada pelo JavaScript em:
+     📁 C:\laragon\www\chat\views\conversations\index.php
+        └─ Linha 9016-9034
+        └─ Função: function loadContactHistory(contactId)
+  
+  🌐 Rota definida em:
+     📁 C:\laragon\www\chat\routes\web.php
+        └─ Linha 187
+        └─ Router::get('/contacts/{id}/history', ...)
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 🥈 QUERY #2 - RANKING DE AGENTES (1+ segundo)                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  📁 C:\laragon\www\chat\app\Services\AgentPerformanceService.php
+     └─ Linha 253-284
+     └─ Método: public static function getAgentsRanking(...)
+     
+  🔍 Procure por: "COUNT(DISTINCT c.id) as total_conversations"
+  
+  ⚡ Chamada por:
+  
+     1) Dashboard:
+        📁 C:\laragon\www\chat\app\Controllers\DashboardController.php
+           └─ Linha 45
+           └─ $topAgents = DashboardService::getTopAgents(...)
+     
+     2) Analytics:
+        📁 C:\laragon\www\chat\app\Controllers\AnalyticsController.php
+           └─ Linha 306
+           └─ $ranking = AgentPerformanceService::getAgentsRanking(...)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+  📋 CHECKLIST DE LOCALIZAÇÃO
+═══════════════════════════════════════════════════════════════════════════════
+
+Query #1 - Histórico do Contato:
+  ☐ Abrir: app\Controllers\ContactController.php
+  ☐ Ir para linha: 315
+  ☐ Procurar: "getHistoryMetrics"
+  ☐ Encontrar: SELECT COUNT(DISTINCT c.id) ... AVG(response_times...)
+
+Query #2 - Ranking de Agentes:
+  ☐ Abrir: app\Services\AgentPerformanceService.php
+  ☐ Ir para linha: 253
+  ☐ Procurar: "getAgentsRanking"
+  ☐ Encontrar: SELECT u.id, u.name ... COUNT(DISTINCT c.id) ...
+
+
+═══════════════════════════════════════════════════════════════════════════════
+  🔎 COMO BUSCAR NO EDITOR
+═══════════════════════════════════════════════════════════════════════════════
+
+No VS Code / Cursor:
+
+  1) Query #1:
+     Ctrl+Shift+F (buscar em todos os arquivos)
+     Digite: "avg_response_time_minutes"
+     
+  2) Query #2:
+     Ctrl+Shift+F
+     Digite: "getAgentsRanking"
+
+
+═══════════════════════════════════════════════════════════════════════════════
+  🎯 FLUXO SIMPLIFICADO
+═══════════════════════════════════════════════════════════════════════════════
+
+QUERY #1:
+  Usuário clica conversa
+    ↓
+  JavaScript chama: loadContactHistory(contactId)
+    ↓
+  Faz fetch para: /contacts/{id}/history
+    ↓
+  Rota chama: ContactController::getHistoryMetrics()
+    ↓
+  Executa query pesada (3+ segundos)
+
+
+QUERY #2:
+  Usuário acessa /dashboard
+    ↓
+  DashboardController::index()
+    ↓
+  Chama: DashboardService::getTopAgents()
+    ↓
+  Chama: AgentPerformanceService::getAgentsRanking()
+    ↓
+  Executa query pesada (1+ segundo)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+  ⚡ SOLUÇÃO RÁPIDA (onde modificar)
+═══════════════════════════════════════════════════════════════════════════════
+
+PASSO 1: Criar helper de cache
+  📝 Criar: app\Helpers\Cache.php
+  📋 Ver código em: SOLUCAO_QUERIES_PESADAS.md (seção "Criar Helper de Cache")
+
+PASSO 2: Modificar Query #1
+  📝 Abrir: app\Controllers\ContactController.php
+  📍 Linha: ~315
+  🔧 Envolver query com: Cache::remember()
+  📋 Ver código em: SOLUCAO_QUERIES_PESADAS.md (seção "Modificar ContactController")
+
+PASSO 3: Modificar Query #2
+  📝 Abrir: app\Services\AgentPerformanceService.php
+  📍 Linha: ~253
+  🔧 Envolver método com: Cache::remember()
+  📋 Ver código em: SOLUCAO_QUERIES_PESADAS.md (seção "Modificar AgentPerformanceService")
+
+
+═══════════════════════════════════════════════════════════════════════════════
+  ✅ COMO CONFIRMAR QUE ENCONTROU
+═══════════════════════════════════════════════════════════════════════════════
+
+Query #1 - Você está no lugar certo se ver:
+
+  public function getHistoryMetrics(int $id): void
+  {
+      Permission::abortIfCannot('contacts.view');
+      
+      try {
+          $contact = \App\Models\Contact::find($id);
+          
+          $stats = \App\Helpers\Database::fetch("
+              SELECT 
+                  COUNT(DISTINCT c.id) AS total_conversations,
+                  AVG(response_times.response_time_minutes) AS avg_response_time_minutes
+              FROM conversations c
+              LEFT JOIN (
+                  ...
+
+
+Query #2 - Você está no lugar certo se ver:
+
+  public static function getAgentsRanking(?string $dateFrom = null, ?string $dateTo = null, int $limit = 10): array
+  {
+      $dateFrom = $dateFrom ?? date('Y-m-01');
+      $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+
+      $sql = "SELECT 
+                  u.id,
+                  u.name,
+                  u.email,
+                  u.avatar,
+                  COUNT(DISTINCT c.id) as total_conversations,
+                  COUNT(DISTINCT CASE WHEN c.status IN ('closed', 'resolved') ...
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Dúvidas? Consulte os arquivos:
+  📖 README_QUERIES_PESADAS.md       - Resumo executivo
+  📖 QUERIES_PESADAS_MAPEAMENTO.md   - Detalhamento técnico
+  📖 SOLUCAO_QUERIES_PESADAS.md      - Código pronto para implementar
+  📖 FLUXO_QUERIES_PESADAS.md        - Diagramas visuais
+
+═══════════════════════════════════════════════════════════════════════════════

@@ -47,34 +47,55 @@ class DashboardController
             // Métricas individuais de todos os agentes (para cards)
             $allAgentsMetrics = \App\Services\DashboardService::getAllAgentsMetrics($dateFrom, $dateTo);
             
-            // Métricas de times (se usuário tiver permissão)
+            // Métricas de times
             $teamsMetrics = [];
-            if (\App\Helpers\Permission::can('teams.view')) {
-                try {
+            try {
+                if (\App\Helpers\Permission::can('teams.view')) {
+                    // Admin: ver todos os times
                     $teamsMetrics = \App\Services\TeamPerformanceService::getTeamsRanking($dateFrom, $dateTo, 10);
+                } else {
+                    // Agente: ver apenas times aos quais pertence
+                    $userTeams = \App\Models\Team::getUserTeams($userId);
                     
-                    // Adicionar métricas de conversão WooCommerce por time
-                    if (\App\Helpers\Permission::can('conversion.view')) {
-                        foreach ($teamsMetrics as &$team) {
-                            $conversionMetrics = self::getTeamConversionMetrics($team['team_id'], $dateFrom, str_replace(' 23:59:59', '', $dateTo));
-                            $team['conversion_rate_sales'] = $conversionMetrics['conversion_rate'];
-                            $team['total_revenue'] = $conversionMetrics['total_revenue'];
-                            $team['avg_ticket'] = $conversionMetrics['avg_ticket'];
-                            $team['total_orders'] = $conversionMetrics['total_orders'];
+                    if (!empty($userTeams)) {
+                        foreach ($userTeams as $userTeam) {
+                            $teamStats = \App\Services\TeamPerformanceService::getPerformanceStats($userTeam['id'], $dateFrom, $dateTo);
+                            if ($teamStats) {
+                                $teamsMetrics[] = [
+                                    'team_id' => $userTeam['id'],
+                                    'team_name' => $userTeam['name'],
+                                    'team_color' => $userTeam['color'] ?? '#3F4254',
+                                    'total_conversations' => $teamStats['total_conversations'],
+                                    'resolved_conversations' => $teamStats['resolved_conversations'],
+                                    'avg_first_response_time' => $teamStats['avg_first_response_time'],
+                                    'avg_resolution_time' => $teamStats['avg_resolution_time'],
+                                    'satisfaction_rate' => $teamStats['satisfaction_rate']
+                                ];
+                            }
                         }
                     }
-                } catch (\Exception $e) {
-                    error_log("Erro ao carregar métricas de times: " . $e->getMessage());
                 }
+                
+                // Adicionar métricas de conversão WooCommerce por time
+                foreach ($teamsMetrics as &$team) {
+                    $conversionMetrics = self::getTeamConversionMetrics($team['team_id'], $dateFrom, str_replace(' 23:59:59', '', $dateTo));
+                    $team['conversion_rate_sales'] = $conversionMetrics['conversion_rate'];
+                    $team['total_revenue'] = $conversionMetrics['total_revenue'];
+                    $team['avg_ticket'] = $conversionMetrics['avg_ticket'];
+                    $team['total_orders'] = $conversionMetrics['total_orders'];
+                }
+            } catch (\Exception $e) {
+                error_log("Erro ao carregar métricas de times: " . $e->getMessage());
             }
             
-            // Métricas de conversão WooCommerce (se usuário tiver permissão)
+            // Métricas de conversão WooCommerce
             $conversionRanking = [];
-            if (\App\Helpers\Permission::can('conversion.view')) {
-                try {
-                    // Buscar apenas vendedores que têm woocommerce_seller_id cadastrado
+            try {
+                $ranking = [];
+                
+                if (\App\Helpers\Permission::can('conversion.view')) {
+                    // Admin: ver ranking completo de todos os vendedores
                     $sellers = \App\Models\User::getSellers();
-                    $ranking = [];
                     
                     foreach ($sellers as $seller) {
                         $metrics = \App\Services\AgentConversionService::getConversionMetrics(
@@ -96,17 +117,56 @@ class DashboardController
                             ];
                         }
                     }
+                } else {
+                    // Agente: ver apenas membros dos seus times
+                    $userTeams = \App\Models\Team::getUserTeams($userId);
+                    $teamMemberIds = [];
                     
-                    // Ordenar por taxa de conversão (decrescente)
-                    usort($ranking, function($a, $b) {
-                        return $b['conversion_rate'] <=> $a['conversion_rate'];
-                    });
+                    foreach ($userTeams as $userTeam) {
+                        $memberIds = \App\Models\Team::getMemberIds($userTeam['id']);
+                        $teamMemberIds = array_merge($teamMemberIds, $memberIds);
+                    }
                     
-                    // Criar 3 rankings diferentes
-                    $conversionRanking = $ranking; // Todos para criar os rankings
-                } catch (\Exception $e) {
-                    error_log("Erro ao carregar métricas de conversão: " . $e->getMessage());
+                    // Remover duplicados e incluir o próprio usuário
+                    $teamMemberIds = array_unique(array_merge($teamMemberIds, [$userId]));
+                    
+                    // Buscar métricas apenas dos membros dos times
+                    $sellers = \App\Models\User::getSellers();
+                    
+                    foreach ($sellers as $seller) {
+                        // Somente se for membro de algum time do usuário
+                        if (in_array($seller['id'], $teamMemberIds)) {
+                            $metrics = \App\Services\AgentConversionService::getConversionMetrics(
+                                $seller['id'],
+                                $dateFrom,
+                                str_replace(' 23:59:59', '', $dateTo)
+                            );
+                            
+                            if ($metrics['total_conversations'] > 0 || $metrics['total_orders'] > 0) {
+                                $ranking[] = [
+                                    'agent_id' => $seller['id'],
+                                    'agent_name' => $seller['name'],
+                                    'seller_id' => $seller['woocommerce_seller_id'],
+                                    'total_conversations' => $metrics['total_conversations'],
+                                    'total_orders' => $metrics['total_orders'],
+                                    'conversion_rate' => $metrics['conversion_rate'],
+                                    'total_revenue' => $metrics['total_revenue'],
+                                    'avg_ticket' => $metrics['avg_ticket']
+                                ];
+                            }
+                        }
+                    }
                 }
+                
+                // Ordenar por taxa de conversão (decrescente)
+                usort($ranking, function($a, $b) {
+                    return $b['conversion_rate'] <=> $a['conversion_rate'];
+                });
+                
+                // Criar 3 rankings diferentes
+                $conversionRanking = $ranking; // Todos para criar os rankings
+            } catch (\Exception $e) {
+                error_log("Erro ao carregar métricas de conversão: " . $e->getMessage());
             }
             
             // Rankings de vendas

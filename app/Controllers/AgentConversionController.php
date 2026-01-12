@@ -49,9 +49,13 @@ class AgentConversionController
      */
     public function show(): void
     {
-        Permission::abortIfCannot('conversations.view.all');
-        
         $agentId = (int)Request::get('id');
+        $currentUserId = \App\Helpers\Auth::user()['id'];
+        
+        // Verificar permissão: Admin pode ver todos, agente pode ver apenas o próprio
+        if ($agentId !== $currentUserId && !Permission::can('conversations.view.all')) {
+            Permission::abortIfCannot('conversations.view.all');
+        }
         
         try {
             $dateFrom = Request::get('date_from', date('Y-m-01'));

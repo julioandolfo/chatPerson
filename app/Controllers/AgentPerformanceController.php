@@ -55,11 +55,9 @@ class AgentPerformanceController
         $agentId = (int)Request::get('id');
         $user = Auth::user();
         
-        // Verificar permissão
-        if ($agentId !== $user['id']) {
+        // Verificar permissão: pode ver o próprio OU ser admin para ver outros
+        if ($agentId !== $user['id'] && !Permission::can('agent_performance.view.all')) {
             Permission::abortIfCannot('agent_performance.view.all');
-        } else {
-            Permission::abortIfCannot('agent_performance.view.own');
         }
         
         $dateFrom = Request::get('date_from', date('Y-m-d', strtotime('-30 days')));
@@ -126,11 +124,9 @@ class AgentPerformanceController
             return;
         }
         
-        // Verificar permissão
-        if ($report['analysis']['agent_id'] !== $user['id']) {
+        // Verificar permissão: pode ver o próprio OU ser admin para ver outros
+        if ($report['analysis']['agent_id'] !== $user['id'] && !Permission::can('agent_performance.view.all')) {
             Permission::abortIfCannot('agent_performance.view.all');
-        } else {
-            Permission::abortIfCannot('agent_performance.view.own');
         }
         
         Response::view('agent-performance/conversation', [

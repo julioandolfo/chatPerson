@@ -334,7 +334,7 @@ Router::post('/api4com-calls/webhook', [Api4ComCallController::class, 'webhook']
 
 // Rotas de Performance de Vendedores
 Router::get('/agent-performance', [AgentPerformanceController::class, 'index'], ['Authentication', 'Permission:agent_performance.view.all']);
-Router::get('/agent-performance/agent', [AgentPerformanceController::class, 'agent'], ['Authentication', 'Permission:agent_performance.view.own']);
+Router::get('/agent-performance/agent', [AgentPerformanceController::class, 'agent'], ['Authentication']);
 Router::get('/agent-performance/ranking', [AgentPerformanceController::class, 'ranking'], ['Authentication', 'Permission:agent_performance.view.all']);
 Router::get('/agent-performance/conversation', [AgentPerformanceController::class, 'conversation'], ['Authentication', 'Permission:agent_performance.view.own']);
 Router::post('/agent-performance/analyze', [AgentPerformanceController::class, 'analyze'], ['Authentication', 'Permission:agent_performance.analyze']);

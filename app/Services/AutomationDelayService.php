@@ -36,8 +36,9 @@ class AutomationDelayService
 
     /**
      * Processar delays pendentes
+     * OTIMIZADO: Limite reduzido de 100 para 50
      */
-    public static function processPendingDelays(int $limit = 100): array
+    public static function processPendingDelays(int $limit = 50): array
     {
         $delays = AutomationDelay::getPendingDelays($limit);
         $processed = [];

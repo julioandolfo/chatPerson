@@ -169,9 +169,8 @@
                 </div>
                 <!--end:Menu item-->
                 
-                <!--begin:Menu item - Performance de Vendedores-->
-                <?php if (\App\Helpers\Permission::can('agent_performance.view.own') || \App\Helpers\Permission::can('agent_performance.view.all')): ?>
-                <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= isActive('/agent-performance', $currentUri) ? 'here show' : '' ?>">
+                <!--begin:Menu item - Performance-->
+                <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= isActive('/agent-performance', $currentUri) || isActive('/agent-conversion', $currentUri) ? 'here show' : '' ?>">
                     <span class="menu-link" data-title="Performance">
                         <span class="menu-icon">
                             <i class="ki-duotone ki-chart-line-up fs-2">
@@ -218,6 +217,14 @@
                                 <span class="menu-title">Minha Performance</span>
                             </a>
                         </div>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/agent-conversion/agent', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/agent-conversion/agent?id=' . \App\Helpers\Auth::user()['id']) ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Minhas Conversões</span>
+                            </a>
+                        </div>
                         <?php if (\App\Helpers\Permission::can('agent_performance.best_practices')): ?>
                         <div class="menu-item">
                             <a class="menu-link <?= isActive('/agent-performance/best-practices', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/agent-performance/best-practices') ?>">
@@ -241,7 +248,6 @@
                     </div>
                     <!--end:Menu sub-->
                 </div>
-                <?php endif; ?>
                 <!--end:Menu item-->
                 
                 <!--begin:Menu item-->

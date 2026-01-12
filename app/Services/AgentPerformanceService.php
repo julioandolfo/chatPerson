@@ -249,58 +249,64 @@ class AgentPerformanceService
     /**
      * Obter ranking de agentes HUMANOS por performance
      * Exclui mensagens de IA das métricas
+     * ✅ Com cache de 2 minutos para evitar query pesada repetida
      */
     public static function getAgentsRanking(?string $dateFrom = null, ?string $dateTo = null, int $limit = 10): array
     {
         $dateFrom = $dateFrom ?? date('Y-m-01');
         $dateTo = $dateTo ?? date('Y-m-d H:i:s');
 
-        $sql = "SELECT 
-                    u.id,
-                    u.name,
-                    u.email,
-                    u.avatar,
-                    COUNT(DISTINCT c.id) as total_conversations,
-                    COUNT(DISTINCT CASE WHEN c.status IN ('closed', 'resolved') THEN c.id END) as closed_conversations,
-                    COUNT(DISTINCT m.id) as total_messages,
-                    AVG(CASE WHEN c.status IN ('closed', 'resolved') AND c.resolved_at IS NOT NULL 
-                        THEN TIMESTAMPDIFF(MINUTE, c.created_at, c.resolved_at) END) as avg_resolution_time
-                FROM users u
-                LEFT JOIN conversations c ON u.id = c.agent_id 
-                    AND c.created_at >= ? 
-                    AND c.created_at <= ?
-                LEFT JOIN messages m ON u.id = m.sender_id 
-                    AND m.sender_type = 'agent'
-                    AND m.ai_agent_id IS NULL
-                    AND m.created_at >= ? 
-                    AND m.created_at <= ?
-                WHERE u.role IN ('agent', 'admin', 'supervisor')
-                    AND u.status = 'active'
-                GROUP BY u.id, u.name, u.email, u.avatar
-                HAVING total_conversations > 0
-                ORDER BY closed_conversations DESC, total_conversations DESC
-                LIMIT ?";
+        // ✅ CACHE DE 2 MINUTOS (120 segundos)
+        $cacheKey = "agents_ranking_{$dateFrom}_{$dateTo}_{$limit}";
         
-        $agents = \App\Helpers\Database::fetchAll($sql, [$dateFrom, $dateTo, $dateFrom, $dateTo, $limit]);
-        
-        // Calcular taxa de resolução e tempo médio de resposta para cada agente
-        foreach ($agents as &$agent) {
-            $agent['resolution_rate'] = $agent['total_conversations'] > 0
-                ? round(($agent['closed_conversations'] / $agent['total_conversations']) * 100, 2)
-                : 0;
-            $agent['avg_resolution_time'] = $agent['avg_resolution_time'] 
-                ? round((float)$agent['avg_resolution_time'], 2) 
-                : null;
+        return \App\Helpers\Cache::remember($cacheKey, 120, function() use ($dateFrom, $dateTo, $limit) {
+            $sql = "SELECT 
+                        u.id,
+                        u.name,
+                        u.email,
+                        u.avatar,
+                        COUNT(DISTINCT c.id) as total_conversations,
+                        COUNT(DISTINCT CASE WHEN c.status IN ('closed', 'resolved') THEN c.id END) as closed_conversations,
+                        COUNT(DISTINCT m.id) as total_messages,
+                        AVG(CASE WHEN c.status IN ('closed', 'resolved') AND c.resolved_at IS NOT NULL 
+                            THEN TIMESTAMPDIFF(MINUTE, c.created_at, c.resolved_at) END) as avg_resolution_time
+                    FROM users u
+                    LEFT JOIN conversations c ON u.id = c.agent_id 
+                        AND c.created_at >= ? 
+                        AND c.created_at <= ?
+                    LEFT JOIN messages m ON u.id = m.sender_id 
+                        AND m.sender_type = 'agent'
+                        AND m.ai_agent_id IS NULL
+                        AND m.created_at >= ? 
+                        AND m.created_at <= ?
+                    WHERE u.role IN ('agent', 'admin', 'supervisor')
+                        AND u.status = 'active'
+                    GROUP BY u.id, u.name, u.email, u.avatar
+                    HAVING total_conversations > 0
+                    ORDER BY closed_conversations DESC, total_conversations DESC
+                    LIMIT ?";
             
-            // Calcular tempo médio de resposta individual (excluindo IA)
-            $agent['avg_response_time'] = self::getAverageFirstResponseTime(
-                $agent['id'], 
-                $dateFrom, 
-                $dateTo
-            );
-        }
-        
-        return $agents;
+            $agents = \App\Helpers\Database::fetchAll($sql, [$dateFrom, $dateTo, $dateFrom, $dateTo, $limit]);
+            
+            // Calcular taxa de resolução e tempo médio de resposta para cada agente
+            foreach ($agents as &$agent) {
+                $agent['resolution_rate'] = $agent['total_conversations'] > 0
+                    ? round(($agent['closed_conversations'] / $agent['total_conversations']) * 100, 2)
+                    : 0;
+                $agent['avg_resolution_time'] = $agent['avg_resolution_time'] 
+                    ? round((float)$agent['avg_resolution_time'], 2) 
+                    : null;
+                
+                // Calcular tempo médio de resposta individual (excluindo IA)
+                $agent['avg_response_time'] = self::getAverageFirstResponseTime(
+                    $agent['id'], 
+                    $dateFrom, 
+                    $dateTo
+                );
+            }
+            
+            return $agents;
+        });
     }
 
     /**

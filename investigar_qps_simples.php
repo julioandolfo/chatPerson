@@ -207,20 +207,28 @@ try {
     echo "  Chave: $testKey\n";
     echo "  Valor: $testValue\n\n";
     
-    // Tentar salvar
-    $saved = \App\Helpers\Cache::set($testKey, $testValue, 60);
-    echo "  Salvar: " . ($saved ? "✅ OK" : "❌ FALHOU") . "\n";
-    
-    // Tentar recuperar
-    $retrieved = \App\Helpers\Cache::get($testKey);
-    $retrieveOk = ($retrieved === $testValue);
-    echo "  Recuperar: " . ($retrieveOk ? "✅ OK" : "❌ FALHOU") . "\n";
-    
-    if (!$saved || !$retrieveOk) {
-        echo "\n🚨 PROBLEMA ENCONTRADO: Cache NÃO está funcionando!\n";
-        echo "   Isso explica o QPS alto!\n";
-    } else {
-        echo "\n✅ Cache está funcionando corretamente.\n";
+    try {
+        // Usar Cache::remember (API correta)
+        $result = \App\Helpers\Cache::remember($testKey, 60, function() use ($testValue) {
+            return $testValue;
+        });
+        
+        $cacheOk = ($result === $testValue);
+        echo "  Cache::remember: " . ($cacheOk ? "✅ OK" : "❌ FALHOU") . "\n";
+        
+        // Verificar se tem no cache
+        $hasCache = \App\Helpers\Cache::has($testKey);
+        echo "  Cache::has: " . ($hasCache ? "✅ OK" : "❌ FALHOU") . "\n";
+        
+        if (!$cacheOk || !$hasCache) {
+            echo "\n🚨 PROBLEMA ENCONTRADO: Cache NÃO está funcionando!\n";
+            echo "   Isso explica o QPS alto!\n";
+        } else {
+            echo "\n✅ Cache está funcionando corretamente.\n";
+        }
+    } catch (\Exception $e) {
+        echo "  ❌ ERRO: " . $e->getMessage() . "\n";
+        echo "\n🚨 PROBLEMA: Cache com erro!\n";
     }
     
     // 7. RESUMO E DIAGNÓSTICO

@@ -122,6 +122,11 @@ ON conversations(agent_id, status);
 CREATE INDEX idx_messages_last 
 ON messages(conversation_id, created_at DESC);
 
+-- 5.3 Índice para realtime_coaching_hints (getHintsByConversation)
+-- Acelera: WHERE conversation_id = ? AND agent_id = ? ORDER BY created_at DESC
+CREATE INDEX idx_coaching_hints_conv_agent 
+ON realtime_coaching_hints(conversation_id, agent_id, created_at DESC);
+
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- 6. VERIFICAÇÃO E ANÁLISE
 -- ═══════════════════════════════════════════════════════════════════════════════

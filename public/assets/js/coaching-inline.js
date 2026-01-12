@@ -6,17 +6,40 @@ class CoachingInline {
     constructor() {
         this.hints = {};
         this.conversationId = null;
+        this.enabled = true; // Será verificado na primeira requisição
         this.init();
     }
 
     init() {
         console.log('[CoachingInline] Inicializado');
         
-        // Observar mudanças na conversa
-        this.observeConversationChanges();
-        
-        // Polling a cada 10 segundos para buscar novos hints
-        this.startPolling();
+        // Verificar se está habilitado antes de iniciar
+        this.checkIfEnabled().then(enabled => {
+            if (enabled) {
+                console.log('[CoachingInline] Coaching habilitado - iniciando observação');
+                // Observar mudanças na conversa
+                this.observeConversationChanges();
+                
+                // Polling a cada 10 segundos para buscar novos hints
+                this.startPolling();
+            } else {
+                console.log('[CoachingInline] Coaching desabilitado - não iniciando');
+            }
+        });
+    }
+    
+    async checkIfEnabled() {
+        try {
+            // Fazer uma requisição de teste para verificar se está habilitado
+            const response = await fetch('/api/coaching/hints/pending');
+            const data = await response.json();
+            this.enabled = data.enabled !== false;
+            return this.enabled;
+        } catch (error) {
+            console.error('[CoachingInline] Erro ao verificar se está habilitado:', error);
+            this.enabled = false;
+            return false;
+        }
     }
 
     observeConversationChanges() {
@@ -46,10 +69,23 @@ class CoachingInline {
 
     async loadHints() {
         if (!this.conversationId) return;
+        
+        // ✅ Não fazer requisição se desabilitado
+        if (!this.enabled) {
+            console.log('[CoachingInline] Coaching desabilitado - pulando requisição');
+            return;
+        }
 
         try {
             const response = await fetch(`/api/coaching/hints/conversation/${this.conversationId}`);
             const data = await response.json();
+
+            // ✅ Verificar se foi desabilitado no meio do caminho
+            if (data.enabled === false) {
+                console.log('[CoachingInline] Coaching foi desabilitado - parando polling');
+                this.enabled = false;
+                return;
+            }
 
             if (data.success) {
                 this.hints = data.hints_by_message || {};

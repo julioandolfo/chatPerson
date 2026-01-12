@@ -20,22 +20,28 @@ class ConversationSettingsService
 
     /**
      * Obter todas as configurações
+     * ✅ COM CACHE de 5 minutos para evitar SELECT repetido
      */
     public static function getSettings(): array
     {
-        $setting = Setting::whereFirst('key', '=', self::SETTINGS_KEY);
+        // ✅ Cache de 5 minutos (300 segundos)
+        $cacheKey = 'conversation_settings_config';
         
-        if (!$setting) {
-            return self::getDefaultSettings();
-        }
-        
-        $settings = json_decode($setting['value'], true);
-        if (!is_array($settings)) {
-            return self::getDefaultSettings();
-        }
-        
-        // Mesclar com padrões para garantir que todas as chaves existam
-        return array_merge(self::getDefaultSettings(), $settings);
+        return \App\Helpers\Cache::remember($cacheKey, 300, function() {
+            $setting = Setting::whereFirst('key', '=', self::SETTINGS_KEY);
+            
+            if (!$setting) {
+                return self::getDefaultSettings();
+            }
+            
+            $settings = json_decode($setting['value'], true);
+            if (!is_array($settings)) {
+                return self::getDefaultSettings();
+            }
+            
+            // Mesclar com padrões para garantir que todas as chaves existam
+            return array_merge(self::getDefaultSettings(), $settings);
+        });
     }
 
     /**
@@ -52,6 +58,10 @@ class ConversationSettingsService
             'json',
             'conversations'
         );
+        
+        // ✅ Limpar cache após salvar
+        \App\Helpers\Cache::forget('conversation_settings_config');
+        
         return true;
     }
 

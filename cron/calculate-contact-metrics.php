@@ -1,6 +1,10 @@
+#!/usr/bin/env php
 <?php
 /**
- * CRON Job - Calcular Métricas de Contatos
+ * CRON Job - Calcular Métricas de Contatos (STANDALONE)
+ * 
+ * Versão standalone que não depende do Composer.
+ * Usa o autoloader nativo do sistema.
  * 
  * Recalcula métricas de contatos de forma inteligente:
  * - Prioriza conversas abertas com mensagens novas
@@ -9,14 +13,18 @@
  * 
  * Adicionar ao crontab:
  * # A cada 30 minutos (ajuste conforme necessário)
- * */30 * * * * cd /path/to/chat && php cron/calculate-contact-metrics.php >> logs/cron-metrics.log 2>&1
+ * */30 * * * * cd /var/www/html && php cron/calculate-contact-metrics.php >> logs/cron-metrics.log 2>&1
  * 
  * Ou para teste manual:
  * php cron/calculate-contact-metrics.php
  */
 
-// Bootstrap
-require_once __DIR__ . '/../app/bootstrap.php';
+// Garantir que estamos no diretório correto
+$rootDir = dirname(__DIR__);
+chdir($rootDir);
+
+// Carregar bootstrap (que já tem o autoloader)
+require_once $rootDir . '/config/bootstrap.php';
 
 use App\Services\ContactMetricsService;
 
@@ -30,10 +38,11 @@ $startTime = microtime(true);
 $startMemory = memory_get_usage(true);
 
 echo "═══════════════════════════════════════════════════════════════\n";
-echo "🚀 CRON: Calculando métricas de contatos\n";
+echo "🚀 CRON: Calculando métricas de contatos (Standalone)\n";
 echo "═══════════════════════════════════════════════════════════════\n";
-echo "Início: " . date('Y-m-d H:i:s') . "\n";
-echo "Lote: {$batchSize} contatos\n";
+echo "📁 Root Dir: {$rootDir}\n";
+echo "⏰ Início: " . date('Y-m-d H:i:s') . "\n";
+echo "📊 Lote: {$batchSize} contatos\n";
 echo "\n";
 
 try {

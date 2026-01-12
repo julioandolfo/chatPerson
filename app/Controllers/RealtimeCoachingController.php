@@ -19,6 +19,18 @@ class RealtimeCoachingController
      */
     public function getHintsByConversation(int $conversationId): void
     {
+        // ✅ Verificar se coaching está habilitado
+        $settings = \App\Services\RealtimeCoachingService::getSettings();
+        if (!$settings['enabled']) {
+            Response::json([
+                'success' => true,
+                'enabled' => false,
+                'hints' => [],
+                'hints_by_message' => []
+            ]);
+            return;
+        }
+        
         $userId = Auth::user()['id'];
         
         // Buscar hints da conversa
@@ -46,6 +58,7 @@ class RealtimeCoachingController
         
         Response::json([
             'success' => true,
+            'enabled' => true,
             'hints' => $hints,
             'hints_by_message' => $hintsByMessage
         ]);
@@ -57,6 +70,17 @@ class RealtimeCoachingController
      */
     public function getPendingHints(): void
     {
+        // ✅ Verificar se coaching está habilitado
+        $settings = \App\Services\RealtimeCoachingService::getSettings();
+        if (!$settings['enabled']) {
+            Response::json([
+                'success' => true,
+                'enabled' => false,
+                'hints' => []
+            ]);
+            return;
+        }
+        
         $userId = Auth::user()['id'];
         $conversationId = Request::get('conversation_id');
         

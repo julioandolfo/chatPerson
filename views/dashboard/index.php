@@ -1834,7 +1834,7 @@ function loadChartData(chartType, canvasId, configCallback, additionalFilters = 
     const groupBy = document.querySelector("input[name=\"chart_group_by\"]:checked")?.value || "day";
     const viewMode = document.querySelector("input[name=\"chart_view_mode\"]:checked")?.value || "aggregated";
     
-    const url = new URL({$chartDataUrlJson}, window.location.origin);
+    const url = new URL(<?= $chartDataUrlJson ?>, window.location.origin);
     url.searchParams.append("type", chartType);
     url.searchParams.append("date_from", dateFrom);
     url.searchParams.append("date_to", dateTo);
@@ -2282,7 +2282,7 @@ function loadDashboard() {
     const dateFrom = document.getElementById("kt_dashboard_date_from").value;
     const dateTo = document.getElementById("kt_dashboard_date_to").value;
     
-    window.location.href = {$dashboardUrlJson} + '?date_from=' + dateFrom + '&date_to=' + dateTo;
+    window.location.href = <?= $dashboardUrlJson ?> + '?date_from=' + dateFrom + '&date_to=' + dateTo;
 }
 
 // Função para exportar relatório
@@ -2290,7 +2290,7 @@ function exportReport(format) {
     const dateFrom = document.getElementById("kt_dashboard_date_from").value;
     const dateTo = document.getElementById("kt_dashboard_date_to").value;
     
-    const url = new URL({$exportUrlJson}, window.location.origin);
+    const url = new URL(<?= $exportUrlJson ?>, window.location.origin);
     url.searchParams.append("format", format);
     url.searchParams.append("date_from", dateFrom);
     url.searchParams.append("date_to", dateTo);
@@ -2423,14 +2423,14 @@ function syncWooCommerceOrders() {
             Swal.fire({
                 icon: "success",
                 title: "Sucesso!",
-                html: `<div class="text-start">
-                    <p><strong>Sincronização concluída:</strong></p>
-                    <ul class="mb-0">
-                        <li>Integrações processadas: \${data.integrations_processed || 0}</li>
-                        <li>Pedidos processados: \${data.orders_processed || 0}</li>
-                        <li>Novos contatos: \${data.new_contacts || 0}</li>
-                    </ul>
-                </div>`,
+                html: '<div class="text-start">' +
+                    '<p><strong>Sincronização concluída:</strong></p>' +
+                    '<ul class="mb-0">' +
+                        '<li>Integrações processadas: ' + (data.integrations_processed || 0) + '</li>' +
+                        '<li>Pedidos processados: ' + (data.orders_processed || 0) + '</li>' +
+                        '<li>Novos contatos: ' + (data.new_contacts || 0) + '</li>' +
+                    '</ul>' +
+                '</div>',
                 confirmButtonText: "Recarregar Dashboard"
             }).then((result) => {
                 if (result.isConfirmed) {

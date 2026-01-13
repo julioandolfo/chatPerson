@@ -90,5 +90,14 @@ class Department extends Model
             return false;
         }
     }
+    
+    /**
+     * Obter todos os setores ativos
+     */
+    public static function getActive(): array
+    {
+        $sql = "SELECT * FROM departments ORDER BY name ASC";
+        return \App\Helpers\Database::fetchAll($sql);
+    }
 }
 

@@ -65,11 +65,11 @@ class DashboardController
                                     'team_id' => $userTeam['id'],
                                     'team_name' => $userTeam['name'],
                                     'team_color' => $userTeam['color'] ?? '#3F4254',
-                                    'total_conversations' => $teamStats['total_conversations'],
-                                    'resolved_conversations' => $teamStats['resolved_conversations'],
-                                    'avg_first_response_time' => $teamStats['avg_first_response_time'],
-                                    'avg_resolution_time' => $teamStats['avg_resolution_time'],
-                                    'satisfaction_rate' => $teamStats['satisfaction_rate']
+                                    'total_conversations' => $teamStats['total_conversations'] ?? 0,
+                                    'resolved_conversations' => $teamStats['resolved_conversations'] ?? 0,
+                                    'avg_first_response_time' => $teamStats['avg_first_response_time'] ?? null,
+                                    'avg_resolution_time' => $teamStats['avg_resolution_time'] ?? null,
+                                    'satisfaction_rate' => $teamStats['satisfaction_rate'] ?? 0
                                 ];
                             }
                         }
@@ -310,6 +310,7 @@ class DashboardController
 
     /**
      * Obter dados de gráficos (AJAX)
+     * ✅ ATUALIZADO: Suporta filtros avançados para conversations_over_time
      */
     public function getChartData(): void
     {
@@ -323,14 +324,52 @@ class DashboardController
             $dateTo = $dateTo . ' 23:59:59';
         }
         
-        self::logDash("getChartData: type={$chartType}, dateFrom={$dateFrom}, dateTo={$dateTo}");
+        // ✅ NOVO: Capturar filtros adicionais
+        $filters = [];
+        
+        // Filtro por setor
+        if ($departmentId = \App\Helpers\Request::get('department_id')) {
+            $filters['department_id'] = (int)$departmentId;
+        }
+        
+        // Filtro por times (array)
+        if ($teamIdsRaw = \App\Helpers\Request::get('team_ids')) {
+            if (is_string($teamIdsRaw)) {
+                $teamIdsRaw = json_decode($teamIdsRaw, true) ?: explode(',', $teamIdsRaw);
+            }
+            $filters['team_ids'] = array_map('intval', array_filter($teamIdsRaw));
+        }
+        
+        // Filtro por agentes (array)
+        if ($agentIdsRaw = \App\Helpers\Request::get('agent_ids')) {
+            if (is_string($agentIdsRaw)) {
+                $agentIdsRaw = json_decode($agentIdsRaw, true) ?: explode(',', $agentIdsRaw);
+            }
+            $filters['agent_ids'] = array_map('intval', array_filter($agentIdsRaw));
+        }
+        
+        // Filtro por canal
+        if ($channel = \App\Helpers\Request::get('channel')) {
+            $filters['channel'] = $channel;
+        }
+        
+        // Filtro por funil
+        if ($funnelId = \App\Helpers\Request::get('funnel_id')) {
+            $filters['funnel_id'] = (int)$funnelId;
+        }
+        
+        // ✅ NOVO: Modo de visualização (aggregated ou comparative)
+        $viewMode = \App\Helpers\Request::get('view_mode', 'aggregated');
+        $filters['view_mode'] = $viewMode;
+        
+        self::logDash("getChartData: type={$chartType}, dateFrom={$dateFrom}, dateTo={$dateTo}, viewMode={$viewMode}, filters=" . json_encode($filters));
         
         try {
             $data = [];
             
             switch ($chartType) {
                 case 'conversations_over_time':
-                    $data = \App\Services\DashboardService::getConversationsOverTime($dateFrom, $dateTo, $groupBy);
+                    $data = \App\Services\DashboardService::getConversationsOverTime($dateFrom, $dateTo, $groupBy, $filters);
                     break;
                     
                 case 'conversations_by_channel':

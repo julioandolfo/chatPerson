@@ -1043,8 +1043,14 @@ class DashboardService
 
     /**
      * Obter dados de conversas ao longo do tempo (para gráfico de linha)
+     * ✅ NOVO: Suporta filtros avançados (setor, time, agentes)
      */
-    public static function getConversationsOverTime(?string $dateFrom = null, ?string $dateTo = null, string $groupBy = 'day'): array
+    public static function getConversationsOverTime(
+        ?string $dateFrom = null, 
+        ?string $dateTo = null, 
+        string $groupBy = 'day',
+        array $filters = []
+    ): array
     {
         $dateFrom = $dateFrom ?? date('Y-m-01');
         $dateTo = $dateTo ?? date('Y-m-d') . ' 23:59:59';
@@ -1062,25 +1068,260 @@ class DashboardService
             default => '%Y-%m-%d'
         };
         
+        // Montar SQL base
         $sql = "SELECT 
-                    DATE_FORMAT(created_at, ?) as period,
-                    COUNT(*) as total,
-                    COUNT(CASE WHEN status IN ('open', 'pending') THEN 1 END) as open_count,
-                    COUNT(CASE WHEN status IN ('closed', 'resolved') THEN 1 END) as closed_count
-                FROM conversations
-                WHERE created_at >= ? AND created_at <= ?
-                GROUP BY period
-                ORDER BY period ASC";
+                    DATE_FORMAT(c.created_at, ?) as period,
+                    COUNT(DISTINCT c.id) as total,
+                    COUNT(DISTINCT CASE WHEN c.status IN ('open', 'pending') THEN c.id END) as open_count,
+                    COUNT(DISTINCT CASE WHEN c.status IN ('closed', 'resolved') THEN c.id END) as closed_count";
         
-        self::logDash("getConversationsOverTime SQL: dateFrom={$dateFrom}, dateTo={$dateTo}, dateFormat={$dateFormat}");
+        // Adicionar contagens por agente se filtro de agentes foi aplicado
+        $agentIds = $filters['agent_ids'] ?? [];
+        if (!empty($agentIds)) {
+            foreach ($agentIds as $agentId) {
+                $sql .= ",\n                    COUNT(DISTINCT CASE WHEN c.agent_id = {$agentId} THEN c.id END) as agent_{$agentId}_count";
+            }
+        }
         
-        $result = \App\Helpers\Database::fetchAll($sql, [$dateFormat, $dateFrom, $dateTo]);
+        // Adicionar contagens por time se filtro de times foi aplicado
+        $teamIds = $filters['team_ids'] ?? [];
+        if (!empty($teamIds)) {
+            $sql .= ",\n                    tm.team_id,\n                    t.name as team_name";
+        }
+        
+        $sql .= "\n                FROM conversations c";
+        
+        // JOIN com times se necessário
+        if (!empty($teamIds)) {
+            $sql .= "\n                LEFT JOIN team_members tm ON c.agent_id = tm.user_id";
+            $sql .= "\n                LEFT JOIN teams t ON tm.team_id = t.id";
+        }
+        
+        // WHERE conditions
+        $conditions = ["c.created_at >= ?", "c.created_at <= ?"];
+        $params = [$dateFormat, $dateFrom, $dateTo];
+        
+        // Filtro por setor
+        if (!empty($filters['department_id'])) {
+            $conditions[] = "c.department_id = ?";
+            $params[] = $filters['department_id'];
+        }
+        
+        // Filtro por time
+        if (!empty($teamIds)) {
+            $placeholders = implode(',', array_fill(0, count($teamIds), '?'));
+            $conditions[] = "tm.team_id IN ({$placeholders})";
+            $params = array_merge($params, $teamIds);
+        }
+        
+        // Filtro por agentes específicos
+        if (!empty($agentIds)) {
+            $placeholders = implode(',', array_fill(0, count($agentIds), '?'));
+            $conditions[] = "c.agent_id IN ({$placeholders})";
+            $params = array_merge($params, $agentIds);
+        }
+        
+        // Filtro por canal (se fornecido)
+        if (!empty($filters['channel'])) {
+            $conditions[] = "c.channel = ?";
+            $params[] = $filters['channel'];
+        }
+        
+        // Filtro por funil (se fornecido)
+        if (!empty($filters['funnel_id'])) {
+            $conditions[] = "c.funnel_id = ?";
+            $params[] = $filters['funnel_id'];
+        }
+        
+        $sql .= "\n                WHERE " . implode(' AND ', $conditions);
+        
+        // GROUP BY
+        if (!empty($teamIds)) {
+            $sql .= "\n                GROUP BY period, tm.team_id, t.name";
+        } else {
+            $sql .= "\n                GROUP BY period";
+        }
+        
+        $sql .= "\n                ORDER BY period ASC";
+        
+        self::logDash("getConversationsOverTime SQL: dateFrom={$dateFrom}, dateTo={$dateTo}, dateFormat={$dateFormat}, filters=" . json_encode($filters));
+        
+        $result = \App\Helpers\Database::fetchAll($sql, $params);
         
         self::logDash("getConversationsOverTime: " . count($result) . " registros retornados");
+        
+        // ✅ MODO COMPARATIVO: Retornar dados separados por time/agente
+        $viewMode = $filters['view_mode'] ?? 'aggregated'; // 'aggregated' ou 'comparative'
+        
+        if ($viewMode === 'comparative') {
+            // MODO COMPARATIVO: Criar datasets separados
+            if (!empty($teamIds)) {
+                return self::formatComparativeDataByTeam($result, $teamIds);
+            } elseif (!empty($agentIds)) {
+                return self::formatComparativeDataByAgent($result, $agentIds, $dateFrom, $dateTo, $dateFormat);
+            }
+        }
+        
+        // MODO AGREGADO (padrão): Somar tudo
+        if (!empty($teamIds) && !empty($result)) {
+            $grouped = [];
+            foreach ($result as $row) {
+                $period = $row['period'];
+                if (!isset($grouped[$period])) {
+                    $grouped[$period] = [
+                        'period' => $period,
+                        'total' => 0,
+                        'open_count' => 0,
+                        'closed_count' => 0,
+                        'teams' => []
+                    ];
+                }
+                
+                $grouped[$period]['total'] += (int)$row['total'];
+                $grouped[$period]['open_count'] += (int)$row['open_count'];
+                $grouped[$period]['closed_count'] += (int)$row['closed_count'];
+                
+                if ($row['team_id']) {
+                    $grouped[$period]['teams'][] = [
+                        'team_id' => $row['team_id'],
+                        'team_name' => $row['team_name'],
+                        'count' => (int)$row['total']
+                    ];
+                }
+            }
+            
+            return array_values($grouped);
+        }
         
         return $result;
     }
 
+    /**
+     * Formatar dados comparativos por time
+     */
+    private static function formatComparativeDataByTeam(array $rawData, array $teamIds): array
+    {
+        $teamsData = [];
+        
+        // Buscar informações dos times
+        $placeholders = implode(',', array_fill(0, count($teamIds), '?'));
+        $teamsInfo = \App\Helpers\Database::fetchAll(
+            "SELECT id, name, color FROM teams WHERE id IN ({$placeholders})",
+            $teamIds
+        );
+        
+        // Mapear times por ID
+        $teamsMap = [];
+        foreach ($teamsInfo as $team) {
+            $teamsMap[$team['id']] = [
+                'name' => $team['name'],
+                'color' => $team['color'] ?? self::generateColor($team['id'])
+            ];
+        }
+        
+        // Organizar dados por time
+        foreach ($rawData as $row) {
+            $teamId = $row['team_id'];
+            $period = $row['period'];
+            
+            if (!isset($teamsData[$teamId])) {
+                $teamsData[$teamId] = [
+                    'team_id' => $teamId,
+                    'team_name' => $teamsMap[$teamId]['name'] ?? "Time {$teamId}",
+                    'color' => $teamsMap[$teamId]['color'] ?? self::generateColor($teamId),
+                    'data' => []
+                ];
+            }
+            
+            $teamsData[$teamId]['data'][$period] = [
+                'total' => (int)$row['total'],
+                'open_count' => (int)$row['open_count'],
+                'closed_count' => (int)$row['closed_count']
+            ];
+        }
+        
+        return [
+            'mode' => 'comparative',
+            'type' => 'teams',
+            'datasets' => array_values($teamsData)
+        ];
+    }
+    
+    /**
+     * Formatar dados comparativos por agente
+     */
+    private static function formatComparativeDataByAgent(array $rawData, array $agentIds, string $dateFrom, string $dateTo, string $dateFormat): array
+    {
+        $agentsData = [];
+        
+        // Buscar informações dos agentes
+        $placeholders = implode(',', array_fill(0, count($agentIds), '?'));
+        $agentsInfo = \App\Helpers\Database::fetchAll(
+            "SELECT id, name FROM users WHERE id IN ({$placeholders})",
+            $agentIds
+        );
+        
+        // Mapear agentes por ID
+        $agentsMap = [];
+        foreach ($agentsInfo as $agent) {
+            $agentsMap[$agent['id']] = $agent['name'];
+        }
+        
+        // Buscar dados de cada agente separadamente
+        foreach ($agentIds as $agentId) {
+            $sql = "SELECT 
+                        DATE_FORMAT(c.created_at, ?) as period,
+                        COUNT(DISTINCT c.id) as total,
+                        COUNT(DISTINCT CASE WHEN c.status IN ('open', 'pending') THEN c.id END) as open_count,
+                        COUNT(DISTINCT CASE WHEN c.status IN ('closed', 'resolved') THEN c.id END) as closed_count
+                    FROM conversations c
+                    WHERE c.agent_id = ?
+                    AND c.created_at >= ?
+                    AND c.created_at <= ?
+                    GROUP BY period
+                    ORDER BY period ASC";
+            
+            $agentData = \App\Helpers\Database::fetchAll($sql, [$dateFormat, $agentId, $dateFrom, $dateTo]);
+            
+            $dataByPeriod = [];
+            foreach ($agentData as $row) {
+                $dataByPeriod[$row['period']] = [
+                    'total' => (int)$row['total'],
+                    'open_count' => (int)$row['open_count'],
+                    'closed_count' => (int)$row['closed_count']
+                ];
+            }
+            
+            $agentsData[] = [
+                'agent_id' => $agentId,
+                'agent_name' => $agentsMap[$agentId] ?? "Agente {$agentId}",
+                'color' => self::generateColor($agentId),
+                'data' => $dataByPeriod
+            ];
+        }
+        
+        return [
+            'mode' => 'comparative',
+            'type' => 'agents',
+            'datasets' => $agentsData
+        ];
+    }
+    
+    /**
+     * Gerar cor baseada em ID
+     */
+    private static function generateColor(int $id): string
+    {
+        $colors = [
+            '#009ef7', '#50cd89', '#ffc700', '#f1416c', '#7239ea',
+            '#00a3ff', '#17c653', '#f6c000', '#dc3545', '#6610f2',
+            '#0d6efd', '#198754', '#fd7e14', '#d63384', '#6f42c1',
+            '#0dcaf0', '#20c997', '#ffc107', '#dc3545', '#6c757d'
+        ];
+        
+        return $colors[$id % count($colors)];
+    }
+    
     /**
      * Obter dados de conversas por canal (para gráfico de pizza)
      */

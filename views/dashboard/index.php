@@ -1445,7 +1445,30 @@ ob_start();
                     <span class="card-label fw-bold fs-3 mb-1">Conversas ao Longo do Tempo</span>
                     <span class="text-muted mt-1 fw-semibold fs-7">Evolução de conversas no período</span>
                 </h3>
-                <div class="card-toolbar">
+                <div class="card-toolbar d-flex gap-3">
+                    <!--begin::Modo de Visualização-->
+                    <div class="btn-group" role="group">
+                        <input type="radio" class="btn-check" name="chart_view_mode" id="view_mode_aggregated" value="aggregated" checked>
+                        <label class="btn btn-sm btn-light-primary" for="view_mode_aggregated" title="Agregar todos os dados">
+                            <i class="ki-duotone ki-abstract-10 fs-4">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Agregado
+                        </label>
+                        
+                        <input type="radio" class="btn-check" name="chart_view_mode" id="view_mode_comparative" value="comparative">
+                        <label class="btn btn-sm btn-light-primary" for="view_mode_comparative" title="Comparar separadamente">
+                            <i class="ki-duotone ki-chart-line-up fs-4">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Comparativo
+                        </label>
+                    </div>
+                    <!--end::Modo de Visualização-->
+                    
+                    <!--begin::Agrupamento Temporal-->
                     <div class="btn-group" role="group">
                         <input type="radio" class="btn-check" name="chart_group_by" id="group_by_day" value="day" checked>
                         <label class="btn btn-sm btn-light" for="group_by_day">Dia</label>
@@ -1456,11 +1479,95 @@ ob_start();
                         <input type="radio" class="btn-check" name="chart_group_by" id="group_by_month" value="month">
                         <label class="btn btn-sm btn-light" for="group_by_month">Mês</label>
                     </div>
+                    <!--end::Agrupamento Temporal-->
                 </div>
             </div>
-            <div class="card-body pt-3">
+            
+            <!--begin::Card body - Filtros Avançados-->
+            <div class="card-body border-top pt-6">
+                <div class="row g-3 mb-5">
+                    <div class="col-md-3">
+                        <label class="form-label fs-7 fw-semibold mb-2">Setor:</label>
+                        <select id="chart_filter_department" class="form-select form-select-sm form-select-solid" onchange="applyChartFilters()">
+                            <option value="">Todos os Setores</option>
+                            <?php
+                            $departments = \App\Models\Department::getActive();
+                            foreach ($departments as $dept):
+                            ?>
+                                <option value="<?= $dept['id'] ?>"><?= htmlspecialchars($dept['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <label class="form-label fs-7 fw-semibold mb-2">Times:</label>
+                        <select id="chart_filter_teams" class="form-select form-select-sm form-select-solid" multiple data-control="select2" data-placeholder="Selecione times..." onchange="applyChartFilters()">
+                            <?php
+                            $teams = \App\Models\Team::getActive();
+                            foreach ($teams as $team):
+                            ?>
+                                <option value="<?= $team['id'] ?>"><?= htmlspecialchars($team['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <label class="form-label fs-7 fw-semibold mb-2">Agentes:</label>
+                        <select id="chart_filter_agents" class="form-select form-select-sm form-select-solid" multiple data-control="select2" data-placeholder="Selecione agentes..." onchange="applyChartFilters()">
+                            <?php
+                            $agents = \App\Helpers\Database::fetchAll(
+                                "SELECT id, name FROM users WHERE role IN ('agent', 'admin', 'supervisor') AND status = 'active' ORDER BY name ASC"
+                            );
+                            foreach ($agents as $agent):
+                            ?>
+                                <option value="<?= $agent['id'] ?>"><?= htmlspecialchars($agent['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <label class="form-label fs-7 fw-semibold mb-2">Canal:</label>
+                        <select id="chart_filter_channel" class="form-select form-select-sm form-select-solid" onchange="applyChartFilters()">
+                            <option value="">Todos os Canais</option>
+                            <option value="whatsapp">WhatsApp</option>
+                            <option value="instagram">Instagram</option>
+                            <option value="messenger">Messenger</option>
+                            <option value="webchat">Webchat</option>
+                            <option value="api">API</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <div class="text-muted fs-7 mb-2">
+                            <i class="ki-duotone ki-information-5 fs-6 text-primary">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            Use os filtros acima para segmentar as conversas
+                        </div>
+                        <div class="text-muted fs-8">
+                            <i class="ki-duotone ki-chart-line-up fs-6 text-success">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <strong>Modo Comparativo:</strong> Selecione times ou agentes para comparar performances com legendas coloridas
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-light-primary" onclick="clearChartFilters()">
+                        <i class="ki-duotone ki-arrows-circle fs-5">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Limpar Filtros
+                    </button>
+                </div>
+                
                 <canvas id="kt_chart_conversations_over_time" style="height: 300px;"></canvas>
             </div>
+            <!--end::Card body-->
         </div>
     </div>
     <!--end::Col-->
@@ -1720,16 +1827,36 @@ let chartConversationsByStatus = null;
 let chartAgentsPerformance = null;
 
 // Função para carregar dados do gráfico
-function loadChartData(chartType, canvasId, configCallback) {
+// ✅ ATUALIZADO: Suporta filtros adicionais e modo de visualização
+function loadChartData(chartType, canvasId, configCallback, additionalFilters = {}) {
     const dateFrom = document.getElementById("kt_dashboard_date_from").value;
     const dateTo = document.getElementById("kt_dashboard_date_to").value;
     const groupBy = document.querySelector("input[name=\"chart_group_by\"]:checked")?.value || "day";
+    const viewMode = document.querySelector("input[name=\"chart_view_mode\"]:checked")?.value || "aggregated";
     
     const url = new URL({$chartDataUrlJson}, window.location.origin);
     url.searchParams.append("type", chartType);
     url.searchParams.append("date_from", dateFrom);
     url.searchParams.append("date_to", dateTo);
     if (groupBy) url.searchParams.append("group_by", groupBy);
+    if (viewMode) url.searchParams.append("view_mode", viewMode);
+    
+    // ✅ NOVO: Adicionar filtros adicionais
+    if (additionalFilters.department_id) {
+        url.searchParams.append("department_id", additionalFilters.department_id);
+    }
+    if (additionalFilters.team_ids && additionalFilters.team_ids.length > 0) {
+        url.searchParams.append("team_ids", JSON.stringify(additionalFilters.team_ids));
+    }
+    if (additionalFilters.agent_ids && additionalFilters.agent_ids.length > 0) {
+        url.searchParams.append("agent_ids", JSON.stringify(additionalFilters.agent_ids));
+    }
+    if (additionalFilters.channel) {
+        url.searchParams.append("channel", additionalFilters.channel);
+    }
+    if (additionalFilters.funnel_id) {
+        url.searchParams.append("funnel_id", additionalFilters.funnel_id);
+    }
     
     fetch(url)
         .then(response => {
@@ -1806,7 +1933,14 @@ function loadChartData(chartType, canvasId, configCallback) {
 }
 
 // Configuração do gráfico de conversas ao longo do tempo
+// ✅ ATUALIZADO: Suporta modo comparativo com legendas coloridas
 function configConversationsOverTime(data) {
+    // ✅ MODO COMPARATIVO: Dados vêm separados por time/agente
+    if (data.mode === 'comparative') {
+        return configConversationsComparative(data);
+    }
+    
+    // ✅ MODO AGREGADO: Modo tradicional
     const labels = data.map(item => item.period);
     const totalData = data.map(item => parseInt(item.total || 0));
     const openData = data.map(item => parseInt(item.open_count || 0));
@@ -1860,6 +1994,109 @@ function configConversationsOverTime(data) {
             }
         }
     };
+}
+
+// ✅ NOVO: Configuração do gráfico comparativo (times/agentes separados)
+function configConversationsComparative(data) {
+    const datasets = data.datasets || [];
+    
+    if (datasets.length === 0) {
+        return configConversationsOverTime([]);
+    }
+    
+    // Coletar todos os períodos únicos
+    const allPeriods = new Set();
+    datasets.forEach(dataset => {
+        Object.keys(dataset.data || {}).forEach(period => allPeriods.add(period));
+    });
+    const labels = Array.from(allPeriods).sort();
+    
+    // Criar dataset para cada time/agente
+    const chartDatasets = datasets.map(dataset => {
+        const name = dataset.team_name || dataset.agent_name || "Sem nome";
+        const color = dataset.color || "#009ef7";
+        
+        // Preencher dados por período
+        const periodData = labels.map(period => {
+            const dataPoint = dataset.data[period];
+            return dataPoint ? parseInt(dataPoint.total || 0) : 0;
+        });
+        
+        // Converter cor hex para rgba
+        const rgbaColor = hexToRgba(color, 0.2);
+        
+        return {
+            label: name,
+            data: periodData,
+            borderColor: color,
+            backgroundColor: rgbaColor,
+            tension: 0.4,
+            borderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 6
+        };
+    });
+    
+    return {
+        type: "line",
+        data: {
+            labels: labels,
+            datasets: chartDatasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: "top",
+                    labels: {
+                        usePointStyle: true,
+                        padding: 15,
+                        font: {
+                            size: 12,
+                            weight: 'bold'
+                        }
+                    }
+                },
+                tooltip: {
+                    mode: "index",
+                    intersect: false,
+                    callbacks: {
+                        title: function(context) {
+                            return 'Período: ' + context[0].label;
+                        },
+                        label: function(context) {
+                            const label = context.dataset.label || '';
+                            const value = context.parsed.y;
+                            return label + ': ' + value + ' conversas';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0
+                    }
+                }
+            },
+            interaction: {
+                mode: 'nearest',
+                axis: 'x',
+                intersect: false
+            }
+        }
+    };
+}
+
+// ✅ NOVO: Converter cor hexadecimal para rgba
+function hexToRgba(hex, alpha) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 // Configuração do gráfico de conversas por canal
@@ -1975,6 +2212,71 @@ function loadAllCharts() {
     loadChartData("agents_performance", "kt_chart_agents_performance", configAgentsPerformance);
 }
 
+// ✅ NOVO: Obter filtros do gráfico de conversas ao longo do tempo
+function getChartFilters() {
+    const filters = {};
+    
+    const departmentId = document.getElementById("chart_filter_department")?.value;
+    if (departmentId) {
+        filters.department_id = departmentId;
+    }
+    
+    // Times (select2 multiselect)
+    const teamSelect = document.getElementById("chart_filter_teams");
+    if (teamSelect) {
+        const teamIds = $(teamSelect).val(); // Select2 retorna array
+        if (teamIds && teamIds.length > 0) {
+            filters.team_ids = teamIds;
+        }
+    }
+    
+    // Agentes (select2 multiselect)
+    const agentSelect = document.getElementById("chart_filter_agents");
+    if (agentSelect) {
+        const agentIds = $(agentSelect).val(); // Select2 retorna array
+        if (agentIds && agentIds.length > 0) {
+            filters.agent_ids = agentIds;
+        }
+    }
+    
+    const channel = document.getElementById("chart_filter_channel")?.value;
+    if (channel) {
+        filters.channel = channel;
+    }
+    
+    return filters;
+}
+
+// ✅ NOVO: Aplicar filtros ao gráfico
+function applyChartFilters() {
+    const filters = getChartFilters();
+    loadChartData("conversations_over_time", "kt_chart_conversations_over_time", configConversationsOverTime, filters);
+}
+
+// ✅ NOVO: Limpar todos os filtros
+function clearChartFilters() {
+    // Limpar select simples
+    const departmentSelect = document.getElementById("chart_filter_department");
+    if (departmentSelect) departmentSelect.value = "";
+    
+    const channelSelect = document.getElementById("chart_filter_channel");
+    if (channelSelect) channelSelect.value = "";
+    
+    // Limpar select2 multiselects
+    const teamSelect = $("#chart_filter_teams");
+    if (teamSelect.length) teamSelect.val(null).trigger("change");
+    
+    const agentSelect = $("#chart_filter_agents");
+    if (agentSelect.length) agentSelect.val(null).trigger("change");
+    
+    // Resetar para modo agregado
+    const aggregatedMode = document.getElementById("view_mode_aggregated");
+    if (aggregatedMode) aggregatedMode.checked = true;
+    
+    // Recarregar gráfico sem filtros
+    loadChartData("conversations_over_time", "kt_chart_conversations_over_time", configConversationsOverTime);
+}
+
 // Função para recarregar dashboard
 function loadDashboard() {
     const dateFrom = document.getElementById("kt_dashboard_date_from").value;
@@ -1998,12 +2300,51 @@ function exportReport(format) {
 
 // Carregar gráficos quando a página carregar
 document.addEventListener("DOMContentLoaded", function() {
+    // ✅ NOVO: Inicializar Select2 nos filtros multiselect
+    $("#chart_filter_teams").select2({
+        placeholder: "Selecione times...",
+        allowClear: true,
+        width: "100%"
+    });
+    
+    $("#chart_filter_agents").select2({
+        placeholder: "Selecione agentes...",
+        allowClear: true,
+        width: "100%"
+    });
+    
     loadAllCharts();
     
-    // Atualizar gráfico de conversas ao longo do tempo quando mudar o agrupamento
+    // ✅ ATUALIZADO: Atualizar gráfico quando mudar o agrupamento (mantendo filtros)
     document.querySelectorAll("input[name=\"chart_group_by\"]").forEach(radio => {
         radio.addEventListener("change", function() {
-            loadChartData("conversations_over_time", "kt_chart_conversations_over_time", configConversationsOverTime);
+            const filters = getChartFilters();
+            loadChartData("conversations_over_time", "kt_chart_conversations_over_time", configConversationsOverTime, filters);
+        });
+    });
+    
+    // ✅ NOVO: Atualizar gráfico quando mudar o modo de visualização
+    document.querySelectorAll("input[name=\"chart_view_mode\"]").forEach(radio => {
+        radio.addEventListener("change", function() {
+            const filters = getChartFilters();
+            const viewMode = this.value;
+            
+            // Mostrar aviso se modo comparativo sem filtros
+            if (viewMode === 'comparative') {
+                if (!filters.team_ids?.length && !filters.agent_ids?.length) {
+                    Swal.fire({
+                        icon: 'info',
+                        title: 'Modo Comparativo',
+                        text: 'Selecione times ou agentes específicos para comparar suas performances lado a lado.',
+                        confirmButtonText: 'Entendi'
+                    });
+                    // Voltar para modo agregado
+                    document.getElementById('view_mode_aggregated').checked = true;
+                    return;
+                }
+            }
+            
+            loadChartData("conversations_over_time", "kt_chart_conversations_over_time", configConversationsOverTime, filters);
         });
     });
 });

@@ -151,7 +151,7 @@ class WhatsAppService
             $ch = curl_init($url);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 30,
+                CURLOPT_TIMEOUT => 60, // ✅ Aumentado de 30s para 60s
                 CURLOPT_POST => true,
                 CURLOPT_POSTFIELDS => '', // --data '' conforme exemplo
                 CURLOPT_HTTPHEADER => $headers,
@@ -179,7 +179,7 @@ class WhatsAppService
                 $ch = curl_init($url);
                 curl_setopt_array($ch, [
                     CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 30,
+                    CURLOPT_TIMEOUT => 60, // ✅ Aumentado de 30s para 60s
                     CURLOPT_HTTPGET => true,
                     CURLOPT_HTTPHEADER => $headers,
                     CURLOPT_FOLLOWLOCATION => true,
@@ -709,7 +709,7 @@ class WhatsAppService
             $ch = curl_init($url);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 30,
+                CURLOPT_TIMEOUT => 60, // ✅ Aumentado de 30s para 60s
                 CURLOPT_POST => true,
                 CURLOPT_POSTFIELDS => json_encode($payload),
                 CURLOPT_HTTPHEADER => $headers,
@@ -886,7 +886,7 @@ class WhatsAppService
             $ch = curl_init($url);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 30,
+                CURLOPT_TIMEOUT => 60, // ✅ Aumentado de 30s para 60s
                 CURLOPT_POST => true,
                 CURLOPT_POSTFIELDS => json_encode($payload),
                 CURLOPT_HTTPHEADER => $headers,
@@ -1384,7 +1384,7 @@ class WhatsAppService
                         
                         curl_setopt_array($ch, [
                             CURLOPT_RETURNTRANSFER => true,
-                            CURLOPT_TIMEOUT => 30,
+                            CURLOPT_TIMEOUT => 60, // ✅ Aumentado de 30s para 60s
                             CURLOPT_HTTPHEADER => $headers,
                             CURLOPT_FOLLOWLOCATION => true,
                             CURLOPT_SSL_VERIFYPEER => false,

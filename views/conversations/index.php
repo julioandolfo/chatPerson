@@ -6670,7 +6670,7 @@ let hasMoreMessages = true;
 let oldestMessageId = null;
 let currentConversationId = null;
 let currentContactAvatar = null; // Avatar do contato da conversa atual
-let conversationPageSize = 150;
+let conversationPageSize = 50; // ✅ Limite de conversas por página (50 conversas por carregamento)
 let conversationOffset = 0;
 let conversationHasMore = true;
 let isLoadingConversations = false;
@@ -10295,9 +10295,8 @@ function refreshConversationList(params = null, append = false) {
         conversationHasMore = true;
     }
     
-    // Usar limit fixo e offset incremental
-    const pageLimit = 150;
-    effectiveParams.set('limit', pageLimit);
+    // ✅ Usar limit dinâmico (conversationPageSize = 50) e offset incremental
+    effectiveParams.set('limit', conversationPageSize);
     effectiveParams.set('offset', conversationOffset);
     lastConversationsParams = new URLSearchParams(effectiveParams.toString());
 
@@ -10550,9 +10549,8 @@ function refreshConversationList(params = null, append = false) {
         conversationsList.dataset.loaded = '1';
         conversationsList.dataset.rendering = '0';
         
-        // ✅ CORREÇÃO: Controlar flag de "tem mais conversas"
-        const pageLimit = 150;
-        conversationHasMore = conversations.length >= pageLimit;
+        // ✅ CORREÇÃO: Controlar flag de "tem mais conversas" (usa conversationPageSize = 50)
+        conversationHasMore = conversations.length >= conversationPageSize;
         isLoadingConversations = false;
         
         const loadMoreBtn = document.getElementById('loadMoreConversationsBtn');
@@ -10592,7 +10590,7 @@ function loadMoreConversations() {
     }
     
     isLoadingConversations = true;
-    conversationOffset += 150;  // Incrementar offset para próxima página
+    conversationOffset += conversationPageSize;  // ✅ Incrementar offset dinamicamente (50 conversas)
     
     const params = lastConversationsParams ? new URLSearchParams(lastConversationsParams.toString()) : new URLSearchParams(window.location.search);
     

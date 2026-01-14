@@ -1488,7 +1488,7 @@ ob_start();
                 <div class="row g-3 mb-5">
                     <div class="col-md-3">
                         <label class="form-label fs-7 fw-semibold mb-2">Setor:</label>
-                        <select id="chart_filter_department" class="form-select form-select-sm form-select-solid" onchange="applyChartFilters()">
+                        <select id="chart_filter_department" class="form-select form-select-sm form-select-solid">
                             <option value="">Todos os Setores</option>
                             <?php
                             $departments = \App\Models\Department::getActive();
@@ -1501,7 +1501,7 @@ ob_start();
                     
                     <div class="col-md-3">
                         <label class="form-label fs-7 fw-semibold mb-2">Times:</label>
-                        <select id="chart_filter_teams" class="form-select form-select-sm form-select-solid" multiple data-control="select2" data-placeholder="Selecione times..." onchange="applyChartFilters()">
+                        <select id="chart_filter_teams" class="form-select form-select-sm form-select-solid" multiple data-control="select2" data-placeholder="Selecione times...">
                             <?php
                             $teams = \App\Models\Team::getActive();
                             foreach ($teams as $team):
@@ -1513,7 +1513,7 @@ ob_start();
                     
                     <div class="col-md-3">
                         <label class="form-label fs-7 fw-semibold mb-2">Agentes:</label>
-                        <select id="chart_filter_agents" class="form-select form-select-sm form-select-solid" multiple data-control="select2" data-placeholder="Selecione agentes..." onchange="applyChartFilters()">
+                        <select id="chart_filter_agents" class="form-select form-select-sm form-select-solid" multiple data-control="select2" data-placeholder="Selecione agentes...">
                             <?php
                             $agents = \App\Helpers\Database::fetchAll(
                                 "SELECT id, name FROM users WHERE role IN ('agent', 'admin', 'supervisor') AND status = 'active' ORDER BY name ASC"
@@ -1527,7 +1527,7 @@ ob_start();
                     
                     <div class="col-md-3">
                         <label class="form-label fs-7 fw-semibold mb-2">Canal:</label>
-                        <select id="chart_filter_channel" class="form-select form-select-sm form-select-solid" onchange="applyChartFilters()">
+                        <select id="chart_filter_channel" class="form-select form-select-sm form-select-solid">
                             <option value="">Todos os Canais</option>
                             <option value="whatsapp">WhatsApp</option>
                             <option value="instagram">Instagram</option>
@@ -2272,6 +2272,7 @@ function getChartFilters() {
 // ✅ NOVO: Aplicar filtros ao gráfico
 function applyChartFilters() {
     const filters = getChartFilters();
+    console.log("[applyChartFilters] Filtros aplicados:", JSON.stringify(filters, null, 2));
     loadChartData("conversations_over_time", "kt_chart_conversations_over_time", configConversationsOverTime, filters);
 }
 
@@ -2327,12 +2328,29 @@ document.addEventListener("DOMContentLoaded", function() {
         placeholder: "Selecione times...",
         allowClear: true,
         width: "100%"
+    }).on("change", function() {
+        console.log("[chart] Times changed:", $(this).val());
+        applyChartFilters();
     });
     
     $("#chart_filter_agents").select2({
         placeholder: "Selecione agentes...",
         allowClear: true,
         width: "100%"
+    }).on("change", function() {
+        console.log("[chart] Agents changed:", $(this).val());
+        applyChartFilters();
+    });
+    
+    // ✅ Event listeners para filtros simples (setor e canal)
+    document.getElementById("chart_filter_department")?.addEventListener("change", function() {
+        console.log("[chart] Department changed:", this.value);
+        applyChartFilters();
+    });
+    
+    document.getElementById("chart_filter_channel")?.addEventListener("change", function() {
+        console.log("[chart] Channel changed:", this.value);
+        applyChartFilters();
     });
     
     loadAllCharts();

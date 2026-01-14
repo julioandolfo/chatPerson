@@ -604,7 +604,7 @@ class WhatsAppService
                     Logger::quepasa("sendMessage - media_url: {$options['media_url']}");
                     
                     if ($mediaType === 'audio') {
-                        Logger::quepasa("sendMessage - ✅ É ÁUDIO! Preparando envio via BASE64 (recomendado para iOS)...");
+                        Logger::quepasa("sendMessage - ✅ É ÁUDIO/VOZ! Preparando envio via BASE64 (OGG/Opus)...");
                         
                         // Se veio como video/webm mas é áudio, alinhar o mimetype para audio/webm
                         if (!empty($mediaMime) && str_contains($mediaMime, 'video/webm')) {
@@ -612,11 +612,6 @@ class WhatsAppService
                             $mediaMime = 'audio/webm';
                         }
 
-                        // Usar mimetype correto: audio/ogg (não application/ogg)
-                        if (empty($mediaMime) || !str_contains($mediaMime, 'ogg')) {
-                            $mediaMime = 'audio/ogg';
-                        }
-                        
                         // Obter caminho local do arquivo
                         $mediaUrl = $options['media_url'];
                         $publicBase = realpath(__DIR__ . '/../../public');
@@ -625,13 +620,27 @@ class WhatsAppService
                         
                         Logger::quepasa("sendMessage - Caminho do áudio: {$absolutePath}");
                         
-                        // ✅ NOVA ABORDAGEM: Enviar áudio via BASE64 (campo content)
-                        // Conforme documentação Quepasa: melhor compatibilidade com iOS
+                        // ✅ NOVA ABORDAGEM: Enviar áudio via BASE64, preferindo MP3 para compatibilidade iOS
                         if (file_exists($absolutePath)) {
-                            $audioContent = file_get_contents($absolutePath);
-                            $audioSize = strlen($audioContent);
+                            $audioSize = filesize($absolutePath);
+                            Logger::quepasa("sendMessage - Arquivo encontrado: {$audioSize} bytes");
                             
-                            Logger::quepasa("sendMessage - Arquivo lido: {$audioSize} bytes");
+                            // Detectar mimetype real do arquivo
+                            $detectedMime = null;
+                            if (function_exists('finfo_open')) {
+                                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                                $detectedMime = $finfo ? finfo_file($finfo, $absolutePath) : null;
+                                if ($finfo) {
+                                    finfo_close($finfo);
+                                }
+                            } elseif (function_exists('mime_content_type')) {
+                                $detectedMime = mime_content_type($absolutePath) ?: null;
+                            }
+                            
+                            if (!empty($detectedMime)) {
+                                $mediaMime = self::normalizeMimeType($detectedMime);
+                                Logger::quepasa("sendMessage - Mime detectado: {$mediaMime}");
+                            }
                             
                             // Verificar tamanho máximo (WhatsApp limita a ~16MB para áudio)
                             $maxAudioSize = 16 * 1024 * 1024; // 16MB
@@ -648,28 +657,54 @@ class WhatsAppService
                                 
                                 Logger::quepasa("sendMessage - Usando URL como fallback (arquivo grande)");
                             } else {
-                                // Converter para base64
+                                $sourcePath = $absolutePath;
+                                $convertedPath = null;
+                                $finalMime = self::normalizeMimeType($mediaMime ?: 'audio/ogg');
+                                $finalFileName = $mediaName ?: 'audio.ogg';
+                                
+                                // Preferir OGG/Opus (voz do WhatsApp) para compatibilidade iOS
+                                if ($finalMime !== 'audio/ogg') {
+                                    $conversion = self::convertAudioToOpus($absolutePath);
+                                    if (!empty($conversion['success'])) {
+                                        $sourcePath = $conversion['filepath'];
+                                        $convertedPath = $conversion['filepath'];
+                                        $finalMime = 'audio/ogg';
+                                        $finalFileName = preg_replace('/\.[^.]+$/', '.ogg', $finalFileName);
+                                        
+                                        Logger::quepasa("sendMessage - ✅ Áudio convertido para OGG/Opus: {$sourcePath}");
+                                    } else {
+                                        Logger::quepasa("sendMessage - ⚠️ Falha ao converter para OGG/Opus: " . ($conversion['error'] ?? 'desconhecido'));
+                                    }
+                                }
+                                
+                                $audioContent = file_get_contents($sourcePath);
                                 $audioBase64 = base64_encode($audioContent);
                                 
                                 Logger::quepasa("sendMessage - Base64 gerado: " . strlen($audioBase64) . " caracteres");
                                 
                                 // ✅ Usar campo 'content' com data URI (recomendado pela API Quepasa)
-                                // Formato: data:<mimetype>;base64,<data>
-                                $payload['content'] = "data:{$mediaMime};base64,{$audioBase64}";
+                                $contentMime = $finalMime === 'audio/ogg' ? 'audio/ogg; codecs=opus' : $finalMime;
+                                $payload['content'] = "data:{$contentMime};base64,{$audioBase64}";
+                                $payload['fileName'] = $finalFileName;
                                 
                                 // Campo text continua obrigatório
                                 if ($captionTrim !== '') {
                                     $payload['text'] = $captionTrim;
                                 } else {
-                                    $payload['text'] = ' '; // Espaço obrigatório
+                                    $payload['text'] = ' ';
                                 }
                                 
-                                Logger::quepasa("sendMessage - ✅ Payload ÁUDIO via BASE64 configurado:");
-                                Logger::quepasa("sendMessage -   mimetype: {$mediaMime}");
+                                Logger::quepasa("sendMessage - ✅ Payload ÁUDIO/VOZ via BASE64 configurado:");
+                                Logger::quepasa("sendMessage -   mimetype: {$contentMime}");
+                                Logger::quepasa("sendMessage -   fileName: {$finalFileName}");
                                 Logger::quepasa("sendMessage -   tamanho original: {$audioSize} bytes");
                                 Logger::quepasa("sendMessage -   tamanho base64: " . strlen($audioBase64) . " caracteres");
-                                Logger::quepasa("sendMessage -   content: data:{$mediaMime};base64,[" . strlen($audioBase64) . " chars]");
+                                Logger::quepasa("sendMessage -   content: data:{$contentMime};base64,[" . strlen($audioBase64) . " chars]");
                                 Logger::quepasa("sendMessage -   text: '" . ($payload['text'] === ' ' ? '(espaço)' : substr($payload['text'], 0, 50)) . "'");
+                                
+                                if ($convertedPath && file_exists($convertedPath)) {
+                                    @unlink($convertedPath);
+                                }
                             }
                         } else {
                             Logger::quepasa("sendMessage - ⚠️ ERRO: Arquivo de áudio não encontrado: {$absolutePath}");
@@ -2732,5 +2767,130 @@ class WhatsAppService
             Logger::quepasa("getPhoneFromLinkedId - Erro: " . $e->getMessage());
             return null;
         }
+    }
+
+    private static function normalizeMimeType(?string $mime): string
+    {
+        $mime = strtolower(trim((string)$mime));
+        if ($mime === '') {
+            return '';
+        }
+        $parts = explode(';', $mime, 2);
+        return trim($parts[0]);
+    }
+
+    private static function canUseExec(): bool
+    {
+        if (!function_exists('exec') || !function_exists('shell_exec')) {
+            return false;
+        }
+
+        $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+        $disabled = array_filter($disabled);
+
+        if (in_array('exec', $disabled, true) || in_array('shell_exec', $disabled, true)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static function resolveFfmpegPath(): ?string
+    {
+        $ffmpegPath = '';
+        if (stripos(PHP_OS_FAMILY, 'Windows') !== false) {
+            $where = trim((string) shell_exec('where ffmpeg 2>NUL'));
+            if (!empty($where)) {
+                $lines = preg_split('/\r\n|\r|\n/', $where);
+                $ffmpegPath = trim($lines[0] ?? '');
+            }
+        } else {
+            $ffmpegPath = trim((string) shell_exec('command -v ffmpeg 2>/dev/null'));
+        }
+
+        if (!empty($ffmpegPath)) {
+            return $ffmpegPath;
+        }
+
+        $candidates = [
+            'ffmpeg',
+            '/usr/bin/ffmpeg',
+            '/usr/local/bin/ffmpeg',
+            'C:\\ffmpeg\\bin\\ffmpeg.exe'
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (file_exists($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private static function convertAudioToMp3(string $sourcePath): array
+    {
+        if (!self::canUseExec()) {
+            return ['success' => false, 'error' => 'exec desabilitado'];
+        }
+
+        $ffmpegPath = self::resolveFfmpegPath();
+        if (empty($ffmpegPath)) {
+            return ['success' => false, 'error' => 'ffmpeg não encontrado'];
+        }
+
+        $targetPath = dirname($sourcePath) . DIRECTORY_SEPARATOR . uniqid('audio_', true) . '.mp3';
+        $cmd = escapeshellcmd($ffmpegPath) . ' -y -i ' . escapeshellarg($sourcePath) . ' -vn -c:a libmp3lame -b:a 128k ' . escapeshellarg($targetPath) . ' 2>&1';
+
+        exec($cmd, $output, $exitCode);
+
+        if ($exitCode !== 0 || !file_exists($targetPath) || filesize($targetPath) === 0) {
+            if (file_exists($targetPath)) {
+                @unlink($targetPath);
+            }
+            return [
+                'success' => false,
+                'error' => 'ffmpeg falhou (exit ' . $exitCode . '): ' . implode("\n", array_slice($output, 0, 5))
+            ];
+        }
+
+        return [
+            'success' => true,
+            'filepath' => $targetPath,
+            'size' => filesize($targetPath)
+        ];
+    }
+
+    private static function convertAudioToOpus(string $sourcePath): array
+    {
+        if (!self::canUseExec()) {
+            return ['success' => false, 'error' => 'exec desabilitado'];
+        }
+
+        $ffmpegPath = self::resolveFfmpegPath();
+        if (empty($ffmpegPath)) {
+            return ['success' => false, 'error' => 'ffmpeg não encontrado'];
+        }
+
+        $targetPath = dirname($sourcePath) . DIRECTORY_SEPARATOR . uniqid('audio_', true) . '.ogg';
+        $cmd = escapeshellcmd($ffmpegPath) . ' -y -i ' . escapeshellarg($sourcePath) . ' -vn -c:a libopus -b:a 96k ' . escapeshellarg($targetPath) . ' 2>&1';
+
+        exec($cmd, $output, $exitCode);
+
+        if ($exitCode !== 0 || !file_exists($targetPath) || filesize($targetPath) === 0) {
+            if (file_exists($targetPath)) {
+                @unlink($targetPath);
+            }
+            return [
+                'success' => false,
+                'error' => 'ffmpeg falhou (exit ' . $exitCode . '): ' . implode("\n", array_slice($output, 0, 5))
+            ];
+        }
+
+        return [
+            'success' => true,
+            'filepath' => $targetPath,
+            'size' => filesize($targetPath)
+        ];
     }
 }

@@ -705,7 +705,9 @@ class WhatsAppService
                                 Logger::quepasa("sendMessage -   tamanho original: {$audioSize} bytes");
                                 Logger::quepasa("sendMessage -   tamanho base64: " . strlen($audioBase64) . " caracteres");
                                 Logger::quepasa("sendMessage -   content: data:{$contentMime};base64,[" . strlen($audioBase64) . " chars]");
-                                Logger::quepasa("sendMessage -   text: '" . ($payload['text'] === ' ' ? '(espaço)' : substr($payload['text'], 0, 50)) . "'");
+                                $payloadText = $payload['text'] ?? null;
+                                $textPreview = $payloadText === null ? '(sem texto)' : ($payloadText === ' ' ? '(espaço)' : substr($payloadText, 0, 50));
+                                Logger::quepasa("sendMessage -   text: '" . $textPreview . "'");
                                 
                                 if ($convertedPath && file_exists($convertedPath)) {
                                     @unlink($convertedPath);

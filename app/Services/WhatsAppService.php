@@ -604,7 +604,7 @@ class WhatsAppService
                     Logger::quepasa("sendMessage - media_url: {$options['media_url']}");
                     
                     if ($mediaType === 'audio') {
-                        Logger::quepasa("sendMessage - ✅ É ÁUDIO! Preparando envio SIMPLIFICADO...");
+                        Logger::quepasa("sendMessage - ✅ É ÁUDIO! Preparando envio via BASE64 (recomendado para iOS)...");
                         
                         // Se veio como video/webm mas é áudio, alinhar o mimetype para audio/webm
                         if (!empty($mediaMime) && str_contains($mediaMime, 'video/webm')) {
@@ -617,67 +617,73 @@ class WhatsAppService
                             $mediaMime = 'audio/ogg';
                         }
                         
-                        // Forçar URL https se disponível (evita bloqueio de mídia por http)
+                        // Obter caminho local do arquivo
                         $mediaUrl = $options['media_url'];
-                        if (str_starts_with($mediaUrl, 'http://')) {
-                            $mediaUrlHttps = preg_replace('/^http:/i', 'https:', $mediaUrl);
-                            $mediaUrl = $mediaUrlHttps ?: $mediaUrl;
-                        }
-
-                        // Verificar se o arquivo é acessível (existência local e HEAD remoto)
-                        try {
-                            $publicBase = realpath(__DIR__ . '/../../public');
-                            $pathFromUrl = parse_url($mediaUrl, PHP_URL_PATH) ?: '';
-                            $absolutePath = $publicBase . $pathFromUrl;
-
-                            $existsLocal = file_exists($absolutePath);
-                            $sizeLocal = $existsLocal ? filesize($absolutePath) : 0;
-                            Logger::quepasa("sendMessage - Verificação mídia local: path={$absolutePath}, existe=" . ($existsLocal ? 'sim' : 'não') . ", size={$sizeLocal}");
-
-                            // HEAD remoto
-                            $headCh = curl_init($mediaUrl);
-                            curl_setopt_array($headCh, [
-                                CURLOPT_NOBODY => true,
-                                CURLOPT_RETURNTRANSFER => true,
-                                CURLOPT_TIMEOUT => 10,
-                                CURLOPT_FOLLOWLOCATION => true,
-                                CURLOPT_SSL_VERIFYPEER => false,
-                                CURLOPT_SSL_VERIFYHOST => false,
-                            ]);
-                            curl_exec($headCh);
-                            $headCode = curl_getinfo($headCh, CURLINFO_HTTP_CODE);
-                            $headType = curl_getinfo($headCh, CURLINFO_CONTENT_TYPE);
-                            $headLen = curl_getinfo($headCh, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
-                            curl_close($headCh);
-                            Logger::quepasa("sendMessage - HEAD mídia: code={$headCode}, type=" . ($headType ?: 'null') . ", len=" . ($headLen ?: 'null'));
-                        } catch (\Throwable $t) {
-                            Logger::quepasa("sendMessage - Erro na verificação de mídia: " . $t->getMessage());
-                        }
+                        $publicBase = realpath(__DIR__ . '/../../public');
+                        $pathFromUrl = parse_url($mediaUrl, PHP_URL_PATH) ?: '';
+                        $absolutePath = $publicBase . $pathFromUrl;
                         
-                        // ✅ CORREÇÃO: Payload simplificado conforme documentação Quepasa
-                        // Usar apenas url + text (obrigatório) + fileName
-                        $payload['url'] = $mediaUrl;
+                        Logger::quepasa("sendMessage - Caminho do áudio: {$absolutePath}");
                         
-                        // Ajustar nome do arquivo: usar extensão .ogg (não .ogx)
-                        $audioFileName = $mediaName ? $mediaName : 'audio.ogg';
-                        // Garantir que termine em .ogg
-                        if (!str_ends_with(strtolower($audioFileName), '.ogg')) {
-                            $audioFileName = preg_replace('/\.[^.]+$/', '.ogg', $audioFileName);
-                        }
-                        $payload['fileName'] = $audioFileName;
-                        
-                        // Campo text é OBRIGATÓRIO mesmo para mídia (usar caption ou espaço)
-                        if ($captionTrim !== '') {
-                            $payload['text'] = $captionTrim;
+                        // ✅ NOVA ABORDAGEM: Enviar áudio via BASE64 (campo content)
+                        // Conforme documentação Quepasa: melhor compatibilidade com iOS
+                        if (file_exists($absolutePath)) {
+                            $audioContent = file_get_contents($absolutePath);
+                            $audioSize = strlen($audioContent);
+                            
+                            Logger::quepasa("sendMessage - Arquivo lido: {$audioSize} bytes");
+                            
+                            // Verificar tamanho máximo (WhatsApp limita a ~16MB para áudio)
+                            $maxAudioSize = 16 * 1024 * 1024; // 16MB
+                            
+                            if ($audioSize > $maxAudioSize) {
+                                Logger::quepasa("sendMessage - ⚠️ AVISO: Áudio muito grande ({$audioSize} bytes > 16MB), tentando enviar via URL");
+                                
+                                // Fallback: usar URL se arquivo for muito grande
+                                $payload['url'] = str_starts_with($mediaUrl, 'http://') 
+                                    ? preg_replace('/^http:/i', 'https:', $mediaUrl) 
+                                    : $mediaUrl;
+                                $payload['fileName'] = $mediaName ?: 'audio.ogg';
+                                $payload['text'] = $captionTrim !== '' ? $captionTrim : ' ';
+                                
+                                Logger::quepasa("sendMessage - Usando URL como fallback (arquivo grande)");
+                            } else {
+                                // Converter para base64
+                                $audioBase64 = base64_encode($audioContent);
+                                
+                                Logger::quepasa("sendMessage - Base64 gerado: " . strlen($audioBase64) . " caracteres");
+                                
+                                // ✅ Usar campo 'content' com data URI (recomendado pela API Quepasa)
+                                // Formato: data:<mimetype>;base64,<data>
+                                $payload['content'] = "data:{$mediaMime};base64,{$audioBase64}";
+                                
+                                // Campo text continua obrigatório
+                                if ($captionTrim !== '') {
+                                    $payload['text'] = $captionTrim;
+                                } else {
+                                    $payload['text'] = ' '; // Espaço obrigatório
+                                }
+                                
+                                Logger::quepasa("sendMessage - ✅ Payload ÁUDIO via BASE64 configurado:");
+                                Logger::quepasa("sendMessage -   mimetype: {$mediaMime}");
+                                Logger::quepasa("sendMessage -   tamanho original: {$audioSize} bytes");
+                                Logger::quepasa("sendMessage -   tamanho base64: " . strlen($audioBase64) . " caracteres");
+                                Logger::quepasa("sendMessage -   content: data:{$mediaMime};base64,[" . strlen($audioBase64) . " chars]");
+                                Logger::quepasa("sendMessage -   text: '" . ($payload['text'] === ' ' ? '(espaço)' : substr($payload['text'], 0, 50)) . "'");
+                            }
                         } else {
-                            $payload['text'] = ' '; // Espaço obrigatório quando não há caption
+                            Logger::quepasa("sendMessage - ⚠️ ERRO: Arquivo de áudio não encontrado: {$absolutePath}");
+                            Logger::quepasa("sendMessage - Tentando enviar via URL como fallback...");
+                            
+                            // Fallback: usar URL se arquivo não existir localmente
+                            $payload['url'] = str_starts_with($mediaUrl, 'http://') 
+                                ? preg_replace('/^http:/i', 'https:', $mediaUrl) 
+                                : $mediaUrl;
+                            $payload['fileName'] = $mediaName ?: 'audio.ogg';
+                            $payload['text'] = $captionTrim !== '' ? $captionTrim : ' ';
+                            
+                            Logger::quepasa("sendMessage - Usando URL como fallback (arquivo não encontrado localmente)");
                         }
-                        
-                        Logger::quepasa("sendMessage - ✅ Payload ÁUDIO simplificado configurado:");
-                        Logger::quepasa("sendMessage -   url: {$payload['url']}");
-                        Logger::quepasa("sendMessage -   fileName: {$payload['fileName']}");
-                        Logger::quepasa("sendMessage -   text: '" . ($payload['text'] === ' ' ? '(espaço)' : substr($payload['text'], 0, 50)) . "'");
-                        Logger::quepasa("sendMessage -   mimetype esperado pelo Quepasa: {$mediaMime}");
                     } else {
                         Logger::quepasa("sendMessage - Não é áudio, enviando como mídia normal (imagem/vídeo/documento)");
                         

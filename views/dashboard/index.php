@@ -1565,7 +1565,9 @@ ob_start();
                     </button>
                 </div>
                 
-                <canvas id="kt_chart_conversations_over_time" style="height: 300px;"></canvas>
+                <div style="position: relative; height: 300px; width: 100%;">
+                    <canvas id="kt_chart_conversations_over_time"></canvas>
+                </div>
             </div>
             <!--end::Card body-->
         </div>

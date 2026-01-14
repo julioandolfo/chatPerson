@@ -685,22 +685,19 @@ class WhatsAppService
                                 // ✅ Usar campo 'content' com data URI (recomendado pela API Quepasa)
                                 $contentMime = $finalMime ?: 'audio/mpeg';
                                 $payload['content'] = "data:{$contentMime};base64,{$audioBase64}";
-                                $payload['type'] = 'audio';
-                                $payload['ptt'] = true;
-                                $payload['voice'] = true;
                                 $payload['fileName'] = $finalFileName;
                                 
-                                // Campo text continua obrigatório
+                                // Enviar sem texto para evitar mensagem em branco
                                 if ($captionTrim !== '') {
                                     $payload['text'] = $captionTrim;
                                 } else {
-                                    $payload['text'] = ' ';
+                                    unset($payload['text']);
                                 }
                                 
                                 Logger::quepasa("sendMessage - ✅ Payload ÁUDIO/VOZ via BASE64 configurado:");
                                 Logger::quepasa("sendMessage -   mimetype: {$contentMime}");
-                                Logger::quepasa("sendMessage -   ptt: true");
-                                Logger::quepasa("sendMessage -   voice: true");
+                                Logger::quepasa("sendMessage -   ptt: (não enviado)");
+                                Logger::quepasa("sendMessage -   voice: (não enviado)");
                                 Logger::quepasa("sendMessage -   fileName: {$finalFileName}");
                                 Logger::quepasa("sendMessage -   tamanho original: {$audioSize} bytes");
                                 Logger::quepasa("sendMessage -   tamanho base64: " . strlen($audioBase64) . " caracteres");

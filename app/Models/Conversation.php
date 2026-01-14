@@ -343,12 +343,23 @@ class Conversation extends Model
         
         // ✅ FILTRO PADRÃO: Se usuário está logado E não aplicou filtro de agente explícito
         // Mostrar apenas: conversas atribuídas a ELE + conversas NÃO ATRIBUÍDAS
+        // EXCETO se for Admin/Super Admin (eles podem ver TODAS as conversas)
         if (!empty($filters['current_user_id']) && !isset($filters['agent_id']) && !isset($filters['agent_ids'])) {
             $userId = (int)$filters['current_user_id'];
-            $sql .= " AND (c.agent_id = ? OR c.agent_id IS NULL OR c.agent_id = 0)";
-            $params[] = $userId;
             
-            \App\Helpers\Log::debug("🔒 [Conversation::getAll] Filtro padrão aplicado: userId={$userId} (mostrar apenas atribuídas a ele + não atribuídas)", 'conversas.log');
+            // ✅ NOVO: Verificar se é Admin ou Super Admin
+            $isAdmin = \App\Services\PermissionService::isAdmin($userId);
+            $isSuperAdmin = \App\Services\PermissionService::isSuperAdmin($userId);
+            
+            if (!$isAdmin && !$isSuperAdmin) {
+                // Usuário comum: filtrar apenas conversas dele + não atribuídas
+                $sql .= " AND (c.agent_id = ? OR c.agent_id IS NULL OR c.agent_id = 0)";
+                $params[] = $userId;
+                \App\Helpers\Log::debug("🔒 [Conversation::getAll] Filtro padrão aplicado: userId={$userId} (mostrar apenas atribuídas a ele + não atribuídas)", 'conversas.log');
+            } else {
+                // Admin/Super Admin: pode ver TODAS as conversas (sem filtro)
+                \App\Helpers\Log::debug("👑 [Conversation::getAll] Admin/Super Admin detectado: userId={$userId} - MOSTRANDO TODAS as conversas sem filtro", 'conversas.log');
+            }
         }
         
         $sql .= " GROUP BY c.id";

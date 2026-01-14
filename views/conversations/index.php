@@ -10571,14 +10571,42 @@ function refreshConversationList(params = null, append = false) {
         }
     })
     .catch(error => {
-        console.error('Erro ao buscar conversas:', error);
-        conversationsList.innerHTML = `
-            <div class="text-center py-10">
-                <div class="text-danger">Erro ao carregar conversas</div>
-                <div class="text-muted fs-7 mt-2">${error.message || 'Erro desconhecido'}</div>
-                <button class="btn btn-sm btn-light mt-3" onclick="location.reload()">Recarregar pígina</button>
-            </div>
-        `;
+        console.error('❌ Erro ao buscar conversas:', error);
+        
+        // ✅ CORREÇÃO CRÍTICA: Resetar flags para desbloquear futuras tentativas
+        isLoadingConversations = false;
+        conversationHasMore = true; // Permitir tentar novamente
+        
+        // Se era append, mostrar erro sem limpar lista existente
+        if (append) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'text-center py-5 text-danger';
+            errorDiv.innerHTML = `
+                <div>⚠️ Erro ao carregar mais conversas</div>
+                <div class="fs-7 mt-2">${error.message || 'Erro desconhecido'}</div>
+                <button class="btn btn-sm btn-light mt-3" onclick="loadMoreConversations()">Tentar novamente</button>
+            `;
+            conversationsList.appendChild(errorDiv);
+        } else {
+            // Primeiro carregamento com erro - mostrar tela de erro
+            conversationsList.innerHTML = `
+                <div class="text-center py-10">
+                    <div class="text-danger">Erro ao carregar conversas</div>
+                    <div class="text-muted fs-7 mt-2">${error.message || 'Erro desconhecido'}</div>
+                    <button class="btn btn-sm btn-light mt-3" onclick="location.reload()">Recarregar página</button>
+                </div>
+            `;
+        }
+        
+        // Resetar botão "Carregar mais"
+        const loadMoreBtn = document.getElementById('loadMoreConversationsBtn');
+        if (loadMoreBtn) {
+            const spinner = loadMoreBtn.querySelector('.spinner-border');
+            if (spinner) {
+                spinner.style.display = 'none';
+            }
+            loadMoreBtn.disabled = false;
+        }
     });
 }
 

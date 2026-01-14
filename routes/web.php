@@ -347,6 +347,7 @@ Router::get('/agent-performance/compare', [AgentPerformanceController::class, 'c
 Router::get('/agent-performance/chart-data', [AgentPerformanceController::class, 'chartData'], ['Authentication', 'Permission:agent_performance.view.all']);
 
 // Rotas de Coaching em Tempo Real (IA)
+Router::get('/api/coaching/settings', [RealtimeCoachingController::class, 'getSettings'], ['Authentication']); // ✅ Configurações do coaching
 Router::get('/api/coaching/hints/conversation/{conversationId}', [RealtimeCoachingController::class, 'getHintsByConversation'], ['Authentication']);
 Router::get('/api/coaching/hints/pending', [RealtimeCoachingController::class, 'getPendingHints'], ['Authentication']);
 Router::post('/api/coaching/hints/{hintId}/view', [RealtimeCoachingController::class, 'markAsViewed'], ['Authentication']);

@@ -15,7 +15,7 @@ class RealtimeCoaching {
         this.currentConversationId = null;
         this.currentAgentId = null;
         this.pollingInterval = null;
-        this.pollingFrequency = 5000; // 5 segundos
+        this.pollingFrequency = 60000; // 60 segundos (otimizado - coaching não é tempo-real crítico)
         this.displayedHints = new Set(); // IDs de hints já exibidos
         this.settings = {
             enabled: false,
@@ -30,11 +30,19 @@ class RealtimeCoaching {
     /**
      * Inicializar sistema
      */
-    init() {
+    async init() {
         console.log('[Coaching] Inicializando sistema de coaching em tempo real');
         
-        // Carregar configurações
-        this.loadSettings();
+        // ✅ Carregar configurações e verificar se está habilitado
+        await this.loadSettings();
+        
+        // ✅ Se desabilitado, não iniciar nada
+        if (!this.settings.enabled) {
+            console.log('[Coaching] ❌ Coaching desabilitado - não iniciando polling nem listeners');
+            return;
+        }
+        
+        console.log('[Coaching] ✅ Coaching habilitado - iniciando sistema');
         
         // Configurar WebSocket listener
         this.setupWebSocketListener();
@@ -53,16 +61,28 @@ class RealtimeCoaching {
      */
     async loadSettings() {
         try {
-            // Em produção, carregar do backend
-            // Por enquanto, usar padrões
-            this.settings = {
-                enabled: true, // Será controlado pelas configs do sistema
-                auto_show_hint: true,
-                hint_display_duration: 30,
-                play_sound: false
-            };
+            // ✅ Verificar se coaching está habilitado no servidor
+            const response = await fetch('/api/coaching/settings');
+            const data = await response.json();
+            
+            if (data.success && data.settings) {
+                this.settings = {
+                    enabled: data.settings.coaching_enabled === '1' || data.settings.coaching_enabled === true,
+                    auto_show_hint: data.settings.auto_show_hint !== false,
+                    hint_display_duration: parseInt(data.settings.hint_display_duration) || 30,
+                    play_sound: data.settings.play_sound === true
+                };
+                
+                console.log('[Coaching] Configurações carregadas:', this.settings);
+            } else {
+                // ✅ Se não conseguir carregar, assumir desabilitado por segurança
+                console.warn('[Coaching] Não foi possível carregar configurações - desabilitando coaching');
+                this.settings.enabled = false;
+            }
         } catch (error) {
             console.error('[Coaching] Erro ao carregar configurações:', error);
+            // ✅ Em caso de erro, desabilitar por segurança
+            this.settings.enabled = false;
         }
     }
     
@@ -102,6 +122,13 @@ class RealtimeCoaching {
      * Polling de hints pendentes
      */
     async pollPendingHints() {
+        // ✅ Verificar se coaching está habilitado
+        if (!this.settings.enabled) {
+            console.log('[Coaching] Coaching desabilitado - parando polling');
+            this.stopPolling();
+            return;
+        }
+        
         if (!this.currentConversationId) {
             return;
         }
@@ -109,6 +136,14 @@ class RealtimeCoaching {
         try {
             const response = await fetch(`/coaching/pending-hints?conversation_id=${this.currentConversationId}&seconds=10`);
             const data = await response.json();
+            
+            // ✅ Verificar se foi desabilitado no servidor
+            if (data.enabled === false) {
+                console.log('[Coaching] Coaching foi desabilitado no servidor - parando polling');
+                this.settings.enabled = false;
+                this.stopPolling();
+                return;
+            }
             
             if (data.success && data.hints && data.hints.length > 0) {
                 console.log('[Coaching] Polling encontrou ' + data.hints.length + ' hint(s)');
@@ -122,6 +157,17 @@ class RealtimeCoaching {
             }
         } catch (error) {
             console.error('[Coaching] Erro no polling:', error);
+        }
+    }
+    
+    /**
+     * Parar polling
+     */
+    stopPolling() {
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
+            this.pollingInterval = null;
+            console.log('[Coaching] Polling parado');
         }
     }
     

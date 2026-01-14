@@ -54,7 +54,7 @@ class CoachingInline {
                     this.loadHints();
                 }
             }
-        }, 1000);
+        }, 5000); // 5 segundos (otimizado - não precisa verificar a cada segundo)
     }
 
     startPolling() {

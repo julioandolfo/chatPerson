@@ -1858,13 +1858,26 @@ function loadChartData(chartType, canvasId, configCallback, additionalFilters = 
         url.searchParams.append("funnel_id", additionalFilters.funnel_id);
     }
     
+    // Logs de depuração
+    console.debug("[chart] fetch start", {
+        chartType,
+        canvasId,
+        url: url.toString(),
+        groupBy,
+        viewMode,
+        filters: additionalFilters
+    });
+    
     fetch(url)
         .then(response => {
-            console.log("Chart response status:", response.status, "for", chartType);
+            console.log("Chart response status:", response.status, "for", chartType, "url=", url.toString());
             return response.json();
         })
         .then(data => {
             console.log("Chart data received:", chartType, data);
+            if (!data || data.success === false) {
+                console.error("[chart] backend error", { chartType, data, url: url.toString() });
+            }
             
             if (data.success && data.data) {
                 // Verificar se há dados
@@ -1919,6 +1932,7 @@ function loadChartData(chartType, canvasId, configCallback, additionalFilters = 
         })
         .catch(error => {
             console.error("Erro ao carregar dados do gráfico:", chartType, error);
+            console.error("[chart] fetch failed", { chartType, url: url.toString(), error });
             // Mostrar mensagem de erro no canvas
             const canvas = document.getElementById(canvasId);
             if (canvas) {

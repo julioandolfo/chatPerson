@@ -14,6 +14,20 @@ use App\Models\RealtimeCoachingHint;
 class RealtimeCoachingController
 {
     /**
+     * Obter configurações do coaching
+     * GET /api/coaching/settings
+     */
+    public function getSettings(): void
+    {
+        $settings = \App\Services\RealtimeCoachingService::getSettings();
+        
+        Response::json([
+            'success' => true,
+            'settings' => $settings
+        ]);
+    }
+    
+    /**
      * Buscar hints de uma conversa
      * GET /api/coaching/hints/:conversationId
      */

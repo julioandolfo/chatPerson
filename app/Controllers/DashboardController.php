@@ -370,27 +370,33 @@ class DashboardController
             switch ($chartType) {
                 case 'conversations_over_time':
                     $data = \App\Services\DashboardService::getConversationsOverTime($dateFrom, $dateTo, $groupBy, $filters);
+                    self::logDash("getChartData conversations_over_time items=" . (is_array($data) ? count($data) : 0));
                     break;
                     
                 case 'conversations_by_channel':
                     $data = \App\Services\DashboardService::getConversationsByChannelChart($dateFrom, $dateTo);
+                    self::logDash("getChartData conversations_by_channel items=" . (is_array($data) ? count($data) : 0));
                     break;
                     
                 case 'conversations_by_status':
                     $data = \App\Services\DashboardService::getConversationsByStatusChart($dateFrom, $dateTo);
+                    self::logDash("getChartData conversations_by_status items=" . (is_array($data) ? count($data) : 0));
                     break;
                     
                 case 'agents_performance':
                     $limit = (int)\App\Helpers\Request::get('limit', 10);
                     $data = \App\Services\DashboardService::getAgentsPerformanceChart($dateFrom, $dateTo, $limit);
+                    self::logDash("getChartData agents_performance items=" . (is_array($data) ? count($data) : 0));
                     break;
                     
                 case 'messages_over_time':
                     $data = \App\Services\DashboardService::getMessagesOverTime($dateFrom, $dateTo, $groupBy);
+                    self::logDash("getChartData messages_over_time items=" . (is_array($data) ? count($data) : 0));
                     break;
                     
                 case 'sla_metrics':
                     $data = \App\Services\DashboardService::getSLAMetrics($dateFrom, $dateTo);
+                    self::logDash("getChartData sla_metrics items=" . (is_array($data) ? count($data) : 0));
                     break;
                     
                 default:
@@ -407,6 +413,7 @@ class DashboardController
             ]);
         } catch (\Exception $e) {
             self::logDash("ERRO getChartData: {$chartType} - " . $e->getMessage());
+            self::logDash("TRACE getChartData: " . $e->getTraceAsString());
             Response::json([
                 'success' => false,
                 'error' => 'Erro ao carregar dados do gráfico',

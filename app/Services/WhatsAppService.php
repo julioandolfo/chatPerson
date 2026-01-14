@@ -604,7 +604,7 @@ class WhatsAppService
                     Logger::quepasa("sendMessage - media_url: {$options['media_url']}");
                     
                     if ($mediaType === 'audio') {
-                        Logger::quepasa("sendMessage - ✅ É ÁUDIO/VOZ! Preparando envio via BASE64 (OGG/Opus)...");
+                        Logger::quepasa("sendMessage - ✅ É ÁUDIO/VOZ! Preparando envio via BASE64 (MP3 recomendado)...");
                         
                         // Se veio como video/webm mas é áudio, alinhar o mimetype para audio/webm
                         if (!empty($mediaMime) && str_contains($mediaMime, 'video/webm')) {
@@ -652,28 +652,28 @@ class WhatsAppService
                                 $payload['url'] = str_starts_with($mediaUrl, 'http://') 
                                     ? preg_replace('/^http:/i', 'https:', $mediaUrl) 
                                     : $mediaUrl;
-                                $payload['fileName'] = $mediaName ?: 'audio.ogg';
+                                $payload['fileName'] = $mediaName ?: 'audio.mp3';
                                 $payload['text'] = $captionTrim !== '' ? $captionTrim : ' ';
                                 
                                 Logger::quepasa("sendMessage - Usando URL como fallback (arquivo grande)");
                             } else {
                                 $sourcePath = $absolutePath;
                                 $convertedPath = null;
-                                $finalMime = self::normalizeMimeType($mediaMime ?: 'audio/ogg');
-                                $finalFileName = $mediaName ?: 'audio.ogg';
+                                $finalMime = self::normalizeMimeType($mediaMime ?: 'audio/mpeg');
+                                $finalFileName = $mediaName ?: 'audio.mp3';
                                 
-                                // Preferir OGG/Opus (voz do WhatsApp) para compatibilidade iOS
-                                if ($finalMime !== 'audio/ogg') {
-                                    $conversion = self::convertAudioToOpus($absolutePath);
+                                // Preferir MP3 (recomendado pela doc Quepasa para garantir áudio executável)
+                                if ($finalMime !== 'audio/mpeg') {
+                                    $conversion = self::convertAudioToMp3($absolutePath);
                                     if (!empty($conversion['success'])) {
                                         $sourcePath = $conversion['filepath'];
                                         $convertedPath = $conversion['filepath'];
-                                        $finalMime = 'audio/ogg';
-                                        $finalFileName = preg_replace('/\.[^.]+$/', '.ogg', $finalFileName);
+                                        $finalMime = 'audio/mpeg';
+                                        $finalFileName = preg_replace('/\.[^.]+$/', '.mp3', $finalFileName);
                                         
-                                        Logger::quepasa("sendMessage - ✅ Áudio convertido para OGG/Opus: {$sourcePath}");
+                                        Logger::quepasa("sendMessage - ✅ Áudio convertido para MP3: {$sourcePath}");
                                     } else {
-                                        Logger::quepasa("sendMessage - ⚠️ Falha ao converter para OGG/Opus: " . ($conversion['error'] ?? 'desconhecido'));
+                                        Logger::quepasa("sendMessage - ⚠️ Falha ao converter para MP3: " . ($conversion['error'] ?? 'desconhecido'));
                                     }
                                 }
                                 
@@ -683,8 +683,11 @@ class WhatsAppService
                                 Logger::quepasa("sendMessage - Base64 gerado: " . strlen($audioBase64) . " caracteres");
                                 
                                 // ✅ Usar campo 'content' com data URI (recomendado pela API Quepasa)
-                                $contentMime = $finalMime === 'audio/ogg' ? 'audio/ogg; codecs=opus' : $finalMime;
+                                $contentMime = $finalMime ?: 'audio/mpeg';
                                 $payload['content'] = "data:{$contentMime};base64,{$audioBase64}";
+                                $payload['type'] = 'audio';
+                                $payload['ptt'] = true;
+                                $payload['voice'] = true;
                                 $payload['fileName'] = $finalFileName;
                                 
                                 // Campo text continua obrigatório
@@ -696,6 +699,8 @@ class WhatsAppService
                                 
                                 Logger::quepasa("sendMessage - ✅ Payload ÁUDIO/VOZ via BASE64 configurado:");
                                 Logger::quepasa("sendMessage -   mimetype: {$contentMime}");
+                                Logger::quepasa("sendMessage -   ptt: true");
+                                Logger::quepasa("sendMessage -   voice: true");
                                 Logger::quepasa("sendMessage -   fileName: {$finalFileName}");
                                 Logger::quepasa("sendMessage -   tamanho original: {$audioSize} bytes");
                                 Logger::quepasa("sendMessage -   tamanho base64: " . strlen($audioBase64) . " caracteres");
@@ -714,7 +719,7 @@ class WhatsAppService
                             $payload['url'] = str_starts_with($mediaUrl, 'http://') 
                                 ? preg_replace('/^http:/i', 'https:', $mediaUrl) 
                                 : $mediaUrl;
-                            $payload['fileName'] = $mediaName ?: 'audio.ogg';
+                            $payload['fileName'] = $mediaName ?: 'audio.mp3';
                             $payload['text'] = $captionTrim !== '' ? $captionTrim : ' ';
                             
                             Logger::quepasa("sendMessage - Usando URL como fallback (arquivo não encontrado localmente)");

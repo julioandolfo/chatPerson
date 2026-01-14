@@ -117,6 +117,24 @@ ob_start();
                                     <span class="badge badge-light-primary"><?= $count ?></span>
                                 </td>
                                 <td class="text-end">
+                                    <?php
+                                    // ✅ Buscar conversa ativa do contato
+                                    $activeConversation = \App\Models\Conversation::whereFirst('contact_id', '=', $contact['id'], [
+                                        'order_by' => 'updated_at',
+                                        'order_dir' => 'DESC'
+                                    ]);
+                                    ?>
+                                    
+                                    <?php if ($activeConversation): ?>
+                                        <a href="<?= \App\Helpers\Url::to('/conversations?id=' . $activeConversation['id']) ?>" class="btn btn-icon btn-bg-light btn-active-color-success btn-sm me-1" data-bs-toggle="tooltip" title="Ir para Conversa">
+                                            <i class="ki-duotone ki-message-text-2 fs-2">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                                <span class="path3"></span>
+                                            </i>
+                                        </a>
+                                    <?php endif; ?>
+                                    
                                     <a href="<?= \App\Helpers\Url::to('/contacts/' . $contact['id']) ?>" class="btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1" data-bs-toggle="tooltip" title="Ver detalhes">
                                         <i class="ki-duotone ki-eye fs-2">
                                             <span class="path1"></span>

@@ -1869,9 +1869,15 @@ function loadChartData(chartType, canvasId, configCallback, additionalFilters = 
     });
     
     fetch(url)
-        .then(response => {
+        .then(async response => {
             console.log("Chart response status:", response.status, "for", chartType, "url=", url.toString());
-            return response.json();
+            const raw = await response.text();
+            try {
+                return JSON.parse(raw);
+            } catch (err) {
+                console.error("[chart] JSON parse error", { chartType, url: url.toString(), raw: raw?.slice(0, 500) });
+                throw err;
+            }
         })
         .then(data => {
             console.log("Chart data received:", chartType, data);

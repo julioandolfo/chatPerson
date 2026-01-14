@@ -226,9 +226,16 @@ class Conversation extends Model
             $searchTerm = trim($filters['search']);
             if (!empty($searchTerm)) {
                 $search = "%{$searchTerm}%";
+                
+                // ✅ CORREÇÃO: Normalizar telefone para busca (remover formatação)
+                // Se o termo de busca parece ser um telefone, normalizar
+                $normalizedPhone = \App\Models\Contact::normalizePhoneNumber($searchTerm);
+                $phoneSearch = "%{$normalizedPhone}%";
+                
                 $sql .= " AND (
                     ct.name LIKE ? OR 
                     ct.phone LIKE ? OR 
+                    ct.phone LIKE ? OR
                     ct.email LIKE ? OR
                     EXISTS (
                         SELECT 1 FROM messages m 
@@ -249,16 +256,17 @@ class Conversation extends Model
                         AND (u_search.name LIKE ? OR u_search.email LIKE ?)
                     )
                 )";
-                $params[] = $search;
-                $params[] = $search;
-                $params[] = $search;
-                $params[] = $search;
+                $params[] = $search; // nome
+                $params[] = $search; // telefone (original com formatação)
+                $params[] = $phoneSearch; // ✅ telefone normalizado (sem formatação)
+                $params[] = $search; // email
+                $params[] = $search; // mensagens
                 $params[] = $search; // tags
                 $params[] = $search; // participantes nome
                 $params[] = $search; // participantes email
                 
                 // Log para debug
-                \App\Helpers\Log::debug("Aplicando filtro de busca: '{$searchTerm}'", 'conversas.log');
+                \App\Helpers\Log::debug("Aplicando filtro de busca: '{$searchTerm}' (telefone normalizado: '{$normalizedPhone}')", 'conversas.log');
             }
         }
         

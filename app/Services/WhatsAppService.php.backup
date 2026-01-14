@@ -604,7 +604,7 @@ class WhatsAppService
                     Logger::quepasa("sendMessage - media_url: {$options['media_url']}");
                     
                     if ($mediaType === 'audio') {
-                        Logger::quepasa("sendMessage - ✅ É ÁUDIO! Preparando envio SIMPLIFICADO...");
+                        Logger::quepasa("sendMessage - ✅ É ÁUDIO! Preparando envio como PTT...");
                         
                         // Se veio como video/webm mas é áudio, alinhar o mimetype para audio/webm
                         if (!empty($mediaMime) && str_contains($mediaMime, 'video/webm')) {
@@ -612,10 +612,8 @@ class WhatsAppService
                             $mediaMime = 'audio/webm';
                         }
 
-                        // Usar mimetype correto: audio/ogg (não application/ogg)
-                        if (empty($mediaMime) || !str_contains($mediaMime, 'ogg')) {
-                            $mediaMime = 'audio/ogg';
-                        }
+                        // Forçar mimetype aceito pelo WhatsApp/Quepasa
+                        $mediaMime = 'audio/ogg';
                         
                         // Forçar URL https se disponível (evita bloqueio de mídia por http)
                         $mediaUrl = $options['media_url'];
@@ -653,52 +651,40 @@ class WhatsAppService
                         } catch (\Throwable $t) {
                             Logger::quepasa("sendMessage - Erro na verificação de mídia: " . $t->getMessage());
                         }
-                        
-                        // ✅ CORREÇÃO: Payload simplificado conforme documentação Quepasa
-                        // Usar apenas url + text (obrigatório) + fileName
+                        // Enviar como áudio PTT (opção recomendada pelo Quepasa/WhatsApp)
+                        $payload['audio'] = [
+                            'url' => $mediaUrl,
+                            // Para compatibilidade com Quepasa: usar application/ogg e extensão .ogx
+                            'mimetype' => 'application/ogg',
+                            'filename' => ($mediaName ? preg_replace('/\.ogg$/i', '.ogx', $mediaName) : 'audio.ogx'),
+                            'ptt' => true,
+                            'voice' => true, // reforçar que é áudio/voz
+                            'caption' => $captionTrim === '' ? null : $captionTrim
+                        ];
+
+                        // Compatibilidade: alguns provedores podem ler url/fileName/type no nível raiz
+                        $payload['type'] = 'audio';
                         $payload['url'] = $mediaUrl;
+                        $payload['fileName'] = ($mediaName ? preg_replace('/\.ogg$/i', '.ogx', $mediaName) : 'audio.ogx');
                         
-                        // Ajustar nome do arquivo: usar extensão .ogg (não .ogx)
-                        $audioFileName = $mediaName ? $mediaName : 'audio.ogg';
-                        // Garantir que termine em .ogg
-                        if (!str_ends_with(strtolower($audioFileName), '.ogg')) {
-                            $audioFileName = preg_replace('/\.[^.]+$/', '.ogg', $audioFileName);
+                        Logger::quepasa("sendMessage - Payload audio configurado:");
+                        Logger::quepasa("sendMessage -   url: {$payload['audio']['url']}");
+                        Logger::quepasa("sendMessage -   mimetype: {$payload['audio']['mimetype']}");
+                        Logger::quepasa("sendMessage -   filename: {$payload['audio']['filename']}");
+                        Logger::quepasa("sendMessage -   ptt: true");
+                        Logger::quepasa("sendMessage -   voice: true");
+
+                        // Remover texto quando não há caption real para evitar mensagem vazia
+                        if ($captionTrim === '') {
+                            unset($payload['text']);
                         }
-                        $payload['fileName'] = $audioFileName;
-                        
-                        // Campo text é OBRIGATÓRIO mesmo para mídia (usar caption ou espaço)
-                        if ($captionTrim !== '') {
-                            $payload['text'] = $captionTrim;
-                        } else {
-                            $payload['text'] = ' '; // Espaço obrigatório quando não há caption
-                        }
-                        
-                        Logger::quepasa("sendMessage - ✅ Payload ÁUDIO simplificado configurado:");
-                        Logger::quepasa("sendMessage -   url: {$payload['url']}");
-                        Logger::quepasa("sendMessage -   fileName: {$payload['fileName']}");
-                        Logger::quepasa("sendMessage -   text: '" . ($payload['text'] === ' ' ? '(espaço)' : substr($payload['text'], 0, 50)) . "'");
-                        Logger::quepasa("sendMessage -   mimetype esperado pelo Quepasa: {$mediaMime}");
                     } else {
                         Logger::quepasa("sendMessage - Não é áudio, enviando como mídia normal (imagem/vídeo/documento)");
-                        
-                        // ✅ CORREÇÃO: Para vídeo/documento também precisa do campo text obrigatório
+                        // Para imagem/vídeo/documento manter envio por URL
                         $payload['url'] = $options['media_url'];
-                        
                         if (!empty($mediaName)) {
                             $payload['fileName'] = $mediaName;
                         }
-                        
-                        // Campo text é OBRIGATÓRIO mesmo para mídia (conforme doc Quepasa)
-                        if ($captionTrim !== '') {
-                            $payload['text'] = $captionTrim;
-                        } else {
-                            $payload['text'] = ' '; // Espaço obrigatório quando não há caption
-                        }
-                        
-                        Logger::quepasa("sendMessage - Payload {$mediaType} configurado:");
-                        Logger::quepasa("sendMessage -   url: {$payload['url']}");
-                        Logger::quepasa("sendMessage -   fileName: " . ($payload['fileName'] ?? 'NULL'));
-                        Logger::quepasa("sendMessage -   text: '" . ($payload['text'] === ' ' ? '(espaço)' : substr($payload['text'], 0, 50)) . "'");
                     }
                 } else {
                     Logger::quepasa("sendMessage - Nenhuma mídia detectada nas opções");

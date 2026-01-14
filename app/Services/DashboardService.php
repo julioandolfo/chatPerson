@@ -182,20 +182,20 @@ class DashboardService
     {
         // ✅ Cache de 5 minutos
         return \App\Helpers\Cache::remember('dashboard_department_stats', 300, function() {
-            $sql = "SELECT 
-                        d.id,
-                        d.name,
-                        COUNT(DISTINCT c.id) as conversations_count,
-                        COUNT(DISTINCT CASE WHEN c.status = 'open' THEN c.id END) as open_conversations,
-                        COUNT(DISTINCT ad.user_id) as agents_count
-                    FROM departments d
-                    LEFT JOIN conversations c ON d.id = c.department_id
-                    LEFT JOIN agent_departments ad ON d.id = ad.department_id
-                    GROUP BY d.id, d.name
-                    ORDER BY conversations_count DESC
-                    LIMIT 10";
-            
-            return \App\Helpers\Database::fetchAll($sql);
+        $sql = "SELECT 
+                    d.id,
+                    d.name,
+                    COUNT(DISTINCT c.id) as conversations_count,
+                    COUNT(DISTINCT CASE WHEN c.status = 'open' THEN c.id END) as open_conversations,
+                    COUNT(DISTINCT ad.user_id) as agents_count
+                FROM departments d
+                LEFT JOIN conversations c ON d.id = c.department_id
+                LEFT JOIN agent_departments ad ON d.id = ad.department_id
+                GROUP BY d.id, d.name
+                ORDER BY conversations_count DESC
+                LIMIT 10";
+        
+        return \App\Helpers\Database::fetchAll($sql);
         });
     }
 
@@ -206,19 +206,19 @@ class DashboardService
     {
         // ✅ Cache de 5 minutos
         return \App\Helpers\Cache::remember('dashboard_funnel_stats', 300, function() {
-            $sql = "SELECT 
-                        f.id,
-                        f.name,
-                        COUNT(DISTINCT c.id) as conversations_count,
-                        COUNT(DISTINCT fs.id) as stages_count
-                    FROM funnels f
-                    LEFT JOIN conversations c ON f.id = c.funnel_id
-                    LEFT JOIN funnel_stages fs ON f.id = fs.funnel_id
-                    GROUP BY f.id, f.name
-                    ORDER BY conversations_count DESC
-                    LIMIT 10";
-            
-            return \App\Helpers\Database::fetchAll($sql);
+        $sql = "SELECT 
+                    f.id,
+                    f.name,
+                    COUNT(DISTINCT c.id) as conversations_count,
+                    COUNT(DISTINCT fs.id) as stages_count
+                FROM funnels f
+                LEFT JOIN conversations c ON f.id = c.funnel_id
+                LEFT JOIN funnel_stages fs ON f.id = fs.funnel_id
+                GROUP BY f.id, f.name
+                ORDER BY conversations_count DESC
+                LIMIT 10";
+        
+        return \App\Helpers\Database::fetchAll($sql);
         });
     }
 
@@ -246,20 +246,20 @@ class DashboardService
         // ✅ Cache de 2 minutos (conversas recentes mudam frequentemente)
         $cacheKey = "dashboard_recent_conversations_{$limit}";
         return \App\Helpers\Cache::remember($cacheKey, 120, function() use ($limit) {
-            $sql = "SELECT 
-                        c.*,
-                        ct.name as contact_name,
-                        ct.phone as contact_phone,
-                        ct.avatar as contact_avatar,
-                        u.name as agent_name,
-                        (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.read_at IS NULL) as unread_count
-                    FROM conversations c
-                    LEFT JOIN contacts ct ON c.contact_id = ct.id
-                    LEFT JOIN users u ON c.agent_id = u.id
-                    ORDER BY c.updated_at DESC
-                    LIMIT ?";
-            
-            return \App\Helpers\Database::fetchAll($sql, [$limit]);
+        $sql = "SELECT 
+                    c.*,
+                    ct.name as contact_name,
+                    ct.phone as contact_phone,
+                    ct.avatar as contact_avatar,
+                    u.name as agent_name,
+                    (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.read_at IS NULL) as unread_count
+                FROM conversations c
+                LEFT JOIN contacts ct ON c.contact_id = ct.id
+                LEFT JOIN users u ON c.agent_id = u.id
+                ORDER BY c.updated_at DESC
+                LIMIT ?";
+        
+        return \App\Helpers\Database::fetchAll($sql, [$limit]);
         });
     }
 
@@ -275,28 +275,28 @@ class DashboardService
         // ✅ Cache de 2 minutos (atividades mudam frequentemente)
         $cacheKey = "dashboard_recent_activity_{$limit}";
         return \App\Helpers\Cache::remember($cacheKey, 120, function() use ($limit) {
-            $sql = "SELECT 
-                        a.*,
-                        u.name as user_name,
-                        u.avatar as user_avatar
-                    FROM activities a
-                    LEFT JOIN users u ON a.user_id = u.id
-                    WHERE a.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
-                    ORDER BY a.created_at DESC
-                    LIMIT ?";
-            
-            $activities = \App\Helpers\Database::fetchAll($sql, [$limit]);
-            
-            // Decodificar metadata
-            foreach ($activities as &$activity) {
-                if (!empty($activity['metadata'])) {
-                    $activity['metadata'] = json_decode($activity['metadata'], true);
-                } else {
-                    $activity['metadata'] = [];
-                }
+        $sql = "SELECT 
+                    a.*,
+                    u.name as user_name,
+                    u.avatar as user_avatar
+                FROM activities a
+                LEFT JOIN users u ON a.user_id = u.id
+                WHERE a.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                ORDER BY a.created_at DESC
+                LIMIT ?";
+        
+        $activities = \App\Helpers\Database::fetchAll($sql, [$limit]);
+        
+        // Decodificar metadata
+        foreach ($activities as &$activity) {
+            if (!empty($activity['metadata'])) {
+                $activity['metadata'] = json_decode($activity['metadata'], true);
+            } else {
+                $activity['metadata'] = [];
             }
-            
-            return $activities;
+        }
+        
+        return $activities;
         });
     }
 
@@ -873,7 +873,7 @@ class DashboardService
         // ✅ Cache de 3 minutos por agente
         $cacheKey = "dashboard_agent_metrics_{$agentId}_" . md5($dateFrom . $dateTo);
         return \App\Helpers\Cache::remember($cacheKey, 180, function() use ($agentId, $dateFrom, $dateTo) {
-            $agent = User::find($agentId);
+        $agent = User::find($agentId);
         if (!$agent) {
             return [];
         }
@@ -1024,7 +1024,7 @@ class DashboardService
         // ✅ Cache de 3 minutos (chama getAgentMetrics que já tem cache, mas cache do resultado completo)
         $cacheKey = "dashboard_all_agents_metrics_" . md5($dateFrom . $dateTo);
         return \App\Helpers\Cache::remember($cacheKey, 180, function() use ($dateFrom, $dateTo) {
-            // Buscar todos os agentes ativos
+        // Buscar todos os agentes ativos
         $sql = "SELECT id, name, email, avatar, availability_status 
                 FROM users 
                 WHERE role IN ('agent', 'admin', 'supervisor') 
@@ -1343,7 +1343,7 @@ class DashboardService
         
         return $colors[$id % count($colors)];
     }
-    
+
     /**
      * Obter dados de conversas por canal (para gráfico de pizza)
      */

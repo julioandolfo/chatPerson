@@ -16107,6 +16107,23 @@ const ALLOWED_ATTACHMENT_TYPES = [
     'text/plain', 'text/csv'
 ];
 
+function getMaxAttachmentSize(file) {
+    const type = (file && file.type) ? file.type : '';
+    const name = (file && file.name) ? file.name : '';
+    const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
+
+    if (type.startsWith('video/') || ['mp4', 'webm', 'ogg', 'mov', 'm4v'].includes(ext)) {
+        return 64 * 1024 * 1024; // 64MB
+    }
+    if (type.startsWith('audio/') || ['mp3', 'wav', 'ogg', 'webm'].includes(ext)) {
+        return 16 * 1024 * 1024; // 16MB
+    }
+    if (type.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+        return 16 * 1024 * 1024; // 16MB
+    }
+    return 100 * 1024 * 1024; // 100MB (documentos)
+}
+
 function renderPendingAttachments() {
     const container = document.getElementById('pendingAttachmentsContainer');
     if (!container) return;
@@ -16142,9 +16159,9 @@ function removePendingAttachment(idx) {
 }
 
 function addPendingAttachment(file) {
-    const maxSize = 10 * 1024 * 1024;
+    const maxSize = getMaxAttachmentSize(file);
     if (file.size > maxSize) {
-        alert('Arquivo muito grande. Tamanho máximo: 10MB');
+        alert('Arquivo muito grande. Tamanho máximo: ' + Math.floor(maxSize / 1024 / 1024) + 'MB');
         return;
     }
     const isAllowed = ALLOWED_ATTACHMENT_TYPES.includes(file.type) ||
@@ -16214,9 +16231,9 @@ function uploadFile(file) {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
-    const maxSize = 10 * 1024 * 1024;
+    const maxSize = getMaxAttachmentSize(file);
     if (file.size > maxSize) {
-        uploadDiv.innerHTML = '<div class="message-content"><div class="message-bubble text-danger">Arquivo muito grande. Tamanho míximo: 10MB</div></div>';
+        uploadDiv.innerHTML = '<div class="message-content"><div class="message-bubble text-danger">Arquivo muito grande. Tamanho máximo: ' + Math.floor(maxSize / 1024 / 1024) + 'MB</div></div>';
         return;
     }
 

@@ -11,7 +11,13 @@ use App\Helpers\Logger;
 class AttachmentService
 {
     private static string $uploadDir = __DIR__ . '/../../public/assets/media/attachments/';
-    private static int $maxFileSize = 10 * 1024 * 1024; // 10MB
+    private static int $maxFileSize = 10 * 1024 * 1024; // 10MB (default)
+    private static array $maxFileSizes = [
+        'image' => 16 * 1024 * 1024, // 16MB
+        'video' => 64 * 1024 * 1024, // 64MB
+        'audio' => 16 * 1024 * 1024, // 16MB
+        'document' => 100 * 1024 * 1024 // 100MB
+    ];
     private static array $allowedTypes = [
         'image' => ['jpg', 'jpeg', 'png', 'gif', 'webp'],
         'video' => ['mp4', 'webm', 'ogg', 'mov', 'm4v'],
@@ -29,11 +35,6 @@ class AttachmentService
             throw new \Exception('Erro ao fazer upload do arquivo');
         }
 
-        // Validar tamanho
-        if ($file['size'] > self::$maxFileSize) {
-            throw new \Exception('Arquivo muito grande. Tamanho máximo: ' . (self::$maxFileSize / 1024 / 1024) . 'MB');
-        }
-
         // Obter extensão
         $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
         $mimeType = self::getMimeType($file['tmp_name']);
@@ -42,6 +43,12 @@ class AttachmentService
         $fileType = self::getFileType($extension, $mimeType);
         if (!$fileType) {
             throw new \Exception('Tipo de arquivo não permitido');
+        }
+
+        // Validar tamanho (por tipo)
+        $maxSize = self::$maxFileSizes[$fileType] ?? self::$maxFileSize;
+        if ($file['size'] > $maxSize) {
+            throw new \Exception('Arquivo muito grande. Tamanho máximo: ' . (int)($maxSize / 1024 / 1024) . 'MB');
         }
 
         // Criar diretório se não existir
@@ -505,16 +512,18 @@ class AttachmentService
             return $errors;
         }
 
-        if ($file['size'] > self::$maxFileSize) {
-            $errors[] = 'Arquivo muito grande. Tamanho máximo: ' . (self::$maxFileSize / 1024 / 1024) . 'MB';
-        }
-
         $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
         $mimeType = self::getMimeType($file['tmp_name']);
         $fileType = self::getFileType($extension, $mimeType);
 
         if (!$fileType) {
             $errors[] = 'Tipo de arquivo não permitido';
+            return $errors;
+        }
+
+        $maxSize = self::$maxFileSizes[$fileType] ?? self::$maxFileSize;
+        if ($file['size'] > $maxSize) {
+            $errors[] = 'Arquivo muito grande. Tamanho máximo: ' . (int)($maxSize / 1024 / 1024) . 'MB';
         }
 
         return $errors;

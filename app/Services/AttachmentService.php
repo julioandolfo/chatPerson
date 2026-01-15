@@ -14,7 +14,7 @@ class AttachmentService
     private static int $maxFileSize = 10 * 1024 * 1024; // 10MB
     private static array $allowedTypes = [
         'image' => ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-        'video' => ['mp4', 'webm', 'ogg'],
+        'video' => ['mp4', 'webm', 'ogg', 'mov', 'm4v'],
         'audio' => ['mp3', 'wav', 'ogg', 'webm'], // webm (audio/webm) será convertido para ogg/opus
         'document' => ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'csv']
     ];
@@ -253,6 +253,8 @@ class AttachmentService
             'image/webp' => 'webp',
             'video/mp4' => 'mp4',
             'video/webm' => 'webm',
+            'video/quicktime' => 'mov',
+            'video/x-m4v' => 'm4v',
             'audio/webm' => 'webm',
             'audio/mpeg' => 'mp3',
             'audio/wav' => 'wav',

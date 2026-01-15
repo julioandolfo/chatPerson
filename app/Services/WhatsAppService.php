@@ -736,17 +736,21 @@ class WhatsAppService
                             $payload['fileName'] = $mediaName;
                         }
                         
-                        // Campo text é OBRIGATÓRIO mesmo para mídia (conforme doc Quepasa)
+                        // Para vídeo sem legenda, não enviar texto
                         if ($captionTrim !== '') {
                             $payload['text'] = $captionTrim;
+                        } elseif ($mediaType !== 'video') {
+                            $payload['text'] = ' '; // Espaço obrigatório quando não há caption (imagem/documento)
                         } else {
-                            $payload['text'] = ' '; // Espaço obrigatório quando não há caption
+                            unset($payload['text']);
                         }
                         
                         Logger::quepasa("sendMessage - Payload {$mediaType} configurado:");
                         Logger::quepasa("sendMessage -   url: {$payload['url']}");
                         Logger::quepasa("sendMessage -   fileName: " . ($payload['fileName'] ?? 'NULL'));
-                        Logger::quepasa("sendMessage -   text: '" . ($payload['text'] === ' ' ? '(espaço)' : substr($payload['text'], 0, 50)) . "'");
+                        $payloadText = $payload['text'] ?? null;
+                        $textPreview = $payloadText === null ? '(sem texto)' : ($payloadText === ' ' ? '(espaço)' : substr($payloadText, 0, 50));
+                        Logger::quepasa("sendMessage -   text: '" . $textPreview . "'");
                     }
                 } else {
                     Logger::quepasa("sendMessage - Nenhuma mídia detectada nas opções");

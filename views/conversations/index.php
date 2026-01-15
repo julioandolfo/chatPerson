@@ -16100,7 +16100,7 @@ function addParticipant() {
 // Helpers de anexos (fila antes de enviar)
 const ALLOWED_ATTACHMENT_TYPES = [
     'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
-    'video/mp4', 'video/webm', 'video/ogg',
+    'video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/x-m4v',
     'audio/mp3', 'audio/wav', 'audio/ogg',
     'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -16148,7 +16148,7 @@ function addPendingAttachment(file) {
         return;
     }
     const isAllowed = ALLOWED_ATTACHMENT_TYPES.includes(file.type) ||
-        /\.(jpg|jpeg|png|gif|webp|mp4|webm|ogg|mp3|wav|pdf|doc|docx|xls|xlsx|txt|csv)$/i.test(file.name);
+        /\.(jpg|jpeg|png|gif|webp|mp4|webm|ogg|mov|m4v|mp3|wav|pdf|doc|docx|xls|xlsx|txt|csv)$/i.test(file.name);
     if (!isAllowed) {
         alert('Tipo de arquivo não permitido');
         return;

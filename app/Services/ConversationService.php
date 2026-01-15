@@ -1474,13 +1474,16 @@ class ConversationService
             }
         }
 
-        // **ENVIAR PARA INTEGRAÇÃO** se a mensagem for do agente
+        // **ENVIAR PARA INTEGRAÇÃO** se a mensagem for do agente (MAS NÃO SE FOR NOTA INTERNA)
         $integrationAccountId = $conversation['integration_account_id'] ?? null;
         $whatsappAccountId = $conversation['whatsapp_account_id'] ?? null; // Legacy
         
-        \App\Helpers\Logger::info("ConversationService::sendMessage - Verificando envio (type={$senderType}, channel={$conversation['channel']}, integration_id=" . ($integrationAccountId ?? 'NULL') . ", wa_id=" . ($whatsappAccountId ?? 'NULL') . ")");
+        \App\Helpers\Logger::info("ConversationService::sendMessage - Verificando envio (type={$senderType}, messageType={$messageType}, channel={$conversation['channel']}, integration_id=" . ($integrationAccountId ?? 'NULL') . ", wa_id=" . ($whatsappAccountId ?? 'NULL') . ")");
         
-        if ($senderType === 'agent' && ($integrationAccountId || ($conversation['channel'] === 'whatsapp' && $whatsappAccountId))) {
+        // ✅ CORREÇÃO: NÃO enviar notas internas para o cliente via WhatsApp
+        if ($messageType === 'note') {
+            \App\Helpers\Logger::info("ConversationService::sendMessage - 📝 Nota interna detectada (message_type=note). NÃO será enviada ao cliente via WhatsApp.");
+        } elseif ($senderType === 'agent' && ($integrationAccountId || ($conversation['channel'] === 'whatsapp' && $whatsappAccountId))) {
             \App\Helpers\Logger::info("ConversationService::sendMessage - Condições para WhatsApp atendidas, processando envio");
             try {
                 // Obter contato para pegar o telefone/identifier

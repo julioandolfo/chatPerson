@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // Log de debug
 $logFile = __DIR__ . '/../../storage/logs/conversas_bug.log';
 @file_put_contents($logFile, date('Y-m-d H:i:s') . " - Carregando views/conversations/index.php\n", FILE_APPEND);
@@ -724,12 +724,27 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     padding: 15px;
     color: var(--bs-text-muted);
     font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .messages-loading .spinner-border {
     width: 1.5rem;
     height: 1.5rem;
-    margin-right: 10px;
 }
 
 .messages-load-more {
@@ -738,11 +753,22 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     color: var(--bs-primary);
     cursor: pointer;
     font-size: 13px;
-    transition: opacity 0.2s;
+    transition: all 0.2s;
 }
 
 .messages-load-more:hover {
     opacity: 0.7;
+    transform: scale(1.05);
+}
+
+/* Hover elevate effect para cards de histórico */
+.hover-elevate-up {
+    transition: all 0.2s ease-in-out;
+}
+
+.hover-elevate-up:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
 }
 
 /* Highlight de mensagem encontrada na busca */
@@ -7317,6 +7343,7 @@ function selectConversation(id) {
         console.log('🔧 [selectConversation] Resposta recebida:', {
             success: data.success,
             access_restricted: data.access_restricted,
+            access_restricted_type: typeof data.access_restricted,
             has_conversation: !!data.conversation,
             access_info: data.access_info
         });
@@ -7329,11 +7356,24 @@ function selectConversation(id) {
             window.history.pushState({ conversationId: id }, '', newUrl);
             
             // ============================================
-            // VERIFICAR SE ACESSO ë RESTRITO
+            // VERIFICAR SE ACESSO É RESTRITO
             // ============================================
-            if (data.access_restricted === true) {
-                showRestrictedAccessView(id, data.conversation, data.access_info);
+            // ✅ CORREÇÃO: Verificar tanto boolean true quanto string "true" ou valor truthy
+            if (data.access_restricted === true || data.access_restricted === 'true' || data.access_restricted === 1) {
+                console.log('🔒 [selectConversation] Acesso restrito detectado - exibindo overlay');
+                
+                // ✅ GARANTIR que accessInfo sempre existe (mesmo que vazio)
+                const accessInfo = data.access_info || {
+                    can_view: false,
+                    is_participant: false,
+                    is_assigned: false,
+                    has_pending_request: false
+                };
+                
+                showRestrictedAccessView(id, data.conversation, accessInfo);
                 return;
+            } else {
+                console.log('✅ [selectConversation] Acesso permitido - carregando conversa normalmente');
             }
             
             // ============================================
@@ -7359,6 +7399,12 @@ function selectConversation(id) {
             isLoadingMessages = false;
             hasMoreMessages = true;
             oldestMessageId = null;
+            
+            // Remover indicador "Início da conversa" se existir (de conversa anterior)
+            const noMoreMsgIndicator = document.getElementById('noMoreMessagesIndicator');
+            if (noMoreMsgIndicator) {
+                noMoreMsgIndicator.remove();
+            }
             
             // Atualizar mensagens
             const messages = data.messages || [];
@@ -7576,11 +7622,18 @@ function resetRestrictedAccessState() {
  * Mostrar view de acesso restrito (chat ofuscado com botão de solicitar)
  */
 function showRestrictedAccessView(conversationId, conversation, accessInfo) {
+    console.log('🔒 [showRestrictedAccessView] CHAMADA - conversationId:', conversationId, 'accessInfo:', accessInfo);
+    
     const chatMessages = document.getElementById('chatMessages');
     const chatInput = document.getElementById('chatInput');
     const chatHeader = document.getElementById('chatHeader');
     
-    if (!chatMessages) return;
+    if (!chatMessages) {
+        console.error('❌ [showRestrictedAccessView] Elemento chatMessages não encontrado!');
+        return;
+    }
+    
+    console.log('✅ [showRestrictedAccessView] Elementos encontrados, montando overlay...');
     
     // Atualizar header com info bísica
     if (chatHeader) {
@@ -7622,7 +7675,12 @@ function showRestrictedAccessView(conversationId, conversation, accessInfo) {
     let actionButton = '';
     let statusMessage = '';
     
-    if (accessInfo.has_pending_request) {
+    // ✅ CORREÇÃO: Garantir que accessInfo existe e tem os campos necessários
+    const hasPendingRequest = accessInfo && (accessInfo.has_pending_request === true || accessInfo.has_pending_request === 'true');
+    
+    console.log('🔒 [showRestrictedAccessView] hasPendingRequest:', hasPendingRequest);
+    
+    if (hasPendingRequest) {
         statusMessage = `
             <div class="alert alert-warning d-flex align-items-center mb-4" role="alert">
                 <i class="ki-duotone ki-timer fs-2 me-3 text-warning">
@@ -7717,6 +7775,8 @@ function showRestrictedAccessView(conversationId, conversation, accessInfo) {
     if (sidebar) {
         sidebar.classList.remove('open');
     }
+    
+    console.log('✅ [showRestrictedAccessView] Overlay de acesso restrito exibido com sucesso!');
 }
 
 /**
@@ -8088,6 +8148,34 @@ function handleScroll(event) {
     }
 }
 
+// Mostrar indicador de que não há mais mensagens
+function showNoMoreMessagesIndicator() {
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) return;
+    
+    // Verificar se já existe o indicador
+    const existingIndicator = document.getElementById('noMoreMessagesIndicator');
+    if (existingIndicator) return;
+    
+    const indicator = document.createElement('div');
+    indicator.id = 'noMoreMessagesIndicator';
+    indicator.className = 'text-center py-3 text-muted';
+    indicator.innerHTML = `
+        <div class="d-flex align-items-center justify-content-center gap-2">
+            <div class="border-bottom flex-grow-1" style="max-width: 100px;"></div>
+            <div class="fs-7">
+                <i class="ki-duotone ki-check-circle fs-5 text-success me-1">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                Início da conversa
+            </div>
+            <div class="border-bottom flex-grow-1" style="max-width: 100px;"></div>
+        </div>
+    `;
+    chatMessages.insertBefore(indicator, chatMessages.firstChild);
+}
+
 // Carregar mais mensagens antigas
 async function loadMoreMessages() {
     if (isLoadingMessages || !hasMoreMessages || !currentConversationId || !oldestMessageId) {
@@ -8112,7 +8200,7 @@ async function loadMoreMessages() {
         <div class="spinner-border spinner-border-sm text-primary" role="status">
             <span class="visually-hidden">Carregando...</span>
         </div>
-        Carregando mensagens antigas...
+        <span class="ms-2">Carregando mensagens antigas...</span>
     `;
     chatMessages.insertBefore(loadingIndicator, chatMessages.firstChild);
     
@@ -8189,9 +8277,15 @@ async function loadMoreMessages() {
             const scrollHeightAfter = chatMessages.scrollHeight;
             const scrollDiff = scrollHeightAfter - scrollHeightBefore;
             chatMessages.scrollTop = scrollDiff;
+            
+            // ✅ Se não há mais mensagens, mostrar indicador
+            if (!hasMoreMessages) {
+                showNoMoreMessagesIndicator();
+            }
         } else {
-            // Não hí mais mensagens
+            // Não há mais mensagens
             hasMoreMessages = false;
+            showNoMoreMessagesIndicator();
         }
     } catch (error) {
         console.error('Erro ao carregar mensagens antigas:', error);
@@ -9095,13 +9189,40 @@ function loadContactHistory(contactId) {
         previous.forEach(conv => {
             const lastMsg = conv.last_message ? escapeHtml(conv.last_message.substring(0, 60)) + (conv.last_message.length > 60 ? '...' : '') : 'Sem mensagens';
             const updatedAt = conv.updated_at || conv.created_at;
+            const statusBadgeClass = conv.status === 'closed' || conv.status === 'resolved' ? 'badge-light-success' : 'badge-light-secondary';
+            const msgCount = conv.message_count || 0;
+            
             html += `
-                <div class="d-flex flex-column p-3 border rounded mb-2 bg-light-dark">
+                <div class="d-flex flex-column p-3 border rounded mb-2 bg-light-dark cursor-pointer hover-elevate-up" 
+                     onclick="selectConversation(${conv.id})" 
+                     style="transition: all 0.2s; cursor: pointer;"
+                     title="Clique para abrir esta conversa">
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <span class="fw-semibold">Conversa #${conv.id}</span>
-                        <span class="badge badge-light-secondary">${conv.status || ''}</span>
+                        <span class="fw-semibold">
+                            <i class="ki-duotone ki-message-text fs-6 text-primary me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            Conversa #${conv.id}
+                        </span>
+                        <span class="badge ${statusBadgeClass}">${conv.status || ''}</span>
                     </div>
-                    <div class="text-muted fs-8">${formatDateTime(updatedAt)}</div>
+                    <div class="text-muted fs-8">
+                        <i class="ki-duotone ki-calendar fs-7 me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        ${formatDateTime(updatedAt)}
+                    </div>
+                    <div class="text-muted fs-8 mt-1">
+                        <i class="ki-duotone ki-message-text-2 fs-7 me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        ${msgCount} mensagens
+                    </div>
                     <div class="text-muted fs-8 mt-1">${lastMsg}</div>
                 </div>
             `;

@@ -1002,6 +1002,7 @@ class OpenAIService
     private static function assignRoundRobin(int $conversationId): ?int
     {
         // Buscar agente com menos conversas ativas
+        // Filtrar por: ativo, online, habilitado na fila, respeitando limite de conversas
         $agents = Database::fetchAll(
             "SELECT u.id, u.name, 
                     COUNT(c.id) as active_conversations
@@ -1009,7 +1010,10 @@ class OpenAIService
              LEFT JOIN conversations c ON c.assigned_to = u.id AND c.status IN ('open', 'pending')
              WHERE u.role IN ('agent', 'supervisor', 'admin')
                    AND u.status = 'active'
+                   AND u.availability_status = 'online'
+                   AND (u.queue_enabled IS NULL OR u.queue_enabled = 1)
              GROUP BY u.id
+             HAVING (u.max_conversations IS NULL OR active_conversations < u.max_conversations)
              ORDER BY active_conversations ASC, RAND()
              LIMIT 1"
         );

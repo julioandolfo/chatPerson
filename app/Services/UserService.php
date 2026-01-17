@@ -26,6 +26,15 @@ class UserService
             $data['woocommerce_seller_id'] = null;
         }
         
+        // Processar campo queue_enabled (checkbox)
+        // Para novos usuários, default é habilitado (1)
+        // Se existe a chave no array, processar o valor; senão, usar default 1
+        if (array_key_exists('queue_enabled', $data)) {
+            $data['queue_enabled'] = !empty($data['queue_enabled']) ? 1 : 0;
+        } else {
+            $data['queue_enabled'] = 1; // Default é habilitado para novos usuários
+        }
+        
         // Definir valores padrão
         $data['availability_status'] = $data['availability_status'] ?? 'offline';
         $data['current_conversations'] = 0;
@@ -106,6 +115,14 @@ class UserService
         }
         if (isset($data['woocommerce_seller_id']) && $data['woocommerce_seller_id'] === '') {
             $data['woocommerce_seller_id'] = null;
+        }
+        
+        // Processar campo queue_enabled (checkbox)
+        // Para update: se a chave existe no array (vem do formulário), processar
+        // Se não existe, não alterar (pode ser update de outros campos)
+        // Se existe e tem valor truthy, converter para 1; se existe e não tem valor, converter para 0
+        if (array_key_exists('queue_enabled', $data)) {
+            $data['queue_enabled'] = !empty($data['queue_enabled']) ? 1 : 0;
         }
 
         $errors = Validator::validate($data, [

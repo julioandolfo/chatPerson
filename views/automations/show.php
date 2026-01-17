@@ -1323,6 +1323,30 @@ function renderNode(node) {
             `;
         });
         innerHtml += '</div>';
+    } else if (node.node_type === 'condition') {
+        // Nó de Condição: mostrar handles TRUE e FALSE
+        innerHtml += '<div class="condition-outputs" style="margin-top: 10px;">';
+        innerHtml += `
+            <div class="condition-output-row" style="position: relative; display: flex; align-items: center; justify-content: flex-end; margin-bottom: 8px; padding-right: 5px;">
+                <span class="condition-output-label" style="font-size: 12px; color: #50cd89; font-weight: 600;">✓ TRUE</span>
+                <div class="node-connection-handle output condition-handle" 
+                     data-node-id="${String(node.id || '')}" 
+                     data-handle-type="output" 
+                     data-connection-type="true"
+                     style="position: absolute; right: -11px; top: 50%; transform: translateY(-50%); background: #50cd89 !important;">
+                </div>
+            </div>
+            <div class="condition-output-row" style="position: relative; display: flex; align-items: center; justify-content: flex-end; padding-right: 5px;">
+                <span class="condition-output-label" style="font-size: 12px; color: #f1416c; font-weight: 600;">✗ FALSE</span>
+                <div class="node-connection-handle output condition-handle" 
+                     data-node-id="${String(node.id || '')}" 
+                     data-handle-type="output" 
+                     data-connection-type="false"
+                     style="position: absolute; right: -11px; top: 50%; transform: translateY(-50%); background: #f1416c !important;">
+                </div>
+            </div>
+        `;
+        innerHtml += '</div>';
     } else {
         // Handle de saída normal para outros tipos
         innerHtml += `<div class="node-connection-handle output" data-node-id="${String(node.id || '')}" data-handle-type="output"></div>`;
@@ -1339,9 +1363,10 @@ function renderNode(node) {
     outputHandles.forEach(function(outputHandle) {
         outputHandle.addEventListener('mousedown', function(e) {
             e.stopPropagation();
-            // Suportar tanto option-index (chatbot) quanto intent-index (AI agent)
+            // Suportar option-index (chatbot), intent-index (AI agent) e connection-type (condition)
             const optionIndex = outputHandle.getAttribute('data-option-index') || outputHandle.getAttribute('data-intent-index');
-            startConnection(node.id, 'output', e, optionIndex);
+            const connectionType = outputHandle.getAttribute('data-connection-type'); // 'true' ou 'false' para condições
+            startConnection(node.id, 'output', e, optionIndex, connectionType);
         });
     });
     
@@ -2152,6 +2177,9 @@ function openNodeConfig(nodeId) {
                     <label class="required fw-semibold fs-6 mb-2">Campo</label>
                     <select name="field" id="kt_condition_field" class="form-select form-select-solid" required onchange="updateConditionOperators(this.value)">
                         <option value="">Selecione um campo</option>
+                        <optgroup label="Sistema">
+                            <option value="business_hours">Horário de Atendimento</option>
+                        </optgroup>
                         <optgroup label="Conversa">
                             <option value="channel">Canal</option>
                             <option value="status">Status</option>
@@ -2587,6 +2615,20 @@ function openNodeConfig(nodeId) {
                 }
             }
         }
+        
+        // Tratamento especial para condição: chamar updateConditionOperators
+        if (node.node_type === 'condition' && node.node_data.field) {
+            setTimeout(() => {
+                updateConditionOperators(node.node_data.field);
+                // Pré-selecionar operador após atualizar opções
+                if (node.node_data.operator) {
+                    const operatorSelect = document.getElementById('kt_condition_operator');
+                    if (operatorSelect) {
+                        operatorSelect.value = node.node_data.operator;
+                    }
+                }
+            }, 50);
+        }
     }
     
     // Carregar estágios quando funil for selecionado (action_move_stage)
@@ -2762,7 +2804,7 @@ function updateSvgSize() {
     connectionsSvg.setAttribute('height', height);
 }
 
-function getNodeHandlePosition(nodeId, handleType, optionIndex) {
+function getNodeHandlePosition(nodeId, handleType, optionIndex, connectionType) {
     if (!canvasViewport) return null;
     
     const nodeElement = document.getElementById(String(nodeId));
@@ -2770,8 +2812,12 @@ function getNodeHandlePosition(nodeId, handleType, optionIndex) {
     
     let handle;
     
+    // Se for handle de condição (TRUE/FALSE)
+    if (handleType === 'output' && connectionType) {
+        handle = nodeElement.querySelector(`.node-connection-handle.${handleType}[data-connection-type="${connectionType}"]`);
+    }
     // Se for handle de opção (chatbot ou AI intent)
-    if (handleType === 'output' && optionIndex !== undefined && optionIndex !== null) {
+    else if (handleType === 'output' && optionIndex !== undefined && optionIndex !== null) {
         // Tentar primeiro com data-option-index (chatbot), depois data-intent-index (AI agent)
         handle = nodeElement.querySelector(`.node-connection-handle.${handleType}[data-option-index="${optionIndex}"]`) ||
                  nodeElement.querySelector(`.node-connection-handle.${handleType}[data-intent-index="${optionIndex}"]`);
@@ -2822,7 +2868,7 @@ function cancelConnection() {
     document.body.style.userSelect = '';
 }
 
-function startConnection(nodeId, handleType, e, optionIndex) {
+function startConnection(nodeId, handleType, e, optionIndex, connectionType) {
     e.stopPropagation();
     e.preventDefault();
     
@@ -2832,10 +2878,11 @@ function startConnection(nodeId, handleType, e, optionIndex) {
     connectingFrom = { 
         nodeId: nodeId, 
         handleType: handleType,
-        optionIndex: optionIndex !== undefined ? optionIndex : null
+        optionIndex: optionIndex !== undefined ? optionIndex : null,
+        connectionType: connectionType || null // 'true' ou 'false' para condições
     };
     
-    const pos = getNodeHandlePosition(nodeId, handleType, optionIndex);
+    const pos = getNodeHandlePosition(nodeId, handleType, optionIndex, connectionType);
     if (!pos) {
         connectingFrom = null;
         return;
@@ -2942,10 +2989,11 @@ function endConnection(nodeId, handleType, e) {
         fromNode.node_data.connections = [];
     }
     
-    // Verificar se conexão já existe (mesma origem, destino e opção)
+    // Verificar se conexão já existe (mesma origem, destino, opção e tipo de conexão)
     const exists = fromNode.node_data.connections.some(function(conn) {
-        return conn.target_node_id === nodeId && 
-               conn.option_index === (connectingFrom.optionIndex !== null ? connectingFrom.optionIndex : undefined);
+        const optionMatch = conn.option_index === (connectingFrom.optionIndex !== null ? connectingFrom.optionIndex : undefined);
+        const typeMatch = conn.connection_type === (connectingFrom.connectionType || undefined);
+        return conn.target_node_id === nodeId && optionMatch && typeMatch;
     });
     
     if (!exists) {
@@ -2954,9 +3002,14 @@ function endConnection(nodeId, handleType, e) {
             type: 'next'
         };
         
-        // Adicionar option_index se existir
+        // Adicionar option_index se existir (para chatbot/AI)
         if (connectingFrom.optionIndex !== null && connectingFrom.optionIndex !== undefined) {
             newConnection.option_index = parseInt(connectingFrom.optionIndex);
+        }
+        
+        // Adicionar connection_type se existir (para condições: 'true' ou 'false')
+        if (connectingFrom.connectionType) {
+            newConnection.connection_type = connectingFrom.connectionType;
         }
         
         fromNode.node_data.connections.push(newConnection);
@@ -2981,7 +3034,8 @@ function renderConnections() {
         
         node.node_data.connections.forEach(function(connection) {
             const optionIndex = connection.option_index !== undefined ? connection.option_index : null;
-            const fromPos = getNodeHandlePosition(node.id, 'output', optionIndex);
+            const connectionType = connection.connection_type || null; // 'true' ou 'false' para condições
+            const fromPos = getNodeHandlePosition(node.id, 'output', optionIndex, connectionType);
             const toPos = getNodeHandlePosition(connection.target_node_id, 'input');
             
             if (fromPos && toPos) {
@@ -3017,7 +3071,15 @@ function renderConnections() {
                 path.setAttribute('data-to', String(connection.target_node_id || ''));
                 path.setAttribute('class', 'connection-line');
                 path.setAttribute('fill', 'none');
-                path.setAttribute('stroke', '#009ef7');
+                
+                // Cor da linha baseada no tipo de conexão (condições: true=verde, false=vermelho)
+                let lineColor = '#009ef7'; // Cor padrão (azul)
+                if (connectionType === 'true') {
+                    lineColor = '#50cd89'; // Verde para TRUE
+                } else if (connectionType === 'false') {
+                    lineColor = '#f1416c'; // Vermelho para FALSE
+                }
+                path.setAttribute('stroke', lineColor);
                 path.setAttribute('stroke-width', '2');
                 
                 // Remover animação após renderização inicial (opcional - descomente para animar)
@@ -3038,6 +3100,8 @@ function renderConnections() {
                 deleteBtn.style.cursor = 'pointer';
                 deleteBtn.setAttribute('data-from', String(node.id || ''));
                 deleteBtn.setAttribute('data-to', String(connection.target_node_id || ''));
+                if (optionIndex !== null) deleteBtn.setAttribute('data-option-index', optionIndex);
+                if (connectionType) deleteBtn.setAttribute('data-connection-type', connectionType);
                 
                 // Círculo de fundo
                 const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -3075,8 +3139,10 @@ function renderConnections() {
                     e.stopPropagation();
                     const fromId = this.getAttribute('data-from');
                     const toId = this.getAttribute('data-to');
+                    const optIdx = this.getAttribute('data-option-index');
+                    const connType = this.getAttribute('data-connection-type');
                     if (confirm('Deseja remover esta conexão?')) {
-                        removeConnection(fromId, toId);
+                        removeConnection(fromId, toId, optIdx, connType);
                     }
                 });
                 
@@ -3106,7 +3172,7 @@ function renderConnections() {
                 const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
                 const arrowPoints = `0,0 ${-arrowSize},${-arrowSize/2} ${-arrowSize},${arrowSize/2}`;
                 arrow.setAttribute('points', arrowPoints);
-                arrow.setAttribute('fill', '#009ef7');
+                arrow.setAttribute('fill', lineColor); // Mesma cor da linha
                 arrow.setAttribute('transform', `translate(${arrowX},${arrowY}) rotate(${angle})`);
                 arrow.setAttribute('class', 'connection-arrow');
                 
@@ -3132,8 +3198,8 @@ function renderConnections() {
     });
 }
 
-function removeConnection(fromNodeId, toNodeId) {
-    console.log('removeConnection chamado:', { fromNodeId, toNodeId, type_from: typeof fromNodeId, type_to: typeof toNodeId });
+function removeConnection(fromNodeId, toNodeId, optionIndex, connectionType) {
+    console.log('removeConnection chamado:', { fromNodeId, toNodeId, optionIndex, connectionType, type_from: typeof fromNodeId, type_to: typeof toNodeId });
     
     // Converter para string para garantir comparação consistente
     const fromIdStr = String(fromNodeId);
@@ -3148,9 +3214,23 @@ function removeConnection(fromNodeId, toNodeId) {
     }
     
     const oldConnectionsCount = node.node_data.connections.length;
-    node.node_data.connections = node.node_data.connections.filter(
-        conn => String(conn.target_node_id) !== toIdStr
-    );
+    node.node_data.connections = node.node_data.connections.filter(function(conn) {
+        // Comparar target_node_id
+        if (String(conn.target_node_id) !== toIdStr) return true;
+        
+        // Se tem optionIndex, comparar também
+        if (optionIndex !== null && optionIndex !== undefined) {
+            if (String(conn.option_index) !== String(optionIndex)) return true;
+        }
+        
+        // Se tem connectionType (condition), comparar também
+        if (connectionType) {
+            if (conn.connection_type !== connectionType) return true;
+        }
+        
+        // Se todos os critérios correspondem, remover esta conexão
+        return false;
+    });
     
     const newConnectionsCount = node.node_data.connections.length;
     console.log('Conexões removidas:', oldConnectionsCount - newConnectionsCount);
@@ -4048,13 +4128,28 @@ function updateConditionOperators(field) {
     
     if (!operatorSelect || !valueContainer || !valueInput) return;
     
+    // Campos especiais do sistema (não precisam de valor)
+    const systemFields = ['business_hours'];
+    const isSystemField = systemFields.includes(field);
+    
     // Operadores numéricos para campos numéricos
     const numericFields = ['unread_count', 'created_days_ago'];
     const isNumeric = numericFields.includes(field);
     
     let operatorOptions = '<option value="">Selecione um operador</option>';
     
-    if (isNumeric) {
+    if (isSystemField) {
+        // Campos do sistema com operadores específicos
+        if (field === 'business_hours') {
+            operatorOptions += `
+                <option value="is_within">Dentro do horário de atendimento</option>
+                <option value="is_outside">Fora do horário de atendimento</option>
+            `;
+        }
+        // Esconder o campo de valor para campos do sistema
+        valueContainer.style.display = 'none';
+        valueInput.removeAttribute('required');
+    } else if (isNumeric) {
         operatorOptions += `
             <option value="equals">Igual a (=)</option>
             <option value="not_equals">Diferente de (≠)</option>
@@ -4065,6 +4160,8 @@ function updateConditionOperators(field) {
         `;
         valueInput.type = 'number';
         valueInput.placeholder = 'Digite um número...';
+        valueContainer.style.display = 'block';
+        valueInput.setAttribute('required', 'required');
     } else {
         operatorOptions += `
             <option value="equals">Igual a (=)</option>
@@ -4080,6 +4177,8 @@ function updateConditionOperators(field) {
         `;
         valueInput.type = 'text';
         valueInput.placeholder = 'Digite o valor...';
+        valueContainer.style.display = 'block';
+        valueInput.setAttribute('required', 'required');
     }
     
     operatorSelect.innerHTML = operatorOptions;

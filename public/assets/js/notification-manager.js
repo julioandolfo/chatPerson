@@ -3,10 +3,22 @@
  * 
  * Gerencia notificações push/toast no canto inferior direito da tela.
  * Integrado com SoundManager para tocar sons junto com as notificações.
+ * 
+ * v2.0 - Melhorias:
+ * - Cache persistente em localStorage para evitar duplicatas ao atualizar página
+ * - Agrupamento de notificações da mesma conversa
+ * - Limite de notificações por conversa
+ * - Limpeza automática de cache antigo
  */
 
 (function(window) {
     'use strict';
+
+    // Chave para localStorage
+    const STORAGE_KEY = 'notification_manager_cache';
+    const CACHE_VERSION = 'v2';
+    const MAX_NOTIFICATIONS_PER_CONVERSATION = 3; // Máximo de notificações por conversa
+    const CACHE_EXPIRY_TIME = 30 * 60 * 1000; // 30 minutos de expiração
 
     const NotificationManager = {
         // Container das notificações
@@ -38,20 +50,27 @@
         notificationId: 0,
         
         // Cache de notificações já mostradas (para evitar duplicatas)
+        // Agora carregado de localStorage para persistir entre atualizações
         shownNotifications: {
             conversations: new Set(),
             messages: new Set(),
             assignments: new Set()
         },
         
-        // Tempo para limpar cache (5 minutos)
+        // Contador de notificações por conversa (para agrupar)
+        conversationNotificationCount: {},
+        
+        // Tempo para limpar cache da memória (5 minutos)
         cacheTimeout: 5 * 60 * 1000,
         
         // Última notificação mostrada (para debounce)
         lastNotificationTime: 0,
         
         // Intervalo mínimo entre notificações do mesmo tipo (ms)
-        debounceInterval: 500,
+        debounceInterval: 1000,
+        
+        // Última mensagem por conversa (para agrupar notificações)
+        lastMessageByConversation: {},
         
         // Tipos de notificação com ícones e cores
         types: {
@@ -125,7 +144,10 @@
                 return;
             }
             
-            console.log('[NotificationManager] Inicializando...');
+            console.log('[NotificationManager] Inicializando v2.0...');
+            
+            // Carregar cache do localStorage PRIMEIRO
+            this.loadCacheFromStorage();
             
             // Carregar configurações do servidor
             this.loadSettings();
@@ -145,8 +167,142 @@
             // Solicitar permissão para notificações do navegador (opcional)
             this.requestBrowserPermission();
             
+            // Limpar cache antigo periodicamente
+            this.startCacheCleanup();
+            
             this.initialized = true;
             console.log('[NotificationManager] ✅ Inicializado com sucesso');
+        },
+        
+        /**
+         * Carregar cache do localStorage
+         */
+        loadCacheFromStorage: function() {
+            try {
+                const stored = localStorage.getItem(STORAGE_KEY);
+                if (stored) {
+                    const data = JSON.parse(stored);
+                    
+                    // Verificar versão do cache
+                    if (data.version !== CACHE_VERSION) {
+                        console.log('[NotificationManager] Cache desatualizado, limpando...');
+                        this.clearStorageCache();
+                        return;
+                    }
+                    
+                    // Verificar se expirou
+                    if (data.timestamp && (Date.now() - data.timestamp) > CACHE_EXPIRY_TIME) {
+                        console.log('[NotificationManager] Cache expirado, limpando...');
+                        this.clearStorageCache();
+                        return;
+                    }
+                    
+                    // Restaurar sets
+                    this.shownNotifications.conversations = new Set(data.conversations || []);
+                    this.shownNotifications.messages = new Set(data.messages || []);
+                    this.shownNotifications.assignments = new Set(data.assignments || []);
+                    this.conversationNotificationCount = data.conversationCount || {};
+                    this.lastMessageByConversation = data.lastMessageByConversation || {};
+                    
+                    console.log('[NotificationManager] Cache restaurado:', {
+                        conversations: this.shownNotifications.conversations.size,
+                        messages: this.shownNotifications.messages.size,
+                        assignments: this.shownNotifications.assignments.size
+                    });
+                }
+            } catch (e) {
+                console.warn('[NotificationManager] Erro ao carregar cache:', e);
+                this.clearStorageCache();
+            }
+        },
+        
+        /**
+         * Salvar cache no localStorage
+         */
+        saveCacheToStorage: function() {
+            try {
+                const data = {
+                    version: CACHE_VERSION,
+                    timestamp: Date.now(),
+                    conversations: Array.from(this.shownNotifications.conversations),
+                    messages: Array.from(this.shownNotifications.messages),
+                    assignments: Array.from(this.shownNotifications.assignments),
+                    conversationCount: this.conversationNotificationCount,
+                    lastMessageByConversation: this.lastMessageByConversation
+                };
+                
+                // Limitar tamanho para não sobrecarregar localStorage
+                // Manter apenas últimas 500 mensagens e 200 conversas
+                if (data.messages.length > 500) {
+                    data.messages = data.messages.slice(-500);
+                    this.shownNotifications.messages = new Set(data.messages);
+                }
+                if (data.conversations.length > 200) {
+                    data.conversations = data.conversations.slice(-200);
+                    this.shownNotifications.conversations = new Set(data.conversations);
+                }
+                
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            } catch (e) {
+                console.warn('[NotificationManager] Erro ao salvar cache:', e);
+            }
+        },
+        
+        /**
+         * Limpar cache do localStorage
+         */
+        clearStorageCache: function() {
+            try {
+                localStorage.removeItem(STORAGE_KEY);
+                this.shownNotifications = {
+                    conversations: new Set(),
+                    messages: new Set(),
+                    assignments: new Set()
+                };
+                this.conversationNotificationCount = {};
+                this.lastMessageByConversation = {};
+            } catch (e) {
+                console.warn('[NotificationManager] Erro ao limpar cache:', e);
+            }
+        },
+        
+        /**
+         * Iniciar limpeza periódica de cache antigo
+         */
+        startCacheCleanup: function() {
+            // Limpar a cada 10 minutos
+            setInterval(() => {
+                this.cleanupOldCacheEntries();
+            }, 10 * 60 * 1000);
+        },
+        
+        /**
+         * Limpar entradas antigas do cache
+         */
+        cleanupOldCacheEntries: function() {
+            // Limitar tamanho dos sets
+            if (this.shownNotifications.messages.size > 500) {
+                const arr = Array.from(this.shownNotifications.messages);
+                this.shownNotifications.messages = new Set(arr.slice(-500));
+            }
+            
+            if (this.shownNotifications.conversations.size > 200) {
+                const arr = Array.from(this.shownNotifications.conversations);
+                this.shownNotifications.conversations = new Set(arr.slice(-200));
+            }
+            
+            // Limpar contadores antigos de conversas
+            const now = Date.now();
+            for (const convId in this.lastMessageByConversation) {
+                if ((now - this.lastMessageByConversation[convId].timestamp) > CACHE_EXPIRY_TIME) {
+                    delete this.lastMessageByConversation[convId];
+                    delete this.conversationNotificationCount[convId];
+                }
+            }
+            
+            // Salvar cache atualizado
+            this.saveCacheToStorage();
+            console.log('[NotificationManager] Cache limpo');
         },
         
         /**
@@ -389,6 +545,24 @@
                     font-weight: 400;
                 }
                 
+                .notification-count {
+                    font-size: 11px;
+                    font-weight: 600;
+                    min-width: 18px;
+                    height: 18px;
+                    padding: 0 5px;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    animation: pulse 0.3s ease-out;
+                }
+                
+                @keyframes pulse {
+                    0% { transform: scale(1); }
+                    50% { transform: scale(1.2); }
+                    100% { transform: scale(1); }
+                }
+                
                 .notification-message {
                     font-size: 13px;
                     color: var(--bs-gray-600, #7E8299);
@@ -531,21 +705,81 @@
             const cache = this.shownNotifications[type];
             return cache ? cache.has(String(id)) : false;
         },
+        
+        /**
+         * Verificar se deve mostrar notificação para uma conversa
+         * Considera limite por conversa e agrupamento
+         */
+        shouldShowForConversation: function(conversationId, messageId) {
+            if (!conversationId) return true;
+            
+            const convIdStr = String(conversationId);
+            const msgIdStr = String(messageId);
+            
+            // Verificar se a mensagem específica já foi notificada
+            if (this.hasShownNotification('messages', msgIdStr)) {
+                console.log('[NotificationManager] Mensagem já notificada:', msgIdStr);
+                return false;
+            }
+            
+            // Verificar limite de notificações por conversa
+            const count = this.conversationNotificationCount[convIdStr] || 0;
+            if (count >= MAX_NOTIFICATIONS_PER_CONVERSATION) {
+                console.log('[NotificationManager] Limite de notificações atingido para conversa:', convIdStr);
+                return false;
+            }
+            
+            // Verificar debounce por conversa (não mostrar mais de 1 a cada 2 segundos para mesma conversa)
+            const lastMsg = this.lastMessageByConversation[convIdStr];
+            if (lastMsg && (Date.now() - lastMsg.timestamp) < 2000) {
+                console.log('[NotificationManager] Debounce por conversa:', convIdStr);
+                return false;
+            }
+            
+            return true;
+        },
 
         /**
          * Marcar notificação como mostrada
          */
-        markAsShown: function(type, id) {
+        markAsShown: function(type, id, conversationId = null) {
             if (!id) return;
+            
+            const idStr = String(id);
             const cache = this.shownNotifications[type];
             if (cache) {
-                cache.add(String(id));
-                
-                // Limpar após timeout
-                setTimeout(() => {
-                    cache.delete(String(id));
-                }, this.cacheTimeout);
+                cache.add(idStr);
             }
+            
+            // Atualizar contadores de conversa para mensagens
+            if (type === 'messages' && conversationId) {
+                const convIdStr = String(conversationId);
+                this.conversationNotificationCount[convIdStr] = (this.conversationNotificationCount[convIdStr] || 0) + 1;
+                this.lastMessageByConversation[convIdStr] = {
+                    messageId: idStr,
+                    timestamp: Date.now()
+                };
+            }
+            
+            // Salvar no localStorage
+            this.saveCacheToStorage();
+            
+            // Limpar da memória após timeout (mas mantém no localStorage)
+            setTimeout(() => {
+                if (cache) {
+                    cache.delete(idStr);
+                }
+                // Decrementar contador da conversa
+                if (conversationId) {
+                    const convIdStr = String(conversationId);
+                    if (this.conversationNotificationCount[convIdStr]) {
+                        this.conversationNotificationCount[convIdStr]--;
+                        if (this.conversationNotificationCount[convIdStr] <= 0) {
+                            delete this.conversationNotificationCount[convIdStr];
+                        }
+                    }
+                }
+            }, this.cacheTimeout);
         },
         
         /**
@@ -559,6 +793,18 @@
             this.lastNotificationTime = now;
             return false;
         },
+        
+        /**
+         * Limpar contadores de uma conversa específica
+         * Útil quando o usuário abre a conversa
+         */
+        clearConversationCounter: function(conversationId) {
+            if (!conversationId) return;
+            const convIdStr = String(conversationId);
+            delete this.conversationNotificationCount[convIdStr];
+            delete this.lastMessageByConversation[convIdStr];
+            this.saveCacheToStorage();
+        },
 
         /**
          * Configurar event listeners
@@ -570,27 +816,38 @@
                 const data = e.detail || {};
                 const message = data.message || data;
                 const messageId = message.id || message.message?.id;
-                
-                // Evitar duplicatas
-                if (this.hasShownNotification('messages', messageId)) {
-                    console.log('[NotificationManager] Mensagem já notificada:', messageId);
-                    return;
-                }
+                const conversationId = data.conversation_id || message.conversation_id;
                 
                 // Verificar se é mensagem incoming (do contato)
                 const isIncoming = message.direction === 'incoming' || 
                                    message.sender_type === 'contact' ||
                                    (message.message && message.message.direction === 'incoming');
                 
-                if (isIncoming) {
-                    this.markAsShown('messages', messageId);
-                    this.showMessageNotification({
-                        conversation_id: data.conversation_id || message.conversation_id,
-                        content: message.content || message.message?.content || 'Nova mensagem recebida',
-                        contact_name: message.contact_name || message.sender_name || data.contact_name,
-                        contact_avatar: message.contact_avatar || message.avatar || data.avatar
-                    });
+                if (!isIncoming) {
+                    return; // Ignorar mensagens outgoing
                 }
+                
+                // Verificação inteligente de duplicatas
+                if (!this.shouldShowForConversation(conversationId, messageId)) {
+                    return;
+                }
+                
+                // Verificar debounce global
+                if (this.shouldDebounce()) {
+                    console.log('[NotificationManager] Debounce global ativo, aguardando...');
+                    return;
+                }
+                
+                // Marcar como mostrada ANTES de exibir
+                this.markAsShown('messages', messageId, conversationId);
+                
+                this.showMessageNotification({
+                    conversation_id: conversationId,
+                    message_id: messageId,
+                    content: message.content || message.message?.content || 'Nova mensagem recebida',
+                    contact_name: message.contact_name || message.sender_name || data.contact_name,
+                    contact_avatar: message.contact_avatar || message.avatar || data.avatar
+                });
             });
             
             document.addEventListener('realtime:new_conversation', (e) => {
@@ -601,6 +858,11 @@
                 // Evitar duplicatas
                 if (this.hasShownNotification('conversations', conversationId)) {
                     console.log('[NotificationManager] Conversa já notificada:', conversationId);
+                    return;
+                }
+                
+                // Verificar debounce
+                if (this.shouldDebounce()) {
                     return;
                 }
                 
@@ -615,15 +877,16 @@
             document.addEventListener('realtime:conversation_assigned', (e) => {
                 const data = e.detail || {};
                 const conversationId = data.conversation_id || data.id;
-                const assignmentKey = `assign_${conversationId}`;
+                const assignmentKey = `assign_${conversationId}_${Date.now()}`;
                 
-                // Evitar duplicatas
-                if (this.hasShownNotification('assignments', assignmentKey)) {
-                    console.log('[NotificationManager] Atribuição já notificada:', assignmentKey);
+                // Evitar duplicatas (usando timestamp para permitir reatribuições)
+                const baseKey = `assign_${conversationId}`;
+                if (this.hasShownNotification('assignments', baseKey)) {
+                    console.log('[NotificationManager] Atribuição já notificada recentemente:', baseKey);
                     return;
                 }
                 
-                this.markAsShown('assignments', assignmentKey);
+                this.markAsShown('assignments', baseKey);
                 this.showAssignmentNotification({
                     conversation_id: conversationId,
                     contact_name: data.contact_name || 'Contato'
@@ -669,8 +932,19 @@
             });
             
             // Listener para selecionar conversa quando clicado na notificação
+            // Também limpa o contador de notificações da conversa
             document.addEventListener('notification:selectConversation', (e) => {
-                console.log('[NotificationManager] Selecionando conversa:', e.detail.conversationId);
+                const conversationId = e.detail.conversationId;
+                console.log('[NotificationManager] Selecionando conversa:', conversationId);
+                this.clearConversationCounter(conversationId);
+            });
+            
+            // Listener quando usuário abre uma conversa (limpar contador)
+            document.addEventListener('conversation:opened', (e) => {
+                const conversationId = e.detail?.conversationId || e.detail?.id;
+                if (conversationId) {
+                    this.clearConversationCounter(conversationId);
+                }
             });
             
             console.log('[NotificationManager] ✅ Event listeners configurados');
@@ -717,6 +991,11 @@
             const toast = document.createElement('div');
             toast.className = `notification-toast type-${typeConfig.color}`;
             toast.dataset.id = id;
+            
+            // Adicionar conversationId para identificação
+            if (conversationId) {
+                toast.dataset.conversationId = String(conversationId);
+            }
             
             // Avatar ou ícone
             let avatarHtml = '';
@@ -911,6 +1190,19 @@
             const contactName = data.contact_name || data.sender_name || 'Contato';
             const messagePreview = data.content || data.message || 'Nova mensagem recebida';
             const avatar = data.contact_avatar || data.avatar || null;
+            const conversationId = data.conversation_id;
+            
+            // Verificar se já tem notificação ativa desta conversa e atualizar
+            const existingNotification = this.getActiveNotificationForConversation(conversationId);
+            if (existingNotification) {
+                // Atualizar notificação existente ao invés de criar nova
+                this.updateNotificationContent(existingNotification, {
+                    message: messagePreview,
+                    sender: contactName,
+                    isUpdate: true
+                });
+                return;
+            }
             
             this.show({
                 type: 'new_message',
@@ -918,8 +1210,78 @@
                 message: messagePreview,
                 sender: contactName,
                 avatar: avatar,
-                conversationId: data.conversation_id
+                conversationId: conversationId
             });
+        },
+        
+        /**
+         * Buscar notificação ativa para uma conversa
+         */
+        getActiveNotificationForConversation: function(conversationId) {
+            if (!conversationId || !this.container) return null;
+            
+            const toasts = this.container.querySelectorAll('.notification-toast');
+            for (const toast of toasts) {
+                if (toast.dataset.conversationId === String(conversationId)) {
+                    return toast;
+                }
+            }
+            return null;
+        },
+        
+        /**
+         * Atualizar conteúdo de uma notificação existente
+         */
+        updateNotificationContent: function(toast, data) {
+            if (!toast) return;
+            
+            const messageEl = toast.querySelector('.notification-message');
+            if (messageEl && data.message) {
+                let content = '';
+                if (data.sender) {
+                    content = `<span class="notification-sender">${this.escapeHtml(data.sender)}:</span> ${this.escapeHtml(data.message)}`;
+                } else {
+                    content = this.escapeHtml(data.message);
+                }
+                
+                if (data.isUpdate) {
+                    // Adicionar indicador de múltiplas mensagens
+                    const countEl = toast.querySelector('.notification-count');
+                    if (countEl) {
+                        const count = parseInt(countEl.textContent) + 1;
+                        countEl.textContent = count;
+                    } else {
+                        const titleEl = toast.querySelector('.notification-title');
+                        if (titleEl) {
+                            const badge = document.createElement('span');
+                            badge.className = 'notification-count badge badge-circle badge-sm bg-primary ms-2';
+                            badge.textContent = '2';
+                            titleEl.insertBefore(badge, titleEl.querySelector('.notification-time'));
+                        }
+                    }
+                }
+                
+                messageEl.innerHTML = content;
+            }
+            
+            // Resetar timer de auto-dismiss
+            if (toast.dataset.timeoutId) {
+                clearTimeout(parseInt(toast.dataset.timeoutId));
+            }
+            
+            const duration = this.settings.duration || this.defaultDuration;
+            const timeoutId = setTimeout(() => {
+                this.dismiss(toast.dataset.id);
+            }, duration);
+            toast.dataset.timeoutId = timeoutId;
+            
+            // Resetar animação de progresso
+            const progress = toast.querySelector('.notification-progress');
+            if (progress) {
+                progress.style.animation = 'none';
+                progress.offsetHeight; // Forçar reflow
+                progress.style.animation = `notification-progress ${duration}ms linear forwards`;
+            }
         },
 
         /**

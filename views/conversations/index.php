@@ -57,7 +57,7 @@ function renderAttachment($attachment) {
     if ($type === 'image') {
         // Placeholder base64 simples (pixel transparente 1x1)
         $placeholder = 'data:image/svg+xml;base64,' . base64_encode('<svg width="300" height="300" xmlns="http://www.w3.org/2000/svg"><rect width="300" height="300" fill="#f0f0f0"/></svg>');
-        $html .= '<a href="' . $url . '" target="_blank" class="d-inline-block lazy-image-container" data-src="' . $url . '">';
+        $html .= '<a href="javascript:void(0);" onclick="openImageLightbox(\'' . addslashes($url) . '\', \'' . addslashes($name) . '\'); return false;" class="d-inline-block lazy-image-container" data-src="' . $url . '" style="position: relative;">';
         $html .= '<img src="' . $placeholder . '" alt="' . $name . '" data-src="' . $url . '" class="lazy-image" style="max-width: 300px; max-height: 300px; border-radius: 8px; cursor: pointer; background: #f0f0f0; min-width: 100px; min-height: 100px;">';
         $html .= '<div class="lazy-loading-spinner" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none;"><div class="spinner-border spinner-border-sm text-primary" role="status"></div></div>';
         $html .= '</a>';
@@ -4132,6 +4132,69 @@ function getChannelInfo(channel) {
     </div>
 </div>
 
+<!-- MODAL: Lightbox de Imagem -->
+<div class="modal fade" id="kt_modal_image_lightbox" tabindex="-1" aria-hidden="true" style="backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);">
+    <div class="modal-dialog modal-dialog-centered modal-xl" style="max-width: 90vw;">
+        <div class="modal-content bg-transparent border-0 shadow-none">
+            <div class="modal-header border-0 pb-2" style="background: rgba(0,0,0,0.7); backdrop-filter: blur(10px); border-radius: 8px 8px 0 0;">
+                <h5 class="modal-title text-white" id="kt_lightbox_image_title">Imagem</h5>
+                <button type="button" class="btn btn-icon btn-sm btn-light" data-bs-dismiss="modal" aria-label="Fechar">
+                    <i class="ki-duotone ki-cross fs-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </button>
+            </div>
+            <div class="modal-body text-center p-3" style="background: rgba(0,0,0,0.9); min-height: 400px; display: flex; align-items: center; justify-content: center;">
+                <img id="kt_lightbox_image_src" src="" alt="Imagem" class="img-fluid rounded" style="max-height: 80vh; max-width: 100%; object-fit: contain; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+            </div>
+            <div class="modal-footer border-0 pt-2" style="background: rgba(0,0,0,0.7); backdrop-filter: blur(10px); border-radius: 0 0 8px 8px; justify-content: center;">
+                <a id="kt_lightbox_download_btn" href="" download class="btn btn-light">
+                    <i class="ki-duotone ki-download fs-3 me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Baixar Imagem
+                </a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-3 me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Lightbox backdrop escuro */
+#kt_modal_image_lightbox.modal {
+    background-color: rgba(0, 0, 0, 0.92) !important;
+}
+
+#kt_modal_image_lightbox .modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.95) !important;
+}
+
+/* Animação suave para a imagem */
+#kt_lightbox_image_src {
+    transition: all 0.3s ease-in-out;
+    cursor: zoom-in;
+}
+
+#kt_lightbox_image_src:hover {
+    transform: scale(1.02);
+}
+
+/* Ajuste para modo escuro */
+[data-bs-theme="dark"] #kt_modal_image_lightbox .modal-header,
+[data-bs-theme="dark"] #kt_modal_image_lightbox .modal-footer {
+    background: rgba(20,20,20,0.85) !important;
+}
+</style>
+
 <!-- MODAL: Gerenciar Participantes -->
 <div class="modal fade" id="kt_modal_participants" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered mw-650px">
@@ -7262,6 +7325,11 @@ function selectConversation(id) {
     // Atualizar conversa selecionada globalmente e resetar estado local
     resetConversationState(id);
     window.currentConversationId = currentConversationId;
+    
+    // Disparar evento de conversa aberta (para NotificationManager limpar contador)
+    document.dispatchEvent(new CustomEvent('conversation:opened', {
+        detail: { conversationId: id, id: id }
+    }));
 
     // Marcar conversa como ativa na lista
     document.querySelectorAll('.conversation-item').forEach(item => {
@@ -16347,6 +16415,38 @@ function formatFileSize(bytes) {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
 
+/**
+ * Abrir lightbox de imagem
+ */
+function openImageLightbox(imageUrl, imageTitle) {
+    console.log('🖼️ Abrindo lightbox:', imageUrl, imageTitle);
+    
+    const imgElement = document.getElementById('kt_lightbox_image_src');
+    const titleElement = document.getElementById('kt_lightbox_image_title');
+    const downloadBtn = document.getElementById('kt_lightbox_download_btn');
+    
+    if (imgElement) {
+        imgElement.src = imageUrl;
+        imgElement.alt = imageTitle || 'Imagem';
+    }
+    
+    if (titleElement) {
+        titleElement.textContent = imageTitle || 'Imagem';
+    }
+    
+    if (downloadBtn) {
+        downloadBtn.href = imageUrl;
+        downloadBtn.download = imageTitle || 'imagem';
+    }
+    
+    // Abrir modal
+    const modalElement = document.getElementById('kt_modal_image_lightbox');
+    if (modalElement) {
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+    }
+}
+
 function renderAttachmentHtml(attachment) {
     if (!attachment) return '';
     
@@ -16398,7 +16498,7 @@ function renderAttachmentHtml(attachment) {
     if (type === 'image') {
         // Placeholder base64 simples
         const placeholder = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2YwZjBmMCIvPjwvc3ZnPg==';
-        html += `<a href="${url}" target="_blank" class="d-inline-block lazy-image-container" data-src="${url}" onclick="event.stopPropagation();" style="position: relative;">
+        html += `<a href="javascript:void(0);" onclick="openImageLightbox('${url.replace(/'/g, "\\'")}', '${name.replace(/'/g, "\\'")}'); event.stopPropagation(); return false;" class="d-inline-block lazy-image-container" data-src="${url}" style="position: relative;">
             <img src="${placeholder}" alt="${name}" data-src="${url}" class="lazy-image" style="max-width: 300px; max-height: 300px; border-radius: 8px; cursor: pointer; background: #f0f0f0; min-width: 100px; min-height: 100px;">
             <div class="lazy-loading-spinner" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none;"><div class="spinner-border spinner-border-sm text-primary" role="status"></div></div>
         </a>`;

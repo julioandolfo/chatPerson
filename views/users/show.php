@@ -44,8 +44,18 @@ ob_start();
                             $availStatus = $user['availability_status'] ?? 'offline';
                             $availColor = $availabilityColors[$availStatus] ?? 'secondary';
                             $availLabel = $availabilityLabels[$availStatus] ?? 'Desconhecido';
+                            $queueEnabled = ($user['queue_enabled'] ?? 1) == 1;
                             ?>
                             <span class="badge badge-lg badge-light-<?= $availColor ?> ms-2"><?= $availLabel ?></span>
+                            <?php if (!$queueEnabled): ?>
+                                <span class="badge badge-lg badge-light-dark ms-2" title="Não recebe novas conversas automaticamente">
+                                    <i class="ki-duotone ki-cross-circle fs-6 me-1">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    Fora da fila
+                                </span>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </div>
                     <p class="text-gray-600 text-center"><?= htmlspecialchars($user['email']) ?></p>
@@ -676,6 +686,18 @@ ob_start();
                                value="<?= htmlspecialchars($user['max_conversations'] ?? '') ?>" 
                                min="1" placeholder="Deixe vazio para ilimitado" />
                         <div class="form-text">Número máximo de conversas que este agente pode atender simultaneamente</div>
+                    </div>
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Fila de Distribuição</label>
+                        <div class="form-check form-switch form-check-custom form-check-solid">
+                            <input type="hidden" name="queue_enabled" value="0" />
+                            <input class="form-check-input" type="checkbox" name="queue_enabled" value="1" 
+                                   id="show_user_queue_enabled" <?= (($user['queue_enabled'] ?? 1) == 1) ? 'checked' : '' ?> />
+                            <label class="form-check-label fw-semibold text-gray-700" for="show_user_queue_enabled">
+                                Receber novas conversas automaticamente
+                            </label>
+                        </div>
+                        <div class="form-text">Quando desabilitado, o agente não receberá novas conversas via automações ou distribuição automática</div>
                     </div>
                     
                     <div class="separator separator-dashed my-7"></div>

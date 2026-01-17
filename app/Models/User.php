@@ -9,7 +9,7 @@ class User extends Model
 {
     protected string $table = 'users';
     protected string $primaryKey = 'id';
-    protected array $fillable = ['name', 'email', 'password', 'role', 'status', 'avatar', 'woocommerce_seller_id', 'availability_status', 'max_conversations', 'current_conversations', 'last_seen_at', 'agent_settings'];
+    protected array $fillable = ['name', 'email', 'password', 'role', 'status', 'avatar', 'woocommerce_seller_id', 'availability_status', 'queue_enabled', 'max_conversations', 'current_conversations', 'last_seen_at', 'agent_settings'];
     protected array $hidden = ['password'];
     protected bool $timestamps = true;
 
@@ -227,6 +227,27 @@ class User extends Model
     }
 
     /**
+     * Verificar se o agente está habilitado para receber da fila
+     */
+    public static function isQueueEnabled(int $userId): bool
+    {
+        $user = self::find($userId);
+        if (!$user) {
+            return false;
+        }
+        // Default é true se o campo não existir ou for NULL
+        return ($user['queue_enabled'] ?? 1) == 1;
+    }
+
+    /**
+     * Atualizar status de fila do agente
+     */
+    public static function updateQueueStatus(int $userId, bool $enabled): bool
+    {
+        return self::update($userId, ['queue_enabled' => $enabled ? 1 : 0]);
+    }
+
+    /**
      * Obter agentes disponíveis (online e com capacidade)
      */
     public static function getAvailableAgents(?int $departmentId = null): array
@@ -237,7 +258,8 @@ class User extends Model
                 LEFT JOIN conversations c ON u.id = c.agent_id AND c.status IN ('open', 'pending')
                 WHERE u.status = 'active' 
                   AND u.role IN ('agent', 'admin', 'supervisor')
-                  AND u.availability_status = 'online'";
+                  AND u.availability_status = 'online'
+                  AND (u.queue_enabled IS NULL OR u.queue_enabled = 1)";
         
         $params = [];
 

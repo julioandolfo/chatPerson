@@ -2704,10 +2704,12 @@ class AutomationService
         $finalResult = self::evaluateLogicOperator($results, $logicOperator);
 
         // Seguir para o nó correspondente (true ou false)
-        $connectionType = $finalResult ? 'true' : 'false';
+        $expectedConnectionType = $finalResult ? 'true' : 'false';
         if (!empty($nodeData['connections'])) {
             foreach ($nodeData['connections'] as $connection) {
-                if (($connection['type'] ?? 'next') === $connectionType) {
+                // Usar connection_type para determinar qual caminho seguir
+                $connType = $connection['connection_type'] ?? null;
+                if ($connType === $expectedConnectionType) {
                     $nextNode = self::findNodeById($connection['target_node_id'], $allNodes);
                     if ($nextNode) {
                         self::executeNode($nextNode, $conversationId, $allNodes, $executionId);
@@ -2746,6 +2748,19 @@ class AutomationService
      */
     private static function evaluateCondition(array $conversation, string $field, string $operator, $value): bool
     {
+        // Campos especiais do sistema
+        if ($field === 'business_hours') {
+            $isBusinessHours = AvailabilityService::isBusinessHours();
+            switch ($operator) {
+                case 'is_within':
+                    return $isBusinessHours;
+                case 'is_outside':
+                    return !$isBusinessHours;
+                default:
+                    return false;
+            }
+        }
+        
         $conversationValue = $conversation[$field] ?? null;
 
         switch ($operator) {

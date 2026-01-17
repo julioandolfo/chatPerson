@@ -171,10 +171,10 @@ class AttachmentService
      */
     private static function getFileType(string $extension, string $mimeType): ?string
     {
+        $mimeType = strtolower(trim($mimeType));
+        $mimePrefix = strtolower(explode('/', $mimeType)[0] ?? '');
         foreach (self::$allowedTypes as $type => $extensions) {
             if (in_array($extension, $extensions)) {
-                $mimePrefix = explode('/', $mimeType)[0];
-                
                 // Caso especial: webm gravado como áudio (audio/webm)
                 if ($extension === 'webm' && $mimePrefix === 'audio') {
                     return 'audio';
@@ -184,6 +184,11 @@ class AttachmentService
                 if ($type === 'video' && $mimePrefix === 'video') return 'video';
                 if ($type === 'audio' && $mimePrefix === 'audio') return 'audio';
                 if ($type === 'document') return 'document';
+
+                // Fallback: alguns uploads vêm como application/octet-stream
+                if ($mimePrefix === 'application' && $mimeType === 'application/octet-stream') {
+                    return $type;
+                }
             }
         }
         

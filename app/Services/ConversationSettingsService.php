@@ -419,6 +419,12 @@ class ConversationSettingsService
             return false;
         }
         
+        // Verificar se está habilitado para receber da fila
+        // Default é true se o campo não existir ou for NULL
+        if (($agent['queue_enabled'] ?? 1) != 1) {
+            return false;
+        }
+        
         // Verificar limite do agente
         $maxAgent = self::getMaxConversationsForAgent($agentId);
         if ($maxAgent !== null && $agent['current_conversations'] >= $maxAgent) {
@@ -774,12 +780,13 @@ class ConversationSettingsService
         $agents = [];
         
         // Agentes humanos
-        $sql = "SELECT u.id, u.name, u.current_conversations, u.max_conversations, u.availability_status,
+        $sql = "SELECT u.id, u.name, u.current_conversations, u.max_conversations, u.availability_status, u.queue_enabled,
                        MAX(c.updated_at) as last_assignment_at, 'human' as agent_type
                 FROM users u
                 LEFT JOIN conversations c ON u.id = c.agent_id AND c.status IN ('open', 'pending')
                 WHERE u.status = 'active' 
-                AND u.role IN ('agent', 'admin', 'supervisor', 'senior_agent', 'junior_agent')";
+                AND u.role IN ('agent', 'admin', 'supervisor', 'senior_agent', 'junior_agent')
+                AND (u.queue_enabled IS NULL OR u.queue_enabled = 1)";
         
         // Filtrar por disponibilidade apenas se considerAvailability = true
         if ($considerAvailability) {

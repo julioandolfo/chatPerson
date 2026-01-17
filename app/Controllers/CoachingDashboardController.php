@@ -121,7 +121,16 @@ class CoachingDashboardController
         // Período
         $period = Request::get('period', 'week');
         
-        // Dashboard do agente
+        // Calcular datas baseado no período
+        $periodStart = match($period) {
+            'today' => date('Y-m-d'),
+            'week' => date('Y-m-d', strtotime('monday this week')),
+            'month' => date('Y-m-01'),
+            default => date('Y-m-d', strtotime('monday this week'))
+        };
+        $periodEnd = date('Y-m-d') . ' 23:59:59';
+        
+        // Dashboard do agente (coaching)
         $dashboard = CoachingMetricsService::getDashboardSummary($agentId, $period);
         
         // Histórico de performance (últimas 4 semanas)
@@ -137,15 +146,52 @@ class CoachingDashboardController
         // Estatísticas de impacto
         $impactStats = CoachingConversationImpact::getAgentImpactStats($agentId);
         
+        // ==========================================
+        // NOVAS MÉTRICAS - Dashboard Completo
+        // ==========================================
+        
+        // Métricas de atendimento (conversas, SLA, tempos)
+        $agentMetrics = \App\Services\DashboardService::getAgentMetrics($agentId, $periodStart, $periodEnd);
+        
+        // Performance do agente (AgentPerformanceService)
+        $performanceStats = \App\Services\AgentPerformanceService::getPerformanceStats($agentId, $periodStart, $periodEnd);
+        
+        // Estatísticas de disponibilidade
+        $availabilityStats = [];
+        try {
+            $availabilityStats = \App\Services\AvailabilityService::getAvailabilityStats($agentId, $periodStart, $periodEnd);
+        } catch (\Exception $e) {
+            error_log("Erro ao obter estatísticas de disponibilidade: " . $e->getMessage());
+        }
+        
+        // Métricas de conversão (WooCommerce - se for vendedor)
+        $conversionMetrics = [];
+        try {
+            $conversionMetrics = \App\Services\AgentConversionService::getConversionMetrics($agentId, $periodStart, str_replace(' 23:59:59', '', $periodEnd));
+        } catch (\Exception $e) {
+            error_log("Erro ao obter métricas de conversão: " . $e->getMessage());
+        }
+        
+        // Configurações de SLA
+        $slaSettings = \App\Services\ConversationSettingsService::getSettings()['sla'] ?? [];
+        
         Response::view('coaching/agent-performance', [
-            'title' => "Performance de Coaching - {$agent['name']}",
+            'title' => "Performance - {$agent['name']}",
             'agent' => $agent,
             'dashboard' => $dashboard,
             'history' => $history,
             'learningSpeed' => $learningSpeed,
             'conversations' => $conversations,
             'impactStats' => $impactStats,
-            'selectedPeriod' => $period
+            'selectedPeriod' => $period,
+            // Novas métricas
+            'agentMetrics' => $agentMetrics,
+            'performanceStats' => $performanceStats,
+            'availabilityStats' => $availabilityStats,
+            'conversionMetrics' => $conversionMetrics,
+            'slaSettings' => $slaSettings,
+            'periodStart' => $periodStart,
+            'periodEnd' => $periodEnd
         ]);
     }
     

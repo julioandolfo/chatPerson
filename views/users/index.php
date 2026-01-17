@@ -96,8 +96,20 @@ ob_start();
                                         $availStatus = $user['availability_status'] ?? 'offline';
                                         $availColor = $availColors[$availStatus] ?? 'secondary';
                                         $availLabel = $availLabels[$availStatus] ?? 'Desconhecido';
+                                        $queueEnabled = ($user['queue_enabled'] ?? 1) == 1;
                                         ?>
-                                        <span class="badge badge-light-<?= $availColor ?>"><?= $availLabel ?></span>
+                                        <div class="d-flex flex-column gap-1">
+                                            <span class="badge badge-light-<?= $availColor ?>"><?= $availLabel ?></span>
+                                            <?php if (!$queueEnabled): ?>
+                                                <span class="badge badge-light-dark fs-8" title="Não recebe novas conversas automaticamente">
+                                                    <i class="ki-duotone ki-cross-circle fs-7 me-1">
+                                                        <span class="path1"></span>
+                                                        <span class="path2"></span>
+                                                    </i>
+                                                    Fora da fila
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
                                     <?php else: ?>
                                         <span class="badge badge-light-secondary">-</span>
                                     <?php endif; ?>
@@ -179,6 +191,7 @@ ob_start();
                                                        data-user-status="<?= htmlspecialchars($user['status'] ?? 'active', ENT_QUOTES) ?>"
                                                        data-user-availability="<?= htmlspecialchars($user['availability_status'] ?? 'offline', ENT_QUOTES) ?>"
                                                        data-user-max-conversations="<?= htmlspecialchars($user['max_conversations'] ?? '', ENT_QUOTES) ?>"
+                                                       data-user-queue-enabled="<?= htmlspecialchars(($user['queue_enabled'] ?? 1) ? '1' : '0', ENT_QUOTES) ?>"
                                                        onclick="editUser(this); return false;">
                                                         <i class="ki-duotone ki-pencil fs-5 me-2">
                                                             <span class="path1"></span>
@@ -294,6 +307,17 @@ ob_start();
                                min="1" placeholder="Deixe vazio para ilimitado" />
                         <div class="form-text">Número máximo de conversas que este agente pode atender simultaneamente</div>
                     </div>
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Fila de Distribuição</label>
+                        <div class="form-check form-switch form-check-custom form-check-solid">
+                            <input type="hidden" name="queue_enabled" value="0" />
+                            <input class="form-check-input" type="checkbox" name="queue_enabled" value="1" id="new_user_queue_enabled" checked />
+                            <label class="form-check-label fw-semibold text-gray-700" for="new_user_queue_enabled">
+                                Receber novas conversas automaticamente
+                            </label>
+                        </div>
+                        <div class="form-text">Quando desabilitado, o agente não receberá novas conversas via automações ou distribuição automática</div>
+                    </div>
                 </div>
                 <div class="modal-footer flex-center">
                     <button type="reset" data-bs-dismiss="modal" class="btn btn-light me-3">Cancelar</button>
@@ -370,6 +394,17 @@ ob_start();
                         <input type="number" name="max_conversations" id="edit_user_max_conversations" class="form-control form-control-solid" 
                                min="1" placeholder="Deixe vazio para ilimitado" />
                         <div class="form-text">Número máximo de conversas que este agente pode atender simultaneamente</div>
+                    </div>
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Fila de Distribuição</label>
+                        <div class="form-check form-switch form-check-custom form-check-solid">
+                            <input type="hidden" name="queue_enabled" value="0" />
+                            <input class="form-check-input" type="checkbox" name="queue_enabled" value="1" id="edit_user_queue_enabled" />
+                            <label class="form-check-label fw-semibold text-gray-700" for="edit_user_queue_enabled">
+                                Receber novas conversas automaticamente
+                            </label>
+                        </div>
+                        <div class="form-text">Quando desabilitado, o agente não receberá novas conversas via automações ou distribuição automática</div>
                     </div>
                 </div>
                 <div class="modal-footer flex-center">
@@ -594,6 +629,7 @@ document.addEventListener("DOMContentLoaded", function() {
         const userStatus = element.getAttribute("data-user-status") || "active";
         const userAvailability = element.getAttribute("data-user-availability") || "offline";
         const userMaxConversations = element.getAttribute("data-user-max-conversations") || "";
+        const userQueueEnabled = element.getAttribute("data-user-queue-enabled") || "1";
         
         document.getElementById("edit_user_id").value = userId;
         document.getElementById("edit_user_name").value = userName;
@@ -603,6 +639,7 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById("edit_user_status").value = userStatus;
         document.getElementById("edit_user_availability_status").value = userAvailability;
         document.getElementById("edit_user_max_conversations").value = userMaxConversations;
+        document.getElementById("edit_user_queue_enabled").checked = (userQueueEnabled === "1" || userQueueEnabled === "true");
         
         const form = document.getElementById("kt_modal_edit_user_form");
         const baseUrl = window.location.origin;

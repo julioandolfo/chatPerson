@@ -16,7 +16,8 @@ class RealtimeClient {
         this.subscribedConversations = [];
         this.eventHandlers = {};
         this.isConnected = false;
-        this.lastUpdateTime = {};
+        this.lastUpdateTime = this.loadLastUpdateTime(); // Carregar do localStorage
+        this.processedMessageIds = this.loadProcessedMessageIds(); // IDs de mensagens já processadas
         this.config = {
             enabled: true,
             connectionType: 'auto', // 'auto', 'websocket', 'polling'
@@ -25,6 +26,97 @@ class RealtimeClient {
             websocketCustomUrl: '',
             pollingInterval: 3000
         };
+    }
+    
+    /**
+     * Carregar lastUpdateTime do localStorage
+     */
+    loadLastUpdateTime() {
+        try {
+            const stored = localStorage.getItem('realtime_last_update_time');
+            if (stored) {
+                const data = JSON.parse(stored);
+                // Verificar se não expirou (30 minutos)
+                if (data.timestamp && (Date.now() - data.timestamp) < 30 * 60 * 1000) {
+                    return data.value || Date.now();
+                }
+            }
+        } catch (e) {
+            console.warn('[RealtimeClient] Erro ao carregar lastUpdateTime:', e);
+        }
+        return Date.now(); // Usar timestamp atual como fallback
+    }
+    
+    /**
+     * Salvar lastUpdateTime no localStorage
+     */
+    saveLastUpdateTime() {
+        try {
+            localStorage.setItem('realtime_last_update_time', JSON.stringify({
+                value: this.lastUpdateTime,
+                timestamp: Date.now()
+            }));
+        } catch (e) {
+            console.warn('[RealtimeClient] Erro ao salvar lastUpdateTime:', e);
+        }
+    }
+    
+    /**
+     * Carregar IDs de mensagens processadas do localStorage
+     */
+    loadProcessedMessageIds() {
+        try {
+            const stored = localStorage.getItem('realtime_processed_messages');
+            if (stored) {
+                const data = JSON.parse(stored);
+                // Verificar se não expirou (30 minutos)
+                if (data.timestamp && (Date.now() - data.timestamp) < 30 * 60 * 1000) {
+                    return new Set(data.ids || []);
+                }
+            }
+        } catch (e) {
+            console.warn('[RealtimeClient] Erro ao carregar processedMessageIds:', e);
+        }
+        return new Set();
+    }
+    
+    /**
+     * Salvar IDs de mensagens processadas no localStorage
+     */
+    saveProcessedMessageIds() {
+        try {
+            // Limitar a 500 IDs para não sobrecarregar localStorage
+            let ids = Array.from(this.processedMessageIds);
+            if (ids.length > 500) {
+                ids = ids.slice(-500);
+                this.processedMessageIds = new Set(ids);
+            }
+            
+            localStorage.setItem('realtime_processed_messages', JSON.stringify({
+                ids: ids,
+                timestamp: Date.now()
+            }));
+        } catch (e) {
+            console.warn('[RealtimeClient] Erro ao salvar processedMessageIds:', e);
+        }
+    }
+    
+    /**
+     * Verificar se mensagem já foi processada
+     */
+    isMessageProcessed(messageId) {
+        return this.processedMessageIds.has(String(messageId));
+    }
+    
+    /**
+     * Marcar mensagem como processada
+     */
+    markMessageProcessed(messageId) {
+        this.processedMessageIds.add(String(messageId));
+        // Salvar periodicamente (não a cada mensagem para performance)
+        if (this.processedMessageIds.size % 10 === 0) {
+            this.saveProcessedMessageIds();
+        }
     }
 
     /**
@@ -206,6 +298,7 @@ class RealtimeClient {
             if (data.success && data.updates) {
                 this.processPollingUpdates(data.updates);
                 this.lastUpdateTime = data.timestamp || Date.now();
+                this.saveLastUpdateTime(); // Persistir no localStorage
             }
         } catch (error) {
             console.error('Erro no polling:', error);
@@ -219,32 +312,55 @@ class RealtimeClient {
     processPollingUpdates(updates) {
         if (updates.new_messages) {
             updates.new_messages.forEach(msg => {
-                console.group('🔍 RealtimeClient: Processando nova mensagem do polling');
-                console.log('Mensagem recebida do backend:', msg);
-                console.table({
-                    'ID': msg.id,
-                    'conversation_id': msg.conversation_id,
-                    'sender_type': msg.sender_type,
-                    'direction': msg.direction,
-                    'type': msg.type
-                });
-                
-                if (!msg.direction) {
-                    console.error('❌ ERRO: Campo "direction" AUSENTE na resposta do polling!');
-                } else {
-                    console.log(`✅ Campo direction presente: ${msg.direction}`);
+                // Verificar se mensagem já foi processada (evitar duplicatas)
+                if (msg.id && this.isMessageProcessed(msg.id)) {
+                    console.log('[RealtimeClient] Mensagem já processada, ignorando:', msg.id);
+                    return;
                 }
-                console.groupEnd();
+                
+                // Marcar como processada
+                if (msg.id) {
+                    this.markMessageProcessed(msg.id);
+                }
+                
+                // Debug silencioso (apenas em desenvolvimento)
+                if (window.DEBUG_REALTIME) {
+                    console.group('🔍 RealtimeClient: Processando nova mensagem do polling');
+                    console.log('Mensagem recebida do backend:', msg);
+                    console.table({
+                        'ID': msg.id,
+                        'conversation_id': msg.conversation_id,
+                        'sender_type': msg.sender_type,
+                        'direction': msg.direction,
+                        'type': msg.type
+                    });
+                    console.groupEnd();
+                }
                 
                 this.emit('new_message', {
                     conversation_id: msg.conversation_id,
                     message: msg
                 });
             });
+            
+            // Salvar IDs processados após processar todas as mensagens
+            if (updates.new_messages.length > 0) {
+                this.saveProcessedMessageIds();
+            }
         }
 
         if (updates.new_conversations) {
             updates.new_conversations.forEach(conv => {
+                // Verificar se conversa já foi processada
+                const convKey = `conv_${conv.id}`;
+                if (this.isMessageProcessed(convKey)) {
+                    console.log('[RealtimeClient] Conversa já processada, ignorando:', conv.id);
+                    return;
+                }
+                
+                // Marcar como processada
+                this.markMessageProcessed(convKey);
+                
                 this.emit('new_conversation', {
                     conversation: conv
                 });

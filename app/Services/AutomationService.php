@@ -54,7 +54,7 @@ class AutomationService
         $errors = Validator::validate($data, [
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'trigger_type' => 'required|string|in:new_conversation,message_received,conversation_updated,conversation_moved,conversation_resolved,no_customer_response,no_agent_response,time_based,contact_created,contact_updated,agent_activity,webhook',
+            'trigger_type' => 'required|string|in:new_conversation,message_received,agent_message_sent,conversation_updated,conversation_moved,conversation_resolved,no_customer_response,no_agent_response,time_based,contact_created,contact_updated,agent_activity,webhook',
             'trigger_config' => 'nullable|array',
             'funnel_id' => 'nullable|integer',
             'stage_id' => 'nullable|integer',
@@ -310,6 +310,66 @@ class AutomationService
         }
         
         \App\Helpers\Logger::automation("=== executeForNewConversation FIM ===");
+    }
+
+    /**
+     * Executar automação para mensagem enviada por agente
+     * Dispara instantaneamente quando um agente (humano ou IA) envia uma mensagem
+     */
+    public static function executeForAgentMessageSent(int $messageId): void
+    {
+        \App\Helpers\Logger::automation("🔥 === executeForAgentMessageSent INÍCIO === messageId: {$messageId}");
+        
+        $message = \App\Models\Message::find($messageId);
+        if (!$message) {
+            \App\Helpers\Logger::automation("Mensagem não encontrada. Abortando.");
+            return;
+        }
+        
+        // Verificar se é mensagem de agente
+        if ($message['sender_type'] !== 'agent') {
+            \App\Helpers\Logger::automation("Mensagem não é de agente (sender_type={$message['sender_type']}). Abortando.");
+            return;
+        }
+        
+        \App\Helpers\Logger::automation("Mensagem de agente encontrada: sender_id={$message['sender_id']}, content_preview='" . substr($message['content'] ?? '', 0, 50) . "...'");
+
+        $conversation = Conversation::find($message['conversation_id']);
+        if (!$conversation) {
+            \App\Helpers\Logger::automation("Conversa não encontrada. Abortando.");
+            return;
+        }
+
+        \App\Helpers\Logger::automation("Conversa ID: {$conversation['id']}");
+
+        // Buscar automações ativas para agent_message_sent
+        $triggerData = [
+            'channel' => $conversation['channel'] ?? null,
+            'whatsapp_account_id' => $conversation['whatsapp_account_id'] ?? null,
+            'integration_account_id' => $conversation['integration_account_id'] ?? null,
+            'sender_id' => $message['sender_id'] ?? null
+        ];
+
+        $funnelId = $conversation['funnel_id'] ?? null;
+        $stageId = $conversation['funnel_stage_id'] ?? null;
+
+        \App\Helpers\Logger::automation("Buscando automações agent_message_sent: triggerData=" . json_encode($triggerData) . ", funnelId={$funnelId}, stageId={$stageId}");
+
+        $automations = Automation::getActiveByTrigger('agent_message_sent', $triggerData, $funnelId, $stageId);
+
+        \App\Helpers\Logger::automation("Automações encontradas: " . count($automations));
+
+        foreach ($automations as $automation) {
+            \App\Helpers\Logger::automation("Executando automação ID: {$automation['id']}, Nome: {$automation['name']}");
+            try {
+                self::executeAutomation($automation['id'], $conversation['id']);
+                \App\Helpers\Logger::automation("Automação ID: {$automation['id']} executada com SUCESSO");
+            } catch (\Exception $e) {
+                \App\Helpers\Logger::automation("ERRO ao executar automação ID: {$automation['id']} - " . $e->getMessage());
+            }
+        }
+        
+        \App\Helpers\Logger::automation("=== executeForAgentMessageSent FIM ===");
     }
 
     /**

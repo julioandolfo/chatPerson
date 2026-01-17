@@ -57,7 +57,8 @@ ob_start();
                                     <?php
                                     $triggerLabels = [
                                         'new_conversation' => 'Nova Conversa',
-                                        'message_received' => 'Mensagem Recebida',
+                                        'message_received' => 'Mensagem do Cliente',
+                                        'agent_message_sent' => 'Mensagem do Agente',
                                         'conversation_updated' => 'Conversa Atualizada',
                                         'conversation_moved' => 'Conversa Movida',
                                         'conversation_resolved' => 'Conversa Resolvida',
@@ -176,7 +177,8 @@ ob_start();
                         <label class="required fw-semibold fs-6 mb-2">Gatilho</label>
                         <select name="trigger_type" id="kt_trigger_type" class="form-select form-select-solid" required>
                             <option value="new_conversation">Nova Conversa</option>
-                            <option value="message_received">Mensagem Recebida</option>
+                            <option value="message_received">Mensagem do Cliente (Instantâneo)</option>
+                            <option value="agent_message_sent">Mensagem do Agente (Instantâneo)</option>
                             <option value="conversation_updated">Conversa Atualizada</option>
                             <option value="conversation_moved">Conversa Movida no Funil</option>
                             <option value="conversation_resolved">Conversa Resolvida</option>

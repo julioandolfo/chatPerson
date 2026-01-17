@@ -574,7 +574,11 @@ class KanbanAgentService
             $type = $condition['type'] ?? '';
             
             // Condições que NÃO precisam de IA
-            if (in_array($type, ['stage_duration_hours', 'has_tag', 'no_tag', 'assigned_to', 'unassigned', 'has_messages'])) {
+            if (in_array($type, [
+                'stage_duration_hours', 'has_tag', 'no_tag', 'assigned_to', 'unassigned', 'has_messages',
+                'has_agent_message', 'has_client_message',
+                'last_message_content', 'last_agent_message_content', 'last_client_message_content', 'any_message_contains'
+            ])) {
                 $conditionsWithoutAI[] = $condition;
             } else {
                 // Condições que PRECISAM de IA (sentiment, score, urgency)
@@ -740,6 +744,83 @@ class KanbanAgentService
             case 'ai_urgency':
                 return self::compare($analysis['urgency'] ?? 'low', $operator, $value);
             
+            case 'has_agent_message':
+                // Verificar se há mensagem de agente na conversa
+                $agentMessages = Database::fetchAll(
+                    "SELECT COUNT(*) as count FROM messages 
+                     WHERE conversation_id = ? 
+                     AND sender_type = 'agent'",
+                    [$conversation['id']]
+                );
+                $hasAgentMessage = isset($agentMessages[0]['count']) && (int)$agentMessages[0]['count'] > 0;
+                // Operador: 'equals' com valor 'true' ou 'false'
+                if ($operator === 'equals') {
+                    return $value === 'true' ? $hasAgentMessage : !$hasAgentMessage;
+                }
+                return $hasAgentMessage; // Default: retorna se tem
+            
+            case 'has_client_message':
+                // Verificar se há mensagem do cliente na conversa
+                $clientMessages = Database::fetchAll(
+                    "SELECT COUNT(*) as count FROM messages 
+                     WHERE conversation_id = ? 
+                     AND sender_type = 'contact'",
+                    [$conversation['id']]
+                );
+                $hasClientMessage = isset($clientMessages[0]['count']) && (int)$clientMessages[0]['count'] > 0;
+                // Operador: 'equals' com valor 'true' ou 'false'
+                if ($operator === 'equals') {
+                    return $value === 'true' ? $hasClientMessage : !$hasClientMessage;
+                }
+                return $hasClientMessage; // Default: retorna se tem
+            
+            case 'last_message_content':
+                // Verificar conteúdo da última mensagem (qualquer remetente)
+                $lastMessage = Message::whereFirst('conversation_id', '=', $conversation['id'], 'ORDER BY created_at DESC');
+                if (!$lastMessage) {
+                    return false;
+                }
+                $content = $lastMessage['content'] ?? '';
+                return self::compareText($content, $operator, $value);
+            
+            case 'last_agent_message_content':
+                // Verificar conteúdo da última mensagem do agente
+                $lastAgentMsg = Message::whereFirst(
+                    'conversation_id', 
+                    '=', 
+                    $conversation['id'], 
+                    "AND sender_type = 'agent' ORDER BY created_at DESC"
+                );
+                if (!$lastAgentMsg) {
+                    return false;
+                }
+                $content = $lastAgentMsg['content'] ?? '';
+                return self::compareText($content, $operator, $value);
+            
+            case 'last_client_message_content':
+                // Verificar conteúdo da última mensagem do cliente
+                $lastClientMsg = Message::whereFirst(
+                    'conversation_id', 
+                    '=', 
+                    $conversation['id'], 
+                    "AND sender_type = 'contact' ORDER BY created_at DESC"
+                );
+                if (!$lastClientMsg) {
+                    return false;
+                }
+                $content = $lastClientMsg['content'] ?? '';
+                return self::compareText($content, $operator, $value);
+            
+            case 'any_message_contains':
+                // Verificar se qualquer mensagem contém o texto
+                $messagesWithText = Database::fetchAll(
+                    "SELECT COUNT(*) as count FROM messages 
+                     WHERE conversation_id = ? 
+                     AND LOWER(content) LIKE LOWER(?)",
+                    [$conversation['id'], '%' . $value . '%']
+                );
+                return isset($messagesWithText[0]['count']) && (int)$messagesWithText[0]['count'] > 0;
+            
             default:
                 return false;
         }
@@ -767,6 +848,39 @@ class KanbanAgentService
                 return is_array($expected) && in_array($actual, $expected);
             case 'not_includes':
                 return is_array($expected) && !in_array($actual, $expected);
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Comparar texto com operadores específicos
+     */
+    private static function compareText(string $actual, string $operator, $expected): bool
+    {
+        $actualLower = strtolower($actual);
+        $expectedLower = strtolower($expected ?? '');
+        
+        switch ($operator) {
+            case 'equals':
+                return $actualLower === $expectedLower;
+            case 'not_equals':
+                return $actualLower !== $expectedLower;
+            case 'contains':
+                return strpos($actualLower, $expectedLower) !== false;
+            case 'not_contains':
+                return strpos($actualLower, $expectedLower) === false;
+            case 'starts_with':
+                return strpos($actualLower, $expectedLower) === 0;
+            case 'ends_with':
+                return substr($actualLower, -strlen($expectedLower)) === $expectedLower;
+            case 'is_empty':
+                return empty(trim($actual));
+            case 'is_not_empty':
+                return !empty(trim($actual));
+            case 'regex':
+                // Suporte a expressão regular
+                return preg_match('/' . $expected . '/i', $actual) === 1;
             default:
                 return false;
         }

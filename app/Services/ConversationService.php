@@ -1984,6 +1984,18 @@ class ConversationService
                 error_log("Erro ao executar automações: " . $e->getMessage());
             }
         }
+        
+        // Executar automações para mensagem enviada por agente (instantâneo)
+        if ($senderType === 'agent') {
+            \App\Helpers\Logger::info("ConversationService::sendMessage - DISPARANDO executeForAgentMessageSent (messageId={$messageId})");
+            try {
+                \App\Services\AutomationService::executeForAgentMessageSent($messageId);
+                \App\Helpers\Logger::info("ConversationService::sendMessage - executeForAgentMessageSent CONCLUÍDO");
+            } catch (\Exception $e) {
+                \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO ao executar automações de agente: " . $e->getMessage());
+                error_log("Erro ao executar automações de agente: " . $e->getMessage());
+            }
+        }
 
         \App\Helpers\Logger::info("═══ ConversationService::sendMessage FIM ═══ messageId={$messageId}, conv={$conversationId}");
 

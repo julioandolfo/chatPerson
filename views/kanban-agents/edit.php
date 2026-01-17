@@ -383,6 +383,44 @@ async function loadSystemData() {
                     operators: ['greater_than', 'less_than', 'greater_or_equal', 'less_or_equal'],
                     valueType: 'number'
                 },
+                'has_agent_message': {
+                    label: 'Tem Mensagem do Agente',
+                    operators: ['equals'],
+                    valueType: 'select',
+                    options: ['true', 'false'],
+                    optionLabels: { 'true': 'Sim', 'false': 'Não' }
+                },
+                'has_client_message': {
+                    label: 'Tem Mensagem do Cliente',
+                    operators: ['equals'],
+                    valueType: 'select',
+                    options: ['true', 'false'],
+                    optionLabels: { 'true': 'Sim', 'false': 'Não' }
+                },
+                'last_message_content': {
+                    label: 'Conteúdo da Última Mensagem',
+                    operators: ['equals', 'not_equals', 'contains', 'not_contains', 'starts_with', 'ends_with', 'is_empty', 'is_not_empty'],
+                    valueType: 'text',
+                    placeholder: 'Digite o texto para comparar...'
+                },
+                'last_agent_message_content': {
+                    label: 'Conteúdo da Última Msg do Agente',
+                    operators: ['equals', 'not_equals', 'contains', 'not_contains', 'starts_with', 'ends_with', 'is_empty', 'is_not_empty'],
+                    valueType: 'text',
+                    placeholder: 'Digite o texto para comparar...'
+                },
+                'last_client_message_content': {
+                    label: 'Conteúdo da Última Msg do Cliente',
+                    operators: ['equals', 'not_equals', 'contains', 'not_contains', 'starts_with', 'ends_with', 'is_empty', 'is_not_empty'],
+                    valueType: 'text',
+                    placeholder: 'Digite o texto para comparar...'
+                },
+                'any_message_contains': {
+                    label: 'Alguma Mensagem Contém',
+                    operators: ['equals'],
+                    valueType: 'text',
+                    placeholder: 'Digite o texto que deve existir em alguma mensagem...'
+                },
                 'ai_analysis_score': { 
                     label: 'Score de Análise IA', 
                     operators: ['greater_than', 'less_than', 'greater_or_equal', 'less_or_equal'], 

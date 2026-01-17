@@ -114,7 +114,11 @@ class AgentPerformanceController
         $slaSettings = [];
         $conversationSettings = Setting::get('conversation_settings');
         if ($conversationSettings) {
-            $slaSettings = json_decode($conversationSettings, true) ?: [];
+            if (is_array($conversationSettings)) {
+                $slaSettings = $conversationSettings;
+            } else {
+                $slaSettings = json_decode($conversationSettings, true) ?: [];
+            }
         }
         
         Response::view('agent-performance/agent', [

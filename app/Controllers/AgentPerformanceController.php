@@ -15,6 +15,12 @@ use App\Services\PerformanceReportService;
 use App\Services\GamificationService;
 use App\Services\CoachingService;
 use App\Services\BestPracticesService;
+use App\Services\DashboardService;
+use App\Services\AvailabilityService;
+use App\Services\AgentConversionService;
+use App\Services\AgentPerformanceService;
+use App\Models\User;
+use App\Models\Setting;
 
 class AgentPerformanceController
 {
@@ -55,15 +61,27 @@ class AgentPerformanceController
         $agentId = (int)Request::get('id');
         $user = Auth::user();
         
+        // Se não forneceu agentId, usar o próprio
+        if (!$agentId) {
+            $agentId = $user['id'];
+        }
+        
         // Verificar permissão: pode ver o próprio OU ser admin para ver outros
         if ($agentId !== $user['id'] && !Permission::can('agent_performance.view.all')) {
             Permission::abortIfCannot('agent_performance.view.all');
         }
         
+        // Buscar dados do agente
+        $agent = User::find($agentId);
+        if (!$agent) {
+            Response::redirect('/agent-performance', 'Agente não encontrado', 'error');
+            return;
+        }
+        
         $dateFrom = Request::get('date_from', date('Y-m-d', strtotime('-30 days')));
         $dateTo = Request::get('date_to', date('Y-m-d'));
         
-        // Relatório do agente
+        // Relatório do agente (dimensões de coaching)
         $report = PerformanceReportService::generateAgentReport($agentId, $dateFrom, $dateTo);
         
         // Badges
@@ -73,13 +91,46 @@ class AgentPerformanceController
         // Metas
         $goals = CoachingService::checkGoalsProgress($agentId);
         
+        // ====== MÉTRICAS ADICIONAIS DO DASHBOARD ======
+        
+        // Métricas de atendimento do agente
+        $agentMetrics = DashboardService::getAgentDetailedMetrics($agentId, $dateFrom, $dateTo);
+        
+        // Estatísticas de performance do AgentPerformanceService
+        $performanceStats = AgentPerformanceService::getAgentStats($agentId, $dateFrom, $dateTo);
+        
+        // Estatísticas de disponibilidade
+        $availabilityStats = AvailabilityService::getAgentStats($agentId, $dateFrom, $dateTo);
+        
+        // Métricas de conversão (se habilitado WooCommerce)
+        $conversionMetrics = [];
+        try {
+            $conversionMetrics = AgentConversionService::getAgentMetrics($agentId, $dateFrom, $dateTo);
+        } catch (\Exception $e) {
+            // WooCommerce pode não estar configurado
+        }
+        
+        // Configurações de SLA
+        $slaSettings = [];
+        $conversationSettings = Setting::get('conversation_settings');
+        if ($conversationSettings) {
+            $slaSettings = json_decode($conversationSettings, true) ?: [];
+        }
+        
         Response::view('agent-performance/agent', [
             'report' => $report,
             'badges' => $badges,
             'badgeStats' => $badgeStats,
             'goals' => $goals,
             'dateFrom' => $dateFrom,
-            'dateTo' => $dateTo
+            'dateTo' => $dateTo,
+            // Novas métricas
+            'agent' => $agent,
+            'agentMetrics' => $agentMetrics,
+            'performanceStats' => $performanceStats,
+            'availabilityStats' => $availabilityStats,
+            'conversionMetrics' => $conversionMetrics,
+            'slaSettings' => $slaSettings
         ]);
     }
     

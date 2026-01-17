@@ -1548,5 +1548,138 @@ class DashboardService
             'sla_30min_rate' => $total > 0 ? round((($result['responded_30min'] ?? 0) / $total) * 100, 2) : 0
         ];
     }
+    
+    /**
+     * Obter métricas detalhadas de um agente (para página de performance completa)
+     * Combina métricas de atendimento, mensagens, SLA e mais
+     */
+    public static function getAgentDetailedMetrics(int $agentId, ?string $dateFrom = null, ?string $dateTo = null): array
+    {
+        $dateFrom = $dateFrom ?? date('Y-m-01');
+        $dateTo = $dateTo ?? date('Y-m-d') . ' 23:59:59';
+        
+        // Garantir que dateTo inclui o dia inteiro
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
+        
+        // ✅ Cache de 3 minutos por agente
+        $cacheKey = "dashboard_agent_detailed_metrics_{$agentId}_" . md5($dateFrom . $dateTo);
+        return \App\Helpers\Cache::remember($cacheKey, 180, function() use ($agentId, $dateFrom, $dateTo) {
+            // Obter métricas básicas do agente
+            $baseMetrics = self::getAgentMetrics($agentId, $dateFrom, $dateTo);
+            
+            // Métricas adicionais de mensagens
+            $sqlMessages = "SELECT 
+                    COUNT(*) as total_messages,
+                    COUNT(DISTINCT conversation_id) as conversations_with_messages
+                FROM messages 
+                WHERE sender_id = ? 
+                AND sender_type = 'agent'
+                AND created_at >= ? 
+                AND created_at <= ?";
+            
+            $messagesResult = \App\Helpers\Database::fetch($sqlMessages, [$agentId, $dateFrom, $dateTo]);
+            
+            // Conversas por status detalhado
+            $sqlStatusDetail = "SELECT 
+                    status,
+                    COUNT(*) as count
+                FROM conversations 
+                WHERE agent_id = ?
+                AND (created_at >= ? OR updated_at >= ?)
+                AND (created_at <= ? OR updated_at <= ?)
+                GROUP BY status";
+            
+            $statusResults = \App\Helpers\Database::fetchAll($sqlStatusDetail, [
+                $agentId, $dateFrom, $dateFrom, $dateTo, $dateTo
+            ]);
+            
+            $conversationsByStatus = [];
+            foreach ($statusResults as $row) {
+                $conversationsByStatus[$row['status']] = (int)$row['count'];
+            }
+            
+            // Conversas por canal
+            $sqlChannels = "SELECT 
+                    channel,
+                    COUNT(*) as count
+                FROM conversations 
+                WHERE agent_id = ?
+                AND (created_at >= ? OR updated_at >= ?)
+                AND (created_at <= ? OR updated_at <= ?)
+                GROUP BY channel";
+            
+            $channelResults = \App\Helpers\Database::fetchAll($sqlChannels, [
+                $agentId, $dateFrom, $dateFrom, $dateTo, $dateTo
+            ]);
+            
+            $conversationsByChannel = [];
+            foreach ($channelResults as $row) {
+                $conversationsByChannel[$row['channel']] = (int)$row['count'];
+            }
+            
+            // Tempo médio de resolução em minutos/horas
+            $avgResolutionHours = $baseMetrics['avg_resolution_hours'] ?? 0;
+            $avgResolutionMinutes = $avgResolutionHours * 60;
+            
+            // Calcular média de mensagens por conversa
+            $totalMessages = (int)($messagesResult['total_messages'] ?? 0);
+            $conversationsWithMessages = (int)($messagesResult['conversations_with_messages'] ?? 0);
+            $avgMessagesPerConversation = $conversationsWithMessages > 0 
+                ? round($totalMessages / $conversationsWithMessages, 2) 
+                : 0;
+            
+            // Conversas por dia (média)
+            $daysDiff = max(1, (strtotime($dateTo) - strtotime($dateFrom)) / 86400);
+            $totalConversations = $baseMetrics['total_conversations'] ?? 0;
+            $conversationsPerDay = round($totalConversations / $daysDiff, 2);
+            
+            // Calcular CSAT se disponível (placeholder - precisa de tabela de avaliações)
+            $csat = null;
+            try {
+                $sqlCsat = "SELECT AVG(rating) as avg_rating, COUNT(*) as total_ratings
+                    FROM conversation_ratings
+                    WHERE agent_id = ?
+                    AND created_at >= ?
+                    AND created_at <= ?";
+                $csatResult = \App\Helpers\Database::fetch($sqlCsat, [$agentId, $dateFrom, $dateTo]);
+                if ($csatResult && $csatResult['total_ratings'] > 0) {
+                    $csat = [
+                        'average' => round((float)$csatResult['avg_rating'], 2),
+                        'total' => (int)$csatResult['total_ratings']
+                    ];
+                }
+            } catch (\Exception $e) {
+                // Tabela de ratings pode não existir
+            }
+            
+            return array_merge($baseMetrics, [
+                // Métricas de mensagens
+                'total_messages' => $totalMessages,
+                'avg_messages_per_conversation' => $avgMessagesPerConversation,
+                
+                // Detalhamento de conversas
+                'conversations_by_status' => $conversationsByStatus,
+                'conversations_by_channel' => $conversationsByChannel,
+                
+                // Tempo de resolução formatado
+                'avg_resolution_minutes' => round($avgResolutionMinutes, 2),
+                
+                // Métricas de produtividade
+                'conversations_per_day' => $conversationsPerDay,
+                
+                // CSAT
+                'csat' => $csat,
+                
+                // Período
+                'period' => [
+                    'from' => $dateFrom,
+                    'to' => $dateTo,
+                    'days' => round($daysDiff)
+                ]
+            ]);
+        }); // ✅ Fim do Cache::remember
+    }
 }
 

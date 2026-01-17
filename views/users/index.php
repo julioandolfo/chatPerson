@@ -192,6 +192,7 @@ ob_start();
                                                        data-user-availability="<?= htmlspecialchars($user['availability_status'] ?? 'offline', ENT_QUOTES) ?>"
                                                        data-user-max-conversations="<?= htmlspecialchars($user['max_conversations'] ?? '', ENT_QUOTES) ?>"
                                                        data-user-queue-enabled="<?= htmlspecialchars(($user['queue_enabled'] ?? 1) ? '1' : '0', ENT_QUOTES) ?>"
+                                                       data-user-woocommerce-seller-id="<?= htmlspecialchars($user['woocommerce_seller_id'] ?? '', ENT_QUOTES) ?>"
                                                        onclick="editUser(this); return false;">
                                                         <i class="ki-duotone ki-pencil fs-5 me-2">
                                                             <span class="path1"></span>
@@ -262,8 +263,13 @@ ob_start();
                     </i>
                 </div>
             </div>
-            <form id="kt_modal_new_user_form" class="form" action="<?= \App\Helpers\Url::to('/users') ?>" method="POST">
+            <form id="kt_modal_new_user_form" class="form" action="<?= \App\Helpers\Url::to('/users') ?>" method="POST" enctype="multipart/form-data">
                 <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Avatar</label>
+                        <input type="file" name="avatar_file" class="form-control form-control-solid" accept="image/*" />
+                        <div class="form-text">JPG, PNG, GIF ou WEBP. Máximo 2MB</div>
+                    </div>
                     <div class="fv-row mb-7">
                         <label class="required fw-semibold fs-6 mb-2">Nome</label>
                         <input type="text" name="name" class="form-control form-control-solid" placeholder="Nome completo" required />
@@ -318,6 +324,26 @@ ob_start();
                         </div>
                         <div class="form-text">Quando desabilitado, o agente não receberá novas conversas via automações ou distribuição automática</div>
                     </div>
+                    
+                    <div class="separator separator-dashed my-5"></div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2 d-flex align-items-center">
+                            <i class="ki-duotone ki-shop fs-2 text-success me-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                                <span class="path4"></span>
+                                <span class="path5"></span>
+                            </i>
+                            ID do WooCommerce
+                        </label>
+                        <input type="number" name="woocommerce_seller_id" class="form-control form-control-solid" 
+                               min="1" placeholder="Ex: 1" />
+                        <div class="form-text">
+                            <strong>Métricas de Conversão:</strong> Informe o ID do vendedor no WooCommerce para rastrear conversões e vendas.
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer flex-center">
                     <button type="reset" data-bs-dismiss="modal" class="btn btn-light me-3">Cancelar</button>
@@ -348,9 +374,14 @@ ob_start();
                     </i>
                 </div>
             </div>
-            <form id="kt_modal_edit_user_form" class="form" method="POST">
+            <form id="kt_modal_edit_user_form" class="form" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="user_id" id="edit_user_id" />
                 <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Avatar</label>
+                        <input type="file" name="avatar_file" class="form-control form-control-solid" accept="image/*" />
+                        <div class="form-text">JPG, PNG, GIF ou WEBP. Máximo 2MB. Deixe vazio para manter o atual.</div>
+                    </div>
                     <div class="fv-row mb-7">
                         <label class="required fw-semibold fs-6 mb-2">Nome</label>
                         <input type="text" name="name" id="edit_user_name" class="form-control form-control-solid" placeholder="Nome completo" required />
@@ -405,6 +436,26 @@ ob_start();
                             </label>
                         </div>
                         <div class="form-text">Quando desabilitado, o agente não receberá novas conversas via automações ou distribuição automática</div>
+                    </div>
+                    
+                    <div class="separator separator-dashed my-5"></div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2 d-flex align-items-center">
+                            <i class="ki-duotone ki-shop fs-2 text-success me-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                                <span class="path4"></span>
+                                <span class="path5"></span>
+                            </i>
+                            ID do WooCommerce
+                        </label>
+                        <input type="number" name="woocommerce_seller_id" id="edit_user_woocommerce_seller_id" class="form-control form-control-solid" 
+                               min="1" placeholder="Ex: 1" />
+                        <div class="form-text">
+                            <strong>Métricas de Conversão:</strong> Informe o ID do vendedor no WooCommerce para rastrear conversões e vendas.
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer flex-center">
@@ -553,10 +604,9 @@ document.addEventListener("DOMContentLoaded", function() {
             fetch(form.action, {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
                     "X-Requested-With": "XMLHttpRequest"
                 },
-                body: new URLSearchParams(formData)
+                body: formData
             })
             .then(response => {
                 console.log("[RESPONSE] Resposta recebida:", response.status, response.statusText);
@@ -630,6 +680,7 @@ document.addEventListener("DOMContentLoaded", function() {
         const userAvailability = element.getAttribute("data-user-availability") || "offline";
         const userMaxConversations = element.getAttribute("data-user-max-conversations") || "";
         const userQueueEnabled = element.getAttribute("data-user-queue-enabled") || "1";
+        const userWooCommerceSellerId = element.getAttribute("data-user-woocommerce-seller-id") || "";
         
         document.getElementById("edit_user_id").value = userId;
         document.getElementById("edit_user_name").value = userName;
@@ -640,6 +691,9 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById("edit_user_availability_status").value = userAvailability;
         document.getElementById("edit_user_max_conversations").value = userMaxConversations;
         document.getElementById("edit_user_queue_enabled").checked = (userQueueEnabled === "1" || userQueueEnabled === "true");
+        
+        const wooField = document.getElementById("edit_user_woocommerce_seller_id");
+        if (wooField) wooField.value = userWooCommerceSellerId;
         
         const form = document.getElementById("kt_modal_edit_user_form");
         const baseUrl = window.location.origin;

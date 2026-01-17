@@ -15,6 +15,8 @@ window.editAgent = function(element) {
         const agentStatus = element.getAttribute("data-agent-status") || "active";
         const agentAvailability = element.getAttribute("data-agent-availability") || "offline";
         const agentMaxConversations = element.getAttribute("data-agent-max-conversations") || "";
+        const agentQueueEnabled = element.getAttribute("data-agent-queue-enabled") || "1";
+        const agentWooCommerceSellerId = element.getAttribute("data-agent-woocommerce-seller-id") || "";
 
         const editIdField = document.getElementById("edit_agent_id");
         const editNameField = document.getElementById("edit_agent_name");
@@ -24,6 +26,8 @@ window.editAgent = function(element) {
         const editStatusField = document.getElementById("edit_agent_status");
         const editAvailabilityField = document.getElementById("edit_agent_availability_status");
         const editMaxConversationsField = document.getElementById("edit_agent_max_conversations");
+        const editQueueEnabledField = document.getElementById("edit_agent_queue_enabled");
+        const editWooCommerceSellerIdField = document.getElementById("edit_agent_woocommerce_seller_id");
 
         if (editIdField) editIdField.value = agentId;
         if (editNameField) editNameField.value = agentName;
@@ -33,6 +37,8 @@ window.editAgent = function(element) {
         if (editStatusField) editStatusField.value = agentStatus;
         if (editAvailabilityField) editAvailabilityField.value = agentAvailability;
         if (editMaxConversationsField) editMaxConversationsField.value = agentMaxConversations;
+        if (editQueueEnabledField) editQueueEnabledField.checked = (agentQueueEnabled === "1" || agentQueueEnabled === "true");
+        if (editWooCommerceSellerIdField) editWooCommerceSellerIdField.value = agentWooCommerceSellerId;
 
         const form = document.getElementById("kt_modal_edit_agent_form");
         if (form) {
@@ -317,6 +323,8 @@ window.deleteAgent = function(agentId, agentName) {
                                                        data-agent-status="<?= htmlspecialchars($agent['status'] ?? 'active', ENT_QUOTES) ?>"
                                                        data-agent-availability="<?= htmlspecialchars($agent['availability_status'] ?? 'offline', ENT_QUOTES) ?>"
                                                        data-agent-max-conversations="<?= htmlspecialchars($agent['max_conversations'] ?? '', ENT_QUOTES) ?>"
+                                                       data-agent-queue-enabled="<?= htmlspecialchars(($agent['queue_enabled'] ?? 1) ? '1' : '0', ENT_QUOTES) ?>"
+                                                       data-agent-woocommerce-seller-id="<?= htmlspecialchars($agent['woocommerce_seller_id'] ?? '', ENT_QUOTES) ?>"
                                                        onclick="editAgent(this); return false;">
                                                         <i class="ki-duotone ki-pencil fs-5 me-2">
                                                             <span class="path1"></span>
@@ -449,6 +457,37 @@ window.deleteAgent = function(agentId, agentName) {
                                min="1" placeholder="Deixe vazio para ilimitado" />
                         <div class="form-text">Número máximo de conversas que este agente pode atender simultaneamente</div>
                     </div>
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Fila de Distribuição</label>
+                        <div class="form-check form-switch form-check-custom form-check-solid">
+                            <input type="hidden" name="queue_enabled" value="0" />
+                            <input class="form-check-input" type="checkbox" name="queue_enabled" value="1" id="new_agent_queue_enabled" checked />
+                            <label class="form-check-label fw-semibold text-gray-700" for="new_agent_queue_enabled">
+                                Receber novas conversas automaticamente
+                            </label>
+                        </div>
+                        <div class="form-text">Quando desabilitado, o agente não receberá novas conversas via automações ou distribuição automática</div>
+                    </div>
+                    
+                    <div class="separator separator-dashed my-5"></div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2 d-flex align-items-center">
+                            <i class="ki-duotone ki-shop fs-2 text-success me-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                                <span class="path4"></span>
+                                <span class="path5"></span>
+                            </i>
+                            ID do WooCommerce
+                        </label>
+                        <input type="number" name="woocommerce_seller_id" class="form-control form-control-solid" 
+                               min="1" placeholder="Ex: 1" />
+                        <div class="form-text">
+                            <strong>Métricas de Conversão:</strong> Informe o ID do vendedor no WooCommerce para rastrear conversões e vendas.
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer flex-center">
                     <button type="reset" data-bs-dismiss="modal" class="btn btn-light me-3">Cancelar</button>
@@ -530,6 +569,37 @@ window.deleteAgent = function(agentId, agentName) {
                         <input type="number" name="max_conversations" id="edit_agent_max_conversations" class="form-control form-control-solid" 
                                min="1" placeholder="Deixe vazio para ilimitado" />
                         <div class="form-text">Número máximo de conversas que este agente pode atender simultaneamente</div>
+                    </div>
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Fila de Distribuição</label>
+                        <div class="form-check form-switch form-check-custom form-check-solid">
+                            <input type="hidden" name="queue_enabled" value="0" />
+                            <input class="form-check-input" type="checkbox" name="queue_enabled" value="1" id="edit_agent_queue_enabled" />
+                            <label class="form-check-label fw-semibold text-gray-700" for="edit_agent_queue_enabled">
+                                Receber novas conversas automaticamente
+                            </label>
+                        </div>
+                        <div class="form-text">Quando desabilitado, o agente não receberá novas conversas via automações ou distribuição automática</div>
+                    </div>
+                    
+                    <div class="separator separator-dashed my-5"></div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2 d-flex align-items-center">
+                            <i class="ki-duotone ki-shop fs-2 text-success me-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                                <span class="path4"></span>
+                                <span class="path5"></span>
+                            </i>
+                            ID do WooCommerce
+                        </label>
+                        <input type="number" name="woocommerce_seller_id" id="edit_agent_woocommerce_seller_id" class="form-control form-control-solid" 
+                               min="1" placeholder="Ex: 1" />
+                        <div class="form-text">
+                            <strong>Métricas de Conversão:</strong> Informe o ID do vendedor no WooCommerce para rastrear conversões e vendas.
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer flex-center">
@@ -687,6 +757,8 @@ window.editAgent = function(element) {
         const agentStatus = element.getAttribute("data-agent-status") || "active";
         const agentAvailability = element.getAttribute("data-agent-availability") || "offline";
         const agentMaxConversations = element.getAttribute("data-agent-max-conversations") || "";
+        const agentQueueEnabled = element.getAttribute("data-agent-queue-enabled") || "1";
+        const agentWooCommerceSellerId = element.getAttribute("data-agent-woocommerce-seller-id") || "";
         
         const editIdField = document.getElementById("edit_agent_id");
         const editNameField = document.getElementById("edit_agent_name");
@@ -696,6 +768,8 @@ window.editAgent = function(element) {
         const editStatusField = document.getElementById("edit_agent_status");
         const editAvailabilityField = document.getElementById("edit_agent_availability_status");
         const editMaxConversationsField = document.getElementById("edit_agent_max_conversations");
+        const editQueueEnabledField = document.getElementById("edit_agent_queue_enabled");
+        const editWooCommerceSellerIdField = document.getElementById("edit_agent_woocommerce_seller_id");
         
         if (editIdField) editIdField.value = agentId;
         if (editNameField) editNameField.value = agentName;
@@ -705,6 +779,8 @@ window.editAgent = function(element) {
         if (editStatusField) editStatusField.value = agentStatus;
         if (editAvailabilityField) editAvailabilityField.value = agentAvailability;
         if (editMaxConversationsField) editMaxConversationsField.value = agentMaxConversations;
+        if (editQueueEnabledField) editQueueEnabledField.checked = (agentQueueEnabled === "1" || agentQueueEnabled === "true");
+        if (editWooCommerceSellerIdField) editWooCommerceSellerIdField.value = agentWooCommerceSellerId;
         
         const form = document.getElementById("kt_modal_edit_agent_form");
         if (form) {
@@ -834,29 +910,6 @@ document.addEventListener("DOMContentLoaded", function() {
             });
         });
     }
-        const agentId = element.getAttribute("data-agent-id");
-        const agentName = element.getAttribute("data-agent-name") || "";
-        const agentEmail = element.getAttribute("data-agent-email") || "";
-        const agentRole = element.getAttribute("data-agent-role") || "agent";
-        const agentStatus = element.getAttribute("data-agent-status") || "active";
-        const agentAvailability = element.getAttribute("data-agent-availability") || "offline";
-        const agentMaxConversations = element.getAttribute("data-agent-max-conversations") || "";
-        
-        document.getElementById("edit_agent_id").value = agentId;
-        document.getElementById("edit_agent_name").value = agentName;
-        document.getElementById("edit_agent_email").value = agentEmail;
-        document.getElementById("edit_agent_password").value = "";
-        document.getElementById("edit_agent_role").value = agentRole;
-        document.getElementById("edit_agent_status").value = agentStatus;
-        document.getElementById("edit_agent_availability_status").value = agentAvailability;
-        document.getElementById("edit_agent_max_conversations").value = agentMaxConversations;
-        
-        const form = document.getElementById("kt_modal_edit_agent_form");
-        form.action = "' . \App\Helpers\Url::to('/users') . '/" + agentId;
-        
-        const modal = new bootstrap.Modal(document.getElementById("kt_modal_edit_agent"));
-        modal.show();
-    };
     
     // Form de edição de agente
     const editForm = document.getElementById("kt_modal_edit_agent_form");

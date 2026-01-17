@@ -97,15 +97,15 @@ class AgentPerformanceController
         $agentMetrics = DashboardService::getAgentDetailedMetrics($agentId, $dateFrom, $dateTo);
         
         // Estatísticas de performance do AgentPerformanceService
-        $performanceStats = AgentPerformanceService::getAgentStats($agentId, $dateFrom, $dateTo);
+        $performanceStats = AgentPerformanceService::getPerformanceStats($agentId, $dateFrom, $dateTo);
         
         // Estatísticas de disponibilidade
-        $availabilityStats = AvailabilityService::getAgentStats($agentId, $dateFrom, $dateTo);
+        $availabilityStats = AvailabilityService::getAvailabilityStats($agentId, $dateFrom, $dateTo);
         
         // Métricas de conversão (se habilitado WooCommerce)
         $conversionMetrics = [];
         try {
-            $conversionMetrics = AgentConversionService::getAgentMetrics($agentId, $dateFrom, $dateTo);
+            $conversionMetrics = AgentConversionService::getConversionMetrics($agentId, $dateFrom, $dateTo);
         } catch (\Exception $e) {
             // WooCommerce pode não estar configurado
         }

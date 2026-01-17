@@ -217,7 +217,13 @@ class RealtimeController
                                     'id' => $conversation['id'],
                                     'status' => $conversation['status'] ?? 'open',
                                     'unread_count' => $conversation['unread_count'] ?? 0,
-                                    'updated_at' => $conversation['updated_at']
+                                    'updated_at' => $conversation['updated_at'],
+                                    'agent_id' => $conversation['agent_id'] ?? null,
+                                    'department_id' => $conversation['department_id'] ?? null,
+                                    'funnel_id' => $conversation['funnel_id'] ?? null,
+                                    'funnel_stage_id' => $conversation['funnel_stage_id'] ?? null,
+                                    'last_message' => $conversation['last_message'] ?? null,
+                                    'last_message_at' => $conversation['last_message_at'] ?? null
                                 ];
                             }
                         }
@@ -341,7 +347,11 @@ class RealtimeController
                                     'last_message' => $conv['last_message'] ?? null,
                                     'last_message_at' => $conv['last_message_at'] ?? null,
                                     'channel' => $conv['channel'] ?? 'whatsapp',
+                                    'agent_id' => $conv['agent_id'] ?? null,
                                     'agent_name' => $conv['agent_name'] ?? null,
+                                    'department_id' => $conv['department_id'] ?? null,
+                                    'funnel_id' => $conv['funnel_id'] ?? null,
+                                    'funnel_stage_id' => $conv['funnel_stage_id'] ?? null,
                                     'tags_data' => $conv['tags_data'] ?? null,
                                     'pinned' => $conv['pinned'] ?? 0
                                 ];

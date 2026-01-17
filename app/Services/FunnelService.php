@@ -395,6 +395,28 @@ class FunnelService
                 error_log("Erro ao logar atividade: " . $e->getMessage());
             }
             
+            // Notificar via WebSocket para atualizar UI em tempo real
+            try {
+                $updatedConversation = Conversation::find($conversationId);
+                
+                // Notificar conversa atualizada
+                \App\Helpers\WebSocket::notifyConversationUpdated($conversationId, $updatedConversation);
+                
+                // Notificar evento específico de movimentação
+                \App\Helpers\WebSocket::broadcast('conversation_moved', [
+                    'conversation_id' => $conversationId,
+                    'old_stage_id' => $oldStageId,
+                    'new_stage_id' => $stageId,
+                    'old_funnel_id' => $oldFunnelId,
+                    'new_funnel_id' => $stage['funnel_id'],
+                    'stage_name' => $stage['name'] ?? ''
+                ]);
+                
+                \App\Helpers\Logger::automation("  ✅ Notificação WebSocket enviada");
+            } catch (\Exception $e) {
+                \App\Helpers\Logger::automation("  ⚠️ WebSocket não disponível: " . $e->getMessage());
+            }
+            
             \App\Helpers\Logger::automation("FunnelService::moveConversation - FIM (Sucesso)");
             return true;
         }

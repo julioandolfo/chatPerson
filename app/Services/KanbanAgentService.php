@@ -1274,9 +1274,17 @@ class KanbanAgentService
             throw new \Exception('ID da etapa não especificado');
         }
 
+        $oldStageId = $conversation['funnel_stage_id'] ?? null;
+        
         Conversation::update($conversation['id'], [
             'funnel_stage_id' => $stageId,
             'moved_at' => date('Y-m-d H:i:s')
+        ]);
+        
+        // Notificar via WebSocket para atualizar UI em tempo real
+        self::notifyConversationChange($conversation['id'], 'stage_changed', [
+            'old_stage_id' => $oldStageId,
+            'new_stage_id' => $stageId
         ]);
 
         return ['message' => "Conversa movida para etapa $stageId"];
@@ -1301,9 +1309,18 @@ class KanbanAgentService
             throw new \Exception('Não há próxima etapa');
         }
 
+        $oldStageId = $conversation['funnel_stage_id'];
+        
         Conversation::update($conversation['id'], [
             'funnel_stage_id' => $nextStage['id'],
             'moved_at' => date('Y-m-d H:i:s')
+        ]);
+        
+        // Notificar via WebSocket para atualizar UI em tempo real
+        self::notifyConversationChange($conversation['id'], 'stage_changed', [
+            'old_stage_id' => $oldStageId,
+            'new_stage_id' => $nextStage['id'],
+            'new_stage_name' => $nextStage['name']
         ]);
 
         return ['message' => "Conversa movida para próxima etapa: {$nextStage['name']}"];
@@ -1329,6 +1346,11 @@ class KanbanAgentService
         Conversation::update($conversation['id'], [
             'agent_id' => $agentId,
             'assigned_at' => date('Y-m-d H:i:s')
+        ]);
+        
+        // Notificar via WebSocket
+        self::notifyConversationChange($conversation['id'], 'agent_assigned', [
+            'agent_id' => $agentId
         ]);
 
         return ['message' => "Conversa atribuída ao agente $agentId"];
@@ -1364,6 +1386,12 @@ class KanbanAgentService
             null,
             []
         );
+        
+        // Notificar via WebSocket
+        self::notifyConversationChange($conversation['id'], 'ai_agent_assigned', [
+            'ai_agent_id' => $aiAgentId,
+            'ai_agent_name' => $aiAgent['name']
+        ]);
         
         Logger::info("KanbanAgentService::actionAssignAIAgent - Agente de IA {$aiAgent['name']} (ID: {$aiAgentId}) atribuído à conversa {$conversation['id']}");
         
@@ -1423,6 +1451,13 @@ class KanbanAgentService
         
         $resultMessage = !empty($addedTags) ? 'Tags adicionadas: ' . implode(', ', $addedTags) : 'Nenhuma tag adicionada';
         Logger::info("KanbanAgentService::actionAddTag - Resultado: $resultMessage");
+        
+        // Notificar via WebSocket se tags foram adicionadas
+        if (!empty($addedTags)) {
+            self::notifyConversationChange($conversation['id'], 'tags_updated', [
+                'added_tags' => $addedTags
+            ]);
+        }
 
         return [
             'message' => $resultMessage,
@@ -1461,6 +1496,12 @@ class KanbanAgentService
                 $summaryType === 'internal' // isPrivate
             );
             
+            // Notificar via WebSocket
+            self::notifyConversationChange($conversation['id'], 'note_created', [
+                'note_id' => $note['id'] ?? null,
+                'note_type' => 'summary'
+            ]);
+            
             return ['message' => 'Resumo criado', 'note_id' => $note['id'] ?? null, 'summary' => $summary];
         } catch (\Exception $e) {
             Logger::error("KanbanAgentService::actionCreateSummary - Erro: " . $e->getMessage());
@@ -1493,6 +1534,12 @@ class KanbanAgentService
                 $noteContent,
                 $isInternal
             );
+            
+            // Notificar via WebSocket
+            self::notifyConversationChange($conversation['id'], 'note_created', [
+                'note_id' => $createdNote['id'] ?? null,
+                'is_internal' => $isInternal
+            ]);
             
             return ['message' => 'Nota criada', 'note_id' => $createdNote['id'] ?? null, 'note' => $noteContent];
         } catch (\Exception $e) {
@@ -1543,12 +1590,34 @@ class KanbanAgentService
             
             Logger::info("KanbanAgentService::actionSendInternalMessage - Mensagem interna criada com sucesso (ID: $messageId)");
             
-            // Notificar via WebSocket se disponível
+            // Notificar via WebSocket - usar notificação de nova mensagem
             try {
-                // Enviar conversa mínima para evitar erro de argumentos
+                // Buscar dados do remetente para exibição
+                $sender = User::find($systemUserId);
+                $senderName = $sender ? $sender['name'] : 'Sistema';
+                
+                // Notificar nova mensagem com todos os campos necessários para renderização
+                \App\Helpers\WebSocket::notifyNewMessage(
+                    (int)$conversation['id'],
+                    [
+                        'id' => $messageId,
+                        'conversation_id' => $conversation['id'],
+                        'sender_id' => $systemUserId,
+                        'sender_type' => 'agent',
+                        'sender_name' => $senderName,
+                        'content' => $messageContent,
+                        'message_type' => 'note',
+                        'type' => 'note', // Frontend usa 'type' para renderização
+                        'direction' => 'outgoing', // Notas internas são sempre outgoing
+                        'status' => 'sent',
+                        'created_at' => date('Y-m-d H:i:s')
+                    ]
+                );
+                
+                // Também notificar atualização da conversa
                 \App\Helpers\WebSocket::notifyConversationUpdated(
                     (int)$conversation['id'],
-                    $conversation
+                    Conversation::find($conversation['id'])
                 );
             } catch (\Exception $e) {
                 // WebSocket pode não estar disponível, ignorar erro
@@ -1642,6 +1711,65 @@ class KanbanAgentService
         
         // Fallback: retornar 1 (usuário ID 1 geralmente é admin)
         return 1;
+    }
+
+    /**
+     * Notificar mudança na conversa via WebSocket
+     * Atualiza a UI em tempo real sem necessidade de refresh
+     */
+    private static function notifyConversationChange(int $conversationId, string $changeType, array $data = []): void
+    {
+        try {
+            // Buscar conversa atualizada
+            $conversation = Conversation::find($conversationId);
+            if (!$conversation) {
+                return;
+            }
+            
+            // Buscar dados adicionais para a notificação
+            $contact = null;
+            if (!empty($conversation['contact_id'])) {
+                $contact = Contact::find($conversation['contact_id']);
+            }
+            
+            // Buscar etapa atual
+            $stage = null;
+            if (!empty($conversation['funnel_stage_id'])) {
+                $stage = FunnelStage::find($conversation['funnel_stage_id']);
+            }
+            
+            // Montar dados da notificação
+            $notificationData = array_merge($data, [
+                'change_type' => $changeType,
+                'conversation_id' => $conversationId,
+                'timestamp' => date('Y-m-d H:i:s')
+            ]);
+            
+            // Notificar conversa atualizada
+            \App\Helpers\WebSocket::notifyConversationUpdated($conversationId, $conversation);
+            
+            // Se for mudança de etapa, notificar também o evento específico
+            if ($changeType === 'stage_changed' && $stage) {
+                \App\Helpers\WebSocket::broadcast('conversation_moved', [
+                    'conversation_id' => $conversationId,
+                    'old_stage_id' => $data['old_stage_id'] ?? null,
+                    'new_stage_id' => $data['new_stage_id'] ?? null,
+                    'stage_name' => $stage['name'] ?? '',
+                    'contact_name' => $contact['name'] ?? 'Desconhecido'
+                ]);
+            }
+            
+            // Notificar nova mensagem se houver
+            if (in_array($changeType, ['message_sent', 'internal_message'])) {
+                \App\Helpers\WebSocket::notifyNewMessage($conversationId, $data['message_id'] ?? 0, []);
+            }
+            
+            self::logInfo("WebSocket notification sent: $changeType for conversation $conversationId");
+            
+        } catch (\Exception $e) {
+            // WebSocket pode não estar disponível, logar mas não falhar
+            self::logWarning("WebSocket notification failed: " . $e->getMessage());
+        }
     }
 
     /**

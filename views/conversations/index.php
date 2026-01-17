@@ -7054,6 +7054,30 @@ function sortConversationList() {
 function applyConversationUpdate(conv) {
     const conversationItem = document.querySelector(`[data-conversation-id="${conv.id}"]`);
     if (!conversationItem) return;
+    
+    // Verificar se a etapa/funil mudou e se ainda deve aparecer na lista atual
+    const currentFunnelFilter = new URLSearchParams(window.location.search).get('funnel_id');
+    const currentStageFilter = new URLSearchParams(window.location.search).get('stage_id');
+    
+    // Se há filtro de funil/etapa ativo e a conversa não pertence mais ao filtro, recarregar lista
+    if (currentFunnelFilter || currentStageFilter) {
+        const oldFunnelId = conversationItem.dataset.funnelId;
+        const oldStageId = conversationItem.dataset.stageId;
+        const newFunnelId = conv.funnel_id ? String(conv.funnel_id) : '';
+        const newStageId = conv.funnel_stage_id ? String(conv.funnel_stage_id) : '';
+        
+        // Se funil/etapa mudou e está fora do filtro, remover da lista
+        if ((currentFunnelFilter && newFunnelId !== currentFunnelFilter) ||
+            (currentStageFilter && newStageId !== currentStageFilter)) {
+            console.log('[Realtime] Conversa', conv.id, 'saiu do filtro atual, removendo da lista');
+            conversationItem.remove();
+            return;
+        }
+        
+        // Atualizar dataset com novos valores
+        conversationItem.dataset.funnelId = newFunnelId;
+        conversationItem.dataset.stageId = newStageId;
+    }
 
     // Preservar dropdown aberto se estiver aberto
     const wasOpen = hasOpenDropdown(conv.id);
@@ -17003,6 +17027,43 @@ if (typeof window.wsClient !== 'undefined') {
         } catch (err) {
             console.error('Erro ao adicionar nova conversa na lista:', err);
             // Fallback: recarregar lista por AJAX (preservando filtros)
+            const urlParams = new URLSearchParams(window.location.search);
+            refreshConversationList(urlParams);
+        }
+    });
+    
+    // Handler para conversa movida de etapa/funil (evento específico do KanbanAgent)
+    window.wsClient.on('conversation_moved', (data) => {
+        console.log('[Realtime] Conversa movida de etapa:', data);
+        
+        if (!data || !data.conversation_id) return;
+        
+        // Verificar se a conversa está na lista atual
+        const conversationItem = document.querySelector(`[data-conversation-id="${data.conversation_id}"]`);
+        
+        // Verificar filtros atuais
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentFunnelFilter = urlParams.get('funnel_id');
+        const currentStageFilter = urlParams.get('stage_id');
+        
+        // Se há filtro ativo e a conversa não pertence mais, remover
+        if (conversationItem) {
+            if ((currentFunnelFilter && String(data.new_stage_id || '') && data.new_funnel_id && String(data.new_funnel_id) !== currentFunnelFilter) ||
+                (currentStageFilter && String(data.new_stage_id) !== currentStageFilter)) {
+                console.log('[Realtime] Conversa', data.conversation_id, 'movida para fora do filtro, removendo');
+                conversationItem.remove();
+                return;
+            }
+            
+            // Atualizar dados da etapa na UI
+            conversationItem.dataset.stageId = data.new_stage_id || '';
+            if (data.new_funnel_id) {
+                conversationItem.dataset.funnelId = data.new_funnel_id;
+            }
+        }
+        
+        // Recarregar lista para garantir consistência (principalmente para sidebar)
+        if (data.old_stage_id !== data.new_stage_id) {
             const urlParams = new URLSearchParams(window.location.search);
             refreshConversationList(urlParams);
         }

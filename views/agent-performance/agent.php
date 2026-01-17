@@ -336,7 +336,8 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                     <div class="border border-gray-300 border-dashed rounded min-w-100px py-3 px-4 text-center">
                         <div class="fs-3 fw-bold text-success">
                             <?php
-                            $onlineMinutes = $availabilityStats['total_online_minutes'] ?? 0;
+                            $onlineSeconds = $availabilityStats['online']['seconds'] ?? 0;
+                            $onlineMinutes = floor($onlineSeconds / 60);
                             echo $onlineMinutes >= 60 ? round($onlineMinutes / 60, 1) . 'h' : $onlineMinutes . 'min';
                             ?>
                         </div>
@@ -345,7 +346,8 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                     <div class="border border-gray-300 border-dashed rounded min-w-100px py-3 px-4 text-center">
                         <div class="fs-3 fw-bold text-warning">
                             <?php
-                            $awayMinutes = $availabilityStats['total_away_minutes'] ?? 0;
+                            $awaySeconds = $availabilityStats['away']['seconds'] ?? 0;
+                            $awayMinutes = floor($awaySeconds / 60);
                             echo $awayMinutes >= 60 ? round($awayMinutes / 60, 1) . 'h' : $awayMinutes . 'min';
                             ?>
                         </div>
@@ -354,7 +356,8 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                     <div class="border border-gray-300 border-dashed rounded min-w-100px py-3 px-4 text-center">
                         <div class="fs-3 fw-bold text-danger">
                             <?php
-                            $busyMinutes = $availabilityStats['total_busy_minutes'] ?? 0;
+                            $busySeconds = $availabilityStats['busy']['seconds'] ?? 0;
+                            $busyMinutes = floor($busySeconds / 60);
                             echo $busyMinutes >= 60 ? round($busyMinutes / 60, 1) . 'h' : $busyMinutes . 'min';
                             ?>
                         </div>
@@ -362,7 +365,7 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                     </div>
                     <div class="border border-gray-300 border-dashed rounded min-w-100px py-3 px-4 text-center">
                         <div class="fs-3 fw-bold text-primary">
-                            <?= number_format($availabilityStats['availability_rate'] ?? 0, 1) ?>%
+                            <?= number_format($availabilityStats['online']['percentage'] ?? 0, 1) ?>%
                         </div>
                         <div class="fw-semibold text-muted fs-7">Taxa Disponível</div>
                     </div>
@@ -453,7 +456,7 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                     <div class="col-md-3">
                         <div class="border border-gray-300 border-dashed rounded p-4 text-center">
                             <div class="fs-2x fw-bold text-info">
-                                R$ <?= number_format($conversionMetrics['avg_order_value'] ?? 0, 2, ',', '.') ?>
+                                R$ <?= number_format($conversionMetrics['avg_ticket'] ?? 0, 2, ',', '.') ?>
                             </div>
                             <div class="fw-semibold text-muted">Ticket Médio</div>
                         </div>

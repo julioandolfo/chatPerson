@@ -124,6 +124,14 @@ class RealtimeController
             }
 
             // Processar heartbeat/atividade do usuário
+            if (isset($data['activity_type'])) {
+                try {
+                    \App\Services\AvailabilityService::updateActivity($userId, (string)$data['activity_type']);
+                } catch (\Exception $e) {
+                    \App\Helpers\Logger::error("Erro ao processar atividade no polling: " . $e->getMessage());
+                }
+            }
+
             if (isset($data['last_activity']) || isset($data['activity_type'])) {
                 try {
                     \App\Services\AvailabilityService::processHeartbeat($userId);

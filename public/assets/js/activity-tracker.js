@@ -9,6 +9,7 @@ class ActivityTracker {
         this.heartbeatInterval = null;
         this.activityThrottle = 5000; // Enviar atividade no máximo a cada 5 segundos
         this.lastSentActivity = 0;
+        this.pendingActivityType = null;
         this.settings = {
             enabled: true,
             trackMouse: false,
@@ -94,6 +95,7 @@ class ActivityTracker {
     recordActivity(type = 'activity') {
         const now = Date.now();
         this.lastActivityTime = now;
+        this.pendingActivityType = type;
 
         // Throttle: só enviar se passou tempo suficiente desde última vez
         if (now - this.lastSentActivity < this.activityThrottle) {
@@ -116,6 +118,7 @@ class ActivityTracker {
                     activity_type: type,
                     timestamp: Date.now()
                 });
+                this.pendingActivityType = null;
             } catch (e) {
                 console.error('ActivityTracker: Erro ao enviar via WebSocket', e);
             }
@@ -200,6 +203,20 @@ class ActivityTracker {
      */
     getLastActivity() {
         return this.lastActivityTime;
+    }
+
+    /**
+     * Obter atividade pendente (para polling)
+     */
+    getPendingActivity() {
+        return this.pendingActivityType;
+    }
+
+    /**
+     * Limpar atividade pendente (para polling)
+     */
+    clearPendingActivity() {
+        this.pendingActivityType = null;
     }
 
     /**

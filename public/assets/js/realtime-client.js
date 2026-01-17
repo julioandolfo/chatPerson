@@ -265,6 +265,13 @@ class RealtimeClient {
             // O navegador automaticamente resolve /api/realtime/poll baseado no origin atual
             const pollUrl = '/api/realtime/poll';
 
+            const pendingActivity = (window.activityTracker && typeof window.activityTracker.getPendingActivity === 'function')
+                ? window.activityTracker.getPendingActivity()
+                : null;
+            const lastActivity = (window.activityTracker && typeof window.activityTracker.getLastActivity === 'function')
+                ? window.activityTracker.getLastActivity()
+                : null;
+
             const response = await fetch(pollUrl, {
                 method: 'POST',
                 headers: {
@@ -275,7 +282,9 @@ class RealtimeClient {
                 body: JSON.stringify({
                     user_id: this.userId,
                     subscribed_conversations: this.subscribedConversations,
-                    last_update_time: this.lastUpdateTime
+                    last_update_time: this.lastUpdateTime,
+                    last_activity: lastActivity,
+                    activity_type: pendingActivity
                 })
             });
 
@@ -299,6 +308,9 @@ class RealtimeClient {
                 this.processPollingUpdates(data.updates);
                 this.lastUpdateTime = data.timestamp || Date.now();
                 this.saveLastUpdateTime(); // Persistir no localStorage
+                if (pendingActivity && window.activityTracker && typeof window.activityTracker.clearPendingActivity === 'function') {
+                    window.activityTracker.clearPendingActivity();
+                }
             }
         } catch (error) {
             console.error('Erro no polling:', error);

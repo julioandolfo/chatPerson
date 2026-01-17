@@ -904,9 +904,11 @@ class DashboardService
                          WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent')
                     ) <= ? THEN c.id END) as first_response_within_sla
                 FROM conversations c
-                WHERE c.agent_id = ?
-                AND (c.created_at >= ? OR c.updated_at >= ?)
-                AND (c.created_at <= ? OR c.updated_at <= ?)";
+                INNER JOIN conversation_assignments ca 
+                    ON ca.conversation_id = c.id 
+                    AND ca.agent_id = ?
+                WHERE ca.assigned_at >= ?
+                AND ca.assigned_at <= ?";
         
         // SLA em segundos
         $slaFirstResponseSeconds = $slaFirstResponseMinutes * 60;
@@ -915,14 +917,20 @@ class DashboardService
         $metrics = \App\Helpers\Database::fetch($sql, [
             $slaFirstResponseSeconds,
             $agentId,
-            $dateFrom, $dateFrom,
-            $dateTo, $dateTo
+            $dateFrom,
+            $dateTo
         ]);
         
         // Conversas atuais abertas
-        $sqlCurrent = "SELECT COUNT(*) as total FROM conversations 
-                      WHERE agent_id = ? AND status IN ('open', 'pending')";
-        $current = \App\Helpers\Database::fetch($sqlCurrent, [$agentId]);
+        $sqlCurrent = "SELECT COUNT(DISTINCT c.id) as total
+                      FROM conversations c
+                      INNER JOIN conversation_assignments ca
+                        ON ca.conversation_id = c.id
+                        AND ca.agent_id = ?
+                      WHERE c.status IN ('open', 'pending')
+                      AND ca.assigned_at >= ?
+                      AND ca.assigned_at <= ?";
+        $current = \App\Helpers\Database::fetch($sqlCurrent, [$agentId, $dateFrom, $dateTo]);
         
         $total = (int)($metrics['total_conversations'] ?? 0);
         $resolved = (int)($metrics['resolved_conversations'] ?? 0);
@@ -953,10 +961,12 @@ class DashboardService
                             AND m3.created_at > m1.created_at
                         )
                     INNER JOIN conversations c ON c.id = m1.conversation_id
+                    INNER JOIN conversation_assignments ca 
+                        ON ca.conversation_id = c.id 
+                        AND ca.agent_id = ?
+                        AND ca.assigned_at >= ?
+                        AND ca.assigned_at <= ?
                     WHERE m1.sender_type = 'contact'
-                    AND c.agent_id = ?
-                    AND c.created_at >= ?
-                    AND c.created_at <= ?
                 ) as response_times";
         
         $avgResponseResult = \App\Helpers\Database::fetch($sqlAvgResponse, [$slaResponseSeconds, $agentId, $dateFrom, $dateTo]);
@@ -1572,27 +1582,36 @@ class DashboardService
             // Métricas adicionais de mensagens
             $sqlMessages = "SELECT 
                     COUNT(*) as total_messages,
-                    COUNT(DISTINCT conversation_id) as conversations_with_messages
-                FROM messages 
-                WHERE sender_id = ? 
-                AND sender_type = 'agent'
-                AND created_at >= ? 
-                AND created_at <= ?";
+                    COUNT(DISTINCT m.conversation_id) as conversations_with_messages
+                FROM messages m
+                INNER JOIN conversation_assignments ca
+                    ON ca.conversation_id = m.conversation_id
+                    AND ca.agent_id = ?
+                    AND ca.assigned_at >= ?
+                    AND ca.assigned_at <= ?
+                WHERE m.sender_id = ? 
+                AND m.sender_type = 'agent'
+                AND m.created_at >= ? 
+                AND m.created_at <= ?";
             
-            $messagesResult = \App\Helpers\Database::fetch($sqlMessages, [$agentId, $dateFrom, $dateTo]);
+            $messagesResult = \App\Helpers\Database::fetch($sqlMessages, [
+                $agentId, $dateFrom, $dateTo, $agentId, $dateFrom, $dateTo
+            ]);
             
             // Conversas por status detalhado
             $sqlStatusDetail = "SELECT 
-                    status,
-                    COUNT(*) as count
-                FROM conversations 
-                WHERE agent_id = ?
-                AND (created_at >= ? OR updated_at >= ?)
-                AND (created_at <= ? OR updated_at <= ?)
-                GROUP BY status";
+                    c.status,
+                    COUNT(DISTINCT c.id) as count
+                FROM conversations c
+                INNER JOIN conversation_assignments ca
+                    ON ca.conversation_id = c.id
+                    AND ca.agent_id = ?
+                WHERE ca.assigned_at >= ?
+                AND ca.assigned_at <= ?
+                GROUP BY c.status";
             
             $statusResults = \App\Helpers\Database::fetchAll($sqlStatusDetail, [
-                $agentId, $dateFrom, $dateFrom, $dateTo, $dateTo
+                $agentId, $dateFrom, $dateTo
             ]);
             
             $conversationsByStatus = [];
@@ -1602,16 +1621,18 @@ class DashboardService
             
             // Conversas por canal
             $sqlChannels = "SELECT 
-                    channel,
-                    COUNT(*) as count
-                FROM conversations 
-                WHERE agent_id = ?
-                AND (created_at >= ? OR updated_at >= ?)
-                AND (created_at <= ? OR updated_at <= ?)
-                GROUP BY channel";
+                    c.channel,
+                    COUNT(DISTINCT c.id) as count
+                FROM conversations c
+                INNER JOIN conversation_assignments ca
+                    ON ca.conversation_id = c.id
+                    AND ca.agent_id = ?
+                WHERE ca.assigned_at >= ?
+                AND ca.assigned_at <= ?
+                GROUP BY c.channel";
             
             $channelResults = \App\Helpers\Database::fetchAll($sqlChannels, [
-                $agentId, $dateFrom, $dateFrom, $dateTo, $dateTo
+                $agentId, $dateFrom, $dateTo
             ]);
             
             $conversationsByChannel = [];

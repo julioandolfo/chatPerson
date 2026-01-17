@@ -1274,20 +1274,35 @@ class KanbanAgentService
             throw new \Exception('ID da etapa não especificado');
         }
 
+        // Buscar a etapa para obter o funnel_id correto
+        $stage = FunnelStage::find($stageId);
+        if (!$stage) {
+            throw new \Exception("Etapa ID {$stageId} não encontrada");
+        }
+
         $oldStageId = $conversation['funnel_stage_id'] ?? null;
+        $oldFunnelId = $conversation['funnel_id'] ?? null;
+        $newFunnelId = $stage['funnel_id'];
         
+        // Atualizar tanto a etapa quanto o funil
         Conversation::update($conversation['id'], [
+            'funnel_id' => $newFunnelId,
             'funnel_stage_id' => $stageId,
             'moved_at' => date('Y-m-d H:i:s')
         ]);
         
+        Logger::info("KanbanAgentService::actionMoveToStage - Conversa {$conversation['id']} movida: Funil {$oldFunnelId} -> {$newFunnelId}, Etapa {$oldStageId} -> {$stageId}");
+        
         // Notificar via WebSocket para atualizar UI em tempo real
         self::notifyConversationChange($conversation['id'], 'stage_changed', [
             'old_stage_id' => $oldStageId,
-            'new_stage_id' => $stageId
+            'new_stage_id' => $stageId,
+            'old_funnel_id' => $oldFunnelId,
+            'new_funnel_id' => $newFunnelId,
+            'stage_name' => $stage['name'] ?? ''
         ]);
 
-        return ['message' => "Conversa movida para etapa $stageId"];
+        return ['message' => "Conversa movida para etapa {$stage['name']} (Funil ID: {$newFunnelId})"];
     }
 
     /**

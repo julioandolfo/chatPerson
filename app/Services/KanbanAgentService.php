@@ -42,6 +42,226 @@ class KanbanAgentService
     }
     
     /**
+     * Executar agentes instantâneos para uma mensagem específica
+     * Chamado quando uma mensagem é enviada (cliente ou agente)
+     */
+    public static function executeInstantAgents(int $conversationId, string $triggerType): array
+    {
+        self::logInfo("KanbanAgentService::executeInstantAgents - Iniciando para conversa $conversationId (trigger: $triggerType)");
+        
+        $conversation = Conversation::find($conversationId);
+        if (!$conversation) {
+            self::logWarning("KanbanAgentService::executeInstantAgents - Conversa $conversationId não encontrada");
+            return [];
+        }
+        
+        // Mapear trigger para execution_type
+        $executionTypes = [];
+        if ($triggerType === 'client_message') {
+            $executionTypes = ['instant_client_message', 'instant_any_message'];
+        } elseif ($triggerType === 'agent_message') {
+            $executionTypes = ['instant_agent_message', 'instant_any_message'];
+        } else {
+            $executionTypes = ['instant_any_message'];
+        }
+        
+        // Buscar agentes instantâneos ativos
+        $placeholders = implode(',', array_fill(0, count($executionTypes), '?'));
+        $sql = "SELECT * FROM ai_kanban_agents 
+                WHERE enabled = TRUE 
+                AND execution_type IN ($placeholders)";
+        $agents = Database::fetchAll($sql, $executionTypes);
+        
+        self::logInfo("KanbanAgentService::executeInstantAgents - Agentes encontrados: " . count($agents));
+        
+        $results = [];
+        
+        foreach ($agents as $agentData) {
+            try {
+                // Decodificar campos JSON
+                $agent = AIKanbanAgent::find($agentData['id']);
+                if (!$agent || !$agent['enabled']) {
+                    continue;
+                }
+                
+                // Verificar se a conversa está nos funis/etapas alvo
+                $funnelIds = $agent['target_funnel_ids'] ?? null;
+                $stageIds = $agent['target_stage_ids'] ?? null;
+                
+                // Verificar funil
+                if ($funnelIds && is_array($funnelIds) && !empty($funnelIds)) {
+                    if (!in_array($conversation['funnel_id'], $funnelIds)) {
+                        self::logInfo("Conversa {$conversationId} não está nos funis alvo do agente {$agent['id']}");
+                        continue;
+                    }
+                }
+                
+                // Verificar etapa
+                if ($stageIds && is_array($stageIds) && !empty($stageIds)) {
+                    if (!in_array($conversation['funnel_stage_id'], $stageIds)) {
+                        self::logInfo("Conversa {$conversationId} não está nas etapas alvo do agente {$agent['id']}");
+                        continue;
+                    }
+                }
+                
+                self::logInfo("KanbanAgentService::executeInstantAgents - Executando agente {$agent['id']} para conversa $conversationId");
+                
+                // Executar agente para esta conversa específica
+                $result = self::executeAgentForConversation($agent, $conversation, 'instant_' . $triggerType);
+                
+                $results[] = [
+                    'agent_id' => $agent['id'],
+                    'agent_name' => $agent['name'],
+                    'success' => $result['success'] ?? false,
+                    'message' => $result['message'] ?? ''
+                ];
+                
+            } catch (\Exception $e) {
+                self::logError("KanbanAgentService::executeInstantAgents - Erro ao executar agente {$agentData['id']}: " . $e->getMessage());
+                $results[] = [
+                    'agent_id' => $agentData['id'],
+                    'agent_name' => $agentData['name'] ?? 'Unknown',
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ];
+            }
+        }
+        
+        self::logInfo("KanbanAgentService::executeInstantAgents - Finalizado. Resultados: " . count($results));
+        return $results;
+    }
+    
+    /**
+     * Executar agente para uma conversa específica (usado por execução instantânea)
+     */
+    private static function executeAgentForConversation(array $agent, array $conversation, string $executionType): array
+    {
+        $agentId = $agent['id'];
+        $conversationId = $conversation['id'];
+        
+        self::logInfo("KanbanAgentService::executeAgentForConversation - Agente {$agentId}, Conversa {$conversationId}");
+        
+        // Criar registro de execução
+        $executionId = AIKanbanAgentExecution::createExecution($agentId, $executionType);
+        
+        try {
+            $stats = [
+                'conversations_found' => 1,
+                'conversations_filtered' => 0,
+                'conversations_analyzed' => 0,
+                'conversations_acted_upon' => 0,
+                'actions_executed' => 0,
+                'errors_count' => 0,
+                'results' => []
+            ];
+            
+            // Separar condições
+            $separatedConditions = self::separateConditions($agent['conditions']);
+            $hasConditionsWithoutAI = !empty($separatedConditions['without_ai']['conditions']);
+            $hasConditionsWithAI = !empty($separatedConditions['with_ai']['conditions']);
+            
+            // Avaliar condições sem IA primeiro (filtro rápido)
+            if ($hasConditionsWithoutAI) {
+                $basicConditionsMet = self::evaluateConditionsWithoutAI($separatedConditions['without_ai'], $conversation);
+                if (!$basicConditionsMet['met']) {
+                    self::logInfo("Conversa {$conversationId}: condições básicas NÃO atendidas");
+                    AIKanbanAgentExecution::completeExecution($executionId, $stats);
+                    return ['success' => true, 'message' => 'Condições básicas não atendidas', 'stats' => $stats];
+                }
+                $stats['conversations_filtered'] = 1;
+            } else {
+                $stats['conversations_filtered'] = 1;
+            }
+            
+            // Verificar cooldown
+            $forceExecution = strpos($executionType, 'manual') !== false;
+            [$shouldSkip, $reason] = self::shouldSkipConversation($agent, $conversation, $forceExecution);
+            
+            if ($shouldSkip) {
+                self::logInfo("Conversa {$conversationId}: PULADA - motivo: $reason");
+                AIKanbanAgentExecution::completeExecution($executionId, $stats);
+                return ['success' => true, 'message' => "Conversa pulada: $reason", 'stats' => $stats];
+            }
+            
+            // Analisar conversa com IA
+            $stats['conversations_analyzed'] = 1;
+            self::logInfo("Analisando conversa {$conversationId} com IA");
+            $analysis = self::analyzeConversation($agent, $conversation);
+            
+            // Avaliar condições de IA
+            $aiConditionsMet = ['met' => true, 'details' => []];
+            if ($hasConditionsWithAI) {
+                $aiConditionsMet = self::evaluateConditions($separatedConditions['with_ai'], $conversation, $analysis);
+            }
+            
+            // Executar ações se condições atendidas
+            if ($aiConditionsMet['met']) {
+                $stats['conversations_acted_upon'] = 1;
+                self::logInfo("Executando ações para conversa {$conversationId}");
+                
+                $actionsResult = self::executeActions($agent['actions'], $conversation, $analysis, $agentId, $executionId);
+                $stats['actions_executed'] = $actionsResult['executed'];
+                $stats['errors_count'] = $actionsResult['errors'];
+                
+                // Criar snapshot e registrar log
+                $conversationSnapshot = self::createConversationSnapshot($conversation);
+                
+                AIKanbanAgentActionLog::createLog([
+                    'ai_kanban_agent_id' => $agentId,
+                    'execution_id' => $executionId,
+                    'conversation_id' => $conversationId,
+                    'analysis_summary' => $analysis['summary'] ?? null,
+                    'analysis_score' => $analysis['score'] ?? null,
+                    'conditions_met' => true,
+                    'conditions_details' => array_merge(
+                        $separatedConditions['without_ai']['conditions'] ?? [],
+                        $aiConditionsMet['details'] ?? []
+                    ),
+                    'actions_executed' => $actionsResult['actions'] ?? [],
+                    'success' => (int)($actionsResult['errors'] === 0),
+                    'conversation_snapshot' => $conversationSnapshot
+                ]);
+            } else {
+                // Registrar log mesmo sem ações
+                $conversationSnapshot = self::createConversationSnapshot($conversation);
+                
+                AIKanbanAgentActionLog::createLog([
+                    'ai_kanban_agent_id' => $agentId,
+                    'execution_id' => $executionId,
+                    'conversation_id' => $conversationId,
+                    'analysis_summary' => $analysis['summary'] ?? null,
+                    'analysis_score' => $analysis['score'] ?? null,
+                    'conditions_met' => false,
+                    'conditions_details' => array_merge(
+                        $separatedConditions['without_ai']['conditions'] ?? [],
+                        $aiConditionsMet['details'] ?? []
+                    ),
+                    'actions_executed' => [],
+                    'success' => 1,
+                    'conversation_snapshot' => $conversationSnapshot
+                ]);
+            }
+            
+            // Finalizar execução
+            AIKanbanAgentExecution::completeExecution($executionId, $stats);
+            
+            $message = "Execução instantânea concluída. Ações: {$stats['actions_executed']}, Erros: {$stats['errors_count']}";
+            self::logInfo($message);
+            
+            return [
+                'success' => true,
+                'message' => $message,
+                'stats' => $stats
+            ];
+            
+        } catch (\Throwable $e) {
+            self::logError("Erro na execução instantânea: " . $e->getMessage());
+            AIKanbanAgentExecution::completeExecution($executionId, [], $e->getMessage());
+            throw $e;
+        }
+    }
+    
+    /**
      * Executar todos os agentes prontos para execução
      */
     public static function executeReadyAgents(): array

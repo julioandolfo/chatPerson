@@ -165,7 +165,7 @@ class KanbanAgentController
             'model' => 'required|string',
             'temperature' => 'nullable|numeric|min:0|max:2',
             'max_tokens' => 'nullable|integer|min:1',
-            'execution_type' => 'required|string|in:interval,schedule,manual',
+            'execution_type' => 'required|string|in:interval,schedule,manual,instant_client_message,instant_agent_message,instant_any_message',
             'execution_interval_hours' => 'nullable|integer|min:1',
             'max_conversations_per_execution' => 'nullable|integer|min:1|max:1000'
         ]);
@@ -276,7 +276,7 @@ class KanbanAgentController
             'model' => 'required|string',
             'temperature' => 'nullable|numeric|min:0|max:2',
             'max_tokens' => 'nullable|integer|min:1',
-            'execution_type' => 'required|string|in:interval,schedule,manual',
+            'execution_type' => 'required|string|in:interval,schedule,manual,instant_client_message,instant_agent_message,instant_any_message',
             'execution_interval_hours' => 'nullable|integer|min:1',
             'max_conversations_per_execution' => 'nullable|integer|min:1|max:1000'
         ]);

@@ -1996,6 +1996,17 @@ class ConversationService
                 error_log("Erro ao executar automações de agente: " . $e->getMessage());
             }
         }
+        
+        // Executar Agentes Kanban instantâneos
+        try {
+            $kanbanTriggerType = ($senderType === 'contact') ? 'client_message' : 'agent_message';
+            \App\Helpers\Logger::info("ConversationService::sendMessage - DISPARANDO Kanban Agents instantâneos (trigger: $kanbanTriggerType)");
+            \App\Services\KanbanAgentService::executeInstantAgents($conversationId, $kanbanTriggerType);
+            \App\Helpers\Logger::info("ConversationService::sendMessage - Kanban Agents instantâneos CONCLUÍDO");
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO ao executar Kanban Agents: " . $e->getMessage());
+            error_log("Erro ao executar Kanban Agents: " . $e->getMessage());
+        }
 
         \App\Helpers\Logger::info("═══ ConversationService::sendMessage FIM ═══ messageId={$messageId}, conv={$conversationId}");
 

@@ -58,10 +58,18 @@ ob_start();
                 <div class="col-md-6">
                     <label class="form-label required">Tipo de Execução</label>
                     <select name="execution_type" class="form-select" required id="execution_type">
-                        <option value="interval" <?= ($agent['execution_type'] ?? '') === 'interval' ? 'selected' : '' ?>>Por Intervalo</option>
-                        <option value="schedule" <?= ($agent['execution_type'] ?? '') === 'schedule' ? 'selected' : '' ?>>Agendado</option>
-                        <option value="manual" <?= ($agent['execution_type'] ?? '') === 'manual' ? 'selected' : '' ?>>Manual</option>
+                        <optgroup label="⚡ Instantâneo (por evento)">
+                            <option value="instant_client_message" <?= ($agent['execution_type'] ?? '') === 'instant_client_message' ? 'selected' : '' ?>>Mensagem do Cliente (Instantâneo)</option>
+                            <option value="instant_agent_message" <?= ($agent['execution_type'] ?? '') === 'instant_agent_message' ? 'selected' : '' ?>>Mensagem do Agente (Instantâneo)</option>
+                            <option value="instant_any_message" <?= ($agent['execution_type'] ?? '') === 'instant_any_message' ? 'selected' : '' ?>>Qualquer Mensagem (Instantâneo)</option>
+                        </optgroup>
+                        <optgroup label="🕐 Periódico">
+                            <option value="interval" <?= ($agent['execution_type'] ?? '') === 'interval' ? 'selected' : '' ?>>Por Intervalo</option>
+                            <option value="schedule" <?= ($agent['execution_type'] ?? '') === 'schedule' ? 'selected' : '' ?>>Agendado</option>
+                            <option value="manual" <?= ($agent['execution_type'] ?? '') === 'manual' ? 'selected' : '' ?>>Manual</option>
+                        </optgroup>
                     </select>
+                    <div class="form-text text-muted" id="execution_type_help"></div>
                 </div>
                 <div class="col-md-6" id="interval_hours_container" style="display: <?= ($agent['execution_type'] ?? '') === 'interval' ? 'block' : 'none' ?>;">
                     <label class="form-label">Intervalo (horas)</label>
@@ -223,12 +231,32 @@ const selectedStageIds = <?= json_encode($agent['target_stage_ids'] ?? [], JSON_
 
 document.getElementById('execution_type').addEventListener('change', function() {
     const intervalContainer = document.getElementById('interval_hours_container');
-    if (this.value === 'interval') {
+    const helpText = document.getElementById('execution_type_help');
+    const value = this.value;
+    
+    // Mostrar/ocultar intervalo
+    if (value === 'interval') {
         intervalContainer.style.display = 'block';
     } else {
         intervalContainer.style.display = 'none';
     }
+    
+    // Atualizar texto de ajuda
+    const helpTexts = {
+        'instant_client_message': '⚡ Executa IMEDIATAMENTE quando o CLIENTE envia uma mensagem',
+        'instant_agent_message': '⚡ Executa IMEDIATAMENTE quando o AGENTE envia uma mensagem',
+        'instant_any_message': '⚡ Executa IMEDIATAMENTE quando QUALQUER mensagem é enviada',
+        'interval': '🕐 Executa a cada X horas automaticamente',
+        'schedule': '🕐 Executa em dias/horários específicos',
+        'manual': '🖱️ Executa apenas quando você clicar manualmente'
+    };
+    
+    helpText.textContent = helpTexts[value] || '';
+    helpText.className = value.startsWith('instant_') ? 'form-text text-success fw-bold' : 'form-text text-muted';
 });
+
+// Disparar evento inicial
+document.getElementById('execution_type').dispatchEvent(new Event('change'));
 
 // Atualizar etapas quando funis são selecionados
 function updateStages() {

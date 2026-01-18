@@ -1471,14 +1471,19 @@ class FunnelService
         
         // Buscar histórico de atribuições de agentes
         // Nota: Usa estrutura simplificada (agent_id, não from/to)
+        // Filtrar apenas registros com agent_id válido (não NULL)
         $assignmentHistorySql = "SELECT ca.*, 
                                         u.name as agent_name,
+                                        u.email as agent_email,
                                         u_assigned.name as assigned_by_name,
+                                        u_assigned.email as assigned_by_email,
                                         ca.assigned_at
                                  FROM conversation_assignments ca
-                                 LEFT JOIN users u ON ca.agent_id = u.id
+                                 INNER JOIN users u ON ca.agent_id = u.id
                                  LEFT JOIN users u_assigned ON ca.assigned_by = u_assigned.id
                                  WHERE ca.conversation_id = ?
+                                 AND ca.agent_id IS NOT NULL
+                                 AND ca.removed_at IS NULL
                                  ORDER BY ca.assigned_at DESC
                                  LIMIT 20";
         

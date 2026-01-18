@@ -359,13 +359,27 @@ async function showConversationDetails(conversationId) {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${details.assignment_history.map(assignment => `
-                                <tr>
-                                    <td>${assignment.agent_name || 'Não atribuído'}</td>
-                                    <td>${assignment.assigned_by_name || 'Sistema'}</td>
-                                    <td class="text-muted fs-7">${new Date(assignment.assigned_at).toLocaleString('pt-BR')}</td>
-                                </tr>
-                                `).join('')}
+                                ${details.assignment_history.map(assignment => {
+                                    const agentName = assignment.agent_name || '<span class="text-muted">Não atribuído</span>';
+                                    const assignedBy = assignment.assigned_by_name 
+                                        ? `<span class="fw-semibold">${assignment.assigned_by_name}</span>`
+                                        : '<span class="badge badge-light-info">Sistema/Automação</span>';
+                                    const date = new Date(assignment.assigned_at).toLocaleString('pt-BR', {
+                                        day: '2-digit',
+                                        month: '2-digit',
+                                        year: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                    });
+                                    
+                                    return `
+                                    <tr>
+                                        <td>${agentName}</td>
+                                        <td>${assignedBy}</td>
+                                        <td class="text-muted fs-7">${date}</td>
+                                    </tr>
+                                    `;
+                                }).join('')}
                             </tbody>
                         </table>
                     </div>

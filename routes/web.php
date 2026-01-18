@@ -202,11 +202,12 @@ Router::post('/funnels', [FunnelController::class, 'store'], ['Authentication'])
 Router::post('/funnels/{id}', [FunnelController::class, 'update'], ['Authentication']); // Atualizar funil
 Router::delete('/funnels/{id}', [FunnelController::class, 'delete'], ['Authentication']); // Deletar funil
 Router::post('/funnels/{id}/stages', [FunnelController::class, 'createStage'], ['Authentication']);
-Router::post('/funnels/{id}/stages/{stageId}', [FunnelController::class, 'updateStage'], ['Authentication']);
-Router::delete('/funnels/{id}/stages/{stageId}', [FunnelController::class, 'deleteStage'], ['Authentication']);
+// IMPORTANTE: Rotas específicas devem vir ANTES das rotas genéricas
+Router::post('/funnels/{id}/stages/reorder', [FunnelController::class, 'reorderStages'], ['Authentication']); // ✅ Específica (antes)
 Router::post('/funnels/stages/{stageId}/reorder', [FunnelController::class, 'reorderStage'], ['Authentication']);
 Router::post('/funnels/{id}/conversations/move', [FunnelController::class, 'moveConversation'], ['Authentication']);
-Router::post('/funnels/{id}/stages/reorder', [FunnelController::class, 'reorderStages'], ['Authentication']);
+Router::post('/funnels/{id}/stages/{stageId}', [FunnelController::class, 'updateStage'], ['Authentication']); // ⚠️ Genérica (depois)
+Router::delete('/funnels/{id}/stages/{stageId}', [FunnelController::class, 'deleteStage'], ['Authentication']);
 Router::get('/funnels/{id}/metrics', [FunnelController::class, 'getFunnelMetrics'], ['Authentication']);
 Router::get('/funnels/{id}/stages/metrics', [FunnelController::class, 'getStageMetrics'], ['Authentication']);
 

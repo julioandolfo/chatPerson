@@ -390,12 +390,12 @@ class CampaignController
      */
     private function getWhatsAppAccountsForCampaign(): array
     {
-        $accounts = IntegrationAccount::getActive('whatsapp');
+        $accounts = IntegrationAccount::getByChannel('whatsapp');
         if (!empty($accounts)) {
             return $accounts;
         }
 
-        $legacyAccounts = WhatsAppAccount::getActive();
+        $legacyAccounts = WhatsAppAccount::all();
         if (empty($legacyAccounts)) {
             return [];
         }
@@ -445,7 +445,7 @@ class CampaignController
             }));
         }
 
-        return IntegrationAccount::getActive('whatsapp');
+        return IntegrationAccount::getByChannel('whatsapp');
     }
     
     /**

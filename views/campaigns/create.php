@@ -457,6 +457,11 @@ function updateStages() {
     const stageSelect = document.getElementById('initial_stage_id');
     if (!funnelSelect || !stageSelect) return;
     
+    const defaultFunnelId = "<?php echo $defaultFunnelId ?? ''; ?>";
+    if (!funnelSelect.value && defaultFunnelId) {
+        funnelSelect.value = defaultFunnelId;
+    }
+    
     const funnelId = funnelSelect.value;
     const selectedFunnel = funnelsData.find(f => String(f.id) === String(funnelId));
     
@@ -506,7 +511,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     updateStages();
-    toggleConversationConfig(document.querySelector('[name="create_conversation"]')?.checked ?? true);
+    const createConversationCheckbox = document.querySelector('input[name="create_conversation"][type="checkbox"]');
+    toggleConversationConfig(createConversationCheckbox?.checked ?? true);
 });
 
 function updateReviewSummary() {

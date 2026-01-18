@@ -23,9 +23,10 @@ class DripSequence extends Model
     /**
      * Buscar todas as sequências
      */
-    public static function all(): array
+    public static function all(array $columns = ['*']): array
     {
-        $sql = "SELECT * FROM drip_sequences ORDER BY created_at DESC";
+        $columnsStr = implode(', ', $columns);
+        $sql = "SELECT {$columnsStr} FROM drip_sequences ORDER BY created_at DESC";
         return Database::fetchAll($sql, []);
     }
     

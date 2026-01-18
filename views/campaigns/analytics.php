@@ -143,12 +143,13 @@ function loadAnalytics() {
     fetch(`/api/campaigns/analytics?period=${period}`)
         .then(r => r.json())
         .then(data => {
-            if (data.success) {
-                renderComparisonChart(data.comparison);
-                renderBestHoursChart(data.best_hours);
-                renderBestDaysChart(data.best_days);
-                renderAccountsPerformance(data.accounts_performance);
+            if (!data.success) {
+                throw new Error(data.message || 'Erro ao carregar analytics');
             }
+            renderComparisonChart(data.comparison);
+            renderBestHoursChart(data.best_hours);
+            renderBestDaysChart(data.best_days);
+            renderAccountsPerformance(data.accounts_performance);
         })
         .catch(err => toastr.error('Erro ao carregar analytics'));
 }

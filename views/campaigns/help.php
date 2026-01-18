@@ -4,19 +4,17 @@ $title = 'Ajuda - Campanhas';
 $pageTitle = 'Ajuda';
 ?>
 
-<div class="d-flex flex-column flex-column-fluid">
-    <div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
-        <div id="kt_app_toolbar_container" class="app-container container-fluid d-flex flex-stack">
-            <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
-                <h1 class="page-heading d-flex text-gray-900 fw-bold fs-3 flex-column justify-content-center my-0">
-                    Central de Ajuda - Campanhas
-                </h1>
-            </div>
+<?php ob_start(); ?>
+<div class="app-toolbar py-3 py-lg-6">
+    <div class="app-container container-fluid d-flex flex-stack">
+        <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
+            <h1 class="page-heading d-flex text-gray-900 fw-bold fs-3 flex-column justify-content-center my-0">
+                Central de Ajuda - Campanhas
+            </h1>
         </div>
     </div>
-
-    <div id="kt_app_content" class="app-content flex-column-fluid">
-        <div id="kt_app_content_container" class="app-container container-fluid">
+</div>
+<div class="app-container container-fluid">
             
             <div class="row">
                 <div class="col-xl-3">
@@ -255,6 +253,11 @@ $pageTitle = 'Ajuda';
                 </div>
             </div>
             
-        </div>
     </div>
 </div>
+
+<?php 
+$content = ob_get_clean(); 
+?>
+
+<?php include __DIR__ . '/../layouts/metronic/app.php'; ?>

@@ -283,6 +283,41 @@ $pageTitle = 'Nova Campanha';
                                             </div>
                                             <div class="form-text">Mensagens só serão enviadas dentro deste horário</div>
                                         </div>
+
+                                        <div class="mb-10">
+                                            <label class="form-label">Dias da Semana</label>
+                                            <div class="d-flex flex-wrap gap-4">
+                                                <label class="form-check form-check-custom form-check-solid">
+                                                    <input class="form-check-input" type="checkbox" name="send_days[]" value="1" checked />
+                                                    <span class="form-check-label">Seg</span>
+                                                </label>
+                                                <label class="form-check form-check-custom form-check-solid">
+                                                    <input class="form-check-input" type="checkbox" name="send_days[]" value="2" checked />
+                                                    <span class="form-check-label">Ter</span>
+                                                </label>
+                                                <label class="form-check form-check-custom form-check-solid">
+                                                    <input class="form-check-input" type="checkbox" name="send_days[]" value="3" checked />
+                                                    <span class="form-check-label">Qua</span>
+                                                </label>
+                                                <label class="form-check form-check-custom form-check-solid">
+                                                    <input class="form-check-input" type="checkbox" name="send_days[]" value="4" checked />
+                                                    <span class="form-check-label">Qui</span>
+                                                </label>
+                                                <label class="form-check form-check-custom form-check-solid">
+                                                    <input class="form-check-input" type="checkbox" name="send_days[]" value="5" checked />
+                                                    <span class="form-check-label">Sex</span>
+                                                </label>
+                                                <label class="form-check form-check-custom form-check-solid">
+                                                    <input class="form-check-input" type="checkbox" name="send_days[]" value="6" />
+                                                    <span class="form-check-label">Sáb</span>
+                                                </label>
+                                                <label class="form-check form-check-custom form-check-solid">
+                                                    <input class="form-check-input" type="checkbox" name="send_days[]" value="7" />
+                                                    <span class="form-check-label">Dom</span>
+                                                </label>
+                                            </div>
+                                            <div class="form-text">Selecione os dias permitidos para envio</div>
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -408,6 +443,19 @@ document.addEventListener('DOMContentLoaded', function() {
 function updateReviewSummary() {
     const formData = new FormData(document.getElementById('campaign_form'));
     const accounts = formData.getAll('integration_account_ids[]');
+    const daysSelected = formData.getAll('send_days[]');
+    const daysMap = {
+        '1': 'Seg',
+        '2': 'Ter',
+        '3': 'Qua',
+        '4': 'Qui',
+        '5': 'Sex',
+        '6': 'Sáb',
+        '7': 'Dom'
+    };
+    const daysText = daysSelected.length
+        ? daysSelected.map(d => daysMap[d] || d).join(', ')
+        : 'Todos';
     
     const html = `
         <div class="card bg-light">
@@ -426,6 +474,9 @@ function updateReviewSummary() {
                 </div>
                 <div class="mb-5">
                     <strong>Cadência:</strong> ${formData.get('send_rate_per_minute')} msgs/min
+                </div>
+                <div class="mb-5">
+                    <strong>Dias de Envio:</strong> ${daysText}
                 </div>
                 <div>
                     <strong>Mensagem:</strong>

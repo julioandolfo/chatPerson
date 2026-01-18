@@ -4,25 +4,23 @@ $title = 'Templates de Campanhas';
 $pageTitle = 'Templates';
 ?>
 
-<div class="d-flex flex-column flex-column-fluid">
-    <div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
-        <div id="kt_app_toolbar_container" class="app-container container-fluid d-flex flex-stack">
-            <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
-                <h1 class="page-heading d-flex text-gray-900 fw-bold fs-3 flex-column justify-content-center my-0">
-                    Templates de Campanhas
-                </h1>
-            </div>
-            <div class="d-flex align-items-center gap-2">
-                <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modal_create_template">
-                    <i class="ki-duotone ki-plus fs-2"></i>
-                    Novo Template
-                </button>
-            </div>
+<?php ob_start(); ?>
+<div class="app-toolbar py-3 py-lg-6">
+    <div class="app-container container-fluid d-flex flex-stack">
+        <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
+            <h1 class="page-heading d-flex text-gray-900 fw-bold fs-3 flex-column justify-content-center my-0">
+                Templates de Campanhas
+            </h1>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modal_create_template">
+                <i class="ki-duotone ki-plus fs-2"></i>
+                Novo Template
+            </button>
         </div>
     </div>
-
-    <div id="kt_app_content" class="app-content flex-column-fluid">
-        <div id="kt_app_content_container" class="app-container container-fluid">
+</div>
+<div class="app-container container-fluid">
             
             <!-- Templates Grid -->
             <div class="row g-5">
@@ -175,7 +173,6 @@ $pageTitle = 'Templates';
                 
             </div>
             
-        </div>
     </div>
 </div>
 
@@ -281,3 +278,9 @@ function saveTemplate() {
     .catch(err => toastr.error('Erro de rede'));
 }
 </script>
+
+<?php 
+$content = ob_get_clean(); 
+?>
+
+<?php include __DIR__ . '/../layouts/metronic/app.php'; ?>

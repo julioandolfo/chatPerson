@@ -244,6 +244,9 @@ function loadDashboard() {
     fetch(`/api/campaigns/dashboard?period=${period}`)
         .then(r => r.json())
         .then(data => {
+            if (!data.success) {
+                throw new Error(data.message || 'Erro ao carregar dashboard');
+            }
             dashboardData = data;
             updateKPIs(data);
             renderCharts(data);

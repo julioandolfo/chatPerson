@@ -12,6 +12,7 @@ use App\Services\CampaignNotificationService;
 use App\Models\Campaign;
 use App\Models\ContactList;
 use App\Models\IntegrationAccount;
+use App\Models\WhatsAppAccount;
 use App\Helpers\Response;
 use App\Helpers\Request;
 use App\Helpers\Permission;
@@ -51,8 +52,7 @@ class CampaignController
         $lists = ContactList::all();
 
         // Buscar contas WhatsApp ativas
-        $sql = "SELECT * FROM integration_accounts WHERE channel = 'whatsapp' AND status = 'active' ORDER BY name";
-        $whatsappAccounts = \App\Helpers\Database::fetchAll($sql, []);
+        $whatsappAccounts = $this->getWhatsAppAccountsForCampaign();
 
         Response::view('campaigns/create', [
             'lists' => $lists,
@@ -361,14 +361,76 @@ class CampaignController
         
         $lists = \App\Models\ContactList::all();
         
-        $sql = "SELECT * FROM integration_accounts WHERE channel = 'whatsapp' AND status = 'active' ORDER BY name";
-        $whatsappAccounts = \App\Helpers\Database::fetchAll($sql, []);
+        $whatsappAccounts = $this->getWhatsAppAccountsForCampaign();
         
         Response::view('campaigns/ab-test', [
             'lists' => $lists,
             'whatsappAccounts' => $whatsappAccounts,
             'title' => 'Editor A/B Testing'
         ]);
+    }
+
+    /**
+     * Garantir que contas WhatsApp existam em integration_accounts
+     */
+    private function getWhatsAppAccountsForCampaign(): array
+    {
+        $accounts = IntegrationAccount::getActive('whatsapp');
+        if (!empty($accounts)) {
+            return $accounts;
+        }
+
+        $legacyAccounts = WhatsAppAccount::getActive();
+        if (empty($legacyAccounts)) {
+            return [];
+        }
+
+        foreach ($legacyAccounts as $legacy) {
+            $provider = $legacy['provider'] ?? 'quepasa';
+            $phoneNumber = $legacy['phone_number'] ?? null;
+            if (empty($phoneNumber)) {
+                continue;
+            }
+
+            $existing = IntegrationAccount::findByProviderChannelPhone($provider, 'whatsapp', $phoneNumber);
+            if ($existing) {
+                continue;
+            }
+
+            $config = [];
+            foreach ([
+                'quepasa_user',
+                'quepasa_token',
+                'quepasa_trackid',
+                'quepasa_chatid',
+                'wavoip_token',
+                'wavoip_enabled'
+            ] as $key) {
+                if (!empty($legacy[$key])) {
+                    $config[$key] = $legacy[$key];
+                }
+            }
+
+            $data = [
+                'name' => $legacy['name'] ?? $phoneNumber,
+                'provider' => $provider,
+                'channel' => 'whatsapp',
+                'api_url' => $legacy['api_url'] ?? null,
+                'api_token' => $legacy['api_key'] ?? null,
+                'account_id' => $legacy['instance_id'] ?? null,
+                'phone_number' => $phoneNumber,
+                'status' => $legacy['status'] ?? 'active',
+                'config' => !empty($config) ? json_encode($config) : null,
+                'default_funnel_id' => $legacy['default_funnel_id'] ?? null,
+                'default_stage_id' => $legacy['default_stage_id'] ?? null
+            ];
+
+            IntegrationAccount::create(array_filter($data, function ($value) {
+                return $value !== null && $value !== '';
+            }));
+        }
+
+        return IntegrationAccount::getActive('whatsapp');
     }
     
     /**
@@ -845,6 +907,124 @@ class CampaignController
                 'recent_campaigns' => $recentCampaigns
             ]);
             
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * API: Analytics avançado
+     */
+    public function analytics(): void
+    {
+        Permission::abortIfCannot('campaigns.view');
+
+        try {
+            $period = (int) Request::get('period', 30);
+
+            // Comparação de campanhas (reply/delivery)
+            $comparisonRows = \App\Helpers\Database::fetchAll(
+                "SELECT name,
+                        (total_replied / NULLIF(total_sent, 0) * 100) as reply_rate,
+                        (total_delivered / NULLIF(total_sent, 0) * 100) as delivery_rate
+                 FROM campaigns
+                 WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+                 ORDER BY created_at DESC
+                 LIMIT 10",
+                [$period]
+            );
+
+            $comparison = [
+                'campaign_names' => array_column($comparisonRows, 'name'),
+                'reply_rates' => array_map('floatval', array_column($comparisonRows, 'reply_rate')),
+                'delivery_rates' => array_map('floatval', array_column($comparisonRows, 'delivery_rate'))
+            ];
+
+            // Melhores horários (volume de envios por hora)
+            $hoursRows = \App\Helpers\Database::fetchAll(
+                "SELECT HOUR(created_at) as hour, COUNT(*) as total
+                 FROM campaign_messages
+                 WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+                 GROUP BY HOUR(created_at)
+                 ORDER BY hour ASC",
+                [$period]
+            );
+
+            $hoursMap = array_fill(0, 24, 0);
+            foreach ($hoursRows as $row) {
+                $hour = (int) $row['hour'];
+                $hoursMap[$hour] = (int) $row['total'];
+            }
+            $bestHours = [
+                'rates' => $hoursMap
+            ];
+
+            // Melhores dias (volume por dia da semana)
+            $daysRows = \App\Helpers\Database::fetchAll(
+                "SELECT DAYOFWEEK(created_at) as dow, COUNT(*) as total
+                 FROM campaign_messages
+                 WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+                 GROUP BY DAYOFWEEK(created_at)
+                 ORDER BY dow ASC",
+                [$period]
+            );
+
+            $daysMap = array_fill(0, 7, 0);
+            foreach ($daysRows as $row) {
+                $dowIndex = (int) $row['dow'] - 1; // 0=Domingo
+                if ($dowIndex >= 0 && $dowIndex <= 6) {
+                    $daysMap[$dowIndex] = (int) $row['total'];
+                }
+            }
+            $bestDays = [
+                'rates' => $daysMap
+            ];
+
+            // Performance por conta
+            $accountsRows = \App\Helpers\Database::fetchAll(
+                "SELECT ia.name, ia.phone_number,
+                        SUM(cm.status = 'sent') as total_sent,
+                        SUM(cm.status = 'delivered') as total_delivered,
+                        SUM(cm.status = 'read') as total_read,
+                        SUM(cm.status = 'replied') as total_replied
+                 FROM campaign_messages cm
+                 INNER JOIN integration_accounts ia ON ia.id = cm.integration_account_id
+                 WHERE cm.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+                 GROUP BY ia.id
+                 ORDER BY total_sent DESC",
+                [$period]
+            );
+
+            $accountsPerformance = array_map(function ($row) {
+                $totalSent = (int) ($row['total_sent'] ?? 0);
+                $totalDelivered = (int) ($row['total_delivered'] ?? 0);
+                $totalRead = (int) ($row['total_read'] ?? 0);
+                $totalReplied = (int) ($row['total_replied'] ?? 0);
+
+                $deliveryRate = $totalSent > 0 ? ($totalDelivered / $totalSent) * 100 : 0;
+                $readRate = $totalDelivered > 0 ? ($totalRead / $totalDelivered) * 100 : 0;
+                $replyRate = $totalDelivered > 0 ? ($totalReplied / $totalDelivered) * 100 : 0;
+
+                return [
+                    'name' => $row['name'],
+                    'phone_number' => $row['phone_number'],
+                    'total_sent' => $totalSent,
+                    'delivery_rate' => $deliveryRate,
+                    'read_rate' => $readRate,
+                    'reply_rate' => $replyRate
+                ];
+            }, $accountsRows);
+
+            Response::json([
+                'success' => true,
+                'comparison' => $comparison,
+                'best_hours' => $bestHours,
+                'best_days' => $bestDays,
+                'accounts_performance' => $accountsPerformance
+            ]);
         } catch (\Exception $e) {
             Response::json([
                 'success' => false,

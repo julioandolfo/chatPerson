@@ -4,9 +4,17 @@ $title = 'Início Rápido - Campanhas';
 $pageTitle = 'Início Rápido';
 ?>
 
-<div class="d-flex flex-column flex-column-fluid">
-    <div id="kt_app_content" class="app-content flex-column-fluid">
-        <div id="kt_app_content_container" class="app-container container-fluid">
+<?php ob_start(); ?>
+<div class="app-toolbar py-3 py-lg-6">
+    <div class="app-container container-fluid d-flex flex-stack">
+        <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
+            <h1 class="page-heading d-flex text-gray-900 fw-bold fs-3 flex-column justify-content-center my-0">
+                Início Rápido - Campanhas
+            </h1>
+        </div>
+    </div>
+</div>
+<div class="app-container container-fluid">
             
             <div class="row">
                 <div class="col-xl-8 offset-xl-2">
@@ -203,6 +211,11 @@ $pageTitle = 'Início Rápido';
                 </div>
             </div>
             
-        </div>
     </div>
 </div>
+
+<?php 
+$content = ob_get_clean(); 
+?>
+
+<?php include __DIR__ . '/../layouts/metronic/app.php'; ?>

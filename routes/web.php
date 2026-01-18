@@ -658,6 +658,7 @@ Router::post('/drip-sequences/{id}/contacts', [DripSequenceController::class, 'a
 Router::get('/api/campaigns', [CampaignController::class, 'list'], ['Authentication']);
 Router::get('/api/campaigns/quick-stats', [CampaignController::class, 'quickStats'], ['Authentication']);
 Router::get('/api/campaigns/dashboard', [CampaignController::class, 'dashboard'], ['Authentication']);
+Router::get('/api/campaigns/analytics', [CampaignController::class, 'analytics'], ['Authentication']);
 Router::get('/api/campaigns/export', [CampaignController::class, 'exportCSV'], ['Authentication']);
 Router::get('/api/campaigns/notifications', [CampaignController::class, 'getNotifications'], ['Authentication']);
 Router::post('/api/campaigns/notifications/read', [CampaignController::class, 'markNotificationsRead'], ['Authentication']);

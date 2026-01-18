@@ -332,8 +332,8 @@ class AutomationService
             return;
         }
         
-        // Filtrar chatbot/automações: sender_id deve ser válido e message_type não deve ser 'note'
-        if (empty($message['sender_id']) || $message['message_type'] === 'note') {
+        // Filtrar chatbot/automações: sender_id deve ser > 0 e message_type não deve ser 'note'
+        if (empty($message['sender_id']) || (int)$message['sender_id'] <= 0 || $message['message_type'] === 'note') {
             \App\Helpers\Logger::automation("Mensagem é de automação/chatbot/nota (sender_id={$message['sender_id']}, message_type={$message['message_type']}). Abortando.");
             return;
         }
@@ -2972,12 +2972,12 @@ class AutomationService
     {
         try {
             // Buscar mensagens de AGENTES HUMANOS (não chatbot/automação)
-            // Filtro: sender_type='agent' + sender_id IS NOT NULL (excluir chatbot) + message_type != 'note' (excluir mensagens internas)
+            // Filtro: sender_type='agent' + sender_id > 0 (excluir chatbot/sistema) + message_type != 'note' (excluir mensagens internas)
             $sql = "SELECT COUNT(*) as count 
                     FROM messages 
                     WHERE conversation_id = ? 
                     AND sender_type = 'agent' 
-                    AND sender_id IS NOT NULL
+                    AND sender_id > 0
                     AND message_type != 'note'";
             
             $result = \App\Helpers\Database::fetchAll($sql, [$conversationId]);

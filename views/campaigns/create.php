@@ -198,6 +198,38 @@ $pageTitle = 'Nova Campanha';
                                             </select>
                                             <div class="form-text">Como as contas serão alternadas durante o envio</div>
                                         </div>
+
+                                        <div class="mb-10">
+                                            <label class="form-label d-block">Criar conversa no funil?</label>
+                                            <input type="hidden" name="create_conversation" value="0" />
+                                            <label class="form-check form-check-custom form-check-solid">
+                                                <input class="form-check-input" type="checkbox" name="create_conversation" value="1" checked onchange="toggleConversationConfig(this.checked)" />
+                                                <span class="form-check-label">Sim, criar conversa e posicionar no funil</span>
+                                            </label>
+                                        </div>
+
+                                        <div class="mb-10" id="conversation_config">
+                                            <div class="row g-3">
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Funil</label>
+                                                    <select class="form-select" name="funnel_id" id="funnel_id" onchange="updateStages()">
+                                                        <option value="">Selecione...</option>
+                                                        <?php foreach ($funnels ?? [] as $funnel): ?>
+                                                            <option value="<?php echo $funnel['id']; ?>" <?php echo (!empty($defaultFunnelId) && (int)$defaultFunnelId === (int)$funnel['id']) ? 'selected' : ''; ?>>
+                                                                <?php echo htmlspecialchars($funnel['name']); ?>
+                                                            </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Etapa Inicial</label>
+                                                    <select class="form-select" name="initial_stage_id" id="initial_stage_id">
+                                                        <option value="">Selecione...</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="form-text">A conversa será criada neste funil/etapa</div>
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -418,6 +450,40 @@ document.getElementById('message_content')?.addEventListener('input', function()
     }
 });
 
+const funnelsData = <?php echo json_encode($funnels ?? [], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+
+function updateStages() {
+    const funnelSelect = document.getElementById('funnel_id');
+    const stageSelect = document.getElementById('initial_stage_id');
+    if (!funnelSelect || !stageSelect) return;
+    
+    const funnelId = funnelSelect.value;
+    const selectedFunnel = funnelsData.find(f => String(f.id) === String(funnelId));
+    
+    stageSelect.innerHTML = '<option value="">Selecione...</option>';
+    if (!selectedFunnel || !selectedFunnel.stages) {
+        return;
+    }
+    
+    selectedFunnel.stages.forEach(stage => {
+        const option = document.createElement('option');
+        option.value = stage.id;
+        option.textContent = stage.name;
+        stageSelect.appendChild(option);
+    });
+    
+    const defaultStageId = "<?php echo $defaultStageId ?? ''; ?>";
+    if (defaultStageId) {
+        stageSelect.value = defaultStageId;
+    }
+}
+
+function toggleConversationConfig(enabled) {
+    const container = document.getElementById('conversation_config');
+    if (!container) return;
+    container.style.display = enabled ? 'block' : 'none';
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const stepperEl = document.querySelector('#campaign_wizard');
     stepper = new KTStepper(stepperEl);
@@ -438,12 +504,18 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         submitCampaign();
     });
+
+    updateStages();
+    toggleConversationConfig(document.querySelector('[name="create_conversation"]')?.checked ?? true);
 });
 
 function updateReviewSummary() {
     const formData = new FormData(document.getElementById('campaign_form'));
     const accounts = formData.getAll('integration_account_ids[]');
     const daysSelected = formData.getAll('send_days[]');
+    const createConversation = formData.get('create_conversation') === '1';
+    const funnelName = document.querySelector('#funnel_id option:checked')?.text || 'Não definido';
+    const stageName = document.querySelector('#initial_stage_id option:checked')?.text || 'Não definido';
     const daysMap = {
         '1': 'Seg',
         '2': 'Ter',
@@ -477,6 +549,9 @@ function updateReviewSummary() {
                 </div>
                 <div class="mb-5">
                     <strong>Dias de Envio:</strong> ${daysText}
+                </div>
+                <div class="mb-5">
+                    <strong>Conversa:</strong> ${createConversation ? `Sim (${funnelName} / ${stageName})` : 'Não'}
                 </div>
                 <div>
                     <strong>Mensagem:</strong>

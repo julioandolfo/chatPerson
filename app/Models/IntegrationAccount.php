@@ -24,9 +24,8 @@ class IntegrationAccount extends Model
      */
     public static function findByProviderChannel(string $provider, string $channel): array
     {
-        return self::where('provider', '=', $provider)
-            ->where('channel', '=', $channel)
-            ->get();
+        $sql = "SELECT * FROM integration_accounts WHERE provider = ? AND channel = ?";
+        return \App\Helpers\Database::fetchAll($sql, [$provider, $channel]);
     }
 
     /**
@@ -34,10 +33,10 @@ class IntegrationAccount extends Model
      */
     public static function findByProviderChannelPhone(string $provider, string $channel, string $phoneNumber): ?array
     {
-        return self::where('provider', '=', $provider)
-            ->where('channel', '=', $channel)
-            ->where('phone_number', '=', $phoneNumber)
-            ->first();
+        $sql = "SELECT * FROM integration_accounts 
+                WHERE provider = ? AND channel = ? AND phone_number = ? 
+                LIMIT 1";
+        return \App\Helpers\Database::fetch($sql, [$provider, $channel, $phoneNumber]);
     }
 
     /**
@@ -45,9 +44,10 @@ class IntegrationAccount extends Model
      */
     public static function findByPhone(string $phoneNumber, string $channel = 'whatsapp'): ?array
     {
-        return self::where('phone_number', '=', $phoneNumber)
-            ->where('channel', '=', $channel)
-            ->first();
+        $sql = "SELECT * FROM integration_accounts 
+                WHERE phone_number = ? AND channel = ? 
+                LIMIT 1";
+        return \App\Helpers\Database::fetch($sql, [$phoneNumber, $channel]);
     }
 
     /**
@@ -55,13 +55,13 @@ class IntegrationAccount extends Model
      */
     public static function getActive(string $channel = null): array
     {
-        $query = self::where('status', '=', 'active');
-        
         if ($channel) {
-            $query = $query->where('channel', '=', $channel);
+            $sql = "SELECT * FROM integration_accounts WHERE status = 'active' AND channel = ?";
+            return \App\Helpers\Database::fetchAll($sql, [$channel]);
         }
-        
-        return $query->get();
+
+        $sql = "SELECT * FROM integration_accounts WHERE status = 'active'";
+        return \App\Helpers\Database::fetchAll($sql, []);
     }
 
     /**
@@ -69,7 +69,8 @@ class IntegrationAccount extends Model
      */
     public static function getByChannel(string $channel): array
     {
-        return self::where('channel', '=', $channel)->get();
+        $sql = "SELECT * FROM integration_accounts WHERE channel = ?";
+        return \App\Helpers\Database::fetchAll($sql, [$channel]);
     }
 
     /**
@@ -86,7 +87,8 @@ class IntegrationAccount extends Model
      */
     public static function getByProvider(string $provider): array
     {
-        return self::where('provider', '=', $provider)->get();
+        $sql = "SELECT * FROM integration_accounts WHERE provider = ?";
+        return \App\Helpers\Database::fetchAll($sql, [$provider]);
     }
 
     /**
@@ -94,7 +96,8 @@ class IntegrationAccount extends Model
      */
     public static function findByWebhookUrl(string $webhookUrl): ?array
     {
-        return self::where('webhook_url', '=', $webhookUrl)->first();
+        $sql = "SELECT * FROM integration_accounts WHERE webhook_url = ? LIMIT 1";
+        return \App\Helpers\Database::fetch($sql, [$webhookUrl]);
     }
 
     /**

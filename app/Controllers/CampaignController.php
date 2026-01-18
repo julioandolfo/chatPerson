@@ -13,6 +13,8 @@ use App\Models\Campaign;
 use App\Models\ContactList;
 use App\Models\IntegrationAccount;
 use App\Models\WhatsAppAccount;
+use App\Models\Funnel;
+use App\Models\FunnelStage;
 use App\Helpers\Response;
 use App\Helpers\Request;
 use App\Helpers\Permission;
@@ -54,9 +56,22 @@ class CampaignController
         // Buscar contas WhatsApp ativas
         $whatsappAccounts = $this->getWhatsAppAccountsForCampaign();
 
+        // Funis e etapas para criação de conversa
+        $funnels = Funnel::whereActive();
+        $funnelsWithStages = [];
+        foreach ($funnels as $funnel) {
+            $funnel['stages'] = Funnel::getStages((int)$funnel['id']);
+            $funnelsWithStages[] = $funnel;
+        }
+        $defaultFunnel = Funnel::getDefault();
+        $defaultStage = $defaultFunnel ? FunnelStage::getDefault((int)$defaultFunnel['id']) : null;
+
         Response::view('campaigns/create', [
             'lists' => $lists,
             'whatsappAccounts' => $whatsappAccounts,
+            'funnels' => $funnelsWithStages,
+            'defaultFunnelId' => $defaultFunnel['id'] ?? null,
+            'defaultStageId' => $defaultStage['id'] ?? null,
             'title' => 'Nova Campanha'
         ]);
     }

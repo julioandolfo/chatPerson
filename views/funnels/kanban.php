@@ -15,11 +15,14 @@ ob_start();
 .kanban-item.conversation-item {
     transition: all 0.2s ease-in-out;
     border-radius: 8px;
+    position: relative;
+    z-index: 1;
 }
 
 .kanban-item.conversation-item:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important;
+    z-index: 10;
 }
 
 /* Efeito de drag */
@@ -84,6 +87,24 @@ ob_start();
 .kanban-item .dropdown-menu {
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
     border: 1px solid #e4e6ef;
+    z-index: 1050 !important;
+}
+
+/* Card com dropdown aberto */
+.kanban-item.conversation-item:has(.dropdown.show) {
+    z-index: 1000 !important;
+}
+
+/* Alternativa para navegadores que não suportam :has */
+.kanban-item.conversation-item .dropdown.show {
+    position: relative;
+    z-index: 1000;
+}
+
+/* Ajustar posicionamento do dropdown via JS */
+.dropdown-menu-fixed {
+    position: fixed !important;
+    z-index: 1060 !important;
 }
 
 /* Loading state */
@@ -329,6 +350,37 @@ ob_start();
 /* Animação de transição suave ao filtrar */
 .kanban-item.conversation-item {
     transition: opacity 0.3s ease, transform 0.3s ease, display 0.3s ease;
+}
+
+/* ====== Dark mode ====== */
+[data-bs-theme="dark"] #kt_kanban_filters .card-body {
+    background: linear-gradient(135deg, #1b1c22 0%, #15171c 100%);
+    border-color: #26272f;
+}
+
+[data-bs-theme="dark"] #kt_kanban_filters .form-label {
+    color: var(--bs-text-gray-900) !important;
+}
+
+[data-bs-theme="dark"] #kt_kanban_filters .form-control,
+[data-bs-theme="dark"] #kt_kanban_filters .form-select {
+    background-color: #1e2027;
+    border-color: #2a2b34;
+    color: var(--bs-text-gray-800) !important;
+}
+
+[data-bs-theme="dark"] #kt_kanban_filters .form-control::placeholder {
+    color: var(--bs-text-gray-600) !important;
+}
+
+[data-bs-theme="dark"] #kt_kanban_filters .alert {
+    background: rgba(0, 158, 247, 0.12) !important;
+    border-color: rgba(0, 158, 247, 0.35) !important;
+}
+
+[data-bs-theme="dark"] #kt_kanban_total_results {
+    background: rgba(0, 158, 247, 0.18);
+    color: var(--bs-text-gray-900) !important;
 }
 
 /* Estado de carregamento dos filtros */
@@ -2195,6 +2247,12 @@ async function openStageOrderModal(funnelId) {
     try {
         // Buscar etapas do funil
         const response = await fetch(`${window.KANBAN_CONFIG.BASE_URL}/funnels/${funnelId}/stages`);
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            const text = await response.text();
+            throw new Error('Resposta não é JSON: ' + text.substring(0, 200));
+        }
+        
         const data = await response.json();
         
         if (!data.success || !data.stages) {
@@ -2341,6 +2399,60 @@ window.saveStageOrder = saveStageOrder;
 // ============================================================================
 // DETALHES DA CONVERSA (MODAL) - implementado em conversation-details.js
 // ============================================================================
+
+// ============================================================================
+// FIX Z-INDEX DROPDOWN
+// ============================================================================
+
+// Garantir que dropdown apareça acima dos outros cards
+document.addEventListener('DOMContentLoaded', function() {
+    // Adicionar event listeners para todos os dropdowns
+    document.querySelectorAll('.kanban-item .dropdown').forEach(dropdown => {
+        dropdown.addEventListener('shown.bs.dropdown', function() {
+            // Adicionar classe ao card pai quando dropdown abrir
+            const card = this.closest('.conversation-item');
+            if (card) {
+                card.style.zIndex = '1000';
+            }
+            
+            // Posicionar dropdown com position fixed
+            const menu = this.querySelector('.dropdown-menu');
+            const toggle = this.querySelector('[data-bs-toggle="dropdown"]');
+            
+            if (menu && toggle) {
+                const rect = toggle.getBoundingClientRect();
+                menu.classList.add('dropdown-menu-fixed');
+                
+                // Posicionar abaixo do botão
+                menu.style.top = rect.bottom + 'px';
+                menu.style.left = (rect.right - menu.offsetWidth) + 'px';
+                
+                // Ajustar se sair da tela
+                const menuRect = menu.getBoundingClientRect();
+                if (menuRect.right > window.innerWidth) {
+                    menu.style.left = (window.innerWidth - menuRect.width - 10) + 'px';
+                }
+                if (menuRect.bottom > window.innerHeight) {
+                    menu.style.top = (rect.top - menuRect.height) + 'px';
+                }
+            }
+        });
+        
+        dropdown.addEventListener('hidden.bs.dropdown', function() {
+            // Remover z-index quando dropdown fechar
+            const card = this.closest('.conversation-item');
+            if (card) {
+                card.style.zIndex = '';
+            }
+            const menu = this.querySelector('.dropdown-menu');
+            if (menu) {
+                menu.classList.remove('dropdown-menu-fixed');
+                menu.style.top = '';
+                menu.style.left = '';
+            }
+        });
+    });
+});
 
 // ============================================================================
 // ATALHOS DE TECLADO

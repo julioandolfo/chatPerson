@@ -469,10 +469,6 @@ class FunnelController
                 'success' => false,
                 'message' => 'Erro ao reordenar estágios: ' . $e->getMessage()
             ], 500);
-            Response::json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
         }
     }
 

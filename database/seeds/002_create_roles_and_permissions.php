@@ -180,6 +180,13 @@ function seed_roles_and_permissions() {
         ['name' => 'Acessar biblioteca de práticas', 'slug' => 'agent_performance.best_practices', 'description' => 'Acessar biblioteca de melhores práticas', 'module' => 'agent_performance'],
         ['name' => 'Ver metas', 'slug' => 'agent_performance.goals.view', 'description' => 'Ver metas de performance', 'module' => 'agent_performance'],
         ['name' => 'Gerenciar metas', 'slug' => 'agent_performance.goals.manage', 'description' => 'Criar e gerenciar metas de outros', 'module' => 'agent_performance'],
+        
+        // Campanhas WhatsApp
+        ['name' => 'Ver campanhas', 'slug' => 'campaigns.view', 'description' => 'Visualizar campanhas', 'module' => 'campaigns'],
+        ['name' => 'Criar campanhas', 'slug' => 'campaigns.create', 'description' => 'Criar novas campanhas', 'module' => 'campaigns'],
+        ['name' => 'Editar campanhas', 'slug' => 'campaigns.edit', 'description' => 'Editar campanhas existentes', 'module' => 'campaigns'],
+        ['name' => 'Deletar campanhas', 'slug' => 'campaigns.delete', 'description' => 'Deletar campanhas', 'module' => 'campaigns'],
+        ['name' => 'Iniciar/Pausar campanhas', 'slug' => 'campaigns.control', 'description' => 'Controlar execução de campanhas', 'module' => 'campaigns'],
     ];
     
     $permissionIds = [];

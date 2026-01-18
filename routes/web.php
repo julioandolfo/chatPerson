@@ -43,6 +43,9 @@ use App\Controllers\RealtimeCoachingController;
 use App\Controllers\CoachingDashboardController;
 use App\Controllers\TeamController;
 use App\Controllers\AgentConversionController;
+use App\Controllers\CampaignController;
+use App\Controllers\ContactListController;
+use App\Controllers\DripSequenceController;
 
 // Rotas públicas
 Router::get('/', function() {
@@ -597,4 +600,67 @@ Router::get('/logs', [LogController::class, 'index'], ['Authentication', 'Permis
 Router::get('/logs/view', [LogController::class, 'view'], ['Authentication', 'Permission:admin.logs']);
 Router::get('/logs/download', [LogController::class, 'download'], ['Authentication', 'Permission:admin.logs']);
 Router::post('/logs/clear', [LogController::class, 'clear'], ['Authentication', 'Permission:admin.logs']);
+
+// ============================================
+// CAMPANHAS - Rotas
+// ============================================
+
+// Listas de Contatos
+Router::get('/contact-lists', [ContactListController::class, 'index'], ['Authentication']);
+Router::get('/contact-lists/create', [ContactListController::class, 'create'], ['Authentication']);
+Router::post('/contact-lists', [ContactListController::class, 'store'], ['Authentication']);
+Router::get('/contact-lists/{id}', [ContactListController::class, 'show'], ['Authentication']);
+Router::get('/contact-lists/{id}/edit', [ContactListController::class, 'edit'], ['Authentication']);
+Router::post('/contact-lists/{id}', [ContactListController::class, 'update'], ['Authentication']);
+Router::delete('/contact-lists/{id}', [ContactListController::class, 'destroy'], ['Authentication']);
+Router::post('/contact-lists/{id}/contacts', [ContactListController::class, 'addContact'], ['Authentication']);
+Router::delete('/contact-lists/{id}/contacts', [ContactListController::class, 'removeContact'], ['Authentication']);
+Router::post('/contact-lists/{id}/import-csv', [ContactListController::class, 'importCsv'], ['Authentication']);
+Router::post('/contact-lists/{id}/clear', [ContactListController::class, 'clear'], ['Authentication']);
+
+// Campanhas
+Router::get('/campaigns', [CampaignController::class, 'index'], ['Authentication']);
+Router::get('/campaigns/control-panel', function() { \App\Helpers\Response::view('campaigns/control-panel', ['title' => 'Painel de Controle']); }, ['Authentication']);
+Router::get('/campaigns/quick-start', function() { \App\Helpers\Response::view('campaigns/quick-start', ['title' => 'Início Rápido']); }, ['Authentication']);
+Router::get('/campaigns/help', function() { \App\Helpers\Response::view('campaigns/help', ['title' => 'Ajuda']); }, ['Authentication']);
+Router::get('/campaigns/templates', function() { \App\Helpers\Response::view('campaigns/templates', ['title' => 'Templates']); }, ['Authentication']);
+Router::get('/campaigns/analytics', function() { \App\Helpers\Response::view('campaigns/analytics', ['title' => 'Analytics']); }, ['Authentication']);
+Router::get('/campaigns/compare', function() { \App\Helpers\Response::view('campaigns/compare', ['title' => 'Comparar']); }, ['Authentication']);
+Router::get('/campaigns/realtime', function() { \App\Helpers\Response::view('campaigns/realtime', ['title' => 'Tempo Real']); }, ['Authentication']);
+Router::get('/campaigns/bulk-actions', function() { \App\Helpers\Response::view('campaigns/bulk-actions', ['title' => 'Ações em Massa']); }, ['Authentication']);
+Router::get('/campaigns/scheduler', function() { \App\Helpers\Response::view('campaigns/scheduler', ['title' => 'Agendador']); }, ['Authentication']);
+Router::get('/campaigns/automation-builder', function() { \App\Helpers\Response::view('campaigns/automation-builder', ['title' => 'Automações']); }, ['Authentication']);
+Router::get('/campaigns/create', [CampaignController::class, 'create'], ['Authentication']);
+Router::get('/campaigns/ab-test', [CampaignController::class, 'createABTest'], ['Authentication']);
+Router::post('/campaigns/ab-test', [CampaignController::class, 'storeABTest'], ['Authentication']);
+Router::post('/campaigns', [CampaignController::class, 'store'], ['Authentication']);
+Router::get('/campaigns/{id}', [CampaignController::class, 'show'], ['Authentication']);
+Router::get('/campaigns/{id}/edit', [CampaignController::class, 'edit'], ['Authentication']);
+Router::get('/campaigns/{id}/export', [CampaignController::class, 'exportReport'], ['Authentication']);
+Router::post('/campaigns/{id}', [CampaignController::class, 'update'], ['Authentication']);
+Router::delete('/campaigns/{id}', [CampaignController::class, 'destroy'], ['Authentication']);
+Router::post('/campaigns/{id}/prepare', [CampaignController::class, 'prepare'], ['Authentication']);
+Router::post('/campaigns/{id}/start', [CampaignController::class, 'start'], ['Authentication']);
+Router::post('/campaigns/{id}/pause', [CampaignController::class, 'pause'], ['Authentication']);
+Router::post('/campaigns/{id}/resume', [CampaignController::class, 'resume'], ['Authentication']);
+Router::post('/campaigns/{id}/cancel', [CampaignController::class, 'cancel'], ['Authentication']);
+
+// Drip Sequences
+Router::get('/drip-sequences', [DripSequenceController::class, 'index'], ['Authentication']);
+Router::get('/drip-sequences/create', [DripSequenceController::class, 'create'], ['Authentication']);
+Router::post('/drip-sequences', [DripSequenceController::class, 'store'], ['Authentication']);
+Router::get('/drip-sequences/{id}', [DripSequenceController::class, 'show'], ['Authentication']);
+Router::delete('/drip-sequences/{id}', [DripSequenceController::class, 'destroy'], ['Authentication']);
+Router::post('/drip-sequences/{id}/contacts', [DripSequenceController::class, 'addContacts'], ['Authentication']);
+
+// API Campanhas
+Router::get('/api/campaigns', [CampaignController::class, 'list'], ['Authentication']);
+Router::get('/api/campaigns/quick-stats', [CampaignController::class, 'quickStats'], ['Authentication']);
+Router::get('/api/campaigns/dashboard', [CampaignController::class, 'dashboard'], ['Authentication']);
+Router::get('/api/campaigns/export', [CampaignController::class, 'exportCSV'], ['Authentication']);
+Router::get('/api/campaigns/notifications', [CampaignController::class, 'getNotifications'], ['Authentication']);
+Router::post('/api/campaigns/notifications/read', [CampaignController::class, 'markNotificationsRead'], ['Authentication']);
+Router::get('/api/campaigns/{id}/stats', [CampaignController::class, 'stats'], ['Authentication']);
+Router::get('/api/contact-lists/{id}/contacts', [ContactListController::class, 'contacts'], ['Authentication']);
+Router::get('/api/contacts/search', [ContactListController::class, 'searchContacts'], ['Authentication']);
 

@@ -326,13 +326,19 @@ class AutomationService
             return;
         }
         
-        // Verificar se é mensagem de agente
+        // Verificar se é mensagem de AGENTE HUMANO (não chatbot/automação)
         if ($message['sender_type'] !== 'agent') {
             \App\Helpers\Logger::automation("Mensagem não é de agente (sender_type={$message['sender_type']}). Abortando.");
             return;
         }
         
-        \App\Helpers\Logger::automation("Mensagem de agente encontrada: sender_id={$message['sender_id']}, content_preview='" . substr($message['content'] ?? '', 0, 50) . "...'");
+        // Filtrar chatbot/automações: sender_id deve ser válido e message_type não deve ser 'note'
+        if (empty($message['sender_id']) || $message['message_type'] === 'note') {
+            \App\Helpers\Logger::automation("Mensagem é de automação/chatbot/nota (sender_id={$message['sender_id']}, message_type={$message['message_type']}). Abortando.");
+            return;
+        }
+        
+        \App\Helpers\Logger::automation("Mensagem de agente HUMANO encontrada: sender_id={$message['sender_id']}, content_preview='" . substr($message['content'] ?? '', 0, 50) . "...'");
 
         $conversation = Conversation::find($message['conversation_id']);
         if (!$conversation) {
@@ -2965,14 +2971,14 @@ class AutomationService
     private static function hasAgentIntervened(int $conversationId): bool
     {
         try {
-            // Buscar mensagens de agentes humanos (sender_type = 'agent' e sender_id > 0)
-            // Excluir mensagens do chatbot (que têm metadata com chatbot_message = true)
+            // Buscar mensagens de AGENTES HUMANOS (não chatbot/automação)
+            // Filtro: sender_type='agent' + sender_id IS NOT NULL (excluir chatbot) + message_type != 'note' (excluir mensagens internas)
             $sql = "SELECT COUNT(*) as count 
                     FROM messages 
                     WHERE conversation_id = ? 
                     AND sender_type = 'agent' 
-                    AND sender_id > 0
-                    AND (metadata IS NULL OR metadata NOT LIKE '%chatbot_message%')";
+                    AND sender_id IS NOT NULL
+                    AND message_type != 'note'";
             
             $result = \App\Helpers\Database::fetchAll($sql, [$conversationId]);
             $count = isset($result[0]['count']) ? (int)$result[0]['count'] : 0;

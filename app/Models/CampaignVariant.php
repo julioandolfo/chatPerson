@@ -8,8 +8,23 @@ namespace App\Models;
 
 use App\Helpers\Database;
 
-class CampaignVariant
+class CampaignVariant extends Model
 {
+    protected string $table = 'campaign_variants';
+    protected string $primaryKey = 'id';
+    protected array $fillable = [
+        'campaign_id',
+        'variant_name',
+        'message_content',
+        'percentage',
+        'total_sent',
+        'total_delivered',
+        'total_read',
+        'total_replied',
+        'delivery_rate',
+        'read_rate',
+        'reply_rate'
+    ];
     /**
      * Buscar todas as variantes
      */

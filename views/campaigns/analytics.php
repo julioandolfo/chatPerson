@@ -4,25 +4,23 @@ $title = 'Analytics Avançado';
 $pageTitle = 'Analytics';
 ?>
 
-<div class="d-flex flex-column flex-column-fluid">
-    <div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
-        <div id="kt_app_toolbar_container" class="app-container container-fluid d-flex flex-stack">
-            <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
-                <h1 class="page-heading d-flex text-gray-900 fw-bold fs-3 flex-column justify-content-center my-0">
-                    Analytics Avançado de Campanhas
-                </h1>
-            </div>
-            <div class="d-flex align-items-center gap-2">
-                <button class="btn btn-sm btn-light-primary" onclick="exportAnalytics()">
-                    <i class="ki-duotone ki-file-down fs-3"></i>
-                    Exportar
-                </button>
-            </div>
+<?php ob_start(); ?>
+<div class="app-toolbar py-3 py-lg-6">
+    <div class="app-container container-fluid d-flex flex-stack">
+        <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
+            <h1 class="page-heading d-flex text-gray-900 fw-bold fs-3 flex-column justify-content-center my-0">
+                Analytics Avançado de Campanhas
+            </h1>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-sm btn-light-primary" onclick="exportAnalytics()">
+                <i class="ki-duotone ki-file-down fs-3"></i>
+                Exportar
+            </button>
         </div>
     </div>
-
-    <div id="kt_app_content" class="app-content flex-column-fluid">
-        <div id="kt_app_content_container" class="app-container container-fluid">
+</div>
+<div class="app-container container-fluid">
             
             <!-- Filtros -->
             <div class="card card-flush mb-5">
@@ -135,7 +133,6 @@ $pageTitle = 'Analytics';
                 </div>
             </div>
             
-        </div>
     </div>
 </div>
 
@@ -300,3 +297,9 @@ document.addEventListener('DOMContentLoaded', () => {
     loadAnalytics();
 });
 </script>
+
+<?php 
+$content = ob_get_clean(); 
+?>
+
+<?php include __DIR__ . '/../layouts/metronic/app.php'; ?>

@@ -965,11 +965,14 @@ class KanbanAgentService
                 return self::compare($analysis['urgency'] ?? 'low', $operator, $value);
             
             case 'has_agent_message':
-                // Verificar se há mensagem de agente na conversa
+                // Verificar se há mensagem de AGENTE HUMANO na conversa
+                // Filtrar: apenas sender_type='agent' + sender_id IS NOT NULL (excluir chatbot) + message_type != 'note' (excluir mensagens internas)
                 $agentMessages = Database::fetchAll(
                     "SELECT COUNT(*) as count FROM messages 
                      WHERE conversation_id = ? 
-                     AND sender_type = 'agent'",
+                     AND sender_type = 'agent'
+                     AND sender_id IS NOT NULL
+                     AND message_type != 'note'",
                     [$conversation['id']]
                 );
                 $hasAgentMessage = isset($agentMessages[0]['count']) && (int)$agentMessages[0]['count'] > 0;
@@ -1004,12 +1007,13 @@ class KanbanAgentService
                 return self::compareText($content, $operator, $value);
             
             case 'last_agent_message_content':
-                // Verificar conteúdo da última mensagem do agente
+                // Verificar conteúdo da última mensagem do AGENTE HUMANO
+                // Filtrar: apenas sender_type='agent' + sender_id IS NOT NULL (excluir chatbot) + message_type != 'note' (excluir mensagens internas)
                 $lastAgentMsg = Message::whereFirst(
                     'conversation_id', 
                     '=', 
                     $conversation['id'], 
-                    "AND sender_type = 'agent' ORDER BY created_at DESC"
+                    "AND sender_type = 'agent' AND sender_id IS NOT NULL AND message_type != 'note' ORDER BY created_at DESC"
                 );
                 if (!$lastAgentMsg) {
                     return false;

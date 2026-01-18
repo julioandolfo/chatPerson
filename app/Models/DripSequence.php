@@ -8,8 +8,18 @@ namespace App\Models;
 
 use App\Helpers\Database;
 
-class DripSequence
+class DripSequence extends Model
 {
+    protected string $table = 'drip_sequences';
+    protected string $primaryKey = 'id';
+    protected array $fillable = [
+        'name',
+        'description',
+        'status',
+        'total_steps',
+        'total_contacts',
+        'created_by'
+    ];
     /**
      * Buscar todas as sequências
      */

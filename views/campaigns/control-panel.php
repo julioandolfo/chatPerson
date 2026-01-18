@@ -4,19 +4,12 @@ $title = 'Painel de Controle - Campanhas';
 $pageTitle = 'Painel de Controle';
 ?>
 
-<div class="d-flex flex-column flex-column-fluid">
-    <div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
-        <div id="kt_app_toolbar_container" class="app-container container-fluid d-flex flex-stack">
-            <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
-                <h1 class="page-heading d-flex text-gray-900 fw-bold fs-3 flex-column justify-content-center my-0">
-                    Painel de Controle Central
-                </h1>
-            </div>
-        </div>
+<?php ob_start(); ?>
+<div class="card card-flush mb-5">
+    <div class="card-header">
+        <h3 class="card-title">Painel de Controle Central</h3>
     </div>
-
-    <div id="kt_app_content" class="app-content flex-column-fluid">
-        <div id="kt_app_content_container" class="app-container container-fluid">
+    <div class="card-body">
             
             <!-- Navegação Rápida -->
             <div class="row g-5 mb-5">
@@ -203,7 +196,6 @@ $pageTitle = 'Painel de Controle';
                 </div>
             </div>
             
-        </div>
     </div>
 </div>
 
@@ -246,3 +238,9 @@ document.addEventListener('DOMContentLoaded', () => {
     box-shadow: 0 4px 20px rgba(0,0,0,0.1);
 }
 </style>
+
+<?php 
+$content = ob_get_clean(); 
+?>
+
+<?php include __DIR__ . '/../layouts/metronic/app.php'; ?>

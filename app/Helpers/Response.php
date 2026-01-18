@@ -16,11 +16,19 @@ class Response
     {
         // Desabilitar display de erros para evitar HTML no JSON
         $oldDisplayErrors = ini_get('display_errors');
+        $oldErrorReporting = error_reporting();
+        
         ini_set('display_errors', '0');
+        error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT & ~E_NOTICE);
         
         // Limpar qualquer output buffer antes de enviar JSON
         while (ob_get_level() > 0) {
             ob_end_clean();
+        }
+        
+        // Limpar qualquer output que possa ter sido enviado
+        if (headers_sent()) {
+            error_log("⚠️ Headers já foram enviados antes de Response::json()");
         }
         
         // Garantir que não há nenhum output anterior
@@ -40,8 +48,9 @@ class Response
         
         echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         
-        // Restaurar display_errors antes de sair
+        // Restaurar configurações anteriores
         ini_set('display_errors', $oldDisplayErrors);
+        error_reporting($oldErrorReporting);
         
         exit;
     }

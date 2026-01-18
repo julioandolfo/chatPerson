@@ -201,11 +201,84 @@ ob_start();
 
 /* Painel de filtros */
 #kt_kanban_filters {
-    transition: all 0.3s ease-in-out;
+    transition: all 0.4s ease-in-out;
 }
 
 #kt_kanban_filters .card-body {
-    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    background: linear-gradient(135deg, #f5f8fa 0%, #ffffff 100%);
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+/* Labels dos filtros */
+#kt_kanban_filters .form-label {
+    font-weight: 600;
+    color: #181c32;
+    margin-bottom: 0.65rem;
+    font-size: 0.95rem;
+}
+
+/* Inputs e selects */
+#kt_kanban_filters .form-control,
+#kt_kanban_filters .form-select {
+    border: 1.5px solid #e1e3ea;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    background-color: #ffffff;
+    padding: 0.65rem 1rem;
+    font-size: 0.95rem;
+}
+
+#kt_kanban_filters .form-control:hover,
+#kt_kanban_filters .form-select:hover {
+    border-color: #b5b5c3;
+}
+
+#kt_kanban_filters .form-control:focus,
+#kt_kanban_filters .form-select:focus {
+    border-color: #009ef7;
+    box-shadow: 0 0 0 3px rgba(0, 158, 247, 0.1);
+    background-color: #ffffff;
+}
+
+/* Ícones nos labels dos filtros */
+#kt_kanban_filters .form-label i {
+    opacity: 0.8;
+    margin-right: 0.25rem;
+    color: #009ef7;
+}
+
+/* Botões de ação */
+#kt_kanban_filters .btn {
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 0.6rem 1.25rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+#kt_kanban_filters .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+#kt_kanban_filters .btn:active {
+    transform: translateY(0);
+}
+
+/* Alert de atalhos */
+#kt_kanban_filters .alert {
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+#kt_kanban_filters kbd {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* Conversas filtradas (ocultas) */
@@ -214,14 +287,19 @@ ob_start();
 }
 
 /* Highlight quando filtros estão ativos */
-.btn-light-primary[data-bs-toggle="collapse"][aria-expanded="true"] {
-    background-color: #009ef7 !important;
-    color: white !important;
+.btn-primary[data-bs-toggle="collapse"][aria-expanded="true"] {
+    box-shadow: 0 0 0 4px rgba(0, 158, 247, 0.2) !important;
 }
 
 /* Badge de contador de filtros */
 #kt_filters_count {
     animation: pulse-badge 2s ease-in-out infinite;
+    background-color: #ffffff !important;
+    color: #009ef7 !important;
+    font-weight: 700;
+    font-size: 0.75rem;
+    padding: 0.35rem 0.5rem;
+    min-width: 22px;
 }
 
 @keyframes pulse-badge {
@@ -230,8 +308,8 @@ ob_start();
         opacity: 1;
     }
     50% {
-        transform: scale(1.1);
-        opacity: 0.8;
+        transform: scale(1.15);
+        opacity: 0.85;
     }
 }
 
@@ -240,15 +318,12 @@ ob_start();
     width: 100% !important;
 }
 
-#kt_kanban_filters .form-control:focus,
-#kt_kanban_filters .form-select:focus {
-    border-color: #009ef7;
-    box-shadow: 0 0 0 0.2rem rgba(0, 158, 247, 0.15);
-}
-
-/* Ícones nos labels dos filtros */
-#kt_kanban_filters .form-label i {
-    opacity: 0.7;
+/* Área de resultados */
+#kt_kanban_total_results {
+    background: rgba(0, 158, 247, 0.08);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    display: inline-block;
 }
 
 /* Animação de transição suave ao filtrar */
@@ -412,13 +487,13 @@ ob_start();
             <?php endif; ?>
             
             <!-- Botão de Filtros -->
-            <button type="button" class="btn btn-sm btn-light-primary" data-bs-toggle="collapse" data-bs-target="#kt_kanban_filters">
+            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="collapse" data-bs-target="#kt_kanban_filters">
                 <i class="ki-duotone ki-filter fs-2">
                     <span class="path1"></span>
                     <span class="path2"></span>
                 </i>
                 Filtros
-                <span class="badge badge-circle badge-primary ms-2" id="kt_filters_count" style="display: none;">0</span>
+                <span class="badge badge-circle badge-light ms-2" id="kt_filters_count" style="display: none;">0</span>
             </button>
             
             <?php if (!empty($currentFunnelId)): ?>
@@ -597,33 +672,38 @@ ob_start();
             <div class="separator my-5"></div>
             
             <!-- Guia de Atalhos -->
-            <div class="alert alert-dismissible bg-light-info d-flex flex-column flex-sm-row p-5 mb-5">
-                <i class="ki-duotone ki-keyboard fs-2hx text-info me-4 mb-5 mb-sm-0">
+            <div class="alert alert-dismissible d-flex flex-column flex-sm-row p-5 mb-5" style="background: linear-gradient(135deg, rgba(0, 158, 247, 0.08) 0%, rgba(0, 158, 247, 0.04) 100%); border: 1px solid rgba(0, 158, 247, 0.2); border-radius: 10px;">
+                <i class="ki-duotone ki-keyboard fs-2hx text-primary me-4 mb-5 mb-sm-0">
                     <span class="path1"></span>
                     <span class="path2"></span>
                     <span class="path3"></span>
                 </i>
                 <div class="d-flex flex-column pe-0 pe-sm-10">
-                    <h5 class="mb-2">Atalhos de Teclado</h5>
-                    <div class="fs-7 text-gray-700">
-                        <kbd>Ctrl+F</kbd> Buscar &nbsp;|&nbsp; 
-                        <kbd>Ctrl+Enter</kbd> Aplicar &nbsp;|&nbsp; 
-                        <kbd>Esc</kbd> Limpar &nbsp;|&nbsp; 
-                        <kbd>Ctrl+S</kbd> Salvar &nbsp;|&nbsp; 
-                        <kbd>Ctrl+E</kbd> Exportar
+                    <h5 class="mb-2 fw-bold text-gray-800">Atalhos de Teclado</h5>
+                    <div class="fs-7 text-gray-700 fw-semibold">
+                        <kbd class="bg-primary text-white px-2 py-1 rounded">Ctrl+F</kbd> Buscar &nbsp;|&nbsp; 
+                        <kbd class="bg-primary text-white px-2 py-1 rounded">Ctrl+Enter</kbd> Aplicar &nbsp;|&nbsp; 
+                        <kbd class="bg-light text-dark px-2 py-1 rounded">Esc</kbd> Limpar &nbsp;|&nbsp; 
+                        <kbd class="bg-success text-white px-2 py-1 rounded">Ctrl+S</kbd> Salvar &nbsp;|&nbsp; 
+                        <kbd class="bg-warning text-white px-2 py-1 rounded">Ctrl+E</kbd> Exportar
                     </div>
                 </div>
                 <button type="button" class="btn-close position-absolute top-0 end-0 m-2" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
             
             <!-- Botões de Ação -->
-            <div class="d-flex justify-content-between align-items-center">
-                <div class="text-muted fs-7">
+            <div class="d-flex justify-content-between align-items-center mt-6">
+                <div class="text-gray-700 fs-6 fw-semibold">
+                    <i class="ki-duotone ki-information-4 fs-5 text-primary me-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
                     <span id="kt_kanban_total_results">Mostrando todas as conversas</span>
                 </div>
                 <div class="d-flex gap-2">
                     <!-- Salvar Filtro -->
-                    <button type="button" class="btn btn-sm btn-light-success" onclick="saveCurrentFilters()" title="Salvar filtros atuais">
+                    <button type="button" class="btn btn-sm btn-success" onclick="saveCurrentFilters()" title="Salvar filtros atuais">
                         <i class="ki-duotone ki-save-2 fs-3">
                             <span class="path1"></span>
                             <span class="path2"></span>
@@ -633,7 +713,7 @@ ob_start();
                     
                     <!-- Carregar Filtros Salvos -->
                     <div class="btn-group">
-                        <button type="button" class="btn btn-sm btn-light-info dropdown-toggle" data-bs-toggle="dropdown" title="Carregar filtros salvos">
+                        <button type="button" class="btn btn-sm btn-light-primary dropdown-toggle" data-bs-toggle="dropdown" title="Carregar filtros salvos">
                             <i class="ki-duotone ki-folder-down fs-3">
                                 <span class="path1"></span>
                                 <span class="path2"></span>
@@ -646,7 +726,7 @@ ob_start();
                     </div>
                     
                     <!-- Exportar -->
-                    <button type="button" class="btn btn-sm btn-light-warning" onclick="exportFilteredConversations()" title="Exportar conversas filtradas">
+                    <button type="button" class="btn btn-sm btn-warning" onclick="exportFilteredConversations()" title="Exportar conversas filtradas">
                         <i class="ki-duotone ki-file-down fs-3">
                             <span class="path1"></span>
                             <span class="path2"></span>
@@ -655,7 +735,7 @@ ob_start();
                     </button>
                     
                     <!-- Limpar -->
-                    <button type="button" class="btn btn-sm btn-light-danger" onclick="clearFilters()">
+                    <button type="button" class="btn btn-sm btn-light" onclick="clearFilters()">
                         <i class="ki-duotone ki-cross fs-3">
                             <span class="path1"></span>
                             <span class="path2"></span>

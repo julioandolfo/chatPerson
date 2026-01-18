@@ -427,9 +427,9 @@ class FunnelController
      */
     public function reorderStages(int $id): void
     {
-        Permission::abortIfCannot('funnels.edit');
-        
         try {
+            Permission::abortIfCannot('funnels.edit');
+            
             // Aceitar tanto POST form quanto JSON
             $data = Request::json();
             if (empty($data)) {
@@ -439,7 +439,11 @@ class FunnelController
             $stageIds = $data['stage_ids'] ?? [];
             
             if (empty($stageIds) || !is_array($stageIds)) {
-                throw new \InvalidArgumentException('IDs dos estágios inválidos');
+                Response::json([
+                    'success' => false,
+                    'message' => 'IDs dos estágios inválidos'
+                ], 400);
+                return;
             }
             
             error_log("=== REORDENAR ETAPAS ===");
@@ -460,6 +464,11 @@ class FunnelController
         } catch (\Exception $e) {
             error_log("❌ Erro ao reordenar: " . $e->getMessage());
             error_log("Stack trace: " . $e->getTraceAsString());
+            
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao reordenar estágios: ' . $e->getMessage()
+            ], 500);
             Response::json([
                 'success' => false,
                 'message' => $e->getMessage()

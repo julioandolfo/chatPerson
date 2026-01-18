@@ -156,7 +156,7 @@ class RealtimeController
                     
                     try {
                         // Buscar mensagens novas desde o último update
-                        $lastMessageTime = $lastUpdateTime > 0 ? date('Y-m-d H:i:s', $lastUpdateTime / 1000) : null;
+                        $lastMessageTime = $lastUpdateTime > 0 ? date('Y-m-d H:i:s', (int)($lastUpdateTime / 1000)) : null;
                         
                         $messages = Message::getNewMessagesSince($convId, $lastMessageTime);
                     
@@ -212,7 +212,7 @@ class RealtimeController
                         $conversation = Conversation::find($convId);
                         if ($conversation && isset($conversation['updated_at'])) {
                             $updatedAt = strtotime($conversation['updated_at']);
-                            if ($updatedAt > ($lastUpdateTime / 1000)) {
+                            if ($updatedAt > (int)($lastUpdateTime / 1000)) {
                                 // Buscar nome do funil e etapa se existirem
                                 $funnelName = null;
                                 $stageName = null;
@@ -264,7 +264,7 @@ class RealtimeController
                 $maxChecks = 50; // Limitar para não sobrecarregar
                 
                 // Coletar mensagens com status alterado desde last_update_time
-                $statusUpdates = \App\Models\Message::getStatusUpdatesSince($lastUpdateTime > 0 ? date('Y-m-d H:i:s', $lastUpdateTime / 1000) : null);
+                $statusUpdates = \App\Models\Message::getStatusUpdatesSince($lastUpdateTime > 0 ? date('Y-m-d H:i:s', (int)($lastUpdateTime / 1000)) : null);
                 foreach ($statusUpdates as $su) {
                     $updates['message_status_updates'][] = [
                         'conversation_id' => $su['conversation_id'],
@@ -277,7 +277,7 @@ class RealtimeController
 
                 // Se lastUpdateTime for 0 ou muito antigo, verificar conversas criadas nos últimos 30 segundos
                 $checkRecentThreshold = time() - 30; // Últimos 30 segundos
-                $shouldCheckRecent = ($lastUpdateTime === 0 || ($lastUpdateTime / 1000) < $checkRecentThreshold);
+                $shouldCheckRecent = ($lastUpdateTime === 0 || (int)($lastUpdateTime / 1000) < $checkRecentThreshold);
                 
                 if (is_array($userConversations)) {
                     foreach ($userConversations as $conv) {
@@ -304,7 +304,7 @@ class RealtimeController
                                 // Se for verificação recente, considerar nova se criada nos últimos 30s
                                 if ($shouldCheckRecent && $createdAt > $checkRecentThreshold) {
                                     $isNewConversation = true;
-                                } elseif ($lastUpdateTime > 0 && $createdAt > ($lastUpdateTime / 1000)) {
+                                } elseif ($lastUpdateTime > 0 && $createdAt > (int)($lastUpdateTime / 1000)) {
                                     // Só considerar nova se lastUpdateTime > 0 (não é primeira requisição)
                                     // E se a conversa foi criada depois do último update
                                     $isNewConversation = true;
@@ -318,7 +318,7 @@ class RealtimeController
                         $shouldInclude = false;
                         if ($isNewConversation) {
                             $shouldInclude = true;
-                        } elseif ($updatedAt > ($lastUpdateTime / 1000)) {
+                        } elseif ($updatedAt > (int)($lastUpdateTime / 1000)) {
                             $shouldInclude = true;
                         } elseif ($shouldCheckRecent && $updatedAt > $checkRecentThreshold) {
                             // Se estamos verificando conversas recentes, incluir se atualizada nos últimos 30s

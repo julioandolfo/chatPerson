@@ -3,8 +3,8 @@
  * Entry Point da Aplicação
  */
 
-// Habilitar exibição de erros em desenvolvimento
-error_reporting(E_ALL);
+// Habilitar exibição de erros em desenvolvimento (mas não deprecated)
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 
 // Garantir que o diretório de logs existe
 $logsDir = __DIR__ . '/../logs';
@@ -23,11 +23,19 @@ if ($isJsonRequest) {
     ini_set('display_startup_errors', '0');
     ini_set('log_errors', '1');
     ini_set('error_log', $logsDir . '/app.log');
+    error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT & ~E_NOTICE);
+    
+    // Manipulador de erros personalizado para requisições JSON
+    set_error_handler(function($errno, $errstr, $errfile, $errline) use ($logsDir) {
+        // Logar o erro mas não exibir
+        error_log("[$errno] $errstr in $errfile on line $errline", 3, $logsDir . '/app.log');
+        return true; // Não executar o handler padrão do PHP
+    });
     
     // Iniciar buffer de output para capturar qualquer saída indesejada
     ob_start();
 } else {
-    // Para páginas HTML, exibir erros normalmente
+    // Para páginas HTML, exibir erros normalmente (mas não deprecated)
     ini_set('display_errors', '1');
 }
 

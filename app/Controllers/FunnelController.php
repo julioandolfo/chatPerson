@@ -427,6 +427,11 @@ class FunnelController
      */
     public function reorderStages(int $id): void
     {
+        // Limpar qualquer output anterior
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
         try {
             Permission::abortIfCannot('funnels.edit');
             
@@ -692,9 +697,14 @@ class FunnelController
      */
     public function getConversationDetails(int $conversationId): void
     {
-        Permission::abortIfCannot('conversations.view');
+        // Limpar qualquer output anterior
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
         
         try {
+            Permission::abortIfCannot('conversations.view');
+            
             $details = FunnelService::getConversationDetails($conversationId);
             
             Response::json([

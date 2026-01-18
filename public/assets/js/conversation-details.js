@@ -353,8 +353,7 @@ async function showConversationDetails(conversationId) {
                         <table class="table table-row-bordered align-middle">
                             <thead>
                                 <tr class="fw-bold text-muted">
-                                    <th>De</th>
-                                    <th>Para</th>
+                                    <th>Agente</th>
                                     <th>Atribuído Por</th>
                                     <th>Data</th>
                                 </tr>
@@ -362,8 +361,7 @@ async function showConversationDetails(conversationId) {
                             <tbody>
                                 ${details.assignment_history.map(assignment => `
                                 <tr>
-                                    <td>${assignment.from_agent_name || 'Não atribuído'}</td>
-                                    <td>${assignment.to_agent_name || 'Não atribuído'}</td>
+                                    <td>${assignment.agent_name || 'Não atribuído'}</td>
                                     <td>${assignment.assigned_by_name || 'Sistema'}</td>
                                     <td class="text-muted fs-7">${new Date(assignment.assigned_at).toLocaleString('pt-BR')}</td>
                                 </tr>

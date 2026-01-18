@@ -412,6 +412,14 @@ ob_start();
     color: var(--bs-text-gray-900) !important;
 }
 
+[data-bs-theme="dark"] #kt_kanban_filters kbd {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-bs-theme="dark"] #kt_kanban_filters .alert .text-gray-700 {
+    color: var(--bs-text-gray-800) !important;
+}
+
 /* Estado de carregamento dos filtros */
 .kanban-board.filtering {
     opacity: 0.6;
@@ -2389,6 +2397,13 @@ async function saveStageOrder() {
                 stage_ids: stageIds
             })
         });
+        
+        // Validar Content-Type antes de parsear JSON
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            const text = await response.text();
+            throw new Error('Resposta não é JSON: ' + text.substring(0, 300));
+        }
         
         const data = await response.json();
         

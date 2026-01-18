@@ -1470,14 +1470,13 @@ class FunnelService
         }
         
         // Buscar histórico de atribuições de agentes
+        // Nota: Usa estrutura simplificada (agent_id, não from/to)
         $assignmentHistorySql = "SELECT ca.*, 
-                                        u_from.name as from_agent_name,
-                                        u_to.name as to_agent_name,
+                                        u.name as agent_name,
                                         u_assigned.name as assigned_by_name,
-                                        ca.assigned_at as assigned_at
+                                        ca.assigned_at
                                  FROM conversation_assignments ca
-                                 LEFT JOIN users u_from ON ca.from_agent_id = u_from.id
-                                 LEFT JOIN users u_to ON ca.to_agent_id = u_to.id
+                                 LEFT JOIN users u ON ca.agent_id = u.id
                                  LEFT JOIN users u_assigned ON ca.assigned_by = u_assigned.id
                                  WHERE ca.conversation_id = ?
                                  ORDER BY ca.assigned_at DESC

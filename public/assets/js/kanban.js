@@ -1247,43 +1247,10 @@ function quickResolve(conversationId) {
 }
 
 // ============================================================================
-// REORDENAR ETAPA
+// REORDENAR ETAPA (LEGACY - Removido, usar modal de ordenação)
 // ============================================================================
-
-async function reorderStage(stageId, direction) {
-    try {
-        const baseUrl = window.KANBAN_CONFIG?.BASE_URL || window.location.origin;
-        const response = await fetch(`${baseUrl}/funnels/stages/${stageId}/reorder`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ direction })
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            toast.fire({
-                icon: 'success',
-                title: 'Ordem atualizada!',
-                text: 'A etapa foi movida com sucesso.'
-            });
-            
-            // Recarregar página para atualizar ordem
-            setTimeout(() => location.reload(), 500);
-        } else {
-            throw new Error(result.message || 'Erro ao reordenar etapa');
-        }
-    } catch (error) {
-        console.error('Erro ao reordenar etapa:', error);
-        Swal.fire({
-            icon: 'error',
-            title: 'Erro',
-            text: error.message || 'Não foi possível reordenar a etapa'
-        });
-    }
-}
+// A função reorderStage foi substituída pelo modal drag-and-drop
+// Use o botão "Ordenar Etapas" no cabeçalho do Kanban
 
 // ============================================================================
 // EXPORTAR FUNÇÕES GLOBAIS
@@ -1299,5 +1266,5 @@ window.showStageMetrics = showStageMetrics;
 window.showFunnelMetrics = showFunnelMetrics;
 window.quickAssignAgent = quickAssignAgent;
 window.quickResolve = quickResolve;
-window.reorderStage = reorderStage;
+// reorderStage removido - usar modal de ordenação
 

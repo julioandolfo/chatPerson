@@ -36,16 +36,25 @@ class FunnelStage extends Model
     public static function reorder(int $funnelId, array $stageIds): bool
     {
         try {
-            Database::getInstance()->beginTransaction();
+            $db = Database::getInstance();
+            $db->beginTransaction();
             
-            foreach ($stageIds as $position => $stageId) {
-                $sql = "UPDATE funnel_stages SET position = ? WHERE id = ? AND funnel_id = ?";
-                Database::execute($sql, [$position, $stageId, $funnelId]);
+            // Atualizar AMBOS position e stage_order para manter sincronizados
+            foreach ($stageIds as $index => $stageId) {
+                $newOrder = $index + 1; // Começar em 1
+                $sql = "UPDATE funnel_stages 
+                        SET position = ?, stage_order = ? 
+                        WHERE id = ? AND funnel_id = ?";
+                Database::execute($sql, [$newOrder, $newOrder, $stageId, $funnelId]);
+                
+                error_log("Atualizando etapa ID $stageId: position=$newOrder, stage_order=$newOrder");
             }
             
-            Database::getInstance()->commit();
+            $db->commit();
+            error_log("✅ Etapas reordenadas com sucesso!");
             return true;
         } catch (\Exception $e) {
+            error_log("❌ Erro ao reordenar etapas: " . $e->getMessage());
             Database::getInstance()->rollBack();
             return false;
         }

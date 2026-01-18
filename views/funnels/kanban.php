@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 $layout = 'layouts.metronic.app';
 $title = 'Kanban - Funis';
 
@@ -194,6 +194,204 @@ ob_start();
 .kanban-board::-webkit-scrollbar-thumb:hover {
     background: #a0aec0;
 }
+
+/* ============================================================================
+   FILTROS DO KANBAN
+   ============================================================================ */
+
+/* Painel de filtros */
+#kt_kanban_filters {
+    transition: all 0.3s ease-in-out;
+}
+
+#kt_kanban_filters .card-body {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+}
+
+/* Conversas filtradas (ocultas) */
+.conversation-item.filtered-out {
+    display: none !important;
+}
+
+/* Highlight quando filtros estão ativos */
+.btn-light-primary[data-bs-toggle="collapse"][aria-expanded="true"] {
+    background-color: #009ef7 !important;
+    color: white !important;
+}
+
+/* Badge de contador de filtros */
+#kt_filters_count {
+    animation: pulse-badge 2s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
+}
+
+/* Select2 customizado para filtros */
+#kt_kanban_filters .select2-container {
+    width: 100% !important;
+}
+
+#kt_kanban_filters .form-control:focus,
+#kt_kanban_filters .form-select:focus {
+    border-color: #009ef7;
+    box-shadow: 0 0 0 0.2rem rgba(0, 158, 247, 0.15);
+}
+
+/* Ícones nos labels dos filtros */
+#kt_kanban_filters .form-label i {
+    opacity: 0.7;
+}
+
+/* Animação de transição suave ao filtrar */
+.kanban-item.conversation-item {
+    transition: opacity 0.3s ease, transform 0.3s ease, display 0.3s ease;
+}
+
+/* Estado de carregamento dos filtros */
+.kanban-board.filtering {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.kanban-board.filtering::after {
+    content: "Aplicando filtros...";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255, 255, 255, 0.95);
+    padding: 20px 40px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    font-weight: 600;
+    color: #009ef7;
+    z-index: 1000;
+}
+
+/* ============================================================================
+   MODAL DE ORDENAÇÃO DE ETAPAS
+   ============================================================================ */
+
+.stage-order-item {
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+}
+
+.stage-order-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+    border-color: #e4e6ef;
+}
+
+.sortable-ghost {
+    opacity: 0.4;
+    background-color: #f1f1f2;
+}
+
+.sortable-chosen {
+    background-color: #f9f9f9;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+    border-color: #009ef7 !important;
+}
+
+.sortable-drag {
+    opacity: 0.8;
+    transform: rotate(2deg);
+}
+
+#kt_stage_order_list {
+    min-height: 200px;
+}
+
+/* Animação ao mover etapas */
+.stage-order-item {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* ============================================================================
+   MODAL DE DETALHES DA CONVERSA
+   ============================================================================ */
+
+#kt_modal_conversation_details .modal-body {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+#kt_modal_conversation_details .card {
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+}
+
+/* Timeline */
+.timeline {
+    position: relative;
+    padding-left: 60px;
+}
+
+.timeline-item {
+    position: relative;
+    padding-bottom: 2rem;
+}
+
+.timeline-line {
+    position: absolute;
+    left: 20px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: #e4e6ef;
+}
+
+.timeline-item:last-child .timeline-line {
+    display: none;
+}
+
+.timeline-icon {
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+
+.timeline-content {
+    padding-left: 20px;
+}
+
+/* Smooth scroll */
+#kt_modal_conversation_details .modal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+#kt_modal_conversation_details .modal-body::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+#kt_modal_conversation_details .modal-body::-webkit-scrollbar-thumb {
+    background: #cbd5e0;
+    border-radius: 4px;
+}
+
+#kt_modal_conversation_details .modal-body::-webkit-scrollbar-thumb:hover {
+    background: #a0aec0;
+}
 </style>
 
 <!--begin::Card-->
@@ -212,6 +410,17 @@ ob_start();
                 <?php endforeach; ?>
             </select>
             <?php endif; ?>
+            
+            <!-- Botão de Filtros -->
+            <button type="button" class="btn btn-sm btn-light-primary" data-bs-toggle="collapse" data-bs-target="#kt_kanban_filters">
+                <i class="ki-duotone ki-filter fs-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                Filtros
+                <span class="badge badge-circle badge-primary ms-2" id="kt_filters_count" style="display: none;">0</span>
+            </button>
+            
             <?php if (!empty($currentFunnelId)): ?>
             <button type="button" class="btn btn-sm btn-light-info" onclick="showFunnelMetrics(<?= $currentFunnelId ?>)">
                 <i class="ki-duotone ki-chart-simple fs-2">
@@ -221,7 +430,249 @@ ob_start();
                 </i>
                 Métricas do Funil
             </button>
+            
+            <?php if (\App\Helpers\Permission::can('funnels.edit')): ?>
+            <button type="button" class="btn btn-sm btn-light-primary" onclick="openStageOrderModal(<?= $currentFunnelId ?>)">
+                <i class="ki-duotone ki-row-vertical fs-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                Ordenar Etapas
+            </button>
             <?php endif; ?>
+            <?php endif; ?>
+        </div>
+    </div>
+    
+    <!-- Painel de Filtros Avançados -->
+    <div class="collapse" id="kt_kanban_filters">
+        <div class="card-body border-top pt-6">
+            <div class="row g-5">
+                <!-- Coluna 1 -->
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold fs-6">
+                        <i class="ki-duotone ki-magnifier fs-5 me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Buscar por Nome/Telefone
+                    </label>
+                    <input type="text" class="form-control form-control-solid" id="filter_search" placeholder="Digite para buscar...">
+                </div>
+                
+                <!-- Coluna 2 -->
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold fs-6">
+                        <i class="ki-duotone ki-user fs-5 me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Agente
+                    </label>
+                    <select class="form-select form-select-solid" id="filter_agent" data-control="select2" data-placeholder="Todos os agentes" data-allow-clear="true">
+                        <option value="">Todos os agentes</option>
+                        <option value="unassigned">Não atribuídas</option>
+                        <?php
+                        $agents = \App\Models\User::getAgents();
+                        foreach ($agents as $agent):
+                        ?>
+                            <option value="<?= $agent['id'] ?>"><?= htmlspecialchars($agent['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                
+                <!-- Coluna 3 -->
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold fs-6">
+                        <i class="ki-duotone ki-status fs-5 me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        Status
+                    </label>
+                    <select class="form-select form-select-solid" id="filter_status" data-control="select2" data-placeholder="Todos os status" data-allow-clear="true">
+                        <option value="">Todos os status</option>
+                        <option value="open">Abertas</option>
+                        <option value="pending">Pendentes</option>
+                        <option value="resolved">Resolvidas</option>
+                        <option value="closed">Fechadas</option>
+                    </select>
+                </div>
+                
+                <!-- Coluna 4 -->
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold fs-6">
+                        <i class="ki-duotone ki-flag fs-5 me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Prioridade
+                    </label>
+                    <select class="form-select form-select-solid" id="filter_priority" data-control="select2" data-placeholder="Todas as prioridades" data-allow-clear="true">
+                        <option value="">Todas as prioridades</option>
+                        <option value="low">Baixa</option>
+                        <option value="normal">Normal</option>
+                        <option value="high">Alta</option>
+                        <option value="urgent">Urgente</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="row g-5 mt-2">
+                <!-- Coluna 1 -->
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold fs-6">
+                        <i class="ki-duotone ki-tag fs-5 me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        Tags
+                    </label>
+                    <select class="form-select form-select-solid" id="filter_tags" data-control="select2" data-placeholder="Todas as tags" data-allow-clear="true" multiple>
+                        <?php
+                        $tags = \App\Services\TagService::getAll();
+                        foreach ($tags as $tag):
+                        ?>
+                            <option value="<?= $tag['id'] ?>"><?= htmlspecialchars($tag['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                
+                <!-- Coluna 2 -->
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold fs-6">
+                        <i class="ki-duotone ki-time fs-5 me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        SLA
+                    </label>
+                    <select class="form-select form-select-solid" id="filter_sla" data-control="select2" data-placeholder="Todos" data-allow-clear="true">
+                        <option value="">Todos</option>
+                        <option value="ok">Dentro do prazo</option>
+                        <option value="warning">Próximo do vencimento</option>
+                        <option value="exceeded">Vencido</option>
+                    </select>
+                </div>
+                
+                <!-- Coluna 3 -->
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold fs-6">
+                        <i class="ki-duotone ki-calendar fs-5 me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Período de Criação
+                    </label>
+                    <select class="form-select form-select-solid" id="filter_period" data-control="select2" data-placeholder="Todos os períodos" data-allow-clear="true">
+                        <option value="">Todos os períodos</option>
+                        <option value="today">Hoje</option>
+                        <option value="yesterday">Ontem</option>
+                        <option value="last_7_days">Últimos 7 dias</option>
+                        <option value="last_30_days">Últimos 30 dias</option>
+                        <option value="last_90_days">Últimos 90 dias</option>
+                    </select>
+                </div>
+                
+                <!-- Coluna 4 -->
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold fs-6">
+                        <i class="ki-duotone ki-message-text-2 fs-5 me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        Mensagens Não Lidas
+                    </label>
+                    <select class="form-select form-select-solid" id="filter_unread" data-control="select2" data-placeholder="Todas" data-allow-clear="true">
+                        <option value="">Todas</option>
+                        <option value="yes">Com não lidas</option>
+                        <option value="no">Sem não lidas</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="separator my-5"></div>
+            
+            <!-- Guia de Atalhos -->
+            <div class="alert alert-dismissible bg-light-info d-flex flex-column flex-sm-row p-5 mb-5">
+                <i class="ki-duotone ki-keyboard fs-2hx text-info me-4 mb-5 mb-sm-0">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                    <span class="path3"></span>
+                </i>
+                <div class="d-flex flex-column pe-0 pe-sm-10">
+                    <h5 class="mb-2">Atalhos de Teclado</h5>
+                    <div class="fs-7 text-gray-700">
+                        <kbd>Ctrl+F</kbd> Buscar &nbsp;|&nbsp; 
+                        <kbd>Ctrl+Enter</kbd> Aplicar &nbsp;|&nbsp; 
+                        <kbd>Esc</kbd> Limpar &nbsp;|&nbsp; 
+                        <kbd>Ctrl+S</kbd> Salvar &nbsp;|&nbsp; 
+                        <kbd>Ctrl+E</kbd> Exportar
+                    </div>
+                </div>
+                <button type="button" class="btn-close position-absolute top-0 end-0 m-2" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            
+            <!-- Botões de Ação -->
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="text-muted fs-7">
+                    <span id="kt_kanban_total_results">Mostrando todas as conversas</span>
+                </div>
+                <div class="d-flex gap-2">
+                    <!-- Salvar Filtro -->
+                    <button type="button" class="btn btn-sm btn-light-success" onclick="saveCurrentFilters()" title="Salvar filtros atuais">
+                        <i class="ki-duotone ki-save-2 fs-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Salvar
+                    </button>
+                    
+                    <!-- Carregar Filtros Salvos -->
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-sm btn-light-info dropdown-toggle" data-bs-toggle="dropdown" title="Carregar filtros salvos">
+                            <i class="ki-duotone ki-folder-down fs-3">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Carregar
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" id="saved_filters_list">
+                            <li><a class="dropdown-item text-muted">Nenhum filtro salvo</a></li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Exportar -->
+                    <button type="button" class="btn btn-sm btn-light-warning" onclick="exportFilteredConversations()" title="Exportar conversas filtradas">
+                        <i class="ki-duotone ki-file-down fs-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Exportar
+                    </button>
+                    
+                    <!-- Limpar -->
+                    <button type="button" class="btn btn-sm btn-light-danger" onclick="clearFilters()">
+                        <i class="ki-duotone ki-cross fs-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Limpar
+                    </button>
+                    
+                    <!-- Aplicar -->
+                    <button type="button" class="btn btn-sm btn-primary" onclick="applyFilters()">
+                        <i class="ki-duotone ki-check fs-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Aplicar
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
     <div class="card-body pt-0">
@@ -301,39 +752,7 @@ ob_start();
                                 
                                 <!-- Linha 2: Botões de Ação -->
                                 <div class="d-flex align-items-center justify-content-between">
-                                    <!-- Botões de Reordenação -->
-                                    <?php if (\App\Helpers\Permission::can('funnels.edit')): ?>
-                                        <div class="btn-group btn-group-sm" role="group">
-                                            <?php if ($stageIndex > 0): ?>
-                                                <button type="button" 
-                                                        class="btn btn-sm btn-icon btn-color-gray-500 btn-active-color-primary" 
-                                                        onclick="reorderStage(<?= $stage['id'] ?>, 'up')"
-                                                        title="Mover para esquerda"
-                                                        style="width: 28px; height: 28px;">
-                                                    <i class="ki-duotone ki-arrow-left fs-4">
-                                                        <span class="path1"></span>
-                                                        <span class="path2"></span>
-                                                    </i>
-                                                </button>
-                                            <?php else: ?>
-                                                <div style="width: 28px;"></div>
-                                            <?php endif; ?>
-                                            <?php if ($stageIndex < count($stagesData) - 1): ?>
-                                                <button type="button" 
-                                                        class="btn btn-sm btn-icon btn-color-gray-500 btn-active-color-primary" 
-                                                        onclick="reorderStage(<?= $stage['id'] ?>, 'down')"
-                                                        title="Mover para direita"
-                                                        style="width: 28px; height: 28px;">
-                                                    <i class="ki-duotone ki-arrow-right fs-4">
-                                                        <span class="path1"></span>
-                                                        <span class="path2"></span>
-                                                    </i>
-                                                </button>
-                                            <?php endif; ?>
-                                        </div>
-                                    <?php else: ?>
-                                        <div></div>
-                                    <?php endif; ?>
+                                    <div></div>
                                     
                                     <!-- Botões de Métricas e Edição -->
                                     <div class="d-flex align-items-center gap-1">
@@ -421,6 +840,16 @@ ob_start();
                                     ?>
                                         <div class="kanban-item conversation-item card shadow-sm hover-elevate-up" 
                                              data-conversation-id="<?= $conv['id'] ?>"
+                                             data-contact-name="<?= htmlspecialchars($conv['contact_name'] ?? '', ENT_QUOTES) ?>"
+                                             data-contact-phone="<?= htmlspecialchars($conv['contact_phone'] ?? '', ENT_QUOTES) ?>"
+                                             data-agent-id="<?= $conv['agent_id'] ?? '' ?>"
+                                             data-agent-name="<?= htmlspecialchars($conv['agent_name'] ?? '', ENT_QUOTES) ?>"
+                                             data-status="<?= $conv['status'] ?? 'open' ?>"
+                                             data-priority="<?= $conv['priority'] ?? 'normal' ?>"
+                                             data-sla-status="<?= $conv['sla_status'] ?? 'ok' ?>"
+                                             data-unread-count="<?= $conv['unread_count'] ?? 0 ?>"
+                                             data-created-at="<?= $conv['created_at'] ?? '' ?>"
+                                             data-tags="<?= htmlspecialchars(json_encode(array_column($conv['tags'] ?? [], 'id')), ENT_QUOTES) ?>"
                                              draggable="true"
                                              style="border-left: 4px solid <?= htmlspecialchars($stageColor) ?>; cursor: grab; transition: all 0.2s;">
                                              
@@ -454,9 +883,40 @@ ob_start();
                                                             </i>
                                                         </button>
                                                         <ul class="dropdown-menu dropdown-menu-end">
-                                                            <li><a class="dropdown-item" href="<?= \App\Helpers\Url::to('/conversations?id=' . $conv['id']) ?>"><i class="ki-duotone ki-eye fs-4 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>Ver Detalhes</a></li>
-                                                            <li><a class="dropdown-item" href="#" onclick="quickAssignAgent(<?= $conv['id'] ?>); return false;"><i class="ki-duotone ki-user-tick fs-4 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>Atribuir Agente</a></li>
-                                                            <li><a class="dropdown-item text-success" href="#" onclick="quickResolve(<?= $conv['id'] ?>); return false;"><i class="ki-duotone ki-check-circle fs-4 me-2"><span class="path1"></span><span class="path2"></span></i>Resolver</a></li>
+                                                            <li><a class="dropdown-item" href="#" onclick="showConversationDetails(<?= $conv['id'] ?>); return false;">
+                                                                <i class="ki-duotone ki-information fs-4 me-2">
+                                                                    <span class="path1"></span>
+                                                                    <span class="path2"></span>
+                                                                    <span class="path3"></span>
+                                                                </i>
+                                                                Ver Detalhes
+                                                            </a></li>
+                                                            <li><a class="dropdown-item" href="<?= \App\Helpers\Url::to('/conversations?id=' . $conv['id']) ?>">
+                                                                <i class="ki-duotone ki-messages fs-4 me-2">
+                                                                    <span class="path1"></span>
+                                                                    <span class="path2"></span>
+                                                                    <span class="path3"></span>
+                                                                    <span class="path4"></span>
+                                                                    <span class="path5"></span>
+                                                                </i>
+                                                                Ver Conversa
+                                                            </a></li>
+                                                            <li><hr class="dropdown-divider"></li>
+                                                            <li><a class="dropdown-item" href="#" onclick="quickAssignAgent(<?= $conv['id'] ?>); return false;">
+                                                                <i class="ki-duotone ki-user-tick fs-4 me-2">
+                                                                    <span class="path1"></span>
+                                                                    <span class="path2"></span>
+                                                                    <span class="path3"></span>
+                                                                </i>
+                                                                Atribuir Agente
+                                                            </a></li>
+                                                            <li><a class="dropdown-item text-success" href="#" onclick="quickResolve(<?= $conv['id'] ?>); return false;">
+                                                                <i class="ki-duotone ki-check-circle fs-4 me-2">
+                                                                    <span class="path1"></span>
+                                                                    <span class="path2"></span>
+                                                                </i>
+                                                                Resolver
+                                                            </a></li>
                                                         </ul>
                                                     </div>
                                                 </div>
@@ -792,6 +1252,108 @@ ob_start();
 <?php endif; ?>
 <!--end::Modal - Novo/Editar Estágio-->
 
+<!--begin::Modal - Ordenar Etapas-->
+<?php if (\App\Helpers\Permission::can('funnels.edit')): ?>
+<div class="modal fade" id="kt_modal_stage_order" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-650px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">
+                    <i class="ki-duotone ki-row-vertical fs-2 me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Ordenar Etapas
+                </h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                <div class="alert alert-info d-flex align-items-center p-5 mb-7">
+                    <i class="ki-duotone ki-information-5 fs-2hx text-info me-4">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div class="d-flex flex-column">
+                        <h4 class="mb-1 text-dark">Como usar</h4>
+                        <span>Arraste e solte as etapas para reordená-las. A ordem será salva automaticamente ao clicar em "Salvar Ordem".</span>
+                    </div>
+                </div>
+                
+                <div id="kt_stage_order_list" class="d-flex flex-column gap-3">
+                    <!-- Preenchido via JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer flex-center">
+                <button type="button" data-bs-dismiss="modal" class="btn btn-light me-3">Cancelar</button>
+                <button type="button" onclick="saveStageOrder()" class="btn btn-primary">
+                    <i class="ki-duotone ki-check fs-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Salvar Ordem
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+<!--end::Modal - Ordenar Etapas-->
+
+<!--begin::Modal - Detalhes da Conversa-->
+<div class="modal fade" id="kt_modal_conversation_details" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">
+                    <i class="ki-duotone ki-information-5 fs-2 me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    Detalhes da Conversa
+                </h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body scroll-y">
+                <div id="conversation_details_content">
+                    <!-- Conteúdo carregado via JavaScript -->
+                    <div class="text-center py-10">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                        <p class="text-muted mt-3">Carregando detalhes...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+                <a href="#" id="btn_open_conversation" class="btn btn-primary" target="_blank">
+                    <i class="ki-duotone ki-messages fs-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                        <span class="path4"></span>
+                        <span class="path5"></span>
+                    </i>
+                    Abrir Conversa
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+<!--end::Modal - Detalhes da Conversa-->
+
 <?php 
 $content = ob_get_clean(); 
 $styles = '
@@ -835,6 +1397,9 @@ $funnelIdForJs = isset($currentFunnelId) ? intval($currentFunnelId) : 0;
 $basePath = \App\Helpers\Url::basePath(); // ex: "" ou "/chat"
 
 $scripts = '
+<!-- Sortable.js para Drag and Drop -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
 <!-- Configurações do Kanban -->
 <script>
 // Configurações globais para o Kanban.js
@@ -853,44 +1418,1390 @@ console.log("KANBAN_CONFIG inicializado:", window.KANBAN_CONFIG);
 <!-- Kanban JavaScript -->
 <script src="' . \App\Helpers\Url::asset('js/kanban.js') . '?v=' . time() . '"></script>
 <script>
-// Função fallback caso o arquivo JS ainda não tenha carregado (cache)
-if (typeof window.reorderStage === "undefined") {
-    console.warn("Função reorderStage não encontrada, definindo fallback...");
-    window.reorderStage = async function(stageId, direction) {
-        try {
-            const BASE_URL = window.KANBAN_CONFIG?.BASE_URL || window.location.origin;
-            const response = await fetch(`${BASE_URL}/funnels/stages/${stageId}/reorder`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ direction })
-            });
+// ============================================================================
+// SISTEMA DE FILTROS DO KANBAN
+// ============================================================================
 
-            const result = await response.json();
+// Estado dos filtros
+let activeFilters = {};
+let allConversations = {}; // Armazena todas as conversas por etapa
 
-            if (result.success) {
-                Swal.fire({
-                    icon: "success",
-                    title: "Ordem atualizada!",
-                    text: "A etapa foi movida com sucesso.",
-                    timer: 2000,
-                    showConfirmButton: false
-                });
-                setTimeout(() => location.reload(), 500);
-            } else {
-                throw new Error(result.message || "Erro ao reordenar etapa");
-            }
-        } catch (error) {
-            console.error("Erro ao reordenar etapa:", error);
-            Swal.fire({
-                icon: "error",
-                title: "Erro",
-                text: error.message || "Não foi possível reordenar a etapa"
+// Inicializar sistema de filtros
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Inicializando sistema de filtros do Kanban');
+    
+    // Armazenar conversas originais
+    storeOriginalConversations();
+    
+    // Aplicar filtros em tempo real (debounced)
+    let filterTimeout;
+    document.getElementById('filter_search')?.addEventListener('input', function() {
+        clearTimeout(filterTimeout);
+        filterTimeout = setTimeout(() => applyFilters(), 300);
+    });
+    
+    // Detectar mudanças nos selects
+    ['filter_agent', 'filter_status', 'filter_priority', 'filter_tags', 'filter_sla', 'filter_period', 'filter_unread'].forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('change', () => {
+                // Aplicar automaticamente após selecionar
+                setTimeout(() => applyFilters(), 100);
             });
         }
+    });
+    
+    // Enter no campo de busca aplica filtros
+    document.getElementById('filter_search')?.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            applyFilters();
+        }
+    });
+});
+
+// Armazenar conversas originais
+function storeOriginalConversations() {
+    const stages = document.querySelectorAll('.kanban-items');
+    stages.forEach(stage => {
+        const stageId = stage.getAttribute('data-stage-id');
+        const conversations = Array.from(stage.querySelectorAll('.conversation-item'));
+        allConversations[stageId] = conversations.map(conv => ({
+            element: conv,
+            data: extractConversationData(conv)
+        }));
+    });
+    console.log('Conversas armazenadas:', allConversations);
+}
+
+// Extrair dados da conversa do DOM (usando data-attributes)
+function extractConversationData(element) {
+    const messageEl = element.querySelector('.text-gray-700.fs-7');
+    
+    return {
+        id: element.getAttribute('data-conversation-id'),
+        name: (element.getAttribute('data-contact-name') || '').toLowerCase(),
+        phone: (element.getAttribute('data-contact-phone') || '').toLowerCase(),
+        message: messageEl?.textContent.trim().toLowerCase() || '',
+        agentId: element.getAttribute('data-agent-id') || '',
+        agentName: (element.getAttribute('data-agent-name') || '').toLowerCase(),
+        status: element.getAttribute('data-status') || 'open',
+        priority: element.getAttribute('data-priority') || 'normal',
+        sla: element.getAttribute('data-sla-status') || 'ok',
+        unread: parseInt(element.getAttribute('data-unread-count')) || 0,
+        tags: JSON.parse(element.getAttribute('data-tags') || '[]'),
+        created_at: element.getAttribute('data-created-at') || '',
+        element: element
     };
 }
+
+// Obter status SLA do elemento
+function getSlaStatus(element) {
+    if (!element) return 'ok';
+    if (element.classList.contains('badge-light-danger')) return 'exceeded';
+    if (element.classList.contains('badge-light-warning')) return 'warning';
+    return 'ok';
+}
+
+// Aplicar filtros
+function applyFilters() {
+    console.log('Aplicando filtros...');
+    
+    // Adicionar indicador visual de carregamento
+    const kanbanBoard = document.getElementById('kt_kanban_board');
+    if (kanbanBoard) {
+        kanbanBoard.classList.add('filtering');
+    }
+    
+    // Pequeno delay para melhor UX (mostrar feedback visual)
+    setTimeout(() => {
+        // Coletar valores dos filtros
+        activeFilters = {
+            search: document.getElementById('filter_search')?.value.toLowerCase().trim() || '',
+            agent: document.getElementById('filter_agent')?.value || '',
+            status: document.getElementById('filter_status')?.value || '',
+            priority: document.getElementById('filter_priority')?.value || '',
+            tags: Array.from(document.getElementById('filter_tags')?.selectedOptions || []).map(opt => opt.text.toLowerCase()),
+            sla: document.getElementById('filter_sla')?.value || '',
+            period: document.getElementById('filter_period')?.value || '',
+            unread: document.getElementById('filter_unread')?.value || ''
+        };
+        
+        console.log('Filtros ativos:', activeFilters);
+        
+        let totalVisible = 0;
+        let totalHidden = 0;
+    
+    // Aplicar filtros em cada etapa
+    Object.keys(allConversations).forEach(stageId => {
+        const conversations = allConversations[stageId];
+        const stageContainer = document.querySelector(`.kanban-items[data-stage-id="${stageId}"]`);
+        
+        if (!stageContainer) return;
+        
+        let visibleInStage = 0;
+        
+        conversations.forEach(conv => {
+            const shouldShow = matchesAllFilters(conv.data);
+            
+            if (shouldShow) {
+                conv.element.style.display = 'block';
+                conv.element.classList.remove('filtered-out');
+                visibleInStage++;
+                totalVisible++;
+            } else {
+                conv.element.style.display = 'none';
+                conv.element.classList.add('filtered-out');
+                totalHidden++;
+            }
+        });
+        
+        // Atualizar contador da etapa
+        const countBadge = document.getElementById(`stage_count_${stageId}`);
+        if (countBadge) {
+            countBadge.textContent = visibleInStage;
+        }
+    });
+    
+        // Atualizar contador de filtros ativos
+        updateFiltersCount();
+        
+        // Atualizar texto de resultados
+        const resultsText = document.getElementById('kt_kanban_total_results');
+        if (resultsText) {
+            if (totalHidden > 0) {
+                resultsText.innerHTML = `<strong>${totalVisible}</strong> conversas encontradas <span class="text-muted">(${totalHidden} ocultas pelos filtros)</span>`;
+            } else {
+                resultsText.textContent = 'Mostrando todas as conversas';
+            }
+        }
+        
+        // Remover indicador de carregamento
+        if (kanbanBoard) {
+            kanbanBoard.classList.remove('filtering');
+        }
+        
+        console.log(`Filtros aplicados: ${totalVisible} visíveis, ${totalHidden} ocultas`);
+        
+        // Mostrar notificação de sucesso se houver filtros ativos
+        const activeFilterCount = Object.values(activeFilters).filter(v => 
+            Array.isArray(v) ? v.length > 0 : v !== ''
+        ).length;
+        
+        if (activeFilterCount > 0) {
+            // Toastr notification (se disponível)
+            if (typeof toastr !== 'undefined') {
+                toastr.success(`${totalVisible} conversas encontradas com os filtros aplicados`, 'Filtros Aplicados', {
+                    timeOut: 2000,
+                    positionClass: 'toast-top-right'
+                });
+            }
+        }
+    }, 100); // Delay de 100ms para feedback visual
+}
+
+// Verificar se conversa atende todos os filtros
+function matchesAllFilters(data) {
+    // Filtro de busca (nome, telefone ou mensagem)
+    if (activeFilters.search) {
+        const searchLower = activeFilters.search;
+        if (!data.name.includes(searchLower) && 
+            !data.phone.includes(searchLower) &&
+            !data.message.includes(searchLower)) {
+            return false;
+        }
+    }
+    
+    // Filtro de agente
+    if (activeFilters.agent) {
+        if (activeFilters.agent === 'unassigned') {
+            if (data.agentId !== '' && data.agentId !== null) {
+                return false;
+            }
+        } else {
+            if (data.agentId !== activeFilters.agent) {
+                return false;
+            }
+        }
+    }
+    
+    // Filtro de status
+    if (activeFilters.status && data.status !== activeFilters.status) {
+        return false;
+    }
+    
+    // Filtro de prioridade
+    if (activeFilters.priority && data.priority !== activeFilters.priority) {
+        return false;
+    }
+    
+    // Filtro de SLA
+    if (activeFilters.sla && data.sla !== activeFilters.sla) {
+        return false;
+    }
+    
+    // Filtro de tags (verificar se tem TODAS as tags selecionadas)
+    if (activeFilters.tags && activeFilters.tags.length > 0) {
+        const tagIds = activeFilters.tags.map(tagName => {
+            // Encontrar ID da tag pelo nome
+            const option = document.querySelector(`#filter_tags option[selected]`);
+            return option?.value;
+        });
+        
+        const hasAllTags = activeFilters.tags.every(tagName => {
+            // Buscar pelo nome da tag nos elementos visuais
+            const tagElements = data.element.querySelectorAll('.badge.fs-8[style*="background-color"]');
+            return Array.from(tagElements).some(el => 
+                el.textContent.trim().toLowerCase().includes(tagName)
+            );
+        });
+        
+        if (!hasAllTags) {
+            return false;
+        }
+    }
+    
+    // Filtro de período de criação
+    if (activeFilters.period && data.created_at) {
+        const createdDate = new Date(data.created_at);
+        const now = new Date();
+        const diffDays = Math.floor((now - createdDate) / (1000 * 60 * 60 * 24));
+        
+        switch(activeFilters.period) {
+            case 'today':
+                if (diffDays > 0) return false;
+                break;
+            case 'yesterday':
+                if (diffDays !== 1) return false;
+                break;
+            case 'last_7_days':
+                if (diffDays > 7) return false;
+                break;
+            case 'last_30_days':
+                if (diffDays > 30) return false;
+                break;
+            case 'last_90_days':
+                if (diffDays > 90) return false;
+                break;
+        }
+    }
+    
+    // Filtro de mensagens não lidas
+    if (activeFilters.unread) {
+        if (activeFilters.unread === 'yes' && data.unread === 0) {
+            return false;
+        }
+        if (activeFilters.unread === 'no' && data.unread > 0) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// Atualizar contador de filtros ativos
+function updateFiltersCount() {
+    let count = 0;
+    if (activeFilters.search) count++;
+    if (activeFilters.agent) count++;
+    if (activeFilters.status) count++;
+    if (activeFilters.priority) count++;
+    if (activeFilters.tags && activeFilters.tags.length > 0) count += activeFilters.tags.length;
+    if (activeFilters.sla) count++;
+    if (activeFilters.period) count++;
+    if (activeFilters.unread) count++;
+    
+    const badge = document.getElementById('kt_filters_count');
+    if (badge) {
+        if (count > 0) {
+            badge.textContent = count;
+            badge.style.display = 'inline-block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+}
+
+// Limpar filtros
+function clearFilters() {
+    console.log('Limpando filtros...');
+    
+    // Limpar campos
+    document.getElementById('filter_search').value = '';
+    
+    // Limpar selects
+    ['filter_agent', 'filter_status', 'filter_priority', 'filter_sla', 'filter_period', 'filter_unread'].forEach(id => {
+        const select = document.getElementById(id);
+        if (select) {
+            $(select).val('').trigger('change'); // Usar jQuery para Select2
+        }
+    });
+    
+    // Limpar tags (multiselect)
+    const tagsSelect = document.getElementById('filter_tags');
+    if (tagsSelect) {
+        $(tagsSelect).val([]).trigger('change');
+    }
+    
+    // Resetar filtros ativos
+    activeFilters = {};
+    
+    // Mostrar todas as conversas
+    Object.keys(allConversations).forEach(stageId => {
+        const conversations = allConversations[stageId];
+        conversations.forEach(conv => {
+            conv.element.style.display = 'block';
+            conv.element.classList.remove('filtered-out');
+        });
+        
+        // Restaurar contador original
+        const countBadge = document.getElementById(`stage_count_${stageId}`);
+        if (countBadge) {
+            countBadge.textContent = conversations.length;
+        }
+    });
+    
+    // Atualizar UI
+    updateFiltersCount();
+    document.getElementById('kt_kanban_total_results').textContent = 'Mostrando todas as conversas';
+    
+    console.log('Filtros limpos');
+}
+
+// Função auxiliar para fechar painel de filtros
+function toggleFilters() {
+    const filterPanel = document.getElementById('kt_kanban_filters');
+    if (filterPanel) {
+        const bsCollapse = new bootstrap.Collapse(filterPanel, {
+            toggle: true
+        });
+    }
+}
+
+// ============================================================================
+// SALVAR E CARREGAR FILTROS
+// ============================================================================
+
+// Salvar filtros atuais como favorito
+function saveCurrentFilters() {
+    // Verificar se há filtros ativos
+    const activeFilterCount = Object.values(activeFilters).filter(v => 
+        Array.isArray(v) ? v.length > 0 : v !== ''
+    ).length;
+    
+    if (activeFilterCount === 0) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Nenhum filtro ativo',
+            text: 'Configure alguns filtros antes de salvar',
+            timer: 2000
+        });
+        return;
+    }
+    
+    // Pedir nome para o filtro
+    Swal.fire({
+        title: 'Salvar Filtros',
+        input: 'text',
+        inputLabel: 'Nome do filtro',
+        inputPlaceholder: 'Ex: Conversas urgentes não atribuídas',
+        showCancelButton: true,
+        confirmButtonText: 'Salvar',
+        cancelButtonText: 'Cancelar',
+        inputValidator: (value) => {
+            if (!value) {
+                return 'Digite um nome para o filtro!';
+            }
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const filterName = result.value;
+            
+            // Buscar filtros salvos
+            let savedFilters = JSON.parse(localStorage.getItem('kanban_saved_filters') || '[]');
+            
+            // Adicionar novo filtro
+            savedFilters.push({
+                name: filterName,
+                filters: {...activeFilters},
+                created_at: new Date().toISOString(),
+                funnel_id: window.KANBAN_CONFIG?.funnelId || 0
+            });
+            
+            // Salvar no localStorage
+            localStorage.setItem('kanban_saved_filters', JSON.stringify(savedFilters));
+            
+            // Atualizar lista
+            loadSavedFiltersList();
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Filtro salvo!',
+                text: `Filtro "${filterName}" salvo com sucesso`,
+                timer: 2000,
+                showConfirmButton: false
+            });
+        }
+    });
+}
+
+// Carregar lista de filtros salvos
+function loadSavedFiltersList() {
+    const savedFilters = JSON.parse(localStorage.getItem('kanban_saved_filters') || '[]');
+    const currentFunnelId = window.KANBAN_CONFIG?.funnelId || 0;
+    
+    // Filtrar por funil atual
+    const funnelFilters = savedFilters.filter(f => f.funnel_id === currentFunnelId);
+    
+    const listElement = document.getElementById('saved_filters_list');
+    if (!listElement) return;
+    
+    if (funnelFilters.length === 0) {
+        listElement.innerHTML = '<li><a class="dropdown-item text-muted">Nenhum filtro salvo</a></li>';
+        return;
+    }
+    
+    listElement.innerHTML = funnelFilters.map((filter, index) => `
+        <li>
+            <a class="dropdown-item d-flex justify-content-between align-items-center" href="#" onclick="loadSavedFilter(${index}); return false;">
+                <span>
+                    <i class="ki-duotone ki-filter fs-4 me-2 text-primary">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    ${filter.name}
+                </span>
+                <button class="btn btn-sm btn-icon btn-light-danger" onclick="event.stopPropagation(); deleteSavedFilter(${index}); return false;" title="Deletar">
+                    <i class="ki-duotone ki-trash fs-6">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                </button>
+            </a>
+        </li>
+    `).join('') + `
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item text-danger" href="#" onclick="deleteAllSavedFilters(); return false;">
+            <i class="ki-duotone ki-trash fs-4 me-2">
+                <span class="path1"></span>
+                <span class="path2"></span>
+                <span class="path3"></span>
+            </i>
+            Deletar Todos
+        </a></li>
+    `;
+}
+
+// Carregar filtro salvo específico
+function loadSavedFilter(index) {
+    const savedFilters = JSON.parse(localStorage.getItem('kanban_saved_filters') || '[]');
+    const currentFunnelId = window.KANBAN_CONFIG?.funnelId || 0;
+    const funnelFilters = savedFilters.filter(f => f.funnel_id === currentFunnelId);
+    
+    if (!funnelFilters[index]) return;
+    
+    const filter = funnelFilters[index];
+    
+    // Aplicar valores aos campos
+    document.getElementById('filter_search').value = filter.filters.search || '';
+    
+    // Aplicar selects
+    $('#filter_agent').val(filter.filters.agent || '').trigger('change');
+    $('#filter_status').val(filter.filters.status || '').trigger('change');
+    $('#filter_priority').val(filter.filters.priority || '').trigger('change');
+    $('#filter_sla').val(filter.filters.sla || '').trigger('change');
+    $('#filter_period').val(filter.filters.period || '').trigger('change');
+    $('#filter_unread').val(filter.filters.unread || '').trigger('change');
+    
+    // Aplicar tags (multiselect) - precisa de tratamento especial
+    // Por enquanto, vamos apenas aplicar os filtros
+    
+    // Aplicar filtros
+    applyFilters();
+    
+    // Notificar
+    if (typeof toastr !== 'undefined') {
+        toastr.info(`Filtro "${filter.name}" carregado`, 'Filtros', {
+            timeOut: 2000
+        });
+    }
+}
+
+// Deletar filtro salvo
+function deleteSavedFilter(index) {
+    const savedFilters = JSON.parse(localStorage.getItem('kanban_saved_filters') || '[]');
+    const currentFunnelId = window.KANBAN_CONFIG?.funnelId || 0;
+    const funnelFilters = savedFilters.filter(f => f.funnel_id === currentFunnelId);
+    
+    if (!funnelFilters[index]) return;
+    
+    const filterName = funnelFilters[index].name;
+    
+    Swal.fire({
+        title: 'Confirmar exclusão',
+        text: `Deseja deletar o filtro "${filterName}"?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, deletar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#f1416c'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Encontrar índice no array completo
+            const filterToDelete = funnelFilters[index];
+            const globalIndex = savedFilters.findIndex(f => 
+                f.name === filterToDelete.name && 
+                f.created_at === filterToDelete.created_at
+            );
+            
+            if (globalIndex !== -1) {
+                savedFilters.splice(globalIndex, 1);
+                localStorage.setItem('kanban_saved_filters', JSON.stringify(savedFilters));
+                loadSavedFiltersList();
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Filtro deletado!',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+            }
+        }
+    });
+}
+
+// Deletar todos os filtros salvos
+function deleteAllSavedFilters() {
+    Swal.fire({
+        title: 'Confirmar exclusão',
+        text: 'Deseja deletar TODOS os filtros salvos?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, deletar todos',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#f1416c'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            localStorage.removeItem('kanban_saved_filters');
+            loadSavedFiltersList();
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Todos os filtros foram deletados!',
+                timer: 1500,
+                showConfirmButton: false
+            });
+        }
+    });
+}
+
+// ============================================================================
+// EXPORTAR CONVERSAS FILTRADAS
+// ============================================================================
+
+// Exportar conversas filtradas para CSV
+function exportFilteredConversations() {
+    // Coletar conversas visíveis
+    const visibleConversations = [];
+    
+    Object.keys(allConversations).forEach(stageId => {
+        allConversations[stageId].forEach(conv => {
+            if (conv.element.style.display !== 'none' && !conv.element.classList.contains('filtered-out')) {
+                visibleConversations.push({
+                    id: conv.data.id,
+                    nome: conv.data.name,
+                    telefone: conv.data.phone,
+                    agente: conv.data.agentName || 'Não atribuído',
+                    status: conv.data.status,
+                    prioridade: conv.data.priority,
+                    sla: conv.data.sla,
+                    nao_lidas: conv.data.unread,
+                    criado_em: conv.data.created_at
+                });
+            }
+        });
+    });
+    
+    if (visibleConversations.length === 0) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Nenhuma conversa para exportar',
+            text: 'Não há conversas visíveis com os filtros atuais',
+            timer: 2000
+        });
+        return;
+    }
+    
+    // Gerar CSV
+    const headers = ['ID', 'Nome', 'Telefone', 'Agente', 'Status', 'Prioridade', 'SLA', 'Não Lidas', 'Criado Em'];
+    const csvContent = [
+        headers.join(','),
+        ...visibleConversations.map(conv => [
+            conv.id,
+            `"${conv.nome}"`,
+            conv.telefone,
+            `"${conv.agente}"`,
+            conv.status,
+            conv.prioridade,
+            conv.sla,
+            conv.nao_lidas,
+            conv.criado_em
+        ].join(','))
+    ].join('\n');
+    
+    // Download
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `conversas_kanban_${timestamp}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Notificar
+    Swal.fire({
+        icon: 'success',
+        title: 'Exportação concluída!',
+        text: `${visibleConversations.length} conversas exportadas`,
+        timer: 2000,
+        showConfirmButton: false
+    });
+}
+
+// Carregar lista de filtros salvos ao inicializar
+document.addEventListener('DOMContentLoaded', function() {
+    loadSavedFiltersList();
+});
+
+// ============================================================================
+// ORDENAÇÃO DE ETAPAS (DRAG AND DROP)
+// ============================================================================
+
+let stageOrderSortable = null;
+let currentFunnelIdForOrder = null;
+
+// Abrir modal de ordenação de etapas
+async function openStageOrderModal(funnelId) {
+    currentFunnelIdForOrder = funnelId;
+    
+    try {
+        // Buscar etapas do funil
+        const response = await fetch(`${window.KANBAN_CONFIG.BASE_URL}/funnels/${funnelId}/stages`);
+        const data = await response.json();
+        
+        if (!data.success || !data.stages) {
+            throw new Error('Erro ao carregar etapas');
+        }
+        
+        const stages = data.stages;
+        
+        // Ordenar por stage_order, position e id (mesma lógica do backend)
+        stages.sort((a, b) => {
+            const orderA = a.stage_order || a.position || 0;
+            const orderB = b.stage_order || b.position || 0;
+            if (orderA === orderB) {
+                return (a.id || 0) - (b.id || 0);
+            }
+            return orderA - orderB;
+        });
+        
+        // Renderizar lista de etapas
+        const listElement = document.getElementById('kt_stage_order_list');
+        listElement.innerHTML = stages.map(stage => `
+            <div class="card shadow-sm stage-order-item" data-stage-id="${stage.id}" style="cursor: move;">
+                <div class="card-body d-flex align-items-center p-4">
+                    <i class="ki-duotone ki-menu fs-2 text-gray-500 me-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                        <span class="path4"></span>
+                    </i>
+                    <div class="d-flex align-items-center flex-grow-1">
+                        <div class="symbol symbol-40px me-3">
+                            <div class="symbol-label" style="background-color: ${stage.color || '#009ef7'}20;">
+                                <i class="ki-duotone ki-category fs-2" style="color: ${stage.color || '#009ef7'};">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="fw-bold text-gray-800 fs-6">${stage.name}</div>
+                            ${stage.is_system_stage ? '<span class="badge badge-success badge-sm mt-1">Etapa do Sistema</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="text-muted fs-7">
+                        <i class="ki-duotone ki-arrow-up-down fs-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+        // Inicializar Sortable.js
+        if (stageOrderSortable) {
+            stageOrderSortable.destroy();
+        }
+        
+        stageOrderSortable = new Sortable(listElement, {
+            animation: 150,
+            handle: '.stage-order-item',
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            dragClass: 'sortable-drag',
+            easing: 'cubic-bezier(0.4, 0.0, 0.2, 1)',
+            onEnd: function(evt) {
+                console.log('Etapa movida da posição', evt.oldIndex, 'para', evt.newIndex);
+            }
+        });
+        
+        // Abrir modal
+        const modal = new bootstrap.Modal(document.getElementById('kt_modal_stage_order'));
+        modal.show();
+        
+    } catch (error) {
+        console.error('Erro ao abrir modal de ordenação:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Não foi possível carregar as etapas'
+        });
+    }
+}
+
+// Salvar ordem das etapas
+async function saveStageOrder() {
+    if (!currentFunnelIdForOrder) return;
+    
+    try {
+        // Obter IDs na ordem atual
+        const listElement = document.getElementById('kt_stage_order_list');
+        const stageItems = listElement.querySelectorAll('.stage-order-item');
+        const stageIds = Array.from(stageItems).map(item => parseInt(item.dataset.stageId));
+        
+        console.log('Salvando ordem:', stageIds);
+        
+        // Enviar para o backend
+        const response = await fetch(`${window.KANBAN_CONFIG.BASE_URL}/funnels/${currentFunnelIdForOrder}/stages/reorder`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                stage_ids: stageIds
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Fechar modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_stage_order'));
+            modal.hide();
+            
+            // Mostrar sucesso
+            Swal.fire({
+                icon: 'success',
+                title: 'Ordem salva!',
+                text: 'As etapas foram reordenadas com sucesso',
+                timer: 2000,
+                showConfirmButton: false
+            }).then(() => {
+                // Recarregar página para atualizar Kanban
+                location.reload();
+            });
+        } else {
+            throw new Error(data.message || 'Erro ao salvar ordem');
+        }
+    } catch (error) {
+        console.error('Erro ao salvar ordem:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro ao salvar',
+            text: error.message || 'Não foi possível salvar a ordem das etapas'
+        });
+    }
+}
+
+// Exportar função global
+window.openStageOrderModal = openStageOrderModal;
+window.saveStageOrder = saveStageOrder;
+
+// ============================================================================
+// DETALHES DA CONVERSA (MODAL)
+// ============================================================================
+
+async function showConversationDetails(conversationId) {
+    try {
+        // Abrir modal
+        const modal = new bootstrap.Modal(document.getElementById('kt_modal_conversation_details'));
+        modal.show();
+        
+        // Resetar conteúdo
+        const contentDiv = document.getElementById('conversation_details_content');
+        contentDiv.innerHTML = `
+            <div class="text-center py-10">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+                <p class="text-muted mt-3">Carregando detalhes...</p>
+            </div>
+        `;
+        
+        // Buscar detalhes
+        const response = await fetch(\`\${window.KANBAN_CONFIG.BASE_URL}/conversations/\${conversationId}/details\`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success || !data.details) {
+            throw new Error(data.message || 'Erro ao carregar detalhes');
+        }
+        
+        const details = data.details;
+        const conv = details.conversation;
+        
+        // Atualizar link do botão "Abrir Conversa"
+        document.getElementById('btn_open_conversation').href = \`\${window.KANBAN_CONFIG.BASE_URL}/conversations?id=\${conversationId}\`;
+        
+        // Renderizar HTML
+        let html = '';
+        
+        // ========== INFORMAÇÕES BÁSICAS ==========
+        html += \`
+        <div class="card mb-5">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ki-duotone ki-user fs-2 me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Informações Básicas
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="row g-5">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-5">
+                            <div class="symbol symbol-50px me-4">
+                                \${conv.contact_avatar ? 
+                                    \`<img src="\${conv.contact_avatar}" alt="avatar" class="rounded" />\` :
+                                    \`<div class="symbol-label fs-3 fw-bold bg-light-primary text-primary">\${conv.contact_name?.charAt(0) || 'C'}</div>\`
+                                }
+                            </div>
+                            <div>
+                                <div class="fw-bold fs-5 text-gray-900">\${conv.contact_name || 'Sem nome'}</div>
+                                <div class="text-muted">\${conv.contact_phone || ''}</div>
+                                \${conv.contact_email ? \`<div class="text-muted">\${conv.contact_email}</div>\` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <span class="text-muted">Status:</span>
+                            <span class="badge badge-light-\${conv.status === 'open' ? 'success' : conv.status === 'pending' ? 'warning' : 'secondary'} ms-2">
+                                \${conv.status === 'open' ? 'Aberta' : conv.status === 'pending' ? 'Pendente' : conv.status === 'resolved' ? 'Resolvida' : 'Fechada'}
+                            </span>
+                        </div>
+                        <div class="mb-3">
+                            <span class="text-muted">Funil:</span>
+                            <span class="fw-bold ms-2">\${conv.funnel_name || '-'}</span>
+                        </div>
+                        <div class="mb-3">
+                            <span class="text-muted">Etapa Atual:</span>
+                            <span class="badge ms-2" style="background-color: \${conv.stage_color || '#009ef7'};">
+                                \${conv.stage_name || '-'}
+                            </span>
+                        </div>
+                        \${conv.department_name ? \`
+                        <div class="mb-3">
+                            <span class="text-muted">Departamento:</span>
+                            <span class="fw-bold ms-2">\${conv.department_name}</span>
+                        </div>
+                        \` : ''}
+                    </div>
+                </div>
+                
+                <div class="separator my-5"></div>
+                
+                <div class="row g-5">
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <i class="ki-duotone ki-calendar fs-3x text-info mb-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <div class="fw-bold fs-6 text-gray-800">\${conv.lifetime_formatted}</div>
+                            <div class="text-muted fs-8">Tempo de Vida</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <i class="ki-duotone ki-message-text fs-3x text-primary mb-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            <div class="fw-bold fs-6 text-gray-800">\${details.response_metrics.total_messages}</div>
+                            <div class="text-muted fs-8">Total de Mensagens</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <i class="ki-duotone ki-time fs-3x text-warning mb-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <div class="fw-bold fs-6 text-gray-800">\${details.response_metrics.avg_response_time_minutes}min</div>
+                            <div class="text-muted fs-8">Tempo Médio de Resposta</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <i class="ki-duotone ki-abstract-35 fs-3x text-success mb-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <div class="fw-bold fs-6 text-gray-800">\${details.response_metrics.agents_participated.length}</div>
+                            <div class="text-muted fs-8">Agentes Participantes</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        \`;
+        
+        // ========== AGENTE ATUAL ==========
+        if (conv.agent_name) {
+            html += \`
+            <div class="card mb-5">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="ki-duotone ki-user-tick fs-2 me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        Agente Responsável
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="symbol symbol-50px me-4">
+                            \${conv.agent_avatar ? 
+                                \`<img src="\${conv.agent_avatar}" alt="avatar" class="rounded" />\` :
+                                \`<div class="symbol-label fs-3 fw-bold bg-light-primary text-primary">\${conv.agent_name?.charAt(0) || 'A'}</div>\`
+                            }
+                        </div>
+                        <div>
+                            <div class="fw-bold fs-5 text-gray-900">\${conv.agent_name}</div>
+                            \${conv.agent_email ? \`<div class="text-muted">\${conv.agent_email}</div>\` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            \`;
+        }
+        
+        // ========== MÉTRICAS DE RESPOSTA ==========
+        html += \`
+        <div class="card mb-5">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ki-duotone ki-chart-simple-2 fs-2 me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    Métricas de Resposta
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="row g-5">
+                    <div class="col-md-4">
+                        <div class="border border-gray-300 border-dashed rounded p-4 text-center">
+                            <div class="text-muted mb-2">Mensagens do Cliente</div>
+                            <div class="fw-bold fs-2 text-primary">\${details.response_metrics.client_messages}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="border border-gray-300 border-dashed rounded p-4 text-center">
+                            <div class="text-muted mb-2">Mensagens dos Agentes</div>
+                            <div class="fw-bold fs-2 text-success">\${details.response_metrics.agent_messages}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="border border-gray-300 border-dashed rounded p-4 text-center">
+                            <div class="text-muted mb-2">Primeira Resposta</div>
+                            <div class="fw-bold fs-2 text-warning">\${details.response_metrics.first_response_time_minutes || 0}min</div>
+                        </div>
+                    </div>
+                </div>
+                
+                \${details.response_metrics.agents_participated.length > 0 ? \`
+                <div class="separator my-5"></div>
+                <div>
+                    <div class="text-muted mb-3">Agentes que Participaram:</div>
+                    <div class="d-flex flex-wrap gap-2">
+                        \${details.response_metrics.agents_participated.map(agent => 
+                            \`<span class="badge badge-light-primary">\${agent}</span>\`
+                        ).join('')}
+                    </div>
+                </div>
+                \` : ''}
+            </div>
+        </div>
+        \`;
+        
+        // ========== TEMPO EM CADA ETAPA ==========
+        if (details.time_in_stages && details.time_in_stages.length > 0) {
+            html += \`
+            <div class="card mb-5">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="ki-duotone ki-time fs-2 me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Tempo em Cada Etapa
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-row-bordered align-middle">
+                            <thead>
+                                <tr class="fw-bold text-muted">
+                                    <th>Etapa</th>
+                                    <th class="text-end">Tempo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                \${details.time_in_stages.map(stage => \`
+                                <tr>
+                                    <td>
+                                        <span class="badge" style="background-color: \${stage.stage_color};">
+                                            \${stage.stage_name}
+                                        </span>
+                                    </td>
+                                    <td class="text-end fw-bold">\${stage.formatted}</td>
+                                </tr>
+                                \`).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            \`;
+        }
+        
+        // ========== HISTÓRICO DE ETAPAS ==========
+        if (details.stage_history && details.stage_history.length > 0) {
+            html += \`
+            <div class="card mb-5">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="ki-duotone ki-arrow-right-left fs-2 me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Histórico de Movimentações
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        \${details.stage_history.map((history, index) => \`
+                        <div class="timeline-item">
+                            <div class="timeline-line w-40px"></div>
+                            <div class="timeline-icon symbol symbol-circle symbol-40px">
+                                <div class="symbol-label bg-light">
+                                    <i class="ki-duotone ki-abstract-26 fs-2 text-primary">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                </div>
+                            </div>
+                            <div class="timeline-content mb-7 mt-n1">
+                                <div class="pe-3 mb-2">
+                                    <div class="fs-6 fw-bold mb-2">
+                                        \${history.from_stage_name ? 
+                                            \`De <span class="badge" style="background-color: \${history.from_stage_color};">\${history.from_stage_name}</span>\` : 
+                                            'Início'
+                                        }
+                                        ➜
+                                        <span class="badge" style="background-color: \${history.to_stage_color};">
+                                            \${history.to_stage_name}
+                                        </span>
+                                    </div>
+                                    <div class="text-muted fs-7">
+                                        <i class="ki-duotone ki-user fs-7 me-1">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        \${history.changed_by_name || 'Sistema'}
+                                        <span class="text-muted mx-2">•</span>
+                                        \${new Date(history.changed_at).toLocaleString('pt-BR')}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        \`).join('')}
+                    </div>
+                </div>
+            </div>
+            \`;
+        }
+        
+        // ========== HISTÓRICO DE ATRIBUIÇÕES ==========
+        if (details.assignment_history && details.assignment_history.length > 0) {
+            html += \`
+            <div class="card mb-5">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="ki-duotone ki-profile-user fs-2 me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                            <span class="path4"></span>
+                        </i>
+                        Histórico de Atribuições
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-row-bordered align-middle">
+                            <thead>
+                                <tr class="fw-bold text-muted">
+                                    <th>De</th>
+                                    <th>Para</th>
+                                    <th>Atribuído Por</th>
+                                    <th>Data</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                \${details.assignment_history.map(assignment => \`
+                                <tr>
+                                    <td>\${assignment.from_agent_name || 'Não atribuído'}</td>
+                                    <td>\${assignment.to_agent_name || 'Não atribuído'}</td>
+                                    <td>\${assignment.assigned_by_name || 'Sistema'}</td>
+                                    <td class="text-muted fs-7">\${new Date(assignment.assigned_at).toLocaleString('pt-BR')}</td>
+                                </tr>
+                                \`).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            \`;
+        }
+        
+        // ========== TAGS ==========
+        if (details.tags && details.tags.length > 0) {
+            html += \`
+            <div class="card mb-5">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="ki-duotone ki-tag fs-2 me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        Tags
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap gap-2">
+                        \${details.tags.map(tag => \`
+                        <span class="badge fs-6" style="background-color: \${tag.color}20; color: \${tag.color}; border: 1px solid \${tag.color};">
+                            \${tag.name}
+                        </span>
+                        \`).join('')}
+                    </div>
+                </div>
+            </div>
+            \`;
+        }
+        
+        // ========== AVALIAÇÃO ==========
+        if (details.rating) {
+            const stars = '★'.repeat(details.rating.rating) + '☆'.repeat(5 - details.rating.rating);
+            html += \`
+            <div class="card mb-5">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="ki-duotone ki-star fs-2 me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Avaliação
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="fs-2 text-warning mb-3">\${stars}</div>
+                    <div class="fw-bold fs-4 mb-2">\${details.rating.rating}/5</div>
+                    \${details.rating.comment ? \`
+                    <div class="text-muted mt-3">
+                        <div class="fs-7 fw-bold mb-1">Comentário:</div>
+                        <div class="bg-light p-4 rounded">\${details.rating.comment}</div>
+                    </div>
+                    \` : ''}
+                </div>
+            </div>
+            \`;
+        }
+        
+        // ========== NOTAS ==========
+        if (details.notes && details.notes.length > 0) {
+            html += \`
+            <div class="card mb-5">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="ki-duotone ki-notepad fs-2 me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                            <span class="path4"></span>
+                            <span class="path5"></span>
+                        </i>
+                        Notas (\${details.notes.length})
+                    </h3>
+                </div>
+                <div class="card-body">
+                    \${details.notes.map(note => \`
+                    <div class="border border-gray-300 border-dashed rounded p-4 mb-3">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div class="fw-bold">\${note.author_name || 'Anônimo'}</div>
+                            <div class="text-muted fs-7">\${new Date(note.created_at).toLocaleString('pt-BR')}</div>
+                        </div>
+                        <div class="text-gray-700">\${note.note}</div>
+                    </div>
+                    \`).join('')}
+                </div>
+            </div>
+            \`;
+        }
+        
+        // Atualizar conteúdo do modal
+        contentDiv.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Erro ao carregar detalhes:', error);
+        
+        const contentDiv = document.getElementById('conversation_details_content');
+        contentDiv.innerHTML = \`
+            <div class="alert alert-danger d-flex align-items-center p-5">
+                <i class="ki-duotone ki-shield-cross fs-2hx text-danger me-4">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                    <span class="path3"></span>
+                </i>
+                <div class="d-flex flex-column">
+                    <h4 class="mb-1 text-dark">Erro ao carregar detalhes</h4>
+                    <span>\${error.message || 'Não foi possível carregar os detalhes da conversa'}</span>
+                </div>
+            </div>
+        \`;
+    }
+}
+
+// Exportar função global
+window.showConversationDetails = showConversationDetails;
+
+// ============================================================================
+// ATALHOS DE TECLADO
+// ============================================================================
+
+// Adicionar atalhos de teclado
+document.addEventListener('keydown', function(e) {
+    // Verificar se não está em um input/textarea (exceto o campo de busca dos filtros)
+    const isInputActive = document.activeElement.tagName === 'INPUT' || 
+                          document.activeElement.tagName === 'TEXTAREA' ||
+                          document.activeElement.tagName === 'SELECT';
+    
+    // Ctrl/Cmd + F: Focar no campo de busca dos filtros
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        const filterSearch = document.getElementById('filter_search');
+        if (filterSearch) {
+            // Expandir painel se estiver fechado
+            const filterPanel = document.getElementById('kt_kanban_filters');
+            if (filterPanel && !filterPanel.classList.contains('show')) {
+                toggleFilters();
+            }
+            
+            // Focar no campo
+            setTimeout(() => {
+                filterSearch.focus();
+                filterSearch.select();
+            }, 300);
+        }
+    }
+    
+    // Ctrl/Cmd + Enter: Aplicar filtros (quando estiver em campos de filtro)
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && isInputActive) {
+        if (e.target.id && e.target.id.startsWith('filter_')) {
+            e.preventDefault();
+            applyFilters();
+        }
+    }
+    
+    // Esc: Limpar filtros (quando estiver nos campos de filtro)
+    if (e.key === 'Escape' && isInputActive) {
+        if (e.target.id && e.target.id.startsWith('filter_')) {
+            e.preventDefault();
+            clearFilters();
+        }
+    }
+    
+    // Ctrl/Cmd + S: Salvar filtros atuais
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        // Verificar se há filtros ativos
+        const activeFilterCount = Object.values(activeFilters).filter(v => 
+            Array.isArray(v) ? v.length > 0 : v !== ''
+        ).length;
+        
+        if (activeFilterCount > 0) {
+            e.preventDefault();
+            saveCurrentFilters();
+        }
+    }
+    
+    // Ctrl/Cmd + E: Exportar conversas filtradas
+    if ((e.ctrlKey || e.metaKey) && e.key === 'e' && !isInputActive) {
+        e.preventDefault();
+        exportFilteredConversations();
+    }
+});
+
+// ============================================================================
+// INDICADOR DE ATALHOS (TOOLTIP)
+// ============================================================================
+
+// Adicionar tooltips com atalhos
+document.addEventListener('DOMContentLoaded', function() {
+    // Campo de busca
+    const searchField = document.getElementById('filter_search');
+    if (searchField && typeof bootstrap !== 'undefined') {
+        searchField.setAttribute('title', 'Atalho: Ctrl+F para focar');
+        searchField.setAttribute('data-bs-toggle', 'tooltip');
+        searchField.setAttribute('data-bs-placement', 'top');
+    }
+    
+    // Atualizar placeholder do campo de busca
+    if (searchField) {
+        searchField.placeholder = 'Digite para buscar... (Ctrl+F)';
+    }
+});
 </script>';
 ?>
 

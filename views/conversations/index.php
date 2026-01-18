@@ -17038,6 +17038,46 @@ if (typeof window.wsClient !== 'undefined') {
         
         if (!data || !data.conversation_id) return;
         
+        // Verificar se é a conversa atualmente aberta
+        const currentConversationId = window.currentConversationId ?? parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+        
+        if (currentConversationId == data.conversation_id) {
+            console.log('[Realtime] Atualizando sidebar - conversa movida:', data);
+            
+            // Atualizar informações do sidebar em tempo real
+            const funnelNameEl = document.querySelector('#sidebar-funnel-card [data-field="funnel_name"]');
+            const stageBadge = document.querySelector('#sidebar-stage-badge');
+            const stageTime = document.querySelector('#sidebar-stage-time');
+            
+            if (funnelNameEl && data.funnel_name) {
+                funnelNameEl.textContent = data.funnel_name;
+            }
+            
+            if (stageBadge && data.stage_name) {
+                stageBadge.textContent = data.stage_name;
+                
+                // Aplicar cor da etapa (se disponível)
+                if (data.stage_color) {
+                    stageBadge.style.backgroundColor = data.stage_color + '20';
+                    stageBadge.style.color = data.stage_color;
+                    stageBadge.style.borderColor = data.stage_color;
+                    
+                    // Aplicar cor no card
+                    const cardBody = document.querySelector('#sidebar-funnel-card .card-body');
+                    if (cardBody) {
+                        cardBody.style.borderLeftColor = data.stage_color;
+                    }
+                } else {
+                    // Cor padrão
+                    stageBadge.className = 'badge badge-primary';
+                }
+            }
+            
+            if (stageTime) {
+                stageTime.textContent = '⏱️ Agora mesmo';
+            }
+        }
+        
         // Verificar se a conversa está na lista atual
         const conversationItem = document.querySelector(`[data-conversation-id="${data.conversation_id}"]`);
         
@@ -17073,9 +17113,48 @@ if (typeof window.wsClient !== 'undefined') {
         // Usar variível global para refletir a conversa selecionada após navegação AJAX
         const currentConversationId = window.currentConversationId ?? parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
         
-        // Se é a conversa atual, não atualizar badge (já foi removido ao selecionar)
+        // Se é a conversa atual
         if (currentConversationId == data.conversation_id) {
-            // Recarregar apenas se necessário (mudanças de status, atribuição)
+            // Atualizar sidebar se houver mudanças de funil/etapa (dados podem vir via polling)
+            const conversation = data.conversation || data;
+            
+            if (conversation.funnel_name || conversation.stage_name || conversation.funnel_stage_id) {
+                console.log('[Realtime] Atualizando sidebar via conversation_updated:', conversation);
+                
+                const funnelNameEl = document.querySelector('#sidebar-funnel-card [data-field="funnel_name"]');
+                const stageBadge = document.querySelector('#sidebar-stage-badge');
+                const stageTime = document.querySelector('#sidebar-stage-time');
+                
+                if (funnelNameEl && conversation.funnel_name) {
+                    funnelNameEl.textContent = conversation.funnel_name;
+                }
+                
+                if (stageBadge && conversation.stage_name) {
+                    stageBadge.textContent = conversation.stage_name;
+                    
+                    // Aplicar cor da etapa (se disponível)
+                    if (conversation.stage_color) {
+                        stageBadge.style.backgroundColor = conversation.stage_color + '20';
+                        stageBadge.style.color = conversation.stage_color;
+                        stageBadge.style.borderColor = conversation.stage_color;
+                        
+                        // Aplicar cor no card
+                        const cardBody = document.querySelector('#sidebar-funnel-card .card-body');
+                        if (cardBody) {
+                            cardBody.style.borderLeftColor = conversation.stage_color;
+                        }
+                    } else {
+                        // Cor padrão
+                        stageBadge.className = 'badge badge-primary';
+                    }
+                }
+                
+                if (stageTime) {
+                    stageTime.textContent = '⏱️ Agora mesmo';
+                }
+            }
+            
+            // Recarregar página apenas se necessário (mudanças de status, atribuição)
             if (data.changes && (data.changes.status || data.changes.agent_id || data.changes.department_id)) {
                 window.location.reload();
             }

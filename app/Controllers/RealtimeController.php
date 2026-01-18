@@ -213,6 +213,24 @@ class RealtimeController
                         if ($conversation && isset($conversation['updated_at'])) {
                             $updatedAt = strtotime($conversation['updated_at']);
                             if ($updatedAt > ($lastUpdateTime / 1000)) {
+                                // Buscar nome do funil e etapa se existirem
+                                $funnelName = null;
+                                $stageName = null;
+                                $stageColor = null;
+                                
+                                if (!empty($conversation['funnel_stage_id'])) {
+                                    $stage = \App\Models\FunnelStage::find($conversation['funnel_stage_id']);
+                                    if ($stage) {
+                                        $stageName = $stage['name'] ?? null;
+                                        $stageColor = $stage['color'] ?? null;
+                                        
+                                        if (!empty($stage['funnel_id'])) {
+                                            $funnel = \App\Models\Funnel::find($stage['funnel_id']);
+                                            $funnelName = $funnel['name'] ?? null;
+                                        }
+                                    }
+                                }
+                                
                                 $updates['conversation_updates'][] = [
                                     'id' => $conversation['id'],
                                     'status' => $conversation['status'] ?? 'open',
@@ -222,6 +240,9 @@ class RealtimeController
                                     'department_id' => $conversation['department_id'] ?? null,
                                     'funnel_id' => $conversation['funnel_id'] ?? null,
                                     'funnel_stage_id' => $conversation['funnel_stage_id'] ?? null,
+                                    'funnel_name' => $funnelName,
+                                    'stage_name' => $stageName,
+                                    'stage_color' => $stageColor,
                                     'last_message' => $conversation['last_message'] ?? null,
                                     'last_message_at' => $conversation['last_message_at'] ?? null
                                 ];
@@ -335,6 +356,25 @@ class RealtimeController
                             }
                             
                             if (!$exists) {
+                                // Buscar nome do funil e etapa se não estiverem disponíveis
+                                $funnelName = $conv['funnel_name'] ?? null;
+                                $stageName = $conv['stage_name'] ?? null;
+                                $stageColor = $conv['stage_color'] ?? null;
+                                
+                                // Se não tiver nome mas tiver ID, buscar
+                                if (!$stageName && !empty($conv['funnel_stage_id'])) {
+                                    $stage = \App\Models\FunnelStage::find($conv['funnel_stage_id']);
+                                    if ($stage) {
+                                        $stageName = $stage['name'] ?? null;
+                                        $stageColor = $stage['color'] ?? null;
+                                        
+                                        if (!$funnelName && !empty($stage['funnel_id'])) {
+                                            $funnel = \App\Models\Funnel::find($stage['funnel_id']);
+                                            $funnelName = $funnel['name'] ?? null;
+                                        }
+                                    }
+                                }
+                                
                                 $conversationData = [
                                     'id' => $conv['id'],
                                     'status' => $conversationStatus,
@@ -352,6 +392,9 @@ class RealtimeController
                                     'department_id' => $conv['department_id'] ?? null,
                                     'funnel_id' => $conv['funnel_id'] ?? null,
                                     'funnel_stage_id' => $conv['funnel_stage_id'] ?? null,
+                                    'funnel_name' => $funnelName,
+                                    'stage_name' => $stageName,
+                                    'stage_color' => $stageColor,
                                     'tags_data' => $conv['tags_data'] ?? null,
                                     'pinned' => $conv['pinned'] ?? 0
                                 ];

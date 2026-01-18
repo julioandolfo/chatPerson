@@ -430,11 +430,21 @@ class FunnelController
         Permission::abortIfCannot('funnels.edit');
         
         try {
-            $stageIds = Request::post('stage_ids', []);
+            // Aceitar tanto POST form quanto JSON
+            $data = Request::json();
+            if (empty($data)) {
+                $data = Request::post();
+            }
+            
+            $stageIds = $data['stage_ids'] ?? [];
             
             if (empty($stageIds) || !is_array($stageIds)) {
                 throw new \InvalidArgumentException('IDs dos estágios inválidos');
             }
+            
+            error_log("=== REORDENAR ETAPAS ===");
+            error_log("Funnel ID: " . $id);
+            error_log("Stage IDs: " . json_encode($stageIds));
             
             if (FunnelService::reorderStages($id, $stageIds)) {
                 Response::json([
@@ -448,6 +458,8 @@ class FunnelController
                 ], 500);
             }
         } catch (\Exception $e) {
+            error_log("❌ Erro ao reordenar: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
             Response::json([
                 'success' => false,
                 'message' => $e->getMessage()
@@ -666,6 +678,28 @@ class FunnelController
                 'message' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Obter detalhes completos da conversa para modal
+     */
+    public function getConversationDetails(int $conversationId): void
+    {
+        Permission::abortIfCannot('conversations.view');
+        
+        try {
+            $details = FunnelService::getConversationDetails($conversationId);
+            
+            Response::json([
+                'success' => true,
+                'details' => $details
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
             ], 500);
         }
     }

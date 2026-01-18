@@ -402,6 +402,14 @@ class FunnelService
                 // Notificar conversa atualizada
                 \App\Helpers\WebSocket::notifyConversationUpdated($conversationId, $updatedConversation);
                 
+                // Buscar nome do funil
+                $funnel = null;
+                $funnelName = '';
+                if (!empty($stage['funnel_id'])) {
+                    $funnel = Funnel::find($stage['funnel_id']);
+                    $funnelName = $funnel['name'] ?? '';
+                }
+                
                 // Notificar evento específico de movimentação
                 \App\Helpers\WebSocket::broadcast('conversation_moved', [
                     'conversation_id' => $conversationId,
@@ -409,7 +417,9 @@ class FunnelService
                     'new_stage_id' => $stageId,
                     'old_funnel_id' => $oldFunnelId,
                     'new_funnel_id' => $stage['funnel_id'],
-                    'stage_name' => $stage['name'] ?? ''
+                    'stage_name' => $stage['name'] ?? '',
+                    'stage_color' => $stage['color'] ?? null,
+                    'funnel_name' => $funnelName
                 ]);
                 
                 \App\Helpers\Logger::automation("  ✅ Notificação WebSocket enviada");
@@ -1358,6 +1368,223 @@ class FunnelService
      * @return bool
      * @throws \InvalidArgumentException
      */
+    /**
+     * Obter detalhes completos da conversa
+     */
+    public static function getConversationDetails(int $conversationId): array
+    {
+        $db = \App\Helpers\Database::getInstance();
+        
+        // Buscar conversa com informações completas
+        $sql = "SELECT c.*, 
+                       ct.name as contact_name,
+                       ct.phone as contact_phone,
+                       ct.email as contact_email,
+                       ct.avatar as contact_avatar,
+                       u.name as agent_name,
+                       u.email as agent_email,
+                       u.avatar as agent_avatar,
+                       f.name as funnel_name,
+                       fs.name as stage_name,
+                       fs.color as stage_color,
+                       d.name as department_name,
+                       c.created_at,
+                       c.updated_at,
+                       c.closed_at,
+                       c.resolved_at
+                FROM conversations c
+                LEFT JOIN contacts ct ON c.contact_id = ct.id
+                LEFT JOIN users u ON c.agent_id = u.id
+                LEFT JOIN funnels f ON c.funnel_id = f.id
+                LEFT JOIN funnel_stages fs ON c.funnel_stage_id = fs.id
+                LEFT JOIN departments d ON c.department_id = d.id
+                WHERE c.id = ?";
+        
+        $conversation = $db->fetch($sql, [$conversationId]);
+        
+        if (!$conversation) {
+            throw new \Exception('Conversa não encontrada');
+        }
+        
+        // Calcular tempo de vida da conversa
+        $createdAt = new \DateTime($conversation['created_at']);
+        $now = new \DateTime();
+        $lifetime = $now->diff($createdAt);
+        $conversation['lifetime_days'] = $lifetime->days;
+        $conversation['lifetime_hours'] = ($lifetime->days * 24) + $lifetime->h;
+        $conversation['lifetime_formatted'] = $lifetime->days . 'd ' . $lifetime->h . 'h ' . $lifetime->i . 'm';
+        
+        // Buscar histórico de mudanças de etapas
+        $stageHistorySql = "SELECT fsh.*, 
+                                   fs_from.name as from_stage_name,
+                                   fs_from.color as from_stage_color,
+                                   fs_to.name as to_stage_name,
+                                   fs_to.color as to_stage_color,
+                                   u.name as changed_by_name,
+                                   fsh.created_at as changed_at
+                            FROM funnel_stage_history fsh
+                            LEFT JOIN funnel_stages fs_from ON fsh.from_stage_id = fs_from.id
+                            LEFT JOIN funnel_stages fs_to ON fsh.to_stage_id = fs_to.id
+                            LEFT JOIN users u ON fsh.changed_by = u.id
+                            WHERE fsh.conversation_id = ?
+                            ORDER BY fsh.created_at DESC";
+        
+        $stageHistory = $db->fetchAll($stageHistorySql, [$conversationId]);
+        
+        // Calcular tempo em cada etapa
+        $timeInStages = [];
+        if (!empty($stageHistory)) {
+            foreach ($stageHistory as $index => $history) {
+                $startTime = new \DateTime($history['changed_at']);
+                $endTime = isset($stageHistory[$index - 1]) 
+                    ? new \DateTime($stageHistory[$index - 1]['changed_at']) 
+                    : $now;
+                
+                $diff = $endTime->diff($startTime);
+                $hours = ($diff->days * 24) + $diff->h;
+                $minutes = $diff->i;
+                
+                $stageName = $history['to_stage_name'] ?? 'Desconhecido';
+                
+                if (!isset($timeInStages[$stageName])) {
+                    $timeInStages[$stageName] = [
+                        'stage_name' => $stageName,
+                        'stage_color' => $history['to_stage_color'] ?? '#009ef7',
+                        'total_hours' => 0,
+                        'total_minutes' => 0,
+                        'formatted' => ''
+                    ];
+                }
+                
+                $timeInStages[$stageName]['total_hours'] += $hours;
+                $timeInStages[$stageName]['total_minutes'] += $minutes;
+            }
+            
+            // Formatar tempos
+            foreach ($timeInStages as $key => $data) {
+                $totalMinutes = $data['total_minutes'];
+                $additionalHours = floor($totalMinutes / 60);
+                $remainingMinutes = $totalMinutes % 60;
+                
+                $timeInStages[$key]['total_hours'] += $additionalHours;
+                $timeInStages[$key]['total_minutes'] = $remainingMinutes;
+                $timeInStages[$key]['formatted'] = $timeInStages[$key]['total_hours'] . 'h ' . $remainingMinutes . 'm';
+            }
+        }
+        
+        // Buscar histórico de atribuições de agentes
+        $assignmentHistorySql = "SELECT ca.*, 
+                                        u_from.name as from_agent_name,
+                                        u_to.name as to_agent_name,
+                                        u_assigned.name as assigned_by_name,
+                                        ca.created_at as assigned_at
+                                 FROM conversation_assignments ca
+                                 LEFT JOIN users u_from ON ca.from_agent_id = u_from.id
+                                 LEFT JOIN users u_to ON ca.to_agent_id = u_to.id
+                                 LEFT JOIN users u_assigned ON ca.assigned_by = u_assigned.id
+                                 WHERE ca.conversation_id = ?
+                                 ORDER BY ca.created_at DESC
+                                 LIMIT 20";
+        
+        $assignmentHistory = $db->fetchAll($assignmentHistorySql, [$conversationId]);
+        
+        // Buscar todas as mensagens para métricas
+        $messagesSql = "SELECT m.*,
+                               u.name as agent_name
+                        FROM messages m
+                        LEFT JOIN users u ON m.sender_id = u.id AND m.sender_type = 'agent'
+                        WHERE m.conversation_id = ?
+                        ORDER BY m.created_at ASC";
+        
+        $messages = $db->fetchAll($messagesSql, [$conversationId]);
+        
+        // Calcular métricas de resposta
+        $responseMetrics = [
+            'total_messages' => count($messages),
+            'client_messages' => 0,
+            'agent_messages' => 0,
+            'avg_response_time_minutes' => 0,
+            'first_response_time_minutes' => null,
+            'agents_participated' => []
+        ];
+        
+        $responseTimes = [];
+        $lastClientMessage = null;
+        
+        foreach ($messages as $message) {
+            if ($message['sender_type'] === 'contact') {
+                $responseMetrics['client_messages']++;
+                $lastClientMessage = $message;
+            } elseif ($message['sender_type'] === 'agent') {
+                $responseMetrics['agent_messages']++;
+                
+                // Adicionar agente à lista
+                if (!in_array($message['agent_name'], $responseMetrics['agents_participated'])) {
+                    $responseMetrics['agents_participated'][] = $message['agent_name'] ?? 'Desconhecido';
+                }
+                
+                // Calcular tempo de resposta
+                if ($lastClientMessage) {
+                    $clientTime = new \DateTime($lastClientMessage['created_at']);
+                    $agentTime = new \DateTime($message['created_at']);
+                    $diff = $agentTime->diff($clientTime);
+                    $minutes = ($diff->days * 24 * 60) + ($diff->h * 60) + $diff->i;
+                    
+                    $responseTimes[] = $minutes;
+                    
+                    // Primeira resposta
+                    if ($responseMetrics['first_response_time_minutes'] === null) {
+                        $responseMetrics['first_response_time_minutes'] = $minutes;
+                    }
+                    
+                    $lastClientMessage = null;
+                }
+            }
+        }
+        
+        if (!empty($responseTimes)) {
+            $responseMetrics['avg_response_time_minutes'] = round(array_sum($responseTimes) / count($responseTimes), 1);
+        }
+        
+        // Buscar tags
+        $tagsSql = "SELECT t.*
+                    FROM conversation_tags ct
+                    INNER JOIN tags t ON ct.tag_id = t.id
+                    WHERE ct.conversation_id = ?";
+        
+        $tags = $db->fetchAll($tagsSql, [$conversationId]);
+        
+        // Buscar notas
+        $notesSql = "SELECT cn.*, 
+                            u.name as author_name
+                     FROM conversation_notes cn
+                     LEFT JOIN users u ON cn.user_id = u.id
+                     WHERE cn.conversation_id = ?
+                     ORDER BY cn.created_at DESC
+                     LIMIT 10";
+        
+        $notes = $db->fetchAll($notesSql, [$conversationId]);
+        
+        // Buscar avaliação (se existir)
+        $ratingSql = "SELECT * FROM conversation_ratings 
+                      WHERE conversation_id = ?
+                      ORDER BY created_at DESC
+                      LIMIT 1";
+        
+        $rating = $db->fetch($ratingSql, [$conversationId]);
+        
+        return [
+            'conversation' => $conversation,
+            'stage_history' => $stageHistory,
+            'time_in_stages' => array_values($timeInStages),
+            'assignment_history' => $assignmentHistory,
+            'response_metrics' => $responseMetrics,
+            'tags' => $tags,
+            'notes' => $notes,
+            'rating' => $rating
+        ];
+    }
+    
     public static function reorderStage(int $stageId, string $direction): bool
     {
         $db = \App\Helpers\Database::getInstance();

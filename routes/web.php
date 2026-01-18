@@ -85,6 +85,7 @@ Router::post('/conversations/{id}/request-participation', [ConversationControlle
 Router::post('/conversations/requests/{requestId}/approve', [ConversationController::class, 'approveRequest'], ['Authentication']);
 Router::post('/conversations/requests/{requestId}/reject', [ConversationController::class, 'rejectRequest'], ['Authentication']);
 
+Router::get('/conversations/{id}/details', [FunnelController::class, 'getConversationDetails'], ['Authentication']);
 Router::get('/conversations/{id}', [ConversationController::class, 'show'], ['Authentication']);
 Router::delete('/conversations/{id}', [ConversationController::class, 'destroy'], ['Authentication']);
 // Rota alternativa para exibir conversa na lista (usado no layout Chatwoot)

@@ -1765,11 +1765,23 @@ class KanbanAgentService
             
             // Se for mudança de etapa, notificar também o evento específico
             if ($changeType === 'stage_changed' && $stage) {
+                // Buscar informações do funil
+                $funnel = null;
+                $funnelName = '';
+                if (!empty($stage['funnel_id'])) {
+                    $funnel = Funnel::find($stage['funnel_id']);
+                    $funnelName = $funnel['name'] ?? '';
+                }
+                
                 \App\Helpers\WebSocket::broadcast('conversation_moved', [
                     'conversation_id' => $conversationId,
                     'old_stage_id' => $data['old_stage_id'] ?? null,
                     'new_stage_id' => $data['new_stage_id'] ?? null,
+                    'old_funnel_id' => $data['old_funnel_id'] ?? null,
+                    'new_funnel_id' => $data['new_funnel_id'] ?? null,
                     'stage_name' => $stage['name'] ?? '',
+                    'stage_color' => $stage['color'] ?? null,
+                    'funnel_name' => $funnelName,
                     'contact_name' => $contact['name'] ?? 'Desconhecido'
                 ]);
             }

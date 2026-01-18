@@ -401,51 +401,68 @@ class CampaignController
         }
 
         foreach ($legacyAccounts as $legacy) {
-            $provider = $legacy['provider'] ?? 'quepasa';
-            $phoneNumber = $legacy['phone_number'] ?? null;
-            if (empty($phoneNumber)) {
-                continue;
-            }
-
-            $existing = IntegrationAccount::findByProviderChannelPhone($provider, 'whatsapp', $phoneNumber);
-            if ($existing) {
-                continue;
-            }
-
-            $config = [];
-            foreach ([
-                'quepasa_user',
-                'quepasa_token',
-                'quepasa_trackid',
-                'quepasa_chatid',
-                'wavoip_token',
-                'wavoip_enabled'
-            ] as $key) {
-                if (!empty($legacy[$key])) {
-                    $config[$key] = $legacy[$key];
-                }
-            }
-
-            $data = [
-                'name' => $legacy['name'] ?? $phoneNumber,
-                'provider' => $provider,
-                'channel' => 'whatsapp',
-                'api_url' => $legacy['api_url'] ?? null,
-                'api_token' => $legacy['api_key'] ?? null,
-                'account_id' => $legacy['instance_id'] ?? null,
-                'phone_number' => $phoneNumber,
-                'status' => $legacy['status'] ?? 'active',
-                'config' => !empty($config) ? json_encode($config) : null,
-                'default_funnel_id' => $legacy['default_funnel_id'] ?? null,
-                'default_stage_id' => $legacy['default_stage_id'] ?? null
-            ];
-
-            IntegrationAccount::create(array_filter($data, function ($value) {
-                return $value !== null && $value !== '';
-            }));
+            $this->ensureIntegrationAccountFromLegacy($legacy);
         }
 
         return IntegrationAccount::getByChannel('whatsapp');
+    }
+
+    /**
+     * Criar integration_accounts a partir de whatsapp_accounts (fallback)
+     */
+    private function ensureIntegrationAccountFromLegacy(array $legacy): void
+    {
+        $provider = $legacy['provider'] ?? 'quepasa';
+        $phoneNumber = $legacy['phone_number'] ?? null;
+        if (empty($phoneNumber)) {
+            return;
+        }
+
+        $existing = IntegrationAccount::findByPhone($phoneNumber, 'whatsapp');
+        if ($existing) {
+            return;
+        }
+
+        $config = [];
+        foreach ([
+            'quepasa_user',
+            'quepasa_token',
+            'quepasa_trackid',
+            'quepasa_chatid',
+            'wavoip_token',
+            'wavoip_enabled'
+        ] as $key) {
+            if (!empty($legacy[$key])) {
+                $config[$key] = $legacy[$key];
+            }
+        }
+
+        $defaultFunnelId = $legacy['default_funnel_id'] ?? null;
+        if ($defaultFunnelId && !Funnel::find((int)$defaultFunnelId)) {
+            $defaultFunnelId = null;
+        }
+        $defaultStageId = $legacy['default_stage_id'] ?? null;
+        if ($defaultStageId && !FunnelStage::find((int)$defaultStageId)) {
+            $defaultStageId = null;
+        }
+
+        $data = [
+            'name' => $legacy['name'] ?? $phoneNumber,
+            'provider' => $provider,
+            'channel' => 'whatsapp',
+            'api_url' => $legacy['api_url'] ?? null,
+            'api_token' => $legacy['api_key'] ?? null,
+            'account_id' => $legacy['instance_id'] ?? null,
+            'phone_number' => $phoneNumber,
+            'status' => $legacy['status'] ?? 'active',
+            'config' => !empty($config) ? json_encode($config) : null,
+            'default_funnel_id' => $defaultFunnelId,
+            'default_stage_id' => $defaultStageId
+        ];
+
+        IntegrationAccount::create(array_filter($data, function ($value) {
+            return $value !== null && $value !== '';
+        }));
     }
     
     /**

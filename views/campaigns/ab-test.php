@@ -56,6 +56,11 @@ $pageTitle = 'A/B Testing';
                                 </label>
                             </div>
                             <?php endforeach; ?>
+                            <?php if (empty($whatsappAccounts)): ?>
+                            <div class="alert alert-warning">
+                                Nenhuma conta WhatsApp encontrada. Verifique em <a href="/integrations/whatsapp">Integrações</a>.
+                            </div>
+                            <?php endif; ?>
                         </div>
                         
                         <div class="separator my-10"></div>

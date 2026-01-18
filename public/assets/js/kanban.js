@@ -755,7 +755,7 @@ function showStageMetrics(stageId, stageName) {
                     html += '<div class="progress" style="height: 8px;">';
                     html += '<div class="progress-bar ' + progressColor + '" style="width: ' + m.utilization_rate + '%"></div>';
                     html += '</div>';
-                    html += '<div class="text-muted fs-8 mt-1">' + m.utilization_rate.toFixed(1) + '% de utilização</div>';
+                    html += '<div class="text-muted fs-8 mt-1">' + parseFloat(m.utilization_rate).toFixed(1) + '% de utilização</div>';
                     html += '</div>';
                 }
                 html += '</div></div></div>';
@@ -843,7 +843,7 @@ function showStageMetrics(stageId, stageName) {
                         html += '<td><span class="fw-bold">' + (agent.agent_name || 'Desconhecido') + '</span></td>';
                         html += '<td><span class="badge badge-light-primary">' + agent.conversations_count + '</span></td>';
                         html += '<td><span class="badge badge-light-success">' + (agent.resolved_count || 0) + '</span></td>';
-                        html += '<td>' + (agent.avg_time_hours ? agent.avg_time_hours.toFixed(1) + 'h' : '-') + '</td>';
+                        html += '<td>' + (agent.avg_time_hours ? parseFloat(agent.avg_time_hours).toFixed(1) + 'h' : '-') + '</td>';
                         html += '</tr>';
                     });
                     html += '</tbody></table></div>';
@@ -995,7 +995,7 @@ function showFunnelMetrics(funnelId) {
                         html += '<td><span class="fw-bold">' + (agent.agent_name || 'Desconhecido') + '</span></td>';
                         html += '<td><span class="badge badge-light-primary">' + agent.conversations_count + '</span></td>';
                         html += '<td><span class="badge badge-light-success">' + (agent.resolved_count || 0) + '</span></td>';
-                        html += '<td>' + (agent.avg_time_hours ? agent.avg_time_hours.toFixed(1) + 'h' : '-') + '</td>';
+                        html += '<td>' + (agent.avg_time_hours ? parseFloat(agent.avg_time_hours).toFixed(1) + 'h' : '-') + '</td>';
                         html += '<td>' + resolutionRate + '%</td>';
                         html += '</tr>';
                     });

@@ -59,6 +59,23 @@ class ConversationAssignment extends Model
                 return 0;
             }
             
+            // ✅ PROTEÇÃO CONTRA DUPLICATAS: Verificar se já existe registro recente (últimos 10 segundos)
+            $recentAssignment = Database::fetch(
+                "SELECT id, assigned_at FROM conversation_assignments 
+                 WHERE conversation_id = ? 
+                 AND agent_id = ? 
+                 AND removed_at IS NULL
+                 AND assigned_at >= DATE_SUB(NOW(), INTERVAL 10 SECOND)
+                 ORDER BY assigned_at DESC 
+                 LIMIT 1",
+                [$conversationId, $agentId]
+            );
+            
+            if ($recentAssignment) {
+                \App\Helpers\Logger::warning("ConversationAssignment::recordAssignment - Registro duplicado detectado (menos de 10s), pulando. Último registro ID: {$recentAssignment['id']} em {$recentAssignment['assigned_at']}");
+                return (int)$recentAssignment['id'];
+            }
+            
             $data = [
                 'conversation_id' => $conversationId,
                 'agent_id' => $agentId,

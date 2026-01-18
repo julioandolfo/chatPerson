@@ -8,25 +8,63 @@ namespace App\Models;
 
 use App\Helpers\Database;
 
-class DripSequence extends Model
+class DripSequence
 {
-    protected static $table = 'drip_sequences';
+    /**
+     * Buscar todas as sequências
+     */
+    public static function all(): array
+    {
+        $sql = "SELECT * FROM drip_sequences ORDER BY created_at DESC";
+        return Database::fetchAll($sql, []);
+    }
     
-    protected static $fillable = [
-        'name',
-        'description',
-        'status',
-        'total_steps',
-        'total_contacts',
-        'created_by'
-    ];
+    /**
+     * Buscar por ID
+     */
+    public static function find(int $id): ?array
+    {
+        $sql = "SELECT * FROM drip_sequences WHERE id = ? LIMIT 1";
+        return Database::fetch($sql, [$id]);
+    }
+    
+    /**
+     * Criar sequência
+     */
+    public static function create(array $data): int
+    {
+        $fields = ['name', 'description', 'status', 'total_steps', 'total_contacts', 'created_by'];
+        $values = [];
+        $placeholders = [];
+        
+        foreach ($fields as $field) {
+            if (isset($data[$field])) {
+                $values[] = $data[$field];
+                $placeholders[] = '?';
+            }
+        }
+        
+        $sql = "INSERT INTO drip_sequences (" . implode(', ', $fields) . ") VALUES (" . implode(', ', $placeholders) . ")";
+        Database::execute($sql, $values);
+        
+        return Database::getInstance()->lastInsertId();
+    }
+    
+    /**
+     * Deletar sequência
+     */
+    public static function delete(int $id): bool
+    {
+        $sql = "DELETE FROM drip_sequences WHERE id = ?";
+        return Database::execute($sql, [$id]) > 0;
+    }
     
     /**
      * Buscar sequências ativas
      */
     public static function getActive(): array
     {
-        $sql = "SELECT * FROM " . self::$table . " WHERE status = 'active' ORDER BY created_at DESC";
+        $sql = "SELECT * FROM drip_sequences WHERE status = 'active' ORDER BY created_at DESC";
         return Database::fetchAll($sql, []);
     }
     
@@ -51,7 +89,7 @@ class DripSequence extends Model
         
         if ($result) {
             // Incrementar contador
-            $sql = "UPDATE " . self::$table . " SET total_contacts = total_contacts + 1 WHERE id = ?";
+            $sql = "UPDATE drip_sequences SET total_contacts = total_contacts + 1 WHERE id = ?";
             Database::execute($sql, [$sequenceId]);
         }
         

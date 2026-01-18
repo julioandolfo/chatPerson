@@ -164,10 +164,7 @@
                                 <span class="path2"></span>
                             </i>
                         </span>
-                        <span class="menu-title">Campanhas WhatsApp</span>
-                        <span class="menu-badge">
-                            <span class="badge badge-success">Novo</span>
-                        </span>
+                        <span class="menu-title">Campanhas</span>
                         <span class="menu-arrow"></span>
                     </span>
                     <!--begin:Menu sub-->

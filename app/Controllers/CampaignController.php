@@ -51,9 +51,8 @@ class CampaignController
         $lists = ContactList::all();
 
         // Buscar contas WhatsApp ativas
-        $whatsappAccounts = IntegrationAccount::where('channel', '=', 'whatsapp')
-            ->where('status', '=', 'active')
-            ->get();
+        $sql = "SELECT * FROM integration_accounts WHERE channel = 'whatsapp' AND status = 'active' ORDER BY name";
+        $whatsappAccounts = \App\Helpers\Database::fetchAll($sql, []);
 
         Response::view('campaigns/create', [
             'lists' => $lists,
@@ -361,9 +360,9 @@ class CampaignController
         Permission::abortIfCannot('campaigns.create');
         
         $lists = \App\Models\ContactList::all();
-        $whatsappAccounts = \App\Models\IntegrationAccount::where('channel', '=', 'whatsapp')
-            ->where('status', '=', 'active')
-            ->get();
+        
+        $sql = "SELECT * FROM integration_accounts WHERE channel = 'whatsapp' AND status = 'active' ORDER BY name";
+        $whatsappAccounts = \App\Helpers\Database::fetchAll($sql, []);
         
         Response::view('campaigns/ab-test', [
             'lists' => $lists,
@@ -713,7 +712,19 @@ class CampaignController
     }
     
     /**
-     * Dashboard com analytics
+     * View do dashboard
+     */
+    public function dashboardView(): void
+    {
+        Permission::abortIfCannot('campaigns.view');
+        
+        Response::view('campaigns/dashboard', [
+            'title' => 'Dashboard de Campanhas'
+        ]);
+    }
+    
+    /**
+     * API: Dashboard com analytics
      */
     public function dashboard(): void
     {

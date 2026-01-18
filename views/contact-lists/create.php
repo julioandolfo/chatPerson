@@ -77,5 +77,5 @@ document.getElementById('list_form').addEventListener('submit', function(e) {
 
 <?php
 $content = ob_get_clean();
-require __DIR__ . '/../' . $layout . '.php';
+require __DIR__ . '/../layouts/metronic/app.php';
 ?>

@@ -30,6 +30,28 @@ class ContactListController
             'title' => 'Listas de Contatos'
         ]);
     }
+    
+    /**
+     * API: Lista de listas
+     */
+    public function listAPI(): void
+    {
+        Permission::abortIfCannot('campaigns.view');
+
+        try {
+            $lists = ContactList::all();
+            
+            Response::json([
+                'success' => true,
+                'lists' => $lists
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
 
     /**
      * Formulário de criação

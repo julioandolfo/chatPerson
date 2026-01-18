@@ -618,9 +618,10 @@ Router::delete('/contact-lists/{id}/contacts', [ContactListController::class, 'r
 Router::post('/contact-lists/{id}/import-csv', [ContactListController::class, 'importCsv'], ['Authentication']);
 Router::post('/contact-lists/{id}/clear', [ContactListController::class, 'clear'], ['Authentication']);
 
-// Campanhas
+// Campanhas (rotas específicas ANTES das rotas com {id})
 Router::get('/campaigns', [CampaignController::class, 'index'], ['Authentication']);
 Router::get('/campaigns/control-panel', function() { \App\Helpers\Response::view('campaigns/control-panel', ['title' => 'Painel de Controle']); }, ['Authentication']);
+Router::get('/campaigns/dashboard', [CampaignController::class, 'dashboardView'], ['Authentication']);
 Router::get('/campaigns/quick-start', function() { \App\Helpers\Response::view('campaigns/quick-start', ['title' => 'Início Rápido']); }, ['Authentication']);
 Router::get('/campaigns/help', function() { \App\Helpers\Response::view('campaigns/help', ['title' => 'Ajuda']); }, ['Authentication']);
 Router::get('/campaigns/templates', function() { \App\Helpers\Response::view('campaigns/templates', ['title' => 'Templates']); }, ['Authentication']);
@@ -661,6 +662,7 @@ Router::get('/api/campaigns/export', [CampaignController::class, 'exportCSV'], [
 Router::get('/api/campaigns/notifications', [CampaignController::class, 'getNotifications'], ['Authentication']);
 Router::post('/api/campaigns/notifications/read', [CampaignController::class, 'markNotificationsRead'], ['Authentication']);
 Router::get('/api/campaigns/{id}/stats', [CampaignController::class, 'stats'], ['Authentication']);
+Router::get('/api/contact-lists', [ContactListController::class, 'listAPI'], ['Authentication']);
 Router::get('/api/contact-lists/{id}/contacts', [ContactListController::class, 'contacts'], ['Authentication']);
 Router::get('/api/contacts/search', [ContactListController::class, 'searchContacts'], ['Authentication']);
 

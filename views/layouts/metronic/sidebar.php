@@ -153,6 +153,122 @@
                     </a>
                 </div>
                 <!--end:Menu item-->
+                
+                <!--begin:Menu item - Campanhas-->
+                <?php if (\App\Helpers\Permission::can('campaigns.view')): ?>
+                <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= isActive('/campaigns', $currentUri) || isActive('/contact-lists', $currentUri) || isActive('/drip-sequences', $currentUri) ? 'here show' : '' ?>">
+                    <span class="menu-link <?= isActive('/campaigns', $currentUri) ? 'active' : '' ?>" data-title="Campanhas">
+                        <span class="menu-icon">
+                            <i class="ki-duotone ki-send fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                        </span>
+                        <span class="menu-title">Campanhas WhatsApp</span>
+                        <span class="menu-badge">
+                            <span class="badge badge-success">Novo</span>
+                        </span>
+                        <span class="menu-arrow"></span>
+                    </span>
+                    <!--begin:Menu sub-->
+                    <div class="menu-sub menu-sub-accordion">
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/campaigns/control-panel', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/campaigns/control-panel') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Painel de Controle</span>
+                            </a>
+                        </div>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/campaigns', $currentUri) && !isActive('/campaigns/', $currentUri, true) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/campaigns') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Todas as Campanhas</span>
+                            </a>
+                        </div>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/campaigns/create', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/campaigns/create') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Nova Campanha</span>
+                            </a>
+                        </div>
+                        <div class="separator my-2"></div>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/contact-lists', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/contact-lists') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Listas de Contatos</span>
+                            </a>
+                        </div>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/drip-sequences', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/drip-sequences') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Sequências Drip</span>
+                            </a>
+                        </div>
+                        <div class="separator my-2"></div>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/campaigns/dashboard', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/campaigns/dashboard') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Dashboard Campanhas</span>
+                            </a>
+                        </div>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/campaigns/analytics', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/campaigns/analytics') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Analytics Avançado</span>
+                            </a>
+                        </div>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/campaigns/realtime', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/campaigns/realtime') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Monitor em Tempo Real</span>
+                            </a>
+                        </div>
+                        <div class="separator my-2"></div>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/campaigns/templates', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/campaigns/templates') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Templates</span>
+                            </a>
+                        </div>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/campaigns/quick-start', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/campaigns/quick-start') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">🚀 Guia de Início Rápido</span>
+                            </a>
+                        </div>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/campaigns/help', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/campaigns/help') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Central de Ajuda</span>
+                            </a>
+                        </div>
+                    </div>
+                    <!--end:Menu sub-->
+                </div>
+                <!--end:Menu item-->
+                <?php endif; ?>
+                
                 <!--begin:Menu item-->
                 <div class="menu-item">
                     <a class="menu-link <?= isActive('/settings/action-buttons', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/settings/action-buttons') ?>" data-title="Botões de Ações">

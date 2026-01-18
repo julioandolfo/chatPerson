@@ -1474,13 +1474,13 @@ class FunnelService
                                         u_from.name as from_agent_name,
                                         u_to.name as to_agent_name,
                                         u_assigned.name as assigned_by_name,
-                                        ca.created_at as assigned_at
+                                        ca.assigned_at as assigned_at
                                  FROM conversation_assignments ca
                                  LEFT JOIN users u_from ON ca.from_agent_id = u_from.id
                                  LEFT JOIN users u_to ON ca.to_agent_id = u_to.id
                                  LEFT JOIN users u_assigned ON ca.assigned_by = u_assigned.id
                                  WHERE ca.conversation_id = ?
-                                 ORDER BY ca.created_at DESC
+                                 ORDER BY ca.assigned_at DESC
                                  LIMIT 20";
         
         $assignmentHistory = \App\Helpers\Database::fetchAll($assignmentHistorySql, [$conversationId]);

@@ -2282,12 +2282,6 @@ async function openStageOrderModal(funnelId) {
             throw new Error('Resposta não é JSON: ' + text.substring(0, 200));
         }
         
-        const contentType = response.headers.get('content-type') || '';
-        if (!contentType.includes('application/json')) {
-            const text = await response.text();
-            throw new Error('Resposta não é JSON: ' + text.substring(0, 200));
-        }
-        
         const data = await response.json();
         
         if (!data.success || !data.stages) {

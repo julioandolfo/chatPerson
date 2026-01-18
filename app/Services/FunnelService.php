@@ -1388,7 +1388,6 @@ class FunnelService
                        d.name as department_name,
                        c.created_at,
                        c.updated_at,
-                       c.closed_at,
                        c.resolved_at
                 FROM conversations c
                 LEFT JOIN contacts ct ON c.contact_id = ct.id

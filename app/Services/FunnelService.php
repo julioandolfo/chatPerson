@@ -1373,8 +1373,6 @@ class FunnelService
      */
     public static function getConversationDetails(int $conversationId): array
     {
-        $db = \App\Helpers\Database::getInstance();
-        
         // Buscar conversa com informações completas
         $sql = "SELECT c.*, 
                        ct.name as contact_name,
@@ -1400,7 +1398,7 @@ class FunnelService
                 LEFT JOIN departments d ON c.department_id = d.id
                 WHERE c.id = ?";
         
-        $conversation = $db->fetch($sql, [$conversationId]);
+        $conversation = \App\Helpers\Database::fetch($sql, [$conversationId]);
         
         if (!$conversation) {
             throw new \Exception('Conversa não encontrada');
@@ -1429,7 +1427,7 @@ class FunnelService
                             WHERE fsh.conversation_id = ?
                             ORDER BY fsh.created_at DESC";
         
-        $stageHistory = $db->fetchAll($stageHistorySql, [$conversationId]);
+        $stageHistory = \App\Helpers\Database::fetchAll($stageHistorySql, [$conversationId]);
         
         // Calcular tempo em cada etapa
         $timeInStages = [];
@@ -1486,7 +1484,7 @@ class FunnelService
                                  ORDER BY ca.created_at DESC
                                  LIMIT 20";
         
-        $assignmentHistory = $db->fetchAll($assignmentHistorySql, [$conversationId]);
+        $assignmentHistory = \App\Helpers\Database::fetchAll($assignmentHistorySql, [$conversationId]);
         
         // Buscar todas as mensagens para métricas
         $messagesSql = "SELECT m.*,
@@ -1496,7 +1494,7 @@ class FunnelService
                         WHERE m.conversation_id = ?
                         ORDER BY m.created_at ASC";
         
-        $messages = $db->fetchAll($messagesSql, [$conversationId]);
+        $messages = \App\Helpers\Database::fetchAll($messagesSql, [$conversationId]);
         
         // Calcular métricas de resposta
         $responseMetrics = [
@@ -1552,7 +1550,7 @@ class FunnelService
                     INNER JOIN tags t ON ct.tag_id = t.id
                     WHERE ct.conversation_id = ?";
         
-        $tags = $db->fetchAll($tagsSql, [$conversationId]);
+        $tags = \App\Helpers\Database::fetchAll($tagsSql, [$conversationId]);
         
         // Buscar notas
         $notesSql = "SELECT cn.*, 
@@ -1563,7 +1561,7 @@ class FunnelService
                      ORDER BY cn.created_at DESC
                      LIMIT 10";
         
-        $notes = $db->fetchAll($notesSql, [$conversationId]);
+        $notes = \App\Helpers\Database::fetchAll($notesSql, [$conversationId]);
         
         // Buscar avaliação (se existir)
         $ratingSql = "SELECT * FROM conversation_ratings 
@@ -1571,7 +1569,7 @@ class FunnelService
                       ORDER BY created_at DESC
                       LIMIT 1";
         
-        $rating = $db->fetch($ratingSql, [$conversationId]);
+        $rating = \App\Helpers\Database::fetch($ratingSql, [$conversationId]);
         
         return [
             'conversation' => $conversation,

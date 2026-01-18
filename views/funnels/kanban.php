@@ -358,6 +358,11 @@ ob_start();
     border-color: #26272f;
 }
 
+[data-bs-theme="dark"] #kt_kanban_filters {
+    background-color: #15171c;
+    border-color: #26272f;
+}
+
 [data-bs-theme="dark"] #kt_kanban_filters .form-label {
     color: var(--bs-text-gray-900) !important;
 }
@@ -376,6 +381,30 @@ ob_start();
 [data-bs-theme="dark"] #kt_kanban_filters .alert {
     background: rgba(0, 158, 247, 0.12) !important;
     border-color: rgba(0, 158, 247, 0.35) !important;
+}
+
+[data-bs-theme="dark"] #kt_kanban_filters .select2-selection {
+    background-color: #1e2027 !important;
+    border-color: #2a2b34 !important;
+    color: var(--bs-text-gray-800) !important;
+}
+
+[data-bs-theme="dark"] #kt_kanban_filters .select2-selection__rendered {
+    color: var(--bs-text-gray-800) !important;
+}
+
+[data-bs-theme="dark"] #kt_kanban_filters .select2-dropdown {
+    background-color: #1e2027 !important;
+    border-color: #2a2b34 !important;
+}
+
+[data-bs-theme="dark"] #kt_kanban_filters .select2-results__option {
+    color: var(--bs-text-gray-800) !important;
+}
+
+[data-bs-theme="dark"] #kt_kanban_filters .select2-results__option--highlighted {
+    background-color: rgba(0, 158, 247, 0.2) !important;
+    color: #ffffff !important;
 }
 
 [data-bs-theme="dark"] #kt_kanban_total_results {

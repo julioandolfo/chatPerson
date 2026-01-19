@@ -1707,16 +1707,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     }
     
     .conversations-metrics-header #agent-metrics-container {
-        margin-left: 0;
-        width: 100%;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
-    }
-    
-    .conversations-metrics-header #agent-metrics-container > div {
-        width: 100%;
-        justify-content: space-between;
+        display: none !important; /* Ocultar métricas e SLAs no mobile */
     }
     
     /* Lista de conversas - full width em mobile */
@@ -16709,6 +16700,7 @@ function showListView() {
     const overlay = document.getElementById('sidebarOverlay');
     
     if (isMobile()) {
+        window.mobileViewState = 'list';
         // Mobile: mostrar apenas lista
         if (listView) listView.classList.add('mobile-active');
         if (chatView) chatView.classList.remove('mobile-active');
@@ -16724,6 +16716,7 @@ function showChatView() {
     const backBtn = document.getElementById('chatHeaderBackBtn');
     
     if (isMobile()) {
+        window.mobileViewState = 'chat';
         // Mobile: mostrar apenas chat
         if (listView) listView.classList.remove('mobile-active');
         if (chatView) chatView.classList.add('mobile-active');
@@ -16739,6 +16732,7 @@ function showDetailsView() {
     const overlay = document.getElementById('sidebarOverlay');
     
     if (isMobile() || isTablet()) {
+        window.mobileViewState = 'sidebar';
         // Mobile/Tablet: mostrar sidebar como drawer
         if (listView) listView.classList.remove('mobile-active');
         if (chatView) chatView.classList.remove('mobile-active');
@@ -16789,6 +16783,7 @@ function closeConversationSidebar() {
 
 // Inicializar navegação mobile ao carregar
 document.addEventListener('DOMContentLoaded', function() {
+    window.mobileViewState = window.mobileViewState || 'list';
     // Detectar tamanho da tela e ajustar views
     function handleResize() {
         if (!isMobile() && !isTablet()) {
@@ -17663,6 +17658,12 @@ function refreshConversationBadges() {
 
             // Reinscrever conversas visíveis para receber eventos de polling/new_message
             subscribeVisibleConversations();
+            
+            // Manter o chat visível no mobile durante polling
+            const chatView = document.getElementById('chatAreaView');
+            if (isMobile() && window.mobileViewState === 'chat' && chatView && !chatView.classList.contains('mobile-active')) {
+                showChatView();
+            }
         }
     })
     .catch(error => {

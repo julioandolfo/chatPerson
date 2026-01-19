@@ -10579,19 +10579,37 @@ function refreshConversationList(params = null, append = false) {
         const urlParams = new URLSearchParams(window.location.search);
         const selectedConversationId = urlParams.get('id') ? parseInt(urlParams.get('id')) : null;
         
+        // ✅ CORREÇÃO: Se não há conversas E é append, significa que chegou ao fim
+        // Não apagar a lista existente, apenas indicar que não há mais
         if (conversations.length === 0) {
-            conversationsList.innerHTML = `
-                <div class="text-center py-10">
-                    <i class="ki-duotone ki-message-text fs-3x text-gray-400 mb-3">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                        <span class="path3"></span>
-                    </i>
-                    <h5>Nenhuma conversa encontrada</h5>
-                    <p class="text-muted">Tente ajustar os filtros de busca</p>
-                </div>
-            `;
-            return;
+            if (append) {
+                // Era append (carregar mais), mas não veio nada = fim da lista
+                // Não fazer nada, manter conversas existentes
+                console.log('✅ Fim da lista alcançado (append sem novas conversas)');
+                conversationHasMore = false;
+                isLoadingConversations = false;
+                
+                // Ocultar botão "Carregar mais"
+                const loadMoreBtn = document.getElementById('loadMoreConversationsBtn');
+                if (loadMoreBtn) {
+                    loadMoreBtn.style.display = 'none';
+                }
+                return;
+            } else {
+                // Era carregamento inicial/filtro e não há conversas
+                conversationsList.innerHTML = `
+                    <div class="text-center py-10">
+                        <i class="ki-duotone ki-message-text fs-3x text-gray-400 mb-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <h5>Nenhuma conversa encontrada</h5>
+                        <p class="text-muted">Tente ajustar os filtros de busca</p>
+                    </div>
+                `;
+                return;
+            }
         }
         
         // Renderizar conversas

@@ -235,7 +235,7 @@ class Conversation extends Model
                 $sql .= " AND (
                     ct.name LIKE ? OR 
                     ct.phone LIKE ? OR 
-                    ct.phone LIKE ? OR
+                    ct.phone LIKE ? OR 
                     ct.email LIKE ? OR
                     EXISTS (
                         SELECT 1 FROM messages m 
@@ -289,6 +289,7 @@ class Conversation extends Model
                     WHERE m3.conversation_id = c.id
                       AND m3.sender_type = 'agent'
                       AND m3.ai_agent_id IS NULL -- apenas agente humano
+                      AND m3.sender_id > 0 -- ✅ CORREÇÃO: Excluir mensagens do sistema (sender_id=0 ou null)
                   ) < m_contact.created_at
             )";
         }
@@ -301,12 +302,13 @@ class Conversation extends Model
                 WHERE m_agent.conversation_id = c.id
                   AND m_agent.sender_type = 'agent'
                   AND m_agent.ai_agent_id IS NULL -- apenas agente humano
+                  AND m_agent.sender_id > 0 -- ✅ CORREÇÃO: Excluir mensagens do sistema (sender_id=0 ou null)
                   AND m_agent.created_at = (
                     SELECT MAX(m2.created_at)
                     FROM messages m2
                     WHERE m2.conversation_id = c.id
                       AND (
-                        (m2.sender_type = 'agent' AND m2.ai_agent_id IS NULL) -- agente humano
+                        (m2.sender_type = 'agent' AND m2.ai_agent_id IS NULL AND m2.sender_id > 0) -- ✅ agente humano real
                         OR m2.sender_type = 'contact'
                       )
                   )

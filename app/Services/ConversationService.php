@@ -1516,91 +1516,39 @@ class ConversationService
                         }
                     }
                     
-                    // Se houver anexo (imagem, vídeo, áudio, documento), enviar via mídia
+                    // ✅ CORREÇÃO: Enviar TODOS os anexos, não apenas o primeiro
                     if (!empty($attachmentsData)) {
                         Logger::quepasa("ConversationService::sendMessage - Processando anexos para envio WhatsApp");
                         Logger::quepasa("ConversationService::sendMessage - Total de anexos: " . count($attachmentsData));
                         
-                        $firstAttachment = $attachmentsData[0];
-                        
-                        Logger::quepasa("ConversationService::sendMessage - Primeiro anexo:");
-                        Logger::quepasa("ConversationService::sendMessage -   path: " . ($firstAttachment['path'] ?? 'NULL'));
-                        Logger::quepasa("ConversationService::sendMessage -   type: " . ($firstAttachment['type'] ?? 'NULL'));
-                        Logger::quepasa("ConversationService::sendMessage -   mime_type: " . ($firstAttachment['mime_type'] ?? 'NULL'));
-                        Logger::quepasa("ConversationService::sendMessage -   filename: " . ($firstAttachment['filename'] ?? 'NULL'));
-                        Logger::quepasa("ConversationService::sendMessage -   extension: " . ($firstAttachment['extension'] ?? 'NULL'));
-                        
-                        // Construir URL ABSOLUTA do anexo
+                        // Preparar protocolo e host uma vez
                         $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
                         $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
                         $baseUrl = $protocol . '://' . $host;
                         
-                        // Garantir que o path comece com /
+                        // Enviar primeiro anexo com o conteúdo de texto (se houver)
+                        $firstAttachment = $attachmentsData[0];
+                        
+                        Logger::quepasa("ConversationService::sendMessage - Enviando anexo 1/" . count($attachmentsData));
+                        Logger::quepasa("ConversationService::sendMessage -   path: " . ($firstAttachment['path'] ?? 'NULL'));
+                        Logger::quepasa("ConversationService::sendMessage -   type: " . ($firstAttachment['type'] ?? 'NULL'));
+                        
+                        // Construir URL ABSOLUTA do anexo
                         $attachmentPath = '/' . ltrim($firstAttachment['path'], '/');
                         $attachmentUrl = $baseUrl . $attachmentPath;
-                        
-                        // LOG: Debug da URL gerada
-                        error_log("DEBUG WhatsApp - URL do anexo gerada: " . $attachmentUrl);
-                        error_log("DEBUG WhatsApp - Path do anexo: " . $firstAttachment['path']);
-                        error_log("DEBUG WhatsApp - Tipo: " . ($firstAttachment['type'] ?? 'document'));
-                        
-                        // Verificar se arquivo existe fisicamente
-                        $filePath = $_SERVER['DOCUMENT_ROOT'] . $attachmentPath;
-                        if (!file_exists($filePath)) {
-                            error_log("ERRO WhatsApp - Arquivo NÃO existe: " . $filePath);
-                        } else {
-                            error_log("DEBUG WhatsApp - Arquivo existe: " . $filePath . " (" . filesize($filePath) . " bytes)");
-                            
-                            // Testar se a URL está acessível publicamente
-                            $ch = curl_init($attachmentUrl);
-                            curl_setopt_array($ch, [
-                                CURLOPT_RETURNTRANSFER => true,
-                                CURLOPT_NOBODY => true,
-                                CURLOPT_TIMEOUT => 5,
-                                CURLOPT_SSL_VERIFYPEER => false
-                            ]);
-                            curl_exec($ch);
-                            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                            curl_close($ch);
-                            
-                            if ($httpCode === 200) {
-                                error_log("DEBUG WhatsApp - URL acessível publicamente (HTTP 200)");
-                            } else {
-                                error_log("ERRO WhatsApp - URL NÃO acessível publicamente (HTTP {$httpCode})");
-                                error_log("ERRO WhatsApp - Quepasa não conseguirá baixar este arquivo!");
-                            }
-                        }
                         
                         $options['media_url'] = $attachmentUrl;
                         $options['media_type'] = $firstAttachment['type'] ?? 'document';
                         if (!empty($firstAttachment['mime_type'])) {
                             $options['media_mime'] = $firstAttachment['mime_type'];
                         }
-                        // Nome do arquivo para fallback de caption
                         if (!empty($firstAttachment['filename'])) {
                             $options['media_name'] = $firstAttachment['filename'];
                         } else {
                             $options['media_name'] = basename($firstAttachment['path']);
                         }
                         
-                        Logger::quepasa("ConversationService::sendMessage - Opções preparadas para WhatsAppService:");
-                        Logger::quepasa("ConversationService::sendMessage -   media_url: {$options['media_url']}");
-                        Logger::quepasa("ConversationService::sendMessage -   media_type: {$options['media_type']}");
-                        Logger::quepasa("ConversationService::sendMessage -   media_mime: " . ($options['media_mime'] ?? 'NULL'));
-                        Logger::quepasa("ConversationService::sendMessage -   media_name: " . ($options['media_name'] ?? 'NULL'));
-                        
-                        // Verificar se é áudio e se mime_type está correto
-                        if ($options['media_type'] === 'audio') {
-                            Logger::quepasa("ConversationService::sendMessage - ⚠️ É ÁUDIO! Verificando mime_type...");
-                            if (empty($options['media_mime']) || !str_contains($options['media_mime'], 'ogg')) {
-                                Logger::quepasa("ConversationService::sendMessage - ⚠️ ATENÇÃO: mime_type não é OGG! mime_type=" . ($options['media_mime'] ?? 'NULL'));
-                                Logger::quepasa("ConversationService::sendMessage - ⚠️ Verificar se conversão foi executada corretamente!");
-                            } else {
-                                Logger::quepasa("ConversationService::sendMessage - ✅ mime_type está correto (OGG): {$options['media_mime']}");
-                            }
-                        }
-                        
-                        // Para Quepasa, se for imagem/vídeo/áudio e houver legenda, usar content como caption
+                        // Primeira mensagem com anexo pode ter legenda/texto
                         if (!empty($content)) {
                             $options['caption'] = $content;
                         }
@@ -1689,6 +1637,65 @@ class ConversationService
                             'external_id' => $sendResult['message_id'] ?? null,
                             'status' => 'sent'
                         ]);
+                        
+                        // ✅ ENVIAR ANEXOS RESTANTES (do 2º em diante) como mensagens separadas
+                        if (!empty($attachmentsData) && count($attachmentsData) > 1) {
+                            Logger::quepasa("ConversationService::sendMessage - Enviando anexos restantes (" . (count($attachmentsData) - 1) . " anexos)");
+                            
+                            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                            $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
+                            $baseUrl = $protocol . '://' . $host;
+                            
+                            // Loop pelos anexos restantes (começando do índice 1)
+                            for ($i = 1; $i < count($attachmentsData); $i++) {
+                                $attachment = $attachmentsData[$i];
+                                $attachmentNum = $i + 1;
+                                
+                                Logger::quepasa("ConversationService::sendMessage - Enviando anexo {$attachmentNum}/" . count($attachmentsData));
+                                
+                                try {
+                                    // Construir URL do anexo
+                                    $attachmentPath = '/' . ltrim($attachment['path'], '/');
+                                    $attachmentUrl = $baseUrl . $attachmentPath;
+                                    
+                                    $extraOptions = [
+                                        'media_url' => $attachmentUrl,
+                                        'media_type' => $attachment['type'] ?? 'document',
+                                        'media_name' => $attachment['filename'] ?? basename($attachment['path'])
+                                    ];
+                                    
+                                    if (!empty($attachment['mime_type'])) {
+                                        $extraOptions['media_mime'] = $attachment['mime_type'];
+                                    }
+                                    
+                                    // Enviar anexo adicional
+                                    $extraSendResult = null;
+                                    if ($integrationAccountId) {
+                                        $extraSendResult = \App\Services\IntegrationService::sendMessage(
+                                            $integrationAccountId,
+                                            $recipient,
+                                            '', // Sem texto, apenas mídia
+                                            $extraOptions
+                                        );
+                                    } elseif ($whatsappAccountId && $conversation['channel'] === 'whatsapp') {
+                                        $extraSendResult = \App\Services\WhatsAppService::sendMessage(
+                                            $whatsappAccountId,
+                                            $contact['phone'],
+                                            '', // Sem texto
+                                            $extraOptions
+                                        );
+                                    }
+                                    
+                                    if ($extraSendResult && ($extraSendResult['success'] ?? false)) {
+                                        Logger::quepasa("ConversationService::sendMessage - ✅ Anexo {$attachmentNum} enviado com sucesso");
+                                    } else {
+                                        Logger::quepasa("ConversationService::sendMessage - ❌ Falha ao enviar anexo {$attachmentNum}: " . ($extraSendResult['error'] ?? 'Erro desconhecido'));
+                                    }
+                                } catch (\Exception $e) {
+                                    Logger::error("ConversationService::sendMessage - Erro ao enviar anexo {$attachmentNum}: " . $e->getMessage());
+                                }
+                            }
+                        }
                     }
                 } else {
                     \App\Helpers\Logger::notificame("[WARNING] ConversationService::sendMessage - Contato não encontrado ou sem destinatário (phone/identifier/email)");

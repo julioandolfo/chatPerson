@@ -1,3 +1,10 @@
+# Configurações de Upload para Arquivos Grandes
+php_value upload_max_filesize 100M
+php_value post_max_size 105M
+php_value max_execution_time 300
+php_value max_input_time 300
+php_value memory_limit 256M
+
 RewriteEngine On
 
 RewriteCond %{REQUEST_FILENAME} -f

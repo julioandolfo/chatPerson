@@ -1607,25 +1607,42 @@ class FunnelService
             $stmt->execute([$funnelId]);
             $allStages = $stmt->fetchAll(\PDO::FETCH_ASSOC);
             
-            // Se não houver stage_order definido, inicializar
-            $needsInitialization = false;
+            // ⚠️ CÓDIGO COMENTADO: Estava causando reordenação automática
+            // Problema: Toda vez que alguém movia uma etapa e existia alguma com stage_order NULL,
+            // o sistema reordenava TODAS as etapas automaticamente
+            // 
+            // Solução: Executar script SQL CORRIGIR_ORDEM_ETAPAS_DEFINITIVO.sql uma vez
+            //          para garantir que todas as etapas tenham stage_order definido
+            //
+            // // Se não houver stage_order definido, inicializar
+            // $needsInitialization = false;
+            // foreach ($allStages as $stage) {
+            //     if ($stage['stage_order'] === null || $stage['stage_order'] === '') {
+            //         $needsInitialization = true;
+            //         break;
+            //     }
+            // }
+            // 
+            // if ($needsInitialization) {
+            //     // Inicializar stage_order para todas as etapas
+            //     foreach ($allStages as $index => $stage) {
+            //         $sql = "UPDATE funnel_stages SET stage_order = ? WHERE id = ?";
+            //         $db->prepare($sql)->execute([$index + 1, $stage['id']]);
+            //     }
+            //     // Recarregar etapas com os novos valores
+            //     $stmt = $db->prepare("SELECT * FROM funnel_stages WHERE funnel_id = ? ORDER BY stage_order ASC, id ASC");
+            //     $stmt->execute([$funnelId]);
+            //     $allStages = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            // }
+            
+            // ✅ NOVA VALIDAÇÃO: Verificar se todas as etapas têm stage_order
             foreach ($allStages as $stage) {
                 if ($stage['stage_order'] === null || $stage['stage_order'] === '') {
-                    $needsInitialization = true;
-                    break;
+                    throw new \Exception(
+                        'Etapa "' . $stage['name'] . '" (ID: ' . $stage['id'] . ') não tem stage_order definido. ' .
+                        'Execute o script SQL CORRIGIR_ORDEM_ETAPAS_DEFINITIVO.sql para corrigir.'
+                    );
                 }
-            }
-            
-            if ($needsInitialization) {
-                // Inicializar stage_order para todas as etapas
-                foreach ($allStages as $index => $stage) {
-                    $sql = "UPDATE funnel_stages SET stage_order = ? WHERE id = ?";
-                    $db->prepare($sql)->execute([$index + 1, $stage['id']]);
-                }
-                // Recarregar etapas com os novos valores
-                $stmt = $db->prepare("SELECT * FROM funnel_stages WHERE funnel_id = ? ORDER BY stage_order ASC, id ASC");
-                $stmt->execute([$funnelId]);
-                $allStages = $stmt->fetchAll(\PDO::FETCH_ASSOC);
             }
             
             // Encontrar índice da etapa atual

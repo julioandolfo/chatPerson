@@ -76,6 +76,9 @@ class CoachingDashboardController
             $periodStart
         );
         
+        // Buscar conversas analisadas (primeiras 10)
+        $analyzedConversations = CoachingMetricsService::getAnalyzedConversations($agentId, $period, 1, 10);
+        
         Response::view('coaching/dashboard', [
             'title' => 'Dashboard de Coaching',
             'dashboard' => $dashboard,
@@ -83,9 +86,150 @@ class CoachingDashboardController
             'topConversations' => $topConversations,
             'agents' => $agents,
             'globalStats' => $globalStats,
+            'analyzedConversations' => $analyzedConversations,
             'selectedPeriod' => $period,
             'selectedAgent' => $agentId,
             'canViewAll' => in_array($userRole, [1, 2, 3])
+        ]);
+    }
+    
+    /**
+     * API: Buscar mais conversas analisadas (paginação AJAX)
+     * Também suporta buscar uma conversa específica via conversation_id
+     */
+    public function getAnalyzedConversationsAjax(): void
+    {
+        Permission::abortIfCannot('coaching.view');
+        
+        $user = Auth::user();
+        $userId = $user['id'];
+        $userRole = $user['role_id'] ?? $user['role'] ?? 4;
+        
+        // Se buscar conversa específica
+        $conversationId = Request::get('conversation_id');
+        if ($conversationId) {
+            // Buscar conversa específica com todas as métricas
+            $sql = "SELECT 
+                c.id,
+                c.agent_id,
+                c.contact_id,
+                c.status,
+                c.channel,
+                c.created_at,
+                c.updated_at,
+                c.resolved_at,
+                
+                -- Dados do agente
+                u.name as agent_name,
+                u.avatar as agent_avatar,
+                
+                -- Dados do contato
+                ct.name as contact_name,
+                ct.phone as contact_phone,
+                
+                -- Coaching Impact
+                cci.total_hints,
+                cci.hints_helpful,
+                cci.hints_not_helpful,
+                cci.suggestions_used,
+                cci.conversation_outcome,
+                cci.sales_value,
+                cci.performance_improvement_score,
+                cci.avg_response_time_before,
+                cci.avg_response_time_after,
+                
+                -- Performance Analysis
+                apa.overall_score,
+                apa.specific_feedback
+                
+            FROM conversations c
+            LEFT JOIN users u ON c.agent_id = u.id
+            LEFT JOIN contacts ct ON c.contact_id = ct.id
+            LEFT JOIN coaching_conversation_impact cci ON c.id = cci.conversation_id
+            LEFT JOIN agent_performance_analysis apa ON c.id = apa.conversation_id
+            WHERE c.id = ?";
+            
+            $conversation = Database::fetch($sql, [$conversationId]);
+            
+            if ($conversation) {
+                // Buscar hints
+                $hintsSql = "SELECT 
+                        id,
+                        hint_type,
+                        hint_text,
+                        suggestions,
+                        feedback,
+                        viewed_at,
+                        created_at
+                    FROM realtime_coaching_hints
+                    WHERE conversation_id = ?
+                    ORDER BY created_at DESC";
+                
+                $conversation['coaching_hints'] = Database::fetchAll($hintsSql, [$conversationId]);
+                
+                // Formatar valores
+                $conversation['sales_value_formatted'] = number_format((float)($conversation['sales_value'] ?? 0), 2, ',', '.');
+                $conversation['overall_score_formatted'] = number_format((float)($conversation['overall_score'] ?? 0), 2);
+                $conversation['performance_improvement_score_formatted'] = number_format((float)($conversation['performance_improvement_score'] ?? 0), 2);
+                
+                // Status badge
+                $conversation['status_badge'] = match($conversation['status']) {
+                    'open' => ['class' => 'success', 'text' => 'Aberta'],
+                    'pending' => ['class' => 'warning', 'text' => 'Pendente'],
+                    'resolved' => ['class' => 'primary', 'text' => 'Resolvida'],
+                    'closed' => ['class' => 'secondary', 'text' => 'Fechada'],
+                    default => ['class' => 'light', 'text' => ucfirst($conversation['status'])]
+                };
+                
+                // Outcome badge
+                $conversation['outcome_badge'] = match($conversation['conversation_outcome']) {
+                    'converted' => ['class' => 'success', 'text' => '✓ Convertida', 'icon' => 'check-circle'],
+                    'closed' => ['class' => 'primary', 'text' => 'Fechada', 'icon' => 'check'],
+                    'escalated' => ['class' => 'warning', 'text' => 'Escalada', 'icon' => 'arrow-up'],
+                    'abandoned' => ['class' => 'danger', 'text' => 'Abandonada', 'icon' => 'cross-circle'],
+                    default => ['class' => 'light', 'text' => $conversation['conversation_outcome'] ?? 'N/A', 'icon' => 'question']
+                };
+                
+                Response::json([
+                    'success' => true,
+                    'data' => [
+                        'conversations' => [$conversation],
+                        'total' => 1,
+                        'page' => 1,
+                        'per_page' => 1,
+                        'total_pages' => 1,
+                        'has_more' => false
+                    ]
+                ]);
+            } else {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Conversa não encontrada'
+                ], 404);
+            }
+            return;
+        }
+        
+        // Busca normal com paginação
+        $agentId = null;
+        if (!in_array($userRole, [1, 2, 3])) {
+            $agentId = $userId;
+        }
+        
+        $agentFilter = Request::get('agent_id');
+        if ($agentFilter && in_array($userRole, [1, 2, 3])) {
+            $agentId = (int)$agentFilter;
+        }
+        
+        $period = Request::get('period', 'week');
+        $page = (int)Request::get('page', 1);
+        $perPage = (int)Request::get('per_page', 10);
+        
+        $result = CoachingMetricsService::getAnalyzedConversations($agentId, $period, $page, $perPage);
+        
+        Response::json([
+            'success' => true,
+            'data' => $result
         ]);
     }
     

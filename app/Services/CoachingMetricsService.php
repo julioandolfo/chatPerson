@@ -400,4 +400,176 @@ class CoachingMetricsService
         
         return max(1, min($weeksNeeded, 52)); // Entre 1 e 52 semanas
     }
+    
+    /**
+     * Buscar conversas analisadas com métricas de coaching e performance
+     * @param int|null $agentId - Filtrar por agente
+     * @param string $period - Período (today, week, month)
+     * @param int $page - Página atual
+     * @param int $perPage - Itens por página
+     * @return array ['conversations' => [...], 'total' => int, 'page' => int, 'per_page' => int, 'total_pages' => int]
+     */
+    public static function getAnalyzedConversations(
+        ?int $agentId = null,
+        string $period = 'week',
+        int $page = 1,
+        int $perPage = 10
+    ): array {
+        [$dateFrom, $dateTo] = self::getPeriodDates($period);
+        
+        // Contar total de conversas
+        $countSql = "SELECT COUNT(DISTINCT c.id) as total
+            FROM conversations c
+            LEFT JOIN coaching_conversation_impact cci ON c.id = cci.conversation_id
+            LEFT JOIN agent_performance_analysis apa ON c.id = apa.conversation_id
+            WHERE (cci.id IS NOT NULL OR apa.id IS NOT NULL)
+            AND c.created_at >= :date_from 
+            AND c.created_at <= :date_to";
+        
+        $params = [
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo
+        ];
+        
+        if ($agentId) {
+            $countSql .= " AND c.agent_id = :agent_id";
+            $params['agent_id'] = $agentId;
+        }
+        
+        $countResult = Database::fetch($countSql, $params);
+        $total = (int)($countResult['total'] ?? 0);
+        $totalPages = ceil($total / $perPage);
+        $offset = ($page - 1) * $perPage;
+        
+        // Buscar conversas com todas as métricas
+        $sql = "SELECT 
+                c.id,
+                c.agent_id,
+                c.contact_id,
+                c.status,
+                c.channel,
+                c.created_at,
+                c.updated_at,
+                c.resolved_at,
+                
+                -- Dados do agente
+                u.name as agent_name,
+                u.avatar as agent_avatar,
+                
+                -- Dados do contato
+                ct.name as contact_name,
+                ct.phone as contact_phone,
+                
+                -- Coaching Impact
+                cci.total_hints,
+                cci.hints_helpful,
+                cci.hints_not_helpful,
+                cci.suggestions_used,
+                cci.conversation_outcome,
+                cci.sales_value,
+                cci.performance_improvement_score,
+                cci.avg_response_time_before,
+                cci.avg_response_time_after,
+                
+                -- Performance Analysis (10 dimensões)
+                apa.overall_score,
+                apa.proactivity_score,
+                apa.objection_handling_score,
+                apa.rapport_score,
+                apa.closing_techniques_score,
+                apa.qualification_score,
+                apa.clarity_score,
+                apa.value_proposition_score,
+                apa.response_time_score,
+                apa.follow_up_score,
+                apa.professionalism_score,
+                apa.strengths,
+                apa.weaknesses,
+                apa.specific_feedback,
+                
+                -- Count hints
+                (SELECT COUNT(*) FROM realtime_coaching_hints rch 
+                 WHERE rch.conversation_id = c.id) as total_coaching_hints
+                
+            FROM conversations c
+            LEFT JOIN users u ON c.agent_id = u.id
+            LEFT JOIN contacts ct ON c.contact_id = ct.id
+            LEFT JOIN coaching_conversation_impact cci ON c.id = cci.conversation_id
+            LEFT JOIN agent_performance_analysis apa ON c.id = apa.conversation_id
+            WHERE (cci.id IS NOT NULL OR apa.id IS NOT NULL)
+            AND c.created_at >= :date_from 
+            AND c.created_at <= :date_to";
+        
+        if ($agentId) {
+            $sql .= " AND c.agent_id = :agent_id";
+        }
+        
+        $sql .= " ORDER BY c.updated_at DESC
+                  LIMIT :limit OFFSET :offset";
+        
+        $params['limit'] = $perPage;
+        $params['offset'] = $offset;
+        
+        $conversations = Database::fetchAll($sql, $params);
+        
+        // Processar conversas para adicionar hints detalhados
+        foreach ($conversations as &$conversation) {
+            // Buscar hints da conversa
+            $hintsSql = "SELECT 
+                    id,
+                    hint_type,
+                    hint_text,
+                    suggestions,
+                    feedback,
+                    viewed_at,
+                    created_at
+                FROM realtime_coaching_hints
+                WHERE conversation_id = :conversation_id
+                ORDER BY created_at DESC";
+            
+            $conversation['coaching_hints'] = Database::fetchAll($hintsSql, [
+                'conversation_id' => $conversation['id']
+            ]);
+            
+            // Parse JSON fields
+            $conversation['strengths'] = $conversation['strengths'] 
+                ? json_decode($conversation['strengths'], true) 
+                : [];
+            $conversation['weaknesses'] = $conversation['weaknesses'] 
+                ? json_decode($conversation['weaknesses'], true) 
+                : [];
+            
+            // Formatar valores
+            $conversation['sales_value_formatted'] = number_format((float)($conversation['sales_value'] ?? 0), 2, ',', '.');
+            $conversation['overall_score_formatted'] = number_format((float)($conversation['overall_score'] ?? 0), 2);
+            $conversation['performance_improvement_score_formatted'] = number_format((float)($conversation['performance_improvement_score'] ?? 0), 2);
+            
+            // Status badge
+            $conversation['status_badge'] = match($conversation['status']) {
+                'open' => ['class' => 'success', 'text' => 'Aberta'],
+                'pending' => ['class' => 'warning', 'text' => 'Pendente'],
+                'resolved' => ['class' => 'primary', 'text' => 'Resolvida'],
+                'closed' => ['class' => 'secondary', 'text' => 'Fechada'],
+                default => ['class' => 'light', 'text' => ucfirst($conversation['status'])]
+            };
+            
+            // Outcome badge
+            $conversation['outcome_badge'] = match($conversation['conversation_outcome']) {
+                'converted' => ['class' => 'success', 'text' => '✓ Convertida', 'icon' => 'check-circle'],
+                'closed' => ['class' => 'primary', 'text' => 'Fechada', 'icon' => 'check'],
+                'escalated' => ['class' => 'warning', 'text' => 'Escalada', 'icon' => 'arrow-up'],
+                'abandoned' => ['class' => 'danger', 'text' => 'Abandonada', 'icon' => 'cross-circle'],
+                default => ['class' => 'light', 'text' => $conversation['conversation_outcome'] ?? 'N/A', 'icon' => 'question']
+            };
+        }
+        
+        return [
+            'conversations' => $conversations,
+            'total' => $total,
+            'page' => $page,
+            'per_page' => $perPage,
+            'total_pages' => $totalPages,
+            'has_more' => $page < $totalPages
+        ];
+    }
 }

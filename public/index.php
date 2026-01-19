@@ -3,6 +3,13 @@
  * Entry Point da Aplicação
  */
 
+// ✅ CONFIGURAÇÕES DE UPLOAD - Aumentar limites para arquivos grandes
+ini_set('upload_max_filesize', '100M');
+ini_set('post_max_size', '105M');
+ini_set('max_execution_time', '300'); // 5 minutos
+ini_set('max_input_time', '300');
+ini_set('memory_limit', '256M');
+
 // Habilitar exibição de erros em desenvolvimento (mas não deprecated)
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 

@@ -365,6 +365,7 @@ Router::get('/coaching/agent/{agentId}', [CoachingDashboardController::class, 'a
 Router::get('/coaching/top-conversations', [CoachingDashboardController::class, 'topConversations'], ['Authentication', 'Permission:coaching.view']);
 Router::get('/api/coaching/dashboard/data', [CoachingDashboardController::class, 'getDashboardData'], ['Authentication', 'Permission:coaching.view']);
 Router::get('/api/coaching/dashboard/history', [CoachingDashboardController::class, 'getPerformanceHistory'], ['Authentication', 'Permission:coaching.view']);
+Router::get('/api/coaching/analyzed-conversations', [CoachingDashboardController::class, 'getAnalyzedConversationsAjax'], ['Authentication', 'Permission:coaching.view']);
 Router::get('/coaching/export/csv', [CoachingDashboardController::class, 'exportCSV'], ['Authentication', 'Permission:coaching.view']);
 
 // Rota para iniciar chamada a partir de conversa

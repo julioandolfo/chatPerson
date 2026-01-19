@@ -727,7 +727,7 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                 <div class="d-flex justify-content-between align-items-start mb-4">
                     <div class="flex-grow-1">
                         <div class="d-flex align-items-center mb-1">
-                            <a href="<?= Url::to('/conversations/' . $conv['id']) ?>" class="text-gray-900 fw-bold fs-5 text-hover-primary me-2" target="_blank">
+                            <a href="<?= Url::to('/conversations?id=' . $conv['id']) ?>" class="text-gray-900 fw-bold fs-5 text-hover-primary me-2" target="_blank">
                                 #<?= $conv['id'] ?> - <?= htmlspecialchars($conv['contact_name'] ?? 'Sem nome') ?>
                             </a>
                             <span class="badge badge-light-<?= $conv['status_badge']['class'] ?> fs-8">
@@ -979,7 +979,7 @@ function renderConversations(conversations) {
                 <div class="d-flex justify-content-between align-items-start mb-4">
                     <div class="flex-grow-1">
                         <div class="d-flex align-items-center mb-1">
-                            <a href="<?= Url::to('/conversations/') ?>${conv.id}" class="text-gray-900 fw-bold fs-5 text-hover-primary me-2" target="_blank">
+                            <a href="<?= Url::to('/conversations?id=') ?>${conv.id}" class="text-gray-900 fw-bold fs-5 text-hover-primary me-2" target="_blank">
                                 #${conv.id} - ${conv.contact_name || 'Sem nome'}
                             </a>
                             <span class="badge badge-light-${conv.status_badge.class} fs-8">${conv.status_badge.text}</span>
@@ -1058,8 +1058,48 @@ async function showConversationDetails(conversationId) {
                                 </div>
                                 ` : ''}
                                 
+                                ${conv.detailed_analysis ? `
+                                <div class="mb-5">
+                                    <h5 class="mb-3">📝 Análise Detalhada</h5>
+                                    <div class="bg-light p-4 rounded">${conv.detailed_analysis}</div>
+                                </div>
+                                ` : ''}
+                                
+                                ${conv.strengths?.length ? `
+                                <div class="mb-5">
+                                    <h5 class="mb-3">✅ Pontos Fortes</h5>
+                                    <div class="bg-light p-4 rounded">
+                                        <ul class="mb-0">
+                                            ${conv.strengths.map(s => `<li>${s}</li>`).join('')}
+                                        </ul>
+                                    </div>
+                                </div>
+                                ` : ''}
+                                
+                                ${conv.weaknesses?.length ? `
+                                <div class="mb-5">
+                                    <h5 class="mb-3">⚠️ Pontos a Melhorar</h5>
+                                    <div class="bg-light p-4 rounded">
+                                        <ul class="mb-0">
+                                            ${conv.weaknesses.map(w => `<li>${w}</li>`).join('')}
+                                        </ul>
+                                    </div>
+                                </div>
+                                ` : ''}
+                                
+                                ${conv.improvement_suggestions?.length ? `
+                                <div class="mb-5">
+                                    <h5 class="mb-3">💡 Sugestões de Melhoria</h5>
+                                    <div class="bg-light p-4 rounded">
+                                        <ul class="mb-0">
+                                            ${conv.improvement_suggestions.map(s => `<li>${s}</li>`).join('')}
+                                        </ul>
+                                    </div>
+                                </div>
+                                ` : ''}
+                                
                                 <div class="d-flex justify-content-end">
-                                    <a href="<?= Url::to('/conversations/') ?>${conv.id}" target="_blank" class="btn btn-primary">Ver Conversa Completa</a>
+                                    <a href="<?= Url::to('/conversations?id=') ?>${conv.id}" target="_blank" class="btn btn-primary">Ver Conversa Completa</a>
                                 </div>
                             </div>
                         </div>

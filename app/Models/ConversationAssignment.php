@@ -230,4 +230,160 @@ class ConversationAssignment extends Model
         
         return Database::fetch($sql, [$conversationId]);
     }
+    
+    /**
+     * Obter todas as participações de agentes em uma conversa
+     * Retorna agentes únicos com período de início e fim de cada participação
+     * 
+     * @param int $conversationId
+     * @return array Array de participações com: agent_id, agent_name, assigned_at, removed_at
+     */
+    public static function getConversationParticipations(int $conversationId): array
+    {
+        if (!self::tableExists()) {
+            return [];
+        }
+        
+        $sql = "SELECT 
+                    ca.id,
+                    ca.agent_id,
+                    ca.assigned_at,
+                    ca.removed_at,
+                    u.name as agent_name,
+                    u.avatar as agent_avatar
+                FROM conversation_assignments ca
+                LEFT JOIN users u ON ca.agent_id = u.id
+                WHERE ca.conversation_id = ?
+                ORDER BY ca.assigned_at ASC";
+        
+        $assignments = Database::fetchAll($sql, [$conversationId]);
+        
+        // Se não tem histórico, usar agente atual da conversa
+        if (empty($assignments)) {
+            $conversation = Database::fetch(
+                "SELECT agent_id, created_at FROM conversations WHERE id = ?",
+                [$conversationId]
+            );
+            
+            if ($conversation && $conversation['agent_id']) {
+                $agent = Database::fetch(
+                    "SELECT id, name, avatar FROM users WHERE id = ?",
+                    [$conversation['agent_id']]
+                );
+                
+                if ($agent) {
+                    return [[
+                        'agent_id' => $agent['id'],
+                        'agent_name' => $agent['name'],
+                        'agent_avatar' => $agent['avatar'],
+                        'assigned_at' => $conversation['created_at'],
+                        'removed_at' => null
+                    ]];
+                }
+            }
+            
+            return [];
+        }
+        
+        return $assignments;
+    }
+    
+    /**
+     * Obter mensagens de um agente durante sua participação
+     * 
+     * @param int $conversationId
+     * @param int $agentId
+     * @param string|null $assignedAt Data/hora de início da atribuição
+     * @param string|null $removedAt Data/hora de fim da atribuição (null = ainda ativo)
+     * @return array Mensagens do agente no período
+     */
+    public static function getAgentMessagesInParticipation(
+        int $conversationId,
+        int $agentId,
+        ?string $assignedAt = null,
+        ?string $removedAt = null
+    ): array {
+        $sql = "SELECT m.*
+                FROM messages m
+                WHERE m.conversation_id = ?
+                AND m.sender_id = ?
+                AND m.sender_type = 'agent'";
+        
+        $params = [$conversationId, $agentId];
+        
+        // Filtrar mensagens pelo período de participação
+        if ($assignedAt) {
+            $sql .= " AND m.created_at >= ?";
+            $params[] = $assignedAt;
+        }
+        
+        if ($removedAt) {
+            $sql .= " AND m.created_at <= ?";
+            $params[] = $removedAt;
+        }
+        
+        $sql .= " ORDER BY m.created_at ASC";
+        
+        return Database::fetchAll($sql, $params);
+    }
+    
+    /**
+     * Obter todas as mensagens da conversa durante a participação de um agente
+     * (incluindo mensagens do cliente)
+     * 
+     * @param int $conversationId
+     * @param int $agentId
+     * @param string|null $assignedAt
+     * @param string|null $removedAt
+     * @return array Todas as mensagens no período
+     */
+    public static function getAllMessagesInParticipation(
+        int $conversationId,
+        int $agentId,
+        ?string $assignedAt = null,
+        ?string $removedAt = null
+    ): array {
+        $sql = "SELECT m.*
+                FROM messages m
+                WHERE m.conversation_id = ?";
+        
+        $params = [$conversationId];
+        
+        // Filtrar mensagens pelo período de participação
+        if ($assignedAt) {
+            $sql .= " AND m.created_at >= ?";
+            $params[] = $assignedAt;
+        }
+        
+        if ($removedAt) {
+            $sql .= " AND m.created_at <= ?";
+            $params[] = $removedAt;
+        }
+        
+        $sql .= " ORDER BY m.created_at ASC";
+        
+        return Database::fetchAll($sql, $params);
+    }
+    
+    /**
+     * Verificar se há análise de performance para uma participação específica
+     * 
+     * @param int $conversationId
+     * @param int $agentId
+     * @return array|null Análise existente ou null
+     */
+    public static function getParticipationAnalysis(int $conversationId, int $agentId): ?array
+    {
+        try {
+            $sql = "SELECT * FROM agent_performance_analysis 
+                    WHERE conversation_id = ? AND agent_id = ?
+                    LIMIT 1";
+            
+            $result = Database::fetch($sql, [$conversationId, $agentId]);
+            return $result ?: null;
+        } catch (\Exception $e) {
+            // Tabela pode não existir
+            return null;
+        }
+    }
 }

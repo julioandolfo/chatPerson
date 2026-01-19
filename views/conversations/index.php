@@ -2180,7 +2180,7 @@ function getChannelInfo(channel) {
 <div class="conversations-layout">
     
     <!-- COLUNA 1: LISTA DE CONVERSAS -->
-    <div class="conversations-list">
+    <div class="conversations-list mobile-active" id="conversationsListView">
         
         <!-- Header com busca -->
         <div class="conversations-list-header">
@@ -2627,7 +2627,7 @@ function getChannelInfo(channel) {
                                             </div>
     
     <!-- COLUNA 2: üREA DE CHAT -->
-    <div class="chat-area">
+    <div class="chat-area" id="chatAreaView">
         
         <!-- Header do Chat (sempre presente, mas pode estar oculto) -->
         <div class="chat-header" id="chatHeader" style="<?= empty($selectedConversation) ? 'display: none;' : '' ?>">
@@ -3263,6 +3263,8 @@ function getChannelInfo(channel) {
             </div>
         </div>
     <?php endif; ?>
+
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeConversationSidebar()"></div>
     
 </div>
 

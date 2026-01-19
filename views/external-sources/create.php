@@ -236,13 +236,16 @@ function testConnection() {
     });
 }
 
-// Criar fonte temporária
+// Criar fonte temporária para buscar tabelas/colunas
 function createTempSource(config, type) {
     const data = {
-        name: 'TEMP_' + Date.now(),
+        name: 'TEMP_CONFIG_' + Date.now(),
         type: type,
         connection_config: config,
-        status: 'inactive'
+        status: 'inactive',
+        table_name: null,
+        column_mapping: null,
+        query_config: null
     };
     
     fetch('/external-sources', {
@@ -254,8 +257,15 @@ function createTempSource(config, type) {
     .then(result => {
         if (result.success) {
             tempSourceId = result.source_id;
+            console.log('Fonte temporária criada:', tempSourceId);
             loadTables();
+        } else {
+            toastr.error('Erro ao criar configuração temporária');
         }
+    })
+    .catch(err => {
+        console.error('Erro ao criar temp source:', err);
+        toastr.error('Erro ao preparar listagem de tabelas');
     });
 }
 
@@ -263,22 +273,40 @@ function createTempSource(config, type) {
 function loadTables() {
     if (!tempSourceId) return;
     
+    toastr.info('Carregando tabelas do banco externo...');
+    
     fetch(`/api/external-sources/${tempSourceId}/tables`)
         .then(r => r.json())
         .then(result => {
             if (result.success) {
                 const select = document.getElementById('db_table');
-                select.innerHTML = '<option value="">Selecione...</option>';
+                select.innerHTML = '<option value="">Selecione uma tabela...</option>';
                 
-                result.tables.forEach(table => {
-                    const option = document.createElement('option');
-                    option.value = table;
-                    option.textContent = table;
-                    select.appendChild(option);
-                });
-                
-                document.getElementById('step_table').style.display = 'block';
+                if (result.tables && result.tables.length > 0) {
+                    result.tables.forEach(table => {
+                        const option = document.createElement('option');
+                        option.value = table;
+                        option.textContent = table;
+                        select.appendChild(option);
+                    });
+                    
+                    document.getElementById('step_table').style.display = 'block';
+                    toastr.success(`${result.tables.length} tabela(s) encontrada(s)!`);
+                    
+                    // Scroll suave até o próximo passo
+                    setTimeout(() => {
+                        document.getElementById('step_table').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 300);
+                } else {
+                    toastr.warning('Nenhuma tabela encontrada neste banco');
+                }
+            } else {
+                toastr.error(result.message || 'Erro ao listar tabelas');
             }
+        })
+        .catch(err => {
+            toastr.error('Erro ao buscar tabelas');
+            console.error(err);
         });
 }
 
@@ -287,10 +315,12 @@ function loadColumns() {
     const table = document.getElementById('db_table').value;
     if (!table || !tempSourceId) return;
     
+    toastr.info('Carregando colunas da tabela...');
+    
     fetch(`/api/external-sources/${tempSourceId}/columns?table=${encodeURIComponent(table)}`)
         .then(r => r.json())
         .then(result => {
-            if (result.success) {
+            if (result.success && result.columns) {
                 availableColumns = result.columns;
                 
                 // Preencher selects de mapeamento
@@ -306,12 +336,26 @@ function loadColumns() {
                     });
                 });
                 
+                // Mostrar próximos passos
                 document.getElementById('sep_mapping').style.display = 'block';
                 document.getElementById('step_mapping').style.display = 'block';
                 document.getElementById('sep_schedule').style.display = 'block';
                 document.getElementById('step_schedule').style.display = 'block';
                 document.getElementById('btn_save').disabled = false;
+                
+                toastr.success(`${result.columns.length} coluna(s) encontrada(s)!`);
+                
+                // Scroll suave até o mapeamento
+                setTimeout(() => {
+                    document.getElementById('step_mapping').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 300);
+            } else {
+                toastr.error(result.message || 'Erro ao listar colunas');
             }
+        })
+        .catch(err => {
+            toastr.error('Erro ao buscar colunas');
+            console.error(err);
         });
 }
 
@@ -346,26 +390,49 @@ function renderPreview(rows) {
     const container = document.getElementById('preview_container');
     
     if (!rows || rows.length === 0) {
-        container.innerHTML = '<div class="alert alert-warning">Nenhum dado encontrado</div>';
+        container.innerHTML = '<div class="alert alert-warning">Nenhum dado encontrado na tabela</div>';
         container.style.display = 'block';
         return;
     }
     
     const columns = Object.keys(rows[0]);
     
-    let html = '<div class="card card-flush bg-light"><div class="card-body"><h5 class="mb-5">Preview (10 primeiras linhas)</h5>';
-    html += '<div class="table-responsive"><table class="table table-sm table-bordered">';
-    html += '<thead><tr>' + columns.map(col => `<th class="text-nowrap">${col}</th>`).join('') + '</tr></thead>';
+    let html = '<div class="card card-flush bg-light">';
+    html += '<div class="card-header">';
+    html += '<h5 class="card-title">Preview dos Dados (primeiras 10 linhas)</h5>';
+    html += '</div>';
+    html += '<div class="card-body p-0">';
+    html += '<div class="table-responsive">';
+    html += '<table class="table table-sm table-row-bordered table-row-gray-100 align-middle gs-0 gy-3 mb-0">';
+    html += '<thead>';
+    html += '<tr class="fw-bold text-muted bg-light">';
+    html += columns.map(col => `<th class="ps-4 min-w-100px text-nowrap">${col}</th>`).join('');
+    html += '</tr>';
+    html += '</thead>';
     html += '<tbody>';
     
-    rows.forEach(row => {
-        html += '<tr>' + columns.map(col => `<td class="text-nowrap">${row[col] || '-'}</td>`).join('') + '</tr>';
+    rows.forEach((row, idx) => {
+        html += '<tr>';
+        html += columns.map(col => {
+            const value = row[col];
+            const displayValue = value === null ? '<span class="text-muted">NULL</span>' : 
+                                (value === '' ? '<span class="text-muted">vazio</span>' : 
+                                escapeHtml(String(value)));
+            return `<td class="ps-4 text-nowrap"><span class="text-gray-800 fw-normal">${displayValue}</span></td>`;
+        }).join('');
+        html += '</tr>';
     });
     
     html += '</tbody></table></div></div></div>';
     
     container.innerHTML = html;
     container.style.display = 'block';
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 // Salvar fonte
@@ -405,12 +472,14 @@ function saveSource() {
         status: 'active'
     };
     
-    // Se já criou temp, atualizar, senão criar
-    const method = tempSourceId ? 'PUT' : 'POST';
-    const url = tempSourceId ? `/external-sources/${tempSourceId}` : '/external-sources';
+    // Se já criou fonte temporária, deletar ela e criar nova com dados completos
+    if (tempSourceId) {
+        fetch(`/external-sources/${tempSourceId}`, { method: 'DELETE' })
+            .catch(err => console.log('Erro ao deletar temp:', err));
+    }
     
-    fetch(url, {
-        method: method,
+    fetch('/external-sources', {
+        method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data)
     })
@@ -422,7 +491,7 @@ function saveSource() {
         if (result.success) {
             toastr.success('Fonte criada com sucesso!');
             setTimeout(() => {
-                window.location.href = `/external-sources/${result.source_id || tempSourceId}`;
+                window.location.href = '/external-sources';
             }, 1000);
         } else {
             toastr.error(result.message || 'Erro ao criar fonte');
@@ -431,7 +500,7 @@ function saveSource() {
     .catch(err => {
         btn.removeAttribute('data-kt-indicator');
         btn.disabled = false;
-        toastr.error('Erro de rede');
+        toastr.error('Erro de rede: ' + err.message);
     });
 }
 </script>

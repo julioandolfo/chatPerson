@@ -725,4 +725,226 @@ class AgentPerformanceAnalysisService
     {
         return AgentPerformanceAnalysis::getOverallStats($dateFrom, $dateTo);
     }
+    
+    /**
+     * Analisar todas as participações de uma conversa
+     * Cria análises separadas para cada agente que participou
+     * 
+     * @param int $conversationId
+     * @param bool $force Forçar re-análise
+     * @return array Array de análises criadas
+     */
+    public static function analyzeConversationParticipations(int $conversationId, bool $force = false): array
+    {
+        $settings = self::getSettings();
+        
+        if (!$settings['enabled']) {
+            Logger::log("AgentPerformanceAnalysisService::analyzeConversationParticipations - Análise desabilitada");
+            return [];
+        }
+        
+        // Verificar limite de custo
+        if (!self::checkDailyCostLimit()) {
+            Logger::log("AgentPerformanceAnalysisService::analyzeConversationParticipations - Limite de custo diário atingido");
+            return [];
+        }
+        
+        // Obter conversa
+        $conversation = Conversation::find($conversationId);
+        if (!$conversation) {
+            Logger::error("AgentPerformanceAnalysisService::analyzeConversationParticipations - Conversa não encontrada: {$conversationId}");
+            return [];
+        }
+        
+        // Obter participações
+        $participations = \App\Models\ConversationAssignment::getConversationParticipations($conversationId);
+        
+        if (empty($participations)) {
+            Logger::warning("AgentPerformanceAnalysisService::analyzeConversationParticipations - Nenhuma participação encontrada para conversa {$conversationId}");
+            return [];
+        }
+        
+        Logger::log("AgentPerformanceAnalysisService::analyzeConversationParticipations - Encontradas " . count($participations) . " participações para conversa {$conversationId}");
+        
+        $analyses = [];
+        
+        foreach ($participations as $participation) {
+            try {
+                // Verificar se já existe análise
+                if (!$force) {
+                    $existing = \App\Models\ConversationAssignment::getParticipationAnalysis(
+                        $conversationId,
+                        $participation['agent_id']
+                    );
+                    
+                    if ($existing) {
+                        Logger::log("AgentPerformanceAnalysisService::analyzeConversationParticipations - Análise já existe para agente {$participation['agent_id']} na conversa {$conversationId}");
+                        $analyses[] = $existing;
+                        continue;
+                    }
+                }
+                
+                // Analisar participação individual
+                $analysis = self::analyzeAgentParticipation(
+                    $conversation,
+                    $participation['agent_id'],
+                    $participation['assigned_at'],
+                    $participation['removed_at'],
+                    $settings
+                );
+                
+                if ($analysis) {
+                    $analyses[] = $analysis;
+                    Logger::log("AgentPerformanceAnalysisService::analyzeConversationParticipations - ✅ Análise criada para agente {$participation['agent_id']} (score: {$analysis['overall_score']})");
+                }
+                
+            } catch (\Exception $e) {
+                Logger::error("AgentPerformanceAnalysisService::analyzeConversationParticipations - Erro ao analisar participação do agente {$participation['agent_id']}: " . $e->getMessage());
+            }
+        }
+        
+        return $analyses;
+    }
+    
+    /**
+     * Analisar a participação de um agente específico em uma conversa
+     * Considera apenas as mensagens enviadas durante o período de participação
+     * 
+     * @param array $conversation Dados da conversa
+     * @param int $agentId ID do agente
+     * @param string|null $assignedAt Data/hora de início da participação
+     * @param string|null $removedAt Data/hora de fim da participação (null = ainda ativo)
+     * @param array $settings Configurações
+     * @return array|null Análise criada ou null
+     */
+    private static function analyzeAgentParticipation(
+        array $conversation,
+        int $agentId,
+        ?string $assignedAt,
+        ?string $removedAt,
+        array $settings
+    ): ?array {
+        try {
+            Logger::log("AgentPerformanceAnalysisService::analyzeAgentParticipation - Analisando participação do agente {$agentId} na conversa {$conversation['id']}");
+            Logger::log("AgentPerformanceAnalysisService::analyzeAgentParticipation - Período: " . ($assignedAt ?? 'início') . " até " . ($removedAt ?? 'fim'));
+            
+            // Obter TODAS as mensagens da conversa no período (incluindo do cliente)
+            $allMessages = \App\Models\ConversationAssignment::getAllMessagesInParticipation(
+                $conversation['id'],
+                $agentId,
+                $assignedAt,
+                $removedAt
+            );
+            
+            if (empty($allMessages)) {
+                Logger::warning("AgentPerformanceAnalysisService::analyzeAgentParticipation - Nenhuma mensagem encontrada no período de participação");
+                return null;
+            }
+            
+            Logger::log("AgentPerformanceAnalysisService::analyzeAgentParticipation - Total de mensagens no período: " . count($allMessages));
+            
+            // Contar mensagens do agente especificamente
+            $agentMessages = array_filter($allMessages, function($m) use ($agentId) {
+                return $m['sender_type'] === 'agent' && $m['sender_id'] == $agentId;
+            });
+            
+            $agentMessageCount = count($agentMessages);
+            $minAgentMessages = (int)($settings['min_agent_messages'] ?? 3);
+            
+            if ($agentMessageCount < $minAgentMessages) {
+                Logger::log("AgentPerformanceAnalysisService::analyzeAgentParticipation - Mensagens do agente insuficientes ({$agentMessageCount} < {$minAgentMessages})");
+                return null;
+            }
+            
+            Logger::log("AgentPerformanceAnalysisService::analyzeAgentParticipation - Mensagens do agente: {$agentMessageCount}");
+            
+            // Obter API Key
+            $apiKey = self::getApiKey();
+            if (empty($apiKey)) {
+                throw new \Exception('API Key da OpenAI não configurada');
+            }
+            
+            // Construir prompt específico para esta participação
+            $prompt = self::buildParticipationAnalysisPrompt($allMessages, $conversation, $agentId, $assignedAt, $removedAt, $settings);
+            
+            // Fazer requisição à OpenAI
+            $response = self::makeOpenAIRequest($apiKey, $prompt, $settings);
+            
+            // Processar resposta
+            $analysis = self::parseOpenAIResponse($response, $conversation, count($allMessages), $agentMessageCount, $settings['model']);
+            
+            // **IMPORTANTE**: Definir agent_id correto na análise
+            $analysis['agent_id'] = $agentId;
+            $analysis['conversation_id'] = $conversation['id'];
+            
+            // Salvar análise
+            $analysisId = AgentPerformanceAnalysis::create($analysis);
+            $analysis['id'] = $analysisId;
+            
+            Logger::log("AgentPerformanceAnalysisService::analyzeAgentParticipation - ✅ Análise criada (ID: {$analysisId}) - Score: {$analysis['overall_score']}/5.0");
+            
+            // Processar ações pós-análise
+            self::postAnalysisActions($analysis, $conversation, $settings);
+            
+            return $analysis;
+            
+        } catch (\Exception $e) {
+            Logger::error("AgentPerformanceAnalysisService::analyzeAgentParticipation - Erro: " . $e->getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Construir prompt para análise de participação específica
+     */
+    private static function buildParticipationAnalysisPrompt(
+        array $messages,
+        array $conversation,
+        int $agentId,
+        ?string $assignedAt,
+        ?string $removedAt,
+        array $settings
+    ): string {
+        $history = self::formatMessagesForAnalysis($messages);
+        $dimensions = $settings['dimensions'];
+        
+        $prompt = "Você é um especialista em análise de vendas e performance comercial.\n\n";
+        $prompt .= "Analise a PARTICIPAÇÃO ESPECÍFICA de um vendedor em uma conversa de vendas.\n\n";
+        $prompt .= "⚠️ IMPORTANTE: Este vendedor atendeu o cliente APENAS durante o período especificado abaixo.\n";
+        $prompt .= "Avalie SOMENTE as mensagens que este vendedor enviou, desconsiderando mensagens de outros agentes.\n\n";
+        
+        $prompt .= "PERÍODO DE PARTICIPAÇÃO:\n";
+        $prompt .= "- Início: " . ($assignedAt ?? 'Início da conversa') . "\n";
+        $prompt .= "- Fim: " . ($removedAt ?? 'Fim da conversa / Ainda ativo') . "\n\n";
+        
+        $prompt .= "Avalie a PERFORMANCE DESTE VENDEDOR nas seguintes dimensões (nota de 0 a 5, com 1 casa decimal):\n\n";
+        
+        // Adicionar dimensões habilitadas
+        $dimensionCount = 1;
+        foreach (self::DIMENSIONS as $key => $name) {
+            if ($dimensions[$key]['enabled'] ?? true) {
+                $prompt .= "{$dimensionCount}. {$name} (0-5)\n";
+                $prompt .= self::getDimensionCriteria($key);
+                $prompt .= "\n";
+                $dimensionCount++;
+            }
+        }
+        
+        // Contexto adicional
+        $prompt .= "\nCONTEXTO ADICIONAL:\n";
+        $prompt .= "- Status da conversa: " . ($conversation['status'] ?? 'N/A') . "\n";
+        if (!empty($conversation['stage'])) {
+            $prompt .= "- Estágio do funil: " . $conversation['stage'] . "\n";
+        }
+        if (!empty($conversation['estimated_value'])) {
+            $prompt .= "- Valor estimado: R$ " . number_format($conversation['estimated_value'], 2, ',', '.') . "\n";
+        }
+        
+        $prompt .= "\nCONVERSA (mensagens durante a participação):\n";
+        $prompt .= $history;
+        $prompt .= "\n\nRESPONDA EM FORMATO JSON com a seguinte estrutura:\n";
+        $prompt .= self::getExpectedJsonStructure($dimensions);
+        
+        return $prompt;
+    }
 }

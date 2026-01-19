@@ -513,11 +513,12 @@ class CoachingMetricsService
         
         $conversations = Database::fetchAll($sql, $params);
         
-        // Processar conversas para adicionar hints detalhados
+        // Processar conversas para adicionar hints detalhados e análises de participação
         foreach ($conversations as &$conversation) {
             // Buscar hints da conversa
             $hintsSql = "SELECT 
                     id,
+                    agent_id,
                     hint_type,
                     hint_text,
                     suggestions,
@@ -532,17 +533,96 @@ class CoachingMetricsService
                 'conversation_id' => $conversation['id']
             ]);
             
-            // Parse JSON fields
-            $conversation['strengths'] = $conversation['strengths'] 
-                ? json_decode($conversation['strengths'], true) 
-                : [];
-            $conversation['weaknesses'] = $conversation['weaknesses'] 
-                ? json_decode($conversation['weaknesses'], true) 
-                : [];
+            // Buscar TODAS as análises de performance (uma por agente participante)
+            $analysesSql = "SELECT 
+                    apa.id,
+                    apa.agent_id,
+                    apa.overall_score,
+                    apa.proactivity_score,
+                    apa.objection_handling_score,
+                    apa.rapport_score,
+                    apa.closing_techniques_score,
+                    apa.qualification_score,
+                    apa.clarity_score,
+                    apa.value_proposition_score,
+                    apa.response_time_score,
+                    apa.follow_up_score,
+                    apa.professionalism_score,
+                    apa.strengths,
+                    apa.weaknesses,
+                    apa.detailed_analysis,
+                    apa.improvement_suggestions,
+                    u.name as agent_name,
+                    u.avatar as agent_avatar,
+                    ca.assigned_at,
+                    ca.removed_at
+                FROM agent_performance_analysis apa
+                LEFT JOIN users u ON apa.agent_id = u.id
+                LEFT JOIN conversation_assignments ca ON ca.conversation_id = apa.conversation_id 
+                    AND ca.agent_id = apa.agent_id
+                WHERE apa.conversation_id = :conversation_id
+                ORDER BY ca.assigned_at ASC";
+            
+            $analyses = Database::fetchAll($analysesSql, [
+                'conversation_id' => $conversation['id']
+            ]);
+            
+            // Processar cada análise
+            foreach ($analyses as &$analysis) {
+                $analysis['strengths'] = $analysis['strengths'] 
+                    ? json_decode($analysis['strengths'], true) 
+                    : [];
+                $analysis['weaknesses'] = $analysis['weaknesses'] 
+                    ? json_decode($analysis['weaknesses'], true) 
+                    : [];
+                $analysis['improvement_suggestions'] = $analysis['improvement_suggestions']
+                    ? json_decode($analysis['improvement_suggestions'], true)
+                    : [];
+                $analysis['overall_score_formatted'] = number_format((float)($analysis['overall_score'] ?? 0), 2);
+            }
+            
+            $conversation['performance_analyses'] = $analyses;
+            
+            // Para compatibilidade, manter os campos da primeira análise (ou do agente filtrado)
+            $primaryAnalysis = null;
+            if ($agentId) {
+                // Se filtrou por agente, pegar análise desse agente
+                foreach ($analyses as $analysis) {
+                    if ($analysis['agent_id'] == $agentId) {
+                        $primaryAnalysis = $analysis;
+                        break;
+                    }
+                }
+            }
+            
+            if (!$primaryAnalysis && !empty($analyses)) {
+                // Pegar primeira análise
+                $primaryAnalysis = $analyses[0];
+            }
+            
+            if ($primaryAnalysis) {
+                $conversation['overall_score'] = $primaryAnalysis['overall_score'];
+                $conversation['overall_score_formatted'] = $primaryAnalysis['overall_score_formatted'];
+                $conversation['strengths'] = $primaryAnalysis['strengths'];
+                $conversation['weaknesses'] = $primaryAnalysis['weaknesses'];
+                $conversation['detailed_analysis'] = $primaryAnalysis['detailed_analysis'];
+                $conversation['improvement_suggestions'] = $primaryAnalysis['improvement_suggestions'];
+                
+                // Copiar scores das dimensões
+                foreach (['proactivity', 'objection_handling', 'rapport', 'closing_techniques', 
+                         'qualification', 'clarity', 'value_proposition', 'response_time', 
+                         'follow_up', 'professionalism'] as $dimension) {
+                    $conversation["{$dimension}_score"] = $primaryAnalysis["{$dimension}_score"];
+                }
+            } else {
+                $conversation['overall_score'] = null;
+                $conversation['strengths'] = [];
+                $conversation['weaknesses'] = [];
+            
+            }
             
             // Formatar valores
             $conversation['sales_value_formatted'] = number_format((float)($conversation['sales_value'] ?? 0), 2, ',', '.');
-            $conversation['overall_score_formatted'] = number_format((float)($conversation['overall_score'] ?? 0), 2);
             $conversation['performance_improvement_score_formatted'] = number_format((float)($conversation['performance_improvement_score'] ?? 0), 2);
             
             // Status badge

@@ -141,7 +141,19 @@ class CoachingDashboardController
                 -- Performance Analysis
                 apa.overall_score,
                 apa.detailed_analysis,
-                apa.improvement_suggestions
+                apa.improvement_suggestions,
+                apa.strengths,
+                apa.weaknesses,
+                apa.proactivity_score,
+                apa.objection_handling_score,
+                apa.rapport_score,
+                apa.closing_techniques_score,
+                apa.qualification_score,
+                apa.clarity_score,
+                apa.value_proposition_score,
+                apa.response_time_score,
+                apa.follow_up_score,
+                apa.professionalism_score
                 
             FROM conversations c
             LEFT JOIN users u ON c.agent_id = u.id
@@ -167,6 +179,17 @@ class CoachingDashboardController
                     ORDER BY created_at DESC";
                 
                 $conversation['coaching_hints'] = Database::fetchAll($hintsSql, [$conversationId]);
+                
+                // Parse JSON fields
+                $conversation['strengths'] = $conversation['strengths'] 
+                    ? json_decode($conversation['strengths'], true) 
+                    : [];
+                $conversation['weaknesses'] = $conversation['weaknesses'] 
+                    ? json_decode($conversation['weaknesses'], true) 
+                    : [];
+                $conversation['improvement_suggestions'] = $conversation['improvement_suggestions'] 
+                    ? json_decode($conversation['improvement_suggestions'], true) 
+                    : [];
                 
                 // Formatar valores
                 $conversation['sales_value_formatted'] = number_format((float)($conversation['sales_value'] ?? 0), 2, ',', '.');

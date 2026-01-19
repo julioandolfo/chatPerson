@@ -390,20 +390,7 @@ class CampaignController
      */
     private function getWhatsAppAccountsForCampaign(): array
     {
-        $accounts = IntegrationAccount::getByChannel('whatsapp');
-        if (!empty($accounts)) {
-            return $accounts;
-        }
-
-        $legacyAccounts = WhatsAppAccount::all();
-        if (empty($legacyAccounts)) {
-            return [];
-        }
-
-        foreach ($legacyAccounts as $legacy) {
-            $this->ensureIntegrationAccountFromLegacy($legacy);
-        }
-
+        $this->syncWhatsAppIntegrationAccounts();
         return IntegrationAccount::getByChannel('whatsapp');
     }
 
@@ -463,6 +450,43 @@ class CampaignController
         IntegrationAccount::create(array_filter($data, function ($value) {
             return $value !== null && $value !== '';
         }));
+    }
+
+    /**
+     * Sincronizar todas as contas do whatsapp_accounts
+     */
+    private function syncWhatsAppIntegrationAccounts(): void
+    {
+        $legacyAccounts = WhatsAppAccount::all();
+        if (empty($legacyAccounts)) {
+            return;
+        }
+
+        $integrationAccounts = IntegrationAccount::getByChannel('whatsapp');
+        $existingPhones = [];
+        foreach ($integrationAccounts as $account) {
+            $normalized = $this->normalizePhone($account['phone_number'] ?? '');
+            if ($normalized) {
+                $existingPhones[$normalized] = true;
+            }
+        }
+
+        foreach ($legacyAccounts as $legacy) {
+            $normalized = $this->normalizePhone($legacy['phone_number'] ?? '');
+            if (empty($normalized)) {
+                continue;
+            }
+            if (isset($existingPhones[$normalized])) {
+                continue;
+            }
+            $this->ensureIntegrationAccountFromLegacy($legacy);
+            $existingPhones[$normalized] = true;
+        }
+    }
+
+    private function normalizePhone(string $phone): string
+    {
+        return preg_replace('/\D+/', '', $phone);
     }
     
     /**

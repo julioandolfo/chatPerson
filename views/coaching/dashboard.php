@@ -917,10 +917,21 @@ async function showConversationDetails(conversationId) {
                                 </div>
                                 ` : ''}
                                 
-                                ${conv.specific_feedback ? `
+                                ${conv.detailed_analysis ? `
                                 <div class="mb-5">
-                                    <h5 class="mb-3">📝 Feedback Específico</h5>
-                                    <div class="bg-light p-4 rounded">${conv.specific_feedback}</div>
+                                    <h5 class="mb-3">📝 Análise Detalhada</h5>
+                                    <div class="bg-light p-4 rounded">${conv.detailed_analysis}</div>
+                                </div>
+                                ` : ''}
+                                
+                                ${conv.improvement_suggestions ? `
+                                <div class="mb-5">
+                                    <h5 class="mb-3">💡 Sugestões de Melhoria</h5>
+                                    <div class="bg-light p-4 rounded">
+                                        <ul class="mb-0">
+                                            ${JSON.parse(conv.improvement_suggestions).map(s => `<li>${s}</li>`).join('')}
+                                        </ul>
+                                    </div>
                                 </div>
                                 ` : ''}
                                 

@@ -19,6 +19,7 @@ use App\Services\DashboardService;
 use App\Services\AvailabilityService;
 use App\Services\AgentConversionService;
 use App\Services\AgentPerformanceService;
+use App\Services\CoachingMetricsService;
 use App\Models\User;
 use App\Models\Setting;
 
@@ -121,6 +122,19 @@ class AgentPerformanceController
             }
         }
         
+        // Conversas analisadas com métricas de coaching
+        $analyzedConversations = [];
+        try {
+            $analyzedConversations = CoachingMetricsService::getAnalyzedConversations(
+                $agentId, 
+                'month', // período baseado no filtro
+                1, 
+                10
+            );
+        } catch (\Exception $e) {
+            // Tabelas de coaching podem não existir
+        }
+        
         Response::view('agent-performance/agent', [
             'report' => $report,
             'badges' => $badges,
@@ -134,7 +148,8 @@ class AgentPerformanceController
             'performanceStats' => $performanceStats,
             'availabilityStats' => $availabilityStats,
             'conversionMetrics' => $conversionMetrics,
-            'slaSettings' => $slaSettings
+            'slaSettings' => $slaSettings,
+            'analyzedConversations' => $analyzedConversations
         ]);
     }
     

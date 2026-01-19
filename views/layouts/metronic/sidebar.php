@@ -203,6 +203,14 @@
                             </a>
                         </div>
                         <div class="menu-item">
+                            <a class="menu-link <?= isActive('/external-sources', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/external-sources') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Fontes Externas</span>
+                            </a>
+                        </div>
+                        <div class="menu-item">
                             <a class="menu-link <?= isActive('/drip-sequences', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/drip-sequences') ?>">
                                 <span class="menu-bullet">
                                     <span class="bullet bullet-dot"></span>

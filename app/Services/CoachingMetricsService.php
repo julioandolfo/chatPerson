@@ -485,7 +485,8 @@ class CoachingMetricsService
                 apa.professionalism_score,
                 apa.strengths,
                 apa.weaknesses,
-                apa.specific_feedback,
+                apa.detailed_analysis,
+                apa.improvement_suggestions,
                 
                 -- Count hints
                 (SELECT COUNT(*) FROM realtime_coaching_hints rch 

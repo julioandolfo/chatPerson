@@ -140,7 +140,8 @@ class CoachingDashboardController
                 
                 -- Performance Analysis
                 apa.overall_score,
-                apa.specific_feedback
+                apa.detailed_analysis,
+                apa.improvement_suggestions
                 
             FROM conversations c
             LEFT JOIN users u ON c.agent_id = u.id

@@ -618,6 +618,20 @@ Router::post('/contact-lists/{id}/contacts', [ContactListController::class, 'add
 Router::delete('/contact-lists/{id}/contacts', [ContactListController::class, 'removeContact'], ['Authentication']);
 Router::post('/contact-lists/{id}/import-csv', [ContactListController::class, 'importCsv'], ['Authentication']);
 Router::post('/contact-lists/{id}/clear', [ContactListController::class, 'clear'], ['Authentication']);
+Router::put('/contact-lists/{id}/send-order', [ContactListController::class, 'updateSendOrder'], ['Authentication']);
+
+// Fontes de Dados Externas
+Router::get('/external-sources', [\App\Controllers\ExternalDataSourceController::class, 'index'], ['Authentication']);
+Router::get('/external-sources/create', [\App\Controllers\ExternalDataSourceController::class, 'create'], ['Authentication']);
+Router::post('/external-sources', [\App\Controllers\ExternalDataSourceController::class, 'store'], ['Authentication']);
+Router::delete('/external-sources/{id}', [\App\Controllers\ExternalDataSourceController::class, 'destroy'], ['Authentication']);
+Router::post('/external-sources/{id}/sync', [\App\Controllers\ExternalDataSourceController::class, 'sync'], ['Authentication']);
+
+// API Fontes Externas
+Router::post('/api/external-sources/test-connection', [\App\Controllers\ExternalDataSourceController::class, 'testConnection'], ['Authentication']);
+Router::get('/api/external-sources/{id}/tables', [\App\Controllers\ExternalDataSourceController::class, 'listTables'], ['Authentication']);
+Router::get('/api/external-sources/{id}/columns', [\App\Controllers\ExternalDataSourceController::class, 'listColumns'], ['Authentication']);
+Router::get('/api/external-sources/{id}/preview', [\App\Controllers\ExternalDataSourceController::class, 'preview'], ['Authentication']);
 
 // Campanhas (rotas específicas ANTES das rotas com {id})
 Router::get('/campaigns', [CampaignController::class, 'index'], ['Authentication']);

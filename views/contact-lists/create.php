@@ -23,6 +23,32 @@ ob_start();
                 <textarea class="form-control" name="description" rows="3" placeholder="Descreva o propósito desta lista..."></textarea>
             </div>
             
+            <div class="separator my-10"></div>
+            
+            <div class="mb-10">
+                <h4 class="mb-5">Fonte de Dados Externa (Opcional)</h4>
+                <div class="alert alert-info d-flex align-items-center mb-5">
+                    <i class="ki-duotone ki-information-5 fs-2 me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                    <div>
+                        Conecte um banco de dados externo para sincronização automática de contatos.
+                        <a href="/external-sources/create" target="_blank">Configure uma fonte aqui</a>.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="separator my-10"></div>
+            
+            <div class="mb-10">
+                <h4 class="mb-5">Ordem de Envio</h4>
+                <select class="form-select" name="send_order">
+                    <option value="default">Padrão (ordem de adição)</option>
+                    <option value="random">Aleatório</option>
+                    <option value="asc">Crescente por ID</option>
+                    <option value="desc">Decrescente por ID</option>
+                </select>
+                <div class="form-text">Define a ordem que os contatos serão enviados nas campanhas</div>
+            </div>
+            
             <div class="d-flex justify-content-end">
                 <button type="button" class="btn btn-light me-3" onclick="window.history.back()">Cancelar</button>
                 <button type="submit" class="btn btn-primary" id="btn_save">

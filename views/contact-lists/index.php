@@ -12,10 +12,19 @@ ob_start();
             <h2 class="fw-bold">Listas de Contatos</h2>
         </div>
         <div class="card-toolbar">
-            <a href="<?= \App\Helpers\Url::to('/contact-lists/create') ?>" class="btn btn-sm btn-primary">
-                <i class="ki-duotone ki-plus fs-2"></i>
-                Nova Lista
-            </a>
+            <div class="d-flex gap-2">
+                <a href="<?= \App\Helpers\Url::to('/external-sources/create') ?>" class="btn btn-sm btn-light-info">
+                    <i class="ki-duotone ki-technology-2 fs-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Fonte Externa
+                </a>
+                <a href="<?= \App\Helpers\Url::to('/contact-lists/create') ?>" class="btn btn-sm btn-primary">
+                    <i class="ki-duotone ki-plus fs-2"></i>
+                    Nova Lista
+                </a>
+            </div>
         </div>
     </div>
     <div class="card-body pt-0">
@@ -92,8 +101,12 @@ function renderLists(lists) {
                         Criada em ${formatDate(list.created_at)}
                     </div>
                 </div>
-                <div class="card-footer">
-                    <a href="<?= \App\Helpers\Url::to('/contact-lists/') ?>${list.id}" class="btn btn-light-primary btn-sm w-100">
+                <div class="card-footer d-flex gap-2">
+                    <button class="btn btn-light-info btn-sm flex-fill" onclick="openSendOrderModal(${list.id})" title="Configurar ordem de envio">
+                        <i class="ki-duotone ki-sort fs-6"></i>
+                        Ordem
+                    </button>
+                    <a href="<?= \App\Helpers\Url::to('/contact-lists/') ?>${list.id}" class="btn btn-light-primary btn-sm flex-fill">
                         Ver Contatos
                     </a>
                 </div>
@@ -118,6 +131,8 @@ document.addEventListener('DOMContentLoaded', () => {
     loadLists();
 });
 </script>
+
+<?php include __DIR__ . '/send-order.php'; ?>
 
 <?php
 $content = ob_get_clean();

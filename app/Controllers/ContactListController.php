@@ -185,6 +185,40 @@ class ContactListController
             ], 400);
         }
     }
+    
+    /**
+     * Atualizar ordem de envio da lista
+     */
+    public function updateSendOrder(int $id): void
+    {
+        Permission::abortIfCannot('campaigns.edit');
+
+        try {
+            $data = Request::all();
+            
+            $updateData = [
+                'send_order' => $data['send_order'] ?? 'default'
+            ];
+            
+            if (!empty($data['send_order_config'])) {
+                $updateData['send_order_config'] = is_array($data['send_order_config']) 
+                    ? json_encode($data['send_order_config']) 
+                    : $data['send_order_config'];
+            }
+            
+            ContactList::update($id, $updateData);
+
+            Response::json([
+                'success' => true,
+                'message' => 'Ordem de envio atualizada!'
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
 
     /**
      * Adicionar contato à lista

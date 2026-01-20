@@ -318,11 +318,48 @@ class AgentPerformanceAnalysisService
      */
     private static function buildAnalysisPrompt(array $messages, array $conversation, array $settings): string
     {
+        // Calcular métricas reais antes de enviar para IA
+        $metrics = self::calculateConversationMetrics($messages);
+        
         $history = self::formatMessagesForAnalysis($messages);
         $dimensions = $settings['dimensions'];
         
         $prompt = "Você é um especialista em análise de vendas e performance comercial.\n\n";
         $prompt .= "Analise a seguinte conversa de vendas entre um VENDEDOR e um CLIENTE.\n\n";
+        
+        // ADICIONAR MÉTRICAS REAIS
+        $prompt .= "📊 MÉTRICAS CALCULADAS DA CONVERSA:\n";
+        $prompt .= "- Total de mensagens: {$metrics['total_messages']}\n";
+        $prompt .= "- Mensagens do vendedor: {$metrics['agent_messages']}\n";
+        $prompt .= "- Mensagens do cliente: {$metrics['client_messages']}\n";
+        $prompt .= "- Tempo médio de resposta do vendedor: " . self::formatMinutes($metrics['avg_response_time']) . "\n";
+        $prompt .= "- Tempo máximo de resposta: " . self::formatMinutes($metrics['max_response_time']) . "\n";
+        $prompt .= "- Duração total da conversa: " . self::formatMinutes($metrics['conversation_duration']) . "\n\n";
+        
+        // ADICIONAR BENCHMARKS
+        $prompt .= "📋 BENCHMARKS DE REFERÊNCIA:\n";
+        $prompt .= "Tempo de Resposta:\n";
+        $prompt .= "  • 5.0 = EXCELENTE (< 3 minutos em média)\n";
+        $prompt .= "  • 4.0 = BOM (3-5 minutos em média)\n";
+        $prompt .= "  • 3.0 = ACEITÁVEL (5-10 minutos em média)\n";
+        $prompt .= "  • 2.0 = PRECISA MELHORAR (10-20 minutos em média)\n";
+        $prompt .= "  • 1.0 = CRÍTICO (> 20 minutos em média)\n\n";
+        
+        $prompt .= "Follow-up (Persistência e Ir Atrás):\n";
+        $prompt .= "  • 5.0 = Cliente sumiu/enrolou e vendedor retornou MÚLTIPLAS vezes com persistência profissional\n";
+        $prompt .= "  • 4.0 = Cliente disse 'vou pensar' e vendedor retornou cobrando posicionamento\n";
+        $prompt .= "  • 3.0 = Vendedor tentou reativar conversa pelo menos uma vez\n";
+        $prompt .= "  • 2.0 = Vendedor apenas mencionou 'qualquer coisa me chama' mas não foi atrás\n";
+        $prompt .= "  • 1.0 = Vendedor deixou conversa morrer, não insistiu, desistiu fácil\n\n";
+        
+        $prompt .= "⚠️ Follow-up NÃO é agendar reunião! É sobre PERSISTÊNCIA:\n";
+        $prompt .= "  - Cliente some = Vendedor reativa?\n";
+        $prompt .= "  - Cliente enrola = Vendedor insiste?\n";
+        $prompt .= "  - Cliente adia = Vendedor cobra?\n";
+        $prompt .= "  - Ou vendedor desiste fácil?\n\n";
+        
+        $prompt .= "⚠️ IMPORTANTE: Use as métricas calculadas acima para avaliar 'Tempo de Resposta'. Não invente valores!\n\n";
+        
         $prompt .= "Avalie a PERFORMANCE DO VENDEDOR nas seguintes dimensões (nota de 0 a 5, com 1 casa decimal):\n\n";
         
         // Adicionar dimensões habilitadas
@@ -391,12 +428,79 @@ class AgentPerformanceAnalysisService
             'qualification' => "   - Faz perguntas qualificadoras (BANT)?\n   - Entende orçamento, autoridade, necessidade, timing?\n   - Identifica fit do produto?\n   - Evita perder tempo com leads frios?",
             'clarity' => "   - Explica de forma clara?\n   - Evita jargões desnecessários?\n   - Organiza informações logicamente?\n   - Responde o que foi perguntado?",
             'value_proposition' => "   - Apresenta valor, não apenas features?\n   - Conecta produto a benefícios reais?\n   - Usa ROI, social proof, casos de sucesso?\n   - Diferencia da concorrência?",
-            'response_time' => "   - Responde rapidamente?\n   - Não deixa cliente esperando?\n   - Mantém ritmo apropriado?",
-            'follow_up' => "   - Define próximos passos?\n   - Agenda follow-up?\n   - Não deixa conversa morrer?\n   - Persistência saudável?",
+            'response_time' => "   - ⚠️ USE AS MÉTRICAS CALCULADAS ACIMA!\n   - Tempo médio < 3min = 5.0 (excelente)\n   - Tempo médio 3-5min = 4.0 (bom)\n   - Tempo médio 5-10min = 3.0 (aceitável)\n   - Tempo médio 10-20min = 2.0 (precisa melhorar)\n   - Tempo médio > 20min = 1.0 (crítico)",
+            'follow_up' => "   - Vai ATRÁS do cliente que não respondeu?\n   - Cliente disse 'vou pensar' e o vendedor retornou depois?\n   - Cliente sumiu e o vendedor reativou a conversa?\n   - Cliente disse 'volto depois' e o vendedor cobrou?\n   - Ou vendedor deixou a conversa morrer sem insistir?",
             'professionalism' => "   - Gramática e ortografia corretas?\n   - Tom profissional?\n   - Não usa gírias excessivas?\n   - Mantém postura adequada?"
         ];
         
         return $criteria[$dimension] ?? "";
+    }
+    
+    /**
+     * Calcular métricas da conversa
+     */
+    private static function calculateConversationMetrics(array $messages): array
+    {
+        $agentMessages = 0;
+        $clientMessages = 0;
+        $responseTimes = [];
+        $lastClientMessageTime = null;
+        $firstMessageTime = null;
+        $lastMessageTime = null;
+        
+        foreach ($messages as $msg) {
+            $messageTime = strtotime($msg['created_at']);
+            
+            if ($firstMessageTime === null) {
+                $firstMessageTime = $messageTime;
+            }
+            $lastMessageTime = $messageTime;
+            
+            if ($msg['sender_type'] === 'agent') {
+                $agentMessages++;
+                
+                // Calcular tempo de resposta (tempo entre mensagem do cliente e resposta do agente)
+                if ($lastClientMessageTime !== null) {
+                    $responseTime = ($messageTime - $lastClientMessageTime) / 60; // em minutos
+                    if ($responseTime > 0 && $responseTime < 1440) { // ignora > 24h
+                        $responseTimes[] = $responseTime;
+                    }
+                }
+            } else {
+                $clientMessages++;
+                $lastClientMessageTime = $messageTime;
+            }
+        }
+        
+        $avgResponseTime = !empty($responseTimes) ? array_sum($responseTimes) / count($responseTimes) : 0;
+        $maxResponseTime = !empty($responseTimes) ? max($responseTimes) : 0;
+        $conversationDuration = ($lastMessageTime - $firstMessageTime) / 60; // em minutos
+        
+        return [
+            'total_messages' => count($messages),
+            'agent_messages' => $agentMessages,
+            'client_messages' => $clientMessages,
+            'avg_response_time' => round($avgResponseTime, 1),
+            'max_response_time' => round($maxResponseTime, 1),
+            'conversation_duration' => round($conversationDuration, 1),
+            'response_count' => count($responseTimes)
+        ];
+    }
+    
+    /**
+     * Formatar minutos em texto legível
+     */
+    private static function formatMinutes(float $minutes): string
+    {
+        if ($minutes < 1) {
+            return round($minutes * 60) . " segundos";
+        } elseif ($minutes < 60) {
+            return round($minutes, 1) . " minutos";
+        } else {
+            $hours = floor($minutes / 60);
+            $mins = round($minutes % 60);
+            return "{$hours}h {$mins}min";
+        }
     }
     
     /**
@@ -905,6 +1009,9 @@ class AgentPerformanceAnalysisService
         ?string $removedAt,
         array $settings
     ): string {
+        // Calcular métricas reais antes de enviar para IA
+        $metrics = self::calculateConversationMetrics($messages);
+        
         $history = self::formatMessagesForAnalysis($messages);
         $dimensions = $settings['dimensions'];
         
@@ -916,6 +1023,39 @@ class AgentPerformanceAnalysisService
         $prompt .= "PERÍODO DE PARTICIPAÇÃO:\n";
         $prompt .= "- Início: " . ($assignedAt ?? 'Início da conversa') . "\n";
         $prompt .= "- Fim: " . ($removedAt ?? 'Fim da conversa / Ainda ativo') . "\n\n";
+        
+        // ADICIONAR MÉTRICAS REAIS
+        $prompt .= "📊 MÉTRICAS CALCULADAS DESTA PARTICIPAÇÃO:\n";
+        $prompt .= "- Total de mensagens: {$metrics['total_messages']}\n";
+        $prompt .= "- Mensagens do vendedor: {$metrics['agent_messages']}\n";
+        $prompt .= "- Mensagens do cliente: {$metrics['client_messages']}\n";
+        $prompt .= "- Tempo médio de resposta do vendedor: " . self::formatMinutes($metrics['avg_response_time']) . "\n";
+        $prompt .= "- Tempo máximo de resposta: " . self::formatMinutes($metrics['max_response_time']) . "\n";
+        $prompt .= "- Duração desta participação: " . self::formatMinutes($metrics['conversation_duration']) . "\n\n";
+        
+        // ADICIONAR BENCHMARKS
+        $prompt .= "📋 BENCHMARKS DE REFERÊNCIA:\n";
+        $prompt .= "Tempo de Resposta:\n";
+        $prompt .= "  • 5.0 = EXCELENTE (< 3 minutos em média)\n";
+        $prompt .= "  • 4.0 = BOM (3-5 minutos em média)\n";
+        $prompt .= "  • 3.0 = ACEITÁVEL (5-10 minutos em média)\n";
+        $prompt .= "  • 2.0 = PRECISA MELHORAR (10-20 minutos em média)\n";
+        $prompt .= "  • 1.0 = CRÍTICO (> 20 minutos em média)\n\n";
+        
+        $prompt .= "Follow-up (Persistência e Ir Atrás):\n";
+        $prompt .= "  • 5.0 = Cliente sumiu/enrolou e vendedor retornou MÚLTIPLAS vezes com persistência profissional\n";
+        $prompt .= "  • 4.0 = Cliente disse 'vou pensar' e vendedor retornou cobrando posicionamento\n";
+        $prompt .= "  • 3.0 = Vendedor tentou reativar conversa pelo menos uma vez\n";
+        $prompt .= "  • 2.0 = Vendedor apenas mencionou 'qualquer coisa me chama' mas não foi atrás\n";
+        $prompt .= "  • 1.0 = Vendedor deixou conversa morrer, não insistiu, desistiu fácil\n\n";
+        
+        $prompt .= "⚠️ Follow-up NÃO é agendar reunião! É sobre PERSISTÊNCIA:\n";
+        $prompt .= "  - Cliente some = Vendedor reativa?\n";
+        $prompt .= "  - Cliente enrola = Vendedor insiste?\n";
+        $prompt .= "  - Cliente adia = Vendedor cobra?\n";
+        $prompt .= "  - Ou vendedor desiste fácil?\n\n";
+        
+        $prompt .= "⚠️ IMPORTANTE: Use as métricas calculadas acima para avaliar 'Tempo de Resposta'. Não invente valores!\n\n";
         
         $prompt .= "Avalie a PERFORMANCE DESTE VENDEDOR nas seguintes dimensões (nota de 0 a 5, com 1 casa decimal):\n\n";
         

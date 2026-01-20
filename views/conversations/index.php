@@ -81,7 +81,7 @@ function renderAttachment($attachment) {
         $html .= '<span class="path2"></span>';
         $html .= '</i>';
         $html .= '</div>';
-        $html .= '<div class="flex-grow-1" style="min-width: 300px;">';
+        $html .= '<div class="flex-grow-1" style="min-width: 0; max-width: 100%;">';
         $html .= '<audio controls style="width: 100%; outline: none;">';
         $html .= '<source src="' . $url . '" type="' . ($attachment['mime_type'] ?? $attachment['mimetype'] ?? 'audio/webm') . '">';
         $html .= 'Seu navegador não suporta íudio.';
@@ -678,6 +678,13 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     display: flex;
     align-items: center;
     gap: 15px;
+    min-width: 0;
+}
+
+.chat-header-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
 }
 
 .chat-header-title {
@@ -690,6 +697,24 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
 .chat-header-subtitle {
     font-size: 13px;
     color: var(--bs-text-gray-700);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.chat-header-channel {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.chat-header-separator {
+    color: var(--bs-text-gray-500);
+}
+
+.chat-header-actions {
+    flex-wrap: wrap;
 }
 
 .chat-messages {
@@ -941,6 +966,17 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
 
 .message-bubble.audio-only .audio-attachment {
     margin: 0;
+}
+
+/* Evitar player de áudio estourar a bolha */
+.audio-attachment {
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.audio-attachment audio {
+    width: 100%;
+    max-width: 100%;
 }
 
 /* Player de íudio deve herdar cor de fundo da bolha */
@@ -1743,18 +1779,43 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     }
     
     .chat-header {
-        padding: 15px;
+        padding: 12px 15px;
         position: sticky;
         top: 0;
         background: var(--bs-body-bg);
         z-index: 100;
-        flex-wrap: wrap;
+        flex-direction: column;
+        align-items: flex-start;
         gap: 10px;
     }
     
     .chat-header-info {
-        flex: 1;
-        min-width: 0;
+        width: 100%;
+        gap: 10px;
+    }
+
+    .chat-header .symbol {
+        width: 40px;
+        height: 40px;
+    }
+
+    .chat-header-title {
+        font-size: 15px;
+        line-height: 1.2;
+    }
+
+    .chat-header-subtitle {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .chat-header-separator {
+        display: none;
+    }
+
+    .chat-header-channel svg {
+        display: none;
     }
     
     /* Botão voltar no header do chat (mobile) */
@@ -1773,6 +1834,12 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
         padding: 8px !important;
         min-width: 40px;
         height: 40px;
+    }
+
+    .chat-header-actions {
+        width: 100%;
+        gap: 8px;
+        justify-content: flex-start;
     }
     
     /* Mensagens - padding reduzido em mobile */
@@ -2641,7 +2708,7 @@ function getChannelInfo(channel) {
                     ?>
                     <div class="symbol-label bg-light-primary text-primary fs-3 fw-bold"><?= $initials ?></div>
                 </div>
-                <div>
+                <div class="chat-header-text">
                     <div class="chat-header-title" id="chat-header-contact-name"><?= htmlspecialchars($selectedConversation['contact_name'] ?? 'Sem nome') ?></div>
                     <div class="chat-header-subtitle">
                         <?php
@@ -2664,9 +2731,9 @@ function getChannelInfo(channel) {
                             'youtube' => 'YouTube',
                             default => 'Chat'
                         };
-                        echo $channelIcon . ' ' . $channelName;
                         ?>
-                        •
+                        <span class="chat-header-channel" id="chat-header-channel"><?= $channelIcon . ' ' . $channelName ?></span>
+                        <span class="chat-header-separator">•</span>
                         <?php
                         $statusClass = match($selectedConversation['status'] ?? 'open') {
                             'open' => 'success',
@@ -2681,11 +2748,13 @@ function getChannelInfo(channel) {
                             default => 'Desconhecida'
                         };
                         ?>
-                        <span class="badge badge-sm badge-light-<?= $statusClass ?>"><?= $statusText ?></span>
+                        <span class="chat-header-status" id="chat-header-status">
+                            <span class="badge badge-sm badge-light-<?= $statusClass ?>"><?= $statusText ?></span>
+                        </span>
                     </div>
                 </div>
             </div>
-            <div class="d-flex align-items-center gap-2">
+            <div class="d-flex align-items-center gap-2 chat-header-actions">
                 <!-- Busca de mensagens -->
                 <div class="position-relative d-flex gap-2" style="width: 250px;">
                     <div class="position-relative flex-grow-1">
@@ -7612,11 +7681,17 @@ function updateChatHeader(conversation) {
     const channel = conversation.channel || 'chat';
     const status = conversation.status || 'open';
     
-    const channelIcon = {
-        'whatsapp': '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="#25D366" style="vertical-align: middle; margin-right: 4px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg> WhatsApp',
-        'email': '📧 Email',
-        'chat': '💬 Chat'
-    }[channel] || '💬 Chat';
+    let channelLabel = '💬 Chat';
+    if (typeof getChannelInfo === 'function') {
+        const channelInfo = getChannelInfo(channel);
+        channelLabel = `${channelInfo.icon} ${channelInfo.name}`;
+    } else {
+        channelLabel = {
+            'whatsapp': '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="#25D366" style="vertical-align: middle; margin-right: 4px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg> WhatsApp',
+            'email': '📧 Email',
+            'chat': '💬 Chat'
+        }[channel] || '💬 Chat';
+    }
     
     const statusClass = {
         'open': 'success',
@@ -7647,9 +7722,13 @@ function updateChatHeader(conversation) {
     }
     
     // Atualizar canal e status
-    const subtitleElement = header.querySelector('.chat-header-subtitle');
-    if (subtitleElement) {
-        subtitleElement.innerHTML = `${channelIcon} • <span class="badge badge-sm badge-light-${statusClass}">${statusText}</span>`;
+    const channelElement = header.querySelector('#chat-header-channel');
+    if (channelElement) {
+        channelElement.innerHTML = channelLabel;
+    }
+    const statusElement = header.querySelector('#chat-header-status');
+    if (statusElement) {
+        statusElement.innerHTML = `<span class="badge badge-sm badge-light-${statusClass}">${statusText}</span>`;
     }
     
     // Atualizar botão de chamada Api4Com

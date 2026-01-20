@@ -48,13 +48,15 @@ class ExternalDataSourceService
      */
     public static function testConnection(array $connectionConfig, string $type): array
     {
-        Logger::info('ExternalDataSourceService::testConnection - Iniciando teste', [
+        $logInfo = json_encode([
             'type' => $type,
             'host' => $connectionConfig['host'] ?? 'não definido',
             'port' => $connectionConfig['port'] ?? 'não definido',
             'database' => $connectionConfig['database'] ?? 'não definido',
             'username' => $connectionConfig['username'] ?? 'não definido'
-        ]);
+        ], JSON_UNESCAPED_UNICODE);
+        
+        Logger::info('ExternalDataSourceService::testConnection - Iniciando: ' . $logInfo);
         
         try {
             Logger::info('ExternalDataSourceService::testConnection - Criando conexão PDO');
@@ -66,9 +68,7 @@ class ExternalDataSourceService
             // Testar query simples
             $result = $connection->query("SELECT 1 as test")->fetch();
             
-            Logger::info('ExternalDataSourceService::testConnection - Query executada', [
-                'result' => $result
-            ]);
+            Logger::info('ExternalDataSourceService::testConnection - Query executada: ' . json_encode($result));
             
             if ($result && $result['test'] == 1) {
                 Logger::info('ExternalDataSourceService::testConnection - Teste bem-sucedido');
@@ -85,12 +85,7 @@ class ExternalDataSourceService
             ];
             
         } catch (\PDOException $e) {
-            Logger::error('ExternalDataSourceService::testConnection - Erro PDO', [
-                'code' => $e->getCode(),
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ]);
+            Logger::error('ExternalDataSourceService::testConnection - Erro PDO [' . $e->getCode() . ']: ' . $e->getMessage());
             
             return [
                 'success' => false,
@@ -98,12 +93,7 @@ class ExternalDataSourceService
                 'error_code' => $e->getCode()
             ];
         } catch (\Exception $e) {
-            Logger::error('ExternalDataSourceService::testConnection - Erro geral', [
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString()
-            ]);
+            Logger::error('ExternalDataSourceService::testConnection - Erro geral: ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
             
             return [
                 'success' => false,
@@ -123,14 +113,8 @@ class ExternalDataSourceService
         $username = $config['username'] ?? '';
         $password = $config['password'] ?? '';
         
-        Logger::info('ExternalDataSourceService::createConnection - Preparando conexão', [
-            'type' => $type,
-            'host' => $host,
-            'port' => $port,
-            'database' => $database,
-            'username' => $username,
-            'has_password' => !empty($password)
-        ]);
+        $logInfo = "type={$type}, host={$host}, port={$port}, database={$database}, username={$username}, has_password=" . (!empty($password) ? 'yes' : 'no');
+        Logger::info('ExternalDataSourceService::createConnection - Preparando: ' . $logInfo);
         
         $driverMap = [
             'mysql' => 'mysql',
@@ -145,9 +129,7 @@ class ExternalDataSourceService
             $dsn .= ';charset=utf8mb4';
         }
         
-        Logger::info('ExternalDataSourceService::createConnection - DSN construído', [
-            'dsn' => $dsn
-        ]);
+        Logger::info('ExternalDataSourceService::createConnection - DSN: ' . $dsn);
         
         try {
             Logger::info('ExternalDataSourceService::createConnection - Tentando criar PDO');
@@ -163,12 +145,7 @@ class ExternalDataSourceService
             return $pdo;
             
         } catch (\PDOException $e) {
-            Logger::error('ExternalDataSourceService::createConnection - Erro ao criar PDO', [
-                'code' => $e->getCode(),
-                'message' => $e->getMessage(),
-                'dsn' => $dsn,
-                'username' => $username
-            ]);
+            Logger::error('ExternalDataSourceService::createConnection - Erro PDO [' . $e->getCode() . ']: ' . $e->getMessage() . ' | DSN: ' . $dsn);
             throw $e;
         }
     }

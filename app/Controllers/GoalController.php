@@ -100,6 +100,13 @@ class GoalController
                 'alert_on_risk' => Request::post('alert_on_risk', '1') === '1' ? 1 : 0,
                 'reward_points' => Request::post('reward_points', 0),
                 'reward_badge' => Request::post('reward_badge') ?: null,
+                'enable_bonus' => Request::post('enable_bonus', '0') === '1' ? 1 : 0,
+                'ote_base_salary' => Request::post('ote_base_salary') ?: null,
+                'ote_target_commission' => Request::post('ote_target_commission') ?: null,
+                'ote_total' => Request::post('ote_base_salary') && Request::post('ote_target_commission') 
+                    ? floatval(Request::post('ote_base_salary')) + floatval(Request::post('ote_target_commission'))
+                    : null,
+                'bonus_calculation_type' => Request::post('bonus_calculation_type', 'tiered'),
                 'created_by' => Auth::id()
             ];
             
@@ -208,7 +215,14 @@ class GoalController
                 'enable_projection' => Request::post('enable_projection', '1') === '1' ? 1 : 0,
                 'alert_on_risk' => Request::post('alert_on_risk', '1') === '1' ? 1 : 0,
                 'reward_points' => Request::post('reward_points', 0),
-                'reward_badge' => Request::post('reward_badge') ?: null
+                'reward_badge' => Request::post('reward_badge') ?: null,
+                'enable_bonus' => Request::post('enable_bonus', '0') === '1' ? 1 : 0,
+                'ote_base_salary' => Request::post('ote_base_salary') ?: null,
+                'ote_target_commission' => Request::post('ote_target_commission') ?: null,
+                'ote_total' => Request::post('ote_base_salary') && Request::post('ote_target_commission') 
+                    ? floatval(Request::post('ote_base_salary')) + floatval(Request::post('ote_target_commission'))
+                    : null,
+                'bonus_calculation_type' => Request::post('bonus_calculation_type', 'tiered')
             ];
             
             GoalService::update($id, $data);

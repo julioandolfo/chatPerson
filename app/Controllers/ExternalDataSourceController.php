@@ -80,32 +80,27 @@ class ExternalDataSourceController
         try {
             $data = Request::json();
             
-            \App\Helpers\Logger::info('Dados recebidos para teste de conexão', [
+            $logInfo = json_encode([
                 'type' => $data['type'] ?? 'não informado',
-                'connection_config' => [
-                    'host' => $data['connection_config']['host'] ?? 'não informado',
-                    'port' => $data['connection_config']['port'] ?? 'não informado',
-                    'database' => $data['connection_config']['database'] ?? 'não informado',
-                    'username' => $data['connection_config']['username'] ?? 'não informado',
-                    'password' => !empty($data['connection_config']['password']) ? '***DEFINIDA***' : 'não informada'
-                ]
-            ]);
+                'host' => $data['connection_config']['host'] ?? 'não informado',
+                'port' => $data['connection_config']['port'] ?? 'não informado',
+                'database' => $data['connection_config']['database'] ?? 'não informado',
+                'username' => $data['connection_config']['username'] ?? 'não informado',
+                'has_password' => !empty($data['connection_config']['password'])
+            ], JSON_UNESCAPED_UNICODE);
+            
+            \App\Helpers\Logger::info('Dados recebidos: ' . $logInfo);
             
             $result = ExternalDataSourceService::testConnection(
                 $data['connection_config'] ?? [],
                 $data['type'] ?? 'mysql'
             );
 
-            \App\Helpers\Logger::info('Resultado do teste de conexão', $result);
+            \App\Helpers\Logger::info('Resultado: ' . json_encode($result, JSON_UNESCAPED_UNICODE));
 
             Response::json($result);
         } catch (\Exception $e) {
-            \App\Helpers\Logger::error('ERRO ao testar conexão externa', [
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString()
-            ]);
+            \App\Helpers\Logger::error('ERRO ao testar conexão: ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
             
             Response::json([
                 'success' => false,

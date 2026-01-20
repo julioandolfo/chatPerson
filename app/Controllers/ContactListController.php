@@ -73,7 +73,7 @@ class ContactListController
         Permission::abortIfCannot('campaigns.create');
 
         try {
-            $data = Request::all();
+            $data = Request::json();
             $data['created_by'] = Auth::id();
 
             $listId = ContactListService::create($data);
@@ -149,7 +149,7 @@ class ContactListController
         Permission::abortIfCannot('campaigns.edit');
 
         try {
-            $data = Request::all();
+            $data = Request::json();
             ContactListService::update($id, $data);
 
             Response::json([
@@ -194,7 +194,7 @@ class ContactListController
         Permission::abortIfCannot('campaigns.edit');
 
         try {
-            $data = Request::all();
+            $data = Request::json();
             
             $updateData = [
                 'send_order' => $data['send_order'] ?? 'default'

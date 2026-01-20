@@ -5,12 +5,8 @@
 use App\Helpers\Url;
 
 $isEdit = isset($goal);
-$pageTitle = $isEdit ? 'Editar Meta' : 'Nova Meta';
-$breadcrumbs = [
-    ['title' => 'Início', 'url' => Url::to('/')],
-    ['title' => 'Metas', 'url' => Url::to('/goals')],
-    ['title' => $pageTitle, 'url' => '']
-];
+$layout = 'layouts.metronic.app';
+$title = $isEdit ? 'Editar Meta' : 'Nova Meta';
 
 ob_start();
 ?>
@@ -398,5 +394,5 @@ document.getElementById('period-type').addEventListener('change', function() {
 
 <?php
 $content = ob_get_clean();
-include __DIR__ . '/../layouts/metronic/main.php';
+include __DIR__ . '/../layouts/metronic/app.php';
 ?>

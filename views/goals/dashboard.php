@@ -4,11 +4,8 @@
  */
 use App\Helpers\Url;
 
-$pageTitle = 'Minhas Metas';
-$breadcrumbs = [
-    ['title' => 'Início', 'url' => Url::to('/')],
-    ['title' => 'Minhas Metas', 'url' => '']
-];
+$layout = 'layouts.metronic.app';
+$title = 'Minhas Metas';
 
 ob_start();
 ?>
@@ -197,5 +194,5 @@ ob_start();
 
 <?php
 $content = ob_get_clean();
-include __DIR__ . '/../layouts/metronic/main.php';
+include __DIR__ . '/../layouts/metronic/app.php';
 ?>

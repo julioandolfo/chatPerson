@@ -356,13 +356,23 @@
                             </a>
                         </div>
                         <?php endif; ?>
-                        <?php if (\App\Helpers\Permission::can('agent_performance.goals.view')): ?>
+                        <?php if (\App\Helpers\Permission::can('goals.view')): ?>
                         <div class="menu-item">
-                            <a class="menu-link <?= isActive('/agent-performance/goals', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/agent-performance/goals?agent_id=' . \App\Helpers\Auth::user()['id']) ?>">
+                            <a class="menu-link <?= isActive('/goals/dashboard', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/goals/dashboard') ?>">
                                 <span class="menu-bullet">
                                     <span class="bullet bullet-dot"></span>
                                 </span>
                                 <span class="menu-title">Minhas Metas</span>
+                            </a>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (\App\Helpers\Permission::can('goals.create') || \App\Helpers\Permission::can('goals.edit')): ?>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/goals', $currentUri) && !isActive('/goals/dashboard', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/goals') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">🎯 Gerenciar Metas</span>
                             </a>
                         </div>
                         <?php endif; ?>

@@ -4,11 +4,8 @@
  */
 use App\Helpers\Url;
 
-$pageTitle = 'Gerenciar Metas';
-$breadcrumbs = [
-    ['title' => 'Início', 'url' => Url::to('/')],
-    ['title' => 'Metas', 'url' => '']
-];
+$layout = 'layouts.metronic.app';
+$title = 'Gerenciar Metas';
 
 ob_start();
 ?>
@@ -223,5 +220,5 @@ function deleteGoal(id, name) {
 
 <?php
 $content = ob_get_clean();
-include __DIR__ . '/../layouts/metronic/main.php';
+include __DIR__ . '/../layouts/metronic/app.php';
 ?>

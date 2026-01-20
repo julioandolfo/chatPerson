@@ -178,15 +178,21 @@ class Goal extends Model
             );
         }
         
-        // Buscar departamento do agente
-        $user = Database::fetch("SELECT department_id FROM users WHERE id = ?", [$agentId]);
+        // Buscar departamentos do agente (relação muitos-para-muitos)
+        $departments = Database::fetchAll(
+            "SELECT department_id FROM agent_departments WHERE user_id = ?",
+            [$agentId]
+        );
+        
         $departmentGoals = [];
-        if (!empty($user['department_id'])) {
+        if (!empty($departments)) {
+            $departmentIds = array_column($departments, 'department_id');
+            $placeholders = str_repeat('?,', count($departmentIds) - 1) . '?';
             $departmentGoals = Database::fetchAll(
-                "SELECT * FROM goals WHERE target_type = 'department' AND target_id = ? 
+                "SELECT * FROM goals WHERE target_type = 'department' AND target_id IN ($placeholders)
                  AND is_active = 1 AND start_date <= CURDATE() AND end_date >= CURDATE()
                  ORDER BY priority DESC",
-                [$user['department_id']]
+                $departmentIds
             );
         }
         

@@ -10,6 +10,8 @@ use App\Models\Goal;
 use App\Models\GoalProgress;
 use App\Models\GoalAchievement;
 use App\Models\GoalAlert;
+use App\Models\GoalBonusTier;
+use App\Models\GoalBonusEarned;
 use App\Helpers\Database;
 use App\Helpers\Validator;
 use App\Helpers\Logger;
@@ -137,6 +139,11 @@ class GoalService
         // Verificar se atingiu a meta
         if ($percentage >= 100 && !GoalAchievement::isAchieved($goalId)) {
             self::recordAchievement($goal, $currentValue, $percentage);
+        }
+        
+        // Calcular e registrar bonificações (se habilitado)
+        if ($goal['enable_bonus'] ?? false) {
+            self::calculateAndRecordBonus($goal, $percentage);
         }
         
         // Gerar alertas se necessário
@@ -405,11 +412,15 @@ class GoalService
                 
             case 'department':
                 if (!$targetId) return [];
-                $users = Database::fetchAll(
-                    "SELECT id FROM users WHERE department_id = ? AND status = 'active'",
+                // Usar tabela de relacionamento agent_departments
+                $agents = Database::fetchAll(
+                    "SELECT DISTINCT ad.user_id 
+                     FROM agent_departments ad
+                     INNER JOIN users u ON ad.user_id = u.id
+                     WHERE ad.department_id = ? AND u.status = 'active'",
                     [$targetId]
                 );
-                return array_column($users, 'id');
+                return array_column($agents, 'user_id');
                 
             case 'global':
                 $users = Database::fetchAll(
@@ -809,6 +820,43 @@ class GoalService
     }
     
     /**
+     * Calcular e registrar bonificação
+     */
+    private static function calculateAndRecordBonus(array $goal, float $percentage): void
+    {
+        // Apenas para metas individuais
+        if ($goal['target_type'] !== 'individual' || empty($goal['target_id'])) {
+            return;
+        }
+        
+        try {
+            $bonusData = GoalBonusTier::calculateBonus($goal['id'], $percentage);
+            
+            if ($bonusData['total_bonus'] > 0 && !empty($bonusData['last_tier'])) {
+                GoalBonusEarned::recordBonus(
+                    $goal['id'],
+                    $goal['target_id'],
+                    $bonusData['total_bonus'],
+                    $percentage,
+                    $bonusData['last_tier']['id'] ?? null
+                );
+                
+                Logger::info('Bonificação calculada', [
+                    'goal_id' => $goal['id'],
+                    'user_id' => $goal['target_id'],
+                    'bonus' => $bonusData['total_bonus'],
+                    'percentage' => $percentage
+                ]);
+            }
+        } catch (\Exception $e) {
+            Logger::error('Erro ao calcular bonificação', [
+                'goal_id' => $goal['id'],
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+    
+    /**
      * Obter resumo de metas para dashboard
      */
     public static function getDashboardSummary(int $userId): array
@@ -849,6 +897,44 @@ class GoalService
             }
         }
         
+        // Adicionar resumo de bonificações
+        $summary['bonus_summary'] = self::getBonusSummary($userId);
+        
         return $summary;
+    }
+    
+    /**
+     * Obter resumo de bonificações do agente
+     */
+    public static function getBonusSummary(int $userId): array
+    {
+        // Bonificações do mês atual
+        $currentMonth = date('Y-m');
+        $startDate = $currentMonth . '-01';
+        $endDate = date('Y-m-t', strtotime($startDate));
+        
+        $monthSummary = GoalBonusEarned::getAgentSummary($userId, (int)date('Y'), (int)date('m'));
+        
+        // Bonificações recentes
+        $recentBonuses = GoalBonusEarned::getByAgent($userId, null, 5);
+        
+        // Total acumulado no ano
+        $yearStart = date('Y') . '-01-01';
+        $yearEnd = date('Y') . '-12-31';
+        $yearTotal = GoalBonusEarned::getTotalByPeriod($userId, $yearStart, $yearEnd, 'paid');
+        
+        return [
+            'month' => $monthSummary,
+            'year_total' => $yearTotal,
+            'recent' => $recentBonuses
+        ];
+    }
+    
+    /**
+     * Criar tiers padrão para uma meta
+     */
+    public static function createDefaultBonusTiers(int $goalId, float $targetCommission): void
+    {
+        GoalBonusTier::createDefaultTiers($goalId, $targetCommission);
     }
 }

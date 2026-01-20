@@ -50,7 +50,7 @@ class ExternalDataSourceController
         Permission::abortIfCannot('campaigns.create');
 
         try {
-            $data = Request::all();
+            $data = Request::json();
             $data['created_by'] = Auth::id();
 
             $sourceId = ExternalDataSourceService::create($data);
@@ -78,7 +78,7 @@ class ExternalDataSourceController
         \App\Helpers\Logger::info('=== TESTE DE CONEXÃO EXTERNA INICIADO ===');
 
         try {
-            $data = Request::all();
+            $data = Request::json();
             
             \App\Helpers\Logger::info('Dados recebidos para teste de conexão', [
                 'type' => $data['type'] ?? 'não informado',

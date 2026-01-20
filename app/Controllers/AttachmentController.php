@@ -19,8 +19,10 @@ class AttachmentController
      */
     public function download(string $path): void
     {
-        // Verificar permissão básica
-        Permission::abortIfCannot('conversations.view');
+        // ✅ CORRIGIDO: Verificar permissão correta
+        if (!Permission::can('conversations.view.own') && !Permission::can('conversations.view.all')) {
+            Permission::abortIfCannot('conversations.view.own');
+        }
         
         // Decodificar path (pode vir codificado)
         $path = urldecode($path);
@@ -82,8 +84,10 @@ class AttachmentController
      */
     public function view(string $path): void
     {
-        // Verificar permissão básica
-        Permission::abortIfCannot('conversations.view');
+        // ✅ CORRIGIDO: Verificar permissão correta
+        if (!Permission::can('conversations.view.own') && !Permission::can('conversations.view.all')) {
+            Permission::abortIfCannot('conversations.view.own');
+        }
         
         // Decodificar path
         $path = urldecode($path);
@@ -143,7 +147,10 @@ class AttachmentController
      */
     public function listByConversation(int $conversationId): void
     {
-        Permission::abortIfCannot('conversations.view');
+        // ✅ CORRIGIDO: Verificar permissão correta
+        if (!Permission::can('conversations.view.own') && !Permission::can('conversations.view.all')) {
+            Permission::abortIfCannot('conversations.view.own');
+        }
         
         // Verificar acesso à conversa
         $conversation = Conversation::find($conversationId);

@@ -91,6 +91,7 @@ class ConversationSettingsService
                 'working_hours_end' => '18:00',
                 'auto_reassign_on_sla_breach' => true,
                 'reassign_after_minutes' => 30, // minutos após SLA
+                'message_delay_minutes' => 1, // delay mínimo para iniciar SLA (evita mensagens automáticas/despedidas)
             ],
             
             // Distribuição
@@ -834,7 +835,7 @@ class ConversationSettingsService
 
     /**
      * Verificar SLA de primeira resposta
-     * ATUALIZADO: Agora considera working hours e SLA por contexto
+     * ATUALIZADO: Agora considera working hours, SLA por contexto e delay de 1 minuto
      */
     public static function checkFirstResponseSLA(int $conversationId, bool $humanOnly = false): bool
     {
@@ -872,24 +873,139 @@ class ConversationSettingsService
             return true; // Já respondeu
         }
         
+        // ✅ NOVO: Verificar se mensagem do cliente precisa esperar delay mínimo
+        if (!self::shouldStartSLACount($conversationId)) {
+            return true; // SLA ainda não deve começar a contar
+        }
+        
         // Obter SLA aplicável (pode ser personalizado por prioridade/canal/setor)
         $slaConfig = SLARule::getSLAForConversation($conversation);
         $slaMinutes = $slaConfig['first_response_time'];
         
         // Calcular tempo decorrido considerando working hours e pausas
-        $createdAt = new \DateTime($conversation['created_at']);
+        $startTime = self::getSLAStartTime($conversationId);
         $now = new \DateTime();
         
         // Descontar tempo pausado
         $pausedDuration = (int)($conversation['sla_paused_duration'] ?? 0);
         
         // Calcular minutos considerando working hours
-        $elapsedMinutes = WorkingHoursCalculator::calculateMinutes($createdAt, $now);
+        $elapsedMinutes = WorkingHoursCalculator::calculateMinutes($startTime, $now);
         $elapsedMinutes -= $pausedDuration;
         
         return $elapsedMinutes < $slaMinutes;
     }
 
+    /**
+     * Verificar se SLA deve começar a contar (delay de 1 minuto após última mensagem do agente)
+     * Evita contar mensagens automáticas, despedidas rápidas ("ok", "obrigado", etc)
+     */
+    private static function shouldStartSLACount(int $conversationId): bool
+    {
+        $settings = self::getSettings();
+        $delayMinutes = $settings['sla']['message_delay_minutes'] ?? 1;
+        
+        // Se delay for 0, sempre começar a contar
+        if ($delayMinutes <= 0) {
+            return true;
+        }
+        
+        // Buscar última mensagem do agente e primeira mensagem do cliente após ela
+        $sql = "SELECT 
+                    (SELECT MAX(created_at) FROM messages 
+                     WHERE conversation_id = ? AND sender_type = 'agent') as last_agent_message,
+                    (SELECT MIN(created_at) FROM messages 
+                     WHERE conversation_id = ? AND sender_type = 'contact' 
+                     AND created_at > COALESCE(
+                         (SELECT MAX(created_at) FROM messages 
+                          WHERE conversation_id = ? AND sender_type = 'agent'), 
+                         '1970-01-01'
+                     )) as first_contact_after_agent";
+        
+        $result = Database::fetch($sql, [$conversationId, $conversationId, $conversationId]);
+        
+        // Se não há mensagem do agente ainda, começar a contar desde a criação
+        if (!$result || !$result['last_agent_message']) {
+            return true;
+        }
+        
+        // Se não há mensagem do contato após agente, não há o que contar
+        if (!$result['first_contact_after_agent']) {
+            return false;
+        }
+        
+        // Calcular diferença em minutos
+        $lastAgent = new \DateTime($result['last_agent_message']);
+        $firstContact = new \DateTime($result['first_contact_after_agent']);
+        
+        $diffSeconds = $firstContact->getTimestamp() - $lastAgent->getTimestamp();
+        $diffMinutes = $diffSeconds / 60;
+        
+        // SLA só começa a contar se passou mais de X minutos
+        return $diffMinutes >= $delayMinutes;
+    }
+    
+    /**
+     * Obter momento em que SLA deve começar a contar
+     * Considera delay de 1 minuto após última mensagem do agente
+     */
+    private static function getSLAStartTime(int $conversationId): \DateTime
+    {
+        $settings = self::getSettings();
+        $delayMinutes = $settings['sla']['message_delay_minutes'] ?? 1;
+        
+        $conversation = \App\Models\Conversation::find($conversationId);
+        if (!$conversation) {
+            return new \DateTime();
+        }
+        
+        // Se delay desabilitado, usar created_at
+        if ($delayMinutes <= 0) {
+            return new \DateTime($conversation['created_at']);
+        }
+        
+        // Buscar última mensagem do agente e primeira do contato após ela
+        $sql = "SELECT 
+                    (SELECT MAX(created_at) FROM messages 
+                     WHERE conversation_id = ? AND sender_type = 'agent') as last_agent_message,
+                    (SELECT MIN(created_at) FROM messages 
+                     WHERE conversation_id = ? AND sender_type = 'contact' 
+                     AND created_at > COALESCE(
+                         (SELECT MAX(created_at) FROM messages 
+                          WHERE conversation_id = ? AND sender_type = 'agent'), 
+                         '1970-01-01'
+                     )) as first_contact_after_agent";
+        
+        $result = Database::fetch($sql, [$conversationId, $conversationId, $conversationId]);
+        
+        // Se não há mensagem do agente, usar created_at
+        if (!$result || !$result['last_agent_message']) {
+            return new \DateTime($conversation['created_at']);
+        }
+        
+        // Se não há mensagem do contato após agente, usar agora
+        if (!$result['first_contact_after_agent']) {
+            return new \DateTime();
+        }
+        
+        // Calcular se passou o delay
+        $lastAgent = new \DateTime($result['last_agent_message']);
+        $firstContact = new \DateTime($result['first_contact_after_agent']);
+        
+        $diffSeconds = $firstContact->getTimestamp() - $lastAgent->getTimestamp();
+        $diffMinutes = $diffSeconds / 60;
+        
+        // Se passou o delay, SLA começa X minutos após mensagem do agente
+        if ($diffMinutes >= $delayMinutes) {
+            $startTime = clone $lastAgent;
+            $startTime->modify("+{$delayMinutes} minutes");
+            return $startTime;
+        }
+        
+        // Se não passou, usar created_at
+        return new \DateTime($conversation['created_at']);
+    }
+    
     /**
      * Verificar SLA de resolução
      * ATUALIZADO: Agora considera working hours, pausas e SLA por contexto
@@ -927,6 +1043,14 @@ class ConversationSettingsService
 
     /**
      * Pausar SLA (quando conversa está em snooze, aguardando cliente, etc)
+     * 
+     * ✅ CHAMADO AUTOMATICAMENTE:
+     * - Quando conversa é fechada (ConversationService::close)
+     * 
+     * PODE SER CHAMADO MANUALMENTE:
+     * - Quando conversa é colocada em snooze
+     * - Quando aguardando resposta do cliente
+     * - Quando fora de horário de atendimento
      */
     public static function pauseSLA(int $conversationId): bool
     {
@@ -942,6 +1066,14 @@ class ConversationSettingsService
     
     /**
      * Retomar SLA (despausar)
+     * 
+     * ✅ CHAMADO AUTOMATICAMENTE:
+     * - Quando conversa é reaberta (ConversationService::reopen)
+     * 
+     * PODE SER CHAMADO MANUALMENTE:
+     * - Quando conversa sai do snooze
+     * - Quando cliente responde
+     * - Quando volta ao horário de atendimento
      */
     public static function resumeSLA(int $conversationId): bool
     {
@@ -965,6 +1097,7 @@ class ConversationSettingsService
     
     /**
      * Obter tempo de SLA decorrido (em minutos)
+     * ATUALIZADO: Considera delay de mensagem e ponto de início correto
      */
     public static function getElapsedSLAMinutes(int $conversationId): int
     {
@@ -973,7 +1106,13 @@ class ConversationSettingsService
             return 0;
         }
         
-        $createdAt = new \DateTime($conversation['created_at']);
+        // ✅ Verificar se SLA deve começar a contar
+        if (!self::shouldStartSLACount($conversationId)) {
+            return 0; // SLA ainda não começou
+        }
+        
+        // ✅ Usar tempo de início correto (considerando delay)
+        $startTime = self::getSLAStartTime($conversationId);
         $now = new \DateTime();
         
         // Se está pausado, usar o tempo até a pausa
@@ -981,7 +1120,7 @@ class ConversationSettingsService
             $now = new \DateTime($conversation['sla_paused_at']);
         }
         
-        $elapsed = WorkingHoursCalculator::calculateMinutes($createdAt, $now);
+        $elapsed = WorkingHoursCalculator::calculateMinutes($startTime, $now);
         $paused = (int)($conversation['sla_paused_duration'] ?? 0);
         
         return max(0, $elapsed - $paused);

@@ -959,6 +959,12 @@ class FunnelService
     
     /**
      * Calcular compliance de SLA
+     * 
+     * NOTA: SLA de funil usa HORAS (tempo de permanência no estágio)
+     * SLA global usa MINUTOS (tempo de primeira resposta)
+     * São conceitos diferentes:
+     * - SLA Funil: Quanto tempo uma conversa fica em um estágio específico
+     * - SLA Global: Quanto tempo para responder/resolver uma conversa
      */
     private static function calculateSLACompliance(int $stageId, int $slaHours, string $dateFrom, string $dateTo): float
     {

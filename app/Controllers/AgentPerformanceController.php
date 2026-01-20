@@ -19,6 +19,7 @@ use App\Services\DashboardService;
 use App\Services\AvailabilityService;
 use App\Services\AgentConversionService;
 use App\Services\AgentPerformanceService;
+use App\Services\GoalService;
 use App\Services\CoachingMetricsService;
 use App\Models\User;
 use App\Models\Setting;
@@ -149,7 +150,9 @@ class AgentPerformanceController
             'availabilityStats' => $availabilityStats,
             'conversionMetrics' => $conversionMetrics,
             'slaSettings' => $slaSettings,
-            'analyzedConversations' => $analyzedConversations
+            'analyzedConversations' => $analyzedConversations,
+            'goalsSummary' => $goalsSummary,
+            'goalAlerts' => $goalAlerts
         ]);
     }
     

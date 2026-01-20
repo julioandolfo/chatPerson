@@ -534,6 +534,21 @@ Router::post('/teams/delete', [TeamController::class, 'delete'], ['Authenticatio
 Router::get('/teams/performance', [TeamController::class, 'getPerformance'], ['Authentication']);
 Router::post('/teams/compare', [TeamController::class, 'compareTeams'], ['Authentication']);
 
+// Metas/Goals
+Router::get('/goals', [\App\Controllers\GoalController::class, 'index'], ['Authentication', 'Permission:goals.view']);
+Router::get('/goals/create', [\App\Controllers\GoalController::class, 'create'], ['Authentication', 'Permission:goals.create']);
+Router::post('/goals/store', [\App\Controllers\GoalController::class, 'store'], ['Authentication', 'Permission:goals.create']);
+Router::get('/goals/dashboard', [\App\Controllers\GoalController::class, 'dashboard'], ['Authentication']);
+Router::get('/goals/show', [\App\Controllers\GoalController::class, 'show'], ['Authentication', 'Permission:goals.view']);
+Router::get('/goals/edit', [\App\Controllers\GoalController::class, 'edit'], ['Authentication', 'Permission:goals.edit']);
+Router::post('/goals/update', [\App\Controllers\GoalController::class, 'update'], ['Authentication', 'Permission:goals.edit']);
+Router::post('/goals/delete', [\App\Controllers\GoalController::class, 'delete'], ['Authentication', 'Permission:goals.delete']);
+Router::get('/api/goals/calculate', [\App\Controllers\GoalController::class, 'calculateProgress'], ['Authentication', 'Permission:goals.view']);
+Router::post('/api/goals/calculate-all', [\App\Controllers\GoalController::class, 'calculateAllProgress'], ['Authentication', 'Permission:goals.edit']);
+Router::get('/api/goals/agent', [\App\Controllers\GoalController::class, 'getAgentGoals'], ['Authentication']);
+Router::post('/api/goals/duplicate', [\App\Controllers\GoalController::class, 'duplicate'], ['Authentication', 'Permission:goals.create']);
+Router::post('/api/goals/create-monthly', [\App\Controllers\GoalController::class, 'createMonthlyGoals'], ['Authentication', 'Permission:goals.create']);
+
 // Conversão WooCommerce (Lead → Venda)
 Router::get('/agent-conversion', [AgentConversionController::class, 'index'], ['Authentication']);
 Router::get('/agent-conversion/agent', [AgentConversionController::class, 'show'], ['Authentication']);

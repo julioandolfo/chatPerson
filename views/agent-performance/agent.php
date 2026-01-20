@@ -616,6 +616,33 @@ function formatTimeDisplay($seconds, $showUnit = true) {
 </div>
 <?php endif; ?>
 
+<!-- Alertas de Metas -->
+<?php if (!empty($goalAlerts)): ?>
+<div class="card card-flush mb-7 border-danger">
+    <div class="card-header bg-light-danger">
+        <h3 class="card-title text-danger">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            Alertas de Metas (<?= count($goalAlerts) ?>)
+        </h3>
+    </div>
+    <div class="card-body">
+        <?php foreach ($goalAlerts as $alert): 
+            $severityColors = ['info' => 'primary', 'warning' => 'warning', 'critical' => 'danger'];
+            $severityIcons = ['info' => 'info-circle', 'warning' => 'exclamation-triangle', 'critical' => 'x-octagon'];
+        ?>
+        <div class="alert alert-<?= $severityColors[$alert['severity']] ?> d-flex align-items-center mb-3">
+            <i class="bi bi-<?= $severityIcons[$alert['severity']] ?>-fill fs-2x me-4"></i>
+            <div class="flex-grow-1">
+                <h5 class="mb-1"><?= htmlspecialchars($alert['goal_name']) ?></h5>
+                <p class="mb-0"><?= htmlspecialchars($alert['message']) ?></p>
+                <small class="text-muted"><?= date('d/m/Y H:i', strtotime($alert['created_at'])) ?></small>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- Badges e Metas -->
 <div class="row g-5 mb-7">
     <?php if (!empty($badges)): ?>
@@ -656,52 +683,97 @@ function formatTimeDisplay($seconds, $showUnit = true) {
     </div>
     <?php endif; ?>
     
-    <?php if (!empty($goals)): ?>
+    <?php if (!empty($goalsSummary) && $goalsSummary['total_goals'] > 0): ?>
     <div class="col-lg-<?= !empty($badges) ? '6' : '12' ?>">
         <div class="card h-100">
             <div class="card-header border-0 pt-5">
                 <h3 class="card-title">
-                    <i class="ki-duotone ki-chart-line-up fs-2 text-success me-2">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                    </i>
-                    Metas Ativas (<?= count($goals) ?>)
+                    <i class="bi bi-flag-fill fs-2 text-primary me-2"></i>
+                    Metas (<?= $goalsSummary['total_goals'] ?>)
                 </h3>
+                <div class="card-toolbar">
+                    <a href="<?= Url::to('/goals/dashboard') ?>" class="btn btn-sm btn-light-primary">Ver Todas</a>
+                </div>
             </div>
             <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-row-bordered align-middle gs-0 gy-3">
-                        <thead>
-                            <tr class="fw-bold text-muted fs-7">
-                                <th>Dimensão</th>
-                                <th>Meta</th>
-                                <th>Atual</th>
-                                <th>Progresso</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($goals as $goal): 
-                                $progress = $goal['current_score'] >= $goal['target_score'] ? 100 : 
-                                           (($goal['current_score'] / max(1, $goal['target_score'])) * 100);
-                            ?>
-                            <tr>
-                                <td class="fw-semibold"><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $goal['dimension']))) ?></td>
-                                <td><?= number_format($goal['target_score'], 2) ?></td>
-                                <td><?= number_format($goal['current_score'], 2) ?></td>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <div class="progress h-6px w-100px me-2">
-                                            <div class="progress-bar bg-<?= $progress >= 100 ? 'success' : 'primary' ?>" 
-                                                 style="width: <?= min($progress, 100) ?>%"></div>
-                                        </div>
-                                        <span class="fw-bold fs-7"><?= number_format($progress, 0) ?>%</span>
-                                    </div>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+                <!-- Resumo -->
+                <div class="row g-3 mb-5">
+                    <div class="col-6">
+                        <div class="text-center p-3 bg-light-success rounded">
+                            <i class="bi bi-trophy-fill text-success fs-2x"></i>
+                            <div class="text-gray-900 fw-bold fs-3 mt-2"><?= $goalsSummary['achieved'] ?></div>
+                            <div class="text-muted fs-7">Atingidas</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-center p-3 bg-light-primary rounded">
+                            <i class="bi bi-graph-up fs-2x text-primary"></i>
+                            <div class="text-gray-900 fw-bold fs-3 mt-2"><?= $goalsSummary['in_progress'] ?></div>
+                            <div class="text-muted fs-7">Em Progresso</div>
+                        </div>
+                    </div>
                 </div>
+                
+                <!-- Metas individuais -->
+                <?php 
+                $allGoals = [];
+                foreach ($goalsSummary['goals_by_level'] as $level => $levelGoals) {
+                    $allGoals = array_merge($allGoals, $levelGoals);
+                }
+                if (!empty($allGoals)): 
+                ?>
+                <div class="separator my-4"></div>
+                <?php foreach (array_slice($allGoals, 0, 3) as $goal): 
+                    $progress = $goal['progress'] ?? null;
+                    $percentage = $progress ? (float)$progress['percentage'] : 0;
+                    $currentValue = $progress ? (float)$progress['current_value'] : 0;
+                    
+                    // Flag status
+                    $flagStatus = $progress['flag_status'] ?? 'good';
+                    $progressColor = \App\Models\Goal::getFlagColor($flagStatus);
+                    $flagIcon = ['critical' => '🔴', 'warning' => '🟡', 'good' => '🟢', 'excellent' => '🔵'][$flagStatus] ?? '⚪';
+                    
+                    // Projeção
+                    $isOnTrack = $progress['is_on_track'] ?? null;
+                    $expectedPercentage = $progress['expected_percentage'] ?? null;
+                    $projectedPercentage = $progress['projection_percentage'] ?? null;
+                ?>
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between mb-2">
+                        <div class="d-flex flex-column flex-grow-1">
+                            <div class="d-flex align-items-center">
+                                <span class="me-2"><?= $flagIcon ?></span>
+                                <a href="<?= Url::to('/goals/show?id=' . $goal['id']) ?>" class="text-gray-800 text-hover-primary fw-bold fs-7">
+                                    <?= htmlspecialchars($goal['name']) ?>
+                                </a>
+                            </div>
+                            <span class="text-muted fs-8"><?= \App\Models\Goal::TYPES[$goal['type']]['label'] ?? $goal['type'] ?></span>
+                            <?php if ($isOnTrack !== null): ?>
+                                <span class="badge badge-light-<?= $isOnTrack ? 'success' : 'danger' ?> fs-9 mt-1">
+                                    <?= $isOnTrack ? '✓ No ritmo' : '⚠ Fora do ritmo' ?>
+                                    <?php if ($projectedPercentage !== null): ?>
+                                        (Projeção: <?= number_format($projectedPercentage, 0) ?>%)
+                                    <?php endif; ?>
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="text-end">
+                            <span class="text-gray-800 fw-bold fs-5"><?= number_format($percentage, 0) ?>%</span>
+                            <?php if ($expectedPercentage !== null): ?>
+                                <div class="text-muted fs-9">Esperado: <?= number_format($expectedPercentage, 0) ?>%</div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="progress h-8px mb-1">
+                        <div class="progress-bar bg-<?= $progressColor ?>" style="width: <?= min($percentage, 100) ?>%"></div>
+                    </div>
+                    <div class="d-flex justify-content-between fs-8 text-muted">
+                        <span><?= \App\Models\Goal::formatValue($goal['type'], $currentValue) ?></span>
+                        <span><?= \App\Models\Goal::formatValue($goal['type'], $goal['target_value']) ?></span>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+                <?php endif; ?>
             </div>
         </div>
     </div>

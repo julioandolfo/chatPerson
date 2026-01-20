@@ -187,6 +187,12 @@ function seed_roles_and_permissions() {
         ['name' => 'Editar campanhas', 'slug' => 'campaigns.edit', 'description' => 'Editar campanhas existentes', 'module' => 'campaigns'],
         ['name' => 'Deletar campanhas', 'slug' => 'campaigns.delete', 'description' => 'Deletar campanhas', 'module' => 'campaigns'],
         ['name' => 'Iniciar/Pausar campanhas', 'slug' => 'campaigns.control', 'description' => 'Controlar execução de campanhas', 'module' => 'campaigns'],
+        
+        // Metas/Goals
+        ['name' => 'Ver metas', 'slug' => 'goals.view', 'description' => 'Visualizar metas e progresso', 'module' => 'goals'],
+        ['name' => 'Criar metas', 'slug' => 'goals.create', 'description' => 'Criar novas metas', 'module' => 'goals'],
+        ['name' => 'Editar metas', 'slug' => 'goals.edit', 'description' => 'Editar metas existentes', 'module' => 'goals'],
+        ['name' => 'Deletar metas', 'slug' => 'goals.delete', 'description' => 'Deletar metas', 'module' => 'goals'],
     ];
     
     $permissionIds = [];

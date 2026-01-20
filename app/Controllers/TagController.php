@@ -220,7 +220,10 @@ class TagController
      */
     public function getByConversation(int $conversationId): void
     {
-        Permission::abortIfCannot('conversations.view');
+        // ✅ CORRIGIDO: Verificar permissão correta
+        if (!Permission::can('conversations.view.own') && !Permission::can('conversations.view.all')) {
+            Permission::abortIfCannot('conversations.view.own');
+        }
         
         try {
             $tags = TagService::getByConversation($conversationId);

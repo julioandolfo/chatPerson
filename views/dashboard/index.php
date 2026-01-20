@@ -95,6 +95,125 @@ ob_start();
 </div>
 <!--end::Row-->
 
+<!--begin::Row - Metas-->
+<?php if (!empty($goalsSummary) && $goalsSummary['total_goals'] > 0): ?>
+<div class="card mb-5">
+    <div class="card-header border-0 pt-5">
+        <h3 class="card-title align-items-start flex-column">
+            <span class="card-label fw-bold fs-3 mb-1">
+                <i class="bi bi-flag-fill text-primary me-2"></i>Minhas Metas
+            </span>
+            <span class="text-muted mt-1 fw-semibold fs-7"><?= $goalsSummary['total_goals'] ?> metas ativas</span>
+        </h3>
+        <div class="card-toolbar">
+            <a href="<?= \App\Helpers\Url::to('/goals/dashboard') ?>" class="btn btn-sm btn-light-primary">
+                Ver Todas as Metas
+            </a>
+        </div>
+    </div>
+    <div class="card-body py-3">
+        <div class="row g-3">
+            <!-- Card: Total -->
+            <div class="col-md-3">
+                <div class="bg-light-primary p-4 rounded-3">
+                    <i class="bi bi-flag-fill fs-2x text-primary mb-2"></i>
+                    <div class="text-gray-900 fw-bold fs-1"><?= $goalsSummary['total_goals'] ?></div>
+                    <div class="text-muted fs-6">Total de Metas</div>
+                </div>
+            </div>
+            
+            <!-- Card: Atingidas -->
+            <div class="col-md-3">
+                <div class="bg-light-success p-4 rounded-3">
+                    <i class="bi bi-trophy-fill fs-2x text-success mb-2"></i>
+                    <div class="text-gray-900 fw-bold fs-1"><?= $goalsSummary['achieved'] ?></div>
+                    <div class="text-muted fs-6">Atingidas</div>
+                </div>
+            </div>
+            
+            <!-- Card: Em Progresso -->
+            <div class="col-md-3">
+                <div class="bg-light-info p-4 rounded-3">
+                    <i class="bi bi-graph-up-arrow fs-2x text-info mb-2"></i>
+                    <div class="text-gray-900 fw-bold fs-1"><?= $goalsSummary['in_progress'] ?></div>
+                    <div class="text-muted fs-6">Em Progresso</div>
+                </div>
+            </div>
+            
+            <!-- Card: Em Risco -->
+            <div class="col-md-3">
+                <div class="bg-light-danger p-4 rounded-3">
+                    <i class="bi bi-exclamation-triangle-fill fs-2x text-danger mb-2"></i>
+                    <div class="text-gray-900 fw-bold fs-1"><?= $goalsSummary['at_risk'] ?></div>
+                    <div class="text-muted fs-6">Em Risco</div>
+                </div>
+            </div>
+        </div>
+        
+        <?php 
+        // Mostrar as metas individuais do usuário
+        $individualGoals = $goalsSummary['goals_by_level']['individual'] ?? [];
+        if (!empty($individualGoals) && count($individualGoals) > 0): 
+        ?>
+        <div class="separator my-5"></div>
+        <h4 class="fw-bold mb-4">Metas Individuais</h4>
+        <div class="row g-3">
+            <?php foreach (array_slice($individualGoals, 0, 4) as $goal): 
+                $progress = $goal['progress'] ?? null;
+                $percentage = $progress ? (float)$progress['percentage'] : 0;
+                $currentValue = $progress ? (float)$progress['current_value'] : 0;
+                
+                if ($percentage >= 100) {
+                    $progressColor = 'success';
+                } elseif ($percentage >= 75) {
+                    $progressColor = 'primary';
+                } elseif ($percentage >= 50) {
+                    $progressColor = 'warning';
+                } else {
+                    $progressColor = 'danger';
+                }
+            ?>
+            <div class="col-md-6">
+                <div class="card card-flush border">
+                    <div class="card-body p-5">
+                        <div class="d-flex flex-stack mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="me-3">
+                                    <i class="bi bi-bullseye fs-2x text-<?= $progressColor ?>"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <a href="<?= \App\Helpers\Url::to('/goals/show?id=' . $goal['id']) ?>" 
+                                       class="text-gray-800 text-hover-primary fw-bold fs-6 d-block">
+                                        <?= htmlspecialchars($goal['name']) ?>
+                                    </a>
+                                    <span class="text-muted fs-7">
+                                        <?= \App\Models\Goal::TYPES[$goal['type']]['label'] ?? $goal['type'] ?>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <span class="text-gray-800 fw-bold fs-4"><?= number_format($percentage, 0) ?>%</span>
+                            </div>
+                        </div>
+                        <div class="progress h-8px mb-2">
+                            <div class="progress-bar bg-<?= $progressColor ?>" role="progressbar" 
+                                 style="width: <?= min($percentage, 100) ?>%"></div>
+                        </div>
+                        <div class="d-flex justify-content-between fs-7 text-muted">
+                            <span><?= \App\Models\Goal::formatValue($goal['type'], $currentValue) ?></span>
+                            <span><?= \App\Models\Goal::formatValue($goal['type'], $goal['target_value']) ?></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+<?php endif; ?>
+<!--end::Row - Metas-->
+
 <!--begin::Row - Métricas Adicionais-->
 <div class="row g-5 mb-5">
     <!--begin::Col-->

@@ -703,7 +703,23 @@ class FunnelController
         }
         
         try {
-            Permission::abortIfCannot('conversations.view');
+            // ✅ CORRIGIDO: Verificar se pode ver conversas (own ou all)
+            if (!Permission::can('conversations.view.own') && !Permission::can('conversations.view.all')) {
+                throw new \Exception('Você não tem permissão para visualizar conversas');
+            }
+            
+            // Buscar conversa para verificar permissões específicas
+            $conversation = \App\Models\Conversation::find($conversationId);
+            if (!$conversation) {
+                throw new \Exception('Conversa não encontrada');
+            }
+            
+            // ✅ Verificar se pode ver ESTA conversa específica
+            if (!Permission::can('conversations.view.all')) {
+                if (!Permission::canViewConversation($conversation)) {
+                    throw new \Exception('Você não tem permissão para visualizar esta conversa');
+                }
+            }
             
             $details = FunnelService::getConversationDetails($conversationId);
             

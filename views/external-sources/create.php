@@ -207,13 +207,36 @@ function testConnection() {
     
     const type = document.getElementById('db_type').value;
     
+    console.log('Testando conexão com:', {
+        type: type,
+        host: config.host,
+        port: config.port,
+        database: config.database,
+        username: config.username,
+        has_password: !!config.password
+    });
+    
     fetch('/api/external-sources/test-connection', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({connection_config: config, type: type})
     })
-    .then(r => r.json())
+    .then(response => {
+        console.log('Response status:', response.status);
+        console.log('Response headers:', response.headers);
+        return response.text().then(text => {
+            console.log('Response raw:', text);
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                console.error('Erro ao fazer parse do JSON:', e);
+                throw new Error('Resposta não é um JSON válido: ' + text.substring(0, 200));
+            }
+        });
+    })
     .then(result => {
+        console.log('Resultado do teste:', result);
+        
         btn.removeAttribute('data-kt-indicator');
         btn.disabled = false;
         
@@ -226,13 +249,20 @@ function testConnection() {
             createTempSource(config, type);
         } else {
             status.innerHTML = '<span class="badge badge-light-danger"><i class="ki-duotone ki-cross fs-6"></i> Erro</span>';
-            toastr.error(result.message);
+            const errorMsg = result.message || 'Erro desconhecido';
+            toastr.error(errorMsg + (result.error_detail ? ' - ' + result.error_detail : ''));
+            console.error('Erro ao testar conexão:', result);
         }
     })
     .catch(err => {
+        console.error('Erro de rede ou parse:', err);
         btn.removeAttribute('data-kt-indicator');
         btn.disabled = false;
-        toastr.error('Erro de rede');
+        
+        const status = document.getElementById('connection_status');
+        status.innerHTML = '<span class="badge badge-light-danger"><i class="ki-duotone ki-cross fs-6"></i> Erro</span>';
+        
+        toastr.error('Erro de rede: ' + err.message + ' - Verifique os logs em view-all-logs.php');
     });
 }
 

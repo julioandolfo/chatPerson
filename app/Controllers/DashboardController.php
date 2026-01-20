@@ -8,6 +8,7 @@ namespace App\Controllers;
 use App\Helpers\Response;
 use App\Helpers\Database;
 use App\Helpers\Permission;
+use App\Services\GoalService;
 
 class DashboardController
 {
@@ -203,6 +204,9 @@ class DashboardController
             // Atividade recente
             $recentActivity = \App\Services\DashboardService::getRecentActivity(10);
             
+            // Metas do usuário
+            $goalsSummary = GoalService::getDashboardSummary($userId);
+            
             self::logDash("Passando dados para view");
             Response::view('dashboard/index', [
                 'stats' => $generalStats,
@@ -218,7 +222,8 @@ class DashboardController
                 'recentConversations' => $recentConversations,
                 'recentActivity' => $recentActivity,
                 'dateFrom' => $dateFrom,
-                'dateTo' => $dateTo
+                'dateTo' => $dateTo,
+                'goalsSummary' => $goalsSummary
             ]);
         } catch (\Exception $e) {
             self::logDash("ERRO CRÍTICO: " . $e->getMessage());

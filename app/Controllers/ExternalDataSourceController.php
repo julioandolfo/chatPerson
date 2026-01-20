@@ -75,19 +75,42 @@ class ExternalDataSourceController
     {
         Permission::abortIfCannot('campaigns.create');
 
+        \App\Helpers\Logger::info('=== TESTE DE CONEXÃO EXTERNA INICIADO ===');
+
         try {
             $data = Request::all();
+            
+            \App\Helpers\Logger::info('Dados recebidos para teste de conexão', [
+                'type' => $data['type'] ?? 'não informado',
+                'connection_config' => [
+                    'host' => $data['connection_config']['host'] ?? 'não informado',
+                    'port' => $data['connection_config']['port'] ?? 'não informado',
+                    'database' => $data['connection_config']['database'] ?? 'não informado',
+                    'username' => $data['connection_config']['username'] ?? 'não informado',
+                    'password' => !empty($data['connection_config']['password']) ? '***DEFINIDA***' : 'não informada'
+                ]
+            ]);
             
             $result = ExternalDataSourceService::testConnection(
                 $data['connection_config'] ?? [],
                 $data['type'] ?? 'mysql'
             );
 
+            \App\Helpers\Logger::info('Resultado do teste de conexão', $result);
+
             Response::json($result);
         } catch (\Exception $e) {
+            \App\Helpers\Logger::error('ERRO ao testar conexão externa', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             Response::json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
+                'error_detail' => 'Verifique os logs em view-all-logs.php'
             ], 400);
         }
     }

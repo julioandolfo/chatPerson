@@ -186,33 +186,47 @@ class SLAMonitoringService
                 
                 // Se última mensagem do contato é mais recente, verificar SLA de resposta
                 if ($lastContact > $lastAgent) {
-                    $elapsedMinutes = \App\Helpers\WorkingHoursCalculator::calculateMinutes($lastContact, new \DateTime());
-                    $ongoingSLA = $slaConfig['ongoing_response_time'];
+                    // ✅ NOVO: Verificar delay mínimo (1 minuto) antes de contar SLA
+                    $delayMinutes = $settings['sla']['message_delay_minutes'] ?? 1;
+                    $diffSeconds = $lastContact->getTimestamp() - $lastAgent->getTimestamp();
+                    $diffMinutes = $diffSeconds / 60;
                     
-                    if ($elapsedMinutes > $ongoingSLA) {
-                        // SLA de resposta contínua excedido - pode reatribuir
-                        if ($settings['sla']['auto_reassign_on_sla_breach']) {
-                            $currentAgentId = $conversation['agent_id'] ?? null;
-                            
-                            $newAgentId = ConversationSettingsService::autoAssignConversation(
-                                $conversationId,
-                                $conversation['department_id'] ?? null,
-                                $conversation['funnel_id'] ?? null,
-                                $conversation['funnel_stage_id'] ?? null,
-                                $currentAgentId
-                            );
-                            
-                            if ($newAgentId && $newAgentId != $currentAgentId && $newAgentId > 0) {
-                                $reassignmentCount = (int)($conversation['reassignment_count'] ?? 0) + 1;
+                    // Se não passou o delay mínimo, não contar SLA ainda
+                    if ($diffMinutes < $delayMinutes) {
+                        // Ignorar - mensagem muito rápida (provavelmente despedida/automática)
+                    } else {
+                        // Calcular tempo desde a mensagem do contato + delay
+                        $slaStartTime = clone $lastAgent;
+                        $slaStartTime->modify("+{$delayMinutes} minutes");
+                        
+                        $elapsedMinutes = \App\Helpers\WorkingHoursCalculator::calculateMinutes($slaStartTime, new \DateTime());
+                        $ongoingSLA = $slaConfig['ongoing_response_time'];
+                        
+                        if ($elapsedMinutes > $ongoingSLA) {
+                            // SLA de resposta contínua excedido - pode reatribuir
+                            if ($settings['sla']['auto_reassign_on_sla_breach']) {
+                                $currentAgentId = $conversation['agent_id'] ?? null;
                                 
-                                Conversation::update($conversationId, [
-                                    'reassignment_count' => $reassignmentCount,
-                                    'last_reassignment_at' => date('Y-m-d H:i:s')
-                                ]);
+                                $newAgentId = ConversationSettingsService::autoAssignConversation(
+                                    $conversationId,
+                                    $conversation['department_id'] ?? null,
+                                    $conversation['funnel_id'] ?? null,
+                                    $conversation['funnel_stage_id'] ?? null,
+                                    $currentAgentId
+                                );
                                 
-                                ConversationService::assignToAgent($conversationId, $newAgentId, false);
-                                $result['reassigned'] = true;
-                                $result['type'] = 'ongoing_response';
+                                if ($newAgentId && $newAgentId != $currentAgentId && $newAgentId > 0) {
+                                    $reassignmentCount = (int)($conversation['reassignment_count'] ?? 0) + 1;
+                                    
+                                    Conversation::update($conversationId, [
+                                        'reassignment_count' => $reassignmentCount,
+                                        'last_reassignment_at' => date('Y-m-d H:i:s')
+                                    ]);
+                                    
+                                    ConversationService::assignToAgent($conversationId, $newAgentId, false);
+                                    $result['reassigned'] = true;
+                                    $result['type'] = 'ongoing_response';
+                                }
                             }
                         }
                     }

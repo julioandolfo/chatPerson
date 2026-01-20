@@ -244,7 +244,41 @@ function updateStageCounters(oldColumn, newColumn) {
 // ============================================================================
 
 function changeFunnel(funnelId) {
-    window.location.href = window.KANBAN_CONFIG.funnelsUrl + "/" + funnelId + "/kanban";
+    // ✅ Desabilitar select para evitar múltiplos cliques
+    const select = document.getElementById('kt_funnel_selector');
+    if (select) {
+        select.disabled = true;
+    }
+    
+    // ✅ Adicionar classe de loading no board do kanban
+    const kanbanBoard = document.getElementById('kt_kanban_board');
+    if (kanbanBoard) {
+        kanbanBoard.classList.add('loading-funnel');
+    }
+    
+    // ✅ Mostrar SweetAlert de loading
+    Swal.fire({
+        title: 'Carregando funil...',
+        html: `
+            <div class="d-flex flex-column align-items-center">
+                <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+                <p class="text-muted mb-0">Aguarde enquanto carregamos as etapas e conversas...</p>
+            </div>
+        `,
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+    
+    // ✅ Pequeno delay para garantir que as animações apareçam
+    setTimeout(() => {
+        window.location.href = window.KANBAN_CONFIG.funnelsUrl + "/" + funnelId + "/kanban";
+    }, 150);
 }
 
 // ============================================================================

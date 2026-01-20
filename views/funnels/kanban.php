@@ -441,6 +441,46 @@ ob_start();
     z-index: 1000;
 }
 
+/* Estado de carregamento ao trocar de funil */
+.kanban-board.loading-funnel {
+    opacity: 0.5;
+    pointer-events: none;
+    position: relative;
+}
+
+.kanban-board.loading-funnel::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    z-index: 999;
+}
+
+.kanban-board.loading-funnel::after {
+    content: "Carregando funil...";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255, 255, 255, 0.98);
+    padding: 25px 50px;
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    font-weight: 600;
+    font-size: 16px;
+    color: #009ef7;
+    z-index: 1000;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
 /* ============================================================================
    MODAL DE ORDENAÇÃO DE ETAPAS
    ============================================================================ */

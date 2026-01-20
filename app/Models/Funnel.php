@@ -79,6 +79,7 @@ class Funnel extends Model
                         LEFT JOIN tags t ON ct_tags.tag_id = t.id 
                         WHERE ct_tags.conversation_id = c.id) as tags_colors,
                        TIMESTAMPDIFF(HOUR, c.updated_at, NOW()) as hours_in_stage,
+                       -- SLA do estágio do funil (em HORAS, não minutos - é tempo de permanência no estágio)
                        CASE 
                            WHEN TIMESTAMPDIFF(HOUR, c.updated_at, NOW()) > COALESCE(fs.sla_hours, 24) THEN 'exceeded'
                            WHEN TIMESTAMPDIFF(HOUR, c.updated_at, NOW()) > (COALESCE(fs.sla_hours, 24) * 0.8) THEN 'warning'

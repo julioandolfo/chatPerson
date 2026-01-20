@@ -972,7 +972,10 @@ class ConversationController
     public function listForForwarding(): void
     {
         try {
-            Permission::abortIfCannot('conversations.view');
+            // ✅ CORRIGIDO: Verificar permissão correta
+            if (!Permission::can('conversations.view.own') && !Permission::can('conversations.view.all')) {
+                throw new \Exception('Você não tem permissão para visualizar conversas');
+            }
             
             $excludeId = $_GET['exclude'] ?? null;
             $conversations = ConversationService::listForForwarding($excludeId ? (int)$excludeId : null);

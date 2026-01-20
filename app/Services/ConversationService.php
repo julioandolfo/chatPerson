@@ -1087,6 +1087,13 @@ class ConversationService
         }
         
         if (Conversation::update($conversationId, $updateData)) {
+            // ✅ Pausar SLA quando conversa é fechada
+            try {
+                ConversationSettingsService::pauseSLA($conversationId);
+            } catch (\Exception $e) {
+                error_log("Erro ao pausar SLA ao fechar conversa: " . $e->getMessage());
+            }
+            
             // Invalidar cache de conversas
             self::invalidateCache($conversationId);
             
@@ -1220,7 +1227,8 @@ class ConversationService
         // Preparar dados de atualização
         $updateData = [
             'status' => 'open',
-            'resolved_at' => null
+            'resolved_at' => null,
+            'sla_warning_sent' => 0 // ✅ Reset warning para novo ciclo de SLA
         ];
         
         // Se deve atribuir ao agente do contato, atualizar agent_id
@@ -1230,6 +1238,13 @@ class ConversationService
         }
         
         if (Conversation::update($conversationId, $updateData)) {
+            // ✅ Retomar SLA quando conversa é reaberta
+            try {
+                ConversationSettingsService::resumeSLA($conversationId);
+            } catch (\Exception $e) {
+                error_log("Erro ao retomar SLA ao reabrir conversa: " . $e->getMessage());
+            }
+            
             // Invalidar cache de conversas
             self::invalidateCache($conversationId);
             

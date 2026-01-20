@@ -116,6 +116,8 @@ class GoalController
                 'created_by' => Auth::id()
             ];
             
+            Logger::info('Store meta - payload: ' . json_encode($data), 'goals');
+
             $goalId = GoalService::create($data);
             
             // Processar tiers de bônus (se bonificação habilitada)
@@ -253,6 +255,8 @@ class GoalController
                 'bonus_calculation_type' => Request::post('bonus_calculation_type', 'tiered')
             ];
             
+            Logger::info('Update meta - payload: ' . json_encode($data), 'goals');
+
             GoalService::update($id, $data);
             
             // Processar tiers de bônus (sempre, pois pode estar editando)

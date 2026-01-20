@@ -34,6 +34,12 @@ class Goal extends Model
         'template_id',
         'reward_points',
         'reward_badge',
+        'enable_bonus',
+        'enable_bonus_conditions',
+        'ote_base_salary',
+        'ote_target_commission',
+        'ote_total',
+        'bonus_calculation_type',
         'created_by'
     ];
     protected bool $timestamps = true;

@@ -1187,7 +1187,8 @@ class ConversationController
 
             // AUTO-ATRIBUIÇÃO: Se conversa não está atribuída e agente está enviando mensagem (não nota)
             // então atribuir automaticamente ao agente
-            $assignedTo = $conversation['assigned_to'] ?? null;
+            // ✅ CORREÇÃO: Usar 'agent_id' ao invés de 'assigned_to'
+            $assignedTo = $conversation['agent_id'] ?? null;
             $isUnassigned = ($assignedTo === null || $assignedTo === '' || $assignedTo === 0 || $assignedTo === '0');
             if (!$isNote && $isUnassigned) {
                 try {
@@ -1198,7 +1199,7 @@ class ConversationController
                         ConversationService::assignToAgent($id, $userId, true);
                         
                         // Atualizar a variável local para refletir a atribuição
-                        $conversation['assigned_to'] = $userId;
+                        $conversation['agent_id'] = $userId;
                         
                         error_log("[AUTO-ASSIGN] Conversa #{$id} atribuída automaticamente ao agente #{$userId}");
                     }

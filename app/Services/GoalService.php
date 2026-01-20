@@ -55,7 +55,7 @@ class GoalService
         // Calcular progresso inicial
         self::calculateProgress($goalId);
         
-        Logger::info('Meta criada', ['goal_id' => $goalId, 'name' => $data['name']]);
+        Logger::info('Meta criada: ' . json_encode(['goal_id' => $goalId, 'name' => $data['name']]), 'goals');
         
         return $goalId;
     }
@@ -82,7 +82,7 @@ class GoalService
         // Recalcular progresso
         if ($updated) {
             self::calculateProgress($id);
-            Logger::info('Meta atualizada', ['goal_id' => $id]);
+            Logger::info('Meta atualizada: ' . json_encode(['goal_id' => $id]), 'goals');
         }
         
         return $updated;
@@ -98,7 +98,7 @@ class GoalService
             return false;
         }
         
-        Logger::info('Meta deletada', ['goal_id' => $id, 'name' => $goal['name']]);
+        Logger::info('Meta deletada: ' . json_encode(['goal_id' => $id, 'name' => $goal['name']]), 'goals');
         return Goal::delete($id);
     }
     
@@ -788,12 +788,12 @@ class GoalService
             $goal['reward_badge'] ?? null
         );
         
-        Logger::info('Meta atingida', [
+        Logger::info('Meta atingida: ' . json_encode([
             'goal_id' => $goal['id'],
             'name' => $goal['name'],
             'days' => $daysToAchieve,
             'percentage' => $percentage
-        ]);
+        ]), 'goals');
         
         // TODO: Enviar notificação
     }
@@ -810,10 +810,10 @@ class GoalService
             try {
                 $results[] = self::calculateProgress($goal['id']);
             } catch (\Exception $e) {
-                Logger::error('Erro ao calcular progresso da meta', [
+                Logger::error('Erro ao calcular progresso da meta: ' . json_encode([
                     'goal_id' => $goal['id'],
                     'error' => $e->getMessage()
-                ]);
+                ]), 'goals');
             }
         }
         

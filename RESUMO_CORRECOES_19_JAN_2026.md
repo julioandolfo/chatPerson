@@ -1,8 +1,8 @@
-# 📋 Resumo de Correções - 19 de Janeiro de 2026
+# 📋 Resumo de Correções - 19 e 20 de Janeiro de 2026
 
 ## ✅ Todas as Correções Implementadas
 
-**Total**: 4 correções implementadas
+**Total**: 5 correções implementadas
 
 ---
 
@@ -137,6 +137,27 @@ Conversa:
 
 ---
 
+## 🔧 **Correção 5: Bug de Auto-Atribuição ao Enviar Mensagem** 🔴
+
+### Problema:
+- Conversa está atribuída ao **Agente A**
+- Agente A adiciona **Agente B** como **participante**
+- Quando Agente B envia mensagem
+- ❌ Conversa é **automaticamente reatribuída** para Agente B
+- ✅ **ERRADO**: Deveria continuar atribuída ao Agente A
+
+### Causa:
+O código verificava `$conversation['assigned_to']` (campo inexistente), mas o campo correto é `agent_id`. Resultado: `$isUnassigned` sempre era `TRUE`, causando reatribuição toda vez.
+
+### Solução:
+✅ Trocado `assigned_to` por `agent_id` em 2 lugares  
+✅ Agora só atribui se conversa REALMENTE não tem agente  
+✅ Participantes podem ajudar sem assumir responsabilidade
+
+**Arquivo modificado**: `app/Controllers/ConversationController.php` (linhas 1190, 1201)
+
+---
+
 ## 📊 **Resumo Geral**
 
 | Correção | Prioridade | Status | Impacto |
@@ -145,6 +166,7 @@ Conversa:
 | Botão "Ir para Conversa" | 🟢 BAIXA | ✅ IMPLEMENTADO | Facilita navegação |
 | Bug de lista vazia ao rolar | 🔴 ALTA | ✅ CORRIGIDO | Crítico - Lista sumia |
 | Filtro "Não Respondidas" | 🟡 MÉDIA | ✅ CORRIGIDO | Precisão dos filtros |
+| Auto-atribuição participante | 🔴 CRÍTICA | ✅ CORRIGIDO | Estabilidade atribuição |
 
 ---
 
@@ -154,10 +176,13 @@ Conversa:
    - Adicionar normalização de telefone na busca (linha 223-263)
    - Ajustar filtros "Respondidas"/"Não Respondidas" para considerar sender_id (linha 273-317)
 
-2. `views/contacts/index.php`
+2. `app/Controllers/ConversationController.php`
+   - Corrigir campo `assigned_to` → `agent_id` na auto-atribuição (linha 1190, 1201)
+
+3. `views/contacts/index.php`
    - Adicionar botão "Ir para Conversa" (linha 119-134)
 
-3. `views/conversations/index.php`
+4. `views/conversations/index.php`
    - Corrigir bug de lista vazia ao rolar (linha 10582-10609)
 
 ---
@@ -200,6 +225,16 @@ Conversa:
 5. ✅ Conversa deve SAIR da lista "Não Respondidas"
 ```
 
+### Teste 5: Participante NÃO Reatribui Conversa
+```
+1. Criar conversa atribuída ao Agente A (Luan)
+2. Adicionar Agente B (Nicolas) como participante
+3. Logar como Agente B
+4. Enviar mensagem na conversa
+5. ✅ Conversa deve CONTINUAR atribuída ao Agente A
+6. ✅ Agente B permanece apenas como participante
+```
+
 ---
 
 ## ✅ **Status Final**
@@ -219,9 +254,10 @@ Para mais detalhes, consulte:
 - `CORRECAO_BUSCA_TELEFONE_E_BOTAO_CONVERSA.md` - Correções 1 e 2
 - `CORRECAO_BUG_SCROLL_LISTA_VAZIA.md` - Correção 3 (bug crítico)
 - `CORRECAO_FILTRO_NAO_RESPONDIDAS.md` - Correção 4 (filtro sender_id)
+- `CORRECAO_BUG_AUTO_ATRIBUICAO_PARTICIPANTE.md` - Correção 5 (bug crítico)
 
 ---
 
-**Data**: 2026-01-19  
+**Data**: 2026-01-19 e 2026-01-20  
 **Desenvolvedor**: Cursor AI  
-**Última atualização**: 16:50
+**Última atualização**: 17:20

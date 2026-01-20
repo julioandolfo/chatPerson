@@ -383,16 +383,99 @@ ob_start();
                                 </div>
                             </div>
                             
-                            <div class="alert alert-info d-flex align-items-center">
-                                <i class="bi bi-info-circle fs-2 me-3"></i>
-                                <div>
-                                    <strong>Configuração de Tiers:</strong> Após salvar a meta, você poderá adicionar níveis de bonificação 
-                                    (Bronze 50% = R$600, Prata 70% = R$1.000, Ouro 100% = R$2.000, etc).
-                                    Ou <button type="button" class="btn btn-sm btn-light-primary ms-2" onclick="createDefaultTiers()">
-                                        Criar Tiers Padrão Automaticamente
-                                    </button>
+                            <!--begin::Tiers de Bônus-->
+                            <div class="separator my-5"></div>
+                            
+                            <h5 class="fs-6 fw-bold mb-5">
+                                <i class="bi bi-trophy me-2 text-warning"></i>
+                                Níveis de Bonificação (Tiers)
+                            </h5>
+                            <p class="text-muted fs-7 mb-5">
+                                Configure os níveis de bonificação baseados no percentual atingido da meta.
+                            </p>
+                            
+                            <div id="bonus-tiers-container">
+                                <?php 
+                                $bonusTiers = $bonusTiers ?? [];
+                                if (!empty($bonusTiers)): ?>
+                                    <?php foreach ($bonusTiers as $index => $tier): ?>
+                                    <div class="tier-row card border border-gray-300 mb-3" data-tier-id="<?= $tier['id'] ?? '' ?>">
+                                        <div class="card-body py-3">
+                                            <div class="row g-3 align-items-center">
+                                                <div class="col-md-2">
+                                                    <label class="form-label fs-8">Nome</label>
+                                                    <input type="text" class="form-control form-control-sm" 
+                                                           name="tiers[<?= $index ?>][tier_name]" 
+                                                           value="<?= htmlspecialchars($tier['tier_name'] ?? '') ?>" 
+                                                           placeholder="Ex: Bronze">
+                                                    <input type="hidden" name="tiers[<?= $index ?>][id]" value="<?= $tier['id'] ?? '' ?>">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label fs-8">% Mínimo</label>
+                                                    <div class="input-group input-group-sm">
+                                                        <input type="number" step="0.1" min="0" max="200" class="form-control" 
+                                                               name="tiers[<?= $index ?>][threshold_percentage]" 
+                                                               value="<?= $tier['threshold_percentage'] ?? '' ?>" 
+                                                               placeholder="50">
+                                                        <span class="input-group-text">%</span>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label fs-8">Valor Bônus R$</label>
+                                                    <div class="input-group input-group-sm">
+                                                        <span class="input-group-text">R$</span>
+                                                        <input type="number" step="0.01" min="0" class="form-control" 
+                                                               name="tiers[<?= $index ?>][bonus_amount]" 
+                                                               value="<?= $tier['bonus_amount'] ?? '' ?>" 
+                                                               placeholder="500.00">
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label fs-8">Cor</label>
+                                                    <select class="form-select form-select-sm" name="tiers[<?= $index ?>][tier_color]">
+                                                        <option value="bronze" <?= ($tier['tier_color'] ?? '') === 'bronze' ? 'selected' : '' ?>>🥉 Bronze</option>
+                                                        <option value="silver" <?= ($tier['tier_color'] ?? '') === 'silver' ? 'selected' : '' ?>>🥈 Prata</option>
+                                                        <option value="gold" <?= ($tier['tier_color'] ?? '') === 'gold' ? 'selected' : '' ?>>🥇 Ouro</option>
+                                                        <option value="platinum" <?= ($tier['tier_color'] ?? '') === 'platinum' ? 'selected' : '' ?>>💎 Platina</option>
+                                                        <option value="diamond" <?= ($tier['tier_color'] ?? '') === 'diamond' ? 'selected' : '' ?>>💠 Diamante</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label fs-8">Ordem</label>
+                                                    <input type="number" min="0" class="form-control form-control-sm" 
+                                                           name="tiers[<?= $index ?>][tier_order]" 
+                                                           value="<?= $tier['tier_order'] ?? $index ?>" 
+                                                           placeholder="0">
+                                                </div>
+                                                <div class="col-md-2 d-flex align-items-end">
+                                                    <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeTier(this)">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </div>
+                            
+                            <div class="d-flex gap-2 mb-5">
+                                <button type="button" class="btn btn-sm btn-light-primary" onclick="addTier()">
+                                    <i class="bi bi-plus-lg me-1"></i> Adicionar Tier
+                                </button>
+                                <button type="button" class="btn btn-sm btn-light-success" onclick="createDefaultTiers()">
+                                    <i class="bi bi-magic me-1"></i> Criar Tiers Padrão
+                                </button>
+                            </div>
+                            
+                            <div class="notice d-flex bg-light-info rounded border-info border border-dashed p-4 mb-5">
+                                <i class="bi bi-lightbulb fs-4 text-info me-3"></i>
+                                <div class="text-gray-700 fs-7">
+                                    <strong>Como funciona:</strong> Ao atingir cada percentual, o colaborador ganha o bônus correspondente.
+                                    Ex: Se atingir 75%, ganha o bônus do tier de 70%, não acumula tiers anteriores (exceto se configurado).
                                 </div>
                             </div>
+                            <!--end::Tiers de Bônus-->
                             
                             <!--begin::Condições de Ativação-->
                             <div class="separator my-8"></div>
@@ -669,32 +752,115 @@ document.getElementById('ote_target_commission')?.addEventListener('input', calc
 // Calcular OTE inicial
 calculateOTE();
 
+// ========== TIERS DE BÔNUS ==========
+let tierIndex = document.querySelectorAll('.tier-row').length;
+
+function addTier(name = '', threshold = '', amount = '', color = 'bronze', order = null) {
+    const container = document.getElementById('bonus-tiers-container');
+    const idx = tierIndex++;
+    const tierOrder = order ?? idx;
+    
+    const html = `
+        <div class="tier-row card border border-gray-300 mb-3" data-tier-id="">
+            <div class="card-body py-3">
+                <div class="row g-3 align-items-center">
+                    <div class="col-md-2">
+                        <label class="form-label fs-8">Nome</label>
+                        <input type="text" class="form-control form-control-sm" 
+                               name="tiers[${idx}][tier_name]" 
+                               value="${name}" 
+                               placeholder="Ex: Bronze">
+                        <input type="hidden" name="tiers[${idx}][id]" value="">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fs-8">% Mínimo</label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" step="0.1" min="0" max="200" class="form-control" 
+                                   name="tiers[${idx}][threshold_percentage]" 
+                                   value="${threshold}" 
+                                   placeholder="50">
+                            <span class="input-group-text">%</span>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fs-8">Valor Bônus R$</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">R$</span>
+                            <input type="number" step="0.01" min="0" class="form-control" 
+                                   name="tiers[${idx}][bonus_amount]" 
+                                   value="${amount}" 
+                                   placeholder="500.00">
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fs-8">Cor</label>
+                        <select class="form-select form-select-sm" name="tiers[${idx}][tier_color]">
+                            <option value="bronze" ${color === 'bronze' ? 'selected' : ''}>🥉 Bronze</option>
+                            <option value="silver" ${color === 'silver' ? 'selected' : ''}>🥈 Prata</option>
+                            <option value="gold" ${color === 'gold' ? 'selected' : ''}>🥇 Ouro</option>
+                            <option value="platinum" ${color === 'platinum' ? 'selected' : ''}>💎 Platina</option>
+                            <option value="diamond" ${color === 'diamond' ? 'selected' : ''}>💠 Diamante</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fs-8">Ordem</label>
+                        <input type="number" min="0" class="form-control form-control-sm" 
+                               name="tiers[${idx}][tier_order]" 
+                               value="${tierOrder}" 
+                               placeholder="0">
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeTier(this)">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', html);
+}
+
+function removeTier(btn) {
+    const row = btn.closest('.tier-row');
+    if (confirm('Remover este tier?')) {
+        row.remove();
+    }
+}
+
 // Criar tiers padrão automaticamente
 function createDefaultTiers() {
     const targetCommission = parseFloat(document.getElementById('ote_target_commission')?.value || 0);
     
-    if (!targetCommission || targetCommission <= 0) {
-        alert('Por favor, configure a Comissão Target (100%) antes de criar tiers padrão.');
-        return;
+    // Limpar tiers existentes
+    const container = document.getElementById('bonus-tiers-container');
+    if (container.children.length > 0) {
+        if (!confirm('Isso irá substituir os tiers existentes. Continuar?')) {
+            return;
+        }
+        container.innerHTML = '';
+        tierIndex = 0;
     }
     
     const tiers = [
-        { name: 'Bronze 🥉', threshold: 50, multiplier: 0.3 },
-        { name: 'Prata 🥈', threshold: 70, multiplier: 0.5 },
-        { name: 'Ouro 🥇', threshold: 90, multiplier: 0.8 },
-        { name: 'Platina 💎', threshold: 100, multiplier: 1.0 },
-        { name: 'Diamante 💠', threshold: 120, multiplier: 1.5 }
+        { name: 'Bronze', threshold: 50, multiplier: 0.3, color: 'bronze' },
+        { name: 'Prata', threshold: 70, multiplier: 0.5, color: 'silver' },
+        { name: 'Ouro', threshold: 90, multiplier: 0.8, color: 'gold' },
+        { name: 'Platina', threshold: 100, multiplier: 1.0, color: 'platinum' },
+        { name: 'Diamante', threshold: 120, multiplier: 1.5, color: 'diamond' }
     ];
     
-    let message = 'Tiers padrão que serão criados:\n\n';
-    tiers.forEach(tier => {
-        const bonus = (targetCommission * tier.multiplier).toFixed(2);
-        message += `${tier.name}: ${tier.threshold}% = R$ ${bonus}\n`;
+    tiers.forEach((tier, index) => {
+        const bonus = targetCommission > 0 ? (targetCommission * tier.multiplier).toFixed(2) : '';
+        addTier(tier.name, tier.threshold, bonus, tier.color, index);
     });
     
-    message += '\n✅ Esses tiers serão criados automaticamente após salvar a meta.';
-    
-    alert(message);
+    if (targetCommission <= 0) {
+        toastr.info('Preencha a "Comissão Target (100%)" para calcular os valores automaticamente.');
+    } else {
+        toastr.success('Tiers padrão criados! Ajuste os valores conforme necessário.');
+    }
 }
 
 // ========== CONDIÇÕES DE ATIVAÇÃO ==========

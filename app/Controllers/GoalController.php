@@ -11,6 +11,7 @@ use App\Helpers\Request;
 use App\Helpers\Permission;
 use App\Helpers\Auth;
 use App\Helpers\Database;
+use App\Helpers\Logger;
 use App\Services\GoalService;
 use App\Models\Goal;
 use App\Models\GoalProgress;
@@ -69,7 +70,8 @@ class GoalController
             'agents' => User::getActiveAgents(),
             'teams' => Team::getActive(),
             'departments' => Department::getActive(),
-            'bonusConditions' => [] // Array vazio para nova meta
+            'bonusConditions' => [], // Array vazio para nova meta
+            'bonusTiers' => [] // Array vazio para nova meta
         ];
         
         Response::view('goals/form', $data);
@@ -115,6 +117,11 @@ class GoalController
             ];
             
             $goalId = GoalService::create($data);
+            
+            // Processar tiers de bônus (se bonificação habilitada)
+            if ($data['enable_bonus']) {
+                $this->saveBonusTiers($goalId);
+            }
             
             // Processar condições de bônus (se habilitadas)
             if ($data['enable_bonus_conditions']) {
@@ -185,9 +192,16 @@ class GoalController
         // Carregar condições de bônus existentes
         $bonusConditions = GoalBonusCondition::getByGoal((int)$id);
         
+        // Carregar tiers de bônus existentes
+        $bonusTiers = Database::fetchAll(
+            "SELECT * FROM goal_bonus_tiers WHERE goal_id = ? ORDER BY tier_order, threshold_percentage",
+            [$id]
+        );
+        
         $data = [
             'goal' => $goal,
             'bonusConditions' => $bonusConditions,
+            'bonusTiers' => $bonusTiers,
             'types' => Goal::TYPES,
             'target_types' => Goal::TARGET_TYPES,
             'periods' => Goal::PERIODS,
@@ -240,6 +254,9 @@ class GoalController
             ];
             
             GoalService::update($id, $data);
+            
+            // Processar tiers de bônus (sempre, pois pode estar editando)
+            $this->saveBonusTiers((int)$id);
             
             // Processar condições de bônus (se habilitadas)
             $this->saveGoalConditions((int)$id);
@@ -360,12 +377,25 @@ class GoalController
         Permission::abortIfCannot('goals.create');
         
         try {
-            $goalId = Request::post('goal_id');
-            $startDate = Request::post('start_date');
-            $endDate = Request::post('end_date');
-            $newName = Request::post('name') ?: null;
+            // Aceitar tanto POST form quanto JSON
+            $data = Request::json() ?: [];
             
-            $newGoalId = Goal::duplicateAsTemplate($goalId, $startDate, $endDate, $newName);
+            $goalId = $data['goal_id'] ?? Request::post('goal_id');
+            $startDate = $data['start_date'] ?? Request::post('start_date');
+            $endDate = $data['end_date'] ?? Request::post('end_date');
+            $newName = $data['name'] ?? Request::post('name') ?: null;
+            $periodType = $data['period_type'] ?? Request::post('period_type') ?: null;
+            
+            if (empty($goalId) || empty($startDate) || empty($endDate)) {
+                throw new \InvalidArgumentException('Dados obrigatórios não informados');
+            }
+            
+            $newGoalId = Goal::duplicateAsTemplate((int)$goalId, $startDate, $endDate, $newName);
+            
+            // Atualizar o period_type se informado
+            if ($periodType && $newGoalId) {
+                Goal::update($newGoalId, ['period_type' => $periodType]);
+            }
             
             Response::json([
                 'success' => true,
@@ -373,7 +403,10 @@ class GoalController
                 'message' => 'Meta duplicada com sucesso!'
             ]);
         } catch (\Exception $e) {
-            Response::json(['error' => $e->getMessage()], 400);
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
         }
     }
     
@@ -421,9 +454,99 @@ class GoalController
     /**
      * Salvar condições de bônus de uma meta
      */
+    /**
+     * Salvar tiers de bônus
+     */
+    private function saveBonusTiers(int $goalId): void
+    {
+        $tiers = Request::post('tiers');
+        
+        Logger::info("saveBonusTiers - goalId: {$goalId}, tiers: " . json_encode($tiers), 'goals');
+        
+        // Obter IDs existentes para saber quais remover
+        $existingIds = Database::fetchAll(
+            "SELECT id FROM goal_bonus_tiers WHERE goal_id = ?",
+            [$goalId]
+        );
+        $existingIdsList = array_column($existingIds, 'id');
+        $processedIds = [];
+        
+        if (!empty($tiers) && is_array($tiers)) {
+            foreach ($tiers as $tier) {
+                // Pular tiers sem dados essenciais
+                if (empty($tier['tier_name']) && empty($tier['threshold_percentage'])) {
+                    continue;
+                }
+                
+                $tierData = [
+                    'goal_id' => $goalId,
+                    'tier_name' => $tier['tier_name'] ?? 'Tier',
+                    'threshold_percentage' => floatval($tier['threshold_percentage'] ?? 0),
+                    'bonus_amount' => floatval($tier['bonus_amount'] ?? 0),
+                    'tier_color' => $tier['tier_color'] ?? 'bronze',
+                    'tier_order' => intval($tier['tier_order'] ?? 0),
+                    'is_cumulative' => isset($tier['is_cumulative']) ? 1 : 0
+                ];
+                
+                if (!empty($tier['id'])) {
+                    // Atualizar tier existente
+                    Database::execute(
+                        "UPDATE goal_bonus_tiers SET 
+                            tier_name = ?, threshold_percentage = ?, bonus_amount = ?, 
+                            tier_color = ?, tier_order = ?, is_cumulative = ?
+                         WHERE id = ? AND goal_id = ?",
+                        [
+                            $tierData['tier_name'],
+                            $tierData['threshold_percentage'],
+                            $tierData['bonus_amount'],
+                            $tierData['tier_color'],
+                            $tierData['tier_order'],
+                            $tierData['is_cumulative'],
+                            $tier['id'],
+                            $goalId
+                        ]
+                    );
+                    $processedIds[] = $tier['id'];
+                } else {
+                    // Inserir novo tier
+                    Database::execute(
+                        "INSERT INTO goal_bonus_tiers 
+                            (goal_id, tier_name, threshold_percentage, bonus_amount, tier_color, tier_order, is_cumulative) 
+                         VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        [
+                            $tierData['goal_id'],
+                            $tierData['tier_name'],
+                            $tierData['threshold_percentage'],
+                            $tierData['bonus_amount'],
+                            $tierData['tier_color'],
+                            $tierData['tier_order'],
+                            $tierData['is_cumulative']
+                        ]
+                    );
+                    $processedIds[] = Database::lastInsertId();
+                }
+            }
+        }
+        
+        // Remover tiers que não estão mais na lista
+        $toRemove = array_diff($existingIdsList, $processedIds);
+        if (!empty($toRemove)) {
+            $placeholders = implode(',', array_fill(0, count($toRemove), '?'));
+            Database::execute(
+                "DELETE FROM goal_bonus_tiers WHERE id IN ({$placeholders})",
+                array_values($toRemove)
+            );
+        }
+    }
+    
+    /**
+     * Salvar condições de ativação de bônus
+     */
     private function saveGoalConditions(int $goalId): void
     {
         $conditions = Request::post('conditions');
+        
+        Logger::info("saveGoalConditions - goalId: {$goalId}, conditions: " . json_encode($conditions), 'goals');
         
         if (empty($conditions) || !is_array($conditions)) {
             // Se não tem condições, remover existentes
@@ -431,6 +554,7 @@ class GoalController
                 "DELETE FROM goal_bonus_conditions WHERE goal_id = ?",
                 [$goalId]
             );
+            Logger::info("saveGoalConditions - Nenhuma condição, removidas as existentes", 'goals');
             return;
         }
         
@@ -442,23 +566,52 @@ class GoalController
         
         // Inserir novas condições
         $order = 0;
+        $inserted = 0;
         foreach ($conditions as $condition) {
             if (empty($condition['condition_type']) || !isset($condition['min_value'])) {
+                Logger::info("saveGoalConditions - Condição ignorada (dados incompletos): " . json_encode($condition), 'goals');
                 continue;
             }
             
-            GoalBonusCondition::create([
-                'goal_id' => $goalId,
-                'condition_type' => $condition['condition_type'],
-                'operator' => $condition['operator'] ?? '>=',
-                'min_value' => floatval($condition['min_value']),
-                'max_value' => !empty($condition['max_value']) ? floatval($condition['max_value']) : null,
-                'is_required' => isset($condition['is_required']) ? 1 : 0,
-                'bonus_modifier' => floatval($condition['bonus_modifier'] ?? 0.5),
-                'description' => $condition['description'] ?? null,
-                'check_order' => $order++,
-                'is_active' => 1
-            ]);
+            try {
+                $data = [
+                    'goal_id' => $goalId,
+                    'condition_type' => $condition['condition_type'],
+                    'operator' => $condition['operator'] ?? '>=',
+                    'min_value' => floatval($condition['min_value']),
+                    'max_value' => !empty($condition['max_value']) ? floatval($condition['max_value']) : null,
+                    'is_required' => isset($condition['is_required']) ? 1 : 0,
+                    'bonus_modifier' => floatval($condition['bonus_modifier'] ?? 0.5),
+                    'description' => $condition['description'] ?? null,
+                    'check_order' => $order++,
+                    'is_active' => 1
+                ];
+                
+                // Usar insert direto ao invés do Model::create para mais controle
+                Database::execute(
+                    "INSERT INTO goal_bonus_conditions 
+                        (goal_id, condition_type, operator, min_value, max_value, is_required, bonus_modifier, description, check_order, is_active) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    [
+                        $data['goal_id'],
+                        $data['condition_type'],
+                        $data['operator'],
+                        $data['min_value'],
+                        $data['max_value'],
+                        $data['is_required'],
+                        $data['bonus_modifier'],
+                        $data['description'],
+                        $data['check_order'],
+                        $data['is_active']
+                    ]
+                );
+                $inserted++;
+                Logger::info("saveGoalConditions - Condição inserida: " . json_encode($data), 'goals');
+            } catch (\Exception $e) {
+                Logger::error("saveGoalConditions - Erro ao inserir condição: " . $e->getMessage(), 'goals');
+            }
         }
+        
+        Logger::info("saveGoalConditions - Total inseridas: {$inserted}", 'goals');
     }
 }

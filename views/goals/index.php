@@ -167,6 +167,11 @@ ob_start();
                                             <a href="<?= Url::to('/goals/edit?id=' . $goal['id']) ?>" class="btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1" title="Editar">
                                                 <i class="bi bi-pencil fs-4"></i>
                                             </a>
+                                            <button type="button" class="btn btn-icon btn-bg-light btn-active-color-info btn-sm me-1" 
+                                                    onclick="openDuplicateModal(<?= $goal['id'] ?>, '<?= htmlspecialchars(addslashes($goal['name'])) ?>', '<?= $goal['period_type'] ?>')" 
+                                                    title="Duplicar">
+                                                <i class="bi bi-copy fs-4"></i>
+                                            </button>
                                             <button type="button" class="btn btn-icon btn-bg-light btn-active-color-danger btn-sm" 
                                                     onclick="deleteGoal(<?= $goal['id'] ?>, '<?= htmlspecialchars($goal['name']) ?>')" title="Deletar">
                                                 <i class="bi bi-trash fs-4"></i>
@@ -216,7 +221,175 @@ function deleteGoal(id, name) {
         form.submit();
     }
 }
+
+// ========== DUPLICAR META ==========
+let duplicateModal = null;
+let currentDuplicateId = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    duplicateModal = new bootstrap.Modal(document.getElementById('duplicateModal'));
+});
+
+function openDuplicateModal(goalId, goalName, periodType) {
+    currentDuplicateId = goalId;
+    document.getElementById('duplicate-goal-name').textContent = goalName;
+    document.getElementById('duplicate-new-name').value = goalName + ' (Cópia)';
+    document.getElementById('duplicate-period-type').value = periodType;
+    
+    // Atualizar datas baseado no período
+    updateDuplicateDates();
+    
+    duplicateModal.show();
+}
+
+function updateDuplicateDates() {
+    const periodType = document.getElementById('duplicate-period-type').value;
+    const today = new Date();
+    let startDate, endDate;
+    
+    switch (periodType) {
+        case 'daily':
+            startDate = new Date(today);
+            endDate = new Date(today);
+            break;
+        case 'weekly':
+            // Próxima semana
+            const nextWeekStart = new Date(today);
+            nextWeekStart.setDate(today.getDate() + (7 - today.getDay()) % 7 + 1);
+            startDate = nextWeekStart;
+            endDate = new Date(nextWeekStart);
+            endDate.setDate(endDate.getDate() + 6);
+            break;
+        case 'monthly':
+            // Próximo mês
+            startDate = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+            endDate = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+            break;
+        case 'quarterly':
+            // Próximo trimestre
+            const nextQuarter = Math.floor(today.getMonth() / 3) + 1;
+            startDate = new Date(today.getFullYear(), nextQuarter * 3, 1);
+            endDate = new Date(today.getFullYear(), nextQuarter * 3 + 3, 0);
+            break;
+        case 'yearly':
+            // Próximo ano
+            startDate = new Date(today.getFullYear() + 1, 0, 1);
+            endDate = new Date(today.getFullYear() + 1, 11, 31);
+            break;
+        default:
+            // Custom - usar mês atual
+            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    }
+    
+    document.getElementById('duplicate-start-date').value = startDate.toISOString().split('T')[0];
+    document.getElementById('duplicate-end-date').value = endDate.toISOString().split('T')[0];
+}
+
+function duplicateGoal() {
+    const btn = document.getElementById('btn-duplicate');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Duplicando...';
+    
+    const data = {
+        goal_id: currentDuplicateId,
+        name: document.getElementById('duplicate-new-name').value,
+        period_type: document.getElementById('duplicate-period-type').value,
+        start_date: document.getElementById('duplicate-start-date').value,
+        end_date: document.getElementById('duplicate-end-date').value
+    };
+    
+    fetch('<?= Url::to('/api/goals/duplicate') ?>', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            duplicateModal.hide();
+            toastr.success('Meta duplicada com sucesso!');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            toastr.error(result.message || 'Erro ao duplicar meta');
+        }
+    })
+    .catch(err => {
+        toastr.error('Erro ao duplicar meta');
+        console.error(err);
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-copy me-2"></i>Duplicar Meta';
+    });
+}
 </script>
+
+<!-- Modal Duplicar Meta -->
+<div class="modal fade" id="duplicateModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-copy me-2 text-info"></i>
+                    Duplicar Meta
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-light-info border border-info border-dashed d-flex align-items-center p-5 mb-5">
+                    <i class="bi bi-info-circle fs-2 text-info me-4"></i>
+                    <div>
+                        <span class="text-gray-800">Duplicando:</span>
+                        <strong id="duplicate-goal-name" class="d-block"></strong>
+                    </div>
+                </div>
+                
+                <div class="mb-5">
+                    <label class="form-label required">Nome da Nova Meta</label>
+                    <input type="text" class="form-control" id="duplicate-new-name" placeholder="Nome da nova meta">
+                </div>
+                
+                <div class="mb-5">
+                    <label class="form-label required">Período</label>
+                    <select class="form-select" id="duplicate-period-type" onchange="updateDuplicateDates()">
+                        <option value="daily">Diário</option>
+                        <option value="weekly">Semanal</option>
+                        <option value="monthly">Mensal</option>
+                        <option value="quarterly">Trimestral</option>
+                        <option value="yearly">Anual</option>
+                        <option value="custom">Personalizado</option>
+                    </select>
+                </div>
+                
+                <div class="row g-3">
+                    <div class="col-6">
+                        <label class="form-label required">Data Início</label>
+                        <input type="date" class="form-control" id="duplicate-start-date">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label required">Data Fim</label>
+                        <input type="date" class="form-control" id="duplicate-end-date">
+                    </div>
+                </div>
+                
+                <div class="notice d-flex bg-light-primary rounded border-primary border border-dashed p-4 mt-5">
+                    <i class="bi bi-lightbulb fs-4 text-primary me-3"></i>
+                    <div class="text-gray-700 fs-7">
+                        A meta será duplicada com todas as configurações (tipo, valor alvo, bonificações, condições), 
+                        alterando apenas o nome e período.
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-info" id="btn-duplicate" onclick="duplicateGoal()">
+                    <i class="bi bi-copy me-2"></i>Duplicar Meta
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php
 $content = ob_get_clean();

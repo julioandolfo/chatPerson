@@ -315,6 +315,7 @@ class Goal extends Model
     
     /**
      * Duplicar meta (para criar metas mensais recorrentes)
+     * Também duplica tiers de bônus e condições de ativação
      */
     public static function duplicateAsTemplate(int $goalId, string $newStartDate, string $newEndDate, ?string $newName = null): int
     {
@@ -333,6 +334,80 @@ class Goal extends Model
         $newGoal['end_date'] = $newEndDate;
         $newGoal['template_id'] = $goalId;
         
-        return self::create($newGoal);
+        // Criar a nova meta
+        $newGoalId = self::create($newGoal);
+        
+        // Duplicar tiers de bônus (se existirem)
+        $bonusTiers = Database::fetchAll(
+            "SELECT * FROM goal_bonus_tiers WHERE goal_id = ? ORDER BY tier_order",
+            [$goalId]
+        );
+        
+        $tierMapping = []; // Mapeia tier antigo -> tier novo
+        
+        foreach ($bonusTiers as $tier) {
+            $oldTierId = $tier['id'];
+            unset($tier['id']);
+            $tier['goal_id'] = $newGoalId;
+            
+            $sql = "INSERT INTO goal_bonus_tiers (goal_id, threshold_percentage, bonus_amount, bonus_percentage, 
+                    is_cumulative, tier_name, tier_color, tier_order, has_conditions, conditions_logic) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            
+            Database::execute($sql, [
+                $tier['goal_id'],
+                $tier['threshold_percentage'],
+                $tier['bonus_amount'],
+                $tier['bonus_percentage'] ?? null,
+                $tier['is_cumulative'] ?? 0,
+                $tier['tier_name'],
+                $tier['tier_color'] ?? null,
+                $tier['tier_order'] ?? 0,
+                $tier['has_conditions'] ?? 0,
+                $tier['conditions_logic'] ?? 'AND'
+            ]);
+            
+            $tierMapping[$oldTierId] = Database::lastInsertId();
+        }
+        
+        // Duplicar condições de ativação (se existirem)
+        $conditions = Database::fetchAll(
+            "SELECT * FROM goal_bonus_conditions WHERE goal_id = ? ORDER BY check_order",
+            [$goalId]
+        );
+        
+        foreach ($conditions as $condition) {
+            unset($condition['id']);
+            $condition['goal_id'] = $newGoalId;
+            
+            // Atualizar referência do tier se existir
+            if (!empty($condition['bonus_tier_id']) && isset($tierMapping[$condition['bonus_tier_id']])) {
+                $condition['bonus_tier_id'] = $tierMapping[$condition['bonus_tier_id']];
+            } else {
+                $condition['bonus_tier_id'] = null;
+            }
+            
+            $sql = "INSERT INTO goal_bonus_conditions (goal_id, bonus_tier_id, condition_type, operator,
+                    min_value, max_value, reference_goal_id, is_required, bonus_modifier, description, 
+                    check_order, is_active) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            
+            Database::execute($sql, [
+                $condition['goal_id'],
+                $condition['bonus_tier_id'],
+                $condition['condition_type'],
+                $condition['operator'],
+                $condition['min_value'],
+                $condition['max_value'] ?? null,
+                $condition['reference_goal_id'] ?? null,
+                $condition['is_required'] ?? 1,
+                $condition['bonus_modifier'] ?? 1.0,
+                $condition['description'] ?? null,
+                $condition['check_order'] ?? 0,
+                $condition['is_active'] ?? 1
+            ]);
+        }
+        
+        return $newGoalId;
     }
 }

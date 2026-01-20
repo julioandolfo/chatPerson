@@ -527,8 +527,108 @@ AND p.slug IN ('goals.view', 'goals.create', 'goals.edit');
 
 ---
 
+## 🎁 CONDIÇÕES DE ATIVAÇÃO DE BÔNUS
+
+### Funcionalidade
+
+Permite configurar que um bônus só seja liberado se **outras métricas** atingirem valores mínimos.
+
+**Exemplo:** Bônus de faturamento de R$ 2.000 só é liberado se:
+- Taxa de conversão >= 15%
+- CSAT >= 4.0
+
+### Como Funciona
+
+1. **Condições Obrigatórias (`is_required = true`):**
+   - Se NÃO atender: Bônus é **bloqueado completamente** (modificador = 0)
+   - Todas devem ser atendidas para liberar o bônus
+
+2. **Condições Opcionais (`is_required = false`):**
+   - Se NÃO atender: Bônus é **reduzido** pelo modificador configurado
+   - Exemplo: `bonus_modifier = 0.5` significa 50% do bônus
+
+### Tipos de Condição Disponíveis
+
+| Tipo | Descrição |
+|------|-----------|
+| `revenue` | Faturamento Total (R$) |
+| `average_ticket` | Ticket Médio (R$) |
+| `conversion_rate` | Taxa de Conversão (%) |
+| `sales_count` | Quantidade de Vendas |
+| `conversations_count` | Quantidade de Conversas |
+| `resolution_rate` | Taxa de Resolução (%) |
+| `response_time` | Tempo Médio de Resposta (min) |
+| `csat_score` | CSAT Médio |
+| `sla_compliance` | Taxa de SLA (%) |
+| `goal_percentage` | Percentual de Outra Meta (%) |
+
+### Operadores Disponíveis
+
+- `>=` Maior ou igual
+- `>` Maior que
+- `<=` Menor ou igual
+- `<` Menor que
+- `=` Igual
+- `!=` Diferente
+- `between` Entre dois valores
+
+### Exemplo de Configuração
+
+```php
+// Condição: Conversão >= 15% (obrigatória)
+GoalBonusCondition::create([
+    'goal_id' => 1,
+    'condition_type' => 'conversion_rate',
+    'operator' => '>=',
+    'min_value' => 15.0,
+    'is_required' => 1,
+    'description' => 'Conversão mínima de 15%'
+]);
+
+// Condição: CSAT >= 4.0 (opcional, reduz para 80% se não atender)
+GoalBonusCondition::create([
+    'goal_id' => 1,
+    'condition_type' => 'csat_score',
+    'operator' => '>=',
+    'min_value' => 4.0,
+    'is_required' => 0,
+    'bonus_modifier' => 0.8,
+    'description' => 'CSAT mínimo'
+]);
+```
+
+### Fluxo de Cálculo
+
+```
+1. Agente atinge 100% da meta de faturamento
+   ↓
+2. Sistema verifica condições de ativação
+   ↓
+3. Condição "Conversão >= 15%": 
+   - Valor atual: 18% ✅ (passou)
+   ↓
+4. Condição "CSAT >= 4.0":
+   - Valor atual: 3.8 ❌ (não passou, mas é opcional)
+   - Aplica modificador: 0.8
+   ↓
+5. Bônus final: R$ 2.000 × 0.8 = R$ 1.600
+```
+
+### Tabelas no Banco
+
+```sql
+-- Condições de ativação
+goal_bonus_conditions
+
+-- Log de verificações
+goal_bonus_condition_logs
+```
+
+---
+
 ## 🔮 POSSÍVEIS EXPANSÕES FUTURAS
 
+- [x] ~~Condições de ativação de bônus~~ ✅ Implementado
 - [ ] Gráficos de evolução do progresso
 - [ ] Comparação entre períodos
 - [ ] Metas em cascata (meta do time influencia meta individual)

@@ -393,11 +393,18 @@ function loadColumns() {
 function showPreview() {
     if (!tempSourceId) return;
     
+    const table = document.getElementById('db_table').value;
+    if (!table) {
+        toastr.warning('Selecione uma tabela primeiro');
+        return;
+    }
+    
     const btn = event.target;
     btn.setAttribute('data-kt-indicator', 'on');
     btn.disabled = true;
     
-    fetch(`/api/external-sources/${tempSourceId}/preview`)
+    // Passa a tabela como parâmetro (já que a fonte temporária não tem tabela configurada)
+    fetch(`/api/external-sources/${tempSourceId}/preview?table=${encodeURIComponent(table)}`)
         .then(r => r.json())
         .then(result => {
             btn.removeAttribute('data-kt-indicator');
@@ -405,6 +412,7 @@ function showPreview() {
             
             if (result.success && result.rows) {
                 renderPreview(result.rows);
+                toastr.success(`${result.rows.length} registro(s) carregado(s)`);
             } else {
                 toastr.error(result.message || 'Erro ao buscar preview');
             }
@@ -413,6 +421,7 @@ function showPreview() {
             btn.removeAttribute('data-kt-indicator');
             btn.disabled = false;
             toastr.error('Erro ao buscar preview');
+            console.error(err);
         });
 }
 

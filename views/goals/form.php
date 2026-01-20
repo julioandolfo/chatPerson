@@ -393,6 +393,113 @@ ob_start();
                                     </button>
                                 </div>
                             </div>
+                            
+                            <!--begin::Condições de Ativação-->
+                            <div class="separator my-8"></div>
+                            
+                            <h4 class="fs-6 fw-bold mb-5">
+                                <i class="ki-duotone ki-shield-tick fs-4 me-2 text-primary"><span class="path1"></span><span class="path2"></span></i>
+                                Condições de Ativação do Bônus
+                            </h4>
+                            <p class="text-muted fs-7 mb-5">
+                                Configure condições adicionais que precisam ser atingidas para liberar o bônus.
+                                Exemplo: Bônus de faturamento só é liberado se taxa de conversão >= 15%.
+                            </p>
+                            
+                            <div class="form-check form-switch form-check-custom form-check-solid mb-5">
+                                <input class="form-check-input" type="checkbox" name="enable_bonus_conditions" value="1" id="enable_bonus_conditions"
+                                       <?= ($goal['enable_bonus_conditions'] ?? 0) ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-bold" for="enable_bonus_conditions">
+                                    Habilitar Condições de Ativação
+                                </label>
+                            </div>
+                            
+                            <div id="bonus-conditions-settings" style="display: <?= ($goal['enable_bonus_conditions'] ?? 0) ? 'block' : 'none' ?>;">
+                                <div class="notice d-flex bg-light-warning rounded border-warning border border-dashed p-6 mb-5">
+                                    <i class="ki-duotone ki-information-5 fs-2tx text-warning me-4">
+                                        <span class="path1"></span><span class="path2"></span><span class="path3"></span>
+                                    </i>
+                                    <div class="d-flex flex-stack flex-grow-1">
+                                        <div class="fw-semibold">
+                                            <h4 class="text-gray-900 fw-bold">Como funciona</h4>
+                                            <div class="fs-6 text-gray-700">
+                                                Se o agente bater a meta principal mas NÃO atingir as condições abaixo:
+                                                <ul class="mb-0 mt-2">
+                                                    <li><strong>Condições obrigatórias:</strong> Bônus é bloqueado completamente</li>
+                                                    <li><strong>Condições opcionais:</strong> Bônus é reduzido pelo modificador configurado</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div id="conditions-list">
+                                    <?php if (!empty($bonusConditions)): ?>
+                                        <?php foreach ($bonusConditions as $idx => $condition): ?>
+                                        <div class="condition-row card card-bordered mb-3" data-index="<?= $idx ?>">
+                                            <div class="card-body py-4">
+                                                <div class="row g-3 align-items-center">
+                                                    <div class="col-md-3">
+                                                        <label class="form-label fs-7">Métrica</label>
+                                                        <select class="form-select form-select-sm" name="conditions[<?= $idx ?>][condition_type]">
+                                                            <?php foreach (\App\Models\GoalBonusCondition::CONDITION_TYPES as $type => $label): ?>
+                                                            <option value="<?= $type ?>" <?= $condition['condition_type'] === $type ? 'selected' : '' ?>><?= $label ?></option>
+                                                            <?php endforeach; ?>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-2">
+                                                        <label class="form-label fs-7">Operador</label>
+                                                        <select class="form-select form-select-sm" name="conditions[<?= $idx ?>][operator]">
+                                                            <?php foreach (\App\Models\GoalBonusCondition::OPERATORS as $op => $label): ?>
+                                                            <option value="<?= $op ?>" <?= $condition['operator'] === $op ? 'selected' : '' ?>><?= $op ?></option>
+                                                            <?php endforeach; ?>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-2">
+                                                        <label class="form-label fs-7">Valor Mínimo</label>
+                                                        <input type="number" step="0.01" class="form-control form-control-sm" 
+                                                               name="conditions[<?= $idx ?>][min_value]" 
+                                                               value="<?= $condition['min_value'] ?>" placeholder="15">
+                                                    </div>
+                                                    <div class="col-md-2">
+                                                        <label class="form-label fs-7">
+                                                            <span class="form-check form-check-sm form-check-custom">
+                                                                <input class="form-check-input" type="checkbox" 
+                                                                       name="conditions[<?= $idx ?>][is_required]" value="1"
+                                                                       <?= $condition['is_required'] ? 'checked' : '' ?>>
+                                                                <span class="form-check-label">Obrigatória</span>
+                                                            </span>
+                                                        </label>
+                                                        <input type="number" step="0.01" min="0" max="1" class="form-control form-control-sm" 
+                                                               name="conditions[<?= $idx ?>][bonus_modifier]" 
+                                                               value="<?= $condition['bonus_modifier'] ?? 0.5 ?>" 
+                                                               placeholder="0.5" title="Modificador se não atender (0.5 = 50% do bônus)">
+                                                    </div>
+                                                    <div class="col-md-2">
+                                                        <label class="form-label fs-7">Descrição</label>
+                                                        <input type="text" class="form-control form-control-sm" 
+                                                               name="conditions[<?= $idx ?>][description]" 
+                                                               value="<?= htmlspecialchars($condition['description'] ?? '') ?>" 
+                                                               placeholder="Ex: Conversão mínima">
+                                                    </div>
+                                                    <div class="col-md-1 d-flex align-items-end">
+                                                        <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeCondition(this)">
+                                                            <i class="ki-duotone ki-trash fs-6"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </div>
+                                
+                                <button type="button" class="btn btn-sm btn-light-primary" onclick="addCondition()">
+                                    <i class="ki-duotone ki-plus fs-4"><span class="path1"></span><span class="path2"></span></i>
+                                    Adicionar Condição
+                                </button>
+                            </div>
+                            <!--end::Condições de Ativação-->
                         </div>
                     </div>
                     <!--end::OTE e Bonificações-->
@@ -588,6 +695,98 @@ function createDefaultTiers() {
     message += '\n✅ Esses tiers serão criados automaticamente após salvar a meta.';
     
     alert(message);
+}
+
+// ========== CONDIÇÕES DE ATIVAÇÃO ==========
+// Toggle da seção de condições
+document.getElementById('enable_bonus_conditions')?.addEventListener('change', function() {
+    const conditionsSettings = document.getElementById('bonus-conditions-settings');
+    if (this.checked) {
+        conditionsSettings.style.display = 'block';
+    } else {
+        conditionsSettings.style.display = 'none';
+    }
+});
+
+// Contador de condições
+let conditionIndex = document.querySelectorAll('.condition-row').length;
+
+// Tipos de condição disponíveis
+const conditionTypes = {
+    'revenue': 'Faturamento',
+    'average_ticket': 'Ticket Médio',
+    'conversion_rate': 'Taxa de Conversão',
+    'sales_count': 'Qtd de Vendas',
+    'conversations_count': 'Qtd de Conversas',
+    'resolution_rate': 'Taxa de Resolução',
+    'response_time': 'Tempo de Resposta',
+    'csat_score': 'CSAT',
+    'messages_sent': 'Mensagens Enviadas',
+    'sla_compliance': 'SLA'
+};
+
+const operators = ['>=', '>', '<=', '<', '=', '!=', 'between'];
+
+function addCondition() {
+    const list = document.getElementById('conditions-list');
+    const idx = conditionIndex++;
+    
+    const html = `
+        <div class="condition-row card card-bordered mb-3" data-index="${idx}">
+            <div class="card-body py-4">
+                <div class="row g-3 align-items-center">
+                    <div class="col-md-3">
+                        <label class="form-label fs-7">Métrica</label>
+                        <select class="form-select form-select-sm" name="conditions[${idx}][condition_type]">
+                            ${Object.entries(conditionTypes).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fs-7">Operador</label>
+                        <select class="form-select form-select-sm" name="conditions[${idx}][operator]">
+                            ${operators.map(op => `<option value="${op}">${op}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fs-7">Valor Mínimo</label>
+                        <input type="number" step="0.01" class="form-control form-control-sm" 
+                               name="conditions[${idx}][min_value]" placeholder="15">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fs-7">
+                            <span class="form-check form-check-sm form-check-custom">
+                                <input class="form-check-input" type="checkbox" 
+                                       name="conditions[${idx}][is_required]" value="1" checked>
+                                <span class="form-check-label">Obrigatória</span>
+                            </span>
+                        </label>
+                        <input type="number" step="0.01" min="0" max="1" class="form-control form-control-sm" 
+                               name="conditions[${idx}][bonus_modifier]" value="0.5" 
+                               placeholder="0.5" title="Modificador se não atender (0.5 = 50% do bônus)">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fs-7">Descrição</label>
+                        <input type="text" class="form-control form-control-sm" 
+                               name="conditions[${idx}][description]" placeholder="Ex: Conversão mínima">
+                    </div>
+                    <div class="col-md-1 d-flex align-items-end">
+                        <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeCondition(this)">
+                            <i class="ki-duotone ki-trash fs-6"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    list.insertAdjacentHTML('beforeend', html);
+}
+
+function removeCondition(btn) {
+    const row = btn.closest('.condition-row');
+    if (row) {
+        row.remove();
+    }
 }
 </script>
 

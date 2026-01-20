@@ -10,10 +10,12 @@ use App\Helpers\Response;
 use App\Helpers\Request;
 use App\Helpers\Permission;
 use App\Helpers\Auth;
+use App\Helpers\Database;
 use App\Services\GoalService;
 use App\Models\Goal;
 use App\Models\GoalProgress;
 use App\Models\GoalAchievement;
+use App\Models\GoalBonusCondition;
 use App\Models\User;
 use App\Models\Team;
 use App\Models\Department;
@@ -66,7 +68,8 @@ class GoalController
             'periods' => Goal::PERIODS,
             'agents' => User::getActiveAgents(),
             'teams' => Team::getActive(),
-            'departments' => Department::getActive()
+            'departments' => Department::getActive(),
+            'bonusConditions' => [] // Array vazio para nova meta
         ];
         
         Response::view('goals/form', $data);
@@ -101,6 +104,7 @@ class GoalController
                 'reward_points' => Request::post('reward_points', 0),
                 'reward_badge' => Request::post('reward_badge') ?: null,
                 'enable_bonus' => Request::post('enable_bonus', '0') === '1' ? 1 : 0,
+                'enable_bonus_conditions' => Request::post('enable_bonus_conditions', '0') === '1' ? 1 : 0,
                 'ote_base_salary' => Request::post('ote_base_salary') ?: null,
                 'ote_target_commission' => Request::post('ote_target_commission') ?: null,
                 'ote_total' => Request::post('ote_base_salary') && Request::post('ote_target_commission') 
@@ -111,6 +115,11 @@ class GoalController
             ];
             
             $goalId = GoalService::create($data);
+            
+            // Processar condições de bônus (se habilitadas)
+            if ($data['enable_bonus_conditions']) {
+                $this->saveGoalConditions($goalId);
+            }
             
             Response::redirect('/goals', 'success', 'Meta criada com sucesso!');
         } catch (\Exception $e) {
@@ -173,8 +182,12 @@ class GoalController
             return;
         }
         
+        // Carregar condições de bônus existentes
+        $bonusConditions = GoalBonusCondition::getByGoal((int)$id);
+        
         $data = [
             'goal' => $goal,
+            'bonusConditions' => $bonusConditions,
             'types' => Goal::TYPES,
             'target_types' => Goal::TARGET_TYPES,
             'periods' => Goal::PERIODS,
@@ -217,6 +230,7 @@ class GoalController
                 'reward_points' => Request::post('reward_points', 0),
                 'reward_badge' => Request::post('reward_badge') ?: null,
                 'enable_bonus' => Request::post('enable_bonus', '0') === '1' ? 1 : 0,
+                'enable_bonus_conditions' => Request::post('enable_bonus_conditions', '0') === '1' ? 1 : 0,
                 'ote_base_salary' => Request::post('ote_base_salary') ?: null,
                 'ote_target_commission' => Request::post('ote_target_commission') ?: null,
                 'ote_total' => Request::post('ote_base_salary') && Request::post('ote_target_commission') 
@@ -226,6 +240,9 @@ class GoalController
             ];
             
             GoalService::update($id, $data);
+            
+            // Processar condições de bônus (se habilitadas)
+            $this->saveGoalConditions((int)$id);
             
             Response::redirect('/goals', 'success', 'Meta atualizada com sucesso!');
         } catch (\Exception $e) {
@@ -398,6 +415,50 @@ class GoalController
             ]);
         } catch (\Exception $e) {
             Response::json(['error' => $e->getMessage()], 400);
+        }
+    }
+    
+    /**
+     * Salvar condições de bônus de uma meta
+     */
+    private function saveGoalConditions(int $goalId): void
+    {
+        $conditions = Request::post('conditions');
+        
+        if (empty($conditions) || !is_array($conditions)) {
+            // Se não tem condições, remover existentes
+            Database::execute(
+                "DELETE FROM goal_bonus_conditions WHERE goal_id = ?",
+                [$goalId]
+            );
+            return;
+        }
+        
+        // Remover condições anteriores
+        Database::execute(
+            "DELETE FROM goal_bonus_conditions WHERE goal_id = ?",
+            [$goalId]
+        );
+        
+        // Inserir novas condições
+        $order = 0;
+        foreach ($conditions as $condition) {
+            if (empty($condition['condition_type']) || !isset($condition['min_value'])) {
+                continue;
+            }
+            
+            GoalBonusCondition::create([
+                'goal_id' => $goalId,
+                'condition_type' => $condition['condition_type'],
+                'operator' => $condition['operator'] ?? '>=',
+                'min_value' => floatval($condition['min_value']),
+                'max_value' => !empty($condition['max_value']) ? floatval($condition['max_value']) : null,
+                'is_required' => isset($condition['is_required']) ? 1 : 0,
+                'bonus_modifier' => floatval($condition['bonus_modifier'] ?? 0.5),
+                'description' => $condition['description'] ?? null,
+                'check_order' => $order++,
+                'is_active' => 1
+            ]);
         }
     }
 }

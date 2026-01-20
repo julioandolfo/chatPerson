@@ -159,7 +159,9 @@ class ExternalDataSourceController
         Permission::abortIfCannot('campaigns.view');
 
         try {
-            $result = ExternalDataSourceService::previewData($sourceId);
+            // Permitir passar tabela como parâmetro (útil durante configuração)
+            $tableName = Request::get('table');
+            $result = ExternalDataSourceService::previewData($sourceId, $tableName);
             Response::json($result);
         } catch (\Exception $e) {
             Response::json([
@@ -177,14 +179,17 @@ class ExternalDataSourceController
         Permission::abortIfCannot('campaigns.create');
 
         try {
-            $listId = Request::post('list_id');
+            $data = Request::json();
+            $listId = $data['list_id'] ?? null;
+            
             if (empty($listId)) {
                 throw new \Exception('ID da lista é obrigatório');
             }
             
-            $result = ExternalDataSourceService::sync($sourceId, $listId);
+            $result = ExternalDataSourceService::sync($sourceId, (int)$listId);
             Response::json($result);
         } catch (\Exception $e) {
+            \App\Helpers\Logger::error('Erro ao sincronizar fonte: ' . $e->getMessage());
             Response::json([
                 'success' => false,
                 'message' => $e->getMessage()

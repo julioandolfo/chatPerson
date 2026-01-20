@@ -245,7 +245,7 @@ class ExternalDataSourceService
     /**
      * Preview de dados (primeiras 10 linhas)
      */
-    public static function previewData(int $sourceId): array
+    public static function previewData(int $sourceId, ?string $tableOverride = null): array
     {
         try {
             $source = ExternalDataSource::find($sourceId);
@@ -253,8 +253,11 @@ class ExternalDataSourceService
                 throw new \Exception('Fonte não encontrada');
             }
             
-            if (empty($source['table_name'])) {
-                throw new \Exception('Tabela não configurada');
+            // Permitir override da tabela (útil durante configuração)
+            $tableName = $tableOverride ?: $source['table_name'];
+            
+            if (empty($tableName)) {
+                throw new \Exception('Tabela não configurada. Selecione uma tabela primeiro.');
             }
             
             $connectionConfig = json_decode($source['connection_config'], true);
@@ -264,7 +267,7 @@ class ExternalDataSourceService
             $whereClause = $queryConfig['where'] ?? '';
             $orderBy = $queryConfig['order_by'] ?? '';
             
-            $sql = "SELECT * FROM `{$source['table_name']}`";
+            $sql = "SELECT * FROM `{$tableName}`";
             
             if ($whereClause) {
                 $sql .= " WHERE {$whereClause}";

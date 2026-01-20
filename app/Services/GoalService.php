@@ -12,6 +12,7 @@ use App\Models\GoalAchievement;
 use App\Models\GoalAlert;
 use App\Models\GoalBonusTier;
 use App\Models\GoalBonusEarned;
+use App\Models\GoalBonusCondition;
 use App\Helpers\Database;
 use App\Helpers\Validator;
 use App\Helpers\Logger;
@@ -821,6 +822,7 @@ class GoalService
     
     /**
      * Calcular e registrar bonificação
+     * Agora com suporte a condições de ativação
      */
     private static function calculateAndRecordBonus(array $goal, float $percentage): void
     {
@@ -830,7 +832,34 @@ class GoalService
         }
         
         try {
-            $bonusData = GoalBonusTier::calculateBonus($goal['id'], $percentage);
+            // Passar usuário e datas para verificação de condições
+            $bonusData = GoalBonusTier::calculateBonus(
+                $goal['id'], 
+                $percentage,
+                $goal['target_id'],
+                $goal['start_date'],
+                $goal['end_date']
+            );
+            
+            // Registrar log de verificação de condições (se houver)
+            if (!empty($bonusData['goal_condition_result']) || !empty($bonusData['condition_results'])) {
+                $originalBonus = $bonusData['conditions_blocked'] ? 0 : $bonusData['total_bonus'];
+                
+                GoalBonusCondition::logConditionCheck(
+                    $goal['id'],
+                    $bonusData['last_tier']['id'] ?? null,
+                    $goal['target_id'],
+                    $bonusData['goal_condition_result'] ?? [
+                        'all_met' => true,
+                        'conditions_checked' => 0,
+                        'conditions_passed' => 0,
+                        'modifier' => 1.0,
+                        'details' => []
+                    ],
+                    $originalBonus,
+                    $bonusData['total_bonus']
+                );
+            }
             
             if ($bonusData['total_bonus'] > 0 && !empty($bonusData['last_tier'])) {
                 GoalBonusEarned::recordBonus(
@@ -841,18 +870,25 @@ class GoalService
                     $bonusData['last_tier']['id'] ?? null
                 );
                 
-                Logger::info('Bonificação calculada', [
+                $logData = [
                     'goal_id' => $goal['id'],
                     'user_id' => $goal['target_id'],
                     'bonus' => $bonusData['total_bonus'],
                     'percentage' => $percentage
-                ]);
+                ];
+                
+                // Adicionar info de condições se relevante
+                if ($bonusData['conditions_blocked'] ?? false) {
+                    $logData['conditions_blocked'] = true;
+                    $logData['modifier_applied'] = $bonusData['goal_condition_result']['modifier'] ?? 1.0;
+                }
+                
+                Logger::info('Bonificação calculada: ' . json_encode($logData));
+            } elseif ($bonusData['conditions_blocked'] ?? false) {
+                Logger::info('Bonificação bloqueada por condições: goal_id=' . $goal['id'] . ', user_id=' . $goal['target_id']);
             }
         } catch (\Exception $e) {
-            Logger::error('Erro ao calcular bonificação', [
-                'goal_id' => $goal['id'],
-                'error' => $e->getMessage()
-            ]);
+            Logger::error('Erro ao calcular bonificação: ' . $e->getMessage() . ' (goal_id=' . $goal['id'] . ')');
         }
     }
     

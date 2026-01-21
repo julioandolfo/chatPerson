@@ -638,14 +638,52 @@ class KanbanAgentService
             
             return $analysis;
         } catch (\Exception $e) {
-            self::logError("KanbanAgentService::analyzeConversation - Erro: " . $e->getMessage());
+            $errorMessage = $e->getMessage();
+            $errorCode = $e->getCode();
+            
+            self::logError("KanbanAgentService::analyzeConversation - Erro: $errorMessage");
             self::logError("KanbanAgentService::analyzeConversation - Stack trace: " . $e->getTraceAsString());
+            
+            // Tratamento específico para quota excedida
+            if ($errorCode === 429 && strpos($errorMessage, 'QUOTA_EXCEEDED') !== false) {
+                self::logError("KanbanAgentService::analyzeConversation - QUOTA EXCEDIDA - Retornando análise padrão");
+                
+                // Retornar análise padrão neutra para não bloquear o fluxo
+                return [
+                    'summary' => 'Análise temporariamente indisponível (quota da OpenAI excedida). Verifique seu plano.',
+                    'score' => 50, // Score neutro
+                    'sentiment' => 'neutral',
+                    'urgency' => 'low',
+                    'recommendations' => ['Renovar quota da OpenAI para retomar análises automáticas'],
+                    'error' => 'quota_exceeded',
+                    'error_message' => 'Quota da OpenAI excedida'
+                ];
+            }
+            
+            // Tratamento específico para rate limit
+            if ($errorCode === 429 && strpos($errorMessage, 'RATE_LIMIT') !== false) {
+                self::logWarning("KanbanAgentService::analyzeConversation - RATE LIMIT - Retornando análise padrão");
+                
+                return [
+                    'summary' => 'Análise temporariamente indisponível (rate limit da OpenAI). Aguarde alguns instantes.',
+                    'score' => 50,
+                    'sentiment' => 'neutral',
+                    'urgency' => 'low',
+                    'recommendations' => ['Aguardar alguns segundos e tentar novamente'],
+                    'error' => 'rate_limit',
+                    'error_message' => 'Rate limit temporário da OpenAI'
+                ];
+            }
+            
+            // Outros erros genéricos
             return [
-                'summary' => 'Erro ao analisar conversa: ' . $e->getMessage(),
+                'summary' => 'Erro ao analisar conversa: ' . $errorMessage,
                 'score' => 0,
                 'sentiment' => 'neutral',
                 'urgency' => 'low',
-                'recommendations' => []
+                'recommendations' => [],
+                'error' => 'analysis_failed',
+                'error_message' => $errorMessage
             ];
         }
     }
@@ -738,17 +776,112 @@ class KanbanAgentService
             'Content-Type: application/json',
             'Authorization: Bearer ' . $apiKey
         ]);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
         curl_close($ch);
 
+        // Tratamento específico para diferentes códigos HTTP
         if ($httpCode !== 200) {
-            throw new \Exception("Erro na API OpenAI: HTTP $httpCode - $response");
+            $errorData = json_decode($response, true);
+            $errorMessage = $errorData['error']['message'] ?? $response;
+            $errorType = $errorData['error']['type'] ?? 'unknown';
+            $errorCode = $errorData['error']['code'] ?? '';
+            
+            // Log detalhado do erro
+            self::logError("OpenAI API Error - HTTP $httpCode");
+            self::logError("Error Type: $errorType");
+            self::logError("Error Code: $errorCode");
+            self::logError("Error Message: $errorMessage");
+            
+            // Tratamento específico para quota excedida
+            if ($httpCode === 429 && $errorCode === 'insufficient_quota') {
+                self::logError("QUOTA DA OPENAI EXCEDIDA! Verifique seu plano e faturamento.");
+                self::logError("Acesse: https://platform.openai.com/account/billing");
+                
+                // Criar notificação persistente para admin
+                self::createQuotaExceededAlert();
+                
+                // Retornar erro específico para tratamento superior
+                throw new \Exception("QUOTA_EXCEEDED: A quota da OpenAI foi excedida. Verifique seu plano em https://platform.openai.com/account/billing", 429);
+            }
+            
+            // Tratamento para rate limit temporário
+            if ($httpCode === 429 && $errorCode === 'rate_limit_exceeded') {
+                self::logWarning("Rate limit da OpenAI atingido temporariamente. Aguardando...");
+                
+                // Extrair tempo de espera do header Retry-After se disponível
+                sleep(2); // Aguardar 2 segundos antes de retornar erro
+                
+                throw new \Exception("RATE_LIMIT: Rate limit da OpenAI atingido temporariamente. Tente novamente em alguns segundos.", 429);
+            }
+            
+            // Outros erros
+            throw new \Exception("Erro na API OpenAI: HTTP $httpCode - Type: $errorType - $errorMessage", $httpCode);
+        }
+
+        // Verificar erro de cURL
+        if (!empty($curlError)) {
+            self::logError("cURL Error: $curlError");
+            throw new \Exception("Erro de conexão com OpenAI: $curlError");
         }
 
         $result = json_decode($response, true);
+        
+        if (!isset($result['choices'][0]['message']['content'])) {
+            self::logError("Resposta inválida da OpenAI: " . json_encode($result));
+            throw new \Exception("Resposta inválida da API OpenAI");
+        }
+        
         return $result['choices'][0]['message']['content'] ?? '';
+    }
+    
+    /**
+     * Criar alerta quando a quota da OpenAI é excedida
+     */
+    private static function createQuotaExceededAlert(): void
+    {
+        try {
+            // Verificar se já existe um alerta recente (últimas 24h)
+            $recentAlert = Database::fetch(
+                "SELECT * FROM system_alerts 
+                 WHERE type = 'openai_quota_exceeded' 
+                 AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                 ORDER BY created_at DESC LIMIT 1"
+            );
+            
+            if ($recentAlert) {
+                self::logInfo("Alerta de quota já existe (criado em {$recentAlert['created_at']})");
+                return;
+            }
+            
+            // Criar novo alerta
+            $sql = "INSERT INTO system_alerts (
+                type, 
+                severity, 
+                title, 
+                message, 
+                action_url,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, NOW())";
+            
+            Database::insert($sql, [
+                'openai_quota_exceeded',
+                'critical',
+                'Quota da OpenAI Excedida',
+                'A quota da sua API da OpenAI foi excedida. Os agentes de IA Kanban estão temporariamente inativos até que a quota seja renovada ou o plano seja atualizado.',
+                'https://platform.openai.com/account/billing'
+            ]);
+            
+            self::logInfo("Alerta de quota excedida criado com sucesso");
+            
+        } catch (\Exception $e) {
+            // Se a tabela não existir ou houver outro erro, apenas logar
+            self::logWarning("Não foi possível criar alerta de quota: " . $e->getMessage());
+        }
     }
 
     /**

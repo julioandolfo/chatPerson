@@ -116,7 +116,7 @@ class GoalController
                 'created_by' => Auth::id()
             ];
             
-            Logger::info('Store meta - payload: ' . json_encode($data), 'goals');
+            Logger::info('Store meta - payload: ' . json_encode($data), 'goals.log');
 
             $goalId = GoalService::create($data);
             
@@ -255,7 +255,7 @@ class GoalController
                 'bonus_calculation_type' => Request::post('bonus_calculation_type', 'tiered')
             ];
             
-            Logger::info('Update meta - payload: ' . json_encode($data), 'goals');
+            Logger::info('Update meta - payload: ' . json_encode($data), 'goals.log');
 
             GoalService::update($id, $data);
             
@@ -465,10 +465,10 @@ class GoalController
      {
          $tiers = Request::post('tiers');
          
-         Logger::info("saveBonusTiers - goalId: {$goalId}", 'goals');
-         Logger::info("saveBonusTiers - tiers raw: " . print_r($tiers, true), 'goals');
-         Logger::info("saveBonusTiers - tiers is_array: " . (is_array($tiers) ? 'YES' : 'NO'), 'goals');
-         Logger::info("saveBonusTiers - tiers empty: " . (empty($tiers) ? 'YES' : 'NO'), 'goals');
+         Logger::info("saveBonusTiers - goalId: {$goalId}", 'goals.log');
+         Logger::info("saveBonusTiers - tiers raw: " . print_r($tiers, true), 'goals.log');
+         Logger::info("saveBonusTiers - tiers is_array: " . (is_array($tiers) ? 'YES' : 'NO'), 'goals.log');
+         Logger::info("saveBonusTiers - tiers empty: " . (empty($tiers) ? 'YES' : 'NO'), 'goals.log');
         
         // Obter IDs existentes para saber quais remover
         $existingIds = Database::fetchAll(
@@ -553,10 +553,10 @@ class GoalController
      {
          $conditions = Request::post('conditions');
          
-         Logger::info("saveGoalConditions - goalId: {$goalId}", 'goals');
-         Logger::info("saveGoalConditions - conditions raw: " . print_r($conditions, true), 'goals');
-         Logger::info("saveGoalConditions - conditions is_array: " . (is_array($conditions) ? 'YES' : 'NO'), 'goals');
-         Logger::info("saveGoalConditions - conditions empty: " . (empty($conditions) ? 'YES' : 'NO'), 'goals');
+         Logger::info("saveGoalConditions - goalId: {$goalId}", 'goals.log');
+         Logger::info("saveGoalConditions - conditions raw: " . print_r($conditions, true), 'goals.log');
+         Logger::info("saveGoalConditions - conditions is_array: " . (is_array($conditions) ? 'YES' : 'NO'), 'goals.log');
+         Logger::info("saveGoalConditions - conditions empty: " . (empty($conditions) ? 'YES' : 'NO'), 'goals.log');
         
         if (empty($conditions) || !is_array($conditions)) {
             // Se não tem condições, remover existentes
@@ -564,7 +564,7 @@ class GoalController
                 "DELETE FROM goal_bonus_conditions WHERE goal_id = ?",
                 [$goalId]
             );
-            Logger::info("saveGoalConditions - Nenhuma condição, removidas as existentes", 'goals');
+            Logger::info("saveGoalConditions - Nenhuma condição, removidas as existentes", 'goals.log');
             return;
         }
         
@@ -579,7 +579,7 @@ class GoalController
         $inserted = 0;
         foreach ($conditions as $condition) {
             if (empty($condition['condition_type']) || !isset($condition['min_value'])) {
-                Logger::info("saveGoalConditions - Condição ignorada (dados incompletos): " . json_encode($condition), 'goals');
+                Logger::info("saveGoalConditions - Condição ignorada (dados incompletos): " . json_encode($condition), 'goals.log');
                 continue;
             }
             
@@ -616,12 +616,12 @@ class GoalController
                     ]
                 );
                 $inserted++;
-                Logger::info("saveGoalConditions - Condição inserida: " . json_encode($data), 'goals');
+                Logger::info("saveGoalConditions - Condição inserida: " . json_encode($data), 'goals.log');
             } catch (\Exception $e) {
-                Logger::error("saveGoalConditions - Erro ao inserir condição: " . $e->getMessage(), 'goals');
+                Logger::error("saveGoalConditions - Erro ao inserir condição: " . $e->getMessage(), 'goals.log');
             }
         }
         
-        Logger::info("saveGoalConditions - Total inseridas: {$inserted}", 'goals');
+        Logger::info("saveGoalConditions - Total inseridas: {$inserted}", 'goals.log');
     }
 }

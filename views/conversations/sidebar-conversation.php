@@ -20,7 +20,238 @@
     window.closeConversation = window.closeConversation || stub('closeConversation');
     window.reopenConversation = window.reopenConversation || stub('reopenConversation');
     window.addNote = window.addNote || stub('addNote');
+    window.loadConversationSLA = window.loadConversationSLA || stub('loadConversationSLA');
 })();
+</script>
+
+<script>
+// ========== DEFINIÇÃO IMEDIATA DA FUNÇÃO loadConversationSLA ==========
+// Esta função precisa estar disponível imediatamente para updateConversationSidebar
+window.loadConversationSLA = function(conversationId) {
+    if (!conversationId) return;
+    
+    const loadingEl = document.getElementById('sla-loading');
+    const contentEl = document.getElementById('sla-content');
+    const statusBadge = document.getElementById('sla-status-badge');
+    
+    if (loadingEl) loadingEl.style.display = 'block';
+    if (contentEl) contentEl.style.display = 'none';
+    if (statusBadge) statusBadge.textContent = '...';
+    
+    console.log('🔍 Carregando SLA para conversa:', conversationId);
+    
+    fetch(`<?= \App\Helpers\Url::to('/conversations/sla-details') ?>?id=${conversationId}`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => {
+        console.log('📥 Resposta SLA recebida:', {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            url: response.url
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        return response.text().then(text => {
+            console.log('📄 Resposta em texto:', text.substring(0, 500));
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                console.error('❌ Erro ao fazer parse do JSON:', e);
+                console.error('📄 Texto completo:', text);
+                throw new Error('Resposta não é JSON válido');
+            }
+        });
+    })
+    .then(data => {
+        console.log('📊 Dados SLA parseados:', data);
+        
+        if (data.success && data.sla) {
+            const sla = data.sla;
+            
+            if (loadingEl) loadingEl.style.display = 'none';
+            if (contentEl) contentEl.style.display = 'block';
+            
+            // Atualizar badge de status
+            let badgeClass = 'badge-light-success';
+            let badgeText = '✓ No prazo';
+            
+            if (sla.status_indicator === 'exceeded') {
+                badgeClass = 'badge-light-danger';
+                badgeText = '✗ Excedido';
+            } else if (sla.status_indicator === 'warning') {
+                badgeClass = 'badge-light-warning';
+                badgeText = '⚠ Alerta';
+            } else if (!sla.should_start) {
+                badgeClass = 'badge-light-secondary';
+                badgeText = '⏸ Aguardando';
+            }
+            
+            if (statusBadge) {
+                statusBadge.className = `badge badge-sm ${badgeClass}`;
+                statusBadge.textContent = badgeText;
+            }
+            
+            // Atualizar progresso
+            const progressBar = document.getElementById('sla-progress-bar');
+            const elapsedTimeEl = document.getElementById('sla-elapsed-time');
+            const percentageEl = document.getElementById('sla-percentage');
+            const targetEl = document.getElementById('sla-target');
+            
+            if (progressBar) {
+                let barClass = 'bg-success';
+                if (sla.percentage >= 100) barClass = 'bg-danger';
+                else if (sla.percentage >= 80) barClass = 'bg-warning';
+                
+                progressBar.className = `progress-bar progress-bar-striped ${sla.percentage < 100 ? 'progress-bar-animated' : ''} ${barClass}`;
+                progressBar.style.width = Math.min(100, sla.percentage) + '%';
+            }
+            
+            if (elapsedTimeEl) {
+                elapsedTimeEl.textContent = `${sla.elapsed_minutes} min`;
+                elapsedTimeEl.className = `fs-6 fw-bold ${sla.percentage >= 100 ? 'text-danger' : sla.percentage >= 80 ? 'text-warning' : 'text-success'}`;
+            }
+            
+            if (percentageEl) {
+                percentageEl.textContent = `${sla.percentage}%`;
+                percentageEl.className = `fs-8 fw-bold ${sla.percentage >= 100 ? 'text-danger' : sla.percentage >= 80 ? 'text-warning' : 'text-success'}`;
+            }
+            
+            if (targetEl) {
+                targetEl.textContent = `${sla.first_response_sla} min`;
+            }
+            
+            // Detalhes
+            const ruleNameEl = document.getElementById('sla-rule-name');
+            const startTimeEl = document.getElementById('sla-start-time');
+            
+            if (ruleNameEl) ruleNameEl.textContent = sla.sla_rule || 'Global';
+            if (startTimeEl) {
+                const startDate = new Date(sla.start_time);
+                startTimeEl.textContent = startDate.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+            }
+            
+            // Excedido
+            const exceededContainer = document.getElementById('sla-exceeded-container');
+            const exceededByEl = document.getElementById('sla-exceeded-by');
+            
+            if (exceededContainer && exceededByEl) {
+                if (sla.percentage > 100) {
+                    exceededContainer.style.display = 'flex';
+                    const exceededMinutes = sla.elapsed_minutes - sla.first_response_sla;
+                    exceededByEl.textContent = `+${exceededMinutes.toFixed(0)} min`;
+                } else {
+                    exceededContainer.style.display = 'none';
+                }
+            }
+            
+            // Timeline
+            const timelineEl = document.getElementById('sla-timeline');
+            if (timelineEl && sla.timeline) {
+                let timelineHtml = '';
+                
+                sla.timeline.forEach((event, index) => {
+                    const time = new Date(event.time);
+                    const timeStr = time.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+                    
+                    if (event.type === 'agent_response') {
+                        const agentType = event.is_ai ? '🤖 IA' : '👤 Agente';
+                        timelineHtml += `
+                            <div class="timeline-sla-item agent">
+                                <div class="fs-8 text-muted">${timeStr}</div>
+                                <div class="fs-7 fw-semibold text-primary">${agentType} respondeu</div>
+                                ${event.content_preview ? `<div class="fs-8 text-muted" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;">${event.content_preview}</div>` : ''}
+                            </div>
+                        `;
+                    } else if (event.type === 'contact_message') {
+                        const slaClass = event.sla_active ? 'sla-active' : '';
+                        const slaIcon = event.sla_active ? '🔴 ' : '';
+                        const minSince = event.minutes_since_agent ? `(${event.minutes_since_agent.toFixed(1)} min depois)` : '';
+                        
+                        timelineHtml += `
+                            <div class="timeline-sla-item contact ${slaClass}">
+                                <div class="fs-8 text-muted">${timeStr}</div>
+                                <div class="fs-7 fw-semibold text-success">${slaIcon}Cliente enviou</div>
+                                ${minSince ? `<div class="fs-8 text-muted">${minSince}</div>` : ''}
+                                ${event.content_preview ? `<div class="fs-8 text-muted" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;">${event.content_preview}</div>` : ''}
+                            </div>
+                        `;
+                    }
+                });
+                
+                timelineEl.innerHTML = timelineHtml || '<div class="text-muted fs-8">Nenhum evento ainda</div>';
+            }
+            
+            // Badges informativos
+            const badgesContainer = document.getElementById('sla-badges-container');
+            if (badgesContainer) {
+                let badgesHtml = '';
+                
+                if (sla.is_paused) {
+                    badgesHtml += '<span class="badge badge-light-warning fs-8">⏸ Pausado</span>';
+                }
+                
+                if (sla.warning_sent) {
+                    badgesHtml += '<span class="badge badge-light-info fs-8">🔔 Alerta enviado</span>';
+                }
+                
+                if (sla.reassignment_count > 0) {
+                    badgesHtml += `<span class="badge badge-light-danger fs-8">🔄 ${sla.reassignment_count}x reatribuída</span>`;
+                }
+                
+                if (sla.paused_duration > 0) {
+                    badgesHtml += `<span class="badge badge-light-secondary fs-8">⏱ ${sla.paused_duration}min pausado</span>`;
+                }
+                
+                if (!sla.should_start) {
+                    badgesHtml += `<span class="badge badge-light-info fs-8">⏳ Delay de ${sla.delay_minutes}min</span>`;
+                }
+                
+                badgesContainer.innerHTML = badgesHtml || '<span class="text-muted fs-8">Sem eventos especiais</span>';
+            }
+            
+            // Auto-atualizar a cada 30 segundos se SLA estiver ativo
+            if (sla.should_start && !sla.is_within_sla && sla.status !== 'closed') {
+                setTimeout(() => {
+                    if (window.currentConversationId === conversationId) {
+                        window.loadConversationSLA(conversationId);
+                    }
+                }, 30000);
+            }
+        }
+    })
+    .catch(error => {
+        console.error('❌ Erro ao carregar SLA:', error);
+        if (loadingEl) {
+            loadingEl.style.display = 'none';
+        }
+        if (contentEl) {
+            contentEl.style.display = 'block';
+            contentEl.innerHTML = `
+                <div class="alert alert-danger d-flex align-items-center p-3">
+                    <i class="ki-duotone ki-information fs-2 text-danger me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div class="fs-7">
+                        <strong>Erro ao carregar SLA</strong><br>
+                        <span class="text-muted">${error.message || 'Erro desconhecido'}</span>
+                    </div>
+                </div>
+            `;
+        }
+    });
+};
+
+console.log('✅ Função loadConversationSLA registrada (definição imediata)');
+console.log('🔍 URL do endpoint SLA:', '<?= \App\Helpers\Url::to('/conversations/sla-details') ?>');
 </script>
 
 <script>
@@ -2456,9 +2687,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Debug: verificar se a função está disponível
 console.log('🔍 loadWooCommerceOrders disponível?', typeof window.loadWooCommerceOrders);
+console.log('✅ loadConversationSLA já registrada anteriormente');
 
-// ========== FUNÇÃO PARA CARREGAR SLA DA CONVERSA ==========
-window.loadConversationSLA = function(conversationId) {
+// ========== FUNÇÃO loadConversationSLA (REMOVIDA - DEFINIDA NO INÍCIO DO ARQUIVO) ==========
+// A função foi movida para o início do arquivo para estar disponível imediatamente
+/*window.loadConversationSLA = function(conversationId) {
     if (!conversationId) return;
     
     const loadingEl = document.getElementById('sla-loading');
@@ -2681,6 +2914,6 @@ window.loadConversationSLA = function(conversationId) {
 };
 
 console.log('✅ Função loadConversationSLA registrada');
-console.log('🔍 URL do endpoint SLA:', '<?= \App\Helpers\Url::to('/conversations/sla-details') ?>');
+console.log('🔍 URL do endpoint SLA:', '<?= \App\Helpers\Url::to('/conversations/sla-details') ?>');*/
 </script>
 

@@ -55,7 +55,7 @@ class GoalService
         // Calcular progresso inicial
         self::calculateProgress($goalId);
         
-        Logger::info('Meta criada: ' . json_encode(['goal_id' => $goalId, 'name' => $data['name']]), 'goals');
+        Logger::info('Meta criada: ' . json_encode(['goal_id' => $goalId, 'name' => $data['name']]), 'goals.log');
         
         return $goalId;
     }
@@ -82,7 +82,7 @@ class GoalService
         // Recalcular progresso
         if ($updated) {
             self::calculateProgress($id);
-            Logger::info('Meta atualizada: ' . json_encode(['goal_id' => $id]), 'goals');
+            Logger::info('Meta atualizada: ' . json_encode(['goal_id' => $id]), 'goals.log');
         }
         
         return $updated;
@@ -98,7 +98,7 @@ class GoalService
             return false;
         }
         
-        Logger::info('Meta deletada: ' . json_encode(['goal_id' => $id, 'name' => $goal['name']]), 'goals');
+        Logger::info('Meta deletada: ' . json_encode(['goal_id' => $id, 'name' => $goal['name']]), 'goals.log');
         return Goal::delete($id);
     }
     

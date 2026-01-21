@@ -1,114 +1,212 @@
-# Debug: Tiers e Condições não salvando
+# 🔍 DEBUG: Tiers e Condições não estão salvando
 
-## 🔍 O que foi feito:
+## 🎯 Problema
+Ao criar/editar uma meta com Tiers e Condições, eles não estão sendo salvos no banco de dados.
 
-### 1. **Logs Adicionados no Controller**
+## 🧪 Scripts de Diagnóstico
 
-Adicionei logs detalhados em `app/Controllers/GoalController.php` nos métodos:
-- `saveBonusTiers()`
-- `saveGoalConditions()`
+Foram criados 2 scripts para diagnosticar o problema:
 
-Os logs agora mostram:
-- Se os dados estão chegando
-- Se são arrays
-- Se estão vazios
-- O conteúdo completo
+### 1️⃣ **`create-goals-log.php`** - Criar e testar o arquivo de log
 
-### 2. **Debug no Formulário (JavaScript)**
+**URL**: `http://seu-dominio.com/create-goals-log.php`
 
-Adicionei um listener no submit do formulário (`views/goals/form.php`) que mostra no **Console do Navegador**:
-- Quantos tiers estão sendo enviados
-- Quantas conditions estão sendo enviadas
-- Se os checkboxes `enable_bonus` e `enable_bonus_conditions` estão marcados
-- Aviso se nenhum dado está sendo enviado
+**O que faz**:
+- ✅ Verifica se o diretório `logs/` existe
+- ✅ Cria o arquivo `logs/goals.log` com permissões corretas
+- ✅ Testa escrita direta no arquivo
+- ✅ Testa a classe `Logger::info()`
+- ✅ Mostra conteúdo atual do log
+- ✅ Simula logs do GoalController
 
-## 🧪 Como Testar:
-
-### Passo 1: Abrir Console do Navegador
-1. Acesse `/goals/create` ou `/goals/edit?id=X`
-2. Pressione `F12` para abrir DevTools
-3. Vá na aba **Console**
-
-### Passo 2: Preencher o Formulário
-1. Preencha os dados básicos da meta
-2. **Habilite** "Sistema de Bonificações"
-3. **Adicione Tiers**:
-   - Clique em "Adicionar Tier"
-   - Preencha: Nome, % Mínimo, Valor Bônus
-   - Adicione pelo menos 2 tiers
-4. **Adicione Condições** (opcional):
-   - Habilite "Condições de Ativação"
-   - Clique em "Adicionar Condição"
-   - Preencha: Métrica, Operador, Valor
-
-### Passo 3: Salvar e Verificar Console
-1. Clique em **"Criar Meta"** ou **"Atualizar Meta"**
-2. **No Console do Navegador**, você verá:
-
-```javascript
-=== FORM SUBMIT DEBUG ===
-Form action: http://localhost/goals/store
-Form method: POST
-Tiers encontrados: [
-  {key: "tiers[0][tier_name]", value: "Bronze"},
-  {key: "tiers[0][threshold_percentage]", value: "50"},
-  {key: "tiers[0][bonus_amount]", value: "500"},
-  ...
-]
-Conditions encontradas: [
-  {key: "conditions[0][condition_type]", value: "conversion_rate"},
-  ...
-]
-enable_bonus: 1
-enable_bonus_conditions: 1
-```
-
-### Passo 4: Verificar Logs do Servidor
-1. Acesse os logs do PHP (geralmente em `storage/logs/` ou `/var/log/`)
-2. Procure por linhas com `[goals]`:
-
-```
-[2026-01-21 12:34:56] goals.INFO: saveBonusTiers - goalId: 5
-[2026-01-21 12:34:56] goals.INFO: saveBonusTiers - tiers raw: Array (...)
-[2026-01-21 12:34:56] goals.INFO: saveBonusTiers - tiers is_array: YES
-[2026-01-21 12:34:56] goals.INFO: saveBonusTiers - tiers empty: NO
-```
-
-## 🐛 Possíveis Problemas:
-
-### Problema 1: Console mostra "NENHUM" tier/condition
-**Causa**: Os campos não estão sendo preenchidos ou o JavaScript não está encontrando os inputs  
-**Solução**: Verificar se os inputs têm o atributo `name` correto (`tiers[0][tier_name]`, etc)
-
-### Problema 2: Console mostra dados, mas logs do servidor mostram "empty: YES"
-**Causa**: O `Request::post()` não está pegando arrays corretamente  
-**Solução**: Verificar se o formulário está usando `method="POST"` e `enctype` correto
-
-### Problema 3: Logs mostram arrays, mas não salva no banco
-**Causa**: Erro no SQL ou validação  
-**Solução**: Verificar se as tabelas `goal_bonus_tiers` e `goal_bonus_conditions` existem
-
-## 📊 Verificar no Banco de Dados:
-
-```sql
--- Ver tiers de uma meta
-SELECT * FROM goal_bonus_tiers WHERE goal_id = 1;
-
--- Ver condições de uma meta
-SELECT * FROM goal_bonus_conditions WHERE goal_id = 1;
-
--- Ver se as tabelas existem
-SHOW TABLES LIKE 'goal_bonus%';
-```
-
-## 🔧 Próximos Passos (se ainda não funcionar):
-
-1. **Compartilhe o output do Console do navegador**
-2. **Compartilhe os logs do servidor** (linhas com `[goals]`)
-3. **Execute as queries SQL** acima e compartilhe o resultado
+**Execute PRIMEIRO este script!**
 
 ---
 
-**Arquivos modificados**:
-- `app/Controllers/GoalController.php` - Logs adicionados
-- `views/goals/form.php` - Debug JavaScript adicionado
+### 2️⃣ **`test-save-tiers.php`** - Testar salvamento direto
+
+**URL**: `http://seu-dominio.com/test-save-tiers.php`
+
+**O que faz**:
+- ✅ Simula dados de POST com tiers e condições
+- ✅ Busca uma meta existente no banco
+- ✅ Tenta salvar 2 tiers de teste
+- ✅ Tenta salvar 1 condição de teste
+- ✅ Verifica se foram salvos no banco
+- ✅ Escreve logs detalhados em `goals.log`
+
+**Execute DEPOIS do script 1!**
+
+---
+
+## 📋 Passo a Passo Completo
+
+### Etapa 1: Preparar o ambiente
+```bash
+# No servidor, execute:
+1. Acesse: http://seu-dominio.com/create-goals-log.php
+2. Verifique se TODOS os testes passaram ✅
+```
+
+**Resultado esperado**:
+```
+✅ Diretório existe
+✅ Arquivo existe
+✅ Escrita OK!
+✅ Logger::info() executado sem erros!
+✅ 3 logs de teste escritos!
+```
+
+---
+
+### Etapa 2: Testar salvamento direto
+```bash
+1. Acesse: http://seu-dominio.com/test-save-tiers.php
+2. Verifique se os tiers e condições foram salvos
+```
+
+**Resultado esperado**:
+```
+✅ 2 metas encontradas
+✅ Tier 'Bronze' salvo
+✅ Tier 'Prata' salvo
+✅ Total salvos: 2/2
+✅ Condition 'Conversão mínima 15%' salva
+✅ Total salvas: 1/1
+Tiers no banco: 2
+Condições no banco: 1
+✅ TESTE BEM-SUCEDIDO!
+```
+
+---
+
+### Etapa 3: Ver os logs
+```bash
+1. Acesse: http://seu-dominio.com/view-all-logs.php
+2. Clique no botão: 🎯 Metas/OTE (dourado no topo)
+3. Você verá TODOS os logs de teste
+```
+
+**Você deve ver linhas como**:
+```
+[2026-01-21 10:30:15] [INFO] test-save-tiers.php - Iniciando teste para meta ID 1
+[2026-01-21 10:30:15] [INFO] test-save-tiers.php - tiers is_array: YES
+[2026-01-21 10:30:15] [INFO] test-save-tiers.php - tiers empty: NO
+[2026-01-21 10:30:15] [INFO] test-save-tiers.php - tiers count: 2
+[2026-01-21 10:30:15] [INFO] test-save-tiers.php - Tier 'Bronze' salvo com sucesso!
+[2026-01-21 10:30:15] [INFO] test-save-tiers.php - Tier 'Prata' salvo com sucesso!
+```
+
+---
+
+### Etapa 4: Testar pela interface real
+```bash
+1. Acesse: http://seu-dominio.com/goals/edit?id=1 (use um ID válido)
+2. Habilite "Sistema de Bonificações"
+3. Adicione 2 Tiers:
+   - Bronze: 50%, R$ 600
+   - Prata: 70%, R$ 1000
+4. Habilite "Condições de Ativação"
+5. Adicione 1 Condição:
+   - Taxa de Conversão >= 15%
+6. Salve a meta
+7. Volte para: http://seu-dominio.com/view-all-logs.php
+8. Clique em 🎯 Metas/OTE
+```
+
+**Você deve ver logs do GoalController**:
+```
+[2026-01-21 10:35:20] [INFO] Update meta - payload: {"name":"...",...}
+[2026-01-21 10:35:20] [INFO] saveBonusTiers - goalId: 1
+[2026-01-21 10:35:20] [INFO] saveBonusTiers - tiers is_array: YES
+[2026-01-21 10:35:20] [INFO] saveBonusTiers - tiers empty: NO
+```
+
+---
+
+## 🔍 Cenários de Diagnóstico
+
+### ✅ Cenário 1: Teste direto funciona, interface não
+**Sintoma**: `test-save-tiers.php` salva OK, mas formulário não  
+**Diagnóstico**: Problema no frontend (campos não estão enviando dados)  
+**Solução**: Verificar atributos `name=""` dos inputs
+
+### ❌ Cenário 2: Nenhum dos dois funciona
+**Sintoma**: Nem teste direto nem formulário salvam  
+**Diagnóstico**: Problema nas tabelas do banco  
+**Solução**: Verificar se as tabelas existem:
+```sql
+SHOW TABLES LIKE 'goal_bonus%';
+DESCRIBE goal_bonus_tiers;
+DESCRIBE goal_bonus_conditions;
+```
+
+### 🟡 Cenário 3: Logs não aparecem
+**Sintoma**: Tudo funciona mas logs não aparecem  
+**Diagnóstico**: Permissões do arquivo de log  
+**Solução**: Execute o script 1 novamente
+
+### 🟡 Cenário 4: "tiers is_array: NO"
+**Sintoma**: Log mostra que `$tiers` não é um array  
+**Diagnóstico**: `Request::post('tiers')` retorna string ou null  
+**Solução**: Verificar `app/Helpers/Request.php`
+
+---
+
+## 📊 Verificação Final no Banco
+
+Após qualquer teste, execute:
+
+```sql
+-- Ver a última meta criada/editada
+SELECT id, name, enable_bonus, enable_bonus_conditions 
+FROM goals 
+ORDER BY updated_at DESC 
+LIMIT 1;
+
+-- Ver tiers da meta (use o ID acima)
+SELECT * FROM goal_bonus_tiers WHERE goal_id = X ORDER BY tier_order;
+
+-- Ver condições da meta (use o ID acima)
+SELECT * FROM goal_bonus_conditions WHERE goal_id = X ORDER BY check_order;
+```
+
+**Resultado esperado**:
+- `enable_bonus = 1`
+- `enable_bonus_conditions = 1`
+- 2 linhas em `goal_bonus_tiers`
+- 1 linha em `goal_bonus_conditions`
+
+---
+
+## 🚀 URLs de Acesso Rápido
+
+| Script | URL | Ordem |
+|--------|-----|-------|
+| **Criar Log** | `/create-goals-log.php` | 1️⃣ |
+| **Teste Direto** | `/test-save-tiers.php` | 2️⃣ |
+| **Ver Logs** | `/view-all-logs.php` → 🎯 | 3️⃣ |
+| **Editar Meta** | `/goals/edit?id=X` | 4️⃣ |
+
+---
+
+## 📸 O que enviar se não funcionar
+
+Se após todos os testes o problema persistir, envie:
+
+1. **Screenshot** de `/create-goals-log.php` (página completa)
+2. **Screenshot** de `/test-save-tiers.php` (página completa)
+3. **Screenshot** de `/view-all-logs.php` (seção Metas/OTE)
+4. **Resultado SQL**:
+   ```sql
+   SELECT * FROM goal_bonus_tiers WHERE goal_id = X;
+   SELECT * FROM goal_bonus_conditions WHERE goal_id = X;
+   ```
+
+---
+
+**Última atualização**: 2026-01-21  
+**Arquivos criados**:
+- `public/create-goals-log.php`
+- `public/test-save-tiers.php`
+- `public/view-all-logs.php` (atualizado)

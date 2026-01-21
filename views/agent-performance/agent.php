@@ -149,7 +149,8 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                 </div>
                 <div class="fw-semibold text-gray-600">SLA 1ª Resposta</div>
                 <div class="text-muted fs-7 mt-2">
-                    <?= $agentMetrics['first_response_within_sla'] ?? 0 ?> de <?= $agentMetrics['total_conversations'] ?? 0 ?> dentro do SLA
+                    <?php $slaBaseTotal = $agentMetrics['total_conversations_with_contact'] ?? ($agentMetrics['total_conversations'] ?? 0); ?>
+                    <?= $agentMetrics['first_response_within_sla'] ?? 0 ?> de <?= $slaBaseTotal ?> dentro do SLA
                 </div>
             </div>
         </div>
@@ -307,9 +308,10 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                             <tr>
                                 <td class="fw-semibold text-gray-600">1ª Resposta no SLA</td>
                                 <td class="text-end">
+                                    <?php $slaBaseTotal = $agentMetrics['total_conversations_with_contact'] ?? ($agentMetrics['total_conversations'] ?? 0); ?>
                                     <span class="fw-bold text-success"><?= $agentMetrics['first_response_within_sla'] ?? 0 ?></span>
                                     <span class="text-muted">/</span>
-                                    <span class="fw-bold"><?= $agentMetrics['total_conversations'] ?? 0 ?></span>
+                                    <span class="fw-bold"><?= $slaBaseTotal ?></span>
                                 </td>
                             </tr>
                         </tbody>

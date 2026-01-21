@@ -343,6 +343,17 @@ class GoalService
         $startDate = $goal['start_date'];
         $endDate = $goal['end_date'];
         $type = $goal['type'];
+
+        // Evitar erro caso integração WooCommerce não esteja instalada
+        if (in_array($type, ['revenue', 'average_ticket', 'conversion_rate', 'sales_count'], true)
+            && !self::tableExists('woocommerce_order_cache')
+        ) {
+            Logger::warning(
+                "Meta '{$type}': tabela 'woocommerce_order_cache' não encontrada. Valor 0 aplicado.",
+                'goals.log'
+            );
+            return 0;
+        }
         
         // Determinar IDs dos agentes baseado no target_type
         $agentIds = self::getTargetAgentIds($targetType, $targetId);
@@ -393,6 +404,15 @@ class GoalService
                 return 0;
         }
     }
+
+    /**
+     * Verificar se uma tabela existe no banco
+     */
+    private static function tableExists(string $table): bool
+    {
+        $result = Database::fetch("SHOW TABLES LIKE ?", [$table]);
+        return !empty($result);
+    }
     
     /**
      * Obter IDs dos agentes baseado no target_type
@@ -441,17 +461,20 @@ class GoalService
     private static function calculateRevenue(array $agentIds, string $startDate, string $endDate): float
     {
         if (empty($agentIds)) return 0;
-        
-        $placeholders = str_repeat('?,', count($agentIds) - 1) . '?';
-        $params = array_merge($agentIds, [$startDate, $endDate]);
-        
-        $sql = "SELECT COALESCE(SUM(wc.total), 0) as revenue
-                FROM woocommerce_conversions wc
-                INNER JOIN conversations c ON wc.conversation_id = c.id
-                INNER JOIN conversation_assignments ca ON c.id = ca.conversation_id
-                WHERE ca.agent_id IN ($placeholders)
-                AND wc.created_at BETWEEN ? AND ?";
-        
+        $sellerIds = self::getWooCommerceSellerIds($agentIds);
+        if (empty($sellerIds)) return 0;
+
+        $statusList = self::getValidWooCommerceStatuses();
+        $sellerPlaceholders = implode(',', array_fill(0, count($sellerIds), '?'));
+        $statusPlaceholders = implode(',', array_fill(0, count($statusList), '?'));
+        $params = array_merge($sellerIds, [$startDate, $endDate], $statusList);
+
+        $sql = "SELECT COALESCE(SUM(oc.order_total), 0) as revenue
+                FROM woocommerce_order_cache oc
+                WHERE oc.seller_id IN ({$sellerPlaceholders})
+                AND oc.order_date BETWEEN ? AND ?
+                AND oc.order_status IN ({$statusPlaceholders})";
+
         $result = Database::fetch($sql, $params);
         return (float) ($result['revenue'] ?? 0);
     }
@@ -462,17 +485,20 @@ class GoalService
     private static function calculateAverageTicket(array $agentIds, string $startDate, string $endDate): float
     {
         if (empty($agentIds)) return 0;
-        
-        $placeholders = str_repeat('?,', count($agentIds) - 1) . '?';
-        $params = array_merge($agentIds, [$startDate, $endDate]);
-        
-        $sql = "SELECT COALESCE(AVG(wc.total), 0) as avg_ticket
-                FROM woocommerce_conversions wc
-                INNER JOIN conversations c ON wc.conversation_id = c.id
-                INNER JOIN conversation_assignments ca ON c.id = ca.conversation_id
-                WHERE ca.agent_id IN ($placeholders)
-                AND wc.created_at BETWEEN ? AND ?";
-        
+        $sellerIds = self::getWooCommerceSellerIds($agentIds);
+        if (empty($sellerIds)) return 0;
+
+        $statusList = self::getValidWooCommerceStatuses();
+        $sellerPlaceholders = implode(',', array_fill(0, count($sellerIds), '?'));
+        $statusPlaceholders = implode(',', array_fill(0, count($statusList), '?'));
+        $params = array_merge($sellerIds, [$startDate, $endDate], $statusList);
+
+        $sql = "SELECT COALESCE(AVG(oc.order_total), 0) as avg_ticket
+                FROM woocommerce_order_cache oc
+                WHERE oc.seller_id IN ({$sellerPlaceholders})
+                AND oc.order_date BETWEEN ? AND ?
+                AND oc.order_status IN ({$statusPlaceholders})";
+
         $result = Database::fetch($sql, $params);
         return (float) ($result['avg_ticket'] ?? 0);
     }
@@ -483,31 +509,37 @@ class GoalService
     private static function calculateConversionRate(array $agentIds, string $startDate, string $endDate): float
     {
         if (empty($agentIds)) return 0;
-        
         $placeholders = str_repeat('?,', count($agentIds) - 1) . '?';
         $params = array_merge($agentIds, [$startDate, $endDate]);
-        
+
         // Total de conversas
         $sqlTotal = "SELECT COUNT(DISTINCT c.id) as total
                      FROM conversations c
                      INNER JOIN conversation_assignments ca ON c.id = ca.conversation_id
                      WHERE ca.agent_id IN ($placeholders)
                      AND c.created_at BETWEEN ? AND ?";
-        
+
         $total = Database::fetch($sqlTotal, $params);
         $totalConversations = (float) ($total['total'] ?? 0);
         
         if ($totalConversations == 0) return 0;
-        
-        // Conversas com venda
-        $sqlConverted = "SELECT COUNT(DISTINCT wc.conversation_id) as converted
-                         FROM woocommerce_conversions wc
-                         INNER JOIN conversations c ON wc.conversation_id = c.id
-                         INNER JOIN conversation_assignments ca ON c.id = ca.conversation_id
-                         WHERE ca.agent_id IN ($placeholders)
-                         AND wc.created_at BETWEEN ? AND ?";
-        
-        $converted = Database::fetch($sqlConverted, $params);
+
+        $sellerIds = self::getWooCommerceSellerIds($agentIds);
+        if (empty($sellerIds)) return 0;
+
+        $statusList = self::getValidWooCommerceStatuses();
+        $sellerPlaceholders = implode(',', array_fill(0, count($sellerIds), '?'));
+        $statusPlaceholders = implode(',', array_fill(0, count($statusList), '?'));
+        $conversionParams = array_merge($sellerIds, [$startDate, $endDate], $statusList);
+
+        // Conversas com venda (pedidos válidos no cache)
+        $sqlConverted = "SELECT COUNT(DISTINCT oc.order_id) as converted
+                         FROM woocommerce_order_cache oc
+                         WHERE oc.seller_id IN ({$sellerPlaceholders})
+                         AND oc.order_date BETWEEN ? AND ?
+                         AND oc.order_status IN ({$statusPlaceholders})";
+
+        $converted = Database::fetch($sqlConverted, $conversionParams);
         $convertedConversations = (float) ($converted['converted'] ?? 0);
         
         return ($convertedConversations / $totalConversations) * 100;
@@ -519,19 +551,46 @@ class GoalService
     private static function calculateSalesCount(array $agentIds, string $startDate, string $endDate): float
     {
         if (empty($agentIds)) return 0;
-        
-        $placeholders = str_repeat('?,', count($agentIds) - 1) . '?';
-        $params = array_merge($agentIds, [$startDate, $endDate]);
-        
-        $sql = "SELECT COUNT(*) as sales_count
-                FROM woocommerce_conversions wc
-                INNER JOIN conversations c ON wc.conversation_id = c.id
-                INNER JOIN conversation_assignments ca ON c.id = ca.conversation_id
-                WHERE ca.agent_id IN ($placeholders)
-                AND wc.created_at BETWEEN ? AND ?";
-        
+        $sellerIds = self::getWooCommerceSellerIds($agentIds);
+        if (empty($sellerIds)) return 0;
+
+        $statusList = self::getValidWooCommerceStatuses();
+        $sellerPlaceholders = implode(',', array_fill(0, count($sellerIds), '?'));
+        $statusPlaceholders = implode(',', array_fill(0, count($statusList), '?'));
+        $params = array_merge($sellerIds, [$startDate, $endDate], $statusList);
+
+        $sql = "SELECT COUNT(DISTINCT oc.order_id) as sales_count
+                FROM woocommerce_order_cache oc
+                WHERE oc.seller_id IN ({$sellerPlaceholders})
+                AND oc.order_date BETWEEN ? AND ?
+                AND oc.order_status IN ({$statusPlaceholders})";
+
         $result = Database::fetch($sql, $params);
         return (float) ($result['sales_count'] ?? 0);
+    }
+
+    /**
+     * IDs de vendedores WooCommerce vinculados aos agentes
+     */
+    private static function getWooCommerceSellerIds(array $agentIds): array
+    {
+        if (empty($agentIds)) return [];
+        $placeholders = implode(',', array_fill(0, count($agentIds), '?'));
+        $rows = Database::fetchAll(
+            "SELECT woocommerce_seller_id FROM users 
+             WHERE id IN ({$placeholders}) AND woocommerce_seller_id IS NOT NULL",
+            $agentIds
+        );
+        $sellerIds = array_column($rows, 'woocommerce_seller_id');
+        return array_values(array_filter($sellerIds));
+    }
+
+    /**
+     * Status válidos para considerar como venda/conversão
+     */
+    private static function getValidWooCommerceStatuses(): array
+    {
+        return ['processing', 'completed', 'producao', 'designer', 'pedido-enviado', 'pedido-entregue'];
     }
     
     /**

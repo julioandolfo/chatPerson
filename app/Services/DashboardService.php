@@ -887,6 +887,10 @@ class DashboardService
         // Usar SEGUNDOS para maior precisão (IA responde em segundos)
         $sql = "SELECT 
                     COUNT(DISTINCT c.id) as total_conversations,
+                    COUNT(DISTINCT CASE WHEN EXISTS (
+                        SELECT 1 FROM messages m0 
+                        WHERE m0.conversation_id = c.id AND m0.sender_type = 'contact'
+                    ) THEN c.id END) as total_conversations_with_contact,
                     COUNT(DISTINCT CASE WHEN c.status = 'open' THEN c.id END) as open_conversations,
                     COUNT(DISTINCT CASE WHEN c.status = 'resolved' THEN c.id END) as resolved_conversations,
                     COUNT(DISTINCT CASE WHEN c.status = 'closed' THEN c.id END) as closed_conversations,
@@ -933,6 +937,7 @@ class DashboardService
         $current = \App\Helpers\Database::fetch($sqlCurrent, [$agentId, $dateFrom, $dateTo]);
         
         $total = (int)($metrics['total_conversations'] ?? 0);
+        $totalWithContact = (int)($metrics['total_conversations_with_contact'] ?? 0);
         $resolved = (int)($metrics['resolved_conversations'] ?? 0);
         $closed = (int)($metrics['closed_conversations'] ?? 0);
         
@@ -978,7 +983,9 @@ class DashboardService
         $responsesWithinSla = (int)($avgResponseResult['responses_within_sla'] ?? 0);
         
         // Calcular taxa de SLA de primeira resposta
-        $slaFirstResponseRate = $total > 0 ? round((($metrics['first_response_within_sla'] ?? 0) / $total) * 100, 2) : 0;
+        $slaFirstResponseRate = $totalWithContact > 0 
+            ? round((($metrics['first_response_within_sla'] ?? 0) / $totalWithContact) * 100, 2) 
+            : 0;
         
         // Calcular taxa de SLA de respostas
         $slaResponseRate = $totalResponses > 0 ? round(($responsesWithinSla / $totalResponses) * 100, 2) : 0;
@@ -989,6 +996,7 @@ class DashboardService
             'agent_avatar' => $agent['avatar'] ?? null,
             'availability_status' => $agent['availability_status'] ?? 'offline',
             'total_conversations' => $total,
+            'total_conversations_with_contact' => $totalWithContact,
             'open_conversations' => (int)($current['total'] ?? 0),
             'resolved_conversations' => $resolved,
             'closed_conversations' => $closed,

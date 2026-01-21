@@ -504,105 +504,72 @@ class AgentPerformanceController
             $slaMinutes = $settings['sla']['first_response_time'] ?? 15;
             
             // Buscar conversas do agente com SLA excedido
-            // Nota: Esta query usa TIMESTAMPDIFF simples como filtro inicial.
-            // O cálculo preciso considerando horário comercial é feito no PHP abaixo.
-            $sql = "SELECT c.id, c.created_at, c.first_response_at, c.first_human_response_at,
-                           c.status, c.priority, c.reassignment_count, c.updated_at,
-                           ct.name as contact_name, ct.phone as contact_phone,
-                           u.name as agent_name,
-                           TIMESTAMPDIFF(MINUTE, c.created_at, 
-                               COALESCE(c.first_human_response_at, c.first_response_at, NOW())
-                           ) as response_time_minutes,
-                           (SELECT MIN(m.created_at) FROM messages m 
-                            WHERE m.conversation_id = c.id AND m.sender_type = 'agent'
-                           ) as first_agent_message_time,
-                           (SELECT MAX(m.created_at) FROM messages m 
-                            WHERE m.conversation_id = c.id AND m.sender_type = 'contact'
-                           ) as last_contact_message_time
+            // ⚠️ IMPORTANTE: esta lista usa o mesmo critério do DashboardService::getAgentMetrics
+            // (primeira mensagem do cliente -> primeira resposta do agente), sem working hours.
+            $slaFirstResponseSeconds = $slaMinutes * 60;
+            
+            $sql = "SELECT 
+                        c.id, c.created_at, c.first_response_at, c.first_human_response_at,
+                        c.status, c.priority, c.reassignment_count, c.updated_at,
+                        ct.name as contact_name, ct.phone as contact_phone,
+                        u.name as agent_name,
+                        mc.first_contact_at,
+                        ma.first_agent_at,
+                        TIMESTAMPDIFF(SECOND, mc.first_contact_at, COALESCE(ma.first_agent_at, NOW())) as response_seconds
                     FROM conversations c
+                    INNER JOIN conversation_assignments ca 
+                        ON ca.conversation_id = c.id 
+                        AND ca.agent_id = ?
                     LEFT JOIN contacts ct ON c.contact_id = ct.id
                     LEFT JOIN users u ON c.agent_id = u.id
-                    WHERE c.agent_id = ?
-                    AND c.created_at >= ?
-                    AND c.created_at <= ?
+                    LEFT JOIN (
+                        SELECT conversation_id, MIN(created_at) as first_contact_at
+                        FROM messages
+                        WHERE sender_type = 'contact'
+                        GROUP BY conversation_id
+                    ) mc ON mc.conversation_id = c.id
+                    LEFT JOIN (
+                        SELECT conversation_id, MIN(created_at) as first_agent_at
+                        FROM messages
+                        WHERE sender_type = 'agent'
+                        GROUP BY conversation_id
+                    ) ma ON ma.conversation_id = c.id
+                    WHERE ca.assigned_at >= ?
+                    AND ca.assigned_at <= ?
+                    AND mc.first_contact_at IS NOT NULL
                     AND (
-                        -- Conversas abertas sem resposta
-                        (c.first_response_at IS NULL AND c.status IN ('open', 'pending'))
-                        OR
-                        -- Conversas respondidas fora do SLA
-                        (c.first_response_at IS NOT NULL AND
-                         TIMESTAMPDIFF(MINUTE, c.created_at, 
-                            COALESCE(c.first_human_response_at, c.first_response_at)
-                         ) > ?)
+                        ma.first_agent_at IS NULL
+                        OR TIMESTAMPDIFF(SECOND, mc.first_contact_at, ma.first_agent_at) > ?
                     )
-                    ORDER BY c.created_at DESC
-                    LIMIT 100";
-            
+                    ORDER BY mc.first_contact_at DESC
+                    LIMIT 200";
+
             $conversations = \App\Helpers\Database::fetchAll($sql, [
                 $agentId,
                 $dateFrom . ' 00:00:00',
                 $dateTo . ' 23:59:59',
-                $slaMinutes
+                $slaFirstResponseSeconds
             ]);
-            
-            // Enriquecer dados com informações adicionais
+
+            // Enriquecer dados com informações adicionais (mesma base do dashboard)
             foreach ($conversations as &$conv) {
-                $slaConfig = \App\Models\SLARule::getSLAForConversation($conv);
-                
-                // Pular se SLA não está configurado
-                if ($slaConfig['first_response_time'] <= 0) {
-                    $conv['elapsed_minutes'] = 0;
-                    $conv['sla_minutes'] = 15;
-                    $conv['exceeded_by'] = 0;
-                    $conv['percentage'] = 0;
-                    continue;
-                }
-                
-                // Para conversas fechadas/resolvidas, calcular o tempo até a primeira resposta
-                // Para conversas abertas, calcular o tempo decorrido atual
-                if ($conv['status'] === 'closed' || $conv['status'] === 'resolved') {
-                    // Conversa já foi respondida e fechada - usar tempo histórico
-                    $startTime = new \DateTime($conv['created_at']);
-                    $responseTime = null;
-                    
-                    if (!empty($conv['first_human_response_at'])) {
-                        $responseTime = new \DateTime($conv['first_human_response_at']);
-                    } elseif (!empty($conv['first_response_at'])) {
-                        $responseTime = new \DateTime($conv['first_response_at']);
-                    }
-                    
-                    if ($responseTime) {
-                        // Calcular tempo com horário comercial
-                        $elapsedMinutes = \App\Helpers\WorkingHoursCalculator::calculateMinutes($startTime, $responseTime);
-                    } else {
-                        // Sem resposta ainda - calcular até agora
-                        $elapsedMinutes = \App\Helpers\WorkingHoursCalculator::calculateMinutes($startTime, new \DateTime());
-                    }
-                } else {
-                    // Conversa ainda aberta - usar cálculo em tempo real
-                    try {
-                        $elapsedMinutes = \App\Services\ConversationSettingsService::getElapsedSLAMinutes($conv['id']);
-                    } catch (\Exception $e) {
-                        // Fallback: calcular manualmente
-                        $startTime = new \DateTime($conv['created_at']);
-                        $elapsedMinutes = \App\Helpers\WorkingHoursCalculator::calculateMinutes($startTime, new \DateTime());
-                    }
-                }
-                
-                $conv['elapsed_minutes'] = round($elapsedMinutes, 1);
-                $conv['sla_minutes'] = $slaConfig['first_response_time'];
-                $conv['exceeded_by'] = max(0, round($elapsedMinutes - $slaConfig['first_response_time'], 1));
-                $conv['percentage'] = $slaConfig['first_response_time'] > 0 
-                    ? round(($elapsedMinutes / $slaConfig['first_response_time']) * 100, 1)
+                $responseSeconds = (int)($conv['response_seconds'] ?? 0);
+                $elapsedMinutes = $responseSeconds > 0 ? round($responseSeconds / 60, 1) : 0;
+
+                $conv['elapsed_minutes'] = $elapsedMinutes;
+                $conv['sla_minutes'] = $slaMinutes;
+                $conv['exceeded_by'] = max(0, round($elapsedMinutes - $slaMinutes, 1));
+                $conv['percentage'] = $slaMinutes > 0 
+                    ? round(($elapsedMinutes / $slaMinutes) * 100, 1)
                     : 0;
                 
                 // Status visual
-                if ($conv['status'] === 'closed' || $conv['status'] === 'resolved') {
-                    $conv['status_label'] = 'Fechada';
-                    $conv['status_class'] = 'secondary';
-                } elseif (empty($conv['first_response_at'])) {
+                if (empty($conv['first_agent_at'])) {
                     $conv['status_label'] = 'Sem resposta';
                     $conv['status_class'] = 'danger';
+                } elseif ($conv['status'] === 'closed' || $conv['status'] === 'resolved') {
+                    $conv['status_label'] = 'Fechada';
+                    $conv['status_class'] = 'secondary';
                 } else {
                     $conv['status_label'] = 'Respondida fora do SLA';
                     $conv['status_class'] = 'warning';

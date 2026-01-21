@@ -1009,9 +1009,14 @@ class ConversationSettingsService
             return new \DateTime($conversation['created_at']);
         }
         
-        // Se não há mensagem do contato após agente, usar agora
+        // Se não há mensagem do contato após agente, o SLA ainda não iniciou.
+        // Retornar o momento em que ele começaria (última mensagem do agente + delay)
         if (!$result['first_contact_after_agent']) {
-            return new \DateTime();
+            $startTime = new \DateTime($result['last_agent_message']);
+            if ($delayMinutes > 0) {
+                $startTime->modify("+{$delayMinutes} minutes");
+            }
+            return $startTime;
         }
         
         // Calcular se passou o delay
@@ -1028,8 +1033,12 @@ class ConversationSettingsService
             return $startTime;
         }
         
-        // Se não passou, usar created_at
-        return new \DateTime($conversation['created_at']);
+        // Se não passou, SLA ainda não iniciou; retornar momento previsto
+        $startTime = clone $lastAgent;
+        if ($delayMinutes > 0) {
+            $startTime->modify("+{$delayMinutes} minutes");
+        }
+        return $startTime;
     }
     
     /**

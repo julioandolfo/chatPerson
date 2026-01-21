@@ -8888,6 +8888,11 @@ function updateConversationSidebar(conversation, tags) {
     // Carregar agentes do contato
     loadContactAgents(conversation.contact_id);
     
+    // ✅ Carregar Automação da conversa
+    if (typeof window.loadAutomationStatus === 'function') {
+        window.loadAutomationStatus(conversation.id);
+    }
+    
     // ✅ Carregar SLA da conversa
     console.log('🎯 Tentando carregar SLA no updateConversationSidebar, ID:', conversation.id);
     if (typeof window.loadConversationSLA === 'function') {

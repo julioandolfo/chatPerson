@@ -721,13 +721,14 @@ function formatTimeDisplay($seconds, $showUnit = true) {
     </div>
     <?php endif; ?>
     
-    <?php if (!empty($goalsSummary) && $goalsSummary['total_goals'] > 0): ?>
+<?php $totalGoals = $goalsSummary['total_goals'] ?? 0; ?>
+<?php if (!empty($goalsSummary) && $totalGoals > 0): ?>
     <div class="col-lg-<?= !empty($badges) ? '6' : '12' ?>">
         <div class="card h-100">
             <div class="card-header border-0 pt-5">
                 <h3 class="card-title">
                     <i class="bi bi-flag-fill fs-2 text-primary me-2"></i>
-                    Metas (<?= $goalsSummary['total_goals'] ?>)
+                    Metas (<?= $totalGoals ?>)
                 </h3>
                 <div class="card-toolbar">
                     <a href="<?= Url::to('/goals/dashboard') ?>" class="btn btn-sm btn-light-primary">Ver Todas</a>
@@ -739,14 +740,14 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                     <div class="col-6">
                         <div class="text-center p-3 bg-light-success rounded">
                             <i class="bi bi-trophy-fill text-success fs-2x"></i>
-                            <div class="text-gray-900 fw-bold fs-3 mt-2"><?= $goalsSummary['achieved'] ?></div>
+                            <div class="text-gray-900 fw-bold fs-3 mt-2"><?= $goalsSummary['achieved'] ?? 0 ?></div>
                             <div class="text-muted fs-7">Atingidas</div>
                         </div>
                     </div>
                     <div class="col-6">
                         <div class="text-center p-3 bg-light-primary rounded">
                             <i class="bi bi-graph-up fs-2x text-primary"></i>
-                            <div class="text-gray-900 fw-bold fs-3 mt-2"><?= $goalsSummary['in_progress'] ?></div>
+                            <div class="text-gray-900 fw-bold fs-3 mt-2"><?= $goalsSummary['in_progress'] ?? 0 ?></div>
                             <div class="text-muted fs-7">Em Progresso</div>
                         </div>
                     </div>
@@ -755,7 +756,7 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                 <!-- Metas individuais -->
                 <?php 
                 $allGoals = [];
-                foreach ($goalsSummary['goals_by_level'] as $level => $levelGoals) {
+                foreach (($goalsSummary['goals_by_level'] ?? []) as $level => $levelGoals) {
                     $allGoals = array_merge($allGoals, $levelGoals);
                 }
                 if (!empty($allGoals)): 

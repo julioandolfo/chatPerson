@@ -133,7 +133,8 @@ window.loadConversationSLA = function(conversationId) {
             
             if (ruleNameEl) ruleNameEl.textContent = sla.sla_rule || 'Global';
             if (startTimeEl) {
-                const startDate = new Date(sla.start_time);
+                // Converter data do servidor (formato: 2026-01-20 14:20:00) para objeto Date
+                const startDate = new Date(sla.start_time.replace(' ', 'T'));
                 startTimeEl.textContent = startDate.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
             }
             
@@ -2796,7 +2797,8 @@ console.log('✅ loadConversationSLA já registrada anteriormente');
             
             if (ruleNameEl) ruleNameEl.textContent = sla.sla_rule || 'Global';
             if (startTimeEl) {
-                const startDate = new Date(sla.start_time);
+                // Converter data do servidor (formato: 2026-01-20 14:20:00) para objeto Date
+                const startDate = new Date(sla.start_time.replace(' ', 'T'));
                 startTimeEl.textContent = startDate.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
             }
             

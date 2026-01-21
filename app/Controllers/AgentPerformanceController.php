@@ -545,19 +545,18 @@ class AgentPerformanceController
                 $slaMinutes
             ]);
             
-            // Enriquecer dados com informações adicionais e filtrar conversas que realmente excederam
-            $validConversations = [];
-            
-            foreach ($conversations as $conv) {
+            // Enriquecer dados com informações adicionais
+            foreach ($conversations as &$conv) {
                 $slaConfig = \App\Models\SLARule::getSLAForConversation($conv);
                 
                 // Pular se SLA não está configurado
                 if ($slaConfig['first_response_time'] <= 0) {
+                    $conv['elapsed_minutes'] = 0;
+                    $conv['sla_minutes'] = 15;
+                    $conv['exceeded_by'] = 0;
+                    $conv['percentage'] = 0;
                     continue;
                 }
-                
-                // Verificar se SLA deve começar a contar (considerando delay de 1 minuto)
-                $shouldStart = \App\Services\ConversationSettingsService::shouldStartSLACount($conv['id']);
                 
                 // Para conversas fechadas/resolvidas, calcular o tempo até a primeira resposta
                 // Para conversas abertas, calcular o tempo decorrido atual
@@ -573,40 +572,29 @@ class AgentPerformanceController
                     }
                     
                     if ($responseTime) {
-                        // Considerar delay de 1 minuto
-                        $settings = \App\Services\ConversationSettingsService::getSettings();
-                        $delayMinutes = $settings['sla']['message_delay_minutes'] ?? 1;
-                        
-                        // Ajustar tempo de início
-                        $slaStartTime = clone $startTime;
-                        if ($delayMinutes > 0) {
-                            $slaStartTime->modify("+{$delayMinutes} minutes");
-                        }
-                        
-                        $elapsedMinutes = \App\Helpers\WorkingHoursCalculator::calculateMinutes($slaStartTime, $responseTime);
+                        // Calcular tempo com horário comercial
+                        $elapsedMinutes = \App\Helpers\WorkingHoursCalculator::calculateMinutes($startTime, $responseTime);
                     } else {
-                        $elapsedMinutes = 0;
+                        // Sem resposta ainda - calcular até agora
+                        $elapsedMinutes = \App\Helpers\WorkingHoursCalculator::calculateMinutes($startTime, new \DateTime());
                     }
                 } else {
-                    // Conversa ainda aberta
-                    if (!$shouldStart) {
-                        // SLA ainda não deve contar (dentro do delay)
-                        continue;
+                    // Conversa ainda aberta - usar cálculo em tempo real
+                    try {
+                        $elapsedMinutes = \App\Services\ConversationSettingsService::getElapsedSLAMinutes($conv['id']);
+                    } catch (\Exception $e) {
+                        // Fallback: calcular manualmente
+                        $startTime = new \DateTime($conv['created_at']);
+                        $elapsedMinutes = \App\Helpers\WorkingHoursCalculator::calculateMinutes($startTime, new \DateTime());
                     }
-                    
-                    // Usar cálculo em tempo real
-                    $elapsedMinutes = \App\Services\ConversationSettingsService::getElapsedSLAMinutes($conv['id']);
-                }
-                
-                // Verificar se realmente excedeu o SLA
-                if ($elapsedMinutes <= $slaConfig['first_response_time']) {
-                    continue;
                 }
                 
                 $conv['elapsed_minutes'] = round($elapsedMinutes, 1);
                 $conv['sla_minutes'] = $slaConfig['first_response_time'];
-                $conv['exceeded_by'] = round($elapsedMinutes - $slaConfig['first_response_time'], 1);
-                $conv['percentage'] = round(($elapsedMinutes / $slaConfig['first_response_time']) * 100, 1);
+                $conv['exceeded_by'] = max(0, round($elapsedMinutes - $slaConfig['first_response_time'], 1));
+                $conv['percentage'] = $slaConfig['first_response_time'] > 0 
+                    ? round(($elapsedMinutes / $slaConfig['first_response_time']) * 100, 1)
+                    : 0;
                 
                 // Status visual
                 if ($conv['status'] === 'closed' || $conv['status'] === 'resolved') {
@@ -619,11 +607,7 @@ class AgentPerformanceController
                     $conv['status_label'] = 'Respondida fora do SLA';
                     $conv['status_class'] = 'warning';
                 }
-                
-                $validConversations[] = $conv;
             }
-            
-            $conversations = $validConversations;
             
             Response::json([
                 'success' => true,

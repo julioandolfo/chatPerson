@@ -256,17 +256,23 @@ class GoalController
             ];
             
             Logger::info('Update meta - payload: ' . json_encode($data), 'goals.log');
+            Logger::info('Update meta - iniciando GoalService::update', 'goals.log');
 
             GoalService::update($id, $data);
+
+            Logger::info('Update meta - GoalService::update concluído', 'goals.log');
             
             // Processar tiers de bônus (sempre, pois pode estar editando)
+            Logger::info('Update meta - chamando saveBonusTiers', 'goals.log');
             $this->saveBonusTiers((int)$id);
             
             // Processar condições de bônus (se habilitadas)
+            Logger::info('Update meta - chamando saveGoalConditions', 'goals.log');
             $this->saveGoalConditions((int)$id);
             
             Response::redirect('/goals', 'success', 'Meta atualizada com sucesso!');
         } catch (\Exception $e) {
+            Logger::error('Update meta - erro: ' . $e->getMessage(), 'goals.log');
             Response::redirect('/goals/edit?id=' . Request::post('id'), 'error', 'Erro ao atualizar meta: ' . $e->getMessage());
         }
     }

@@ -136,6 +136,16 @@ class AgentPerformanceController
             // Tabelas de coaching podem não existir
         }
         
+        // Metas e alertas do agente
+        $goalsSummary = [];
+        $goalAlerts = [];
+        try {
+            $goalsSummary = GoalService::getBonusSummary($agentId);
+            $goalAlerts = GoalService::getGoalAlerts($agentId);
+        } catch (\Exception $e) {
+            // Sistema de metas pode não estar configurado
+        }
+        
         Response::view('agent-performance/agent', [
             'report' => $report,
             'badges' => $badges,
@@ -468,6 +478,100 @@ class AgentPerformanceController
             }
             
             Response::json(['success' => true, 'data' => $data]);
+            
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+    
+    /**
+     * Obter conversas com SLA excedido do agente
+     */
+    public function getSLABreachedConversations(): void
+    {
+        try {
+            $agentId = (int)(Request::get('agent_id') ?? 0);
+            $dateFrom = Request::get('date_from', date('Y-m-d', strtotime('-30 days')));
+            $dateTo = Request::get('date_to', date('Y-m-d'));
+            
+            if (!$agentId) {
+                Response::json(['success' => false, 'message' => 'ID do agente não fornecido'], 400);
+                return;
+            }
+            
+            // Buscar configurações de SLA
+            $settings = \App\Services\ConversationSettingsService::getSettings();
+            $slaMinutes = $settings['sla']['first_response_time'] ?? 15;
+            
+            // Buscar conversas do agente com SLA excedido
+            $sql = "SELECT c.id, c.created_at, c.first_response_at, c.first_human_response_at,
+                           c.status, c.priority, c.reassignment_count,
+                           ct.name as contact_name, ct.phone as contact_phone,
+                           u.name as agent_name,
+                           TIMESTAMPDIFF(MINUTE, c.created_at, 
+                               COALESCE(c.first_human_response_at, c.first_response_at, NOW())
+                           ) as response_time_minutes,
+                           (SELECT MIN(m.created_at) FROM messages m 
+                            WHERE m.conversation_id = c.id AND m.sender_type = 'agent'
+                           ) as first_agent_message_time
+                    FROM conversations c
+                    LEFT JOIN contacts ct ON c.contact_id = ct.id
+                    LEFT JOIN users u ON c.agent_id = u.id
+                    WHERE c.agent_id = ?
+                    AND c.created_at >= ?
+                    AND c.created_at <= ?
+                    AND (
+                        (c.first_response_at IS NULL AND c.status IN ('open', 'pending'))
+                        OR
+                        TIMESTAMPDIFF(MINUTE, c.created_at, 
+                            COALESCE(c.first_human_response_at, c.first_response_at)
+                        ) > ?
+                    )
+                    ORDER BY c.created_at DESC
+                    LIMIT 100";
+            
+            $conversations = \App\Helpers\Database::fetchAll($sql, [
+                $agentId,
+                $dateFrom . ' 00:00:00',
+                $dateTo . ' 23:59:59',
+                $slaMinutes
+            ]);
+            
+            // Enriquecer dados com informações adicionais
+            foreach ($conversations as &$conv) {
+                $elapsedMinutes = \App\Services\ConversationSettingsService::getElapsedSLAMinutes($conv['id']);
+                $slaConfig = \App\Models\SLARule::getSLAForConversation($conv);
+                
+                $conv['elapsed_minutes'] = $elapsedMinutes;
+                $conv['sla_minutes'] = $slaConfig['first_response_time'];
+                $conv['exceeded_by'] = max(0, $elapsedMinutes - $slaConfig['first_response_time']);
+                $conv['percentage'] = $slaConfig['first_response_time'] > 0 
+                    ? round(($elapsedMinutes / $slaConfig['first_response_time']) * 100, 1)
+                    : 0;
+                
+                // Status visual
+                if ($conv['status'] === 'closed' || $conv['status'] === 'resolved') {
+                    $conv['status_label'] = 'Fechada';
+                    $conv['status_class'] = 'secondary';
+                } elseif (empty($conv['first_response_at'])) {
+                    $conv['status_label'] = 'Sem resposta';
+                    $conv['status_class'] = 'danger';
+                } else {
+                    $conv['status_label'] = 'Respondida fora do SLA';
+                    $conv['status_class'] = 'warning';
+                }
+            }
+            
+            Response::json([
+                'success' => true,
+                'conversations' => $conversations,
+                'total' => count($conversations),
+                'sla_minutes' => $slaMinutes,
+                'period' => [
+                    'from' => $dateFrom,
+                    'to' => $dateTo
+                ]
+            ]);
             
         } catch (\Exception $e) {
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);

@@ -518,6 +518,32 @@ class ConversationSettingsService
         ?int $excludeAgentId = null
     ): ?int
     {
+        // ✅ PRIORIDADE 1: Verificar se contato tem Agente Principal
+        // Isso garante que mesmo em automações, o agente do contato é respeitado
+        try {
+            $conversation = \App\Models\Conversation::find($conversationId);
+            if ($conversation && !empty($conversation['contact_id'])) {
+                $contactAgentId = \App\Services\ContactAgentService::shouldAutoAssignOnConversation(
+                    $conversation['contact_id'],
+                    $conversationId
+                );
+                
+                if ($contactAgentId && $contactAgentId != $excludeAgentId) {
+                    \App\Helpers\Logger::debug(
+                        "autoAssignConversation: Contato tem Agente Principal (#{$contactAgentId}). Priorizando sobre automação.",
+                        'conversas.log'
+                    );
+                    return $contactAgentId;
+                }
+            }
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error(
+                "autoAssignConversation: Erro ao verificar agente do contato: " . $e->getMessage(),
+                'conversas.log'
+            );
+        }
+        
+        // ✅ PRIORIDADE 2: Se não tem agente do contato, usar distribuição configurada
         $settings = self::getSettings();
         
         if (!$settings['distribution']['enable_auto_assignment']) {
@@ -900,7 +926,7 @@ class ConversationSettingsService
      * Verificar se SLA deve começar a contar (delay de 1 minuto após última mensagem do agente)
      * Evita contar mensagens automáticas, despedidas rápidas ("ok", "obrigado", etc)
      */
-    private static function shouldStartSLACount(int $conversationId): bool
+    public static function shouldStartSLACount(int $conversationId): bool
     {
         $settings = self::getSettings();
         $delayMinutes = $settings['sla']['message_delay_minutes'] ?? 1;
@@ -949,7 +975,7 @@ class ConversationSettingsService
      * Obter momento em que SLA deve começar a contar
      * Considera delay de 1 minuto após última mensagem do agente
      */
-    private static function getSLAStartTime(int $conversationId): \DateTime
+    public static function getSLAStartTime(int $conversationId): \DateTime
     {
         $settings = self::getSettings();
         $delayMinutes = $settings['sla']['message_delay_minutes'] ?? 1;

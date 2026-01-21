@@ -3,6 +3,10 @@
  * Entry Point da Aplicação
  */
 
+// ✅ CRÍTICO: Definir timezone ANTES de qualquer operação com data/hora
+// Mesmo que php.ini esteja em UTC, forçamos America/Sao_Paulo
+date_default_timezone_set('America/Sao_Paulo');
+
 // ✅ CONFIGURAÇÕES DE UPLOAD - Aumentar limites para arquivos grandes
 ini_set('upload_max_filesize', '100M');
 ini_set('post_max_size', '105M');
@@ -52,7 +56,7 @@ $appConfig = require __DIR__ . '/../config/app.php';
 // Carregar autoloader
 require_once __DIR__ . '/../app/Helpers/autoload.php';
 
-// Definir timezone
+// ✅ Garantir timezone (já foi definido no início, mas reforçar)
 date_default_timezone_set($appConfig['timezone']);
 
 // Definir encoding

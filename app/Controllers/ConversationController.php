@@ -3256,5 +3256,134 @@ class ConversationController
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
+    
+    /**
+     * Obter detalhes de SLA de uma conversa específica
+     */
+    public function getConversationSLA(): void
+    {
+        $config = $this->prepareJsonResponse();
+        
+        try {
+            $conversationId = (int)($_GET['id'] ?? 0);
+            
+            if (!$conversationId) {
+                $this->restoreAfterJsonResponse($config);
+                Response::json(['success' => false, 'message' => 'ID da conversa não fornecido'], 400);
+                return;
+            }
+            
+            $conversation = \App\Models\Conversation::find($conversationId);
+            if (!$conversation) {
+                $this->restoreAfterJsonResponse($config);
+                Response::json(['success' => false, 'message' => 'Conversa não encontrada'], 404);
+                return;
+            }
+            
+            // Obter SLA aplicável para esta conversa
+            $slaConfig = \App\Models\SLARule::getSLAForConversation($conversation);
+            
+            // Verificar se SLA deve começar a contar
+            $shouldStart = \App\Services\ConversationSettingsService::shouldStartSLACount($conversationId);
+            
+            // Tempo decorrido
+            $elapsedMinutes = \App\Services\ConversationSettingsService::getElapsedSLAMinutes($conversationId);
+            
+            // Tempo de início do SLA
+            $startTime = \App\Services\ConversationSettingsService::getSLAStartTime($conversationId);
+            
+            // Verificar se está dentro do SLA
+            $firstResponseOK = \App\Services\ConversationSettingsService::checkFirstResponseSLA($conversationId);
+            
+            // Buscar histórico de mensagens com tempos
+            $messages = \App\Helpers\Database::fetchAll(
+                "SELECT id, sender_type, ai_agent_id, created_at, content
+                 FROM messages 
+                 WHERE conversation_id = ? 
+                 ORDER BY created_at ASC",
+                [$conversationId]
+            );
+            
+            // Calcular timeline do SLA
+            $timeline = [];
+            $lastAgentMessage = null;
+            $settings = \App\Services\ConversationSettingsService::getSettings();
+            $delayMinutes = $settings['sla']['message_delay_minutes'] ?? 1;
+            
+            foreach ($messages as $msg) {
+                $time = new \DateTime($msg['created_at']);
+                
+                if ($msg['sender_type'] === 'agent') {
+                    $lastAgentMessage = $time;
+                    $timeline[] = [
+                        'type' => 'agent_response',
+                        'time' => $msg['created_at'],
+                        'is_ai' => !empty($msg['ai_agent_id']),
+                        'content_preview' => mb_substr($msg['content'], 0, 100)
+                    ];
+                } elseif ($msg['sender_type'] === 'contact') {
+                    $slaActive = false;
+                    $minutesSinceAgent = null;
+                    
+                    if ($lastAgentMessage) {
+                        $diff = $time->getTimestamp() - $lastAgentMessage->getTimestamp();
+                        $minutesSinceAgent = $diff / 60;
+                        $slaActive = $minutesSinceAgent >= $delayMinutes;
+                    }
+                    
+                    $timeline[] = [
+                        'type' => 'contact_message',
+                        'time' => $msg['created_at'],
+                        'sla_active' => $slaActive,
+                        'minutes_since_agent' => $minutesSinceAgent,
+                        'content_preview' => mb_substr($msg['content'], 0, 100)
+                    ];
+                }
+            }
+            
+            // Calcular status atual
+            $status = 'ok';
+            $percentage = 0;
+            
+            if ($shouldStart && $slaConfig['first_response_time'] > 0) {
+                $percentage = ($elapsedMinutes / $slaConfig['first_response_time']) * 100;
+                
+                if (!$firstResponseOK) {
+                    $status = 'exceeded';
+                } elseif ($percentage >= 80) {
+                    $status = 'warning';
+                }
+            }
+            
+            $this->restoreAfterJsonResponse($config);
+            
+            Response::json([
+                'success' => true,
+                'sla' => [
+                    'conversation_id' => $conversationId,
+                    'status' => $conversation['status'],
+                    'sla_rule' => $slaConfig['rule_name'],
+                    'first_response_sla' => $slaConfig['first_response_time'],
+                    'ongoing_response_sla' => $slaConfig['ongoing_response_time'],
+                    'resolution_sla' => $slaConfig['resolution_time'],
+                    'should_start' => $shouldStart,
+                    'elapsed_minutes' => $elapsedMinutes,
+                    'start_time' => $startTime->format('Y-m-d H:i:s'),
+                    'is_within_sla' => $firstResponseOK,
+                    'is_paused' => !empty($conversation['sla_paused_at']),
+                    'paused_duration' => (int)($conversation['sla_paused_duration'] ?? 0),
+                    'warning_sent' => (bool)($conversation['sla_warning_sent'] ?? 0),
+                    'reassignment_count' => (int)($conversation['reassignment_count'] ?? 0),
+                    'status_indicator' => $status,
+                    'percentage' => min(100, round($percentage, 1)),
+                    'timeline' => $timeline,
+                    'delay_minutes' => $delayMinutes
+                ]
+            ]);
+        } catch (\Exception $e) {
+            $this->restoreAfterJsonResponse($config);
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
 }
 

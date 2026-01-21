@@ -973,4 +973,37 @@ class GoalService
     {
         GoalBonusTier::createDefaultTiers($goalId, $targetCommission);
     }
+    
+    /**
+     * Obter alertas de metas do agente
+     */
+    public static function getGoalAlerts(int $userId, ?string $severity = null, int $limit = 10): array
+    {
+        try {
+            $sql = "SELECT ga.*, g.name as goal_name, g.type as goal_type
+                    FROM goal_alerts ga
+                    INNER JOIN goals g ON ga.goal_id = g.id
+                    WHERE g.target_type = 'individual' 
+                    AND g.target_id = ?
+                    AND ga.is_resolved = 0";
+            
+            $params = [$userId];
+            
+            if ($severity) {
+                $sql .= " AND ga.severity = ?";
+                $params[] = $severity;
+            }
+            
+            $sql .= " ORDER BY ga.created_at DESC LIMIT ?";
+            $params[] = $limit;
+            
+            return Database::fetchAll($sql, $params);
+        } catch (\Exception $e) {
+            Logger::error('Erro ao buscar alertas de metas', [
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            return [];
+        }
+    }
 }

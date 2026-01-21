@@ -73,6 +73,7 @@ Router::get('/dashboard/chart-data', [DashboardController::class, 'getChartData'
 Router::get('/dashboard/export', [DashboardController::class, 'exportReport'], ['Authentication']);
 Router::get('/conversations', [ConversationController::class, 'index'], ['Authentication']);
 Router::get('/conversations/metrics/current-agent', [ConversationController::class, 'getCurrentAgentMetrics'], ['Authentication']);
+Router::get('/conversations/sla-details', [ConversationController::class, 'getConversationSLA'], ['Authentication']);
 Router::post('/conversations', [ConversationController::class, 'store'], ['Authentication']);
 // Rotas específicas DEVEM vir ANTES das rotas com parâmetros dinâmicos
 Router::post('/conversations/new', [ConversationController::class, 'newConversation'], ['Authentication']);
@@ -350,6 +351,7 @@ Router::get('/agent-performance/goals', [AgentPerformanceController::class, 'goa
 Router::post('/agent-performance/goals', [AgentPerformanceController::class, 'createGoal'], ['Authentication', 'Permission:agent_performance.goals.manage']);
 Router::get('/agent-performance/compare', [AgentPerformanceController::class, 'compare'], ['Authentication', 'Permission:agent_performance.view.all']);
 Router::get('/agent-performance/chart-data', [AgentPerformanceController::class, 'chartData'], ['Authentication', 'Permission:agent_performance.view.all']);
+Router::get('/agent-performance/sla-breached', [AgentPerformanceController::class, 'getSLABreachedConversations'], ['Authentication', 'Permission:agent_performance.view.all']);
 
 // Rotas de Coaching em Tempo Real (IA)
 Router::get('/api/coaching/settings', [RealtimeCoachingController::class, 'getSettings'], ['Authentication']); // ✅ Configurações do coaching

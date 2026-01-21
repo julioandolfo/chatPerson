@@ -7,6 +7,9 @@
  * Requer: composer require cboden/ratchet
  */
 
+// ✅ CRÍTICO: Definir timezone ANTES de qualquer operação com data/hora
+date_default_timezone_set('America/Sao_Paulo');
+
 use Ratchet\MessageComponentInterface;
 use Ratchet\ConnectionInterface;
 use Ratchet\Server\IoServer;

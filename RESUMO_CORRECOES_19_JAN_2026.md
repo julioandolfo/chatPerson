@@ -2,7 +2,7 @@
 
 ## ✅ Todas as Correções Implementadas
 
-**Total**: 5 correções implementadas
+**Total**: 6 correções implementadas
 
 ---
 
@@ -158,6 +158,30 @@ O código verificava `$conversation['assigned_to']` (campo inexistente), mas o c
 
 ---
 
+## 🔧 **Correção 6: Automações Ignoravam Agente do Contato** 🔴
+
+### Problema:
+- Conversa atribuída ao **Agente A** (Agente Principal do contato)
+- Chatbot/Automação **remove** atribuição
+- Sistema **reatribui** para **Agente B** via round-robin
+- ❌ **ERRADO**: Deveria reatribuir para **Agente A** (Agente do Contato)
+
+### Causa:
+Automações aplicavam diretamente regras de distribuição (round-robin, por carga, etc) **sem verificar** se o contato tinha um agente principal definido.
+
+### Solução:
+✅ Adicionada verificação de `ContactAgentService::shouldAutoAssignOnConversation` em:
+- `ConversationSettingsService::autoAssignConversation()` (PRIORIDADE 1)
+- `AutomationService::executeAssignAdvanced()` (PRIORIDADE 1)
+
+✅ Agora automações SEMPRE respeitam o Agente do Contato ANTES de aplicar regras de distribuição
+
+**Arquivos modificados**: 
+- `app/Services/ConversationSettingsService.php` (linha 513-544)
+- `app/Services/AutomationService.php` (linha 1058-1110)
+
+---
+
 ## 📊 **Resumo Geral**
 
 | Correção | Prioridade | Status | Impacto |
@@ -167,6 +191,7 @@ O código verificava `$conversation['assigned_to']` (campo inexistente), mas o c
 | Bug de lista vazia ao rolar | 🔴 ALTA | ✅ CORRIGIDO | Crítico - Lista sumia |
 | Filtro "Não Respondidas" | 🟡 MÉDIA | ✅ CORRIGIDO | Precisão dos filtros |
 | Auto-atribuição participante | 🔴 CRÍTICA | ✅ CORRIGIDO | Estabilidade atribuição |
+| Automações x Agente Contato | 🔴 CRÍTICA | ✅ CORRIGIDO | Consistência relacionamento |
 
 ---
 

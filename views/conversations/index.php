@@ -8887,6 +8887,13 @@ function updateConversationSidebar(conversation, tags) {
     
     // Carregar agentes do contato
     loadContactAgents(conversation.contact_id);
+    
+    // ✅ Carregar SLA da conversa
+    if (typeof window.loadConversationSLA === 'function') {
+        window.loadConversationSLA(conversation.id);
+    } else {
+        console.warn('⚠️ Função loadConversationSLA não encontrada ainda');
+    }
 }
 
 // Atualizar timeline da conversa

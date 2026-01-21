@@ -1,0 +1,124 @@
+================================================================================
+  🔍 COMO DEBUGAR UMA CONVERSA ESPECÍFICA - GUIA RÁPIDO
+================================================================================
+
+📋 PROBLEMA ENCONTRADO:
+"Conversa atribuída de Gustavo para Gustavo" várias vezes
+
+🎯 SOLUÇÃO: Use as ferramentas de debug criadas!
+
+================================================================================
+  MÉTODO 1: Script PHP (MAIS COMPLETO) ⭐ RECOMENDADO
+================================================================================
+
+1. Abra o terminal na pasta do projeto
+2. Execute:
+
+   php debug-conversation.php [ID_DA_CONVERSA]
+
+   Exemplo:
+   php debug-conversation.php 123
+
+3. O script vai mostrar:
+   ✅ Informações básicas da conversa
+   ✅ Agente principal do contato
+   ✅ Histórico completo de atribuições
+   ✅ Timeline com mensagens e atribuições
+   ✅ ANÁLISE AUTOMÁTICA de problemas
+   ✅ Recomendações de correção
+
+================================================================================
+  MÉTODO 2: Queries SQL (MAIS RÁPIDO)
+================================================================================
+
+1. Abra o arquivo: debug-conversation-simple.sql
+2. Na linha 10, altere:
+   
+   SET @conversation_id = [ID]; ← COLOQUE O ID AQUI
+   
+   Exemplo:
+   SET @conversation_id = 123;
+
+3. Execute as queries no MySQL/phpMyAdmin
+
+================================================================================
+  EXEMPLO DE SAÍDA
+================================================================================
+
+🔍 DEBUG DE CONVERSA - ID: 123
+────────────────────────────────────────────────────────────────────────────
+
+📊 HISTÓRICO DE ATRIBUIÇÕES
+1. 14:24 - Atribuída para Gustavo (auto)
+2. 14:25 - Atribuída para Gabriel (manual)
+3. 14:28 - Atribuída para Gustavo (auto) ⚠️ AUTO-ATRIBUIÇÃO!
+4. 14:31 - Atribuída para Gustavo (auto) 🔴 BUG: MESMO AGENTE!
+5. 14:34 - Atribuída para Gustavo (auto) 🔴 BUG: MESMO AGENTE!
+
+🔍 ANÁLISE DE PROBLEMAS
+🔴 REATRIBUIÇÕES DESNECESSÁRIAS: 8 atribuições para o mesmo agente
+🔴 AUTO-ATRIBUIÇÃO POR MENSAGEM: 8 atribuições logo após envio
+
+💡 RECOMENDAÇÕES
+1. Bug de auto-atribuição (assigned_to vs agent_id) - JÁ CORRIGIDO
+
+================================================================================
+  O QUE FOI CORRIGIDO
+================================================================================
+
+❌ ANTES (BUG):
+   $assignedTo = $conversation['assigned_to'];  ← Campo não existe!
+   // Sempre null → sempre reatribuía
+
+✅ DEPOIS (CORRIGIDO):
+   $assignedTo = $conversation['agent_id'];  ← Campo correto!
+   // Só reatribui se realmente não tiver agente
+
+Arquivo: app/Controllers/ConversationController.php (linha 1190)
+
+================================================================================
+  COMO CONFIRMAR QUE PROBLEMA FOI RESOLVIDO
+================================================================================
+
+1. Debug de conversa ANTIGA (antes da correção):
+   php debug-conversation.php 123
+   → Deve mostrar: "🔴 REATRIBUIÇÕES DESNECESSÁRIAS"
+
+2. Criar NOVA conversa (depois da correção):
+   - Atribuir para um agente
+   - Agente envia mensagem
+   - Verificar se NÃO aparece reatribuição
+
+3. Debug da conversa NOVA:
+   php debug-conversation.php [ID_NOVA]
+   → Deve mostrar: "✅ Nenhum problema óbvio detectado"
+
+================================================================================
+  ARQUIVOS CRIADOS
+================================================================================
+
+1. debug-conversation.php
+   → Script PHP completo com análise automática
+
+2. debug-conversation-simple.sql
+   → Queries SQL para executar direto no MySQL
+
+3. GUIA_DEBUG_CONVERSAS.md
+   → Documentação completa e detalhada
+
+4. COMO_USAR_DEBUG.txt
+   → Este arquivo (guia rápido)
+
+================================================================================
+  PRECISA DE AJUDA?
+================================================================================
+
+Consulte: GUIA_DEBUG_CONVERSAS.md
+Contém:
+- Passo a passo detalhado
+- Exemplos de uso
+- Análise de problemas comuns
+- Queries SQL úteis
+- Como interpretar resultados
+
+================================================================================

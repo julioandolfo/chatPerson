@@ -458,14 +458,17 @@ class GoalController
     /**
      * Salvar condições de bônus de uma meta
      */
-    /**
-     * Salvar tiers de bônus
-     */
-    private function saveBonusTiers(int $goalId): void
-    {
-        $tiers = Request::post('tiers');
-        
-        Logger::info("saveBonusTiers - goalId: {$goalId}, tiers: " . json_encode($tiers), 'goals');
+     /**
+      * Salvar tiers de bônus
+      */
+     private function saveBonusTiers(int $goalId): void
+     {
+         $tiers = Request::post('tiers');
+         
+         Logger::info("saveBonusTiers - goalId: {$goalId}", 'goals');
+         Logger::info("saveBonusTiers - tiers raw: " . print_r($tiers, true), 'goals');
+         Logger::info("saveBonusTiers - tiers is_array: " . (is_array($tiers) ? 'YES' : 'NO'), 'goals');
+         Logger::info("saveBonusTiers - tiers empty: " . (empty($tiers) ? 'YES' : 'NO'), 'goals');
         
         // Obter IDs existentes para saber quais remover
         $existingIds = Database::fetchAll(
@@ -543,14 +546,17 @@ class GoalController
         }
     }
     
-    /**
-     * Salvar condições de ativação de bônus
-     */
-    private function saveGoalConditions(int $goalId): void
-    {
-        $conditions = Request::post('conditions');
-        
-        Logger::info("saveGoalConditions - goalId: {$goalId}, conditions: " . json_encode($conditions), 'goals');
+     /**
+      * Salvar condições de ativação de bônus
+      */
+     private function saveGoalConditions(int $goalId): void
+     {
+         $conditions = Request::post('conditions');
+         
+         Logger::info("saveGoalConditions - goalId: {$goalId}", 'goals');
+         Logger::info("saveGoalConditions - conditions raw: " . print_r($conditions, true), 'goals');
+         Logger::info("saveGoalConditions - conditions is_array: " . (is_array($conditions) ? 'YES' : 'NO'), 'goals');
+         Logger::info("saveGoalConditions - conditions empty: " . (empty($conditions) ? 'YES' : 'NO'), 'goals');
         
         if (empty($conditions) || !is_array($conditions)) {
             // Se não tem condições, remover existentes

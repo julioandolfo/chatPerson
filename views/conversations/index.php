@@ -8889,10 +8889,12 @@ function updateConversationSidebar(conversation, tags) {
     loadContactAgents(conversation.contact_id);
     
     // ✅ Carregar SLA da conversa
+    console.log('🎯 Tentando carregar SLA no updateConversationSidebar, ID:', conversation.id);
     if (typeof window.loadConversationSLA === 'function') {
+        console.log('✅ loadConversationSLA encontrada, chamando...');
         window.loadConversationSLA(conversation.id);
     } else {
-        console.warn('⚠️ Função loadConversationSLA não encontrada ainda');
+        console.error('❌ Função loadConversationSLA NÃO encontrada!', 'Type:', typeof window.loadConversationSLA);
     }
 }
 

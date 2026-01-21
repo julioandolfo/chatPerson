@@ -2469,14 +2469,39 @@ window.loadConversationSLA = function(conversationId) {
     if (contentEl) contentEl.style.display = 'none';
     if (statusBadge) statusBadge.textContent = '...';
     
+    console.log('🔍 Carregando SLA para conversa:', conversationId);
+    
     fetch(`<?= \App\Helpers\Url::to('/conversations/sla-details') ?>?id=${conversationId}`, {
         headers: {
             'X-Requested-With': 'XMLHttpRequest',
             'Accept': 'application/json'
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('📥 Resposta SLA recebida:', {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            url: response.url
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        return response.text().then(text => {
+            console.log('📄 Resposta em texto:', text.substring(0, 500));
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                console.error('❌ Erro ao fazer parse do JSON:', e);
+                console.error('📄 Texto completo:', text);
+                throw new Error('Resposta não é JSON válido');
+            }
+        });
+    })
     .then(data => {
+        console.log('📊 Dados SLA parseados:', data);
         if (data.success && data.sla) {
             const sla = data.sla;
             
@@ -2632,11 +2657,30 @@ window.loadConversationSLA = function(conversationId) {
         }
     })
     .catch(error => {
-        console.error('Erro ao carregar SLA:', error);
-        if (loadingEl) loadingEl.innerHTML = '<div class="text-danger fs-8">Erro ao carregar</div>';
+        console.error('❌ Erro ao carregar SLA:', error);
+        if (loadingEl) {
+            loadingEl.style.display = 'none';
+        }
+        if (contentEl) {
+            contentEl.style.display = 'block';
+            contentEl.innerHTML = `
+                <div class="alert alert-danger d-flex align-items-center p-3">
+                    <i class="ki-duotone ki-information fs-2 text-danger me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div class="fs-7">
+                        <strong>Erro ao carregar SLA</strong><br>
+                        <span class="text-muted">${error.message || 'Erro desconhecido'}</span>
+                    </div>
+                </div>
+            `;
+        }
     });
 };
 
 console.log('✅ Função loadConversationSLA registrada');
+console.log('🔍 URL do endpoint SLA:', '<?= \App\Helpers\Url::to('/conversations/sla-details') ?>');
 </script>
 

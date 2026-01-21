@@ -954,42 +954,6 @@ function removeCondition(btn) {
         row.remove();
     }
 }
-
-// ========== DEBUG FORM SUBMIT ==========
-document.getElementById('goal-form')?.addEventListener('submit', function(e) {
-    const formData = new FormData(this);
-    
-    console.log('=== FORM SUBMIT DEBUG ===');
-    console.log('Form action:', this.action);
-    console.log('Form method:', this.method);
-    
-    // Verificar tiers
-    const tiersData = [];
-    formData.forEach((value, key) => {
-        if (key.startsWith('tiers[')) {
-            tiersData.push({key, value});
-        }
-    });
-    console.log('Tiers encontrados:', tiersData.length > 0 ? tiersData : 'NENHUM');
-    
-    // Verificar conditions
-    const conditionsData = [];
-    formData.forEach((value, key) => {
-        if (key.startsWith('conditions[')) {
-            conditionsData.push({key, value});
-        }
-    });
-    console.log('Conditions encontradas:', conditionsData.length > 0 ? conditionsData : 'NENHUMA');
-    
-    // Verificar checkboxes de ativação
-    console.log('enable_bonus:', formData.get('enable_bonus') || 'NÃO MARCADO');
-    console.log('enable_bonus_conditions:', formData.get('enable_bonus_conditions') || 'NÃO MARCADO');
-    
-    // Se não tem tiers nem conditions, avisar
-    if (tiersData.length === 0 && conditionsData.length === 0) {
-        console.warn('⚠️ AVISO: Nenhum tier ou condição será enviado!');
-    }
-});
 </script>
 
 <style>

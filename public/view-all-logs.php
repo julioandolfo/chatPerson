@@ -5,6 +5,7 @@
 
 // Lista de arquivos de log para verificar
 $logFiles = [
+    'Metas e OTE (Goals)' => __DIR__ . '/../logs/goals.log',
     'Coaching em Tempo Real' => __DIR__ . '/../logs/coaching.log',
     'Jobs Agendados (Cron)' => __DIR__ . '/../storage/logs/jobs.log',
     'Webhook WooCommerce' => __DIR__ . '/../logs/webhook.log',
@@ -106,6 +107,7 @@ $logFiles = [
     
     <div class="controls">
         <button onclick="location.reload()">🔄 Atualizar</button>
+        <button class="nav-btn" onclick="document.getElementById('metas-e-ote-goals-log').scrollIntoView({behavior: 'smooth'})" style="background: #ffd700; color: #000">🎯 Metas/OTE</button>
         <button class="nav-btn" onclick="document.getElementById('coaching-em-tempo-real-log').scrollIntoView({behavior: 'smooth'})" style="background: #4ec9b0">⚡ Coaching</button>
         <button class="nav-btn" onclick="document.getElementById('jobs-agendados-cron-log').scrollIntoView({behavior: 'smooth'})" style="background: #dcdcaa">⏰ Jobs Cron</button>
         <button class="nav-btn" onclick="document.getElementById('webhook-woocommerce-log').scrollIntoView({behavior: 'smooth'})" style="background: #4caf50">🔗 Webhook</button>

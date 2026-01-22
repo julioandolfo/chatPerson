@@ -859,6 +859,7 @@ class DashboardService
     
     /**
      * Obter métricas individuais de um agente
+     * NOTA: Usa tabela conversations direto para evitar problemas com conversation_assignments
      */
     public static function getAgentMetrics(int $agentId, ?string $dateFrom = null, ?string $dateTo = null): array
     {
@@ -881,10 +882,14 @@ class DashboardService
         // Buscar SLA configurado
         $slaSettings = ConversationSettingsService::getSettings()['sla'] ?? [];
         $slaFirstResponseMinutes = $slaSettings['first_response_time'] ?? 15;
-        $slaResponseMinutes = $slaSettings['ongoing_response_time'] ?? $slaFirstResponseMinutes; // SLA para respostas contínuas
+        $slaResponseMinutes = $slaSettings['ongoing_response_time'] ?? $slaFirstResponseMinutes;
         
-        // Conversas totais recebidas no período
-        // Usar SEGUNDOS para maior precisão (IA responde em segundos)
+        // SLA em segundos
+        $slaFirstResponseSeconds = $slaFirstResponseMinutes * 60;
+        $slaResponseSeconds = $slaResponseMinutes * 60;
+        
+        // ===== QUERY SIMPLIFICADA: usa agent_id direto de conversations =====
+        // Isso evita problemas com diferentes schemas de conversation_assignments
         $sql = "SELECT 
                     COUNT(DISTINCT c.id) as total_conversations,
                     COUNT(DISTINCT CASE WHEN EXISTS (
@@ -899,26 +904,22 @@ class DashboardService
                         (SELECT MIN(m1.created_at) FROM messages m1 
                          WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact'),
                         (SELECT MIN(m2.created_at) FROM messages m2 
-                         WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent' AND m2.sender_id = ca.agent_id)
+                         WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent' AND m2.sender_id = ?)
                     )) as avg_first_response_seconds,
                     COUNT(DISTINCT CASE WHEN TIMESTAMPDIFF(SECOND, 
                         (SELECT MIN(m1.created_at) FROM messages m1 
                          WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact'),
                         (SELECT MIN(m2.created_at) FROM messages m2 
-                         WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent' AND m2.sender_id = ca.agent_id)
+                         WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent' AND m2.sender_id = ?)
                     ) <= ? THEN c.id END) as first_response_within_sla
                 FROM conversations c
-                INNER JOIN conversation_assignments ca 
-                    ON ca.conversation_id = c.id 
-                    AND ca.agent_id = ?
-                WHERE ca.assigned_at >= ?
-                AND ca.assigned_at <= ?";
-        
-        // SLA em segundos
-        $slaFirstResponseSeconds = $slaFirstResponseMinutes * 60;
-        $slaResponseSeconds = $slaResponseMinutes * 60;
+                WHERE c.agent_id = ?
+                AND c.created_at >= ?
+                AND c.created_at <= ?";
         
         $metrics = \App\Helpers\Database::fetch($sql, [
+            $agentId,
+            $agentId,
             $slaFirstResponseSeconds,
             $agentId,
             $dateFrom,
@@ -928,12 +929,10 @@ class DashboardService
         // Conversas atuais abertas
         $sqlCurrent = "SELECT COUNT(DISTINCT c.id) as total
                       FROM conversations c
-                      INNER JOIN conversation_assignments ca
-                        ON ca.conversation_id = c.id
-                        AND ca.agent_id = ?
-                      WHERE c.status IN ('open', 'pending')
-                      AND ca.assigned_at >= ?
-                      AND ca.assigned_at <= ?";
+                      WHERE c.agent_id = ?
+                      AND c.status IN ('open', 'pending')
+                      AND c.created_at >= ?
+                      AND c.created_at <= ?";
         $current = \App\Helpers\Database::fetch($sqlCurrent, [$agentId, $dateFrom, $dateTo]);
         
         $total = (int)($metrics['total_conversations'] ?? 0);
@@ -945,8 +944,7 @@ class DashboardService
         $avgFirstResponseSeconds = (float)($metrics['avg_first_response_seconds'] ?? 0);
         $avgFirstResponseMinutes = $avgFirstResponseSeconds > 0 ? round($avgFirstResponseSeconds / 60, 2) : 0;
         
-        // Calcular tempo médio de resposta geral (todas as trocas de mensagens) - em SEGUNDOS
-        // E também contar quantas respostas estão dentro do SLA de respostas
+        // ===== QUERY SIMPLIFICADA para tempo médio de resposta =====
         $sqlAvgResponse = "SELECT 
                     AVG(response_time_seconds) as avg_time_seconds,
                     COUNT(*) as total_responses,
@@ -954,29 +952,29 @@ class DashboardService
                 FROM (
                     SELECT 
                         TIMESTAMPDIFF(SECOND, m1.created_at, m2.created_at) as response_time_seconds
-                    FROM messages m1
-                    INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
+                    FROM conversations c
+                    INNER JOIN messages m1 
+                        ON m1.conversation_id = c.id
+                        AND m1.sender_type = 'contact'
+                    INNER JOIN messages m2 
+                        ON m2.conversation_id = m1.conversation_id
                         AND m2.sender_type = 'agent'
-                        AND m2.sender_id = ca.agent_id
+                        AND m2.sender_id = ?
                         AND m2.created_at > m1.created_at
                         AND m2.created_at = (
                             SELECT MIN(m3.created_at)
                             FROM messages m3
                             WHERE m3.conversation_id = m1.conversation_id
                             AND m3.sender_type = 'agent'
-                            AND m3.sender_id = ca.agent_id
+                            AND m3.sender_id = ?
                             AND m3.created_at > m1.created_at
                         )
-                    INNER JOIN conversations c ON c.id = m1.conversation_id
-                    INNER JOIN conversation_assignments ca 
-                        ON ca.conversation_id = c.id 
-                        AND ca.agent_id = ?
-                        AND ca.assigned_at >= ?
-                        AND ca.assigned_at <= ?
-                    WHERE m1.sender_type = 'contact'
+                    WHERE c.agent_id = ?
+                    AND c.created_at >= ?
+                    AND c.created_at <= ?
                 ) as response_times";
         
-        $avgResponseResult = \App\Helpers\Database::fetch($sqlAvgResponse, [$slaResponseSeconds, $agentId, $dateFrom, $dateTo]);
+        $avgResponseResult = \App\Helpers\Database::fetch($sqlAvgResponse, [$slaResponseSeconds, $agentId, $agentId, $agentId, $dateFrom, $dateTo]);
         $avgResponseSeconds = $avgResponseResult && $avgResponseResult['avg_time_seconds'] !== null 
             ? (float)$avgResponseResult['avg_time_seconds']
             : 0;
@@ -1589,35 +1587,30 @@ class DashboardService
             // Obter métricas básicas do agente
             $baseMetrics = self::getAgentMetrics($agentId, $dateFrom, $dateTo);
             
-            // Métricas adicionais de mensagens
+            // Métricas adicionais de mensagens (usando conversations.agent_id)
             $sqlMessages = "SELECT 
                     COUNT(*) as total_messages,
                     COUNT(DISTINCT m.conversation_id) as conversations_with_messages
                 FROM messages m
-                INNER JOIN conversation_assignments ca
-                    ON ca.conversation_id = m.conversation_id
-                    AND ca.agent_id = ?
-                    AND ca.assigned_at >= ?
-                    AND ca.assigned_at <= ?
-                WHERE m.sender_id = ? 
+                INNER JOIN conversations c ON c.id = m.conversation_id
+                WHERE c.agent_id = ?
+                AND m.sender_id = ? 
                 AND m.sender_type = 'agent'
                 AND m.created_at >= ? 
                 AND m.created_at <= ?";
             
             $messagesResult = \App\Helpers\Database::fetch($sqlMessages, [
-                $agentId, $dateFrom, $dateTo, $agentId, $dateFrom, $dateTo
+                $agentId, $agentId, $dateFrom, $dateTo
             ]);
             
-            // Conversas por status detalhado
+            // Conversas por status detalhado (usando conversations.agent_id)
             $sqlStatusDetail = "SELECT 
                     c.status,
                     COUNT(DISTINCT c.id) as count
                 FROM conversations c
-                INNER JOIN conversation_assignments ca
-                    ON ca.conversation_id = c.id
-                    AND ca.agent_id = ?
-                WHERE ca.assigned_at >= ?
-                AND ca.assigned_at <= ?
+                WHERE c.agent_id = ?
+                AND c.created_at >= ?
+                AND c.created_at <= ?
                 GROUP BY c.status";
             
             $statusResults = \App\Helpers\Database::fetchAll($sqlStatusDetail, [
@@ -1629,16 +1622,14 @@ class DashboardService
                 $conversationsByStatus[$row['status']] = (int)$row['count'];
             }
             
-            // Conversas por canal
+            // Conversas por canal (usando conversations.agent_id)
             $sqlChannels = "SELECT 
                     c.channel,
                     COUNT(DISTINCT c.id) as count
                 FROM conversations c
-                INNER JOIN conversation_assignments ca
-                    ON ca.conversation_id = c.id
-                    AND ca.agent_id = ?
-                WHERE ca.assigned_at >= ?
-                AND ca.assigned_at <= ?
+                WHERE c.agent_id = ?
+                AND c.created_at >= ?
+                AND c.created_at <= ?
                 GROUP BY c.channel";
             
             $channelResults = \App\Helpers\Database::fetchAll($sqlChannels, [

@@ -184,6 +184,58 @@
     <!--begin::Javascript-->
     <script>var hostUrl = "<?= \App\Helpers\Url::asset('') ?>";</script>
     
+    <!--begin::Global 401 Handler (Sessão Expirada)-->
+    <script>
+    (function() {
+        // Interceptar todas as requisições fetch para tratar 401 globalmente
+        const originalFetch = window.fetch;
+        let sessionExpiredShown = false;
+        
+        window.fetch = async function(...args) {
+            try {
+                const response = await originalFetch.apply(this, args);
+                
+                // Se receber 401, sessão expirou
+                if (response.status === 401 && !sessionExpiredShown) {
+                    sessionExpiredShown = true;
+                    
+                    // Tentar ler mensagem do servidor
+                    let message = 'Sua sessão expirou. Faça login novamente.';
+                    try {
+                        const data = await response.clone().json();
+                        if (data.message) message = data.message;
+                    } catch(e) {}
+                    
+                    // Mostrar alerta e redirecionar
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Sessão Expirada',
+                            text: message,
+                            confirmButtonText: 'Fazer Login',
+                            allowOutsideClick: false,
+                            allowEscapeKey: false
+                        }).then(() => {
+                            window.location.href = '<?= \App\Helpers\Url::to('/login') ?>';
+                        });
+                    } else {
+                        alert(message);
+                        window.location.href = '<?= \App\Helpers\Url::to('/login') ?>';
+                    }
+                }
+                
+                return response;
+            } catch (error) {
+                throw error;
+            }
+        };
+        
+        // Log para debug
+        console.log('[Auth] Handler global de sessão configurado');
+    })();
+    </script>
+    <!--end::Global 401 Handler-->
+    
     <!--begin::Prevent Bootstrap Modal Auto-Init Error-->
     <script>
         // Interceptar cliques em botões de modal ANTES do Bootstrap processá-los

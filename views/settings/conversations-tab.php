@@ -368,9 +368,11 @@ $tts = $cs['text_to_speech'] ?? [];
                     <div class="fv-row mb-7">
                         <label class="fw-semibold fs-6 mb-2">Modelo OpenAI</label>
                         <select name="sentiment_analysis_model" class="form-select form-select-solid">
-                            <option value="gpt-3.5-turbo" <?= ($sentiment['model'] ?? 'gpt-3.5-turbo') === 'gpt-3.5-turbo' ? 'selected' : '' ?>>GPT-3.5 Turbo (Recomendado - Mais barato)</option>
-                            <option value="gpt-4" <?= ($sentiment['model'] ?? '') === 'gpt-4' ? 'selected' : '' ?>>GPT-4 (Mais preciso - Mais caro)</option>
+                            <option value="gpt-3.5-turbo" <?= ($sentiment['model'] ?? 'gpt-3.5-turbo') === 'gpt-3.5-turbo' ? 'selected' : '' ?>>GPT-3.5 Turbo (Mais barato)</option>
+                            <option value="gpt-4o" <?= ($sentiment['model'] ?? '') === 'gpt-4o' ? 'selected' : '' ?>>GPT-4o (Recomendado - Rápido e preciso)</option>
+                            <option value="gpt-4o-mini" <?= ($sentiment['model'] ?? '') === 'gpt-4o-mini' ? 'selected' : '' ?>>GPT-4o Mini (Econômico)</option>
                             <option value="gpt-4-turbo" <?= ($sentiment['model'] ?? '') === 'gpt-4-turbo' ? 'selected' : '' ?>>GPT-4 Turbo</option>
+                            <option value="gpt-4" <?= ($sentiment['model'] ?? '') === 'gpt-4' ? 'selected' : '' ?>>GPT-4 (Legado)</option>
                         </select>
                         <div class="form-text">Modelo da OpenAI a usar para análise</div>
                     </div>

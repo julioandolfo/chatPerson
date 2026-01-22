@@ -130,9 +130,7 @@ class GoalService
         $status = self::determineStatus($percentage, $goal);
         
         // Determinar flag
-        $goalModel = new Goal();
-        $goalModel->data = $goal;
-        $flagStatus = $goalModel->getFlagStatus($percentage);
+        $flagStatus = self::determineFlagStatus($percentage, $goal);
         
         // Salvar progresso com projeção
         self::saveProgressWithProjection($goalId, $currentValue, $percentage, $status, $projection, $flagStatus);
@@ -216,6 +214,30 @@ class GoalService
                 ? round(($goal['target_value'] - $currentValue) / $daysRemaining, 2)
                 : 0
         ];
+    }
+
+    /**
+     * Determinar flag baseado no percentual e thresholds da meta
+     */
+    private static function determineFlagStatus(float $percentage, array $goal): string
+    {
+        $critical = $goal['flag_critical_threshold'] ?? 70.0;
+        $warning = $goal['flag_warning_threshold'] ?? 85.0;
+        $good = $goal['flag_good_threshold'] ?? 95.0;
+
+        if ($percentage >= 100) {
+            return 'excellent';
+        }
+        if ($percentage >= $good) {
+            return 'good';
+        }
+        if ($percentage >= $warning) {
+            return 'warning';
+        }
+        if ($percentage >= $critical) {
+            return 'warning';
+        }
+        return 'critical';
     }
     
     /**

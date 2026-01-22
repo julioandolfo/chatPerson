@@ -113,6 +113,14 @@ class Database
     }
 
     /**
+     * Obter último ID inserido
+     */
+    public static function lastInsertId(): int
+    {
+        return (int) self::getInstance()->lastInsertId();
+    }
+
+    /**
      * Executar update/delete e retornar linhas afetadas
      */
     public static function execute(string $sql, array $params = []): int

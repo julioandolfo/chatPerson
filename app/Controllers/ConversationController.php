@@ -3365,7 +3365,11 @@ class ConversationController
             $timeline = [];
             $lastAgentMessage = null;
             $settings = \App\Services\ConversationSettingsService::getSettings();
+            $delayEnabled = $settings['sla']['message_delay_enabled'] ?? true;
             $delayMinutes = $settings['sla']['message_delay_minutes'] ?? 1;
+            if (!$delayEnabled) {
+                $delayMinutes = 0;
+            }
             
             foreach ($messages as $msg) {
                 $time = new \DateTime($msg['created_at']);
@@ -3437,7 +3441,8 @@ class ConversationController
                     'status_indicator' => $status,
                     'percentage' => min(100, round($percentage, 1)),
                     'timeline' => $timeline,
-                    'delay_minutes' => $delayMinutes
+                    'delay_minutes' => $delayMinutes,
+                    'delay_enabled' => $delayEnabled
                 ]
             ]);
         } catch (\Exception $e) {

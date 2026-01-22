@@ -211,37 +211,109 @@ class SentimentAnalysisService
     private static function buildSentimentPrompt(array $messages, array $settings): string
     {
         $history = self::formatMessagesForAnalysis($messages);
+        $messageCount = count($messages);
         
-        $prompt = "Analise o sentimento e emoções do CLIENTE na seguinte conversa de atendimento.\n\n";
-        $prompt .= "IMPORTANTE: Analise o sentimento do CLIENTE (não do agente), mas use o contexto completo da conversa para entender melhor:\n";
-        $prompt .= "- Como o cliente está se sentindo ao longo da conversa\n";
-        $prompt .= "- Se o atendimento melhorou ou piorou o sentimento\n";
-        $prompt .= "- O estado emocional final do cliente\n\n";
-        $prompt .= "Histórico da conversa:\n{$history}\n\n";
-        $prompt .= "Retorne APENAS um JSON válido com a seguinte estrutura:\n";
-        $prompt .= "{\n";
-        $prompt .= "  \"sentiment_score\": -1.0 a 1.0 (decimal, onde -1.0 é muito negativo e 1.0 é muito positivo),\n";
-        $prompt .= "  \"sentiment_label\": \"positive\" | \"neutral\" | \"negative\",\n";
-        
+        $prompt = <<<PROMPT
+Você é um especialista em análise de sentimento em conversas de atendimento ao cliente. Sua tarefa é analisar o SENTIMENTO GERAL do CLIENTE ao longo de toda a conversa.
+
+## REGRAS CRÍTICAS DE ANÁLISE
+
+### 1. CONTEXTO É TUDO
+- Analise a conversa COMPLETA, do início ao fim
+- O sentimento final deve refletir a JORNADA EMOCIONAL do cliente
+- Uma conversa que começou mal mas foi resolvida = sentimento POSITIVO ou NEUTRO
+- Uma conversa que começou bem mas terminou mal = sentimento NEGATIVO
+
+### 2. NÃO REAJA A MENSAGENS ISOLADAS
+- Um emoji triste (😢😔😞) isolado NÃO significa automaticamente sentimento negativo
+- Pode ser empatia, humor, ou expressão casual
+- Avalie o CONTEXTO: o que foi dito antes e depois?
+- O problema foi resolvido? O cliente agradeceu no final?
+
+### 3. SINAIS DE SENTIMENTO POSITIVO
+- Cliente agradece ("obrigado", "valeu", "muito obrigado")
+- Problema foi resolvido ou encaminhado satisfatoriamente
+- Cliente demonstra satisfação com o atendimento
+- Uso de emojis positivos no contexto de resolução (👍😊🙏)
+- Cliente elogia o agente ou a empresa
+- Despedida amigável
+
+### 4. SINAIS DE SENTIMENTO NEGATIVO (CONFIRME COM CONTEXTO)
+- Cliente reclama repetidamente sem resolução
+- Frustração explícita que NÃO foi resolvida
+- Ameaças (cancelar, reclamar, processar)
+- Insatisfação com a resolução oferecida
+- Cliente abandona a conversa irritado
+- Múltiplas mensagens de cobrança sem resposta adequada
+
+### 5. SINAIS DE SENTIMENTO NEUTRO
+- Conversa informativa sem carga emocional forte
+- Problema resolvido de forma funcional (sem entusiasmo nem frustração)
+- Cliente objetivo e direto, sem demonstrar emoções
+- Interação transacional simples
+
+### 6. PESO DAS MENSAGENS
+- Mensagens FINAIS têm MAIS PESO que as iniciais
+- Se o cliente estava frustrado mas terminou satisfeito = POSITIVO
+- Se o cliente estava ok mas terminou frustrado = NEGATIVO
+- Considere a EVOLUÇÃO do sentimento
+
+### 7. EMOJIS - INTERPRETE COM CUIDADO
+- 😢😔😞 podem ser: tristeza real, empatia, brincadeira
+- 😊😄👍 geralmente são positivos
+- 😡🤬 são claramente negativos
+- Sempre avalie o TEXTO que acompanha o emoji
+
+## CONVERSA PARA ANÁLISE ({$messageCount} mensagens)
+
+{$history}
+
+## FORMATO DE RESPOSTA (JSON VÁLIDO)
+
+{
+  "sentiment_score": <número decimal de -1.0 a 1.0>,
+  "sentiment_label": "<positive|neutral|negative>",
+PROMPT;
+
         if ($settings['include_emotions'] ?? true) {
-            $prompt .= "  \"emotions\": {\n";
-            $prompt .= "    \"frustration\": 0.0 a 1.0,\n";
-            $prompt .= "    \"satisfaction\": 0.0 a 1.0,\n";
-            $prompt .= "    \"anxiety\": 0.0 a 1.0,\n";
-            $prompt .= "    \"anger\": 0.0 a 1.0,\n";
-            $prompt .= "    \"happiness\": 0.0 a 1.0,\n";
-            $prompt .= "    \"confusion\": 0.0 a 1.0\n";
-            $prompt .= "  },\n";
+            $prompt .= <<<PROMPT
+
+  "emotions": {
+    "frustration": <0.0 a 1.0>,
+    "satisfaction": <0.0 a 1.0>,
+    "anxiety": <0.0 a 1.0>,
+    "anger": <0.0 a 1.0>,
+    "happiness": <0.0 a 1.0>,
+    "confusion": <0.0 a 1.0>
+  },
+PROMPT;
         }
-        
+
         if ($settings['include_urgency'] ?? true) {
-            $prompt .= "  \"urgency_level\": \"low\" | \"medium\" | \"high\" | \"critical\",\n";
+            $prompt .= <<<PROMPT
+
+  "urgency_level": "<low|medium|high|critical>",
+PROMPT;
         }
-        
-        $prompt .= "  \"confidence\": 0.0 a 1.0 (confiança na análise),\n";
-        $prompt .= "  \"analysis_text\": \"Breve explicação do sentimento detectado em português\"\n";
-        $prompt .= "}\n\n";
-        $prompt .= "IMPORTANTE: Retorne APENAS o JSON válido, sem markdown, sem explicações adicionais, sem ```json```.";
+
+        $prompt .= <<<PROMPT
+
+  "confidence": <0.0 a 1.0>,
+  "sentiment_evolution": "<improved|stable|worsened>",
+  "resolution_status": "<resolved|partially_resolved|unresolved|unknown>",
+  "analysis_text": "<Explicação em português de 1-2 frases do sentimento detectado, mencionando o contexto>"
+}
+
+## CRITÉRIOS PARA SCORE
+
+- **-1.0 a -0.6**: Cliente muito insatisfeito, problema não resolvido, frustração clara
+- **-0.6 a -0.2**: Cliente insatisfeito, mas sem extremos
+- **-0.2 a 0.2**: Neutro, conversa funcional sem emoções fortes
+- **0.2 a 0.6**: Cliente satisfeito, problema resolvido
+- **0.6 a 1.0**: Cliente muito satisfeito, elogiou o atendimento
+
+IMPORTANTE: Retorne APENAS o JSON válido, sem markdown, sem ```json```, sem explicações fora do JSON.
+PROMPT;
 
         return $prompt;
     }
@@ -285,7 +357,7 @@ class SentimentAnalysisService
                 ]
             ],
             'temperature' => $temperature,
-            'max_tokens' => 500,
+            'max_tokens' => 800,
             'response_format' => ['type' => 'json_object']
         ];
 
@@ -333,12 +405,15 @@ class SentimentAnalysisService
         $content = $response['choices'][0]['message']['content'] ?? '';
         $usage = $response['usage'] ?? [];
         
+        // Limpar possíveis caracteres extras
+        $content = trim($content);
+        
         // Tentar parsear JSON
         $analysisData = json_decode($content, true);
         
         if (json_last_error() !== JSON_ERROR_NONE) {
-            // Tentar extrair JSON do texto
-            if (preg_match('/\{[^}]+\}/s', $content, $matches)) {
+            // Tentar extrair JSON do texto (incluindo JSONs aninhados)
+            if (preg_match('/\{(?:[^{}]|(?:\{[^{}]*\}))*\}/s', $content, $matches)) {
                 $analysisData = json_decode($matches[0], true);
             }
         }
@@ -369,6 +444,39 @@ class SentimentAnalysisService
         $tokensUsed = (int)($usage['total_tokens'] ?? 0);
         $cost = self::calculateCost($model, $tokensUsed);
 
+        // Construir análise textual enriquecida com contexto
+        $analysisText = $analysisData['analysis_text'] ?? '';
+        
+        // Adicionar informações de evolução e resolução ao texto
+        $sentimentEvolution = $analysisData['sentiment_evolution'] ?? null;
+        $resolutionStatus = $analysisData['resolution_status'] ?? null;
+        
+        $evolutionLabels = [
+            'improved' => 'Sentimento melhorou ao longo da conversa',
+            'stable' => 'Sentimento manteve-se estável',
+            'worsened' => 'Sentimento piorou ao longo da conversa'
+        ];
+        
+        $resolutionLabels = [
+            'resolved' => 'Problema resolvido',
+            'partially_resolved' => 'Parcialmente resolvido',
+            'unresolved' => 'Não resolvido',
+            'unknown' => 'Status desconhecido'
+        ];
+        
+        // Enriquecer análise com metadados
+        $metadata = [];
+        if ($sentimentEvolution && isset($evolutionLabels[$sentimentEvolution])) {
+            $metadata[] = $evolutionLabels[$sentimentEvolution];
+        }
+        if ($resolutionStatus && isset($resolutionLabels[$resolutionStatus])) {
+            $metadata[] = $resolutionLabels[$resolutionStatus];
+        }
+        
+        if (!empty($metadata)) {
+            $analysisText = $analysisText . ' [' . implode(' | ', $metadata) . ']';
+        }
+
         return [
             'conversation_id' => $conversationId,
             'message_id' => $messageId,
@@ -377,7 +485,7 @@ class SentimentAnalysisService
             'emotions' => !empty($analysisData['emotions']) ? json_encode($analysisData['emotions']) : null,
             'urgency_level' => $analysisData['urgency_level'] ?? null,
             'confidence' => $confidence,
-            'analysis_text' => $analysisData['analysis_text'] ?? null,
+            'analysis_text' => $analysisText,
             'messages_analyzed' => $messagesCount,
             'tokens_used' => $tokensUsed,
             'cost' => $cost,
@@ -391,8 +499,10 @@ class SentimentAnalysisService
      */
     private static function calculateCost(string $model, int $tokens): float
     {
-        // Preços por 1K tokens (aproximados)
+        // Preços por 1K tokens (aproximados - Janeiro 2025)
         $prices = [
+            'gpt-4o' => ['input' => 0.0025, 'output' => 0.01],
+            'gpt-4o-mini' => ['input' => 0.00015, 'output' => 0.0006],
             'gpt-4' => ['input' => 0.03, 'output' => 0.06],
             'gpt-4-turbo' => ['input' => 0.01, 'output' => 0.03],
             'gpt-3.5-turbo' => ['input' => 0.0005, 'output' => 0.0015],

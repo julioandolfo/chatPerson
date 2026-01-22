@@ -494,6 +494,11 @@ class AgentPerformanceController
             $dateFrom = Request::get('date_from', date('Y-m-d', strtotime('-30 days')));
             $dateTo = Request::get('date_to', date('Y-m-d'));
             $type = Request::get('type', 'first'); // first | ongoing
+            $page = max(1, (int)(Request::get('page') ?? 1));
+            $perPage = (int)(Request::get('per_page') ?? 20);
+            if ($perPage < 5) $perPage = 5;
+            if ($perPage > 100) $perPage = 100;
+            $offset = ($page - 1) * $perPage;
             
             if (!$agentId) {
                 Response::json(['success' => false, 'message' => 'ID do agente não fornecido'], 400);
@@ -510,6 +515,41 @@ class AgentPerformanceController
             // (primeira mensagem do cliente -> primeira resposta do agente), sem working hours.
             if ($type === 'ongoing') {
                 $slaOngoingSeconds = $slaOngoingMinutes * 60;
+                $countSql = "SELECT COUNT(DISTINCT c.id) as total
+                        FROM conversations c
+                        INNER JOIN (
+                            SELECT 
+                                m1.conversation_id,
+                                MAX(TIMESTAMPDIFF(SECOND, m1.created_at, m2.created_at)) as max_response_seconds
+                            FROM messages m1
+                            INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
+                                AND m2.sender_type = 'agent'
+                                AND m2.created_at > m1.created_at
+                                AND m2.created_at = (
+                                    SELECT MIN(m3.created_at)
+                                    FROM messages m3
+                                    WHERE m3.conversation_id = m1.conversation_id
+                                    AND m3.sender_type = 'agent'
+                                    AND m3.created_at > m1.created_at
+                                )
+                            WHERE m1.sender_type = 'contact'
+                            GROUP BY m1.conversation_id
+                        ) mr ON mr.conversation_id = c.id
+                        WHERE EXISTS (
+                            SELECT 1 FROM conversation_assignments ca
+                            WHERE ca.conversation_id = c.id
+                            AND ca.agent_id = ?
+                            AND ca.assigned_at >= ?
+                            AND ca.assigned_at <= ?
+                        )
+                        AND mr.max_response_seconds > ?";
+                $countResult = \App\Helpers\Database::fetch($countSql, [
+                    $agentId,
+                    $dateFrom . ' 00:00:00',
+                    $dateTo . ' 23:59:59',
+                    $slaOngoingSeconds
+                ]);
+                $totalRows = (int)($countResult['total'] ?? 0);
                 
                 $sql = "SELECT 
                             c.id, c.created_at, c.first_response_at, c.first_human_response_at,
@@ -518,9 +558,6 @@ class AgentPerformanceController
                             u.name as agent_name,
                             mr.max_response_seconds
                         FROM conversations c
-                        INNER JOIN conversation_assignments ca 
-                            ON ca.conversation_id = c.id 
-                            AND ca.agent_id = ?
                         LEFT JOIN contacts ct ON c.contact_id = ct.id
                         LEFT JOIN users u ON c.agent_id = u.id
                         INNER JOIN (
@@ -541,11 +578,16 @@ class AgentPerformanceController
                             WHERE m1.sender_type = 'contact'
                             GROUP BY m1.conversation_id
                         ) mr ON mr.conversation_id = c.id
-                        WHERE ca.assigned_at >= ?
-                        AND ca.assigned_at <= ?
+                        WHERE EXISTS (
+                            SELECT 1 FROM conversation_assignments ca
+                            WHERE ca.conversation_id = c.id
+                            AND ca.agent_id = ?
+                            AND ca.assigned_at >= ?
+                            AND ca.assigned_at <= ?
+                        )
                         AND mr.max_response_seconds > ?
                         ORDER BY mr.max_response_seconds DESC
-                        LIMIT 200";
+                        LIMIT {$perPage} OFFSET {$offset}";
                 
                 $conversations = \App\Helpers\Database::fetchAll($sql, [
                     $agentId,
@@ -555,6 +597,39 @@ class AgentPerformanceController
                 ]);
             } else {
                 $slaFirstResponseSeconds = $slaMinutes * 60;
+                $countSql = "SELECT COUNT(DISTINCT c.id) as total
+                        FROM conversations c
+                        LEFT JOIN (
+                            SELECT conversation_id, MIN(created_at) as first_contact_at
+                            FROM messages
+                            WHERE sender_type = 'contact'
+                            GROUP BY conversation_id
+                        ) mc ON mc.conversation_id = c.id
+                        LEFT JOIN (
+                            SELECT conversation_id, MIN(created_at) as first_agent_at
+                            FROM messages
+                            WHERE sender_type = 'agent'
+                            GROUP BY conversation_id
+                        ) ma ON ma.conversation_id = c.id
+                        WHERE EXISTS (
+                            SELECT 1 FROM conversation_assignments ca
+                            WHERE ca.conversation_id = c.id
+                            AND ca.agent_id = ?
+                            AND ca.assigned_at >= ?
+                            AND ca.assigned_at <= ?
+                        )
+                        AND mc.first_contact_at IS NOT NULL
+                        AND (
+                            ma.first_agent_at IS NULL
+                            OR TIMESTAMPDIFF(SECOND, mc.first_contact_at, ma.first_agent_at) > ?
+                        )";
+                $countResult = \App\Helpers\Database::fetch($countSql, [
+                    $agentId,
+                    $dateFrom . ' 00:00:00',
+                    $dateTo . ' 23:59:59',
+                    $slaFirstResponseSeconds
+                ]);
+                $totalRows = (int)($countResult['total'] ?? 0);
                 
                 $sql = "SELECT 
                             c.id, c.created_at, c.first_response_at, c.first_human_response_at,
@@ -565,9 +640,6 @@ class AgentPerformanceController
                             ma.first_agent_at,
                             TIMESTAMPDIFF(SECOND, mc.first_contact_at, COALESCE(ma.first_agent_at, NOW())) as response_seconds
                         FROM conversations c
-                        INNER JOIN conversation_assignments ca 
-                            ON ca.conversation_id = c.id 
-                            AND ca.agent_id = ?
                         LEFT JOIN contacts ct ON c.contact_id = ct.id
                         LEFT JOIN users u ON c.agent_id = u.id
                         LEFT JOIN (
@@ -582,15 +654,20 @@ class AgentPerformanceController
                             WHERE sender_type = 'agent'
                             GROUP BY conversation_id
                         ) ma ON ma.conversation_id = c.id
-                        WHERE ca.assigned_at >= ?
-                        AND ca.assigned_at <= ?
+                        WHERE EXISTS (
+                            SELECT 1 FROM conversation_assignments ca
+                            WHERE ca.conversation_id = c.id
+                            AND ca.agent_id = ?
+                            AND ca.assigned_at >= ?
+                            AND ca.assigned_at <= ?
+                        )
                         AND mc.first_contact_at IS NOT NULL
                         AND (
                             ma.first_agent_at IS NULL
                             OR TIMESTAMPDIFF(SECOND, mc.first_contact_at, ma.first_agent_at) > ?
                         )
                         ORDER BY mc.first_contact_at DESC
-                        LIMIT 200";
+                        LIMIT {$perPage} OFFSET {$offset}";
 
                 $conversations = \App\Helpers\Database::fetchAll($sql, [
                     $agentId,
@@ -603,8 +680,11 @@ class AgentPerformanceController
             // Enriquecer dados com informações adicionais (mesma base do dashboard)
             foreach ($conversations as &$conv) {
                 if ($type === 'ongoing') {
-                    $responseSeconds = (int)($conv['max_response_seconds'] ?? 0);
-                    $elapsedMinutes = $responseSeconds > 0 ? round($responseSeconds / 60, 1) : 0;
+                    $elapsedMinutes = $this->calculateOngoingMaxResponseMinutes(
+                        (int)$conv['id'],
+                        $settings,
+                        $conv['status'] ?? null
+                    );
                     $slaBaseMinutes = $slaOngoingMinutes;
                 } else {
                     $responseSeconds = (int)($conv['response_seconds'] ?? 0);
@@ -635,7 +715,10 @@ class AgentPerformanceController
             Response::json([
                 'success' => true,
                 'conversations' => $conversations,
-                'total' => count($conversations),
+                'total' => $totalRows ?? count($conversations),
+                'page' => $page,
+                'per_page' => $perPage,
+                'total_pages' => isset($totalRows) ? (int)ceil($totalRows / $perPage) : 1,
                 'sla_minutes' => $type === 'ongoing' ? $slaOngoingMinutes : $slaMinutes,
                 'type' => $type,
                 'period' => [
@@ -647,5 +730,85 @@ class AgentPerformanceController
         } catch (\Exception $e) {
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Calcular o maior tempo de resposta (SLA de respostas) por conversa.
+     * Considera delay configurado e horário de atendimento quando habilitado.
+     */
+    private function calculateOngoingMaxResponseMinutes(int $conversationId, array $settings, ?string $status = null): float
+    {
+        $delayEnabled = $settings['sla']['message_delay_enabled'] ?? true;
+        $delayMinutes = $settings['sla']['message_delay_minutes'] ?? 1;
+        $useWorkingHours = $settings['sla']['working_hours_enabled'] ?? false;
+        
+        if (!$delayEnabled) {
+            $delayMinutes = 0;
+        }
+        
+        $messages = \App\Helpers\Database::fetchAll(
+            "SELECT sender_type, created_at
+             FROM messages
+             WHERE conversation_id = ?
+             AND sender_type IN ('contact', 'agent')
+             ORDER BY created_at ASC",
+            [$conversationId]
+        );
+        
+        if (!$messages) {
+            return 0;
+        }
+        
+        $lastAgentAt = null;
+        $pendingContactAt = null;
+        $maxMinutes = 0.0;
+        
+        foreach ($messages as $msg) {
+            $currentAt = new \DateTime($msg['created_at']);
+            
+            if ($msg['sender_type'] === 'agent') {
+                if ($pendingContactAt) {
+                    $maxMinutes = max($maxMinutes, $this->calculateMinutesDiff($pendingContactAt, $currentAt, $useWorkingHours));
+                    $pendingContactAt = null;
+                }
+                $lastAgentAt = $currentAt;
+                continue;
+            }
+            
+            if ($msg['sender_type'] === 'contact') {
+                if (!$lastAgentAt) {
+                    continue;
+                }
+                
+                $diffSinceAgent = ($currentAt->getTimestamp() - $lastAgentAt->getTimestamp()) / 60;
+                if ($delayMinutes > 0 && $diffSinceAgent < $delayMinutes) {
+                    continue;
+                }
+                
+                if (!$pendingContactAt) {
+                    $pendingContactAt = $currentAt;
+                }
+            }
+        }
+        
+        // Se ficou pendente e a conversa está aberta, calcular até agora
+        if ($pendingContactAt && in_array($status, ['open', 'pending'], true)) {
+            $now = new \DateTime();
+            $maxMinutes = max($maxMinutes, $this->calculateMinutesDiff($pendingContactAt, $now, $useWorkingHours));
+        }
+        
+        return round($maxMinutes, 1);
+    }
+
+    /**
+     * Diferença em minutos entre duas datas, usando horário comercial se habilitado.
+     */
+    private function calculateMinutesDiff(\DateTime $start, \DateTime $end, bool $useWorkingHours): float
+    {
+        if ($useWorkingHours) {
+            return (float)\App\Helpers\WorkingHoursCalculator::calculateMinutes($start, $end);
+        }
+        
+        return max(0, ($end->getTimestamp() - $start->getTimestamp()) / 60);
     }
 }

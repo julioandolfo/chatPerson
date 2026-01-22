@@ -218,7 +218,7 @@ window.loadConversationSLA = function(conversationId) {
                     badgesHtml += `<span class="badge badge-light-secondary fs-8">⏱ ${sla.paused_duration}min pausado</span>`;
                 }
                 
-                if (!sla.should_start) {
+                if (sla.delay_enabled && !sla.should_start) {
                     badgesHtml += `<span class="badge badge-light-info fs-8">⏳ Delay de ${sla.delay_minutes}min</span>`;
                 }
                 

@@ -355,6 +355,7 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                         </div>
                     </div>
                 </div>
+                <div id="sla-breached-pagination"></div>
             </div>
         </div>
     </div>
@@ -393,6 +394,7 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                         </div>
                     </div>
                 </div>
+                <div id="sla-ongoing-breached-pagination"></div>
             </div>
         </div>
     </div>
@@ -1276,12 +1278,48 @@ async function showConversationDetails(conversationId) {
 }
 
 // ========== CARREGAR CONVERSAS COM SLA EXCEDIDO ==========
-function loadSLABreachedConversations() {
+let slaBreachedPage = 1;
+const slaBreachedPerPage = 20;
+let slaOngoingBreachedPage = 1;
+const slaOngoingBreachedPerPage = 20;
+
+function renderPagination(containerId, total, page, perPage, onPageChange) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const totalPages = Math.max(1, Math.ceil(total / perPage));
+    
+    if (totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    const prevDisabled = page <= 1 ? 'disabled' : '';
+    const nextDisabled = page >= totalPages ? 'disabled' : '';
+    
+    container.innerHTML = `
+        <div class="d-flex justify-content-end align-items-center gap-2 mt-4">
+            <button class="btn btn-sm btn-light" ${prevDisabled} data-action="prev">Anterior</button>
+            <span class="text-muted fs-7">Página ${page} de ${totalPages}</span>
+            <button class="btn btn-sm btn-light" ${nextDisabled} data-action="next">Próxima</button>
+        </div>
+    `;
+    
+    container.querySelectorAll('button[data-action]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const action = btn.getAttribute('data-action');
+            if (action === 'prev' && page > 1) onPageChange(page - 1);
+            if (action === 'next' && page < totalPages) onPageChange(page + 1);
+        });
+    });
+}
+
+function loadSLABreachedConversations(page = 1) {
+    slaBreachedPage = page;
     const agentId = <?= $agent['id'] ?? 0 ?>;
     const dateFrom = '<?= $dateFrom ?>';
     const dateTo = '<?= $dateTo ?>';
     
-    fetch(`<?= Url::to('/agent-performance/sla-breached') ?>?agent_id=${agentId}&date_from=${dateFrom}&date_to=${dateTo}`)
+    fetch(`<?= Url::to('/agent-performance/sla-breached') ?>?agent_id=${agentId}&date_from=${dateFrom}&date_to=${dateTo}&page=${slaBreachedPage}&per_page=${slaBreachedPerPage}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -1302,6 +1340,7 @@ function loadSLABreachedConversations() {
                             <p class="text-muted">Parabéns! Todas as conversas foram respondidas dentro do prazo.</p>
                         </div>
                     `;
+                    renderPagination('sla-breached-pagination', data.total, data.page, data.per_page, loadSLABreachedConversations);
                     return;
                 }
                 
@@ -1387,6 +1426,7 @@ function loadSLABreachedConversations() {
                 `;
                 
                 container.innerHTML = html;
+                renderPagination('sla-breached-pagination', data.total, data.page, data.per_page, loadSLABreachedConversations);
             }
         })
         .catch(error => {
@@ -1405,11 +1445,17 @@ function loadSLABreachedConversations() {
 
 // ========== CARREGAR CONVERSAS COM SLA DE RESPOSTAS EXCEDIDO ==========
 function loadSLAOngoingBreachedConversations() {
+    slaOngoingBreachedPage = 1;
+    loadSLAOngoingBreachedConversationsPage(slaOngoingBreachedPage);
+}
+
+function loadSLAOngoingBreachedConversationsPage(page = 1) {
+    slaOngoingBreachedPage = page;
     const agentId = <?= $agent['id'] ?? 0 ?>;
     const dateFrom = '<?= $dateFrom ?>';
     const dateTo = '<?= $dateTo ?>';
     
-    fetch(`<?= Url::to('/agent-performance/sla-breached') ?>?agent_id=${agentId}&date_from=${dateFrom}&date_to=${dateTo}&type=ongoing`)
+    fetch(`<?= Url::to('/agent-performance/sla-breached') ?>?agent_id=${agentId}&date_from=${dateFrom}&date_to=${dateTo}&type=ongoing&page=${slaOngoingBreachedPage}&per_page=${slaOngoingBreachedPerPage}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -1430,6 +1476,7 @@ function loadSLAOngoingBreachedConversations() {
                             <p class="text-muted">Ótimo! As respostas estão dentro do prazo.</p>
                         </div>
                     `;
+                    renderPagination('sla-ongoing-breached-pagination', data.total, data.page, data.per_page, loadSLAOngoingBreachedConversationsPage);
                     return;
                 }
                 
@@ -1515,6 +1562,7 @@ function loadSLAOngoingBreachedConversations() {
                 `;
                 
                 container.innerHTML = html;
+                renderPagination('sla-ongoing-breached-pagination', data.total, data.page, data.per_page, loadSLAOngoingBreachedConversationsPage);
             }
         })
         .catch(error => {

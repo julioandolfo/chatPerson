@@ -866,168 +866,290 @@ $operatorLabels = \App\Models\GoalBonusCondition::OPERATORS;
 </div>
 
 <?php if (!empty($allGoals)): ?>
-<div class="card card-flush mb-7">
-    <div class="card-header">
-        <h3 class="card-title">
-            <i class="bi bi-list-check fs-2 text-primary me-2"></i>
-            Análise Completa de Metas
-        </h3>
-        <div class="card-toolbar">
-            <span class="badge badge-light-primary fs-7"><?= count($allGoals) ?> metas aplicadas</span>
+<?php foreach ($allGoals as $goalIndex => $goal): 
+    $progress = $goal['progress'] ?? null;
+    $percentage = $progress ? (float)$progress['percentage'] : 0;
+    $currentValue = $progress ? (float)$progress['current_value'] : 0;
+    $targetValue = (float)($goal['target_value'] ?? 0);
+    $remainingValue = max(0, $targetValue - $currentValue);
+    $flagStatus = $progress['flag_status'] ?? 'good';
+    $progressColor = \App\Models\Goal::getFlagColor($flagStatus);
+    $bonusPreview = $goal['bonus_preview'] ?? null;
+    $tiers = $goal['tiers'] ?? [];
+    $conditions = $goal['conditions'] ?? [];
+    
+    // Calcular projeção correta baseada em dias
+    $startDate = strtotime($goal['start_date']);
+    $endDate = strtotime($goal['end_date']);
+    $today = time();
+    $totalDays = max(1, ($endDate - $startDate) / 86400);
+    $elapsedDays = max(1, ($today - $startDate) / 86400);
+    $remainingDays = max(0, ($endDate - $today) / 86400);
+    $dailyAverage = $elapsedDays > 0 ? $currentValue / $elapsedDays : 0;
+    $projectedValue = $dailyAverage * $totalDays;
+    $projectedPercentage = $targetValue > 0 ? min(200, ($projectedValue / $targetValue) * 100) : 0;
+    $expectedPercentage = ($elapsedDays / $totalDays) * 100;
+    $isOnTrack = $percentage >= $expectedPercentage;
+    
+    // Encontrar próximo tier
+    $nextTier = null;
+    $nextTierGap = 0;
+    $nextTierValueGap = 0;
+    if (!empty($tiers)) {
+        usort($tiers, fn($a, $b) => $a['threshold_percentage'] <=> $b['threshold_percentage']);
+        foreach ($tiers as $tier) {
+            if ((float)$tier['threshold_percentage'] > $percentage) {
+                $nextTier = $tier;
+                $nextTierGap = (float)$tier['threshold_percentage'] - $percentage;
+                $nextTierValueGap = ($targetValue * (float)$tier['threshold_percentage'] / 100) - $currentValue;
+                break;
+            }
+        }
+    }
+    
+    // Verificar condições bloqueadoras
+    $blockedConditions = [];
+    if (!empty($conditions)) {
+        foreach ($conditions as $cond) {
+            if (!empty($cond['is_required']) && empty($cond['is_met'])) {
+                $blockedConditions[] = $cond;
+            }
+        }
+    }
+?>
+<div class="card card-flush mb-5 border-start border-4 border-<?= $progressColor ?>">
+    <div class="card-header bg-light-<?= $progressColor ?> py-4">
+        <div class="d-flex align-items-center flex-grow-1">
+            <div class="symbol symbol-50px me-4">
+                <span class="symbol-label bg-<?= $progressColor ?> text-white fs-2 fw-bold">
+                    <?= $goalIndex + 1 ?>
+                </span>
+            </div>
+            <div class="flex-grow-1">
+                <h3 class="card-title fw-bold mb-1"><?= htmlspecialchars($goal['name']) ?></h3>
+                <span class="text-muted fs-7">
+                    <?= \App\Models\Goal::TYPES[$goal['type']]['label'] ?? $goal['type'] ?> • 
+                    <?= \App\Models\Goal::TARGET_TYPES[$goal['target_type']] ?? $goal['target_type'] ?> •
+                    <?= date('d/m/Y', strtotime($goal['start_date'])) ?> → <?= date('d/m/Y', strtotime($goal['end_date'])) ?>
+                </span>
+            </div>
+            <div class="text-end">
+                <span class="fs-1 fw-bolder text-<?= $progressColor ?>"><?= number_format($percentage, 1) ?>%</span>
+                <div class="text-muted fs-8">do alvo</div>
+            </div>
         </div>
     </div>
     <div class="card-body">
-        <div class="accordion" id="goalsDetailedAccordion">
-            <?php foreach ($allGoals as $goal): 
-                $progress = $goal['progress'] ?? null;
-                $percentage = $progress ? (float)$progress['percentage'] : 0;
-                $currentValue = $progress ? (float)$progress['current_value'] : 0;
-                $flagStatus = $progress['flag_status'] ?? 'good';
-                $progressColor = \App\Models\Goal::getFlagColor($flagStatus);
-                $bonusPreview = $goal['bonus_preview'] ?? null;
-                $tiers = $goal['tiers'] ?? [];
-                $conditions = $goal['conditions'] ?? [];
-            ?>
-            <div class="accordion-item">
-                <h2 class="accordion-header" id="goalHeading<?= $goal['id'] ?>">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#goalCollapse<?= $goal['id'] ?>">
-                        <div class="d-flex flex-column w-100">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="fw-bold"><?= htmlspecialchars($goal['name']) ?></span>
-                                <span class="badge badge-light-<?= $progressColor ?>">
-                                    <?= number_format($percentage, 0) ?>%
-                                </span>
-                            </div>
-                            <span class="text-muted fs-8">
-                                <?= \App\Models\Goal::TYPES[$goal['type']]['label'] ?? $goal['type'] ?> • 
-                                <?= \App\Models\Goal::TARGET_TYPES[$goal['target_type']] ?? $goal['target_type'] ?>
-                            </span>
-                        </div>
-                    </button>
-                </h2>
-                <div id="goalCollapse<?= $goal['id'] ?>" class="accordion-collapse collapse" data-bs-parent="#goalsDetailedAccordion">
-                    <div class="accordion-body">
-                        <div class="row g-4">
-                            <div class="col-md-4">
-                                <div class="border rounded p-4 h-100">
-                                    <h6 class="fw-bold mb-3">Meta & Progresso</h6>
-                                    <div class="mb-2">Alvo: <strong><?= \App\Models\Goal::formatValue($goal['type'], $goal['target_value']) ?></strong></div>
-                                    <div class="mb-2">Atual: <strong><?= \App\Models\Goal::formatValue($goal['type'], $currentValue) ?></strong></div>
-                                    <div class="mb-2">Período: <strong><?= date('d/m/Y', strtotime($goal['start_date'])) ?> → <?= date('d/m/Y', strtotime($goal['end_date'])) ?></strong></div>
-                                    <?php if (!empty($progress['projection_percentage'])): ?>
-                                        <div class="mb-2">Projeção: <strong><?= number_format($progress['projection_percentage'], 0) ?>%</strong></div>
-                                    <?php endif; ?>
-                                    <div class="progress h-6px mt-3">
-                                        <div class="progress-bar bg-<?= $progressColor ?>" style="width: <?= min($percentage, 100) ?>%"></div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-4">
-                                <div class="border rounded p-4 h-100">
-                                    <h6 class="fw-bold mb-3">Regras & Flags</h6>
-                                    <div class="mb-2">Flag Crítica: <strong><?= number_format($goal['flag_critical_threshold'], 1) ?>%</strong></div>
-                                    <div class="mb-2">Flag Atenção: <strong><?= number_format($goal['flag_warning_threshold'], 1) ?>%</strong></div>
-                                    <div class="mb-2">Flag Boa: <strong><?= number_format($goal['flag_good_threshold'], 1) ?>%</strong></div>
-                                    <div class="mb-2">Notificar em: <strong><?= intval($goal['notify_at_percentage']) ?>%</strong></div>
-                                    <div class="mb-2">Prioridade: <strong><?= ucfirst($goal['priority']) ?></strong></div>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-4">
-                                <div class="border rounded p-4 h-100">
-                                    <h6 class="fw-bold mb-3">Bônus / OTE</h6>
-                                    <div class="mb-2">Bônus ativo: <strong><?= ($goal['enable_bonus'] ?? 0) ? 'Sim' : 'Não' ?></strong></div>
-                                    <div class="mb-2">Condições bônus: <strong><?= ($goal['enable_bonus_conditions'] ?? 0) ? 'Sim' : 'Não' ?></strong></div>
-                                    <div class="mb-2">Cálculo: <strong><?= ucfirst($goal['bonus_calculation_type'] ?? 'tiered') ?></strong></div>
-                                    <?php if (!empty($goal['ote_base_salary']) || !empty($goal['ote_target_commission'])): ?>
-                                        <div class="mb-2">OTE Base: <strong>R$ <?= number_format((float)($goal['ote_base_salary'] ?? 0), 2, ',', '.') ?></strong></div>
-                                        <div class="mb-2">OTE Comissão: <strong>R$ <?= number_format((float)($goal['ote_target_commission'] ?? 0), 2, ',', '.') ?></strong></div>
-                                        <div class="mb-2">OTE Total: <strong>R$ <?= number_format((float)($goal['ote_total'] ?? 0), 2, ',', '.') ?></strong></div>
-                                    <?php endif; ?>
-                                    <?php if ($bonusPreview): ?>
-                                        <div class="mt-3 p-2 bg-light-info rounded">
-                                            <div class="fs-8 text-muted">Bônus estimado</div>
-                                            <div class="fw-bold">R$ <?= number_format((float)($bonusPreview['total_bonus'] ?? 0), 2, ',', '.') ?></div>
-                                            <?php if (!empty($bonusPreview['last_tier'])): ?>
-                                                <div class="fs-8 text-muted">Último tier: <?= htmlspecialchars($bonusPreview['last_tier']['tier_name'] ?? 'N/A') ?></div>
-                                            <?php endif; ?>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="separator my-5"></div>
-                        
-                        <div class="row g-4">
-                            <div class="col-md-6">
-                                <h6 class="fw-bold mb-3">Tiers de Bônus</h6>
-                                <?php if (!empty($tiers)): ?>
-                                    <div class="table-responsive">
-                                        <table class="table table-sm table-row-dashed">
-                                            <thead>
-                                                <tr class="text-muted fs-8">
-                                                    <th>Tier</th>
-                                                    <th>%</th>
-                                                    <th>Bônus</th>
-                                                    <th>Acumula</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <?php foreach ($tiers as $tier): ?>
-                                                    <tr>
-                                                        <td><?= htmlspecialchars($tier['tier_name'] ?? 'Tier') ?></td>
-                                                        <td><?= number_format((float)$tier['threshold_percentage'], 1) ?>%</td>
-                                                        <td>R$ <?= number_format((float)($tier['bonus_amount'] ?? 0), 2, ',', '.') ?></td>
-                                                        <td><?= !empty($tier['is_cumulative']) ? 'Sim' : 'Não' ?></td>
-                                                    </tr>
-                                                <?php endforeach; ?>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                <?php else: ?>
-                                    <span class="text-muted fs-8">Sem tiers configurados.</span>
-                                <?php endif; ?>
-                            </div>
-                            
-                            <div class="col-md-6">
-                                <h6 class="fw-bold mb-3">Condições de Ativação</h6>
-                                <?php if (!empty($conditions)): ?>
-                                    <div class="table-responsive">
-                                        <table class="table table-sm table-row-dashed">
-                                            <thead>
-                                                <tr class="text-muted fs-8">
-                                                    <th>Métrica</th>
-                                                    <th>Regra</th>
-                                                    <th>Obrigatória</th>
-                                                    <th>Modificador</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <?php foreach ($conditions as $cond): ?>
-                                                    <tr>
-                                                        <td><?= $conditionLabels[$cond['condition_type']] ?? $cond['condition_type'] ?></td>
-                                                        <td><?= $operatorLabels[$cond['operator']] ?? $cond['operator'] ?> <?= number_format((float)$cond['min_value'], 2, ',', '.') ?></td>
-                                                        <td><?= !empty($cond['is_required']) ? 'Sim' : 'Não' ?></td>
-                                                        <td><?= number_format((float)($cond['bonus_modifier'] ?? 1), 2, ',', '.') ?></td>
-                                                    </tr>
-                                                <?php endforeach; ?>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                <?php else: ?>
-                                    <span class="text-muted fs-8">Sem condições configuradas.</span>
-                                <?php endif; ?>
-                            </div>
-                        </div>
+        <!-- Barra de Progresso Principal -->
+        <div class="mb-6">
+            <div class="d-flex justify-content-between mb-2">
+                <span class="text-gray-800 fw-bold"><?= \App\Models\Goal::formatValue($goal['type'], $currentValue) ?></span>
+                <span class="text-gray-500"><?= \App\Models\Goal::formatValue($goal['type'], $targetValue) ?></span>
+            </div>
+            <div class="progress h-15px mb-2">
+                <div class="progress-bar bg-<?= $progressColor ?>" style="width: <?= min($percentage, 100) ?>%"></div>
+            </div>
+            <div class="d-flex justify-content-between text-muted fs-8">
+                <span>Falta: <strong class="text-gray-800"><?= \App\Models\Goal::formatValue($goal['type'], $remainingValue) ?></strong></span>
+                <span>Restam <strong class="text-gray-800"><?= number_format($remainingDays, 0) ?></strong> dias</span>
+            </div>
+        </div>
+        
+        <!-- KPIs Principais -->
+        <div class="row g-4 mb-6">
+            <div class="col-md-3">
+                <div class="bg-light-primary rounded p-4 text-center h-100">
+                    <i class="bi bi-graph-up-arrow fs-2x text-primary mb-2"></i>
+                    <div class="fs-2 fw-bold text-primary"><?= number_format($projectedPercentage, 0) ?>%</div>
+                    <div class="text-muted fs-8">Projeção Final</div>
+                    <div class="badge badge-light-<?= $isOnTrack ? 'success' : 'danger' ?> mt-2">
+                        <?= $isOnTrack ? '✓ No ritmo' : '⚠ Abaixo' ?>
                     </div>
                 </div>
             </div>
-            <?php endforeach; ?>
+            <div class="col-md-3">
+                <div class="bg-light-info rounded p-4 text-center h-100">
+                    <i class="bi bi-calendar-check fs-2x text-info mb-2"></i>
+                    <div class="fs-2 fw-bold text-info"><?= \App\Models\Goal::formatValue($goal['type'], $dailyAverage) ?></div>
+                    <div class="text-muted fs-8">Média Diária</div>
+                    <div class="text-muted fs-9 mt-2">
+                        Necessário: <?= \App\Models\Goal::formatValue($goal['type'], $remainingDays > 0 ? $remainingValue / $remainingDays : 0) ?>/dia
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="bg-light-warning rounded p-4 text-center h-100">
+                    <i class="bi bi-speedometer2 fs-2x text-warning mb-2"></i>
+                    <div class="fs-2 fw-bold text-warning"><?= number_format($expectedPercentage, 0) ?>%</div>
+                    <div class="text-muted fs-8">% Esperado Hoje</div>
+                    <div class="text-muted fs-9 mt-2">
+                        Diferença: <span class="text-<?= $percentage >= $expectedPercentage ? 'success' : 'danger' ?>">
+                            <?= ($percentage >= $expectedPercentage ? '+' : '') . number_format($percentage - $expectedPercentage, 1) ?>%
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <?php if ($nextTier): ?>
+                <div class="bg-light-success rounded p-4 text-center h-100">
+                    <i class="bi bi-trophy fs-2x text-success mb-2"></i>
+                    <div class="fs-4 fw-bold text-success"><?= htmlspecialchars($nextTier['tier_name']) ?></div>
+                    <div class="text-muted fs-8">Próximo Bônus</div>
+                    <div class="fs-7 mt-2">
+                        Faltam <strong class="text-success"><?= number_format($nextTierGap, 1) ?>%</strong><br>
+                        <span class="text-muted">(<?= \App\Models\Goal::formatValue($goal['type'], $nextTierValueGap) ?>)</span>
+                    </div>
+                    <div class="badge badge-success mt-2">
+                        R$ <?= number_format((float)($nextTier['bonus_amount'] ?? 0), 2, ',', '.') ?>
+                    </div>
+                </div>
+                <?php else: ?>
+                <div class="bg-light-dark rounded p-4 text-center h-100">
+                    <i class="bi bi-check-circle fs-2x text-gray-500 mb-2"></i>
+                    <div class="fs-5 fw-bold text-gray-600">
+                        <?= !empty($tiers) ? 'Todos Conquistados!' : 'Sem Tiers' ?>
+                    </div>
+                    <div class="text-muted fs-8">Bônus</div>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <!-- Alerta de Condições Bloqueadoras -->
+        <?php if (!empty($blockedConditions)): ?>
+        <div class="alert alert-danger d-flex align-items-center mb-6">
+            <i class="bi bi-exclamation-triangle-fill fs-2x me-3"></i>
+            <div>
+                <h5 class="mb-1">⚠️ Condições Bloqueando Bônus</h5>
+                <ul class="mb-0 ps-3">
+                    <?php foreach ($blockedConditions as $bc): ?>
+                    <li><?= $conditionLabels[$bc['condition_type']] ?? $bc['condition_type'] ?>: 
+                        precisa ser <?= $operatorLabels[$bc['operator']] ?? $bc['operator'] ?> 
+                        <?= number_format((float)$bc['min_value'], 2, ',', '.') ?>
+                    </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        </div>
+        <?php endif; ?>
+        
+        <!-- Detalhes de Bônus e Tiers -->
+        <div class="row g-4">
+            <!-- Tiers de Bônus -->
+            <div class="col-md-6">
+                <div class="border rounded p-4 h-100">
+                    <h6 class="fw-bold mb-3">
+                        <i class="bi bi-bar-chart-steps text-primary me-2"></i>
+                        Tiers de Bônus
+                    </h6>
+                    <?php if (!empty($tiers)): ?>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-row-dashed mb-0">
+                            <thead>
+                                <tr class="text-muted fs-8">
+                                    <th>Tier</th>
+                                    <th class="text-center">Meta</th>
+                                    <th class="text-center">Bônus</th>
+                                    <th class="text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($tiers as $tier): 
+                                    $tierReached = $percentage >= (float)$tier['threshold_percentage'];
+                                    $tierTarget = $targetValue * (float)$tier['threshold_percentage'] / 100;
+                                ?>
+                                <tr class="<?= $tierReached ? 'bg-light-success' : '' ?>">
+                                    <td class="fw-bold"><?= htmlspecialchars($tier['tier_name'] ?? 'Tier') ?></td>
+                                    <td class="text-center">
+                                        <?= number_format((float)$tier['threshold_percentage'], 0) ?>%
+                                        <div class="text-muted fs-9">(<?= \App\Models\Goal::formatValue($goal['type'], $tierTarget) ?>)</div>
+                                    </td>
+                                    <td class="text-center fw-bold text-success">
+                                        R$ <?= number_format((float)($tier['bonus_amount'] ?? 0), 2, ',', '.') ?>
+                                    </td>
+                                    <td class="text-center">
+                                        <?php if ($tierReached): ?>
+                                            <span class="badge badge-success">✓ Alcançado</span>
+                                        <?php else: ?>
+                                            <span class="badge badge-light-warning">
+                                                Falta <?= number_format((float)$tier['threshold_percentage'] - $percentage, 1) ?>%
+                                            </span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php else: ?>
+                        <div class="text-muted text-center py-4">
+                            <i class="bi bi-info-circle fs-3 d-block mb-2"></i>
+                            Sem tiers de bônus configurados.
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            
+            <!-- Condições e Resumo OTE -->
+            <div class="col-md-6">
+                <div class="border rounded p-4 h-100">
+                    <h6 class="fw-bold mb-3">
+                        <i class="bi bi-cash-coin text-success me-2"></i>
+                        Bônus Estimado
+                    </h6>
+                    
+                    <!-- Resumo do Bônus -->
+                    <div class="bg-light-success rounded p-4 mb-4 text-center">
+                        <div class="fs-6 text-muted mb-1">Bônus Atual Estimado</div>
+                        <div class="fs-1 fw-bolder text-success">
+                            R$ <?= number_format((float)($bonusPreview['total_bonus'] ?? 0), 2, ',', '.') ?>
+                        </div>
+                        <?php if (!empty($bonusPreview['last_tier'])): ?>
+                        <div class="text-muted fs-8">
+                            Tier atual: <?= htmlspecialchars($bonusPreview['last_tier']['tier_name'] ?? 'N/A') ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <!-- Condições -->
+                    <?php if (!empty($conditions)): ?>
+                    <h6 class="fw-bold mb-2 fs-7">Condições de Ativação:</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-row-dashed mb-0">
+                            <tbody>
+                                <?php foreach ($conditions as $cond): 
+                                    $condMet = !empty($cond['is_met']);
+                                ?>
+                                <tr>
+                                    <td class="<?= $condMet ? 'text-success' : 'text-danger' ?>">
+                                        <?= $condMet ? '✓' : '✗' ?>
+                                        <?= $conditionLabels[$cond['condition_type']] ?? $cond['condition_type'] ?>
+                                    </td>
+                                    <td class="text-end text-muted fs-8">
+                                        <?= $operatorLabels[$cond['operator']] ?? $cond['operator'] ?> 
+                                        <?= number_format((float)$cond['min_value'], 2, ',', '.') ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <!-- OTE Info -->
+                    <?php if (!empty($goal['ote_total']) && $goal['ote_total'] > 0): ?>
+                    <div class="separator my-3"></div>
+                    <div class="d-flex justify-content-between fs-7">
+                        <span class="text-muted">OTE Total:</span>
+                        <span class="fw-bold">R$ <?= number_format((float)$goal['ote_total'], 2, ',', '.') ?></span>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+<?php endforeach; ?>
 <?php endif; ?>
 
 <!-- Conversas Analisadas com Métricas de Coaching -->

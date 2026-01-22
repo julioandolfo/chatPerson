@@ -199,6 +199,9 @@ class Response
      */
     public static function redirect(string $url): void
     {
+        // Log para debug
+        self::logRedirect("redirect chamado para: {$url}");
+        
         // Se URL não começar com /, assumir que é relativa
         if (strpos($url, '/') !== 0 && strpos($url, 'http') !== 0) {
             $url = '/' . $url;
@@ -210,8 +213,27 @@ class Response
             $url = $basePath . $url;
         }
         
+        self::logRedirect("redirect final URL: {$url}");
+        
         header("Location: {$url}");
         exit;
+    }
+    
+    /**
+     * Log para arquivo logs/auth.log (compartilhado com AuthController)
+     */
+    private static function logRedirect(string $message): void
+    {
+        $logDir = __DIR__ . '/../../logs';
+        if (!is_dir($logDir)) {
+            @mkdir($logDir, 0777, true);
+        }
+        
+        $logFile = $logDir . '/auth.log';
+        $timestamp = date('Y-m-d H:i:s');
+        $logMessage = "[{$timestamp}] [Response] {$message}\n";
+        
+        @file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
     }
 
     /**

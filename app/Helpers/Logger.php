@@ -77,6 +77,14 @@ class Logger
     }
 
     /**
+     * Log específico para SLA
+     */
+    public static function sla(string $message): void
+    {
+        self::log($message, 'sla.log');
+    }
+
+    /**
      * Log específico para Meta (Instagram + WhatsApp)
      */
     public static function meta(string $level, string $message, array $context = []): void

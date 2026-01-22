@@ -17,11 +17,15 @@ class DashboardController
      */
     public function index(): void
     {
+        self::logDash("===== DASHBOARD INDEX INICIADO =====");
+        
         // Dashboard é acessível a todos os usuários autenticados
         // Mas podemos verificar permissão específica se necessário
         // Permission::abortIfCannot('dashboard.view');
         
         $userId = \App\Helpers\Auth::id();
+        self::logDash("userId={$userId}");
+        
         $dateFrom = \App\Helpers\Request::get('date_from', date('Y-m-01'));
         $dateTo = \App\Helpers\Request::get('date_to', date('Y-m-d'));
         
@@ -29,6 +33,8 @@ class DashboardController
         if (!str_contains($dateTo, ':')) {
             $dateTo = $dateTo . ' 23:59:59';
         }
+        
+        self::logDash("Período: dateFrom={$dateFrom}, dateTo={$dateTo}");
         
         try {
             // Estatísticas gerais

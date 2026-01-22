@@ -3278,13 +3278,16 @@ class ConversationController
      */
     public function getConversationSLA(): void
     {
+        $t0 = microtime(true);
         $config = $this->prepareJsonResponse();
         
         try {
             $conversationId = (int)($_GET['id'] ?? 0);
+            \App\Helpers\Logger::sla("getConversationSLA:start conversation_id={$conversationId}");
             
             if (!$conversationId) {
                 $this->restoreAfterJsonResponse($config);
+                \App\Helpers\Logger::sla("getConversationSLA:error conversation_id_missing");
                 Response::json(['success' => false, 'message' => 'ID da conversa não fornecido'], 400);
                 return;
             }
@@ -3292,12 +3295,14 @@ class ConversationController
             $conversation = \App\Models\Conversation::find($conversationId);
             if (!$conversation) {
                 $this->restoreAfterJsonResponse($config);
+                \App\Helpers\Logger::sla("getConversationSLA:error conversation_not_found id={$conversationId}");
                 Response::json(['success' => false, 'message' => 'Conversa não encontrada'], 404);
                 return;
             }
             
             // Obter SLA aplicável para esta conversa
             $slaConfig = \App\Models\SLARule::getSLAForConversation($conversation);
+            $settings = \App\Services\ConversationSettingsService::getSettings();
             
             // Verificar se já houve primeira resposta do agente
             $agentId = $conversation['agent_id'] ?? null;
@@ -3401,7 +3406,6 @@ class ConversationController
             // Calcular timeline do SLA
             $timeline = [];
             $lastAgentMessage = null;
-            $settings = \App\Services\ConversationSettingsService::getSettings();
             $delayEnabled = $settings['sla']['message_delay_enabled'] ?? true;
             $delayMinutes = $settings['sla']['message_delay_minutes'] ?? 1;
             if (!$delayEnabled) {
@@ -3454,6 +3458,8 @@ class ConversationController
             }
             
             $this->restoreAfterJsonResponse($config);
+            $ms = round((microtime(true) - $t0) * 1000, 1);
+            \App\Helpers\Logger::sla("getConversationSLA:done id={$conversationId} type={$slaType} should_start=" . ($shouldStart ? '1' : '0') . " elapsed={$elapsedMinutes} duration_ms={$ms}");
             
             Response::json([
                 'success' => true,
@@ -3483,6 +3489,7 @@ class ConversationController
                 ]
             ]);
         } catch (\Exception $e) {
+            \App\Helpers\Logger::sla("getConversationSLA:exception id={$conversationId} msg=" . $e->getMessage());
             $this->restoreAfterJsonResponse($config);
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
         }

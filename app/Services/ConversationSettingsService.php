@@ -866,14 +866,17 @@ class ConversationSettingsService
      */
     public static function checkFirstResponseSLA(int $conversationId, bool $humanOnly = false): bool
     {
+        \App\Helpers\Logger::sla("checkFirstResponseSLA:start conversation_id={$conversationId} human_only=" . ($humanOnly ? '1' : '0'));
         $settings = self::getSettings();
         
         if (!$settings['sla']['enable_sla_monitoring']) {
+            \App\Helpers\Logger::sla("checkFirstResponseSLA:disabled conversation_id={$conversationId}");
             return true;
         }
         
         $conversation = \App\Models\Conversation::find($conversationId);
         if (!$conversation) {
+            \App\Helpers\Logger::sla("checkFirstResponseSLA:not_found conversation_id={$conversationId}");
             return false;
         }
         $agentId = $conversation['agent_id'] ?? null;
@@ -916,11 +919,13 @@ class ConversationSettingsService
         }
         
         if ($firstAgentMessage && $firstAgentMessage['first_response']) {
+            \App\Helpers\Logger::sla("checkFirstResponseSLA:already_responded conversation_id={$conversationId}");
             return true; // Já respondeu
         }
         
         // ✅ NOVO: Verificar se mensagem do cliente precisa esperar delay mínimo
         if (!self::shouldStartSLACount($conversationId)) {
+            \App\Helpers\Logger::sla("checkFirstResponseSLA:delay_not_started conversation_id={$conversationId}");
             return true; // SLA ainda não deve começar a contar
         }
         
@@ -939,7 +944,9 @@ class ConversationSettingsService
         $elapsedMinutes = WorkingHoursCalculator::calculateMinutes($startTime, $now);
         $elapsedMinutes -= $pausedDuration;
         
-        return $elapsedMinutes < $slaMinutes;
+        $within = $elapsedMinutes < $slaMinutes;
+        \App\Helpers\Logger::sla("checkFirstResponseSLA:done conversation_id={$conversationId} elapsed={$elapsedMinutes} sla={$slaMinutes} within=" . ($within ? '1' : '0'));
+        return $within;
     }
 
     /**
@@ -948,17 +955,20 @@ class ConversationSettingsService
      */
     public static function shouldStartSLACount(int $conversationId): bool
     {
+        \App\Helpers\Logger::sla("shouldStartSLACount:start conversation_id={$conversationId}");
         $settings = self::getSettings();
         $delayEnabled = $settings['sla']['message_delay_enabled'] ?? true;
         $delayMinutes = $settings['sla']['message_delay_minutes'] ?? 1;
         
         // Se delay desabilitado, sempre começar a contar
         if (!$delayEnabled) {
+            \App\Helpers\Logger::sla("shouldStartSLACount:disabled conversation_id={$conversationId}");
             return true;
         }
         
         // Se delay for 0, sempre começar a contar
         if ($delayMinutes <= 0) {
+            \App\Helpers\Logger::sla("shouldStartSLACount:delay_zero conversation_id={$conversationId}");
             return true;
         }
         
@@ -994,11 +1004,13 @@ class ConversationSettingsService
         
         // Se não há mensagem do agente ainda, começar a contar desde a criação
         if (!$result || !$result['last_agent_message']) {
+            \App\Helpers\Logger::sla("shouldStartSLACount:no_agent conversation_id={$conversationId}");
             return true;
         }
         
         // Se não há mensagem do contato após agente, não há o que contar
         if (!$result['first_contact_after_agent']) {
+            \App\Helpers\Logger::sla("shouldStartSLACount:no_contact_after_agent conversation_id={$conversationId}");
             return false;
         }
         
@@ -1010,7 +1022,9 @@ class ConversationSettingsService
         $diffMinutes = $diffSeconds / 60;
         
         // SLA só começa a contar se passou mais de X minutos
-        return $diffMinutes >= $delayMinutes;
+        $start = $diffMinutes >= $delayMinutes;
+        \App\Helpers\Logger::sla("shouldStartSLACount:done conversation_id={$conversationId} diff_minutes={$diffMinutes} delay={$delayMinutes} start=" . ($start ? '1' : '0'));
+        return $start;
     }
     
     /**
@@ -1019,18 +1033,21 @@ class ConversationSettingsService
      */
     public static function getSLAStartTime(int $conversationId): \DateTime
     {
+        \App\Helpers\Logger::sla("getSLAStartTime:start conversation_id={$conversationId}");
         $settings = self::getSettings();
         $delayEnabled = $settings['sla']['message_delay_enabled'] ?? true;
         $delayMinutes = $settings['sla']['message_delay_minutes'] ?? 1;
         
         $conversation = \App\Models\Conversation::find($conversationId);
         if (!$conversation) {
+            \App\Helpers\Logger::sla("getSLAStartTime:not_found conversation_id={$conversationId}");
             return new \DateTime();
         }
         $agentId = $conversation['agent_id'] ?? null;
         
         // Se delay desabilitado, usar created_at
         if (!$delayEnabled || $delayMinutes <= 0) {
+            \App\Helpers\Logger::sla("getSLAStartTime:delay_disabled conversation_id={$conversationId} start={$conversation['created_at']}");
             return new \DateTime($conversation['created_at']);
         }
         
@@ -1063,6 +1080,7 @@ class ConversationSettingsService
         
         // Se não há mensagem do agente, usar created_at
         if (!$result || !$result['last_agent_message']) {
+            \App\Helpers\Logger::sla("getSLAStartTime:no_agent conversation_id={$conversationId} start={$conversation['created_at']}");
             return new \DateTime($conversation['created_at']);
         }
         
@@ -1073,6 +1091,7 @@ class ConversationSettingsService
             if ($delayMinutes > 0) {
                 $startTime->modify("+{$delayMinutes} minutes");
             }
+            \App\Helpers\Logger::sla("getSLAStartTime:no_contact_after_agent conversation_id={$conversationId} start=" . $startTime->format('Y-m-d H:i:s'));
             return $startTime;
         }
         
@@ -1087,6 +1106,7 @@ class ConversationSettingsService
         if ($diffMinutes >= $delayMinutes) {
             $startTime = clone $lastAgent;
             $startTime->modify("+{$delayMinutes} minutes");
+            \App\Helpers\Logger::sla("getSLAStartTime:delay_passed conversation_id={$conversationId} start=" . $startTime->format('Y-m-d H:i:s'));
             return $startTime;
         }
         
@@ -1095,6 +1115,7 @@ class ConversationSettingsService
         if ($delayMinutes > 0) {
             $startTime->modify("+{$delayMinutes} minutes");
         }
+        \App\Helpers\Logger::sla("getSLAStartTime:delay_pending conversation_id={$conversationId} start=" . $startTime->format('Y-m-d H:i:s'));
         return $startTime;
     }
     
@@ -1193,13 +1214,16 @@ class ConversationSettingsService
      */
     public static function getElapsedSLAMinutes(int $conversationId): int
     {
+        \App\Helpers\Logger::sla("getElapsedSLAMinutes:start conversation_id={$conversationId}");
         $conversation = \App\Models\Conversation::find($conversationId);
         if (!$conversation) {
+            \App\Helpers\Logger::sla("getElapsedSLAMinutes:not_found conversation_id={$conversationId}");
             return 0;
         }
         
         // ✅ Verificar se SLA deve começar a contar
         if (!self::shouldStartSLACount($conversationId)) {
+            \App\Helpers\Logger::sla("getElapsedSLAMinutes:not_started conversation_id={$conversationId}");
             return 0; // SLA ainda não começou
         }
         
@@ -1215,7 +1239,9 @@ class ConversationSettingsService
         $elapsed = WorkingHoursCalculator::calculateMinutes($startTime, $now);
         $paused = (int)($conversation['sla_paused_duration'] ?? 0);
         
-        return max(0, $elapsed - $paused);
+        $total = max(0, $elapsed - $paused);
+        \App\Helpers\Logger::sla("getElapsedSLAMinutes:done conversation_id={$conversationId} elapsed={$elapsed} paused={$paused} total={$total}");
+        return $total;
     }
     
     /**

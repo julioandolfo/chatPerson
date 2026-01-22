@@ -97,6 +97,7 @@ class SLAMonitoringService
      */
     public static function processConversationSLA(int $conversationId): array
     {
+        \App\Helpers\Logger::sla("processConversationSLA:start conversation_id={$conversationId}");
         $result = [
             'reassigned' => false,
             'alerted' => false,
@@ -105,11 +106,13 @@ class SLAMonitoringService
 
         $conversation = Conversation::find($conversationId);
         if (!$conversation || $conversation['status'] === 'closed') {
+            \App\Helpers\Logger::sla("processConversationSLA:skip_closed conversation_id={$conversationId}");
             return $result;
         }
         
         // Ignorar conversas com SLA pausado
         if ($conversation['sla_paused_at']) {
+            \App\Helpers\Logger::sla("processConversationSLA:skip_paused conversation_id={$conversationId}");
             return $result;
         }
 
@@ -118,6 +121,7 @@ class SLAMonitoringService
         
         // ========== VERIFICAR SLA DE PRIMEIRA RESPOSTA ==========
         $firstResponseOK = ConversationSettingsService::checkFirstResponseSLA($conversationId);
+        \App\Helpers\Logger::sla("processConversationSLA:first_response conversation_id={$conversationId} ok=" . ($firstResponseOK ? '1' : '0'));
         
         if (!$firstResponseOK && $settings['sla']['auto_reassign_on_sla_breach']) {
             if (ConversationSettingsService::shouldReassign($conversationId)) {
@@ -161,7 +165,7 @@ class SLAMonitoringService
                             }
                         }
                     } catch (\Exception $e) {
-                        error_log("Erro ao reatribuir conversa {$conversationId}: " . $e->getMessage());
+                        \App\Helpers\Logger::sla("processConversationSLA:reassign_error conversation_id={$conversationId} msg=" . $e->getMessage());
                     }
                 }
             }
@@ -218,6 +222,7 @@ class SLAMonitoringService
                         $ongoingSLA = $slaConfig['ongoing_response_time'];
                         
                         if ($elapsedMinutes > $ongoingSLA) {
+                            \App\Helpers\Logger::sla("processConversationSLA:ongoing_breach conversation_id={$conversationId} elapsed={$elapsedMinutes} sla={$ongoingSLA}");
                             // SLA de resposta contínua excedido - pode reatribuir
                             if ($settings['sla']['auto_reassign_on_sla_breach']) {
                                 $currentAgentId = $conversation['agent_id'] ?? null;
@@ -276,12 +281,13 @@ class SLAMonitoringService
                         Conversation::update($conversationId, ['sla_warning_sent' => 1]);
                         $result['alerted'] = true;
                     } catch (\Exception $e) {
-                        error_log("Erro ao criar alerta de SLA: " . $e->getMessage());
+                        \App\Helpers\Logger::sla("processConversationSLA:warning_error conversation_id={$conversationId} msg=" . $e->getMessage());
                     }
                 }
             }
         }
 
+        \App\Helpers\Logger::sla("processConversationSLA:done conversation_id={$conversationId} reassigned=" . ($result['reassigned'] ? '1' : '0') . " alerted=" . ($result['alerted'] ? '1' : '0') . " type=" . ($result['type'] ?? 'none'));
         return $result;
     }
 

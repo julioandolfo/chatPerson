@@ -920,6 +920,7 @@ class DashboardService
             $dateTo = $dateTo . ' 23:59:59';
         }
         
+        \App\Helpers\Logger::sla("getAgentMetrics:start agent_id={$agentId} date_from={$dateFrom} date_to={$dateTo}");
         // ✅ Cache de 3 minutos por agente
         $cacheKey = "dashboard_agent_metrics_{$agentId}_" . md5($dateFrom . $dateTo);
         return \App\Helpers\Cache::remember($cacheKey, 180, function() use ($agentId, $dateFrom, $dateTo) {

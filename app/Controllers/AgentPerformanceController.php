@@ -759,6 +759,8 @@ class AgentPerformanceController
             $type = Request::get('type', 'first'); // first | ongoing
             $agentId = (int)(Request::get('agent_id') ?? 0);
             
+            \App\Helpers\Logger::sla("getSLABreachedDetails:start conversation_id={$conversationId} type={$type} agent_id={$agentId}");
+            
             if (!$conversationId) {
                 Response::json(['success' => false, 'message' => 'ID da conversa não fornecido'], 400);
                 return;
@@ -791,6 +793,7 @@ class AgentPerformanceController
                     'delay_minutes' => $settings['sla']['message_delay_minutes'] ?? 1,
                     'working_hours_enabled' => $settings['sla']['working_hours_enabled'] ?? false
                 ]);
+                \App\Helpers\Logger::sla("getSLABreachedDetails:done conversation_id={$conversationId} type=ongoing total=" . count($exceeded));
                 return;
             }
             
@@ -850,8 +853,10 @@ class AgentPerformanceController
                 'total' => count($intervals),
                 'working_hours_enabled' => $settings['sla']['working_hours_enabled'] ?? false
             ]);
+            \App\Helpers\Logger::sla("getSLABreachedDetails:done conversation_id={$conversationId} type=first total=" . count($intervals));
             
         } catch (\Exception $e) {
+            \App\Helpers\Logger::sla("getSLABreachedDetails:error msg=" . $e->getMessage());
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }

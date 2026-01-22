@@ -140,7 +140,7 @@ class AgentPerformanceController
         $goalsSummary = [];
         $goalAlerts = [];
         try {
-            $goalsSummary = GoalService::getBonusSummary($agentId);
+            $goalsSummary = GoalService::getAgentGoalsDetailed($agentId);
             $goalAlerts = GoalService::getGoalAlerts($agentId);
         } catch (\Exception $e) {
             // Sistema de metas pode não estar configurado
@@ -733,10 +733,125 @@ class AgentPerformanceController
     }
 
     /**
+     * Detalhes do SLA excedido (intervalos e mensagens)
+     */
+    public function getSLABreachedDetails(): void
+    {
+        try {
+            $conversationId = (int)(Request::get('conversation_id') ?? 0);
+            $type = Request::get('type', 'first'); // first | ongoing
+            
+            if (!$conversationId) {
+                Response::json(['success' => false, 'message' => 'ID da conversa não fornecido'], 400);
+                return;
+            }
+            
+            $conversation = \App\Models\Conversation::find($conversationId);
+            if (!$conversation) {
+                Response::json(['success' => false, 'message' => 'Conversa não encontrada'], 404);
+                return;
+            }
+            
+            $settings = \App\Services\ConversationSettingsService::getSettings();
+            $slaMinutes = $settings['sla']['first_response_time'] ?? 15;
+            $slaOngoingMinutes = $settings['sla']['ongoing_response_time'] ?? $slaMinutes;
+            
+            if ($type === 'ongoing') {
+                $intervals = $this->buildOngoingIntervals($conversationId, $settings, $conversation['status'] ?? null);
+                $exceeded = array_values(array_filter($intervals, function ($item) use ($slaOngoingMinutes) {
+                    return ($item['minutes'] ?? 0) > $slaOngoingMinutes;
+                }));
+                
+                Response::json([
+                    'success' => true,
+                    'conversation_id' => $conversationId,
+                    'type' => 'ongoing',
+                    'sla_minutes' => $slaOngoingMinutes,
+                    'intervals' => $exceeded,
+                    'total' => count($exceeded),
+                    'delay_enabled' => $settings['sla']['message_delay_enabled'] ?? true,
+                    'delay_minutes' => $settings['sla']['message_delay_minutes'] ?? 1,
+                    'working_hours_enabled' => $settings['sla']['working_hours_enabled'] ?? false
+                ]);
+                return;
+            }
+            
+            // SLA de 1ª resposta
+            $firstContact = \App\Helpers\Database::fetch(
+                "SELECT id, created_at, content FROM messages
+                 WHERE conversation_id = ? AND sender_type = 'contact'
+                 ORDER BY created_at ASC LIMIT 1",
+                [$conversationId]
+            );
+            
+            $firstAgent = \App\Helpers\Database::fetch(
+                "SELECT id, created_at, content, sender_id FROM messages
+                 WHERE conversation_id = ? AND sender_type = 'agent'
+                 ORDER BY created_at ASC LIMIT 1",
+                [$conversationId]
+            );
+            
+            $intervals = [];
+            if ($firstContact && $firstAgent) {
+                $start = new \DateTime($firstContact['created_at']);
+                $end = new \DateTime($firstAgent['created_at']);
+                $minutes = $this->calculateMinutesDiff(
+                    $start,
+                    $end,
+                    $settings['sla']['working_hours_enabled'] ?? false
+                );
+                
+                $agentName = $this->getUserNameById((int)($firstAgent['sender_id'] ?? 0));
+                
+                $intervals[] = [
+                    'contact_time' => $firstContact['created_at'],
+                    'contact_preview' => mb_substr($firstContact['content'] ?? '', 0, 120),
+                    'agent_time' => $firstAgent['created_at'],
+                    'agent_name' => $agentName,
+                    'agent_preview' => mb_substr($firstAgent['content'] ?? '', 0, 120),
+                    'minutes' => round($minutes, 1),
+                    'exceeded_by' => max(0, round($minutes - $slaMinutes, 1))
+                ];
+            }
+            
+            Response::json([
+                'success' => true,
+                'conversation_id' => $conversationId,
+                'type' => 'first',
+                'sla_minutes' => $slaMinutes,
+                'intervals' => $intervals,
+                'total' => count($intervals),
+                'working_hours_enabled' => $settings['sla']['working_hours_enabled'] ?? false
+            ]);
+            
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Calcular o maior tempo de resposta (SLA de respostas) por conversa.
      * Considera delay configurado e horário de atendimento quando habilitado.
      */
     private function calculateOngoingMaxResponseMinutes(int $conversationId, array $settings, ?string $status = null): float
+    {
+        $intervals = $this->buildOngoingIntervals($conversationId, $settings, $status);
+        if (!$intervals) {
+            return 0;
+        }
+        
+        $max = 0.0;
+        foreach ($intervals as $item) {
+            $max = max($max, (float)($item['minutes'] ?? 0));
+        }
+        
+        return round($max, 1);
+    }
+
+    /**
+     * Construir intervalos de resposta (cliente -> agente) para SLA contínuo.
+     */
+    private function buildOngoingIntervals(int $conversationId, array $settings, ?string $status = null): array
     {
         $delayEnabled = $settings['sla']['message_delay_enabled'] ?? true;
         $delayMinutes = $settings['sla']['message_delay_minutes'] ?? 1;
@@ -747,7 +862,7 @@ class AgentPerformanceController
         }
         
         $messages = \App\Helpers\Database::fetchAll(
-            "SELECT sender_type, created_at
+            "SELECT sender_type, sender_id, created_at, content
              FROM messages
              WHERE conversation_id = ?
              AND sender_type IN ('contact', 'agent')
@@ -756,22 +871,38 @@ class AgentPerformanceController
         );
         
         if (!$messages) {
-            return 0;
+            return [];
         }
         
+        $intervals = [];
         $lastAgentAt = null;
+        $lastAgentId = null;
         $pendingContactAt = null;
-        $maxMinutes = 0.0;
+        $pendingContactContent = null;
         
         foreach ($messages as $msg) {
             $currentAt = new \DateTime($msg['created_at']);
             
             if ($msg['sender_type'] === 'agent') {
                 if ($pendingContactAt) {
-                    $maxMinutes = max($maxMinutes, $this->calculateMinutesDiff($pendingContactAt, $currentAt, $useWorkingHours));
+                    $minutes = $this->calculateMinutesDiff($pendingContactAt, $currentAt, $useWorkingHours);
+                    $agentName = $this->getUserNameById((int)($msg['sender_id'] ?? 0));
+                    
+                    $intervals[] = [
+                        'contact_time' => $pendingContactAt->format('Y-m-d H:i:s'),
+                        'contact_preview' => mb_substr($pendingContactContent ?? '', 0, 120),
+                        'agent_time' => $msg['created_at'],
+                        'agent_name' => $agentName,
+                        'agent_preview' => mb_substr($msg['content'] ?? '', 0, 120),
+                        'minutes' => round($minutes, 1),
+                    ];
+                    
                     $pendingContactAt = null;
+                    $pendingContactContent = null;
                 }
+                
                 $lastAgentAt = $currentAt;
+                $lastAgentId = (int)($msg['sender_id'] ?? 0);
                 continue;
             }
             
@@ -787,6 +918,7 @@ class AgentPerformanceController
                 
                 if (!$pendingContactAt) {
                     $pendingContactAt = $currentAt;
+                    $pendingContactContent = $msg['content'] ?? '';
                 }
             }
         }
@@ -794,10 +926,39 @@ class AgentPerformanceController
         // Se ficou pendente e a conversa está aberta, calcular até agora
         if ($pendingContactAt && in_array($status, ['open', 'pending'], true)) {
             $now = new \DateTime();
-            $maxMinutes = max($maxMinutes, $this->calculateMinutesDiff($pendingContactAt, $now, $useWorkingHours));
+            $minutes = $this->calculateMinutesDiff($pendingContactAt, $now, $useWorkingHours);
+            $agentName = $this->getUserNameById($lastAgentId ?? 0);
+            
+            $intervals[] = [
+                'contact_time' => $pendingContactAt->format('Y-m-d H:i:s'),
+                'contact_preview' => mb_substr($pendingContactContent ?? '', 0, 120),
+                'agent_time' => null,
+                'agent_name' => $agentName,
+                'agent_preview' => null,
+                'minutes' => round($minutes, 1),
+                'pending' => true
+            ];
         }
         
-        return round($maxMinutes, 1);
+        return $intervals;
+    }
+
+    /**
+     * Obter nome do usuário por ID (cache simples em memória)
+     */
+    private function getUserNameById(int $userId): string
+    {
+        static $cache = [];
+        if ($userId <= 0) {
+            return 'Agente';
+        }
+        if (isset($cache[$userId])) {
+            return $cache[$userId];
+        }
+        
+        $row = \App\Helpers\Database::fetch("SELECT name FROM users WHERE id = ? LIMIT 1", [$userId]);
+        $cache[$userId] = $row['name'] ?? 'Agente';
+        return $cache[$userId];
     }
 
     /**

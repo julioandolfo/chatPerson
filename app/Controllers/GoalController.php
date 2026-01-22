@@ -70,6 +70,7 @@ class GoalController
             'agents' => User::getActiveAgents(),
             'teams' => Team::getActive(),
             'departments' => Department::getActive(),
+            'goalAgentIds' => [],
             'bonusConditions' => [], // Array vazio para nova meta
             'bonusTiers' => [] // Array vazio para nova meta
         ];
@@ -85,12 +86,19 @@ class GoalController
         Permission::abortIfCannot('goals.create');
         
         try {
+            $targetType = Request::post('target_type');
+            $targetAgents = Request::post('target_agents') ?? [];
+            
+            if ($targetType === 'multi_agent' && empty($targetAgents)) {
+                throw new \InvalidArgumentException('Selecione pelo menos um agente para a meta.');
+            }
+            
             $data = [
                 'name' => Request::post('name'),
                 'description' => Request::post('description'),
                 'type' => Request::post('type'),
-                'target_type' => Request::post('target_type'),
-                'target_id' => Request::post('target_id') ?: null,
+                'target_type' => $targetType,
+                'target_id' => $targetType === 'multi_agent' ? null : (Request::post('target_id') ?: null),
                 'target_value' => Request::post('target_value'),
                 'period_type' => Request::post('period_type'),
                 'start_date' => Request::post('start_date'),
@@ -119,6 +127,10 @@ class GoalController
             Logger::info('Store meta - payload: ' . json_encode($data), 'goals.log');
 
             $goalId = GoalService::create($data);
+
+            if ($targetType === 'multi_agent') {
+                $this->saveGoalAgents($goalId, $targetAgents);
+            }
             
             // Processar tiers de bônus (se bonificação habilitada)
             if ($data['enable_bonus']) {
@@ -200,6 +212,12 @@ class GoalController
             [$id]
         );
         
+        $goalAgentIds = Database::fetchAll(
+            "SELECT agent_id FROM goal_agent_targets WHERE goal_id = ?",
+            [$id]
+        );
+        $goalAgentIds = array_column($goalAgentIds, 'agent_id');
+
         $data = [
             'goal' => $goal,
             'bonusConditions' => $bonusConditions,
@@ -209,7 +227,8 @@ class GoalController
             'periods' => Goal::PERIODS,
             'agents' => User::getActiveAgents(),
             'teams' => Team::getActive(),
-            'departments' => Department::getActive()
+            'departments' => Department::getActive(),
+            'goalAgentIds' => $goalAgentIds
         ];
         
         Response::view('goals/form', $data);
@@ -224,12 +243,19 @@ class GoalController
         
         try {
             $id = Request::post('id');
+            $targetType = Request::post('target_type');
+            $targetAgents = Request::post('target_agents') ?? [];
+            
+            if ($targetType === 'multi_agent' && empty($targetAgents)) {
+                throw new \InvalidArgumentException('Selecione pelo menos um agente para a meta.');
+            }
+            
             $data = [
                 'name' => Request::post('name'),
                 'description' => Request::post('description'),
                 'type' => Request::post('type'),
-                'target_type' => Request::post('target_type'),
-                'target_id' => Request::post('target_id') ?: null,
+                'target_type' => $targetType,
+                'target_id' => $targetType === 'multi_agent' ? null : (Request::post('target_id') ?: null),
                 'target_value' => Request::post('target_value'),
                 'period_type' => Request::post('period_type'),
                 'start_date' => Request::post('start_date'),
@@ -261,6 +287,12 @@ class GoalController
             GoalService::update($id, $data);
 
             Logger::info('Update meta - GoalService::update concluído', 'goals.log');
+
+            if ($targetType === 'multi_agent') {
+                $this->saveGoalAgents((int)$id, $targetAgents);
+            } else {
+                $this->deleteGoalAgents((int)$id);
+            }
             
             // Processar tiers de bônus (sempre, pois pode estar editando)
             Logger::info('Update meta - chamando saveBonusTiers', 'goals.log');
@@ -629,5 +661,34 @@ class GoalController
         }
         
         Logger::info("saveGoalConditions - Total inseridas: {$inserted}", 'goals.log');
+    }
+
+    /**
+     * Salvar agentes vinculados a uma meta multi-agente
+     */
+    private function saveGoalAgents(int $goalId, array $agentIds): void
+    {
+        $agentIds = array_map('intval', $agentIds);
+        $agentIds = array_values(array_filter($agentIds));
+        
+        $this->deleteGoalAgents($goalId);
+        
+        foreach ($agentIds as $agentId) {
+            Database::execute(
+                "INSERT INTO goal_agent_targets (goal_id, agent_id) VALUES (?, ?)",
+                [$goalId, $agentId]
+            );
+        }
+    }
+
+    /**
+     * Remover todos os agentes vinculados a uma meta
+     */
+    private function deleteGoalAgents(int $goalId): void
+    {
+        Database::execute(
+            "DELETE FROM goal_agent_targets WHERE goal_id = ?",
+            [$goalId]
+        );
     }
 }

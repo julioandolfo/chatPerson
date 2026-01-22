@@ -69,7 +69,8 @@ class Goal extends Model
         'individual' => 'Agente Individual',
         'team' => 'Time/Equipe',
         'department' => 'Departamento',
-        'global' => 'Empresa (Global)'
+        'global' => 'Empresa (Global)',
+        'multi_agent' => 'Vários Agentes'
     ];
     
     /**
@@ -95,6 +96,9 @@ class Goal extends Model
                            WHEN g.target_type = 'individual' THEN (SELECT name FROM users WHERE id = g.target_id)
                            WHEN g.target_type = 'team' THEN (SELECT name FROM teams WHERE id = g.target_id)
                            WHEN g.target_type = 'department' THEN (SELECT name FROM departments WHERE id = g.target_id)
+                           WHEN g.target_type = 'multi_agent' THEN CONCAT('Múltiplos agentes (', 
+                                (SELECT COUNT(*) FROM goal_agent_targets gat WHERE gat.goal_id = g.id), 
+                           ')')
                            ELSE 'Empresa'
                        END as target_name
                 FROM goals g
@@ -145,6 +149,9 @@ class Goal extends Model
                            WHEN g.target_type = 'individual' THEN (SELECT name FROM users WHERE id = g.target_id)
                            WHEN g.target_type = 'team' THEN (SELECT name FROM teams WHERE id = g.target_id)
                            WHEN g.target_type = 'department' THEN (SELECT name FROM departments WHERE id = g.target_id)
+                           WHEN g.target_type = 'multi_agent' THEN CONCAT('Múltiplos agentes (', 
+                                (SELECT COUNT(*) FROM goal_agent_targets gat WHERE gat.goal_id = g.id), 
+                           ')')
                            ELSE 'Empresa'
                        END as target_name
                 FROM goals g
@@ -208,12 +215,23 @@ class Goal extends Model
              AND start_date <= CURDATE() AND end_date >= CURDATE()
              ORDER BY priority DESC"
         );
+
+        // Metas multi-agente
+        $multiGoals = Database::fetchAll(
+            "SELECT g.* FROM goals g
+             INNER JOIN goal_agent_targets gat ON g.id = gat.goal_id
+             WHERE g.target_type = 'multi_agent' AND gat.agent_id = ?
+             AND g.is_active = 1 AND g.start_date <= CURDATE() AND g.end_date >= CURDATE()
+             ORDER BY g.priority DESC",
+            [$agentId]
+        );
         
         return [
             'individual' => $individualGoals,
             'team' => $teamGoals,
             'department' => $departmentGoals,
-            'global' => $globalGoals
+            'global' => $globalGoals,
+            'multi_agent' => $multiGoals
         ];
     }
     

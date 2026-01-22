@@ -15379,6 +15379,13 @@ function assignConversation(conversationId) {
     
     // Resetar formulírio
     document.getElementById('assignForm').reset();
+
+    // Resetar estado do botão de submit
+    const submitBtn = document.querySelector('#assignForm button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Atribuir';
+    }
     
     // Salvar ID da conversa no formulírio
     document.getElementById('assignForm').dataset.conversationId = conversationId;

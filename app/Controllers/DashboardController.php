@@ -204,8 +204,10 @@ class DashboardController
             // Atividade recente
             $recentActivity = \App\Services\DashboardService::getRecentActivity(10);
             
-            // Metas do usuário
+            // Metas do usuário / visão geral
+            $canViewAllGoals = \App\Helpers\Permission::can('goals.view');
             $goalsSummary = GoalService::getDashboardSummary($userId);
+            $goalsOverview = GoalService::getDashboardGoalsOverview($userId, $canViewAllGoals);
             
             self::logDash("Passando dados para view");
             Response::view('dashboard/index', [
@@ -223,7 +225,8 @@ class DashboardController
                 'recentActivity' => $recentActivity,
                 'dateFrom' => $dateFrom,
                 'dateTo' => $dateTo,
-                'goalsSummary' => $goalsSummary
+                'goalsSummary' => $goalsSummary,
+                'goalsOverview' => $goalsOverview
             ]);
         } catch (\Exception $e) {
             self::logDash("ERRO CRÍTICO: " . $e->getMessage());

@@ -1554,6 +1554,226 @@ ob_start();
 <!--end::Row-->
 <?php endif; ?>
 
+<?php if (!empty($goalsOverview)): ?>
+<?php
+$uniqueTeams = [];
+foreach ($goalsOverview as $goalItem) {
+    foreach (($goalItem['teams'] ?? []) as $teamRow) {
+        $uniqueTeams[$teamRow['team_id']] = $teamRow['team_name'];
+    }
+}
+ksort($uniqueTeams);
+?>
+<div class="card card-flush mb-5">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="bi bi-bullseye fs-2 text-primary me-2"></i>
+            Andamento das Metas (Detalhado)
+        </h3>
+        <div class="card-toolbar">
+            <?php if (!empty($uniqueTeams)): ?>
+                <select class="form-select form-select-sm me-2" id="goals-team-filter">
+                    <option value="">Todos os times</option>
+                    <?php foreach ($uniqueTeams as $teamId => $teamName): ?>
+                        <option value="<?= $teamId ?>"><?= htmlspecialchars($teamName) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            <?php endif; ?>
+            <a href="<?= \App\Helpers\Url::to('/goals') ?>" class="btn btn-sm btn-light-primary">Ver Metas</a>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="accordion" id="goalsOverviewAccordion">
+            <?php foreach ($goalsOverview as $goal): 
+                $progress = $goal['progress'] ?? null;
+                $percentage = $progress ? (float)$progress['percentage'] : 0;
+                $currentValue = $progress ? (float)$progress['current_value'] : 0;
+                $flagStatus = $progress['flag_status'] ?? 'good';
+                $progressColor = \App\Models\Goal::getFlagColor($flagStatus);
+            ?>
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="goalOverviewHeading<?= $goal['id'] ?>">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#goalOverviewCollapse<?= $goal['id'] ?>">
+                        <div class="d-flex flex-column w-100">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="fw-bold"><?= htmlspecialchars($goal['name']) ?></span>
+                                <span class="badge badge-light-<?= $progressColor ?>">
+                                    <?= number_format($percentage, 0) ?>%
+                                </span>
+                            </div>
+                            <span class="text-muted fs-8">
+                                <?= \App\Models\Goal::TYPES[$goal['type']]['label'] ?? $goal['type'] ?> • 
+                                <?= \App\Models\Goal::TARGET_TYPES[$goal['target_type']] ?? $goal['target_type'] ?>
+                            </span>
+                        </div>
+                    </button>
+                </h2>
+                <div id="goalOverviewCollapse<?= $goal['id'] ?>" class="accordion-collapse collapse" data-bs-parent="#goalsOverviewAccordion">
+                    <div class="accordion-body">
+                        <div class="row g-4">
+                            <div class="col-md-4">
+                                <div class="border rounded p-4 h-100">
+                                    <h6 class="fw-bold mb-3">Meta Total</h6>
+                                    <div class="mb-2">Alvo: <strong><?= \App\Models\Goal::formatValue($goal['type'], $goal['target_value']) ?></strong></div>
+                                    <div class="mb-2">Atual: <strong><?= \App\Models\Goal::formatValue($goal['type'], $currentValue) ?></strong></div>
+                                    <div class="mb-2">Período: <strong><?= date('d/m/Y', strtotime($goal['start_date'])) ?> → <?= date('d/m/Y', strtotime($goal['end_date'])) ?></strong></div>
+                                    <div class="progress h-6px mt-3">
+                                        <div class="progress-bar bg-<?= $progressColor ?>" style="width: <?= min($percentage, 100) ?>%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-8">
+                                <h6 class="fw-bold mb-3">Agentes Envolvidos</h6>
+                                <?php if (!empty($goal['agents'])): ?>
+                                    <?php
+                                        $totalAchieved = 0;
+                                        foreach ($goal['agents'] as $agentRow) {
+                                            $totalAchieved += (float)($agentRow['current_value'] ?? 0);
+                                        }
+                                    ?>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-row-dashed">
+                                            <thead>
+                                                <tr class="text-muted fs-8">
+                                                    <th>#</th>
+                                                    <th>Agente</th>
+                                                    <th class="text-end">Atual</th>
+                                                    <th class="text-end">% do Alvo</th>
+                                                    <th class="text-end">Contrib. no Total</th>
+                                                    <th class="text-end">Bônus</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($goal['agents'] as $index => $agent): ?>
+                                                    <?php
+                                                        $bonusPreview = $agent['bonus_preview'] ?? null;
+                                                        $bonusBlocked = $bonusPreview['conditions_blocked'] ?? false;
+                                                        $bonusTotal = $bonusPreview['total_bonus'] ?? 0;
+                                                        $lastTier = $bonusPreview['last_tier']['tier_name'] ?? null;
+                                                        $contribution = $totalAchieved > 0 ? ((float)($agent['current_value'] ?? 0) / $totalAchieved) * 100 : 0;
+                                                        $blockedDetails = '';
+                                                        if ($bonusBlocked && !empty($bonusPreview['goal_condition_result']['details'])) {
+                                                            $blockedItems = [];
+                                                            foreach ($bonusPreview['goal_condition_result']['details'] as $detail) {
+                                                                if (!($detail['met'] ?? false)) {
+                                                                    $label = $detail['description'] ?? ($detail['condition_type'] ?? 'Condição');
+                                                                    $blockedItems[] = $label . (empty($detail['is_required']) ? ' (opcional)' : ' (obrigatória)');
+                                                                }
+                                                            }
+                                                            if (!empty($blockedItems)) {
+                                                                $blockedDetails = implode(' | ', $blockedItems);
+                                                            }
+                                                        }
+                                                    ?>
+                                                    <tr>
+                                                        <td><?= $index + 1 ?></td>
+                                                        <td><?= htmlspecialchars($agent['name']) ?></td>
+                                                        <td class="text-end"><?= \App\Models\Goal::formatValue($goal['type'], $agent['current_value'] ?? 0) ?></td>
+                                                        <td class="text-end">
+                                                            <div class="d-flex flex-column align-items-end">
+                                                                <span><?= number_format((float)($agent['percentage'] ?? 0), 1) ?>%</span>
+                                                                <div class="progress h-4px w-100 mt-1">
+                                                                    <div class="progress-bar bg-<?= $progressColor ?>" style="width: <?= min((float)($agent['percentage'] ?? 0), 100) ?>%"></div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td class="text-end"><?= number_format($contribution, 1) ?>%</td>
+                                                        <td class="text-end">
+                                                            <?php if (!empty($goal['enable_bonus'])): ?>
+                                                                <div class="d-flex flex-column align-items-end">
+                                                                    <span class="fw-bold <?= $bonusBlocked ? 'text-danger' : 'text-success' ?>" <?= $blockedDetails ? 'title="' . htmlspecialchars($blockedDetails) . '"' : '' ?>>
+                                                                        R$ <?= number_format((float)$bonusTotal, 2, ',', '.') ?>
+                                                                    </span>
+                                                                    <?php if ($bonusBlocked): ?>
+                                                                        <span class="badge badge-light-danger fs-9">Bloqueado</span>
+                                                                    <?php elseif ($lastTier): ?>
+                                                                        <span class="text-muted fs-9"><?= htmlspecialchars($lastTier) ?></span>
+                                                                    <?php else: ?>
+                                                                        <span class="text-muted fs-9">Sem tier</span>
+                                                                    <?php endif; ?>
+                                                                </div>
+                                                            <?php else: ?>
+                                                                <span class="text-muted fs-9">N/A</span>
+                                                            <?php endif; ?>
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php else: ?>
+                                    <span class="text-muted fs-8">Sem agentes vinculados.</span>
+                                <?php endif; ?>
+                            </div>
+                            <div class="col-md-8 mt-4">
+                                <h6 class="fw-bold mb-3">Soma por Time</h6>
+                                <?php if (!empty($goal['teams'])): ?>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-row-dashed">
+                                            <thead>
+                                                <tr class="text-muted fs-8">
+                                                    <th>#</th>
+                                                    <th>Time</th>
+                                                    <th class="text-end">Total</th>
+                                                    <th class="text-end">% do Alvo</th>
+                                                    <th class="text-end">Ranking</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($goal['teams'] as $index => $team): ?>
+                                                    <?php
+                                                        $isLeader = $index === 0;
+                                                        $rowClass = $isLeader ? 'bg-light-success' : '';
+                                                    ?>
+                                                    <tr class="<?= $rowClass ?>" data-team-id="<?= (int)$team['team_id'] ?>">
+                                                        <td><?= $index + 1 ?></td>
+                                                        <td><?= htmlspecialchars($team['team_name']) ?></td>
+                                                        <td class="text-end"><?= \App\Models\Goal::formatValue($goal['type'], $team['total_value'] ?? 0) ?></td>
+                                                        <td class="text-end"><?= number_format((float)($team['percentage'] ?? 0), 1) ?>%</td>
+                                                        <td class="text-end">
+                                                            <div class="d-flex flex-column align-items-end">
+                                                                <?php if ($isLeader): ?>
+                                                                    <span class="badge badge-light-success fs-9 mb-1">Líder</span>
+                                                                <?php endif; ?>
+                                                                <div class="progress h-4px w-100">
+                                                                    <div class="progress-bar bg-success" style="width: <?= min((float)($team['percentage'] ?? 0), 100) ?>%"></div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php else: ?>
+                                    <span class="text-muted fs-8">Sem times vinculados.</span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php if (!empty($uniqueTeams)): ?>
+<script>
+document.getElementById('goals-team-filter')?.addEventListener('change', function () {
+    const teamId = this.value;
+    document.querySelectorAll('[data-team-id]').forEach(row => {
+        if (!teamId || row.getAttribute('data-team-id') === teamId) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+});
+</script>
+<?php endif; ?>
+
 <!--begin::Row - Gráficos-->
 <div class="row g-5 mb-5">
     <!--begin::Col - Gráfico de Conversas ao Longo do Tempo-->

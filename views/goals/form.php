@@ -103,6 +103,19 @@ ob_start();
                                     <option value="">Selecione...</option>
                                 </select>
                             </div>
+                            
+                            <div class="col-md-6" id="target-multi-selection" style="display: none;">
+                                <label class="required form-label">Selecionar Agentes</label>
+                                <select class="form-select" name="target_agents[]" id="target-agents" multiple>
+                                    <?php foreach ($agents as $agent): ?>
+                                        <option value="<?= $agent['id'] ?>"
+                                            <?= in_array($agent['id'], $goalAgentIds ?? [], true) ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($agent['name']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <small class="text-muted">Selecione um ou mais agentes. A meta será aplicada para cada um.</small>
+                            </div>
                         </div>
                     </div>
                     <!--end::Configuração da Meta-->
@@ -626,39 +639,54 @@ document.getElementById('goal-type').dispatchEvent(new Event('change'));
 document.getElementById('target-type').addEventListener('change', function() {
     const targetType = this.value;
     const targetSelection = document.getElementById('target-selection');
+    const targetMultiSelection = document.getElementById('target-multi-selection');
     const targetId = document.getElementById('target-id');
+    const targetAgents = document.getElementById('target-agents');
     const targetLabel = document.getElementById('target-label');
     
     if (targetType === 'global') {
         targetSelection.style.display = 'none';
+        targetMultiSelection.style.display = 'none';
         targetId.required = false;
-    } else {
-        targetSelection.style.display = 'block';
-        targetId.required = true;
-        
-        // Atualizar label
-        const labels = {
-            individual: 'Selecionar Agente',
-            team: 'Selecionar Time',
-            department: 'Selecionar Departamento'
-        };
-        targetLabel.textContent = labels[targetType] || 'Selecionar';
-        
-        // Preencher options
-        targetId.innerHTML = '<option value="">Selecione...</option>';
-        if (targetsData[targetType]) {
-            targetsData[targetType].forEach(item => {
-                const option = document.createElement('option');
-                option.value = item.id;
-                option.textContent = item.name;
-                <?php if ($isEdit): ?>
-                    if (item.id == <?= $goal['target_id'] ?? 0 ?>) {
-                        option.selected = true;
-                    }
-                <?php endif; ?>
-                targetId.appendChild(option);
-            });
-        }
+        targetAgents.required = false;
+        return;
+    }
+    
+    if (targetType === 'multi_agent') {
+        targetSelection.style.display = 'none';
+        targetMultiSelection.style.display = 'block';
+        targetId.required = false;
+        targetAgents.required = true;
+        return;
+    }
+    
+    targetMultiSelection.style.display = 'none';
+    targetSelection.style.display = 'block';
+    targetId.required = true;
+    targetAgents.required = false;
+    
+    // Atualizar label
+    const labels = {
+        individual: 'Selecionar Agente',
+        team: 'Selecionar Time',
+        department: 'Selecionar Departamento'
+    };
+    targetLabel.textContent = labels[targetType] || 'Selecionar';
+    
+    // Preencher options
+    targetId.innerHTML = '<option value="">Selecione...</option>';
+    if (targetsData[targetType]) {
+        targetsData[targetType].forEach(item => {
+            const option = document.createElement('option');
+            option.value = item.id;
+            option.textContent = item.name;
+            <?php if ($isEdit): ?>
+                if (item.id == <?= $goal['target_id'] ?? 0 ?>) {
+                    option.selected = true;
+                }
+            <?php endif; ?>
+            targetId.appendChild(option);
+        });
     }
 });
 

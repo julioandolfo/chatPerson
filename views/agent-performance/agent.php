@@ -763,7 +763,11 @@ function formatTimeDisplay($seconds, $showUnit = true) {
     </div>
     <?php endif; ?>
     
-<?php $totalGoals = $goalsSummary['total_goals'] ?? 0; ?>
+<?php
+$totalGoals = $goalsSummary['total_goals'] ?? 0;
+$conditionLabels = \App\Models\GoalBonusCondition::CONDITION_TYPES;
+$operatorLabels = \App\Models\GoalBonusCondition::OPERATORS;
+?>
 <?php if (!empty($goalsSummary) && $totalGoals > 0): ?>
     <div class="col-lg-<?= !empty($badges) ? '6' : '12' ?>">
         <div class="card h-100">
@@ -860,6 +864,171 @@ function formatTimeDisplay($seconds, $showUnit = true) {
     </div>
     <?php endif; ?>
 </div>
+
+<?php if (!empty($allGoals)): ?>
+<div class="card card-flush mb-7">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="bi bi-list-check fs-2 text-primary me-2"></i>
+            Análise Completa de Metas
+        </h3>
+        <div class="card-toolbar">
+            <span class="badge badge-light-primary fs-7"><?= count($allGoals) ?> metas aplicadas</span>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="accordion" id="goalsDetailedAccordion">
+            <?php foreach ($allGoals as $goal): 
+                $progress = $goal['progress'] ?? null;
+                $percentage = $progress ? (float)$progress['percentage'] : 0;
+                $currentValue = $progress ? (float)$progress['current_value'] : 0;
+                $flagStatus = $progress['flag_status'] ?? 'good';
+                $progressColor = \App\Models\Goal::getFlagColor($flagStatus);
+                $bonusPreview = $goal['bonus_preview'] ?? null;
+                $tiers = $goal['tiers'] ?? [];
+                $conditions = $goal['conditions'] ?? [];
+            ?>
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="goalHeading<?= $goal['id'] ?>">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#goalCollapse<?= $goal['id'] ?>">
+                        <div class="d-flex flex-column w-100">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="fw-bold"><?= htmlspecialchars($goal['name']) ?></span>
+                                <span class="badge badge-light-<?= $progressColor ?>">
+                                    <?= number_format($percentage, 0) ?>%
+                                </span>
+                            </div>
+                            <span class="text-muted fs-8">
+                                <?= \App\Models\Goal::TYPES[$goal['type']]['label'] ?? $goal['type'] ?> • 
+                                <?= \App\Models\Goal::TARGET_TYPES[$goal['target_type']] ?? $goal['target_type'] ?>
+                            </span>
+                        </div>
+                    </button>
+                </h2>
+                <div id="goalCollapse<?= $goal['id'] ?>" class="accordion-collapse collapse" data-bs-parent="#goalsDetailedAccordion">
+                    <div class="accordion-body">
+                        <div class="row g-4">
+                            <div class="col-md-4">
+                                <div class="border rounded p-4 h-100">
+                                    <h6 class="fw-bold mb-3">Meta & Progresso</h6>
+                                    <div class="mb-2">Alvo: <strong><?= \App\Models\Goal::formatValue($goal['type'], $goal['target_value']) ?></strong></div>
+                                    <div class="mb-2">Atual: <strong><?= \App\Models\Goal::formatValue($goal['type'], $currentValue) ?></strong></div>
+                                    <div class="mb-2">Período: <strong><?= date('d/m/Y', strtotime($goal['start_date'])) ?> → <?= date('d/m/Y', strtotime($goal['end_date'])) ?></strong></div>
+                                    <?php if (!empty($progress['projection_percentage'])): ?>
+                                        <div class="mb-2">Projeção: <strong><?= number_format($progress['projection_percentage'], 0) ?>%</strong></div>
+                                    <?php endif; ?>
+                                    <div class="progress h-6px mt-3">
+                                        <div class="progress-bar bg-<?= $progressColor ?>" style="width: <?= min($percentage, 100) ?>%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="border rounded p-4 h-100">
+                                    <h6 class="fw-bold mb-3">Regras & Flags</h6>
+                                    <div class="mb-2">Flag Crítica: <strong><?= number_format($goal['flag_critical_threshold'], 1) ?>%</strong></div>
+                                    <div class="mb-2">Flag Atenção: <strong><?= number_format($goal['flag_warning_threshold'], 1) ?>%</strong></div>
+                                    <div class="mb-2">Flag Boa: <strong><?= number_format($goal['flag_good_threshold'], 1) ?>%</strong></div>
+                                    <div class="mb-2">Notificar em: <strong><?= intval($goal['notify_at_percentage']) ?>%</strong></div>
+                                    <div class="mb-2">Prioridade: <strong><?= ucfirst($goal['priority']) ?></strong></div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="border rounded p-4 h-100">
+                                    <h6 class="fw-bold mb-3">Bônus / OTE</h6>
+                                    <div class="mb-2">Bônus ativo: <strong><?= ($goal['enable_bonus'] ?? 0) ? 'Sim' : 'Não' ?></strong></div>
+                                    <div class="mb-2">Condições bônus: <strong><?= ($goal['enable_bonus_conditions'] ?? 0) ? 'Sim' : 'Não' ?></strong></div>
+                                    <div class="mb-2">Cálculo: <strong><?= ucfirst($goal['bonus_calculation_type'] ?? 'tiered') ?></strong></div>
+                                    <?php if (!empty($goal['ote_base_salary']) || !empty($goal['ote_target_commission'])): ?>
+                                        <div class="mb-2">OTE Base: <strong>R$ <?= number_format((float)($goal['ote_base_salary'] ?? 0), 2, ',', '.') ?></strong></div>
+                                        <div class="mb-2">OTE Comissão: <strong>R$ <?= number_format((float)($goal['ote_target_commission'] ?? 0), 2, ',', '.') ?></strong></div>
+                                        <div class="mb-2">OTE Total: <strong>R$ <?= number_format((float)($goal['ote_total'] ?? 0), 2, ',', '.') ?></strong></div>
+                                    <?php endif; ?>
+                                    <?php if ($bonusPreview): ?>
+                                        <div class="mt-3 p-2 bg-light-info rounded">
+                                            <div class="fs-8 text-muted">Bônus estimado</div>
+                                            <div class="fw-bold">R$ <?= number_format((float)($bonusPreview['total_bonus'] ?? 0), 2, ',', '.') ?></div>
+                                            <?php if (!empty($bonusPreview['last_tier'])): ?>
+                                                <div class="fs-8 text-muted">Último tier: <?= htmlspecialchars($bonusPreview['last_tier']['tier_name'] ?? 'N/A') ?></div>
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="separator my-5"></div>
+                        
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <h6 class="fw-bold mb-3">Tiers de Bônus</h6>
+                                <?php if (!empty($tiers)): ?>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-row-dashed">
+                                            <thead>
+                                                <tr class="text-muted fs-8">
+                                                    <th>Tier</th>
+                                                    <th>%</th>
+                                                    <th>Bônus</th>
+                                                    <th>Acumula</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($tiers as $tier): ?>
+                                                    <tr>
+                                                        <td><?= htmlspecialchars($tier['tier_name'] ?? 'Tier') ?></td>
+                                                        <td><?= number_format((float)$tier['threshold_percentage'], 1) ?>%</td>
+                                                        <td>R$ <?= number_format((float)($tier['bonus_amount'] ?? 0), 2, ',', '.') ?></td>
+                                                        <td><?= !empty($tier['is_cumulative']) ? 'Sim' : 'Não' ?></td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php else: ?>
+                                    <span class="text-muted fs-8">Sem tiers configurados.</span>
+                                <?php endif; ?>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <h6 class="fw-bold mb-3">Condições de Ativação</h6>
+                                <?php if (!empty($conditions)): ?>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-row-dashed">
+                                            <thead>
+                                                <tr class="text-muted fs-8">
+                                                    <th>Métrica</th>
+                                                    <th>Regra</th>
+                                                    <th>Obrigatória</th>
+                                                    <th>Modificador</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($conditions as $cond): ?>
+                                                    <tr>
+                                                        <td><?= $conditionLabels[$cond['condition_type']] ?? $cond['condition_type'] ?></td>
+                                                        <td><?= $operatorLabels[$cond['operator']] ?? $cond['operator'] ?> <?= number_format((float)$cond['min_value'], 2, ',', '.') ?></td>
+                                                        <td><?= !empty($cond['is_required']) ? 'Sim' : 'Não' ?></td>
+                                                        <td><?= number_format((float)($cond['bonus_modifier'] ?? 1), 2, ',', '.') ?></td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php else: ?>
+                                    <span class="text-muted fs-8">Sem condições configuradas.</span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- Conversas Analisadas com Métricas de Coaching -->
 <?php if (!empty($analyzedConversations['conversations'])): ?>
@@ -1404,6 +1573,14 @@ function loadSLABreachedConversations(page = 1) {
                                 </span>
                             </td>
                             <td class="text-end">
+                                <button class="btn btn-sm btn-light-info me-1" onclick="showSLABreachDetails(${conv.id}, 'first')">
+                                    <i class="ki-duotone ki-information fs-4">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    Detalhes
+                                </button>
                                 <a href="<?= Url::to('/conversations') ?>?id=${conv.id}" 
                                    class="btn btn-sm btn-light-primary" 
                                    target="_blank">
@@ -1540,6 +1717,14 @@ function loadSLAOngoingBreachedConversationsPage(page = 1) {
                                 </span>
                             </td>
                             <td class="text-end">
+                                <button class="btn btn-sm btn-light-info me-1" onclick="showSLABreachDetails(${conv.id}, 'ongoing')">
+                                    <i class="ki-duotone ki-information fs-4">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    Detalhes
+                                </button>
                                 <a href="<?= Url::to('/conversations') ?>?id=${conv.id}" 
                                    class="btn btn-sm btn-light-primary" 
                                    target="_blank">
@@ -1584,6 +1769,108 @@ function formatDateTime(datetime) {
     if (!datetime) return '-';
     const date = new Date(datetime);
     return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+}
+
+// Modal de detalhes do SLA excedido
+function showSLABreachDetails(conversationId, type = 'first') {
+    const modalId = 'slaBreachDetailsModal';
+    document.getElementById(modalId)?.remove();
+    
+    const title = type === 'ongoing' ? 'Detalhes do SLA de Respostas' : 'Detalhes do SLA de 1ª Resposta';
+    const modalHtml = `
+        <div class="modal fade" id="${modalId}" tabindex="-1">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">${title}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="sla-breach-details-container" class="text-center py-8">
+                            <div class="spinner-border text-primary"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modal = new bootstrap.Modal(document.getElementById(modalId));
+    modal.show();
+    
+    fetch(`<?= Url::to('/agent-performance/sla-breached-details') ?>?conversation_id=${conversationId}&type=${type}`)
+        .then(r => r.json())
+        .then(data => {
+            const container = document.getElementById('sla-breach-details-container');
+            if (!data.success) {
+                container.innerHTML = `<div class="alert alert-danger">Erro ao carregar detalhes</div>`;
+                return;
+            }
+            
+            if (!data.total) {
+                container.innerHTML = `<div class="text-muted">Nenhum intervalo encontrado.</div>`;
+                return;
+            }
+            
+            const rows = data.intervals.map((item) => {
+                const contactTime = formatDateTime(item.contact_time);
+                const agentTime = item.agent_time ? formatDateTime(item.agent_time) : 'Pendente';
+                const agentName = item.agent_name || 'Agente';
+                const minutes = item.minutes ?? 0;
+                const exceededBy = item.exceeded_by ?? Math.max(0, minutes - data.sla_minutes);
+                
+                return `
+                    <tr>
+                        <td class="text-center">${contactTime}</td>
+                        <td>
+                            <div class="fw-semibold">Cliente</div>
+                            <div class="text-muted fs-7">${escapeHtml(item.contact_preview || '')}</div>
+                        </td>
+                        <td class="text-center">${agentTime}</td>
+                        <td>
+                            <div class="fw-semibold">${escapeHtml(agentName)}</div>
+                            <div class="text-muted fs-7">${escapeHtml(item.agent_preview || '')}</div>
+                        </td>
+                        <td class="text-center"><span class="badge badge-light-danger">${minutes} min</span></td>
+                        <td class="text-center"><span class="badge badge-light-danger">+${Number(exceededBy).toFixed(0)} min</span></td>
+                    </tr>
+                `;
+            }).join('');
+            
+            container.innerHTML = `
+                <div class="mb-4 text-muted fs-7">
+                    SLA: <strong>${data.sla_minutes} min</strong> • 
+                    Delay: <strong>${data.delay_enabled ? (data.delay_minutes + ' min') : 'desativado'}</strong> • 
+                    Horário comercial: <strong>${data.working_hours_enabled ? 'sim' : 'não'}</strong>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle table-row-dashed fs-6 gy-4">
+                        <thead>
+                            <tr class="text-start text-gray-500 fw-bold fs-7 text-uppercase gs-0">
+                                <th class="text-center">Cliente</th>
+                                <th>Mensagem Cliente</th>
+                                <th class="text-center">Agente</th>
+                                <th>Resposta Agente</th>
+                                <th class="text-center">Tempo</th>
+                                <th class="text-center">Excedido</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        })
+        .catch(() => {
+            const container = document.getElementById('sla-breach-details-container');
+            if (container) container.innerHTML = `<div class="alert alert-danger">Erro ao carregar detalhes</div>`;
+        });
+    
+    document.getElementById(modalId).addEventListener('hidden.bs.modal', function() {
+        this.remove();
+    });
 }
 
 // Carregar ao abrir página

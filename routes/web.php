@@ -352,6 +352,7 @@ Router::post('/agent-performance/goals', [AgentPerformanceController::class, 'cr
 Router::get('/agent-performance/compare', [AgentPerformanceController::class, 'compare'], ['Authentication', 'Permission:agent_performance.view.all']);
 Router::get('/agent-performance/chart-data', [AgentPerformanceController::class, 'chartData'], ['Authentication', 'Permission:agent_performance.view.all']);
 Router::get('/agent-performance/sla-breached', [AgentPerformanceController::class, 'getSLABreachedConversations'], ['Authentication', 'Permission:agent_performance.view.all']);
+Router::get('/agent-performance/sla-breached-details', [AgentPerformanceController::class, 'getSLABreachedDetails'], ['Authentication', 'Permission:agent_performance.view.all']);
 
 // Rotas de Coaching em Tempo Real (IA)
 Router::get('/api/coaching/settings', [RealtimeCoachingController::class, 'getSettings'], ['Authentication']); // ✅ Configurações do coaching

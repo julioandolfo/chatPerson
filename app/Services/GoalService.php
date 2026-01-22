@@ -378,7 +378,7 @@ class GoalService
         }
         
         // Determinar IDs dos agentes baseado no target_type
-        $agentIds = self::getTargetAgentIds($targetType, $targetId);
+        $agentIds = self::getTargetAgentIds($targetType, $targetId, (int)($goal['id'] ?? 0));
         
         if (empty($agentIds)) {
             return 0;
@@ -441,7 +441,7 @@ class GoalService
     /**
      * Obter IDs dos agentes baseado no target_type
      */
-    private static function getTargetAgentIds(string $targetType, ?int $targetId): array
+    private static function getTargetAgentIds(string $targetType, ?int $targetId, int $goalId = 0): array
     {
         switch ($targetType) {
             case 'individual':
@@ -473,6 +473,14 @@ class GoalService
                      AND role IN ('super_admin', 'admin', 'supervisor', 'senior_agent', 'agent', 'junior_agent')"
                 );
                 return array_column($users, 'id');
+
+            case 'multi_agent':
+                if ($goalId <= 0) return [];
+                $rows = Database::fetchAll(
+                    "SELECT agent_id FROM goal_agent_targets WHERE goal_id = ?",
+                    [$goalId]
+                );
+                return array_column($rows, 'agent_id');
                 
             default:
                 return [];
@@ -990,7 +998,8 @@ class GoalService
                 'individual' => [],
                 'team' => [],
                 'department' => [],
-                'global' => []
+                'global' => [],
+                'multi_agent' => []
             ]
         ];
         
@@ -1021,7 +1030,89 @@ class GoalService
         
         return $summary;
     }
+
+    /**
+     * Obter metas do agente com detalhes (condições, tiers, bônus)
+     */
+    public static function getAgentGoalsDetailed(int $userId): array
+    {
+        $summary = self::getDashboardSummary($userId);
+
+        foreach ($summary['goals_by_level'] as $level => &$levelGoals) {
+            foreach ($levelGoals as &$goal) {
+                $goal['tiers'] = GoalBonusTier::getByGoal((int)$goal['id']);
+                $goal['conditions'] = GoalBonusCondition::getByGoal((int)$goal['id']);
+
+                $progress = $goal['progress'] ?? GoalProgress::getLatest((int)$goal['id']);
+                if ($progress) {
+                    $goal['progress'] = $progress;
+                    $goal['bonus_preview'] = GoalBonusTier::calculateBonus(
+                        (int)$goal['id'],
+                        (float)$progress['percentage'],
+                        $userId,
+                        $goal['start_date'],
+                        $goal['end_date']
+                    );
+                }
+            }
+        }
+
+        return $summary;
+    }
     
+    /**
+     * Visão detalhada de metas para o dashboard principal
+     */
+    public static function getDashboardGoalsOverview(int $userId, bool $canViewAll): array
+    {
+        $goals = $canViewAll
+            ? Goal::getActive(['active_period' => true])
+            : self::flattenGoals(Goal::getAgentGoals($userId));
+
+        foreach ($goals as &$goal) {
+            $progress = GoalProgress::getLatest((int)$goal['id']);
+            if ($progress) {
+                $goal['progress'] = $progress;
+            }
+
+            $agentIds = self::getTargetAgentIds(
+                $goal['target_type'],
+                $goal['target_id'] ?? null,
+                (int)$goal['id']
+            );
+            $agents = self::getAgentsByIds($agentIds);
+
+            foreach ($agents as &$agent) {
+                $currentValue = self::calculateCurrentValueForAgent($goal, (int)$agent['id']);
+                $percentage = ($goal['target_value'] ?? 0) > 0
+                    ? ($currentValue / (float)$goal['target_value']) * 100
+                    : 0;
+                $agent['current_value'] = $currentValue;
+                $agent['percentage'] = round($percentage, 2);
+                
+                if (!empty($goal['enable_bonus'])) {
+                    $agent['bonus_preview'] = GoalBonusTier::calculateBonus(
+                        (int)$goal['id'],
+                        (float)$agent['percentage'],
+                        (int)$agent['id'],
+                        $goal['start_date'],
+                        $goal['end_date']
+                    );
+                }
+            }
+            unset($agent);
+
+            usort($agents, function ($a, $b) {
+                return $b['percentage'] <=> $a['percentage'];
+            });
+
+            $goal['agents'] = $agents;
+            $goal['teams'] = self::calculateTeamsTotals($goal, $agents);
+        }
+
+        return $goals;
+    }
+
     /**
      * Obter resumo de bonificações do agente
      */
@@ -1055,6 +1146,138 @@ class GoalService
     public static function createDefaultBonusTiers(int $goalId, float $targetCommission): void
     {
         GoalBonusTier::createDefaultTiers($goalId, $targetCommission);
+    }
+
+    /**
+     * Achatar metas por nível em uma lista única
+     */
+    private static function flattenGoals(array $goalsByLevel): array
+    {
+        $flat = [];
+        foreach ($goalsByLevel as $levelGoals) {
+            $flat = array_merge($flat, $levelGoals);
+        }
+        return $flat;
+    }
+
+    /**
+     * Buscar agentes por IDs
+     */
+    private static function getAgentsByIds(array $agentIds): array
+    {
+        if (empty($agentIds)) return [];
+        $placeholders = implode(',', array_fill(0, count($agentIds), '?'));
+        return Database::fetchAll(
+            "SELECT id, name, role, status FROM users WHERE id IN ({$placeholders})",
+            $agentIds
+        );
+    }
+
+    /**
+     * Somatório por time para comparação no dashboard
+     */
+    private static function calculateTeamsTotals(array $goal, array $agents): array
+    {
+        $agentIds = array_column($agents, 'id');
+        if (empty($agentIds)) return [];
+
+        $teamsByAgent = self::getTeamsByAgentIds($agentIds);
+        if (empty($teamsByAgent)) return [];
+
+        $teamTotals = [];
+        foreach ($agents as $agent) {
+            $agentTeamIds = $teamsByAgent[$agent['id']] ?? [];
+            foreach ($agentTeamIds as $teamId => $teamName) {
+                if (!isset($teamTotals[$teamId])) {
+                    $teamTotals[$teamId] = [
+                        'team_id' => $teamId,
+                        'team_name' => $teamName,
+                        'total_value' => 0,
+                        'percentage' => 0
+                    ];
+                }
+                $teamTotals[$teamId]['total_value'] += (float)($agent['current_value'] ?? 0);
+            }
+        }
+
+        $targetValue = (float)($goal['target_value'] ?? 0);
+        foreach ($teamTotals as &$team) {
+            $team['percentage'] = $targetValue > 0
+                ? round(($team['total_value'] / $targetValue) * 100, 2)
+                : 0;
+        }
+        unset($team);
+
+        $result = array_values($teamTotals);
+        usort($result, function ($a, $b) {
+            return $b['percentage'] <=> $a['percentage'];
+        });
+
+        return $result;
+    }
+
+    /**
+     * Mapear times por agente
+     */
+    private static function getTeamsByAgentIds(array $agentIds): array
+    {
+        if (empty($agentIds)) return [];
+        $placeholders = implode(',', array_fill(0, count($agentIds), '?'));
+        $rows = Database::fetchAll(
+            "SELECT tm.user_id, t.id as team_id, t.name
+             FROM team_members tm
+             INNER JOIN teams t ON tm.team_id = t.id
+             WHERE tm.user_id IN ({$placeholders})",
+            $agentIds
+        );
+
+        $map = [];
+        foreach ($rows as $row) {
+            $userId = (int)$row['user_id'];
+            $teamId = (int)$row['team_id'];
+            $map[$userId][$teamId] = $row['name'];
+        }
+        return $map;
+    }
+
+    /**
+     * Calcular valor atual por agente para uma meta
+     */
+    private static function calculateCurrentValueForAgent(array $goal, int $agentId): float
+    {
+        $startDate = $goal['start_date'];
+        $endDate = $goal['end_date'];
+        $type = $goal['type'];
+        $agentIds = [$agentId];
+
+        switch ($type) {
+            case 'revenue':
+                return self::calculateRevenue($agentIds, $startDate, $endDate);
+            case 'average_ticket':
+                return self::calculateAverageTicket($agentIds, $startDate, $endDate);
+            case 'conversion_rate':
+                return self::calculateConversionRate($agentIds, $startDate, $endDate);
+            case 'sales_count':
+                return self::calculateSalesCount($agentIds, $startDate, $endDate);
+            case 'conversations_count':
+                return self::calculateConversationsCount($agentIds, $startDate, $endDate);
+            case 'resolution_rate':
+                return self::calculateResolutionRate($agentIds, $startDate, $endDate);
+            case 'response_time':
+                return self::calculateResponseTime($agentIds, $startDate, $endDate);
+            case 'csat_score':
+                return self::calculateCSAT($agentIds, $startDate, $endDate);
+            case 'messages_sent':
+                return self::calculateMessagesSent($agentIds, $startDate, $endDate);
+            case 'sla_compliance':
+                return self::calculateSLACompliance($agentIds, $startDate, $endDate);
+            case 'first_response_time':
+                return self::calculateFirstResponseTime($agentIds, $startDate, $endDate);
+            case 'resolution_time':
+                return self::calculateResolutionTime($agentIds, $startDate, $endDate);
+            default:
+                return 0;
+        }
     }
     
     /**

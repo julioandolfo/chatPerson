@@ -165,6 +165,15 @@ class GoalController
         
         // Progresso atual
         $currentProgress = GoalService::getMultiAgentProgress($goal);
+        $goalAgents = [];
+        try {
+            $goalAgents = GoalService::getGoalAgentsWithProgress((int)$id);
+        } catch (\Exception $e) {
+            $goalAgents = [];
+        }
+        
+        $bonusTiers = \App\Models\GoalBonusTier::getByGoal((int)$id);
+        $bonusConditions = \App\Models\GoalBonusCondition::getByGoal((int)$id);
         
         // Histórico (últimos 30 dias)
         $history = GoalProgress::getHistory($id, 30);
@@ -182,7 +191,10 @@ class GoalController
             'progress' => $currentProgress,
             'history' => $history,
             'stats' => $stats,
-            'achievement' => $achievement
+            'achievement' => $achievement,
+            'goalAgents' => $goalAgents,
+            'bonusTiers' => $bonusTiers,
+            'bonusConditions' => $bonusConditions
         ];
         
         Response::view('goals/show', $data);

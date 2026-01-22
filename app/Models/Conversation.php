@@ -401,6 +401,42 @@ class Conversation extends Model
         // Log dos filtros antes de executar (debug lista de conversas)
         \App\Helpers\Log::context("Conversation::getAll filtros", $filters, 'conversas.log', 'DEBUG');
         
+        // Debug adicional: contagem por status para funil/etapa filtrados
+        if (!empty($filters['funnel_stage_id']) || !empty($filters['funnel_stage_ids'])) {
+            try {
+                $stageIds = [];
+                if (!empty($filters['funnel_stage_id'])) {
+                    $stageIds = [(int)$filters['funnel_stage_id']];
+                } elseif (!empty($filters['funnel_stage_ids']) && is_array($filters['funnel_stage_ids'])) {
+                    $stageIds = array_map('intval', $filters['funnel_stage_ids']);
+                }
+                
+                if (!empty($stageIds)) {
+                    $placeholders = implode(',', array_fill(0, count($stageIds), '?'));
+                    $debugSql = "SELECT c.status, COUNT(*) as total
+                                 FROM conversations c
+                                 WHERE c.funnel_stage_id IN ({$placeholders})";
+                    $debugParams = $stageIds;
+                    
+                    if (!empty($filters['funnel_id'])) {
+                        $debugSql .= " AND c.funnel_id = ?";
+                        $debugParams[] = (int)$filters['funnel_id'];
+                    }
+                    
+                    $debugSql .= " GROUP BY c.status";
+                    $statusCounts = Database::fetchAll($debugSql, $debugParams);
+                    \App\Helpers\Log::context("Contagem por status (debug funil/etapa)", [
+                        'funnel_id' => $filters['funnel_id'] ?? null,
+                        'funnel_stage_id' => $filters['funnel_stage_id'] ?? null,
+                        'funnel_stage_ids' => $filters['funnel_stage_ids'] ?? null,
+                        'status_counts' => $statusCounts
+                    ], 'conversas.log', 'DEBUG');
+                }
+            } catch (\Exception $e) {
+                \App\Helpers\Log::debug("Erro no debug de contagem por status (funil/etapa): " . $e->getMessage(), 'conversas.log');
+            }
+        }
+        
         // Log da query SQL e parâmetros antes de executar
         \App\Helpers\Log::debug("SQL Query: " . substr($sql, 0, 500), 'conversas.log');
         \App\Helpers\Log::context("SQL Params", $params, 'conversas.log', 'DEBUG');

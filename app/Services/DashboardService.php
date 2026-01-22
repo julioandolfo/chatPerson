@@ -39,6 +39,27 @@ class DashboardService
     }
 
     /**
+     * Detectar colunas da tabela conversation_assignments
+     */
+    private static function getAssignmentsColumns(): array
+    {
+        static $cached = null;
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $hasAgentId = \App\Helpers\Database::fetch("SHOW COLUMNS FROM conversation_assignments LIKE 'agent_id'");
+        $hasAssignedAt = \App\Helpers\Database::fetch("SHOW COLUMNS FROM conversation_assignments LIKE 'assigned_at'");
+
+        $cached = [
+            'agent_column' => $hasAgentId ? 'agent_id' : 'to_agent_id',
+            'assigned_column' => $hasAssignedAt ? 'assigned_at' : 'created_at'
+        ];
+
+        return $cached;
+    }
+
+    /**
      * Obter estatísticas gerais do dashboard
      */
     public static function getGeneralStats(?int $userId = null, ?string $dateFrom = null, ?string $dateTo = null): array
@@ -883,6 +904,10 @@ class DashboardService
         $slaFirstResponseMinutes = $slaSettings['first_response_time'] ?? 15;
         $slaResponseMinutes = $slaSettings['ongoing_response_time'] ?? $slaFirstResponseMinutes; // SLA para respostas contínuas
         
+        $assignCols = self::getAssignmentsColumns();
+        $agentColumn = $assignCols['agent_column'];
+        $assignedColumn = $assignCols['assigned_column'];
+
         // Conversas totais recebidas no período
         // Usar SEGUNDOS para maior precisão (IA responde em segundos)
         $sql = "SELECT 
@@ -910,9 +935,9 @@ class DashboardService
                 FROM conversations c
                 INNER JOIN conversation_assignments ca 
                     ON ca.conversation_id = c.id 
-                    AND ca.agent_id = ?
-                WHERE ca.assigned_at >= ?
-                AND ca.assigned_at <= ?";
+                    AND ca.{$agentColumn} = ?
+                WHERE ca.{$assignedColumn} >= ?
+                AND ca.{$assignedColumn} <= ?";
         
         // SLA em segundos
         $slaFirstResponseSeconds = $slaFirstResponseMinutes * 60;
@@ -932,10 +957,10 @@ class DashboardService
                       FROM conversations c
                       INNER JOIN conversation_assignments ca
                         ON ca.conversation_id = c.id
-                        AND ca.agent_id = ?
+                        AND ca.{$agentColumn} = ?
                       WHERE c.status IN ('open', 'pending')
-                      AND ca.assigned_at >= ?
-                      AND ca.assigned_at <= ?";
+                      AND ca.{$assignedColumn} >= ?
+                      AND ca.{$assignedColumn} <= ?";
         $current = \App\Helpers\Database::fetch($sqlCurrent, [$agentId, $dateFrom, $dateTo]);
         
         $total = (int)($metrics['total_conversations'] ?? 0);
@@ -959,22 +984,22 @@ class DashboardService
                     FROM messages m1
                     INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
                         AND m2.sender_type = 'agent'
-                        AND m2.sender_id = ca.agent_id
+                        AND m2.sender_id = ca.{$agentColumn}
                         AND m2.created_at > m1.created_at
                         AND m2.created_at = (
                             SELECT MIN(m3.created_at)
                             FROM messages m3
                             WHERE m3.conversation_id = m1.conversation_id
                             AND m3.sender_type = 'agent'
-                            AND m3.sender_id = ca.agent_id
+                            AND m3.sender_id = ca.{$agentColumn}
                             AND m3.created_at > m1.created_at
                         )
                     INNER JOIN conversations c ON c.id = m1.conversation_id
                     INNER JOIN conversation_assignments ca 
                         ON ca.conversation_id = c.id 
-                        AND ca.agent_id = ?
-                        AND ca.assigned_at >= ?
-                        AND ca.assigned_at <= ?
+                        AND ca.{$agentColumn} = ?
+                        AND ca.{$assignedColumn} >= ?
+                        AND ca.{$assignedColumn} <= ?
                     WHERE m1.sender_type = 'contact'
                 ) as response_times";
         
@@ -1588,6 +1613,10 @@ class DashboardService
         // ✅ Cache de 3 minutos por agente
         $cacheKey = "dashboard_agent_detailed_metrics_{$agentId}_" . md5($dateFrom . $dateTo);
         return \App\Helpers\Cache::remember($cacheKey, 180, function() use ($agentId, $dateFrom, $dateTo) {
+            $assignCols = self::getAssignmentsColumns();
+            $agentColumn = $assignCols['agent_column'];
+            $assignedColumn = $assignCols['assigned_column'];
+
             // Obter métricas básicas do agente
             $baseMetrics = self::getAgentMetrics($agentId, $dateFrom, $dateTo);
             
@@ -1598,9 +1627,9 @@ class DashboardService
                 FROM messages m
                 INNER JOIN conversation_assignments ca
                     ON ca.conversation_id = m.conversation_id
-                    AND ca.agent_id = ?
-                    AND ca.assigned_at >= ?
-                    AND ca.assigned_at <= ?
+                    AND ca.{$agentColumn} = ?
+                    AND ca.{$assignedColumn} >= ?
+                    AND ca.{$assignedColumn} <= ?
                 WHERE m.sender_id = ? 
                 AND m.sender_type = 'agent'
                 AND m.created_at >= ? 
@@ -1617,9 +1646,9 @@ class DashboardService
                 FROM conversations c
                 INNER JOIN conversation_assignments ca
                     ON ca.conversation_id = c.id
-                    AND ca.agent_id = ?
-                WHERE ca.assigned_at >= ?
-                AND ca.assigned_at <= ?
+                    AND ca.{$agentColumn} = ?
+                WHERE ca.{$assignedColumn} >= ?
+                AND ca.{$assignedColumn} <= ?
                 GROUP BY c.status";
             
             $statusResults = \App\Helpers\Database::fetchAll($sqlStatusDetail, [
@@ -1638,9 +1667,9 @@ class DashboardService
                 FROM conversations c
                 INNER JOIN conversation_assignments ca
                     ON ca.conversation_id = c.id
-                    AND ca.agent_id = ?
-                WHERE ca.assigned_at >= ?
-                AND ca.assigned_at <= ?
+                    AND ca.{$agentColumn} = ?
+                WHERE ca.{$assignedColumn} >= ?
+                AND ca.{$assignedColumn} <= ?
                 GROUP BY c.channel";
             
             $channelResults = \App\Helpers\Database::fetchAll($sqlChannels, [

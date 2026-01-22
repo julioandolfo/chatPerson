@@ -44,9 +44,11 @@ class DashboardController
             
             // Top agentes
             $topAgents = \App\Services\DashboardService::getTopAgents($dateFrom, $dateTo, 5);
+            self::logDash("topAgents_count=" . count($topAgents));
             
             // Métricas individuais de todos os agentes (para cards)
             $allAgentsMetrics = \App\Services\DashboardService::getAllAgentsMetrics($dateFrom, $dateTo);
+            self::logDash("allAgentsMetrics_count=" . count($allAgentsMetrics));
             
             // Métricas de times
             $teamsMetrics = [];
@@ -85,6 +87,7 @@ class DashboardController
                     $team['avg_ticket'] = $conversionMetrics['avg_ticket'];
                     $team['total_orders'] = $conversionMetrics['total_orders'];
                 }
+                self::logDash("teamsMetrics_count=" . count($teamsMetrics));
             } catch (\Exception $e) {
                 error_log("Erro ao carregar métricas de times: " . $e->getMessage());
             }
@@ -166,6 +169,7 @@ class DashboardController
                 
                 // Criar 3 rankings diferentes
                 $conversionRanking = $ranking; // Todos para criar os rankings
+                self::logDash("conversionRanking_count=" . count($conversionRanking));
             } catch (\Exception $e) {
                 error_log("Erro ao carregar métricas de conversão: " . $e->getMessage());
             }
@@ -197,6 +201,9 @@ class DashboardController
                 });
                 $rankingByTicket = array_slice($rankingByTicket, 0, 5);
             }
+            self::logDash("rankingByRevenue_count=" . count($rankingByRevenue));
+            self::logDash("rankingByConversion_count=" . count($rankingByConversion));
+            self::logDash("rankingByTicket_count=" . count($rankingByTicket));
             
             // Conversas recentes (apenas 5)
             $recentConversations = \App\Services\DashboardService::getRecentConversations(5);

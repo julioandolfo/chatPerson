@@ -517,7 +517,6 @@ ob_start();
 <!--begin::Row - Estatísticas Detalhadas-->
 <div class="row g-5 g-xl-10 mb-5 mb-xl-10">
     <!--begin::Col - Top Agentes-->
-    <?php if (!empty($topAgents)): ?>
     <div class="col-xl-6">
         <div class="card">
             <div class="card-header border-0 pt-5">
@@ -527,55 +526,58 @@ ob_start();
                 </h3>
             </div>
             <div class="card-body py-3">
-                <div class="table-responsive">
-                    <table class="table align-middle table-row-dashed fs-6 gy-5">
-                        <thead>
-                            <tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">
-                                <th class="min-w-200px">Agente</th>
-                                <th class="min-w-100px">Conversas</th>
-                                <th class="min-w-100px">Fechadas</th>
-                                <th class="min-w-100px">Taxa</th>
-                            </tr>
-                        </thead>
-                        <tbody class="text-gray-600 fw-semibold">
-                            <?php foreach ($topAgents as $index => $agent): ?>
-                                <tr>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="symbol symbol-40px me-3">
-                                                <?php if (!empty($agent['avatar'])): ?>
-                                                    <img src="<?= htmlspecialchars($agent['avatar']) ?>" alt="<?= htmlspecialchars($agent['name']) ?>" />
-                                                <?php else: ?>
-                                                    <div class="symbol-label fs-3 fw-semibold text-primary bg-light-primary">
-                                                        <?= mb_substr(htmlspecialchars($agent['name'] ?? 'A'), 0, 1) ?>
-                                                    </div>
-                                                <?php endif; ?>
-                                            </div>
-                                            <div class="d-flex flex-column">
-                                                <span class="text-gray-800 fw-bold"><?= htmlspecialchars($agent['name'] ?? 'Sem nome') ?></span>
-                                                <span class="text-muted fs-7"><?= htmlspecialchars($agent['email'] ?? '') ?></span>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span class="text-gray-800 fw-bold"><?= number_format($agent['total_conversations'] ?? 0) ?></span>
-                                    </td>
-                                    <td>
-                                        <span class="text-success fw-bold"><?= number_format($agent['closed_conversations'] ?? 0) ?></span>
-                                    </td>
-                                    <td>
-                                        <span class="badge badge-light-success"><?= number_format($agent['resolution_rate'] ?? 0, 1) ?>%</span>
-                                    </td>
+                <?php if (!empty($topAgents)): ?>
+                    <div class="table-responsive">
+                        <table class="table align-middle table-row-dashed fs-6 gy-5">
+                            <thead>
+                                <tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">
+                                    <th class="min-w-200px">Agente</th>
+                                    <th class="min-w-100px">Conversas</th>
+                                    <th class="min-w-100px">Fechadas</th>
+                                    <th class="min-w-100px">Taxa</th>
                                 </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody class="text-gray-600 fw-semibold">
+                                <?php foreach ($topAgents as $index => $agent): ?>
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="symbol symbol-40px me-3">
+                                                    <?php if (!empty($agent['avatar'])): ?>
+                                                        <img src="<?= htmlspecialchars($agent['avatar']) ?>" alt="<?= htmlspecialchars($agent['name']) ?>" />
+                                                    <?php else: ?>
+                                                        <div class="symbol-label fs-3 fw-semibold text-primary bg-light-primary">
+                                                            <?= mb_substr(htmlspecialchars($agent['name'] ?? 'A'), 0, 1) ?>
+                                                        </div>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <div class="d-flex flex-column">
+                                                    <span class="text-gray-800 fw-bold"><?= htmlspecialchars($agent['name'] ?? 'Sem nome') ?></span>
+                                                    <span class="text-muted fs-7"><?= htmlspecialchars($agent['email'] ?? '') ?></span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="text-gray-800 fw-bold"><?= number_format($agent['total_conversations'] ?? 0) ?></span>
+                                        </td>
+                                        <td>
+                                            <span class="text-success fw-bold"><?= number_format($agent['closed_conversations'] ?? 0) ?></span>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-light-success"><?= number_format($agent['resolution_rate'] ?? 0, 1) ?>%</span>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <div class="text-muted fs-7">Sem dados de agentes para o período.</div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
     <!--end::Col-->
-    <?php endif; ?>
     
     <!--begin::Col - Conversas Recentes-->
     <?php if (!empty($recentConversations)): ?>
@@ -734,7 +736,8 @@ ob_start();
 <?php endif; ?>
 
 <!--begin::Row - Cards Individuais de Agentes-->
-<?php if (!empty($allAgentsMetrics)): 
+<?php
+    $hasAgentsMetrics = !empty($allAgentsMetrics);
     // Buscar configurações de SLA dinâmicas
     $slaSettings = \App\Services\ConversationSettingsService::getSettings()['sla'] ?? [];
     $slaFirstResponse = $slaSettings['first_response_time'] ?? 15; // minutos
@@ -750,6 +753,7 @@ ob_start();
                 </h3>
             </div>
             <div class="card-body pt-3">
+                <?php if ($hasAgentsMetrics): ?>
                 <div class="row g-4">
                     <?php foreach ($allAgentsMetrics as $agent): ?>
                     <div class="col-xl-4 col-lg-6">
@@ -1124,15 +1128,16 @@ ob_start();
                     </div>
                     <?php endforeach; ?>
                 </div>
+                <?php else: ?>
+                    <div class="text-muted fs-7">Sem métricas de agentes para o período.</div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
 </div>
 <!--end::Row-->
-<?php endif; ?>
 
 <!--begin::Row - Métricas de Times-->
-<?php if (!empty($teamsMetrics)): ?>
 <div class="row g-5 mb-5">
     <div class="col-12">
         <div class="card">
@@ -1154,139 +1159,142 @@ ob_start();
                 </div>
             </div>
             <div class="card-body pt-3">
-                <div class="table-responsive">
-                    <table class="table table-row-dashed align-middle fs-6 gy-4">
-                        <thead>
-                            <tr class="text-start text-gray-400 fw-bold fs-7 text-uppercase gs-0">
-                                <th class="min-w-200px">Time</th>
-                                <th class="min-w-80px text-center">Membros</th>
-                                <th class="min-w-100px text-center">Conversas</th>
-                                <th class="min-w-100px text-center">Resolvidas</th>
-                                <th class="min-w-100px text-center">Taxa Resolução</th>
-                                <th class="min-w-120px text-center">TM Resposta</th>
-                                <?php if (\App\Helpers\Permission::can('conversion.view')): ?>
-                                <th class="min-w-100px text-center">Vendas</th>
-                                <th class="min-w-100px text-center">Taxa Conversão</th>
-                                <th class="min-w-120px text-end">Faturamento</th>
-                                <th class="min-w-100px text-end">Ticket Médio</th>
-                                <?php endif; ?>
-                                <th class="text-end min-w-100px">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody class="fw-semibold text-gray-600">
-                            <?php foreach ($teamsMetrics as $index => $team): ?>
-                            <tr>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <div class="symbol symbol-40px me-3" style="background-color: <?= htmlspecialchars($team['team_color'] ?? '#009ef7') ?>20;">
-                                            <span class="symbol-label" style="color: <?= htmlspecialchars($team['team_color'] ?? '#009ef7') ?>;">
-                                                <i class="ki-duotone ki-people fs-2x">
-                                                    <span class="path1"></span>
-                                                    <span class="path2"></span>
-                                                    <span class="path3"></span>
-                                                    <span class="path4"></span>
-                                                    <span class="path5"></span>
-                                                </i>
-                                            </span>
-                                        </div>
-                                        <div class="d-flex flex-column">
-                                            <a href="/teams/show?id=<?= $team['team_id'] ?>&date_from=<?= $dateFrom ?>&date_to=<?= date('Y-m-d', strtotime($dateTo)) ?>" class="text-gray-800 text-hover-primary fw-bold fs-6">
-                                                <?= htmlspecialchars($team['team_name']) ?>
-                                            </a>
-                                            <?php if (!empty($team['leader_name'])): ?>
-                                            <span class="text-muted fs-7">Líder: <?= htmlspecialchars($team['leader_name']) ?></span>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="text-center">
-                                    <span class="badge badge-light fs-7"><?= $team['members_count'] ?? 0 ?></span>
-                                </td>
-                                <td class="text-center">
-                                    <span class="fw-bold text-gray-800 fs-6"><?= $team['total_conversations'] ?? 0 ?></span>
-                                </td>
-                                <td class="text-center">
-                                    <span class="badge badge-light-success fs-7"><?= $team['closed_conversations'] ?? 0 ?></span>
-                                </td>
-                                <td class="text-center">
-                                    <div class="d-flex flex-column align-items-center">
-                                        <span class="fw-bold text-gray-800 fs-6 mb-1"><?= number_format($team['resolution_rate'] ?? 0, 1) ?>%</span>
-                                        <div class="progress h-6px w-100px">
-                                            <div class="progress-bar bg-<?= ($team['resolution_rate'] ?? 0) >= 80 ? 'success' : (($team['resolution_rate'] ?? 0) >= 50 ? 'warning' : 'danger') ?>" 
-                                                 role="progressbar" 
-                                                 style="width: <?= min(100, $team['resolution_rate'] ?? 0) ?>%" 
-                                                 aria-valuenow="<?= $team['resolution_rate'] ?? 0 ?>" 
-                                                 aria-valuemin="0" 
-                                                 aria-valuemax="100">
+                <?php if (!empty($teamsMetrics)): ?>
+                    <div class="table-responsive">
+                        <table class="table table-row-dashed align-middle fs-6 gy-4">
+                            <thead>
+                                <tr class="text-start text-gray-400 fw-bold fs-7 text-uppercase gs-0">
+                                    <th class="min-w-200px">Time</th>
+                                    <th class="min-w-80px text-center">Membros</th>
+                                    <th class="min-w-100px text-center">Conversas</th>
+                                    <th class="min-w-100px text-center">Resolvidas</th>
+                                    <th class="min-w-100px text-center">Taxa Resolução</th>
+                                    <th class="min-w-120px text-center">TM Resposta</th>
+                                    <?php if (\App\Helpers\Permission::can('conversion.view')): ?>
+                                    <th class="min-w-100px text-center">Vendas</th>
+                                    <th class="min-w-100px text-center">Taxa Conversão</th>
+                                    <th class="min-w-120px text-end">Faturamento</th>
+                                    <th class="min-w-100px text-end">Ticket Médio</th>
+                                    <?php endif; ?>
+                                    <th class="text-end min-w-100px">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody class="fw-semibold text-gray-600">
+                                <?php foreach ($teamsMetrics as $index => $team): ?>
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="symbol symbol-40px me-3" style="background-color: <?= htmlspecialchars($team['team_color'] ?? '#009ef7') ?>20;">
+                                                <span class="symbol-label" style="color: <?= htmlspecialchars($team['team_color'] ?? '#009ef7') ?>;">
+                                                    <i class="ki-duotone ki-people fs-2x">
+                                                        <span class="path1"></span>
+                                                        <span class="path2"></span>
+                                                        <span class="path3"></span>
+                                                        <span class="path4"></span>
+                                                        <span class="path5"></span>
+                                                    </i>
+                                                </span>
+                                            </div>
+                                            <div class="d-flex flex-column">
+                                                <a href="/teams/show?id=<?= $team['team_id'] ?>&date_from=<?= $dateFrom ?>&date_to=<?= date('Y-m-d', strtotime($dateTo)) ?>" class="text-gray-800 text-hover-primary fw-bold fs-6">
+                                                    <?= htmlspecialchars($team['team_name']) ?>
+                                                </a>
+                                                <?php if (!empty($team['leader_name'])): ?>
+                                                <span class="text-muted fs-7">Líder: <?= htmlspecialchars($team['leader_name']) ?></span>
+                                                <?php endif; ?>
                                             </div>
                                         </div>
-                                    </div>
-                                </td>
-                                <td class="text-center">
-                                    <span class="fw-bold text-gray-800">
-                                        <?= \App\Services\TeamPerformanceService::formatTime($team['avg_first_response_time'] ?? null) ?>
-                                    </span>
-                                </td>
-                                <?php if (\App\Helpers\Permission::can('conversion.view')): ?>
-                                <td class="text-center">
-                                    <span class="badge badge-light-success"><?= $team['total_orders'] ?? 0 ?></span>
-                                </td>
-                                <td class="text-center">
-                                    <?php
-                                    $convRate = $team['conversion_rate_sales'] ?? 0;
-                                    $convColor = 'danger';
-                                    if ($convRate >= 30) $convColor = 'success';
-                                    elseif ($convRate >= 15) $convColor = 'warning';
-                                    ?>
-                                    <div class="d-flex flex-column align-items-center">
-                                        <span class="fw-bold text-gray-800 fs-7 mb-1"><?= number_format($convRate, 1) ?>%</span>
-                                        <div class="progress h-5px w-60px">
-                                            <div class="progress-bar bg-<?= $convColor ?>" style="width: <?= min(100, $convRate) ?>%"></div>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge badge-light fs-7"><?= $team['members_count'] ?? 0 ?></span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="fw-bold text-gray-800 fs-6"><?= $team['total_conversations'] ?? 0 ?></span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge badge-light-success fs-7"><?= $team['closed_conversations'] ?? 0 ?></span>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="d-flex flex-column align-items-center">
+                                            <span class="fw-bold text-gray-800 fs-6 mb-1"><?= number_format($team['resolution_rate'] ?? 0, 1) ?>%</span>
+                                            <div class="progress h-6px w-100px">
+                                                <div class="progress-bar bg-<?= ($team['resolution_rate'] ?? 0) >= 80 ? 'success' : (($team['resolution_rate'] ?? 0) >= 50 ? 'warning' : 'danger') ?>" 
+                                                     role="progressbar" 
+                                                     style="width: <?= min(100, $team['resolution_rate'] ?? 0) ?>%" 
+                                                     aria-valuenow="<?= $team['resolution_rate'] ?? 0 ?>" 
+                                                     aria-valuemin="0" 
+                                                     aria-valuemax="100">
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                </td>
-                                <td class="text-end">
-                                    <span class="fw-bold text-success">
-                                        <?= \App\Services\AgentConversionService::formatCurrency($team['total_revenue'] ?? 0) ?>
-                                    </span>
-                                </td>
-                                <td class="text-end">
-                                    <span class="fw-bold text-gray-800">
-                                        <?= \App\Services\AgentConversionService::formatCurrency($team['avg_ticket'] ?? 0) ?>
-                                    </span>
-                                </td>
-                                <?php endif; ?>
-                                <td class="text-end">
-                                    <a href="/teams/show?id=<?= $team['team_id'] ?>&date_from=<?= $dateFrom ?>&date_to=<?= date('Y-m-d', strtotime($dateTo)) ?>" class="btn btn-sm btn-light btn-active-light-primary">
-                                        <i class="ki-duotone ki-eye fs-4">
-                                            <span class="path1"></span>
-                                            <span class="path2"></span>
-                                            <span class="path3"></span>
-                                        </i>
-                                        Ver Detalhes
-                                    </a>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                
-                <?php if (count($teamsMetrics) >= 10): ?>
-                <div class="text-center mt-5">
-                    <a href="/teams/dashboard?date_from=<?= $dateFrom ?>&date_to=<?= date('Y-m-d', strtotime($dateTo)) ?>" class="btn btn-link">
-                        Ver todos os times →
-                    </a>
-                </div>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="fw-bold text-gray-800">
+                                            <?= \App\Services\TeamPerformanceService::formatTime($team['avg_first_response_time'] ?? null) ?>
+                                        </span>
+                                    </td>
+                                    <?php if (\App\Helpers\Permission::can('conversion.view')): ?>
+                                    <td class="text-center">
+                                        <span class="badge badge-light-success"><?= $team['total_orders'] ?? 0 ?></span>
+                                    </td>
+                                    <td class="text-center">
+                                        <?php
+                                        $convRate = $team['conversion_rate_sales'] ?? 0;
+                                        $convColor = 'danger';
+                                        if ($convRate >= 30) $convColor = 'success';
+                                        elseif ($convRate >= 15) $convColor = 'warning';
+                                        ?>
+                                        <div class="d-flex flex-column align-items-center">
+                                            <span class="fw-bold text-gray-800 fs-7 mb-1"><?= number_format($convRate, 1) ?>%</span>
+                                            <div class="progress h-5px w-60px">
+                                                <div class="progress-bar bg-<?= $convColor ?>" style="width: <?= min(100, $convRate) ?>%"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="text-end">
+                                        <span class="fw-bold text-success">
+                                            <?= \App\Services\AgentConversionService::formatCurrency($team['total_revenue'] ?? 0) ?>
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <span class="fw-bold text-gray-800">
+                                            <?= \App\Services\AgentConversionService::formatCurrency($team['avg_ticket'] ?? 0) ?>
+                                        </span>
+                                    </td>
+                                    <?php endif; ?>
+                                    <td class="text-end">
+                                        <a href="/teams/show?id=<?= $team['team_id'] ?>&date_from=<?= $dateFrom ?>&date_to=<?= date('Y-m-d', strtotime($dateTo)) ?>" class="btn btn-sm btn-light btn-active-light-primary">
+                                            <i class="ki-duotone ki-eye fs-4">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                                <span class="path3"></span>
+                                            </i>
+                                            Ver Detalhes
+                                        </a>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <?php if (count($teamsMetrics) >= 10): ?>
+                    <div class="text-center mt-5">
+                        <a href="/teams/dashboard?date_from=<?= $dateFrom ?>&date_to=<?= date('Y-m-d', strtotime($dateTo)) ?>" class="btn btn-link">
+                            Ver todos os times →
+                        </a>
+                    </div>
+                    <?php endif; ?>
+                <?php else: ?>
+                    <div class="text-muted fs-7">Sem dados de times para o período.</div>
                 <?php endif; ?>
             </div>
         </div>
     </div>
 </div>
 <!--end::Row-->
-<?php endif; ?>
 
-<?php if (!empty($conversionRanking) && \App\Helpers\Permission::can('conversion.view')): ?>
+<?php if (\App\Helpers\Permission::can('conversion.view')): ?>
 <!--begin::Row - Conversão WooCommerce-->
 <div class="row g-5 mb-5">
     <div class="col-12">
@@ -1329,72 +1337,76 @@ ob_start();
                 </div>
             </div>
             <div class="card-body pt-3">
-                <div class="table-responsive">
-                    <table class="table align-middle table-row-dashed fs-6 gy-5">
-                        <thead>
-                            <tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">
-                                <th class="min-w-200px">Vendedor</th>
-                                <th class="min-w-80px text-center">Conversas</th>
-                                <th class="min-w-80px text-center">Vendas</th>
-                                <th class="min-w-120px text-center">Taxa Conversão</th>
-                                <th class="min-w-120px text-end">Valor Total</th>
-                                <th class="text-end min-w-100px">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody class="text-gray-600 fw-semibold">
-                            <?php foreach ($conversionRanking as $seller): ?>
-                                <?php
-                                    $conversionRate = $seller['conversion_rate'] ?? 0;
-                                    $progressColor = 'danger';
-                                    if ($conversionRate >= 30) {
-                                        $progressColor = 'success';
-                                    } elseif ($conversionRate >= 15) {
-                                        $progressColor = 'warning';
-                                    }
-                                ?>
-                                <tr>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="d-flex flex-column">
-                                                <a href="<?= \App\Helpers\Url::to('/agent-conversion/agent', ['id' => $seller['agent_id'], 'date_from' => $dateFrom, 'date_to' => date('Y-m-d', strtotime($dateTo))]) ?>" class="text-gray-800 text-hover-primary fs-6 fw-bold">
-                                                    <?= htmlspecialchars($seller['agent_name']) ?>
-                                                </a>
-                                                <span class="text-muted fs-7">ID WC: <?= $seller['seller_id'] ?? '-' ?></span>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="fw-bold text-gray-800"><?= $seller['total_conversations'] ?? 0 ?></span>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge badge-light-success"><?= $seller['total_orders'] ?? 0 ?></span>
-                                    </td>
-                                    <td class="text-center">
-                                        <div class="d-flex flex-column align-items-center">
-                                            <span class="fw-bold text-gray-800 fs-6 mb-1"><?= number_format($conversionRate, 1) ?>%</span>
-                                            <div class="progress h-6px w-100px">
-                                                <div class="progress-bar bg-<?= $progressColor ?>" role="progressbar" style="width: <?= min(100, $conversionRate) ?>%" aria-valuenow="<?= $conversionRate ?>" aria-valuemin="0" aria-valuemax="100"></div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="text-end">
-                                        <span class="text-success fw-bold">
-                                            <?= \App\Services\AgentConversionService::formatCurrency($seller['total_revenue'] ?? 0) ?>
-                                        </span>
-                                    </td>
-                                    <td class="text-end">
-                                        <a href="<?= \App\Helpers\Url::to('/agent-conversion/agent', ['id' => $seller['agent_id'], 'date_from' => $dateFrom, 'date_to' => date('Y-m-d', strtotime($dateTo))]) ?>" class="btn btn-icon btn-bg-light btn-active-color-primary btn-sm">
-                                            <i class="ki-duotone ki-arrow-right fs-2">
-                                                <span class="path1"></span>
-                                                <span class="path2"></span>
-                                            </i>
-                                        </a>
-                                    </td>
+                <?php if (!empty($conversionRanking)): ?>
+                    <div class="table-responsive">
+                        <table class="table align-middle table-row-dashed fs-6 gy-5">
+                            <thead>
+                                <tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">
+                                    <th class="min-w-200px">Vendedor</th>
+                                    <th class="min-w-80px text-center">Conversas</th>
+                                    <th class="min-w-80px text-center">Vendas</th>
+                                    <th class="min-w-120px text-center">Taxa Conversão</th>
+                                    <th class="min-w-120px text-end">Valor Total</th>
+                                    <th class="text-end min-w-100px">Ações</th>
                                 </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody class="text-gray-600 fw-semibold">
+                                <?php foreach ($conversionRanking as $seller): ?>
+                                    <?php
+                                        $conversionRate = $seller['conversion_rate'] ?? 0;
+                                        $progressColor = 'danger';
+                                        if ($conversionRate >= 30) {
+                                            $progressColor = 'success';
+                                        } elseif ($conversionRate >= 15) {
+                                            $progressColor = 'warning';
+                                        }
+                                    ?>
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="d-flex flex-column">
+                                                    <a href="<?= \App\Helpers\Url::to('/agent-conversion/agent', ['id' => $seller['agent_id'], 'date_from' => $dateFrom, 'date_to' => date('Y-m-d', strtotime($dateTo))]) ?>" class="text-gray-800 text-hover-primary fs-6 fw-bold">
+                                                        <?= htmlspecialchars($seller['agent_name']) ?>
+                                                    </a>
+                                                    <span class="text-muted fs-7">ID WC: <?= $seller['seller_id'] ?? '-' ?></span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="fw-bold text-gray-800"><?= $seller['total_conversations'] ?? 0 ?></span>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge badge-light-success"><?= $seller['total_orders'] ?? 0 ?></span>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="d-flex flex-column align-items-center">
+                                                <span class="fw-bold text-gray-800 fs-6 mb-1"><?= number_format($conversionRate, 1) ?>%</span>
+                                                <div class="progress h-6px w-100px">
+                                                    <div class="progress-bar bg-<?= $progressColor ?>" role="progressbar" style="width: <?= min(100, $conversionRate) ?>%" aria-valuenow="<?= $conversionRate ?>" aria-valuemin="0" aria-valuemax="100"></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="text-end">
+                                            <span class="text-success fw-bold">
+                                                <?= \App\Services\AgentConversionService::formatCurrency($seller['total_revenue'] ?? 0) ?>
+                                            </span>
+                                        </td>
+                                        <td class="text-end">
+                                            <a href="<?= \App\Helpers\Url::to('/agent-conversion/agent', ['id' => $seller['agent_id'], 'date_from' => $dateFrom, 'date_to' => date('Y-m-d', strtotime($dateTo))]) ?>" class="btn btn-icon btn-bg-light btn-active-color-primary btn-sm">
+                                                <i class="ki-duotone ki-arrow-right fs-2">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <div class="text-muted fs-7">Sem dados de conversão para o período.</div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -1552,6 +1564,24 @@ ob_start();
     
 </div>
 <!--end::Row-->
+<?php endif; ?>
+
+<?php if (empty($rankingByRevenue) && empty($rankingByConversion) && empty($rankingByTicket) && \App\Helpers\Permission::can('conversion.view')): ?>
+<div class="row g-5 mb-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-3 mb-1">Rankings de Vendas</span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">Sem dados no período</span>
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="text-muted fs-7">Não há dados suficientes para gerar rankings.</div>
+            </div>
+        </div>
+    </div>
+</div>
 <?php endif; ?>
 
 <?php if (!empty($goalsOverview)): ?>

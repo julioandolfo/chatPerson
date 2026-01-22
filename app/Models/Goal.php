@@ -92,6 +92,7 @@ class Goal extends Model
     {
         $sql = "SELECT g.*, 
                        u.name as creator_name,
+                       (SELECT COUNT(*) FROM goal_agent_targets gat WHERE gat.goal_id = g.id) as target_count,
                        CASE 
                            WHEN g.target_type = 'individual' THEN (SELECT name FROM users WHERE id = g.target_id)
                            WHEN g.target_type = 'team' THEN (SELECT name FROM teams WHERE id = g.target_id)
@@ -145,6 +146,7 @@ class Goal extends Model
         $sql = "SELECT g.*, 
                        u.name as creator_name,
                        u.email as creator_email,
+                       (SELECT COUNT(*) FROM goal_agent_targets gat WHERE gat.goal_id = g.id) as target_count,
                        CASE 
                            WHEN g.target_type = 'individual' THEN (SELECT name FROM users WHERE id = g.target_id)
                            WHEN g.target_type = 'team' THEN (SELECT name FROM teams WHERE id = g.target_id)

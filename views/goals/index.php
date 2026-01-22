@@ -135,7 +135,17 @@ ob_start();
                                             </div>
                                         </td>
                                         <td class="text-gray-800 fw-bold">
-                                            <?= \App\Models\Goal::formatValue($goal['type'], $goal['target_value']) ?>
+                                            <?php
+                                                $targetCount = (int)($goal['target_count'] ?? 0);
+                                                $isMulti = ($goal['target_type'] ?? '') === 'multi_agent';
+                                                $targetTotal = $isMulti && $targetCount > 0
+                                                    ? ((float)$goal['target_value'] * $targetCount)
+                                                    : (float)$goal['target_value'];
+                                            ?>
+                                            <?= \App\Models\Goal::formatValue($goal['type'], $targetTotal) ?>
+                                            <?php if ($isMulti && $targetCount > 0): ?>
+                                                <div class="text-muted fs-8"><?= $targetCount ?>x <?= \App\Models\Goal::formatValue($goal['type'], $goal['target_value']) ?></div>
+                                            <?php endif; ?>
                                         </td>
                                         <td class="text-gray-800">
                                             <?= \App\Models\Goal::formatValue($goal['type'], $currentValue) ?>

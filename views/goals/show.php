@@ -57,6 +57,11 @@ ob_start();
             $flagStatus = $progress['flag_status'] ?? 'good';
             $flagColor = \App\Models\Goal::getFlagColor($flagStatus);
             $flagIcon = ['critical' => '🔴', 'warning' => '🟡', 'good' => '🟢', 'excellent' => '🔵'][$flagStatus] ?? '⚪';
+            $targetCount = (int)($goal['target_count'] ?? 0);
+            $isMulti = ($goal['target_type'] ?? '') === 'multi_agent';
+            $targetTotal = $isMulti && $targetCount > 0
+                ? ((float)$goal['target_value'] * $targetCount)
+                : (float)$goal['target_value'];
         ?>
         <div class="card mb-5">
             <div class="card-header">
@@ -84,8 +89,11 @@ ob_start();
                         <div class="mb-5">
                             <label class="text-muted">Valor Alvo</label>
                             <div class="text-gray-900 fw-bold fs-2">
-                                <?= \App\Models\Goal::formatValue($goal['type'], $goal['target_value']) ?>
+                                <?= \App\Models\Goal::formatValue($goal['type'], $targetTotal) ?>
                             </div>
+                            <?php if ($isMulti && $targetCount > 0): ?>
+                                <div class="text-muted fs-7">Total: <?= $targetCount ?>x <?= \App\Models\Goal::formatValue($goal['type'], $goal['target_value']) ?></div>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -159,6 +167,38 @@ ob_start();
         </div>
         <?php endif; ?>
         <!--end::Projection Card-->
+
+        <!--begin::Agents Card-->
+        <?php if (!empty($goalAgents)): ?>
+        <div class="card mb-5">
+            <div class="card-header">
+                <h3 class="card-title">👥 Agentes Envolvidos</h3>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-row-dashed align-middle">
+                        <thead>
+                            <tr class="text-muted fw-bold fs-7 text-uppercase">
+                                <th>Agente</th>
+                                <th class="text-end">Atual</th>
+                                <th class="text-end">% da Meta</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($goalAgents as $agent): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($agent['name']) ?></td>
+                                    <td class="text-end"><?= \App\Models\Goal::formatValue($goal['type'], $agent['current_value'] ?? 0) ?></td>
+                                    <td class="text-end"><?= number_format((float)($agent['percentage'] ?? 0), 1) ?>%</td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+        <!--end::Agents Card-->
         
         <!--begin::Details Card-->
         <div class="card mb-5">
@@ -181,6 +221,12 @@ ob_start();
                                 <?php endif; ?>
                             </td>
                         </tr>
+                        <?php if ($isMulti && $targetCount > 0): ?>
+                        <tr>
+                            <td class="fw-bold text-muted">Meta por agente</td>
+                            <td><?= \App\Models\Goal::formatValue($goal['type'], $goal['target_value']) ?> (<?= $targetCount ?> agentes)</td>
+                        </tr>
+                        <?php endif; ?>
                         <tr>
                             <td class="fw-bold text-muted">Thresholds</td>
                             <td>
@@ -211,6 +257,82 @@ ob_start();
             </div>
         </div>
         <!--end::Details Card-->
+
+        <!--begin::Bonus Card-->
+        <?php if (!empty($bonusTiers) || !empty($bonusConditions)): ?>
+        <div class="card mb-5">
+            <div class="card-header">
+                <h3 class="card-title">💰 Regras, Condições e Bônus</h3>
+            </div>
+            <div class="card-body">
+                <div class="row g-5">
+                    <div class="col-md-6">
+                        <h5 class="fw-bold mb-3">Tiers de Bônus</h5>
+                        <?php if (!empty($bonusTiers)): ?>
+                            <div class="table-responsive">
+                                <table class="table table-row-dashed">
+                                    <thead>
+                                        <tr class="text-muted fw-bold fs-7 text-uppercase">
+                                            <th>Tier</th>
+                                            <th>%</th>
+                                            <th>Bônus</th>
+                                            <th>Acumula</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($bonusTiers as $tier): ?>
+                                            <tr>
+                                                <td><?= htmlspecialchars($tier['tier_name'] ?? 'Tier') ?></td>
+                                                <td><?= number_format((float)$tier['threshold_percentage'], 1) ?>%</td>
+                                                <td>R$ <?= number_format((float)($tier['bonus_amount'] ?? 0), 2, ',', '.') ?></td>
+                                                <td><?= !empty($tier['is_cumulative']) ? 'Sim' : 'Não' ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <span class="text-muted">Sem tiers configurados.</span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="col-md-6">
+                        <h5 class="fw-bold mb-3">Condições de Ativação</h5>
+                        <?php if (!empty($bonusConditions)): ?>
+                            <?php
+                                $conditionLabels = \App\Models\GoalBonusCondition::CONDITION_TYPES;
+                                $operatorLabels = \App\Models\GoalBonusCondition::OPERATORS;
+                            ?>
+                            <div class="table-responsive">
+                                <table class="table table-row-dashed">
+                                    <thead>
+                                        <tr class="text-muted fw-bold fs-7 text-uppercase">
+                                            <th>Métrica</th>
+                                            <th>Regra</th>
+                                            <th>Obrigatória</th>
+                                            <th>Modificador</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($bonusConditions as $cond): ?>
+                                            <tr>
+                                                <td><?= $conditionLabels[$cond['condition_type']] ?? $cond['condition_type'] ?></td>
+                                                <td><?= $operatorLabels[$cond['operator']] ?? $cond['operator'] ?> <?= number_format((float)$cond['min_value'], 2, ',', '.') ?></td>
+                                                <td><?= !empty($cond['is_required']) ? 'Sim' : 'Não' ?></td>
+                                                <td><?= number_format((float)($cond['bonus_modifier'] ?? 1), 2, ',', '.') ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <span class="text-muted">Sem condições configuradas.</span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+        <!--end::Bonus Card-->
         
         <!--begin::History Card-->
         <?php if (!empty($history)): ?>

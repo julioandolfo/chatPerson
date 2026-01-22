@@ -115,15 +115,21 @@ class GoalService
         // Obter valor atual baseado no tipo de meta
         $currentValue = self::getCurrentValue($goal);
         
+        // Calcular alvo total (multi-agente soma por agente)
+        $agentIds = self::getTargetAgentIds($goal['target_type'], $goal['target_id'] ?? null, (int)$goalId);
+        $targetValue = self::getTargetValueTotal($goal, count($agentIds));
+        
         // Calcular porcentagem
-        $percentage = $goal['target_value'] > 0 
-            ? ($currentValue / $goal['target_value']) * 100 
+        $percentage = $targetValue > 0 
+            ? ($currentValue / $targetValue) * 100 
             : 0;
         
         // Calcular projeção se habilitado
         $projection = null;
         if ($goal['enable_projection'] ?? true) {
-            $projection = self::calculateProjection($goal, $currentValue, $percentage);
+            $projectionGoal = $goal;
+            $projectionGoal['target_value'] = $targetValue;
+            $projection = self::calculateProjection($projectionGoal, $currentValue, $percentage);
         }
         
         // Determinar status
@@ -1110,6 +1116,8 @@ class GoalService
             });
 
             $goal['agents'] = $agents;
+            $goal['target_value_total'] = self::getTargetValueTotal($goal, count($agents));
+            $goal['target_value_per_agent'] = (float)($goal['target_value'] ?? 0);
             $goal['progress'] = self::buildOverviewProgress($goal, $agents, $goal['progress'] ?? null);
             $goal['teams'] = self::calculateTeamsTotals($goal, $agents);
         }
@@ -1117,6 +1125,37 @@ class GoalService
         return $goals;
     }
 
+    /**
+     * Obter agentes de uma meta com progresso individual
+     */
+    public static function getGoalAgentsWithProgress(int $goalId): array
+    {
+        $goal = Goal::find($goalId);
+        if (!$goal) return [];
+
+        $agentIds = self::getTargetAgentIds(
+            $goal['target_type'],
+            $goal['target_id'] ?? null,
+            (int)$goal['id']
+        );
+        $agents = self::getAgentsByIds($agentIds);
+
+        foreach ($agents as &$agent) {
+            $currentValue = self::calculateCurrentValueForAgent($goal, (int)$agent['id']);
+            $percentage = ($goal['target_value'] ?? 0) > 0
+                ? ($currentValue / (float)$goal['target_value']) * 100
+                : 0;
+            $agent['current_value'] = $currentValue;
+            $agent['percentage'] = round($percentage, 2);
+        }
+        unset($agent);
+
+        usort($agents, function ($a, $b) {
+            return $b['percentage'] <=> $a['percentage'];
+        });
+
+        return $agents;
+    }
     /**
      * Progresso agregado para metas multi-agente (uso em listagem/detalhe)
      */
@@ -1313,7 +1352,7 @@ class GoalService
             $totalCurrent += (float)($agent['current_value'] ?? 0);
         }
 
-        $targetValue = (float)($goal['target_value'] ?? 0);
+        $targetValue = self::getTargetValueTotal($goal, count($agents));
         $percentage = $targetValue > 0 ? ($totalCurrent / $targetValue) * 100 : 0;
 
         $override = [
@@ -1341,6 +1380,19 @@ class GoalService
         ];
 
         return $progress ? array_merge($progress, $override) : $override;
+    }
+
+    /**
+     * Valor alvo total (multi-agente soma por agente)
+     */
+    private static function getTargetValueTotal(array $goal, int $agentsCount): float
+    {
+        $targetValue = (float)($goal['target_value'] ?? 0);
+        if (($goal['target_type'] ?? '') === 'multi_agent') {
+            $count = max(1, $agentsCount);
+            return $targetValue * $count;
+        }
+        return $targetValue;
     }
     
     /**

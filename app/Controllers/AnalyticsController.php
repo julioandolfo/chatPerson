@@ -33,7 +33,7 @@ class AnalyticsController
         
         // Obter filtros padrão
         $filters = [
-            'start_date' => Request::get('start_date') ?: date('Y-m-d', strtotime('-30 days')),
+            'start_date' => Request::get('start_date') ?: date('Y-m-01'),
             'end_date' => Request::get('end_date') ?: date('Y-m-d'),
             'department_id' => Request::get('department_id'),
             'agent_id' => Request::get('agent_id'),
@@ -216,7 +216,7 @@ class AnalyticsController
         
         try {
             $filters = [
-                'start_date' => Request::get('start_date') ?: date('Y-m-d', strtotime('-30 days')),
+                'start_date' => Request::get('start_date') ?: date('Y-m-01'),
                 'end_date' => Request::get('end_date') ?: date('Y-m-d'),
                 'department_id' => Request::get('department_id'),
                 'agent_id' => Request::get('agent_id'),
@@ -297,7 +297,7 @@ class AnalyticsController
         
         try {
             $filters = [
-                'start_date' => Request::get('start_date') ?: date('Y-m-d', strtotime('-30 days')),
+                'start_date' => Request::get('start_date') ?: date('Y-m-01'),
                 'end_date' => Request::get('end_date') ?: date('Y-m-d'),
                 'agent_id' => Request::get('agent_id'),
             ];
@@ -346,7 +346,7 @@ class AnalyticsController
         
         try {
             $filters = [
-                'start_date' => Request::get('start_date') ?: date('Y-m-d', strtotime('-30 days')),
+                'start_date' => Request::get('start_date') ?: date('Y-m-01'),
                 'end_date' => Request::get('end_date') ?: date('Y-m-d'),
                 'department_id' => Request::get('department_id'),
                 'agent_id' => Request::get('agent_id'),
@@ -458,7 +458,7 @@ class AnalyticsController
         
         try {
             $filters = [
-                'start_date' => Request::get('start_date') ?: date('Y-m-d', strtotime('-30 days')),
+                'start_date' => Request::get('start_date') ?: date('Y-m-01'),
                 'end_date' => Request::get('end_date') ?: date('Y-m-d'),
                 'funnel_id' => Request::get('funnel_id'),
             ];
@@ -538,7 +538,7 @@ class AnalyticsController
         
         try {
             $filters = [
-                'start_date' => Request::get('start_date') ?: date('Y-m-d', strtotime('-30 days')),
+                'start_date' => Request::get('start_date') ?: date('Y-m-01'),
                 'end_date' => Request::get('end_date') ?: date('Y-m-d'),
             ];
             
@@ -649,7 +649,7 @@ class AnalyticsController
         
         try {
             $filters = [
-                'start_date' => Request::get('start_date') ?: date('Y-m-d', strtotime('-30 days')),
+                'start_date' => Request::get('start_date') ?: date('Y-m-01'),
                 'end_date' => Request::get('end_date') ?: date('Y-m-d'),
             ];
             
@@ -851,7 +851,7 @@ class AnalyticsController
         
         try {
             $filters = [
-                'start_date' => Request::get('start_date') ?: date('Y-m-d', strtotime('-30 days')),
+                'start_date' => Request::get('start_date') ?: date('Y-m-01'),
                 'end_date' => Request::get('end_date') ?: date('Y-m-d'),
             ];
             

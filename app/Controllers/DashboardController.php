@@ -108,7 +108,7 @@ class DashboardController
                     $sellers = \App\Models\User::getSellers();
                     
                     foreach ($sellers as $seller) {
-                        $metrics = \App\Services\AgentConversionService::getConversionMetrics(
+                        $metrics = \App\Services\AgentConversionService::getDetailedConversionMetrics(
                             $seller['id'],
                             $dateFrom,
                             str_replace(' 23:59:59', '', $dateTo)
@@ -120,8 +120,11 @@ class DashboardController
                                 'agent_name' => $seller['name'],
                                 'seller_id' => $seller['woocommerce_seller_id'],
                                 'total_conversations' => $metrics['total_conversations'],
+                                'conversations_agent_initiated' => $metrics['conversations_agent_initiated'] ?? 0,
+                                'conversations_client_initiated' => $metrics['conversations_client_initiated'] ?? 0,
                                 'total_orders' => $metrics['total_orders'],
                                 'conversion_rate' => $metrics['conversion_rate'],
+                                'conversion_rate_client_only' => $metrics['conversion_rate_client_only'] ?? 0,
                                 'total_revenue' => $metrics['total_revenue'],
                                 'avg_ticket' => $metrics['avg_ticket']
                             ];
@@ -146,7 +149,7 @@ class DashboardController
                     foreach ($sellers as $seller) {
                         // Somente se for membro de algum time do usuário
                         if (in_array($seller['id'], $teamMemberIds)) {
-                            $metrics = \App\Services\AgentConversionService::getConversionMetrics(
+                            $metrics = \App\Services\AgentConversionService::getDetailedConversionMetrics(
                                 $seller['id'],
                                 $dateFrom,
                                 str_replace(' 23:59:59', '', $dateTo)
@@ -158,8 +161,11 @@ class DashboardController
                                     'agent_name' => $seller['name'],
                                     'seller_id' => $seller['woocommerce_seller_id'],
                                     'total_conversations' => $metrics['total_conversations'],
+                                    'conversations_agent_initiated' => $metrics['conversations_agent_initiated'] ?? 0,
+                                    'conversations_client_initiated' => $metrics['conversations_client_initiated'] ?? 0,
                                     'total_orders' => $metrics['total_orders'],
                                     'conversion_rate' => $metrics['conversion_rate'],
+                                    'conversion_rate_client_only' => $metrics['conversion_rate_client_only'] ?? 0,
                                     'total_revenue' => $metrics['total_revenue'],
                                     'avg_ticket' => $metrics['avg_ticket']
                                 ];

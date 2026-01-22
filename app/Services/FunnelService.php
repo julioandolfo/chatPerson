@@ -604,7 +604,7 @@ class FunnelService
      */
     public static function getStageMetrics(int $stageId, ?string $dateFrom = null, ?string $dateTo = null): array
     {
-        $dateFrom = $dateFrom ?? date('Y-m-d', strtotime('-30 days'));
+        $dateFrom = $dateFrom ?? date('Y-m-01');
         $dateTo = $dateTo ?? date('Y-m-d H:i:s') . ' 23:59:59';
         
         $stage = FunnelStage::find($stageId);
@@ -829,7 +829,7 @@ class FunnelService
      */
     public static function getFunnelMetrics(int $funnelId, ?string $dateFrom = null, ?string $dateTo = null): array
     {
-        $dateFrom = $dateFrom ?? date('Y-m-d', strtotime('-30 days'));
+        $dateFrom = $dateFrom ?? date('Y-m-01');
         $dateTo = $dateTo ?? date('Y-m-d H:i:s') . ' 23:59:59';
         
         $funnel = Funnel::find($funnelId);

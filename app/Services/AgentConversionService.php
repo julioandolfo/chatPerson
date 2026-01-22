@@ -131,6 +131,116 @@ class AgentConversionService
     }
     
     /**
+     * Contar conversas iniciadas pelo agente (agente fez primeiro contato)
+     * Verifica se a primeira mensagem da conversa foi do agente
+     */
+    public static function getAgentInitiatedConversations(int $agentId, string $dateFrom, string $dateTo): int
+    {
+        // Garantir que dateTo inclui o dia inteiro
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
+        
+        $sql = "SELECT COUNT(DISTINCT c.id) as total
+                FROM conversations c
+                WHERE c.agent_id = ?
+                AND c.created_at >= ?
+                AND c.created_at <= ?
+                AND EXISTS (
+                    SELECT 1 FROM messages m 
+                    WHERE m.conversation_id = c.id 
+                    AND m.sender_type = 'agent' 
+                    AND m.sender_id > 0
+                    AND m.created_at = (
+                        SELECT MIN(m2.created_at) 
+                        FROM messages m2 
+                        WHERE m2.conversation_id = c.id
+                        AND m2.sender_id > 0
+                    )
+                )";
+        
+        $result = Database::fetch($sql, [$agentId, $dateFrom, $dateTo]);
+        return (int)($result['total'] ?? 0);
+    }
+    
+    /**
+     * Contar conversas iniciadas pelo cliente (cliente fez primeiro contato)
+     * Verifica se a primeira mensagem da conversa foi do cliente/contato
+     */
+    public static function getClientInitiatedConversations(int $agentId, string $dateFrom, string $dateTo): int
+    {
+        // Garantir que dateTo inclui o dia inteiro
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
+        
+        $sql = "SELECT COUNT(DISTINCT c.id) as total
+                FROM conversations c
+                WHERE c.agent_id = ?
+                AND c.created_at >= ?
+                AND c.created_at <= ?
+                AND EXISTS (
+                    SELECT 1 FROM messages m 
+                    WHERE m.conversation_id = c.id 
+                    AND m.sender_type = 'contact' 
+                    AND m.sender_id > 0
+                    AND m.created_at = (
+                        SELECT MIN(m2.created_at) 
+                        FROM messages m2 
+                        WHERE m2.conversation_id = c.id
+                        AND m2.sender_id > 0
+                    )
+                )";
+        
+        $result = Database::fetch($sql, [$agentId, $dateFrom, $dateTo]);
+        return (int)($result['total'] ?? 0);
+    }
+    
+    /**
+     * Obter métricas de conversão detalhadas com separação por iniciador
+     */
+    public static function getDetailedConversionMetrics(
+        int $agentId,
+        ?string $dateFrom = null,
+        ?string $dateTo = null
+    ): array
+    {
+        $dateFrom = $dateFrom ?? date('Y-m-01');
+        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        
+        // Garantir que dateTo inclui o dia inteiro
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
+        
+        // Métricas básicas
+        $basicMetrics = self::getConversionMetrics($agentId, $dateFrom, $dateTo);
+        
+        // Conversas por iniciador
+        $agentInitiated = self::getAgentInitiatedConversations($agentId, $dateFrom, $dateTo);
+        $clientInitiated = self::getClientInitiatedConversations($agentId, $dateFrom, $dateTo);
+        
+        // Calcular taxas de conversão separadas
+        $totalOrders = $basicMetrics['total_orders'] ?? 0;
+        
+        // Taxa de conversão geral (já calculada)
+        $conversionRateTotal = $basicMetrics['conversion_rate'] ?? 0;
+        
+        // Taxa de conversão apenas clientes (conversas iniciadas pelo cliente)
+        // Considera que a maioria das vendas vem de clientes que entraram em contato
+        $conversionRateClientOnly = $clientInitiated > 0 
+            ? round(($totalOrders / $clientInitiated) * 100, 2) 
+            : 0;
+        
+        return array_merge($basicMetrics, [
+            'conversations_agent_initiated' => $agentInitiated,
+            'conversations_client_initiated' => $clientInitiated,
+            'conversion_rate_total' => $conversionRateTotal,
+            'conversion_rate_client_only' => $conversionRateClientOnly,
+        ]);
+    }
+    
+    /**
      * Obter ranking de agentes por conversão
      */
     public static function getRanking(?string $dateFrom = null, ?string $dateTo = null, int $limit = 10): array

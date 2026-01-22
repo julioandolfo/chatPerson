@@ -34,7 +34,7 @@ class AgentPerformanceController
         Permission::abortIfCannot('agent_performance.view.all');
         
         $user = Auth::user();
-        $dateFrom = Request::get('date_from', date('Y-m-d', strtotime('-30 days')));
+        $dateFrom = Request::get('date_from', date('Y-m-01'));
         $dateTo = Request::get('date_to', date('Y-m-d'));
         
         // Ranking de agentes
@@ -80,7 +80,7 @@ class AgentPerformanceController
             return;
         }
         
-        $dateFrom = Request::get('date_from', date('Y-m-d', strtotime('-30 days')));
+        $dateFrom = Request::get('date_from', date('Y-m-01'));
         $dateTo = Request::get('date_to', date('Y-m-d'));
         
         // Relatório do agente (dimensões de coaching)
@@ -104,10 +104,10 @@ class AgentPerformanceController
         // Estatísticas de disponibilidade
         $availabilityStats = AvailabilityService::getAvailabilityStats($agentId, $dateFrom, $dateTo);
         
-        // Métricas de conversão (se habilitado WooCommerce)
+        // Métricas de conversão (se habilitado WooCommerce) - com detalhes de iniciador
         $conversionMetrics = [];
         try {
-            $conversionMetrics = AgentConversionService::getConversionMetrics($agentId, $dateFrom, $dateTo);
+            $conversionMetrics = AgentConversionService::getDetailedConversionMetrics($agentId, $dateFrom, $dateTo);
         } catch (\Exception $e) {
             // WooCommerce pode não estar configurado
         }
@@ -173,7 +173,7 @@ class AgentPerformanceController
     {
         Permission::abortIfCannot('agent_performance.view.all');
         
-        $dateFrom = Request::get('date_from', date('Y-m-d', strtotime('-30 days')));
+        $dateFrom = Request::get('date_from', date('Y-m-01'));
         $dateTo = Request::get('date_to', date('Y-m-d'));
         $dimension = Request::get('dimension', 'overall');
         
@@ -424,7 +424,7 @@ class AgentPerformanceController
         }
         $agentIds = array_map('intval', array_filter($agentIds));
         
-        $dateFrom = Request::get('date_from', date('Y-m-d', strtotime('-30 days')));
+        $dateFrom = Request::get('date_from', date('Y-m-01'));
         $dateTo = Request::get('date_to', date('Y-m-d'));
         
         $comparison = [];
@@ -455,7 +455,7 @@ class AgentPerformanceController
         
         $type = Request::get('type');
         $agentId = (int)Request::get('agent_id', 0);
-        $dateFrom = Request::get('date_from', date('Y-m-d', strtotime('-30 days')));
+        $dateFrom = Request::get('date_from', date('Y-m-01'));
         $dateTo = Request::get('date_to', date('Y-m-d'));
         
         try {
@@ -491,7 +491,7 @@ class AgentPerformanceController
     {
         try {
             $agentId = (int)(Request::get('agent_id') ?? 0);
-            $dateFrom = Request::get('date_from', date('Y-m-d', strtotime('-30 days')));
+            $dateFrom = Request::get('date_from', date('Y-m-01'));
             $dateTo = Request::get('date_to', date('Y-m-d'));
             $type = Request::get('type', 'first'); // first | ongoing
             $page = max(1, (int)(Request::get('page') ?? 1));

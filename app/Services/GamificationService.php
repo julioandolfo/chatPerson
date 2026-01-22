@@ -177,7 +177,7 @@ class GamificationService
         $awarded = [];
         
         try {
-            $dateFrom = date('Y-m-d', strtotime('-30 days'));
+            $dateFrom = date('Y-m-01');
             $dateTo = date('Y-m-d');
             $stats = \App\Models\AgentPerformanceAnalysis::getAgentAverages($agentId, $dateFrom, $dateTo);
             

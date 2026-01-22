@@ -498,7 +498,13 @@ function formatTimeDisplay($seconds, $showUnit = true) {
 <?php endif; ?>
 
 <!-- Métricas de Conversão (WooCommerce) -->
-<?php if (!empty($conversionMetrics) && !empty($conversionMetrics['total_orders'])): ?>
+<?php if (!empty($conversionMetrics) && ($conversionMetrics['total_orders'] > 0 || $conversionMetrics['total_conversations'] > 0)): ?>
+<?php
+    $agentInitiated = $conversionMetrics['conversations_agent_initiated'] ?? 0;
+    $clientInitiated = $conversionMetrics['conversations_client_initiated'] ?? 0;
+    $conversionRateTotal = $conversionMetrics['conversion_rate'] ?? 0;
+    $conversionRateClientOnly = $conversionMetrics['conversion_rate_client_only'] ?? 0;
+?>
 <div class="row g-5 mb-7">
     <div class="col-12">
         <div class="card">
@@ -518,14 +524,35 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                 </h3>
             </div>
             <div class="card-body py-3">
-                <div class="row g-5">
-                    <div class="col-md-3">
+                <!-- Linha 1: Conversas e Vendas -->
+                <div class="row g-5 mb-5">
+                    <div class="col-md-4">
                         <div class="border border-gray-300 border-dashed rounded p-4 text-center">
-                            <div class="fs-2x fw-bold text-success"><?= $conversionMetrics['total_orders'] ?? 0 ?></div>
-                            <div class="fw-semibold text-muted">Pedidos</div>
+                            <div class="fs-2x fw-bold text-gray-800"><?= $conversionMetrics['total_conversations'] ?? 0 ?></div>
+                            <div class="fw-semibold text-muted mb-3">Total de Conversas</div>
+                            <div class="d-flex justify-content-center gap-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge badge-light-primary">
+                                        <i class="bi bi-person-fill fs-9"></i> <?= $agentInitiated ?>
+                                    </span>
+                                    <span class="fs-8 text-muted">Iniciadas pelo Agente</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge badge-light-info">
+                                        <i class="bi bi-chat-fill fs-9"></i> <?= $clientInitiated ?>
+                                    </span>
+                                    <span class="fs-8 text-muted">Iniciadas pelo Cliente</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
+                        <div class="border border-gray-300 border-dashed rounded p-4 text-center">
+                            <div class="fs-2x fw-bold text-success"><?= $conversionMetrics['total_orders'] ?? 0 ?></div>
+                            <div class="fw-semibold text-muted">Vendas Realizadas</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
                         <div class="border border-gray-300 border-dashed rounded p-4 text-center">
                             <div class="fs-2x fw-bold text-primary">
                                 R$ <?= number_format($conversionMetrics['total_revenue'] ?? 0, 2, ',', '.') ?>
@@ -533,7 +560,11 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                             <div class="fw-semibold text-muted">Receita Total</div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                </div>
+                
+                <!-- Linha 2: Taxas de Conversão e Ticket -->
+                <div class="row g-5">
+                    <div class="col-md-4">
                         <div class="border border-gray-300 border-dashed rounded p-4 text-center">
                             <div class="fs-2x fw-bold text-info">
                                 R$ <?= number_format($conversionMetrics['avg_ticket'] ?? 0, 2, ',', '.') ?>
@@ -541,12 +572,26 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                             <div class="fw-semibold text-muted">Ticket Médio</div>
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="border border-gray-300 border-dashed rounded p-4 text-center">
-                            <div class="fs-2x fw-bold text-warning">
-                                <?= number_format($conversionMetrics['conversion_rate'] ?? 0, 1) ?>%
+                    <div class="col-md-4">
+                        <div class="border border-success border-dashed rounded p-4 text-center bg-light-success">
+                            <div class="fs-2x fw-bold text-success">
+                                <?= number_format($conversionRateTotal, 1) ?>%
                             </div>
-                            <div class="fw-semibold text-muted">Taxa Conversão</div>
+                            <div class="fw-semibold text-muted">Taxa Conversão (Geral)</div>
+                            <div class="fs-8 text-muted mt-1">
+                                Todas as conversas incluídas
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="border border-primary border-dashed rounded p-4 text-center bg-light-primary">
+                            <div class="fs-2x fw-bold text-primary">
+                                <?= number_format($conversionRateClientOnly, 1) ?>%
+                            </div>
+                            <div class="fw-semibold text-muted">Taxa Conversão (Cliente)</div>
+                            <div class="fs-8 text-muted mt-1">
+                                Apenas conversas iniciadas pelo cliente
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -940,18 +985,63 @@ $operatorLabels = \App\Models\GoalBonusCondition::OPERATORS;
         </div>
     </div>
     <div class="card-body">
-        <!-- Barra de Progresso Principal -->
+        <!-- Barra de Progresso Principal com Flags -->
+        <?php
+            $flagCritical = (float)($goal['flag_critical_threshold'] ?? 60);
+            $flagWarning = (float)($goal['flag_warning_threshold'] ?? 70);
+            $flagGood = (float)($goal['flag_good_threshold'] ?? 80);
+        ?>
         <div class="mb-6">
             <div class="d-flex justify-content-between mb-2">
                 <span class="text-gray-800 fw-bold"><?= \App\Models\Goal::formatValue($goal['type'], $currentValue) ?></span>
                 <span class="text-gray-500"><?= \App\Models\Goal::formatValue($goal['type'], $targetValue) ?></span>
             </div>
-            <div class="progress h-15px mb-2">
-                <div class="progress-bar bg-<?= $progressColor ?>" style="width: <?= min($percentage, 100) ?>%"></div>
+            
+            <!-- Barra com zonas de flags -->
+            <div class="position-relative mb-2">
+                <div class="progress h-20px" style="background: linear-gradient(to right, 
+                    #f1416c 0%, #f1416c <?= $flagCritical ?>%, 
+                    #ffc700 <?= $flagCritical ?>%, #ffc700 <?= $flagWarning ?>%, 
+                    #50cd89 <?= $flagWarning ?>%, #50cd89 <?= $flagGood ?>%,
+                    #009ef7 <?= $flagGood ?>%, #009ef7 100%);">
+                    <!-- Overlay de progresso -->
+                    <div class="position-absolute top-0 start-0 h-100 d-flex align-items-center justify-content-center" 
+                         style="width: <?= min($percentage, 100) ?>%; background: rgba(0,0,0,0.3); border-radius: 0.475rem 0 0 0.475rem;">
+                        <span class="fw-bold text-white fs-7" style="text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">
+                            <?= number_format($percentage, 1) ?>%
+                        </span>
+                    </div>
+                    <!-- Marcador de posição atual -->
+                    <div class="position-absolute top-0 h-100" 
+                         style="left: <?= min($percentage, 100) ?>%; width: 3px; background: #fff; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>
+                </div>
+                
+                <!-- Marcadores de flags no topo -->
+                <div class="position-absolute w-100" style="top: -6px;">
+                    <div class="position-absolute" style="left: <?= $flagCritical ?>%; transform: translateX(-50%);" title="Flag Crítica <?= $flagCritical ?>%">
+                        <div class="bg-danger rounded-circle" style="width: 8px; height: 8px;"></div>
+                    </div>
+                    <div class="position-absolute" style="left: <?= $flagWarning ?>%; transform: translateX(-50%);" title="Flag Atenção <?= $flagWarning ?>%">
+                        <div class="bg-warning rounded-circle" style="width: 8px; height: 8px;"></div>
+                    </div>
+                    <div class="position-absolute" style="left: <?= $flagGood ?>%; transform: translateX(-50%);" title="Flag Boa <?= $flagGood ?>%">
+                        <div class="bg-success rounded-circle" style="width: 8px; height: 8px;"></div>
+                    </div>
+                </div>
             </div>
-            <div class="d-flex justify-content-between text-muted fs-8">
-                <span>Falta: <strong class="text-gray-800"><?= \App\Models\Goal::formatValue($goal['type'], $remainingValue) ?></strong></span>
-                <span>Restam <strong class="text-gray-800"><?= number_format($remainingDays, 0) ?></strong> dias</span>
+            
+            <!-- Legenda e info -->
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="d-flex flex-wrap gap-2 fs-9">
+                    <span class="badge badge-light-danger">🔴 &lt;<?= $flagCritical ?>%</span>
+                    <span class="badge badge-light-warning">🟡 <?= $flagCritical ?>-<?= $flagWarning ?>%</span>
+                    <span class="badge badge-light-success">🟢 <?= $flagWarning ?>-<?= $flagGood ?>%</span>
+                    <span class="badge badge-light-primary">🔵 &gt;<?= $flagGood ?>%</span>
+                </div>
+                <div class="text-end text-muted fs-8">
+                    <div>Falta: <strong class="text-gray-800"><?= \App\Models\Goal::formatValue($goal['type'], $remainingValue) ?></strong></div>
+                    <div>Restam <strong class="text-gray-800"><?= number_format($remainingDays, 0) ?></strong> dias</div>
+                </div>
             </div>
         </div>
         

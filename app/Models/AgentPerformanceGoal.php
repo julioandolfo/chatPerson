@@ -73,7 +73,7 @@ class AgentPerformanceGoal extends Model
         }
         
         // Buscar scores atuais do agente (últimos 30 dias)
-        $dateFrom = date('Y-m-d', strtotime('-30 days'));
+        $dateFrom = date('Y-m-01');
         $dateTo = date('Y-m-d');
         
         $averages = AgentPerformanceAnalysis::getAgentAverages($agentId, $dateFrom, $dateTo);

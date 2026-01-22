@@ -315,21 +315,40 @@ class ContactController
             // ✅ Buscar métricas pré-calculadas (SUPER RÁPIDO - apenas SELECT simples)
             $metrics = \App\Models\ContactMetric::getByContact($id);
             
-            // Se não existir, marcar para cálculo e retornar dados básicos
-            if (!$metrics) {
-                // Marcar para cálculo urgente (prioridade 3)
-                \App\Services\ContactMetricsService::onNewMessage($id, true);
+            // Se não existir métricas pré-calculadas, calcular em tempo real (básico)
+            if (!$metrics || empty($metrics['total_conversations'])) {
+                // Calcular total de conversas diretamente (query leve)
+                $countResult = \App\Helpers\Database::fetch(
+                    "SELECT COUNT(*) as total FROM conversations WHERE contact_id = ?",
+                    [$id]
+                );
+                $realTotal = (int)($countResult['total'] ?? 0);
                 
-                // Retornar dados básicos temporários
+                // Calcular tempo médio de resposta (se houver conversas)
+                $avgResponse = null;
+                if ($realTotal > 0) {
+                    $avgResult = \App\Helpers\Database::fetch(
+                        "SELECT AVG(TIMESTAMPDIFF(MINUTE, 
+                            (SELECT MIN(m1.created_at) FROM messages m1 WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact'),
+                            (SELECT MIN(m2.created_at) FROM messages m2 WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent')
+                        )) as avg_minutes
+                        FROM conversations c
+                        WHERE c.contact_id = ?",
+                        [$id]
+                    );
+                    $avgResponse = $avgResult['avg_minutes'] ?? null;
+                }
+                
                 $metrics = [
-                    'total_conversations' => 0,
+                    'total_conversations' => $realTotal,
                     'open_conversations' => 0,
-                    'closed_conversations' => 0,
-                    'avg_response_time_minutes' => null,
+                    'closed_conversations' => $realTotal,
+                    'avg_response_time_minutes' => $avgResponse,
                     'last_message_at' => null
                 ];
                 
-                error_log("Métricas do contato {$id} não calculadas ainda. Marcado para cálculo urgente.");
+                // Marcar para cálculo completo em background (prioridade 3)
+                \App\Services\ContactMetricsService::onNewMessage($id, true);
             }
             
             $stats = [

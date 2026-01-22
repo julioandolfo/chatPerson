@@ -513,6 +513,42 @@ document.addEventListener('DOMContentLoaded', function() {
     margin-bottom: 25px;
 }
 
+/* Estilos Accordion do Sidebar */
+#sidebarAccordion .accordion-item {
+    background: transparent;
+    border: none;
+}
+
+#sidebarAccordion .accordion-button {
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+#sidebarAccordion .accordion-button:not(.collapsed) {
+    color: var(--bs-primary);
+}
+
+#sidebarAccordion .accordion-button::after {
+    width: 1rem;
+    height: 1rem;
+    background-size: 1rem;
+}
+
+#sidebarAccordion .accordion-button:focus {
+    border-color: transparent;
+    box-shadow: none;
+}
+
+#sidebarAccordion .accordion-body {
+    padding: 12px 0;
+}
+
+#sidebarAccordion .accordion-button .badge {
+    font-size: 10px;
+}
+
 /* Estilos SLA Timeline */
 .timeline-sla {
     position: relative;
@@ -808,88 +844,187 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 <div class="separator my-5"></div>
 
-                <!-- Automação -->
-                <div class="sidebar-section" id="sidebar-automation-section">
-                    <div class="sidebar-section-title d-flex justify-content-between align-items-center">
-                        <span>⚙️ Automação</span>
-                    </div>
-                    <div id="sidebar-automation-status">
-                        <div class="text-muted fs-7">Carregando...</div>
-                    </div>
-                </div>
-
-                <div class="separator my-5"></div>
-                
-                <!-- SLA da Conversa -->
-                <div class="sidebar-section" id="sidebar-sla-section">
-                    <div class="sidebar-section-title d-flex justify-content-between align-items-center">
-                        <span>
-                            <i class="ki-duotone ki-timer text-primary fs-5 me-1">
-                                <span class="path1"></span>
-                                <span class="path2"></span>
-                                <span class="path3"></span>
-                            </i>
-                            SLA
-                        </span>
-                        <span class="badge badge-sm" id="sla-status-badge">-</span>
+                <!-- Accordion para seções colapsáveis -->
+                <div class="accordion accordion-icon-toggle" id="sidebarAccordion">
+                    
+                    <!-- Automação (Accordion) -->
+                    <div class="accordion-item border-0 mb-3" id="sidebar-automation-section">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed fs-6 fw-semibold py-3 px-0" type="button" 
+                                    data-bs-toggle="collapse" data-bs-target="#collapseAutomation" 
+                                    aria-expanded="false" aria-controls="collapseAutomation">
+                                <span class="me-2">⚙️</span> Automação
+                            </button>
+                        </h2>
+                        <div id="collapseAutomation" class="accordion-collapse collapse" data-bs-parent="#sidebarAccordion">
+                            <div class="accordion-body px-0 pt-2 pb-0">
+                                <div id="sidebar-automation-status">
+                                    <div class="text-muted fs-7">Carregando...</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
-                    <div id="sla-loading" class="text-center py-5">
-                        <span class="spinner-border spinner-border-sm text-primary"></span>
+                    <!-- SLA da Conversa (Accordion) -->
+                    <div class="accordion-item border-0 mb-3" id="sidebar-sla-section">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed fs-6 fw-semibold py-3 px-0" type="button" 
+                                    data-bs-toggle="collapse" data-bs-target="#collapseSLA" 
+                                    aria-expanded="false" aria-controls="collapseSLA">
+                                <i class="ki-duotone ki-timer text-primary fs-5 me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                SLA
+                                <span class="badge badge-sm ms-auto me-3" id="sla-status-badge">-</span>
+                            </button>
+                        </h2>
+                        <div id="collapseSLA" class="accordion-collapse collapse" data-bs-parent="#sidebarAccordion">
+                            <div class="accordion-body px-0 pt-2 pb-0">
+                                <div id="sla-loading" class="text-center py-5">
+                                    <span class="spinner-border spinner-border-sm text-primary"></span>
+                                </div>
+                                
+                                <div id="sla-content" style="display: none;">
+                                    <!-- Barra de progresso principal -->
+                                    <div class="mb-4">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="fs-7 text-muted">Tempo Decorrido</span>
+                                            <span class="fs-6 fw-bold" id="sla-elapsed-time">-</span>
+                                        </div>
+                                        <div class="progress" style="height: 12px; border-radius: 6px;">
+                                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                                 id="sla-progress-bar" 
+                                                 role="progressbar" 
+                                                 style="width: 0%;">
+                                            </div>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center mt-1">
+                                            <span class="fs-8 text-muted">Meta: <span id="sla-target">-</span></span>
+                                            <span class="fs-8" id="sla-percentage">0%</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Detalhes -->
+                                    <div class="card bg-light mb-3">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <span class="fs-7 text-muted">Regra aplicada:</span>
+                                                <span class="fs-7 fw-semibold" id="sla-rule-name">-</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <span class="fs-7 text-muted">Início SLA:</span>
+                                                <span class="fs-7" id="sla-start-time">-</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center" id="sla-exceeded-container" style="display: none;">
+                                                <span class="fs-7 text-muted">Excedido em:</span>
+                                                <span class="fs-7 fw-bold text-danger" id="sla-exceeded-by">-</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Timeline de eventos -->
+                                    <div class="mb-3">
+                                        <div class="fs-7 fw-semibold text-gray-700 mb-2">Timeline de Eventos:</div>
+                                        <div id="sla-timeline" class="timeline-sla">
+                                            <!-- Timeline será carregada aqui -->
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Badges informativos -->
+                                    <div class="d-flex flex-wrap gap-2" id="sla-badges-container">
+                                        <!-- Badges serão carregados aqui -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
-                    <div id="sla-content" style="display: none;">
-                        <!-- Barra de progresso principal -->
-                        <div class="mb-4">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="fs-7 text-muted">Tempo Decorrido</span>
-                                <span class="fs-6 fw-bold" id="sla-elapsed-time">-</span>
-                            </div>
-                            <div class="progress" style="height: 12px; border-radius: 6px;">
-                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                                     id="sla-progress-bar" 
-                                     role="progressbar" 
-                                     style="width: 0%;">
+                    <!-- Sentimento (Accordion) -->
+                    <div class="accordion-item border-0 mb-3" id="sidebar-sentiment-section" style="display: none;">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed fs-6 fw-semibold py-3 px-0" type="button" 
+                                    data-bs-toggle="collapse" data-bs-target="#collapseSentiment" 
+                                    aria-expanded="false" aria-controls="collapseSentiment">
+                                <span class="me-2">😊</span> Sentimento
+                                <span class="badge badge-sm ms-auto me-3" id="sentiment-accordion-badge">-</span>
+                            </button>
+                        </h2>
+                        <div id="collapseSentiment" class="accordion-collapse collapse" data-bs-parent="#sidebarAccordion">
+                            <div class="accordion-body px-0 pt-2 pb-0">
+                                <div id="sentiment-accordion-content">
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <span class="fs-7 text-muted">Sentimento:</span>
+                                        <span class="fs-7 fw-semibold" id="sentiment-label-accordion">-</span>
+                                    </div>
+                                    <div class="progress" style="height: 6px;">
+                                        <div class="progress-bar" id="sentiment-progress-accordion" role="progressbar" style="width: 50%;"></div>
+                                    </div>
+                                    <div class="fs-8 text-muted mt-1" id="sentiment-score-accordion">Score: -</div>
                                 </div>
                             </div>
-                            <div class="d-flex justify-content-between align-items-center mt-1">
-                                <span class="fs-8 text-muted">Meta: <span id="sla-target">-</span></span>
-                                <span class="fs-8" id="sla-percentage">0%</span>
-                            </div>
-                        </div>
-                        
-                        <!-- Detalhes -->
-                        <div class="card bg-light mb-3">
-                            <div class="card-body p-3">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span class="fs-7 text-muted">Regra aplicada:</span>
-                                    <span class="fs-7 fw-semibold" id="sla-rule-name">-</span>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span class="fs-7 text-muted">Início SLA:</span>
-                                    <span class="fs-7" id="sla-start-time">-</span>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center" id="sla-exceeded-container" style="display: none;">
-                                    <span class="fs-7 text-muted">Excedido em:</span>
-                                    <span class="fs-7 fw-bold text-danger" id="sla-exceeded-by">-</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Timeline de eventos -->
-                        <div class="mb-3">
-                            <div class="fs-7 fw-semibold text-gray-700 mb-2">Timeline de Eventos:</div>
-                            <div id="sla-timeline" class="timeline-sla">
-                                <!-- Timeline será carregada aqui -->
-                            </div>
-                        </div>
-                        
-                        <!-- Badges informativos -->
-                        <div class="d-flex flex-wrap gap-2" id="sla-badges-container">
-                            <!-- Badges serão carregados aqui -->
                         </div>
                     </div>
+                    
+                    <!-- Performance do Agente (Accordion) -->
+                    <div class="accordion-item border-0 mb-3" id="sidebar-performance-section" style="display: none;">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed fs-6 fw-semibold py-3 px-0" type="button" 
+                                    data-bs-toggle="collapse" data-bs-target="#collapsePerformance" 
+                                    aria-expanded="false" aria-controls="collapsePerformance">
+                                <i class="ki-duotone ki-chart-line-up fs-5 text-primary me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Performance
+                                <span class="badge badge-sm ms-auto me-3" id="performance-accordion-badge">-</span>
+                            </button>
+                        </h2>
+                        <div id="collapsePerformance" class="accordion-collapse collapse" data-bs-parent="#sidebarAccordion">
+                            <div class="accordion-body px-0 pt-2 pb-0">
+                                <!-- Estado: Analisado -->
+                                <div id="performance-analyzed-accordion" style="display: none;">
+                                    <div class="d-flex align-items-center justify-content-between mb-1">
+                                        <span class="fs-7 text-muted">Nota Geral:</span>
+                                        <span class="badge badge-lg" id="performance-overall-accordion">-</span>
+                                    </div>
+                                    <div class="progress" style="height: 8px;">
+                                        <div class="progress-bar" id="performance-progress-accordion" role="progressbar" style="width: 0%;"></div>
+                                    </div>
+                                    <div class="fs-8 text-muted mt-2" id="performance-details-accordion"></div>
+                                    <a href="#" id="performance-view-link-accordion" class="btn btn-sm btn-light-primary w-100 mt-2">
+                                        <i class="ki-duotone ki-eye fs-5">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        Ver Análise Completa
+                                    </a>
+                                </div>
+                                
+                                <!-- Estado: Aguardando Análise -->
+                                <div id="performance-pending-accordion" style="display: none;">
+                                    <div class="d-flex align-items-center justify-content-center py-3">
+                                        <div class="text-center">
+                                            <i class="ki-duotone ki-timer fs-3x text-warning mb-2">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                                <span class="path3"></span>
+                                            </i>
+                                            <div class="fs-7 text-muted">Aguardando análise</div>
+                                            <div class="fs-8 text-muted mt-1" id="performance-pending-reason-accordion">
+                                                A análise será processada em breve
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                 </div>
+                <!-- Fim Accordion -->
 
                 <div class="separator my-5"></div>
                 
@@ -903,66 +1038,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <span class="badge badge-danger ms-2" id="sidebar-spam-badge" style="display: none;">🚫 SPAM</span>
                     </div>
                     
-                    <!-- Sentimento -->
-                    <div class="sidebar-info-item" id="sentiment-info" style="display: none;">
-                        <span class="sidebar-info-label">Sentimento:</span>
-                        <span class="sidebar-info-value" id="sentiment-label">-</span>
-                        <div class="mt-2">
-                            <div class="progress" style="height: 6px;">
-                                <div class="progress-bar" id="sentiment-progress" role="progressbar" style="width: 50%;"></div>
-                            </div>
-                            <div class="fs-8 text-muted mt-1" id="sentiment-score">Score: -</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Performance do Agente -->
-                    <div class="sidebar-info-item" id="agent-performance-info" style="display: none;">
-                        <span class="sidebar-info-label">
-                            <i class="ki-duotone ki-chart-line-up fs-5 text-primary me-1">
-                                <span class="path1"></span>
-                                <span class="path2"></span>
-                            </i>
-                            Performance:
-                        </span>
-                        <div class="mt-2">
-                            <!-- Estado: Analisado -->
-                            <div id="performance-analyzed-state" style="display: none;">
-                                <div class="d-flex align-items-center justify-content-between mb-1">
-                                    <span class="fs-7 text-muted">Nota Geral:</span>
-                                    <span class="badge badge-lg" id="performance-overall-badge">-</span>
-                                </div>
-                                <div class="progress" style="height: 8px;">
-                                    <div class="progress-bar" id="performance-progress" role="progressbar" style="width: 0%;"></div>
-                                </div>
-                                <div class="fs-8 text-muted mt-2" id="performance-details"></div>
-                                <a href="#" id="performance-view-link" class="btn btn-sm btn-light-primary w-100 mt-2">
-                                    <i class="ki-duotone ki-eye fs-5">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                        <span class="path3"></span>
-                                    </i>
-                                    Ver Análise Completa
-                                </a>
-                            </div>
-                            
-                            <!-- Estado: Aguardando Análise -->
-                            <div id="performance-pending-state" style="display: none;">
-                                <div class="d-flex align-items-center justify-content-center py-3">
-                                    <div class="text-center">
-                                        <i class="ki-duotone ki-timer fs-3x text-warning mb-2">
-                                            <span class="path1"></span>
-                                            <span class="path2"></span>
-                                            <span class="path3"></span>
-                                        </i>
-                                        <div class="fs-7 text-muted">Aguardando análise</div>
-                                        <div class="fs-8 text-muted mt-1" id="performance-pending-reason">
-                                            A análise será processada em breve
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <!-- Sentimento e Performance movidos para Accordion acima -->
                     
                     <div class="sidebar-info-item">
                         <span class="sidebar-info-label">Canal:</span>

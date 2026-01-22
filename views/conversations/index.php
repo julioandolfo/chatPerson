@@ -9142,16 +9142,18 @@ function updateConversationTimeline(conversationId) {
         });
 }
 
-// Histórico do contato (aba Histórico)
+// Carregar sentimento da conversa (Accordion)
 function loadConversationSentiment(conversationId) {
     if (!conversationId) return;
     
-    const sentimentInfo = document.getElementById('sentiment-info');
-    const sentimentLabel = document.getElementById('sentiment-label');
-    const sentimentProgress = document.getElementById('sentiment-progress');
-    const sentimentScore = document.getElementById('sentiment-score');
+    // Elementos do Accordion de Sentimento
+    const sentimentSection = document.getElementById('sidebar-sentiment-section');
+    const sentimentLabel = document.getElementById('sentiment-label-accordion');
+    const sentimentProgress = document.getElementById('sentiment-progress-accordion');
+    const sentimentScore = document.getElementById('sentiment-score-accordion');
+    const sentimentBadge = document.getElementById('sentiment-accordion-badge');
     
-    if (!sentimentInfo) return;
+    if (!sentimentSection) return;
     
     fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/sentiment`, {
         headers: {
@@ -9162,7 +9164,7 @@ function loadConversationSentiment(conversationId) {
     .then(r => r.json())
     .then(data => {
         if (!data.success || !data.sentiment) {
-            sentimentInfo.style.display = 'none';
+            sentimentSection.style.display = 'none';
             return;
         }
         
@@ -9176,12 +9178,15 @@ function loadConversationSentiment(conversationId) {
         // Determinar cor baseado no sentimento
         let colorClass = 'secondary';
         let labelText = 'Neutro';
+        let emoji = '😐';
         if (label === 'positive') {
             colorClass = 'success';
             labelText = 'Positivo';
+            emoji = '😊';
         } else if (label === 'negative') {
             colorClass = 'danger';
             labelText = 'Negativo';
+            emoji = '😟';
         }
         
         if (sentimentLabel) sentimentLabel.innerHTML = `<span class="badge badge-light-${colorClass}">${labelText}</span>`;
@@ -9190,29 +9195,35 @@ function loadConversationSentiment(conversationId) {
             sentimentProgress.style.width = `${percentage}%`;
         }
         if (sentimentScore) sentimentScore.textContent = `Score: ${score.toFixed(2)}`;
+        if (sentimentBadge) {
+            sentimentBadge.className = `badge badge-sm badge-light-${colorClass} ms-auto me-3`;
+            sentimentBadge.textContent = emoji;
+        }
         
-        sentimentInfo.style.display = 'block';
+        sentimentSection.style.display = 'block';
     })
     .catch(error => {
         console.error('Erro ao carregar sentimento:', error);
-        sentimentInfo.style.display = 'none';
+        sentimentSection.style.display = 'none';
     });
 }
 
-// Carregar performance do agente na conversa
+// Carregar performance do agente na conversa (Accordion)
 function loadAgentPerformance(conversationId) {
     if (!conversationId) return;
     
-    const performanceInfo = document.getElementById('agent-performance-info');
-    const analyzedState = document.getElementById('performance-analyzed-state');
-    const pendingState = document.getElementById('performance-pending-state');
-    const pendingReason = document.getElementById('performance-pending-reason');
-    const overallBadge = document.getElementById('performance-overall-badge');
-    const progressBar = document.getElementById('performance-progress');
-    const detailsEl = document.getElementById('performance-details');
-    const viewLink = document.getElementById('performance-view-link');
+    // Elementos do Accordion de Performance
+    const performanceSection = document.getElementById('sidebar-performance-section');
+    const analyzedState = document.getElementById('performance-analyzed-accordion');
+    const pendingState = document.getElementById('performance-pending-accordion');
+    const pendingReason = document.getElementById('performance-pending-reason-accordion');
+    const overallBadge = document.getElementById('performance-overall-accordion');
+    const progressBar = document.getElementById('performance-progress-accordion');
+    const detailsEl = document.getElementById('performance-details-accordion');
+    const viewLink = document.getElementById('performance-view-link-accordion');
+    const accordionBadge = document.getElementById('performance-accordion-badge');
     
-    if (!performanceInfo) return;
+    if (!performanceSection) return;
     
     fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/performance`, {
         headers: {
@@ -9223,7 +9234,7 @@ function loadAgentPerformance(conversationId) {
     .then(r => r.json())
     .then(data => {
         if (!data.success) {
-            performanceInfo.style.display = 'none';
+            performanceSection.style.display = 'none';
             return;
         }
         
@@ -9247,7 +9258,13 @@ function loadAgentPerformance(conversationId) {
                 emoji = '😐';
             }
             
-            // Atualizar badge
+            // Atualizar badge do header do accordion
+            if (accordionBadge) {
+                accordionBadge.className = `badge badge-sm badge-light-${colorClass} ms-auto me-3`;
+                accordionBadge.textContent = `${emoji} ${score.toFixed(1)}`;
+            }
+            
+            // Atualizar badge interno
             if (overallBadge) {
                 overallBadge.className = `badge badge-lg badge-light-${colorClass}`;
                 overallBadge.textContent = `${emoji} ${score.toFixed(2)}/5.00`;
@@ -9291,15 +9308,20 @@ function loadAgentPerformance(conversationId) {
                 pendingReason.textContent = reason;
             }
             
+            if (accordionBadge) {
+                accordionBadge.className = 'badge badge-sm badge-light-warning ms-auto me-3';
+                accordionBadge.textContent = '⏳';
+            }
+            
             if (analyzedState) analyzedState.style.display = 'none';
             if (pendingState) pendingState.style.display = 'block';
         }
         
-        performanceInfo.style.display = 'block';
+        performanceSection.style.display = 'block';
     })
     .catch(error => {
         console.error('Erro ao carregar performance:', error);
-        performanceInfo.style.display = 'none';
+        performanceSection.style.display = 'none';
     });
 }
 

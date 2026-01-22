@@ -1343,23 +1343,40 @@ ob_start();
                         <table class="table align-middle table-row-dashed fs-6 gy-5">
                             <thead>
                                 <tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">
-                                    <th class="min-w-200px">Vendedor</th>
-                                    <th class="min-w-80px text-center">Conversas</th>
-                                    <th class="min-w-80px text-center">Vendas</th>
-                                    <th class="min-w-120px text-center">Taxa Conversão</th>
-                                    <th class="min-w-120px text-end">Valor Total</th>
-                                    <th class="text-end min-w-100px">Ações</th>
+                                    <th class="min-w-180px">Vendedor</th>
+                                    <th class="min-w-100px text-center">
+                                        Conversas
+                                        <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" title="Total / Iniciadas pelo agente / Iniciadas pelo cliente"></i>
+                                    </th>
+                                    <th class="min-w-60px text-center">Vendas</th>
+                                    <th class="min-w-140px text-center">
+                                        Taxa Conversão
+                                        <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" title="Geral (todas) / Apenas clientes que chamaram"></i>
+                                    </th>
+                                    <th class="min-w-100px text-end">Valor Total</th>
+                                    <th class="text-end min-w-70px">Ações</th>
                                 </tr>
                             </thead>
                             <tbody class="text-gray-600 fw-semibold">
                                 <?php foreach ($conversionRanking as $seller): ?>
                                     <?php
                                         $conversionRate = $seller['conversion_rate'] ?? 0;
+                                        $conversionRateClientOnly = $seller['conversion_rate_client_only'] ?? 0;
+                                        $agentInitiated = $seller['conversations_agent_initiated'] ?? 0;
+                                        $clientInitiated = $seller['conversations_client_initiated'] ?? 0;
+                                        
                                         $progressColor = 'danger';
                                         if ($conversionRate >= 30) {
                                             $progressColor = 'success';
                                         } elseif ($conversionRate >= 15) {
                                             $progressColor = 'warning';
+                                        }
+                                        
+                                        $progressColorClient = 'danger';
+                                        if ($conversionRateClientOnly >= 30) {
+                                            $progressColorClient = 'success';
+                                        } elseif ($conversionRateClientOnly >= 15) {
+                                            $progressColorClient = 'warning';
                                         }
                                     ?>
                                     <tr>
@@ -1374,16 +1391,38 @@ ob_start();
                                             </div>
                                         </td>
                                         <td class="text-center">
-                                            <span class="fw-bold text-gray-800"><?= $seller['total_conversations'] ?? 0 ?></span>
-                                        </td>
-                                        <td class="text-center">
-                                            <span class="badge badge-light-success"><?= $seller['total_orders'] ?? 0 ?></span>
-                                        </td>
-                                        <td class="text-center">
                                             <div class="d-flex flex-column align-items-center">
-                                                <span class="fw-bold text-gray-800 fs-6 mb-1"><?= number_format($conversionRate, 1) ?>%</span>
-                                                <div class="progress h-6px w-100px">
-                                                    <div class="progress-bar bg-<?= $progressColor ?>" role="progressbar" style="width: <?= min(100, $conversionRate) ?>%" aria-valuenow="<?= $conversionRate ?>" aria-valuemin="0" aria-valuemax="100"></div>
+                                                <span class="fw-bold text-gray-800"><?= $seller['total_conversations'] ?? 0 ?></span>
+                                                <div class="d-flex gap-2 fs-8 mt-1">
+                                                    <span class="badge badge-light-primary" title="Iniciadas pelo agente">
+                                                        <i class="bi bi-person-fill fs-9"></i> <?= $agentInitiated ?>
+                                                    </span>
+                                                    <span class="badge badge-light-info" title="Iniciadas pelo cliente">
+                                                        <i class="bi bi-chat-fill fs-9"></i> <?= $clientInitiated ?>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge badge-light-success fs-6"><?= $seller['total_orders'] ?? 0 ?></span>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="d-flex flex-column align-items-center gap-1">
+                                                <!-- Taxa Geral -->
+                                                <div class="d-flex align-items-center gap-2 w-100">
+                                                    <span class="fs-9 text-muted" style="width: 40px;">Geral:</span>
+                                                    <span class="fw-bold text-gray-800"><?= number_format($conversionRate, 1) ?>%</span>
+                                                    <div class="progress h-4px flex-grow-1">
+                                                        <div class="progress-bar bg-<?= $progressColor ?>" style="width: <?= min(100, $conversionRate) ?>%"></div>
+                                                    </div>
+                                                </div>
+                                                <!-- Taxa só Clientes -->
+                                                <div class="d-flex align-items-center gap-2 w-100">
+                                                    <span class="fs-9 text-muted" style="width: 40px;">Cliente:</span>
+                                                    <span class="fw-bold text-<?= $progressColorClient ?>"><?= number_format($conversionRateClientOnly, 1) ?>%</span>
+                                                    <div class="progress h-4px flex-grow-1">
+                                                        <div class="progress-bar bg-<?= $progressColorClient ?>" style="width: <?= min(100, $conversionRateClientOnly) ?>%"></div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </td>
@@ -1703,17 +1742,55 @@ ksort($uniqueTeams);
             </div>
         </div>
         
-        <!-- Barra de Progresso -->
+        <!-- Barra de Progresso com Flags -->
+        <?php
+            $flagCritical = (float)($goal['flag_critical_threshold'] ?? 60);
+            $flagWarning = (float)($goal['flag_warning_threshold'] ?? 70);
+            $flagGood = (float)($goal['flag_good_threshold'] ?? 80);
+        ?>
         <div class="mb-5">
-            <div class="progress h-20px">
-                <div class="progress-bar bg-<?= $progressColor ?>" style="width: <?= min($percentage, 100) ?>%">
-                    <span class="fw-bold"><?= number_format($percentage, 1) ?>%</span>
+            <!-- Barra de fundo com zonas de flags -->
+            <div class="position-relative">
+                <div class="progress h-25px" style="background: linear-gradient(to right, 
+                    #f1416c 0%, #f1416c <?= $flagCritical ?>%, 
+                    #ffc700 <?= $flagCritical ?>%, #ffc700 <?= $flagWarning ?>%, 
+                    #50cd89 <?= $flagWarning ?>%, #50cd89 <?= $flagGood ?>%,
+                    #009ef7 <?= $flagGood ?>%, #009ef7 100%);">
+                    <!-- Barra de progresso atual (overlay escuro) -->
+                    <div class="position-absolute top-0 start-0 h-100 d-flex align-items-center justify-content-center" 
+                         style="width: <?= min($percentage, 100) ?>%; background: rgba(0,0,0,0.3); border-radius: 0.475rem 0 0 0.475rem;">
+                        <span class="fw-bold text-white fs-6" style="text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">
+                            <?= number_format($percentage, 1) ?>%
+                        </span>
+                    </div>
+                    <!-- Marcador de posição atual -->
+                    <div class="position-absolute top-0 h-100" 
+                         style="left: <?= min($percentage, 100) ?>%; width: 3px; background: #fff; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>
+                </div>
+                
+                <!-- Marcadores de flags -->
+                <div class="position-absolute w-100" style="top: -5px;">
+                    <div class="position-absolute" style="left: <?= $flagCritical ?>%; transform: translateX(-50%);">
+                        <div class="bg-danger rounded-circle" style="width: 10px; height: 10px;"></div>
+                    </div>
+                    <div class="position-absolute" style="left: <?= $flagWarning ?>%; transform: translateX(-50%);">
+                        <div class="bg-warning rounded-circle" style="width: 10px; height: 10px;"></div>
+                    </div>
+                    <div class="position-absolute" style="left: <?= $flagGood ?>%; transform: translateX(-50%);">
+                        <div class="bg-success rounded-circle" style="width: 10px; height: 10px;"></div>
+                    </div>
                 </div>
             </div>
-            <div class="d-flex justify-content-between mt-2">
-                <span class="text-muted fs-8">0%</span>
-                <span class="text-muted fs-8">Esperado hoje: <?= number_format($expectedPercentage, 0) ?>%</span>
-                <span class="text-muted fs-8">100%</span>
+            
+            <!-- Legenda -->
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <div class="d-flex gap-4 fs-8">
+                    <span><span class="badge badge-danger me-1">🔴</span> Crítico &lt;<?= $flagCritical ?>%</span>
+                    <span><span class="badge badge-warning me-1">🟡</span> Atenção <?= $flagCritical ?>-<?= $flagWarning ?>%</span>
+                    <span><span class="badge badge-success me-1">🟢</span> Bom <?= $flagWarning ?>-<?= $flagGood ?>%</span>
+                    <span><span class="badge badge-primary me-1">🔵</span> Excelente &gt;<?= $flagGood ?>%</span>
+                </div>
+                <span class="text-muted fs-8">Esperado hoje: <strong><?= number_format($expectedPercentage, 0) ?>%</strong></span>
             </div>
         </div>
         

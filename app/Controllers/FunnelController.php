@@ -564,7 +564,7 @@ class FunnelController
         
         try {
             $stageId = Request::get('stage_id');
-            $dateFrom = Request::get('date_from') ?? date('Y-m-d', strtotime('-30 days'));
+            $dateFrom = Request::get('date_from') ?? date('Y-m-01');
             $dateTo = Request::get('date_to') ?? date('Y-m-d H:i:s');
             
             if (!$stageId) {
@@ -591,7 +591,7 @@ class FunnelController
         Permission::abortIfCannot('funnels.view');
         
         try {
-            $dateFrom = Request::get('date_from') ?? date('Y-m-d', strtotime('-30 days'));
+            $dateFrom = Request::get('date_from') ?? date('Y-m-01');
             $dateTo = Request::get('date_to') ?? date('Y-m-d H:i:s');
             
             $metrics = FunnelService::getFunnelMetrics($id, $dateFrom, $dateTo);

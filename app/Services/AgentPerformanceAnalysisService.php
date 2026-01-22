@@ -816,7 +816,7 @@ class AgentPerformanceAnalysisService
      */
     public static function getAgentsRanking(?string $dateFrom = null, ?string $dateTo = null, int $limit = 50): array
     {
-        if (!$dateFrom) $dateFrom = date('Y-m-d', strtotime('-30 days'));
+        if (!$dateFrom) $dateFrom = date('Y-m-01');
         if (!$dateTo) $dateTo = date('Y-m-d');
         
         return AgentPerformanceAnalysis::getAgentsRanking($dateFrom, $dateTo, $limit);

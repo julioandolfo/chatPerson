@@ -1138,13 +1138,14 @@ ob_start();
 <!--end::Row-->
 
 <!--begin::Row - Métricas de Times-->
+<?php $teamsMetricsCount = is_array($teamsMetrics) ? count($teamsMetrics) : 0; ?>
 <div class="row g-5 mb-5">
     <div class="col-12">
         <div class="card">
             <div class="card-header border-0 pt-5">
                 <h3 class="card-title align-items-start flex-column">
                     <span class="card-label fw-bold fs-3 mb-1">Performance dos Times</span>
-                    <span class="text-muted mt-1 fw-semibold fs-7"><?= count($teamsMetrics) ?> time(s) - Período: <?= date('d/m', strtotime($dateFrom)) ?> a <?= date('d/m/Y', strtotime($dateTo)) ?></span>
+                    <span class="text-muted mt-1 fw-semibold fs-7"><?= $teamsMetricsCount ?> time(s) - Período: <?= date('d/m', strtotime($dateFrom)) ?> a <?= date('d/m/Y', strtotime($dateTo)) ?></span>
                 </h3>
                 <div class="card-toolbar">
                     <a href="/teams/dashboard?date_from=<?= $dateFrom ?>&date_to=<?= date('Y-m-d', strtotime($dateTo)) ?>" class="btn btn-sm btn-primary">
@@ -1278,7 +1279,7 @@ ob_start();
                         </table>
                     </div>
                     
-                    <?php if (count($teamsMetrics) >= 10): ?>
+                    <?php if ($teamsMetricsCount >= 10): ?>
                     <div class="text-center mt-5">
                         <a href="/teams/dashboard?date_from=<?= $dateFrom ?>&date_to=<?= date('Y-m-d', strtotime($dateTo)) ?>" class="btn btn-link">
                             Ver todos os times →

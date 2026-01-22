@@ -62,19 +62,8 @@ date_default_timezone_set($appConfig['timezone']);
 // Definir encoding
 mb_internal_encoding('UTF-8');
 
-// Iniciar sessão com configurações seguras (apenas se não estiver iniciada)
+// Iniciar sessão (apenas se não estiver iniciada)
 if (session_status() === PHP_SESSION_NONE) {
-    // Configurar cookie de sessão antes de iniciar
-    $cookieParams = session_get_cookie_params();
-    session_set_cookie_params([
-        'lifetime' => 7200, // 2 horas
-        'path' => '/',
-        'domain' => $cookieParams['domain'] ?: '',
-        'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
-        'httponly' => true,
-        'samesite' => 'Lax'
-    ]);
-    
     session_start();
 }
 

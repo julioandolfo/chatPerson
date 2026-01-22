@@ -5,9 +5,7 @@
 
 // Lista de arquivos de log para verificar
 $logFiles = [
-    'Autenticação (Login/Logout)' => __DIR__ . '/../logs/auth.log',
     'Dashboard' => __DIR__ . '/../logs/dash.log',
-    'SLA' => __DIR__ . '/../logs/sla.log',
     'Metas e OTE (Goals)' => __DIR__ . '/../logs/goals.log',
     'Coaching em Tempo Real' => __DIR__ . '/../logs/coaching.log',
     'Jobs Agendados (Cron)' => __DIR__ . '/../storage/logs/jobs.log',

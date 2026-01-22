@@ -29,21 +29,6 @@ class Authentication
     }
     
     /**
-     * Verificar se é requisição AJAX/JSON
-     */
-    private static function isAjaxRequest(): bool
-    {
-        $isXhr = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
-                 strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
-        $acceptsJson = !empty($_SERVER['HTTP_ACCEPT']) && 
-                       strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false;
-        $isJsonContent = !empty($_SERVER['CONTENT_TYPE']) && 
-                         strpos($_SERVER['CONTENT_TYPE'], 'application/json') !== false;
-        
-        return $isXhr || $acceptsJson || $isJsonContent;
-    }
-    
-    /**
      * Verificar se usuário está autenticado
      */
     public function handle(): void
@@ -51,23 +36,7 @@ class Authentication
         self::logAuth("Verificando autenticação...");
         
         if (!Auth::check()) {
-            $isAjax = self::isAjaxRequest();
-            self::logAuth("Usuário NÃO autenticado (ajax=" . ($isAjax ? 'sim' : 'nao') . ")");
-            
-            if ($isAjax) {
-                // Para AJAX, retornar JSON 401 em vez de redirect HTML
-                http_response_code(401);
-                header('Content-Type: application/json; charset=utf-8');
-                echo json_encode([
-                    'success' => false,
-                    'message' => 'Sessão expirada. Faça login novamente.',
-                    'redirect' => '/login',
-                    'code' => 'SESSION_EXPIRED'
-                ]);
-                exit;
-            }
-            
-            self::logAuth("Redirecionando para /login");
+            self::logAuth("Usuário NÃO autenticado - redirecionando para /login");
             Response::redirect('/login');
         } else {
             $userId = Auth::id();

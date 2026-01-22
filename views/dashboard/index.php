@@ -1598,9 +1598,21 @@ ksort($uniqueTeams);
 <!-- Seção de Metas - Sempre Visível -->
 <?php foreach ($goalsOverview as $goalIndex => $goal): 
     $progress = $goal['progress'] ?? null;
-    $percentage = $progress ? (float)$progress['percentage'] : 0;
     $currentValue = $progress ? (float)$progress['current_value'] : 0;
-    $targetValue = (float)($goal['target_value'] ?? 0);
+    
+    // Para metas multi-agent: multiplicar o target pelo número de agentes
+    $baseTargetValue = (float)($goal['target_value'] ?? 0);
+    $agentCount = count($goal['agents'] ?? []);
+    $isMultiAgent = ($goal['target_type'] ?? '') === 'multi_agent';
+    
+    // Se for multi-agent, o alvo total é target * número de agentes
+    $targetValue = $isMultiAgent && $agentCount > 1 
+        ? $baseTargetValue * $agentCount 
+        : $baseTargetValue;
+    
+    // Recalcular percentage com o target correto
+    $percentage = $targetValue > 0 ? ($currentValue / $targetValue) * 100 : 0;
+    
     $remainingValue = max(0, $targetValue - $currentValue);
     $flagStatus = $progress['flag_status'] ?? 'good';
     $progressColor = \App\Models\Goal::getFlagColor($flagStatus);
@@ -1633,6 +1645,9 @@ ksort($uniqueTeams);
                     <span class="text-muted fs-7">
                         <?= \App\Models\Goal::TYPES[$goal['type']]['label'] ?? $goal['type'] ?> • 
                         <?= date('d/m', strtotime($goal['start_date'])) ?> → <?= date('d/m/Y', strtotime($goal['end_date'])) ?>
+                        <?php if ($isMultiAgent && $agentCount > 1): ?>
+                            <span class="badge badge-light-info ms-2"><?= $agentCount ?> agentes × <?= \App\Models\Goal::formatValue($goal['type'], $baseTargetValue) ?></span>
+                        <?php endif; ?>
                         <span class="badge badge-light-<?= $isOnTrack ? 'success' : 'danger' ?> ms-2">
                             <?= $isOnTrack ? '✓ No ritmo' : '⚠ Abaixo do ritmo' ?>
                         </span>

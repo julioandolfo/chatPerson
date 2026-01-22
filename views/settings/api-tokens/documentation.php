@@ -46,6 +46,9 @@ ob_start();
                             <a class="nav-link" href="#mensagens">Mensagens</a>
                         </li>
                         <li class="nav-item mb-2">
+                            <a class="nav-link" href="#envio-direto">📤 Envio Direto (WhatsApp)</a>
+                        </li>
+                        <li class="nav-item mb-2">
                             <a class="nav-link" href="#contatos">Contatos</a>
                         </li>
                         <li class="nav-item mb-2">
@@ -319,6 +322,150 @@ ob_start();
                             &nbsp;&nbsp;&nbsp;&nbsp;"type": "text"<br>
                             &nbsp;&nbsp;}'
                         </code>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Envio Direto de Mensagens -->
+            <div class="card mb-5" id="envio-direto">
+                <div class="card-header">
+                    <h3 class="card-title">📤 Envio Direto de Mensagens (WhatsApp)</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-success d-flex align-items-center mb-5">
+                        <i class="ki-duotone ki-check-circle fs-2x text-success me-3"><span class="path1"></span><span class="path2"></span></i>
+                        <div>
+                            <strong>Endpoint Simplificado!</strong><br>
+                            Envie mensagens diretamente para qualquer número, mesmo sem contato ou conversa pré-existente.
+                            O sistema criará automaticamente o contato e a conversa se necessário.
+                        </div>
+                    </div>
+                    
+                    <table class="table table-row-bordered">
+                        <thead>
+                            <tr>
+                                <th>Método</th>
+                                <th>Endpoint</th>
+                                <th>Descrição</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="badge badge-light-success">POST</span></td>
+                                <td><code>/api/v1/messages/send</code></td>
+                                <td>Enviar mensagem via WhatsApp</td>
+                            </tr>
+                            <tr>
+                                <td><span class="badge badge-light-primary">GET</span></td>
+                                <td><code>/api/v1/whatsapp/accounts</code></td>
+                                <td>Listar integrações WhatsApp disponíveis</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <h4 class="fw-bold mb-3 mt-5">Parâmetros do Envio</h4>
+                    <table class="table table-row-bordered">
+                        <thead>
+                            <tr>
+                                <th>Campo</th>
+                                <th>Tipo</th>
+                                <th>Obrigatório</th>
+                                <th>Descrição</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>to</code></td>
+                                <td>string</td>
+                                <td><span class="badge badge-light-danger">Sim</span></td>
+                                <td>Número do destinatário (ex: <code>5535991970289</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>from</code></td>
+                                <td>string</td>
+                                <td><span class="badge badge-light-danger">Sim</span></td>
+                                <td>Número da integração WhatsApp (ex: <code>5535991970289</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>message</code></td>
+                                <td>string</td>
+                                <td><span class="badge badge-light-danger">Sim</span></td>
+                                <td>Texto da mensagem (máx. 4096 caracteres)</td>
+                            </tr>
+                            <tr>
+                                <td><code>contact_name</code></td>
+                                <td>string</td>
+                                <td><span class="badge badge-light-secondary">Não</span></td>
+                                <td>Nome do contato (usado se for um novo contato)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <h4 class="fw-bold mb-3 mt-5">Exemplo: Enviar Mensagem Direta</h4>
+                    <div class="bg-light rounded p-4">
+                        <code class="text-dark">
+                            curl -X POST "<?= $baseUrl ?>/api/v1/messages/send" \<br>
+                            &nbsp;&nbsp;-H "Authorization: Bearer SEU_TOKEN" \<br>
+                            &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
+                            &nbsp;&nbsp;-d '{<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"to": "5511999998888",<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"from": "5535991970289",<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"message": "Olá! Esta é uma mensagem de teste via API.",<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"contact_name": "João Silva"<br>
+                            &nbsp;&nbsp;}'
+                        </code>
+                    </div>
+                    
+                    <h5 class="fw-bold mb-3 mt-5">Resposta de Sucesso</h5>
+                    <div class="bg-light rounded p-4">
+                        <pre class="mb-0"><code>{
+  "success": true,
+  "data": {
+    "message_id": 12345,
+    "external_id": "3EB0123ABC456DEF",
+    "status": "sent",
+    "conversation_id": 789,
+    "contact_id": 456,
+    "is_new_contact": false,
+    "is_new_conversation": false
+  }
+}</code></pre>
+                    </div>
+                    
+                    <h4 class="fw-bold mb-3 mt-5">Exemplo: Listar Integrações WhatsApp</h4>
+                    <div class="bg-light rounded p-4">
+                        <code class="text-dark">
+                            curl -X GET "<?= $baseUrl ?>/api/v1/whatsapp/accounts" \<br>
+                            &nbsp;&nbsp;-H "Authorization: Bearer SEU_TOKEN"
+                        </code>
+                    </div>
+                    
+                    <h5 class="fw-bold mb-3 mt-3">Resposta</h5>
+                    <div class="bg-light rounded p-4">
+                        <pre class="mb-0"><code>{
+  "success": true,
+  "data": {
+    "accounts": [
+      {
+        "id": 1,
+        "name": "Atendimento Geral",
+        "phone_number": "5535991970289",
+        "status": "active",
+        "provider": "quepasa"
+      }
+    ],
+    "total": 1
+  }
+}</code></pre>
+                    </div>
+                    
+                    <div class="alert alert-warning d-flex align-items-center mt-5">
+                        <i class="ki-duotone ki-information-5 fs-2x text-warning me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                        <div>
+                            <strong>Importante:</strong><br>
+                            O número <code>from</code> deve corresponder a uma integração WhatsApp ativa no sistema.
+                            Use o endpoint <code>/api/v1/whatsapp/accounts</code> para listar os números disponíveis.
+                        </div>
                     </div>
                 </div>
             </div>

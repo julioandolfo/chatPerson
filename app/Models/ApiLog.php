@@ -124,6 +124,27 @@ class ApiLog extends Model
     }
     
     /**
+     * Contar requisições recentes (para rate limiting)
+     */
+    public static function countRecentRequests(int $tokenId, int $seconds = 60): int
+    {
+        $db = Database::getInstance();
+        
+        $sql = "SELECT COUNT(*) as count FROM api_logs 
+                WHERE token_id = :token_id 
+                AND created_at >= DATE_SUB(NOW(), INTERVAL :seconds SECOND)";
+        
+        $stmt = $db->prepare($sql);
+        $stmt->bindValue('token_id', $tokenId, \PDO::PARAM_INT);
+        $stmt->bindValue('seconds', $seconds, \PDO::PARAM_INT);
+        $stmt->execute();
+        
+        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        return (int)($result['count'] ?? 0);
+    }
+    
+    /**
      * Limpar logs antigos
      */
     public static function cleanOldLogs(int $daysToKeep = 30): int

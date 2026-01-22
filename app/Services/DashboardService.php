@@ -1003,6 +1003,7 @@ class DashboardService
         
         // Calcular tempo médio de resposta geral (todas as trocas de mensagens) - em SEGUNDOS
         // E também contar quantas respostas estão dentro do SLA de respostas
+        // IMPORTANTE: ca deve ser declarado ANTES de ser usado nos JOINs
         $sqlAvgResponse = "SELECT 
                     AVG(response_time_seconds) as avg_time_seconds,
                     COUNT(*) as total_responses,
@@ -1010,29 +1011,31 @@ class DashboardService
                 FROM (
                     SELECT 
                         TIMESTAMPDIFF(SECOND, m1.created_at, m2.created_at) as response_time_seconds
-                    FROM messages m1
-                    INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
+                    FROM conversations c
+                    INNER JOIN conversation_assignments ca 
+                        ON ca.conversation_id = c.id 
+                        AND ca.{$agentColumn} = ?
+                        AND ca.{$assignedColumn} >= ?
+                        AND ca.{$assignedColumn} <= ?
+                    INNER JOIN messages m1 
+                        ON m1.conversation_id = c.id
+                        AND m1.sender_type = 'contact'
+                    INNER JOIN messages m2 
+                        ON m2.conversation_id = m1.conversation_id
                         AND m2.sender_type = 'agent'
-                        AND m2.sender_id = ca.{$agentColumn}
+                        AND m2.sender_id = ?
                         AND m2.created_at > m1.created_at
                         AND m2.created_at = (
                             SELECT MIN(m3.created_at)
                             FROM messages m3
                             WHERE m3.conversation_id = m1.conversation_id
                             AND m3.sender_type = 'agent'
-                            AND m3.sender_id = ca.{$agentColumn}
+                            AND m3.sender_id = ?
                             AND m3.created_at > m1.created_at
                         )
-                    INNER JOIN conversations c ON c.id = m1.conversation_id
-                    INNER JOIN conversation_assignments ca 
-                        ON ca.conversation_id = c.id 
-                        AND ca.{$agentColumn} = ?
-                        AND ca.{$assignedColumn} >= ?
-                        AND ca.{$assignedColumn} <= ?
-                    WHERE m1.sender_type = 'contact'
                 ) as response_times";
         
-        $avgResponseResult = \App\Helpers\Database::fetch($sqlAvgResponse, [$slaResponseSeconds, $agentId, $dateFrom, $dateTo]);
+        $avgResponseResult = \App\Helpers\Database::fetch($sqlAvgResponse, [$slaResponseSeconds, $agentId, $dateFrom, $dateTo, $agentId, $agentId]);
         $avgResponseSeconds = $avgResponseResult && $avgResponseResult['avg_time_seconds'] !== null 
             ? (float)$avgResponseResult['avg_time_seconds']
             : 0;

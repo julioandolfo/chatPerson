@@ -151,7 +151,7 @@ class WhatsAppService
             $ch = curl_init($url);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 60, // ✅ Aumentado de 30s para 60s
+                CURLOPT_TIMEOUT => 120, // ✅ Timeout padrão de 120s
                 CURLOPT_POST => true,
                 CURLOPT_POSTFIELDS => '', // --data '' conforme exemplo
                 CURLOPT_HTTPHEADER => $headers,
@@ -179,7 +179,7 @@ class WhatsAppService
                 $ch = curl_init($url);
                 curl_setopt_array($ch, [
                     CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 60, // ✅ Aumentado de 30s para 60s
+                    CURLOPT_TIMEOUT => 120, // ✅ Timeout padrão de 120s
                     CURLOPT_HTTPGET => true,
                     CURLOPT_HTTPHEADER => $headers,
                     CURLOPT_FOLLOWLOCATION => true,
@@ -341,7 +341,7 @@ class WhatsAppService
                         $ch = curl_init($url);
                         curl_setopt_array($ch, [
                             CURLOPT_RETURNTRANSFER => true,
-                            CURLOPT_TIMEOUT => 3,
+                            CURLOPT_TIMEOUT => 120, // ✅ Timeout padrão de 120s
                             CURLOPT_HTTPGET => true, // Tentar GET primeiro
                             CURLOPT_HTTPHEADER => $headers,
                             CURLOPT_SSL_VERIFYPEER => false,
@@ -775,7 +775,8 @@ class WhatsAppService
             $ch = curl_init($url);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 60, // ✅ Aumentado de 30s para 60s
+                CURLOPT_TIMEOUT => 120, // ✅ Timeout padrão de 120s
+                CURLOPT_CONNECTTIMEOUT => 30, // ✅ Timeout de conexão separado
                 CURLOPT_POST => true,
                 CURLOPT_POSTFIELDS => json_encode($payload),
                 CURLOPT_HTTPHEADER => $headers,
@@ -785,12 +786,15 @@ class WhatsAppService
                 CURLOPT_SSL_VERIFYHOST => false
             ]);
 
+            Logger::quepasa("sendMessage - Timeout configurado: 120s");
+
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
             $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
             $responseLen = strlen($response ?? '');
             $error = curl_error($ch);
+            $errno = curl_errno($ch);
             curl_close($ch);
 
             Logger::quepasa("sendMessage - HTTP Code: {$httpCode} | Content-Type: " . ($contentType ?: 'null') . " | RespLen: {$responseLen}");
@@ -798,8 +802,23 @@ class WhatsAppService
             Logger::quepasa("sendMessage - Response Preview: " . substr($response ?? '', 0, 500));
 
             if ($error) {
-                Logger::quepasa("sendMessage - Erro cURL: {$error}");
+                Logger::quepasa("sendMessage - Erro cURL [{$errno}]: {$error}");
                 Logger::error("WhatsApp sendMessage Error: {$error}");
+                
+                // ✅ Tratamento especial para timeout (CURLE_OPERATION_TIMEDOUT = 28)
+                // A mensagem pode ter sido enviada mesmo com timeout na resposta
+                if ($errno === CURLE_OPERATION_TIMEDOUT || $errno === 28) {
+                    Logger::quepasa("sendMessage - ⚠️ TIMEOUT: Mensagem pode ter sido enviada, mas resposta não retornou a tempo");
+                    
+                    // Retornar sucesso parcial (sem message_id confirmado)
+                    return [
+                        'success' => true,
+                        'message_id' => null,
+                        'status' => 'sent_timeout',
+                        'warning' => 'Timeout na resposta - mensagem pode ter sido enviada'
+                    ];
+                }
+                
                 throw new \Exception("Erro ao enviar mensagem: {$error}");
             }
 
@@ -952,7 +971,7 @@ class WhatsAppService
             $ch = curl_init($url);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 60, // ✅ Aumentado de 30s para 60s
+                CURLOPT_TIMEOUT => 120, // ✅ Timeout padrão de 120s
                 CURLOPT_POST => true,
                 CURLOPT_POSTFIELDS => json_encode($payload),
                 CURLOPT_HTTPHEADER => $headers,
@@ -1450,7 +1469,7 @@ class WhatsAppService
                         
                         curl_setopt_array($ch, [
                             CURLOPT_RETURNTRANSFER => true,
-                            CURLOPT_TIMEOUT => 60, // ✅ Aumentado de 30s para 60s
+                            CURLOPT_TIMEOUT => 120, // ✅ Timeout padrão de 120s
                             CURLOPT_HTTPHEADER => $headers,
                             CURLOPT_FOLLOWLOCATION => true,
                             CURLOPT_SSL_VERIFYPEER => false,
@@ -2746,7 +2765,7 @@ class WhatsAppService
                 $ch = curl_init($url);
                 curl_setopt_array($ch, [
                     CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 5,
+                    CURLOPT_TIMEOUT => 120, // ✅ Timeout padrão de 120s
                     CURLOPT_HTTPHEADER => $headers,
                     CURLOPT_FOLLOWLOCATION => true,
                     CURLOPT_SSL_VERIFYPEER => false,

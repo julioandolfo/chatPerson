@@ -413,6 +413,15 @@ Router::get('/settings/api-tokens/docs', function() {
 }, ['Authentication']);
 Router::get('/settings/api-tokens/stats', [\App\Controllers\ApiTokenController::class, 'stats'], ['Authentication']);
 
+// ============================================================================
+// API REST v1 - Endpoints públicos (autenticação via API Token)
+// ============================================================================
+// Envio de mensagens via API
+Router::post('/api/v1/messages/send', [\App\Controllers\ApiMessageController::class, 'send'], ['ApiAuth']);
+
+// Listar contas WhatsApp disponíveis
+Router::get('/api/v1/whatsapp/accounts', [\App\Controllers\ApiMessageController::class, 'listAccounts'], ['ApiAuth']);
+
 // Botões de Ações
 Router::get('/settings/action-buttons', [\App\Controllers\ConversationActionButtonController::class, 'index'], ['Authentication']);
 Router::post('/settings/action-buttons', [\App\Controllers\ConversationActionButtonController::class, 'store'], ['Authentication']);

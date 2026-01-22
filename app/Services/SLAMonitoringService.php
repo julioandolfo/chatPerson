@@ -171,14 +171,26 @@ class SLAMonitoringService
         // Verifica se já houve primeira resposta e agora está aguardando nova resposta do agente
         if ($firstResponseOK && !$settings['sla']['enable_resolution_sla']) {
             // Verificar última mensagem do contato vs última do agente
-            $lastMessages = Database::fetch(
-                "SELECT 
-                    MAX(CASE WHEN sender_type = 'contact' THEN created_at END) as last_contact,
-                    MAX(CASE WHEN sender_type = 'agent' THEN created_at END) as last_agent
-                 FROM messages 
-                 WHERE conversation_id = ?",
-                [$conversationId]
-            );
+            $agentId = $conversation['agent_id'] ?? null;
+            if ($agentId) {
+                $lastMessages = Database::fetch(
+                    "SELECT 
+                        MAX(CASE WHEN sender_type = 'contact' THEN created_at END) as last_contact,
+                        MAX(CASE WHEN sender_type = 'agent' AND sender_id = ? THEN created_at END) as last_agent
+                     FROM messages 
+                     WHERE conversation_id = ?",
+                    [$agentId, $conversationId]
+                );
+            } else {
+                $lastMessages = Database::fetch(
+                    "SELECT 
+                        MAX(CASE WHEN sender_type = 'contact' THEN created_at END) as last_contact,
+                        MAX(CASE WHEN sender_type = 'agent' THEN created_at END) as last_agent
+                     FROM messages 
+                     WHERE conversation_id = ?",
+                    [$conversationId]
+                );
+            }
             
             if ($lastMessages && $lastMessages['last_contact'] && $lastMessages['last_agent']) {
                 $lastContact = new \DateTime($lastMessages['last_contact']);

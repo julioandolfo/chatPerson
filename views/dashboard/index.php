@@ -1591,9 +1591,9 @@ ksort($uniqueTeams);
                 $flagStatus = $progress['flag_status'] ?? 'good';
                 $progressColor = \App\Models\Goal::getFlagColor($flagStatus);
             ?>
-            <div class="accordion-item">
+            <div class="accordion-item border-0 mb-3">
                 <h2 class="accordion-header" id="goalOverviewHeading<?= $goal['id'] ?>">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#goalOverviewCollapse<?= $goal['id'] ?>">
+                    <button class="accordion-button collapsed rounded" type="button" data-bs-toggle="collapse" data-bs-target="#goalOverviewCollapse<?= $goal['id'] ?>">
                         <div class="d-flex flex-column w-100">
                             <div class="d-flex justify-content-between align-items-center">
                                 <span class="fw-bold"><?= htmlspecialchars($goal['name']) ?></span>
@@ -1610,6 +1610,43 @@ ksort($uniqueTeams);
                 </h2>
                 <div id="goalOverviewCollapse<?= $goal['id'] ?>" class="accordion-collapse collapse" data-bs-parent="#goalsOverviewAccordion">
                     <div class="accordion-body">
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <div class="card bg-light-primary h-100">
+                                    <div class="card-body p-4">
+                                        <div class="text-muted fs-8">Progresso</div>
+                                        <div class="fs-3 fw-bold text-primary"><?= number_format($percentage, 1) ?>%</div>
+                                        <div class="progress h-8px mt-2">
+                                            <div class="progress-bar bg-primary" style="width: <?= min($percentage, 100) ?>%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-light-success h-100">
+                                    <div class="card-body p-4">
+                                        <div class="text-muted fs-8">Atual</div>
+                                        <div class="fs-5 fw-bold text-success">
+                                            <?= \App\Models\Goal::formatValue($goal['type'], $currentValue) ?>
+                                        </div>
+                                        <div class="text-muted fs-9">Soma dos envolvidos</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-light-info h-100">
+                                    <div class="card-body p-4">
+                                        <div class="text-muted fs-8">Alvo</div>
+                                        <div class="fs-5 fw-bold text-info">
+                                            <?= \App\Models\Goal::formatValue($goal['type'], $goal['target_value']) ?>
+                                        </div>
+                                        <div class="text-muted fs-9">
+                                            <?= date('d/m/Y', strtotime($goal['start_date'])) ?> → <?= date('d/m/Y', strtotime($goal['end_date'])) ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <div class="row g-4">
                             <div class="col-md-4">
                                 <div class="border rounded p-4 h-100">
@@ -1632,7 +1669,7 @@ ksort($uniqueTeams);
                                         }
                                     ?>
                                     <div class="table-responsive">
-                                        <table class="table table-sm table-row-dashed">
+                                        <table class="table table-sm table-row-dashed table-hover">
                                             <thead>
                                                 <tr class="text-muted fs-8">
                                                     <th>#</th>
@@ -1667,7 +1704,16 @@ ksort($uniqueTeams);
                                                     ?>
                                                     <tr>
                                                         <td><?= $index + 1 ?></td>
-                                                        <td><?= htmlspecialchars($agent['name']) ?></td>
+                                                        <td>
+                                                            <?= htmlspecialchars($agent['name']) ?>
+                                                            <?php if ($index === 0): ?>
+                                                                <span class="badge badge-light-success fs-9 ms-1">Top 1</span>
+                                                            <?php elseif ($index === 1): ?>
+                                                                <span class="badge badge-light-warning fs-9 ms-1">Top 2</span>
+                                                            <?php elseif ($index === 2): ?>
+                                                                <span class="badge badge-light-primary fs-9 ms-1">Top 3</span>
+                                                            <?php endif; ?>
+                                                        </td>
                                                         <td class="text-end"><?= \App\Models\Goal::formatValue($goal['type'], $agent['current_value'] ?? 0) ?></td>
                                                         <td class="text-end">
                                                             <div class="d-flex flex-column align-items-end">
@@ -1709,7 +1755,7 @@ ksort($uniqueTeams);
                                 <h6 class="fw-bold mb-3">Soma por Time</h6>
                                 <?php if (!empty($goal['teams'])): ?>
                                     <div class="table-responsive">
-                                        <table class="table table-sm table-row-dashed">
+                                        <table class="table table-sm table-row-dashed table-hover">
                                             <thead>
                                                 <tr class="text-muted fs-8">
                                                     <th>#</th>

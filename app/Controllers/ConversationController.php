@@ -3284,23 +3284,44 @@ class ConversationController
             $slaConfig = \App\Models\SLARule::getSLAForConversation($conversation);
             
             // Verificar se já houve primeira resposta do agente
-            $firstAgentMessage = \App\Helpers\Database::fetch(
-                "SELECT MIN(created_at) as first_response 
-                 FROM messages 
-                 WHERE conversation_id = ? AND sender_type = 'agent'",
-                [$conversationId]
-            );
+            $agentId = $conversation['agent_id'] ?? null;
+            if ($agentId) {
+                $firstAgentMessage = \App\Helpers\Database::fetch(
+                    "SELECT MIN(created_at) as first_response 
+                     FROM messages 
+                     WHERE conversation_id = ? AND sender_type = 'agent' AND sender_id = ?",
+                    [$conversationId, $agentId]
+                );
+            } else {
+                $firstAgentMessage = \App\Helpers\Database::fetch(
+                    "SELECT MIN(created_at) as first_response 
+                     FROM messages 
+                     WHERE conversation_id = ? AND sender_type = 'agent'",
+                    [$conversationId]
+                );
+            }
             $hasFirstResponse = !empty($firstAgentMessage['first_response']);
             
             // Verificar última mensagem do contato e do agente (para SLA contínuo)
-            $lastMessages = \App\Helpers\Database::fetch(
-                "SELECT 
-                    MAX(CASE WHEN sender_type = 'contact' THEN created_at END) as last_contact,
-                    MAX(CASE WHEN sender_type = 'agent' THEN created_at END) as last_agent
-                 FROM messages 
-                 WHERE conversation_id = ?",
-                [$conversationId]
-            );
+            if ($agentId) {
+                $lastMessages = \App\Helpers\Database::fetch(
+                    "SELECT 
+                        MAX(CASE WHEN sender_type = 'contact' THEN created_at END) as last_contact,
+                        MAX(CASE WHEN sender_type = 'agent' AND sender_id = ? THEN created_at END) as last_agent
+                     FROM messages 
+                     WHERE conversation_id = ?",
+                    [$agentId, $conversationId]
+                );
+            } else {
+                $lastMessages = \App\Helpers\Database::fetch(
+                    "SELECT 
+                        MAX(CASE WHEN sender_type = 'contact' THEN created_at END) as last_contact,
+                        MAX(CASE WHEN sender_type = 'agent' THEN created_at END) as last_agent
+                     FROM messages 
+                     WHERE conversation_id = ?",
+                    [$conversationId]
+                );
+            }
             
             // Definir tipo de SLA (primeira resposta vs respostas contínuas)
             $slaType = $hasFirstResponse ? 'ongoing' : 'first';

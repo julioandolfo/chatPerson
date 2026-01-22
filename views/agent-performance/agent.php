@@ -1799,7 +1799,8 @@ function showSLABreachDetails(conversationId, type = 'first') {
     const modal = new bootstrap.Modal(document.getElementById(modalId));
     modal.show();
     
-    fetch(`<?= Url::to('/agent-performance/sla-breached-details') ?>?conversation_id=${conversationId}&type=${type}`)
+    const agentId = <?= $agent['id'] ?? 0 ?>;
+    fetch(`<?= Url::to('/agent-performance/sla-breached-details') ?>?conversation_id=${conversationId}&type=${type}&agent_id=${agentId}`)
         .then(r => r.json())
         .then(data => {
             const container = document.getElementById('sla-breach-details-container');

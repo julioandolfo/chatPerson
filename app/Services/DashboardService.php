@@ -899,13 +899,13 @@ class DashboardService
                         (SELECT MIN(m1.created_at) FROM messages m1 
                          WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact'),
                         (SELECT MIN(m2.created_at) FROM messages m2 
-                         WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent')
+                         WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent' AND m2.sender_id = ca.agent_id)
                     )) as avg_first_response_seconds,
                     COUNT(DISTINCT CASE WHEN TIMESTAMPDIFF(SECOND, 
                         (SELECT MIN(m1.created_at) FROM messages m1 
                          WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact'),
                         (SELECT MIN(m2.created_at) FROM messages m2 
-                         WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent')
+                         WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent' AND m2.sender_id = ca.agent_id)
                     ) <= ? THEN c.id END) as first_response_within_sla
                 FROM conversations c
                 INNER JOIN conversation_assignments ca 
@@ -957,12 +957,14 @@ class DashboardService
                     FROM messages m1
                     INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
                         AND m2.sender_type = 'agent'
+                        AND m2.sender_id = ca.agent_id
                         AND m2.created_at > m1.created_at
                         AND m2.created_at = (
                             SELECT MIN(m3.created_at)
                             FROM messages m3
                             WHERE m3.conversation_id = m1.conversation_id
                             AND m3.sender_type = 'agent'
+                            AND m3.sender_id = ca.agent_id
                             AND m3.created_at > m1.created_at
                         )
                     INNER JOIN conversations c ON c.id = m1.conversation_id

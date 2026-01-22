@@ -1040,20 +1040,23 @@ class GoalService
 
         foreach ($summary['goals_by_level'] as $level => &$levelGoals) {
             foreach ($levelGoals as &$goal) {
+                $currentValue = self::calculateCurrentValueForAgent($goal, $userId);
+                $percentage = ($goal['target_value'] ?? 0) > 0
+                    ? ($currentValue / (float)$goal['target_value']) * 100
+                    : 0;
+
                 $goal['tiers'] = GoalBonusTier::getByGoal((int)$goal['id']);
                 $goal['conditions'] = GoalBonusCondition::getByGoal((int)$goal['id']);
 
                 $progress = $goal['progress'] ?? GoalProgress::getLatest((int)$goal['id']);
-                if ($progress) {
-                    $goal['progress'] = $progress;
-                    $goal['bonus_preview'] = GoalBonusTier::calculateBonus(
-                        (int)$goal['id'],
-                        (float)$progress['percentage'],
-                        $userId,
-                        $goal['start_date'],
-                        $goal['end_date']
-                    );
-                }
+                $goal['progress'] = self::buildAgentProgress($goal, $progress, $currentValue, $percentage);
+                $goal['bonus_preview'] = GoalBonusTier::calculateBonus(
+                    (int)$goal['id'],
+                    (float)$percentage,
+                    $userId,
+                    $goal['start_date'],
+                    $goal['end_date']
+                );
             }
         }
 
@@ -1107,6 +1110,7 @@ class GoalService
             });
 
             $goal['agents'] = $agents;
+            $goal['progress'] = self::buildOverviewProgress($goal, $agents, $goal['progress'] ?? null);
             $goal['teams'] = self::calculateTeamsTotals($goal, $agents);
         }
 
@@ -1278,6 +1282,46 @@ class GoalService
             default:
                 return 0;
         }
+    }
+
+    /**
+     * Progresso agregado para exibição no dashboard (sem depender do histórico)
+     */
+    private static function buildOverviewProgress(array $goal, array $agents, ?array $progress): array
+    {
+        $totalCurrent = 0;
+        foreach ($agents as $agent) {
+            $totalCurrent += (float)($agent['current_value'] ?? 0);
+        }
+
+        $targetValue = (float)($goal['target_value'] ?? 0);
+        $percentage = $targetValue > 0 ? ($totalCurrent / $targetValue) * 100 : 0;
+
+        $override = [
+            'current_value' => $totalCurrent,
+            'percentage' => round($percentage, 2),
+            'flag_status' => self::determineFlagStatus($percentage, $goal)
+        ];
+
+        return $progress ? array_merge($progress, $override) : $override;
+    }
+
+    /**
+     * Progresso individual para exibição na performance do agente
+     */
+    private static function buildAgentProgress(
+        array $goal,
+        ?array $progress,
+        float $currentValue,
+        float $percentage
+    ): array {
+        $override = [
+            'current_value' => $currentValue,
+            'percentage' => round($percentage, 2),
+            'flag_status' => self::determineFlagStatus($percentage, $goal)
+        ];
+
+        return $progress ? array_merge($progress, $override) : $override;
     }
     
     /**

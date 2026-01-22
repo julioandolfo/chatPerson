@@ -410,7 +410,9 @@ class GoalService
      */
     private static function tableExists(string $table): bool
     {
-        $result = Database::fetch("SHOW TABLES LIKE ?", [$table]);
+        $db = Database::getInstance();
+        $quoted = $db->quote($table);
+        $result = Database::fetch("SHOW TABLES LIKE {$quoted}");
         return !empty($result);
     }
     

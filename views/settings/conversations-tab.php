@@ -125,6 +125,26 @@ $tts = $cs['text_to_speech'] ?? [];
                 </div>
             </div>
         </div>
+        <div class="row">
+            <div class="col-lg-6">
+                <div class="fv-row mb-7">
+                    <label class="d-flex align-items-center">
+                        <input type="checkbox" name="sla_message_delay_enabled" class="form-check-input me-2" 
+                               <?= ($sla['message_delay_enabled'] ?? true) ? 'checked' : '' ?> />
+                        <span class="fw-semibold fs-6">Habilitar delay antes de iniciar SLA</span>
+                    </label>
+                    <div class="form-text">Ignora mensagens rápidas do cliente (ex.: “ok”, “obrigado”, automações)</div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="fv-row mb-7">
+                    <label class="fw-semibold fs-6 mb-2">Delay mínimo (minutos)</label>
+                    <input type="number" name="sla_message_delay_minutes" class="form-control form-control-solid" 
+                           value="<?= $sla['message_delay_minutes'] ?? 1 ?>" min="0" />
+                    <div class="form-text">SLA só inicia se o cliente responder após este tempo</div>
+                </div>
+            </div>
+        </div>
         <div class="fv-row mb-7">
             <label class="d-flex align-items-center">
                 <input type="checkbox" name="sla_working_hours_enabled" class="form-check-input me-2" 

@@ -1134,7 +1134,7 @@
          * Navegar para conversa
          */
         navigateToConversation: function(conversationId) {
-            const url = `/conversations/${conversationId}`;
+            const url = `/conversations?id=${conversationId}`;
             
             // Se já estamos na página de conversas, apenas selecionar a conversa
             if (window.location.pathname.includes('/conversations')) {

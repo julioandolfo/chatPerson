@@ -322,7 +322,7 @@ function formatTimeDisplay($seconds, $showUnit = true) {
     </div>
 </div>
 
-<!-- Card de Conversas com SLA Excedido -->
+<!-- Card de Conversas com SLA Excedido (1ª Resposta) -->
 <div class="row g-5 mb-7">
     <div class="col-12">
         <div class="card">
@@ -334,10 +334,10 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                             <span class="path2"></span>
                             <span class="path3"></span>
                         </i>
-                        Conversas com SLA Excedido
+                        Conversas com SLA Excedido (1ª Resposta)
                     </span>
                     <span class="text-muted mt-1 fw-semibold fs-7">
-                        Conversas que não foram respondidas dentro do prazo estabelecido
+                        Conversas que não tiveram a primeira resposta dentro do prazo
                     </span>
                 </h3>
                 <div class="card-toolbar">
@@ -349,6 +349,44 @@ function formatTimeDisplay($seconds, $showUnit = true) {
             </div>
             <div class="card-body py-3">
                 <div id="sla-breached-container">
+                    <div class="text-center py-10">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Card de Conversas com SLA de Respostas Excedido -->
+<div class="row g-5 mb-7">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold text-gray-900">
+                        <i class="ki-duotone ki-timer text-warning fs-2 me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        Conversas com SLA de Respostas Excedido
+                    </span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">
+                        Conversas com respostas acima do prazo durante o atendimento
+                    </span>
+                </h3>
+                <div class="card-toolbar">
+                    <span class="badge badge-light-warning fs-5" id="sla-ongoing-breached-count">
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                        Carregando...
+                    </span>
+                </div>
+            </div>
+            <div class="card-body py-3">
+                <div id="sla-ongoing-breached-container">
                     <div class="text-center py-10">
                         <div class="spinner-border text-primary" role="status">
                             <span class="visually-hidden">Carregando...</span>
@@ -1365,6 +1403,134 @@ function loadSLABreachedConversations() {
         });
 }
 
+// ========== CARREGAR CONVERSAS COM SLA DE RESPOSTAS EXCEDIDO ==========
+function loadSLAOngoingBreachedConversations() {
+    const agentId = <?= $agent['id'] ?? 0 ?>;
+    const dateFrom = '<?= $dateFrom ?>';
+    const dateTo = '<?= $dateTo ?>';
+    
+    fetch(`<?= Url::to('/agent-performance/sla-breached') ?>?agent_id=${agentId}&date_from=${dateFrom}&date_to=${dateTo}&type=ongoing`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const container = document.getElementById('sla-ongoing-breached-container');
+                const countBadge = document.getElementById('sla-ongoing-breached-count');
+                
+                // Atualizar contador
+                countBadge.innerHTML = `${data.total} conversas`;
+                
+                if (data.total === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-10">
+                            <i class="ki-duotone ki-check-circle fs-4x text-success mb-5">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <h3 class="text-gray-700 fw-bold mb-2">Nenhuma conversa com SLA de respostas excedido!</h3>
+                            <p class="text-muted">Ótimo! As respostas estão dentro do prazo.</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Criar tabela
+                let html = `
+                    <div class="table-responsive">
+                        <table class="table align-middle table-row-dashed fs-6 gy-4">
+                            <thead>
+                                <tr class="text-start text-gray-500 fw-bold fs-7 text-uppercase gs-0">
+                                    <th>Conversa</th>
+                                    <th>Contato</th>
+                                    <th class="text-center">Maior Tempo</th>
+                                    <th class="text-center">SLA</th>
+                                    <th class="text-center">Excedido em</th>
+                                    <th class="text-center">Status</th>
+                                    <th class="text-end">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                data.conversations.forEach(conv => {
+                    const exceededBy = conv.exceeded_by || 0;
+                    const percentage = conv.percentage || 0;
+                    
+                    // Cor da barra
+                    let barColor = 'success';
+                    if (percentage >= 100) barColor = 'danger';
+                    else if (percentage >= 80) barColor = 'warning';
+                    
+                    html += `
+                        <tr>
+                            <td>
+                                <div class="d-flex flex-column">
+                                    <span class="fw-bold text-gray-800">#${conv.id}</span>
+                                    <span class="text-muted fs-7">${formatDateTime(conv.created_at)}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex flex-column">
+                                    <span class="fw-semibold text-gray-800">${conv.contact_name || 'Sem nome'}</span>
+                                    <span class="text-muted fs-7">${conv.contact_phone || '-'}</span>
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge badge-light-${barColor} fs-6">
+                                    ${conv.elapsed_minutes} min
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <span class="text-muted fs-6">${conv.sla_minutes} min</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge badge-light-danger fs-6">
+                                    +${exceededBy.toFixed(0)} min
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge badge-light-${conv.status_class} fs-6">
+                                    ${conv.status_label}
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                <a href="<?= Url::to('/conversations') ?>?id=${conv.id}" 
+                                   class="btn btn-sm btn-light-primary" 
+                                   target="_blank">
+                                    <i class="ki-duotone ki-eye fs-4">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    Ver
+                                </a>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                container.innerHTML = html;
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar conversas com SLA de respostas excedido:', error);
+            document.getElementById('sla-ongoing-breached-container').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="ki-duotone ki-cross-circle fs-2x text-danger me-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Erro ao carregar dados
+                </div>
+            `;
+        });
+}
+
 // Helper para formatar data/hora
 function formatDateTime(datetime) {
     if (!datetime) return '-';
@@ -1374,6 +1540,7 @@ function formatDateTime(datetime) {
 
 // Carregar ao abrir página
 loadSLABreachedConversations();
+loadSLAOngoingBreachedConversations();
 </script>
 <?php endif; ?>
 

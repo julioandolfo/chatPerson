@@ -3283,17 +3283,74 @@ class ConversationController
             // Obter SLA aplicável para esta conversa
             $slaConfig = \App\Models\SLARule::getSLAForConversation($conversation);
             
-            // Verificar se SLA deve começar a contar
-            $shouldStart = \App\Services\ConversationSettingsService::shouldStartSLACount($conversationId);
+            // Verificar se já houve primeira resposta do agente
+            $firstAgentMessage = \App\Helpers\Database::fetch(
+                "SELECT MIN(created_at) as first_response 
+                 FROM messages 
+                 WHERE conversation_id = ? AND sender_type = 'agent'",
+                [$conversationId]
+            );
+            $hasFirstResponse = !empty($firstAgentMessage['first_response']);
             
-            // Tempo decorrido
-            $elapsedMinutes = \App\Services\ConversationSettingsService::getElapsedSLAMinutes($conversationId);
+            // Verificar última mensagem do contato e do agente (para SLA contínuo)
+            $lastMessages = \App\Helpers\Database::fetch(
+                "SELECT 
+                    MAX(CASE WHEN sender_type = 'contact' THEN created_at END) as last_contact,
+                    MAX(CASE WHEN sender_type = 'agent' THEN created_at END) as last_agent
+                 FROM messages 
+                 WHERE conversation_id = ?",
+                [$conversationId]
+            );
             
-            // Tempo de início do SLA
-            $startTime = \App\Services\ConversationSettingsService::getSLAStartTime($conversationId);
+            // Definir tipo de SLA (primeira resposta vs respostas contínuas)
+            $slaType = $hasFirstResponse ? 'ongoing' : 'first';
+            $slaLabel = $hasFirstResponse ? 'Respostas' : '1ª Resposta';
+            $slaMinutes = $hasFirstResponse ? $slaConfig['ongoing_response_time'] : $slaConfig['first_response_time'];
             
-            // Verificar se está dentro do SLA
-            $firstResponseOK = \App\Services\ConversationSettingsService::checkFirstResponseSLA($conversationId);
+            $shouldStart = false;
+            $elapsedMinutes = 0;
+            $startTime = null;
+            $isWithinSla = true;
+            
+            if ($slaType === 'ongoing') {
+                $delayEnabled = ($settings['sla']['message_delay_enabled'] ?? true);
+                $delayMinutes = $settings['sla']['message_delay_minutes'] ?? 1;
+                
+                if (!$delayEnabled) {
+                    $delayMinutes = 0;
+                }
+                
+                if (!empty($lastMessages['last_contact']) && !empty($lastMessages['last_agent'])) {
+                    $lastContact = new \DateTime($lastMessages['last_contact']);
+                    $lastAgent = new \DateTime($lastMessages['last_agent']);
+                    
+                    if ($lastContact > $lastAgent) {
+                        $diffSeconds = $lastContact->getTimestamp() - $lastAgent->getTimestamp();
+                        $diffMinutes = $diffSeconds / 60;
+                        
+                        if ($diffMinutes >= $delayMinutes) {
+                            $shouldStart = true;
+                            $startTime = $lastContact; // SLA começa na mensagem do cliente
+                            
+                            $now = new \DateTime();
+                            if ($conversation['sla_paused_at']) {
+                                $now = new \DateTime($conversation['sla_paused_at']);
+                            }
+                            
+                            $elapsedMinutes = \App\Helpers\WorkingHoursCalculator::calculateMinutes($startTime, $now);
+                            $elapsedMinutes -= (int)($conversation['sla_paused_duration'] ?? 0);
+                            $elapsedMinutes = max(0, $elapsedMinutes);
+                            $isWithinSla = $elapsedMinutes < $slaMinutes;
+                        }
+                    }
+                }
+            } else {
+                // SLA de 1ª resposta
+                $shouldStart = \App\Services\ConversationSettingsService::shouldStartSLACount($conversationId);
+                $elapsedMinutes = \App\Services\ConversationSettingsService::getElapsedSLAMinutes($conversationId);
+                $startTime = \App\Services\ConversationSettingsService::getSLAStartTime($conversationId);
+                $isWithinSla = \App\Services\ConversationSettingsService::checkFirstResponseSLA($conversationId);
+            }
             
             // Buscar histórico de mensagens com tempos
             $messages = \App\Helpers\Database::fetchAll(
@@ -3345,10 +3402,10 @@ class ConversationController
             $status = 'ok';
             $percentage = 0;
             
-            if ($shouldStart && $slaConfig['first_response_time'] > 0) {
-                $percentage = ($elapsedMinutes / $slaConfig['first_response_time']) * 100;
+            if ($shouldStart && $slaMinutes > 0) {
+                $percentage = ($elapsedMinutes / $slaMinutes) * 100;
                 
-                if (!$firstResponseOK) {
+                if (!$isWithinSla) {
                     $status = 'exceeded';
                 } elseif ($percentage >= 80) {
                     $status = 'warning';
@@ -3366,10 +3423,13 @@ class ConversationController
                     'first_response_sla' => $slaConfig['first_response_time'],
                     'ongoing_response_sla' => $slaConfig['ongoing_response_time'],
                     'resolution_sla' => $slaConfig['resolution_time'],
+                    'sla_type' => $slaType,
+                    'sla_label' => $slaLabel,
+                    'current_sla_minutes' => $slaMinutes,
                     'should_start' => $shouldStart,
                     'elapsed_minutes' => $elapsedMinutes,
-                    'start_time' => $startTime->format('Y-m-d H:i:s'),
-                    'is_within_sla' => $firstResponseOK,
+                    'start_time' => $startTime ? $startTime->format('Y-m-d H:i:s') : null,
+                    'is_within_sla' => $isWithinSla,
                     'is_paused' => !empty($conversation['sla_paused_at']),
                     'paused_duration' => (int)($conversation['sla_paused_duration'] ?? 0),
                     'warning_sent' => (bool)($conversation['sla_warning_sent'] ?? 0),

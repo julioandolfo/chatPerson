@@ -91,6 +91,7 @@ class ConversationSettingsService
                 'working_hours_end' => '18:00',
                 'auto_reassign_on_sla_breach' => true,
                 'reassign_after_minutes' => 30, // minutos após SLA
+                'message_delay_enabled' => true, // habilitar delay mínimo para iniciar SLA
                 'message_delay_minutes' => 1, // delay mínimo para iniciar SLA (evita mensagens automáticas/despedidas)
             ],
             
@@ -929,7 +930,13 @@ class ConversationSettingsService
     public static function shouldStartSLACount(int $conversationId): bool
     {
         $settings = self::getSettings();
+        $delayEnabled = $settings['sla']['message_delay_enabled'] ?? true;
         $delayMinutes = $settings['sla']['message_delay_minutes'] ?? 1;
+        
+        // Se delay desabilitado, sempre começar a contar
+        if (!$delayEnabled) {
+            return true;
+        }
         
         // Se delay for 0, sempre começar a contar
         if ($delayMinutes <= 0) {
@@ -978,6 +985,7 @@ class ConversationSettingsService
     public static function getSLAStartTime(int $conversationId): \DateTime
     {
         $settings = self::getSettings();
+        $delayEnabled = $settings['sla']['message_delay_enabled'] ?? true;
         $delayMinutes = $settings['sla']['message_delay_minutes'] ?? 1;
         
         $conversation = \App\Models\Conversation::find($conversationId);
@@ -986,7 +994,7 @@ class ConversationSettingsService
         }
         
         // Se delay desabilitado, usar created_at
-        if ($delayMinutes <= 0) {
+        if (!$delayEnabled || $delayMinutes <= 0) {
             return new \DateTime($conversation['created_at']);
         }
         

@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Sistema completo de atendimento multicanal com IA integrada. WhatsApp, Instagram, Facebook e muito mais em uma única plataforma.">
+    <title>Chat System - Atendimento Multicanal com Inteligência Artificial</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar">
+        <div class="container">
+            <div class="nav-wrapper">
+                <div class="logo">
+                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                        <rect width="40" height="40" rx="8" fill="url(#gradient)"/>
+                        <defs>
+                            <linearGradient id="gradient" x1="0" y1="0" x2="40" y2="40">
+                                <stop offset="0%" stop-color="#6366f1"/>
+                                <stop offset="100%" stop-color="#8b5cf6"/>
+                            </linearGradient>
+                        </defs>
+                        <path d="M20 12L28 18V26L20 32L12 26V18L20 12Z" fill="white" opacity="0.9"/>
+                        <circle cx="20" cy="20" r="3" fill="white"/>
+                    </svg>
+                    <span>Chat System</span>
+                </div>
+                <ul class="nav-menu" id="navMenu">
+                    <li><a href="#recursos">Recursos</a></li>
+                    <li><a href="#funcionalidades">Funcionalidades</a></li>
+                    <li><a href="#ia">Inteligência Artificial</a></li>
+                    <li><a href="#sla">SLA & Analytics</a></li>
+                    <li><a href="#demo">Demo</a></li>
+                    <li><a href="#contato" class="btn-nav">Contato</a></li>
+                </ul>
+                <button class="menu-toggle" id="menuToggle">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-background">
+            <div class="gradient-orb orb-1"></div>
+            <div class="gradient-orb orb-2"></div>
+            <div class="gradient-orb orb-3"></div>
+        </div>
+        <div class="container">
+            <div class="hero-content">
+                <div class="hero-text">
+                    <h1 class="hero-title">
+                        <span class="gradient-text">Atendimento Multicanal</span><br>
+                        com Inteligência Artificial
+                    </h1>
+                    <p class="hero-description">
+                        Sistema completo de atendimento que integra WhatsApp, Instagram, Facebook e muito mais. 
+                        Com agentes de IA avançados, automações inteligentes e analytics em tempo real.
+                    </p>
+                    <div class="hero-buttons">
+                        <a href="#demo" class="btn btn-primary">Ver Demonstração</a>
+                        <a href="#contato" class="btn btn-secondary">Solicitar Demo</a>
+                    </div>
+                    <div class="hero-stats">
+                        <div class="stat-item">
+                            <div class="stat-number" data-target="99.9">0</div>
+                            <div class="stat-label">% Uptime</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number" data-target="24">0</div>
+                            <div class="stat-label">Canais Integrados</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number" data-target="1000">0</div>
+                            <div class="stat-label">+ Conversas/min</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-visual">
+                    <div class="chat-preview">
+                        <div class="chat-header">
+                            <div class="chat-avatar"></div>
+                            <div class="chat-info">
+                                <div class="chat-name">João Silva</div>
+                                <div class="chat-status">Online • Respondendo agora</div>
+                            </div>
+                            <div class="chat-actions">
+                                <span class="status-dot active"></span>
+                            </div>
+                        </div>
+                        <div class="chat-messages" id="chatMessages">
+                            <div class="message received">
+                                <div class="message-content">Olá! Gostaria de saber sobre seus produtos.</div>
+                                <div class="message-time">14:23</div>
+                            </div>
+                            <div class="message sent">
+                                <div class="message-content">Olá João! Fico feliz em ajudar. Qual produto te interessa?</div>
+                                <div class="message-time">14:24</div>
+                            </div>
+                            <div class="message received typing">
+                                <div class="typing-indicator">
+                                    <span></span>
+                                    <span></span>
+                                    <span></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Recursos Section -->
+    <section id="recursos" class="features">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Recursos Poderosos</h2>
+                <p class="section-description">Tudo que você precisa para transformar seu atendimento</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card" data-aos="fade-up">
+                    <div class="feature-icon">
+                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                            <rect width="48" height="48" rx="12" fill="#6366f1" opacity="0.1"/>
+                            <path d="M24 16L32 22V30L24 36L16 30V22L24 16Z" stroke="#6366f1" stroke-width="2" fill="none"/>
+                            <circle cx="24" cy="24" r="4" fill="#6366f1"/>
+                        </svg>
+                    </div>
+                    <h3>Multicanal Unificado</h3>
+                    <p>WhatsApp, Instagram, Facebook, Email, Telegram e muito mais em uma única plataforma.</p>
+                </div>
+                <div class="feature-card" data-aos="fade-up" data-delay="100">
+                    <div class="feature-icon">
+                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                            <rect width="48" height="48" rx="12" fill="#8b5cf6" opacity="0.1"/>
+                            <path d="M24 12C17.373 12 12 17.373 12 24C12 30.627 17.373 36 24 36C30.627 36 36 30.627 36 24C36 17.373 30.627 12 24 12Z" stroke="#8b5cf6" stroke-width="2"/>
+                            <path d="M24 18V24L28 28" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <h3>Agentes de IA</h3>
+                    <p>Agentes inteligentes com GPT-4 que atendem automaticamente e escalam para humanos quando necessário.</p>
+                </div>
+                <div class="feature-card" data-aos="fade-up" data-delay="200">
+                    <div class="feature-icon">
+                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                            <rect width="48" height="48" rx="12" fill="#ec4899" opacity="0.1"/>
+                            <path d="M16 24H32M24 16V32" stroke="#ec4899" stroke-width="2" stroke-linecap="round"/>
+                            <circle cx="24" cy="24" r="8" stroke="#ec4899" stroke-width="2" fill="none"/>
+                        </svg>
+                    </div>
+                    <h3>Automações Inteligentes</h3>
+                    <p>Sistema completo de automações com triggers, condições e ações personalizáveis.</p>
+                </div>
+                <div class="feature-card" data-aos="fade-up" data-delay="300">
+                    <div class="feature-icon">
+                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                            <rect width="48" height="48" rx="12" fill="#10b981" opacity="0.1"/>
+                            <path d="M16 20L24 28L32 20" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <rect x="12" y="12" width="24" height="24" rx="4" stroke="#10b981" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <h3>Funis & Kanban</h3>
+                    <p>Gerencie conversas com funis personalizados e movimentação drag & drop intuitiva.</p>
+                </div>
+                <div class="feature-card" data-aos="fade-up" data-delay="400">
+                    <div class="feature-icon">
+                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                            <rect width="48" height="48" rx="12" fill="#f59e0b" opacity="0.1"/>
+                            <path d="M24 16V24L28 28M20 12H28C30.2091 12 32 13.7909 32 16V32C32 34.2091 30.2091 36 28 36H20C17.7909 36 16 34.2091 16 32V16C16 13.7909 17.7909 12 20 12Z" stroke="#f59e0b" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <h3>SLA Avançado</h3>
+                    <p>Monitoramento de SLA com reatribuição automática, alertas e métricas em tempo real.</p>
+                </div>
+                <div class="feature-card" data-aos="fade-up" data-delay="500">
+                    <div class="feature-icon">
+                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                            <rect width="48" height="48" rx="12" fill="#3b82f6" opacity="0.1"/>
+                            <path d="M24 16C19.5817 16 16 19.5817 16 24C16 28.4183 19.5817 32 24 32C28.4183 32 32 28.4183 32 24C32 19.5817 28.4183 16 24 16Z" stroke="#3b82f6" stroke-width="2"/>
+                            <path d="M24 20V24L28 28" stroke="#3b82f6" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <h3>Analytics Completo</h3>
+                    <p>Dashboards com métricas detalhadas de conversas, agentes, sentimento e performance.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Funcionalidades Detalhadas -->
+    <section id="funcionalidades" class="detailed-features">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Funcionalidades Completas</h2>
+                <p class="section-description">Cada detalhe pensado para otimizar seu atendimento</p>
+            </div>
+            <div class="feature-showcase">
+                <div class="showcase-item">
+                    <div class="showcase-content">
+                        <div class="badge">Conversas</div>
+                        <h3>Interface de Chat Profissional</h3>
+                        <p>Interface moderna inspirada no Chatwoot com:</p>
+                        <ul class="feature-list">
+                            <li>✅ Chat em tempo real com WebSocket</li>
+                            <li>✅ Histórico completo de mensagens</li>
+                            <li>✅ Envio de texto, áudio, vídeo, imagens e documentos</li>
+                            <li>✅ Reply/Quote de mensagens</li>
+                            <li>✅ Encaminhamento de mensagens</li>
+                            <li>✅ Agendamento de mensagens</li>
+                            <li>✅ Busca avançada com filtros</li>
+                            <li>✅ Tags e categorização</li>
+                        </ul>
+                    </div>
+                    <div class="showcase-visual">
+                        <div class="chat-interface-demo">
+                            <div class="demo-sidebar">
+                                <div class="demo-search">🔍 Buscar conversas...</div>
+                                <div class="demo-conversation active">
+                                    <div class="demo-avatar"></div>
+                                    <div class="demo-info">
+                                        <div class="demo-name">Maria Santos</div>
+                                        <div class="demo-preview">Olá, preciso de ajuda...</div>
+                                    </div>
+                                    <div class="demo-time">14:30</div>
+                                </div>
+                                <div class="demo-conversation">
+                                    <div class="demo-avatar"></div>
+                                    <div class="demo-info">
+                                        <div class="demo-name">Pedro Costa</div>
+                                        <div class="demo-preview">Obrigado pela ajuda!</div>
+                                    </div>
+                                    <div class="demo-time">13:45</div>
+                                </div>
+                            </div>
+                            <div class="demo-chat">
+                                <div class="demo-message received">
+                                    <div class="demo-avatar-small"></div>
+                                    <div class="demo-message-content">Olá! Gostaria de saber sobre seus produtos.</div>
+                                </div>
+                                <div class="demo-message sent">
+                                    <div class="demo-message-content">Olá Maria! Fico feliz em ajudar.</div>
+                                    <div class="demo-avatar-small"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="showcase-item reverse">
+                    <div class="showcase-content">
+                        <div class="badge">Automações</div>
+                        <h3>Sistema de Automações Completo</h3>
+                        <p>Automatize processos com triggers e ações:</p>
+                        <ul class="feature-list">
+                            <li>✅ Triggers diversos (mensagem, conversa, temporal)</li>
+                            <li>✅ Condições complexas (AND, OR, NOT, XOR)</li>
+                            <li>✅ Ações múltiplas (mover, atribuir, enviar mensagem)</li>
+                            <li>✅ Variáveis e templates dinâmicos</li>
+                            <li>✅ Logs de execução completos</li>
+                            <li>✅ Modo de teste para validação</li>
+                            <li>✅ Branching inteligente com IA</li>
+                        </ul>
+                    </div>
+                    <div class="showcase-visual">
+                        <div class="automation-demo">
+                            <div class="automation-flow">
+                                <div class="flow-node trigger">
+                                    <div class="node-icon">⚡</div>
+                                    <div class="node-label">Nova Mensagem</div>
+                                </div>
+                                <div class="flow-arrow">→</div>
+                                <div class="flow-node condition">
+                                    <div class="node-icon">🔍</div>
+                                    <div class="node-label">Contém "suporte"</div>
+                                </div>
+                                <div class="flow-arrow">→</div>
+                                <div class="flow-node action">
+                                    <div class="node-icon">📤</div>
+                                    <div class="node-label">Enviar Template</div>
+                                </div>
+                                <div class="flow-arrow">→</div>
+                                <div class="flow-node action">
+                                    <div class="node-icon">👤</div>
+                                    <div class="node-label">Atribuir Agente</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="showcase-item">
+                    <div class="showcase-content">
+                        <div class="badge">Permissões</div>
+                        <h3>Sistema de Permissões Hierárquico</h3>
+                        <p>Controle total de acesso com 7 níveis:</p>
+                        <ul class="feature-list">
+                            <li>✅ 7 níveis hierárquicos (Super Admin → Visualizador)</li>
+                            <li>✅ Permissões granulares por recurso</li>
+                            <li>✅ Permissões por setor/departamento</li>
+                            <li>✅ Permissões condicionais (temporais, por status)</li>
+                            <li>✅ Cache de permissões para performance</li>
+                            <li>✅ Herança hierárquica automática</li>
+                        </ul>
+                    </div>
+                    <div class="showcase-visual">
+                        <div class="permissions-demo">
+                            <div class="permission-level">
+                                <div class="level-badge admin">Super Admin</div>
+                                <div class="level-permissions">Todas as permissões</div>
+                            </div>
+                            <div class="permission-level">
+                                <div class="level-badge supervisor">Supervisor</div>
+                                <div class="level-permissions">Gerenciar equipe • Ver relatórios</div>
+                            </div>
+                            <div class="permission-level">
+                                <div class="level-badge agent">Agente</div>
+                                <div class="level-permissions">Atender conversas • Ver próprias conversas</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- IA Section -->
+    <section id="ia" class="ai-section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Inteligência Artificial Integrada</h2>
+                <p class="section-description">Agentes de IA que aprendem e melhoram continuamente</p>
+            </div>
+            <div class="ai-features">
+                <div class="ai-card">
+                    <div class="ai-icon">🤖</div>
+                    <h3>Agentes Especializados</h3>
+                    <p>Crie agentes especializados (SDR, CS, CLOSER, SUPPORT) com prompts personalizados e modelos GPT-4.</p>
+                </div>
+                <div class="ai-card">
+                    <div class="ai-icon">🛠️</div>
+                    <h3>Function Calling</h3>
+                    <p>Agentes podem executar ações no sistema: buscar pedidos, consultar banco de dados, integrar APIs.</p>
+                </div>
+                <div class="ai-card">
+                    <div class="ai-icon">🧠</div>
+                    <h3>Memória RAG</h3>
+                    <p>Sistema de memória que permite aos agentes lembrar conversas anteriores e contexto histórico.</p>
+                </div>
+                <div class="ai-card">
+                    <div class="ai-icon">💰</div>
+                    <h3>Controle de Custos</h3>
+                    <p>Rate limiting, limites por agente e monitoramento completo de tokens e custos OpenAI.</p>
+                </div>
+                <div class="ai-card">
+                    <div class="ai-icon">📊</div>
+                    <h3>Analytics de IA</h3>
+                    <p>Métricas detalhadas: tokens utilizados, custo por conversa, taxa de sucesso e escalação.</p>
+                </div>
+                <div class="ai-card">
+                    <div class="ai-icon">🎯</div>
+                    <h3>Escalação Inteligente</h3>
+                    <p>Agentes escalam automaticamente para humanos quando necessário, mantendo contexto completo.</p>
+                </div>
+            </div>
+            <div class="ai-demo">
+                <div class="ai-conversation-demo">
+                    <div class="ai-message agent">
+                        <div class="ai-avatar">🤖</div>
+                        <div class="ai-content">
+                            <div class="ai-label">Agente IA - SDR</div>
+                            <div class="ai-text">Olá! Sou o assistente virtual. Como posso ajudar você hoje?</div>
+                        </div>
+                    </div>
+                    <div class="ai-message user">
+                        <div class="ai-content">
+                            <div class="ai-text">Quero saber sobre preços</div>
+                        </div>
+                        <div class="ai-avatar">👤</div>
+                    </div>
+                    <div class="ai-message agent">
+                        <div class="ai-avatar">🤖</div>
+                        <div class="ai-content">
+                            <div class="ai-label">Agente IA - SDR</div>
+                            <div class="ai-text">Claro! Vou buscar as informações de preços para você.</div>
+                            <div class="ai-action">🔧 Executando: buscar_produtos()</div>
+                            <div class="ai-text">Encontrei nossos produtos. Posso enviar um catálogo completo?</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLA & Analytics Section -->
+    <section id="sla" class="sla-section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">SLA & Analytics em Tempo Real</h2>
+                <p class="section-description">Monitore e otimize seu atendimento com dados precisos</p>
+            </div>
+            <div class="sla-dashboard">
+                <div class="sla-metrics">
+                    <div class="metric-card">
+                        <div class="metric-icon">⏱️</div>
+                        <div class="metric-value" data-target="2.5">0</div>
+                        <div class="metric-label">Min - Tempo Médio de Resposta</div>
+                        <div class="metric-trend up">↓ 15% vs mês anterior</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon">✅</div>
+                        <div class="metric-value" data-target="98.5">0</div>
+                        <div class="metric-label">% - Taxa de Cumprimento SLA</div>
+                        <div class="metric-trend up">↑ 2.3% vs mês anterior</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon">💬</div>
+                        <div class="metric-value" data-target="1247">0</div>
+                        <div class="metric-label">Conversas Atendidas Hoje</div>
+                        <div class="metric-trend up">↑ 12% vs ontem</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon">😊</div>
+                        <div class="metric-value" data-target="4.8">0</div>
+                        <div class="metric-label">CSAT Médio</div>
+                        <div class="metric-trend up">↑ 0.3 vs mês anterior</div>
+                    </div>
+                </div>
+                <div class="sla-chart">
+                    <div class="chart-header">
+                        <h3>Evolução de SLA - Últimos 30 dias</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="slaChart"></canvas>
+                    </div>
+                </div>
+                <div class="sla-features">
+                    <div class="sla-feature">
+                        <h4>⏰ Monitoramento Contínuo</h4>
+                        <p>Verificação automática de SLA a cada minuto com alertas em tempo real.</p>
+                    </div>
+                    <div class="sla-feature">
+                        <h4>🔄 Reatribuição Automática</h4>
+                        <p>Conversas são reatribuídas automaticamente quando SLA está próximo de vencer.</p>
+                    </div>
+                    <div class="sla-feature">
+                        <h4>📊 Analytics Completo</h4>
+                        <p>Dashboards com métricas de conversas, agentes, sentimento e performance.</p>
+                    </div>
+                    <div class="sla-feature">
+                        <h4>🎯 Working Hours</h4>
+                        <p>SLA considera horários de trabalho, feriados e configurações personalizadas.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Demo Section -->
+    <section id="demo" class="demo-section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Veja o Sistema em Ação</h2>
+                <p class="section-description">Explore todas as funcionalidades com nossa demonstração interativa</p>
+            </div>
+            <div class="demo-tabs">
+                <button class="demo-tab active" data-tab="chat">Chat</button>
+                <button class="demo-tab" data-tab="kanban">Kanban</button>
+                <button class="demo-tab" data-tab="analytics">Analytics</button>
+                <button class="demo-tab" data-tab="automations">Automações</button>
+            </div>
+            <div class="demo-content">
+                <div class="demo-panel active" id="demo-chat">
+                    <div class="demo-chat-full">
+                        <div class="demo-sidebar-full">
+                            <div class="demo-filters">
+                                <input type="text" placeholder="Buscar conversas..." class="demo-search-input">
+                                <select class="demo-filter">
+                                    <option>Todas</option>
+                                    <option>Abertas</option>
+                                    <option>Pendentes</option>
+                                    <option>Fechadas</option>
+                                </select>
+                            </div>
+                            <div class="demo-conversations-list">
+                                <div class="demo-conv-item active">
+                                    <div class="demo-avatar-status">
+                                        <div class="demo-avatar"></div>
+                                        <span class="status-indicator online"></span>
+                                    </div>
+                                    <div class="demo-conv-info">
+                                        <div class="demo-conv-name">Ana Costa</div>
+                                        <div class="demo-conv-preview">Obrigada pela ajuda!</div>
+                                        <div class="demo-conv-meta">
+                                            <span class="demo-tag">Vendas</span>
+                                            <span class="demo-time">2 min</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="demo-conv-item">
+                                    <div class="demo-avatar-status">
+                                        <div class="demo-avatar"></div>
+                                        <span class="status-indicator away"></span>
+                                    </div>
+                                    <div class="demo-conv-info">
+                                        <div class="demo-conv-name">Carlos Mendes</div>
+                                        <div class="demo-conv-preview">Preciso de suporte técnico</div>
+                                        <div class="demo-conv-meta">
+                                            <span class="demo-tag warning">SLA: 5min</span>
+                                            <span class="demo-time">15 min</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="demo-chat-area">
+                            <div class="demo-chat-header-full">
+                                <div class="demo-chat-user">
+                                    <div class="demo-avatar"></div>
+                                    <div>
+                                        <div class="demo-chat-name">Ana Costa</div>
+                                        <div class="demo-chat-status">Online • WhatsApp</div>
+                                    </div>
+                                </div>
+                                <div class="demo-chat-actions">
+                                    <button class="demo-action-btn">📎</button>
+                                    <button class="demo-action-btn">📞</button>
+                                    <button class="demo-action-btn">⚙️</button>
+                                </div>
+                            </div>
+                            <div class="demo-messages-area">
+                                <div class="demo-msg received">
+                                    <div class="demo-msg-avatar"></div>
+                                    <div class="demo-msg-content">
+                                        <div class="demo-msg-text">Olá! Gostaria de saber sobre seus produtos.</div>
+                                        <div class="demo-msg-time">14:23</div>
+                                    </div>
+                                </div>
+                                <div class="demo-msg sent">
+                                    <div class="demo-msg-content">
+                                        <div class="demo-msg-text">Olá Ana! Fico feliz em ajudar. Qual produto te interessa?</div>
+                                        <div class="demo-msg-time">14:24</div>
+                                    </div>
+                                    <div class="demo-msg-avatar"></div>
+                                </div>
+                                <div class="demo-msg received">
+                                    <div class="demo-msg-avatar"></div>
+                                    <div class="demo-msg-content">
+                                        <div class="demo-msg-text">Estou procurando algo para minha empresa.</div>
+                                        <div class="demo-msg-time">14:25</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="demo-input-area">
+                                <button class="demo-input-btn">🎤</button>
+                                <input type="text" placeholder="Digite sua mensagem..." class="demo-input">
+                                <button class="demo-input-btn">😊</button>
+                                <button class="demo-send-btn">Enviar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="demo-panel" id="demo-kanban">
+                    <div class="kanban-demo">
+                        <div class="kanban-column">
+                            <div class="kanban-header">
+                                <h4>Novo</h4>
+                                <span class="kanban-count">3</span>
+                            </div>
+                            <div class="kanban-card">
+                                <div class="card-header">
+                                    <span class="card-priority high">Alta</span>
+                                    <span class="card-time">2 min</span>
+                                </div>
+                                <div class="card-content">Nova conversa - WhatsApp</div>
+                                <div class="card-footer">
+                                    <div class="card-avatar"></div>
+                                    <span class="card-tag">Suporte</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="kanban-column">
+                            <div class="kanban-header">
+                                <h4>Em Atendimento</h4>
+                                <span class="kanban-count">5</span>
+                            </div>
+                            <div class="kanban-card">
+                                <div class="card-header">
+                                    <span class="card-priority normal">Normal</span>
+                                    <span class="card-time">15 min</span>
+                                </div>
+                                <div class="card-content">Conversa em andamento</div>
+                                <div class="card-footer">
+                                    <div class="card-avatar"></div>
+                                    <span class="card-tag">Vendas</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="kanban-column">
+                            <div class="kanban-header">
+                                <h4>Resolvido</h4>
+                                <span class="kanban-count">12</span>
+                            </div>
+                            <div class="kanban-card">
+                                <div class="card-header">
+                                    <span class="card-priority low">Baixa</span>
+                                    <span class="card-time">1h</span>
+                                </div>
+                                <div class="card-content">Conversa resolvida</div>
+                                <div class="card-footer">
+                                    <div class="card-avatar"></div>
+                                    <span class="card-tag">Suporte</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="demo-panel" id="demo-analytics">
+                    <div class="analytics-demo">
+                        <div class="analytics-grid">
+                            <div class="analytics-card large">
+                                <h4>Conversas por Dia</h4>
+                                <div class="analytics-chart-placeholder">
+                                    <div class="chart-bars">
+                                        <div class="bar" style="height: 60%"></div>
+                                        <div class="bar" style="height: 80%"></div>
+                                        <div class="bar" style="height: 45%"></div>
+                                        <div class="bar" style="height: 90%"></div>
+                                        <div class="bar" style="height: 70%"></div>
+                                        <div class="bar" style="height: 85%"></div>
+                                        <div class="bar" style="height: 95%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="analytics-card">
+                                <h4>Taxa de Resolução</h4>
+                                <div class="analytics-value">94.2%</div>
+                                <div class="analytics-trend up">↑ 3.5%</div>
+                            </div>
+                            <div class="analytics-card">
+                                <h4>Agentes Ativos</h4>
+                                <div class="analytics-value">24</div>
+                                <div class="analytics-trend">Online</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="demo-panel" id="demo-automations">
+                    <div class="automations-demo-full">
+                        <div class="automation-list">
+                            <div class="automation-item active">
+                                <div class="automation-status enabled"></div>
+                                <div class="automation-info">
+                                    <h4>Boas-vindas Automáticas</h4>
+                                    <p>Envia mensagem de boas-vindas para novos contatos</p>
+                                </div>
+                                <div class="automation-stats">
+                                    <span>1.2k execuções</span>
+                                </div>
+                            </div>
+                            <div class="automation-item">
+                                <div class="automation-status enabled"></div>
+                                <div class="automation-info">
+                                    <h4>Atribuição por Palavra-chave</h4>
+                                    <p>Atribui conversas baseado em palavras-chave</p>
+                                </div>
+                                <div class="automation-stats">
+                                    <span>856 execuções</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section id="contato" class="cta-section">
+        <div class="container">
+            <div class="cta-content">
+                <h2>Pronto para Transformar seu Atendimento?</h2>
+                <p>Solicite uma demonstração personalizada e veja como podemos ajudar sua empresa</p>
+                <form class="cta-form" id="contactForm">
+                    <div class="form-row">
+                        <input type="text" placeholder="Seu nome" required>
+                        <input type="email" placeholder="Seu email" required>
+                    </div>
+                    <div class="form-row">
+                        <input type="tel" placeholder="Telefone" required>
+                        <input type="text" placeholder="Empresa" required>
+                    </div>
+                    <textarea placeholder="Conte-nos sobre suas necessidades..." rows="4"></textarea>
+                    <button type="submit" class="btn btn-primary btn-large">Solicitar Demonstração</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <div class="footer-logo">
+                        <svg width="32" height="32" viewBox="0 0 40 40" fill="none">
+                            <rect width="40" height="40" rx="8" fill="url(#footerGradient)"/>
+                            <defs>
+                                <linearGradient id="footerGradient" x1="0" y1="0" x2="40" y2="40">
+                                    <stop offset="0%" stop-color="#6366f1"/>
+                                    <stop offset="100%" stop-color="#8b5cf6"/>
+                                </linearGradient>
+                            </defs>
+                            <path d="M20 12L28 18V26L20 32L12 26V18L20 12Z" fill="white" opacity="0.9"/>
+                        </svg>
+                        <span>Chat System</span>
+                    </div>
+                    <p>Sistema completo de atendimento multicanal com inteligência artificial.</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Recursos</h4>
+                    <ul>
+                        <li><a href="#recursos">Recursos</a></li>
+                        <li><a href="#funcionalidades">Funcionalidades</a></li>
+                        <li><a href="#ia">Inteligência Artificial</a></li>
+                        <li><a href="#sla">SLA & Analytics</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Suporte</h4>
+                    <ul>
+                        <li><a href="#">Documentação</a></li>
+                        <li><a href="#">API</a></li>
+                        <li><a href="#">Status</a></li>
+                        <li><a href="#">Contato</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Contato</h4>
+                    <ul>
+                        <li>Email: contato@chatsystem.com</li>
+                        <li>Telefone: (11) 9999-9999</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 Chat System. Todos os direitos reservados.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="assets/js/main.js"></script>
+</body>
+</html>

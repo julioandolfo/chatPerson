@@ -23,7 +23,28 @@ function seed_default_ai_tools() {
                     'description' => 'Busca conversas anteriores do mesmo contato para contexto histórico',
                     'parameters' => [
                         'type' => 'object',
-                        'properties' => []
+                        'properties' => [],
+                        'required' => []
+                    ]
+                ]
+            ], JSON_UNESCAPED_UNICODE),
+            'config' => null,
+            'enabled' => true
+        ],
+        [
+            'name' => 'Buscar Informações do Contato',
+            'slug' => 'buscar_informacoes_contato',
+            'description' => 'Busca informações detalhadas do contato atual (nome, email, telefone, atributos customizados)',
+            'tool_type' => 'system',
+            'function_schema' => json_encode([
+                'type' => 'function',
+                'function' => [
+                    'name' => 'buscar_informacoes_contato',
+                    'description' => 'Busca informações detalhadas do contato atual incluindo nome, email, telefone e atributos customizados',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [],
+                        'required' => []
                     ]
                 ]
             ], JSON_UNESCAPED_UNICODE),
@@ -33,51 +54,59 @@ function seed_default_ai_tools() {
         [
             'name' => 'Adicionar Tag',
             'slug' => 'adicionar_tag',
-            'description' => 'Adiciona uma tag à conversa atual',
+            'description' => 'Adiciona uma tag à conversa atual para organização e categorização',
             'tool_type' => 'system',
             'function_schema' => json_encode([
                 'type' => 'function',
                 'function' => [
                     'name' => 'adicionar_tag',
-                    'description' => 'Adiciona uma tag à conversa atual para organização e filtragem',
+                    'description' => 'Adiciona uma tag à conversa atual para organização e filtragem. Use tags existentes do sistema.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
                             'tag' => [
                                 'type' => 'string',
-                                'description' => 'Nome da tag a ser adicionada'
+                                'description' => 'Nome da tag a ser adicionada (ex: "urgente", "vip", "suporte", "vendas")'
                             ]
                         ],
                         'required' => ['tag']
                     ]
                 ]
             ], JSON_UNESCAPED_UNICODE),
-            'config' => null,
+            'config' => json_encode([
+                'auto_create_tag' => false, // Se deve criar tag automaticamente caso não exista
+                'notify_on_add' => false // Notificar quando tag for adicionada
+            ], JSON_UNESCAPED_UNICODE),
             'enabled' => true
         ],
         [
             'name' => 'Mover para Estágio',
             'slug' => 'mover_para_estagio',
-            'description' => 'Move a conversa para um estágio específico do funil',
+            'description' => 'Move a conversa para um estágio específico do funil de vendas',
             'tool_type' => 'system',
             'function_schema' => json_encode([
                 'type' => 'function',
                 'function' => [
                     'name' => 'mover_para_estagio',
-                    'description' => 'Move a conversa para um estágio específico do funil de vendas',
+                    'description' => 'Move a conversa para um estágio específico do funil de vendas. Use quando o cliente avançar no processo.',
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
                             'stage_id' => [
                                 'type' => 'integer',
-                                'description' => 'ID do estágio para onde mover a conversa'
+                                'description' => 'ID do estágio de destino no funil'
                             ]
                         ],
                         'required' => ['stage_id']
                     ]
                 ]
             ], JSON_UNESCAPED_UNICODE),
-            'config' => null,
+            'config' => json_encode([
+                'keep_agent' => true, // Manter agente atual atribuído
+                'trigger_automations' => true, // Disparar automações do novo estágio
+                'add_note' => true, // Adicionar nota sobre a movimentação
+                'notify_agent' => false // Notificar agente sobre mudança de estágio
+            ], JSON_UNESCAPED_UNICODE),
             'enabled' => true
         ],
         [
@@ -107,51 +136,67 @@ function seed_default_ai_tools() {
                 ]
             ], JSON_UNESCAPED_UNICODE),
             'config' => json_encode([
-                'escalation_type' => 'auto',
-                'priority' => 'normal',
-                'add_escalation_note' => true,
-                'notify_agent' => false,
-                'send_transition_message' => true,
-                'transition_message' => 'Vou transferir você para um de nossos especialistas. Aguarde um momento, por favor.'
+                'escalation_type' => 'auto', // auto, agent, department, custom
+                'agent_id' => null, // ID do agente específico (se escalation_type='agent')
+                'department_id' => null, // ID do setor (se escalation_type='department')
+                'distribution_method' => 'round_robin', // round_robin, least_active, random
+                'consider_availability' => true, // Verificar se agente está disponível
+                'consider_limits' => true, // Respeitar limite de conversas do agente
+                'allow_ai_agents' => false, // Permitir atribuir para agentes de IA
+                'force_assign' => false, // Forçar atribuição mesmo se indisponível
+                'remove_ai_after' => true, // Remover IA da conversa após escalar
+                'send_notification' => true, // Notificar agente humano
+                'escalation_message' => 'Vou transferir você para um de nossos especialistas. Aguarde um momento, por favor.',
+                'priority' => 'normal' // normal, high, urgent
             ], JSON_UNESCAPED_UNICODE),
             'enabled' => true
         ],
         [
             'name' => 'Verificar Status da Conversa',
             'slug' => 'verificar_status_conversa',
-            'description' => 'Verifica o status atual da conversa',
+            'description' => 'Verifica o status atual da conversa e informações de acompanhamento',
             'tool_type' => 'followup',
             'function_schema' => json_encode([
                 'type' => 'function',
                 'function' => [
                     'name' => 'verificar_status_conversa',
-                    'description' => 'Verifica o status atual da conversa e última interação',
+                    'description' => 'Verifica o status atual da conversa, última interação e informações relevantes para follow-up',
                     'parameters' => [
                         'type' => 'object',
-                        'properties' => []
+                        'properties' => [],
+                        'required' => []
                     ]
                 ]
             ], JSON_UNESCAPED_UNICODE),
-            'config' => null,
+            'config' => json_encode([
+                'include_last_message' => true, // Incluir última mensagem
+                'include_agent_info' => true, // Incluir informações do agente
+                'include_timestamps' => true // Incluir timestamps de criação/atualização
+            ], JSON_UNESCAPED_UNICODE),
             'enabled' => true
         ],
         [
             'name' => 'Verificar Última Interação',
             'slug' => 'verificar_ultima_interacao',
-            'description' => 'Verifica quando foi a última interação na conversa',
+            'description' => 'Verifica quando foi a última interação na conversa com cálculo de tempo decorrido',
             'tool_type' => 'followup',
             'function_schema' => json_encode([
                 'type' => 'function',
                 'function' => [
                     'name' => 'verificar_ultima_interacao',
-                    'description' => 'Verifica quando foi a última mensagem ou interação na conversa',
+                    'description' => 'Verifica quando foi a última mensagem ou interação na conversa, com cálculo automático de tempo decorrido em minutos, horas e dias',
                     'parameters' => [
                         'type' => 'object',
-                        'properties' => []
+                        'properties' => [],
+                        'required' => []
                     ]
                 ]
             ], JSON_UNESCAPED_UNICODE),
-            'config' => null,
+            'config' => json_encode([
+                'include_message_content' => true, // Incluir conteúdo da última mensagem
+                'include_sender_info' => true, // Incluir informações do remetente
+                'calculate_time_ago' => true // Calcular tempo decorrido
+            ], JSON_UNESCAPED_UNICODE),
             'enabled' => true
         ]
     ];

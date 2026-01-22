@@ -493,6 +493,7 @@ class AgentPerformanceController
             $agentId = (int)(Request::get('agent_id') ?? 0);
             $dateFrom = Request::get('date_from', date('Y-m-d', strtotime('-30 days')));
             $dateTo = Request::get('date_to', date('Y-m-d'));
+            $type = Request::get('type', 'first'); // first | ongoing
             
             if (!$agentId) {
                 Response::json(['success' => false, 'message' => 'ID do agente não fornecido'], 400);
@@ -502,76 +503,131 @@ class AgentPerformanceController
             // Buscar configurações de SLA
             $settings = \App\Services\ConversationSettingsService::getSettings();
             $slaMinutes = $settings['sla']['first_response_time'] ?? 15;
+            $slaOngoingMinutes = $settings['sla']['ongoing_response_time'] ?? $slaMinutes;
             
             // Buscar conversas do agente com SLA excedido
             // ⚠️ IMPORTANTE: esta lista usa o mesmo critério do DashboardService::getAgentMetrics
             // (primeira mensagem do cliente -> primeira resposta do agente), sem working hours.
-            $slaFirstResponseSeconds = $slaMinutes * 60;
-            
-            $sql = "SELECT 
-                        c.id, c.created_at, c.first_response_at, c.first_human_response_at,
-                        c.status, c.priority, c.reassignment_count, c.updated_at,
-                        ct.name as contact_name, ct.phone as contact_phone,
-                        u.name as agent_name,
-                        mc.first_contact_at,
-                        ma.first_agent_at,
-                        TIMESTAMPDIFF(SECOND, mc.first_contact_at, COALESCE(ma.first_agent_at, NOW())) as response_seconds
-                    FROM conversations c
-                    INNER JOIN conversation_assignments ca 
-                        ON ca.conversation_id = c.id 
-                        AND ca.agent_id = ?
-                    LEFT JOIN contacts ct ON c.contact_id = ct.id
-                    LEFT JOIN users u ON c.agent_id = u.id
-                    LEFT JOIN (
-                        SELECT conversation_id, MIN(created_at) as first_contact_at
-                        FROM messages
-                        WHERE sender_type = 'contact'
-                        GROUP BY conversation_id
-                    ) mc ON mc.conversation_id = c.id
-                    LEFT JOIN (
-                        SELECT conversation_id, MIN(created_at) as first_agent_at
-                        FROM messages
-                        WHERE sender_type = 'agent'
-                        GROUP BY conversation_id
-                    ) ma ON ma.conversation_id = c.id
-                    WHERE ca.assigned_at >= ?
-                    AND ca.assigned_at <= ?
-                    AND mc.first_contact_at IS NOT NULL
-                    AND (
-                        ma.first_agent_at IS NULL
-                        OR TIMESTAMPDIFF(SECOND, mc.first_contact_at, ma.first_agent_at) > ?
-                    )
-                    ORDER BY mc.first_contact_at DESC
-                    LIMIT 200";
+            if ($type === 'ongoing') {
+                $slaOngoingSeconds = $slaOngoingMinutes * 60;
+                
+                $sql = "SELECT 
+                            c.id, c.created_at, c.first_response_at, c.first_human_response_at,
+                            c.status, c.priority, c.reassignment_count, c.updated_at,
+                            ct.name as contact_name, ct.phone as contact_phone,
+                            u.name as agent_name,
+                            mr.max_response_seconds
+                        FROM conversations c
+                        INNER JOIN conversation_assignments ca 
+                            ON ca.conversation_id = c.id 
+                            AND ca.agent_id = ?
+                        LEFT JOIN contacts ct ON c.contact_id = ct.id
+                        LEFT JOIN users u ON c.agent_id = u.id
+                        INNER JOIN (
+                            SELECT 
+                                m1.conversation_id,
+                                MAX(TIMESTAMPDIFF(SECOND, m1.created_at, m2.created_at)) as max_response_seconds
+                            FROM messages m1
+                            INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
+                                AND m2.sender_type = 'agent'
+                                AND m2.created_at > m1.created_at
+                                AND m2.created_at = (
+                                    SELECT MIN(m3.created_at)
+                                    FROM messages m3
+                                    WHERE m3.conversation_id = m1.conversation_id
+                                    AND m3.sender_type = 'agent'
+                                    AND m3.created_at > m1.created_at
+                                )
+                            WHERE m1.sender_type = 'contact'
+                            GROUP BY m1.conversation_id
+                        ) mr ON mr.conversation_id = c.id
+                        WHERE ca.assigned_at >= ?
+                        AND ca.assigned_at <= ?
+                        AND mr.max_response_seconds > ?
+                        ORDER BY mr.max_response_seconds DESC
+                        LIMIT 200";
+                
+                $conversations = \App\Helpers\Database::fetchAll($sql, [
+                    $agentId,
+                    $dateFrom . ' 00:00:00',
+                    $dateTo . ' 23:59:59',
+                    $slaOngoingSeconds
+                ]);
+            } else {
+                $slaFirstResponseSeconds = $slaMinutes * 60;
+                
+                $sql = "SELECT 
+                            c.id, c.created_at, c.first_response_at, c.first_human_response_at,
+                            c.status, c.priority, c.reassignment_count, c.updated_at,
+                            ct.name as contact_name, ct.phone as contact_phone,
+                            u.name as agent_name,
+                            mc.first_contact_at,
+                            ma.first_agent_at,
+                            TIMESTAMPDIFF(SECOND, mc.first_contact_at, COALESCE(ma.first_agent_at, NOW())) as response_seconds
+                        FROM conversations c
+                        INNER JOIN conversation_assignments ca 
+                            ON ca.conversation_id = c.id 
+                            AND ca.agent_id = ?
+                        LEFT JOIN contacts ct ON c.contact_id = ct.id
+                        LEFT JOIN users u ON c.agent_id = u.id
+                        LEFT JOIN (
+                            SELECT conversation_id, MIN(created_at) as first_contact_at
+                            FROM messages
+                            WHERE sender_type = 'contact'
+                            GROUP BY conversation_id
+                        ) mc ON mc.conversation_id = c.id
+                        LEFT JOIN (
+                            SELECT conversation_id, MIN(created_at) as first_agent_at
+                            FROM messages
+                            WHERE sender_type = 'agent'
+                            GROUP BY conversation_id
+                        ) ma ON ma.conversation_id = c.id
+                        WHERE ca.assigned_at >= ?
+                        AND ca.assigned_at <= ?
+                        AND mc.first_contact_at IS NOT NULL
+                        AND (
+                            ma.first_agent_at IS NULL
+                            OR TIMESTAMPDIFF(SECOND, mc.first_contact_at, ma.first_agent_at) > ?
+                        )
+                        ORDER BY mc.first_contact_at DESC
+                        LIMIT 200";
 
-            $conversations = \App\Helpers\Database::fetchAll($sql, [
-                $agentId,
-                $dateFrom . ' 00:00:00',
-                $dateTo . ' 23:59:59',
-                $slaFirstResponseSeconds
-            ]);
+                $conversations = \App\Helpers\Database::fetchAll($sql, [
+                    $agentId,
+                    $dateFrom . ' 00:00:00',
+                    $dateTo . ' 23:59:59',
+                    $slaFirstResponseSeconds
+                ]);
+            }
 
             // Enriquecer dados com informações adicionais (mesma base do dashboard)
             foreach ($conversations as &$conv) {
-                $responseSeconds = (int)($conv['response_seconds'] ?? 0);
-                $elapsedMinutes = $responseSeconds > 0 ? round($responseSeconds / 60, 1) : 0;
+                if ($type === 'ongoing') {
+                    $responseSeconds = (int)($conv['max_response_seconds'] ?? 0);
+                    $elapsedMinutes = $responseSeconds > 0 ? round($responseSeconds / 60, 1) : 0;
+                    $slaBaseMinutes = $slaOngoingMinutes;
+                } else {
+                    $responseSeconds = (int)($conv['response_seconds'] ?? 0);
+                    $elapsedMinutes = $responseSeconds > 0 ? round($responseSeconds / 60, 1) : 0;
+                    $slaBaseMinutes = $slaMinutes;
+                }
 
                 $conv['elapsed_minutes'] = $elapsedMinutes;
-                $conv['sla_minutes'] = $slaMinutes;
-                $conv['exceeded_by'] = max(0, round($elapsedMinutes - $slaMinutes, 1));
-                $conv['percentage'] = $slaMinutes > 0 
-                    ? round(($elapsedMinutes / $slaMinutes) * 100, 1)
+                $conv['sla_minutes'] = $slaBaseMinutes;
+                $conv['exceeded_by'] = max(0, round($elapsedMinutes - $slaBaseMinutes, 1));
+                $conv['percentage'] = $slaBaseMinutes > 0 
+                    ? round(($elapsedMinutes / $slaBaseMinutes) * 100, 1)
                     : 0;
                 
                 // Status visual
-                if (empty($conv['first_agent_at'])) {
+                if ($type === 'first' && empty($conv['first_agent_at'])) {
                     $conv['status_label'] = 'Sem resposta';
                     $conv['status_class'] = 'danger';
                 } elseif ($conv['status'] === 'closed' || $conv['status'] === 'resolved') {
                     $conv['status_label'] = 'Fechada';
                     $conv['status_class'] = 'secondary';
                 } else {
-                    $conv['status_label'] = 'Respondida fora do SLA';
+                    $conv['status_label'] = $type === 'ongoing' ? 'Resposta lenta' : 'Respondida fora do SLA';
                     $conv['status_class'] = 'warning';
                 }
             }
@@ -580,7 +636,8 @@ class AgentPerformanceController
                 'success' => true,
                 'conversations' => $conversations,
                 'total' => count($conversations),
-                'sla_minutes' => $slaMinutes,
+                'sla_minutes' => $type === 'ongoing' ? $slaOngoingMinutes : $slaMinutes,
+                'type' => $type,
                 'period' => [
                     'from' => $dateFrom,
                     'to' => $dateTo

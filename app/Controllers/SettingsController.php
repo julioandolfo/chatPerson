@@ -625,6 +625,7 @@ class SettingsController
                     'working_hours_end' => $data['sla_working_hours_end'] ?? '18:00',
                     'auto_reassign_on_sla_breach' => isset($data['auto_reassign_on_sla_breach']),
                     'reassign_after_minutes' => (int)($data['reassign_after_minutes'] ?? 30),
+                    'message_delay_enabled' => isset($data['sla_message_delay_enabled']),
                     'message_delay_minutes' => isset($data['sla_message_delay_minutes']) ? (int)$data['sla_message_delay_minutes'] : 1,
                 ],
                 'distribution' => [

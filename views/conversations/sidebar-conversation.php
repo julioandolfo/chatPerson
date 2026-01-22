@@ -124,7 +124,9 @@ window.loadConversationSLA = function(conversationId) {
             }
             
             if (targetEl) {
-                targetEl.textContent = `${sla.first_response_sla} min`;
+                const targetMinutes = sla.current_sla_minutes ?? sla.first_response_sla;
+                const label = sla.sla_label ? ` (${sla.sla_label})` : '';
+                targetEl.textContent = `${targetMinutes} min${label}`;
             }
             
             // Detalhes

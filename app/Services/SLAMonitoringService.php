@@ -186,8 +186,12 @@ class SLAMonitoringService
                 
                 // Se última mensagem do contato é mais recente, verificar SLA de resposta
                 if ($lastContact > $lastAgent) {
-                    // ✅ NOVO: Verificar delay mínimo (1 minuto) antes de contar SLA
+                    // ✅ Verificar delay mínimo antes de contar SLA (configurável)
+                    $delayEnabled = $settings['sla']['message_delay_enabled'] ?? true;
                     $delayMinutes = $settings['sla']['message_delay_minutes'] ?? 1;
+                    if (!$delayEnabled) {
+                        $delayMinutes = 0;
+                    }
                     $diffSeconds = $lastContact->getTimestamp() - $lastAgent->getTimestamp();
                     $diffMinutes = $diffSeconds / 60;
                     
@@ -195,9 +199,8 @@ class SLAMonitoringService
                     if ($diffMinutes < $delayMinutes) {
                         // Ignorar - mensagem muito rápida (provavelmente despedida/automática)
                     } else {
-                        // Calcular tempo desde a mensagem do contato + delay
-                        $slaStartTime = clone $lastAgent;
-                        $slaStartTime->modify("+{$delayMinutes} minutes");
+                        // Calcular tempo desde a mensagem do contato (delay é apenas threshold)
+                        $slaStartTime = clone $lastContact;
                         
                         $elapsedMinutes = \App\Helpers\WorkingHoursCalculator::calculateMinutes($slaStartTime, new \DateTime());
                         $ongoingSLA = $slaConfig['ongoing_response_time'];

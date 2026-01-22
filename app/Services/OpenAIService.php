@@ -781,6 +781,7 @@ class OpenAIService
                 // Aceitar tag_id ou tag (nome)
                 $tagId = $arguments['tag_id'] ?? null;
                 $tagName = $arguments['tag'] ?? null;
+                $autoCreate = $config['auto_create_tag'] ?? false;
                 
                 if (!$tagId && !$tagName) {
                     return ['error' => 'ID ou nome da tag não fornecido'];
@@ -789,14 +790,28 @@ class OpenAIService
                 // Se forneceu nome, buscar ID
                 if (!$tagId && $tagName) {
                     $tag = \App\Models\Tag::whereFirst('name', '=', $tagName);
+                    
                     if (!$tag) {
-                        return ['error' => 'Tag não encontrada: ' . $tagName];
+                        if ($autoCreate) {
+                            // Criar tag automaticamente
+                            $tagId = \App\Services\TagService::create([
+                                'name' => $tagName,
+                                'color' => '#' . substr(md5($tagName), 0, 6) // Cor aleatória baseada no nome
+                            ]);
+                        } else {
+                            return ['error' => 'Tag não encontrada: ' . $tagName . '. Tags disponíveis devem ser criadas previamente.'];
+                        }
+                    } else {
+                        $tagId = $tag['id'];
                     }
-                    $tagId = $tag['id'];
                 }
                 
-                \App\Services\TagService::addToConversation($conversationId, (int)$tagId);
-                return ['success' => true, 'message' => 'Tag adicionada com sucesso'];
+                try {
+                    \App\Services\TagService::addToConversation($conversationId, (int)$tagId);
+                    return ['success' => true, 'message' => 'Tag adicionada com sucesso'];
+                } catch (\Exception $e) {
+                    return ['error' => 'Erro ao adicionar tag: ' . $e->getMessage()];
+                }
 
             case 'mover_para_estagio':
                 $stageId = $arguments['stage_id'] ?? null;
@@ -804,11 +819,52 @@ class OpenAIService
                     return ['error' => 'ID do estágio não fornecido'];
                 }
                 
-                \App\Services\FunnelService::moveConversation($conversationId, (int)$stageId, null);
-                return ['success' => true, 'message' => 'Conversa movida para o estágio'];
+                $keepAgent = $config['keep_agent'] ?? true;
+                $triggerAutomations = $config['trigger_automations'] ?? true;
+                $addNote = $config['add_note'] ?? true;
+                
+                try {
+                    // Buscar informações do estágio
+                    $stage = \App\Models\FunnelStage::find((int)$stageId);
+                    if (!$stage) {
+                        return ['error' => 'Estágio não encontrado'];
+                    }
+                    
+                    // Mover conversa
+                    \App\Services\FunnelService::moveConversation($conversationId, (int)$stageId, null);
+                    
+                    // Adicionar nota se configurado
+                    if ($addNote) {
+                        $noteText = "🤖 **IA moveu a conversa**\n\nEstágio: {$stage['name']}\nData/Hora: " . date('d/m/Y H:i:s');
+                        
+                        \App\Models\Message::create([
+                            'conversation_id' => $conversationId,
+                            'message_type' => 'note',
+                            'content' => $noteText,
+                            'sender_type' => 'system',
+                            'status' => 'sent'
+                        ]);
+                    }
+                    
+                    // Disparar automações se configurado
+                    if ($triggerAutomations) {
+                        \App\Services\AutomationService::checkStageAutomations($conversationId, (int)$stageId);
+                    }
+                    
+                    return [
+                        'success' => true,
+                        'message' => 'Conversa movida para o estágio: ' . $stage['name'],
+                        'stage_id' => $stageId,
+                        'stage_name' => $stage['name']
+                    ];
+                } catch (\Exception $e) {
+                    return ['error' => 'Erro ao mover para estágio: ' . $e->getMessage()];
+                }
 
             case 'escalar_para_humano':
-                return self::escalateToHuman($conversationId, $arguments, $config, $context);
+                // ✅ USAR IMPLEMENTAÇÃO COMPLETA (executeHumanEscalationTool)
+                $tool = ['name' => 'escalar_para_humano', 'tool_type' => 'human_escalation'];
+                return self::executeHumanEscalationTool($tool, $arguments, $config, $conversationId, $context);
 
             default:
                 return ['error' => 'System tool não reconhecida: ' . $functionName];
@@ -816,7 +872,8 @@ class OpenAIService
     }
 
     /**
-     * Escalar conversa para agente humano
+     * Escalar conversa para agente humano (DEPRECATED)
+     * @deprecated Usar executeHumanEscalationTool() - mantido apenas para compatibilidade
      */
     private static function escalateToHuman(int $conversationId, array $arguments, array $config, array $context): array
     {
@@ -973,64 +1030,6 @@ class OpenAIService
     }
 
     /**
-     * Atribuir conversa a setor (round-robin dentro do setor)
-     */
-    private static function assignToDepartment(int $conversationId, int $departmentId): ?int
-    {
-        // Buscar agentes do setor que estão online/disponíveis
-        $agents = Database::fetchAll(
-            "SELECT u.id, u.name, 
-                    COUNT(c.id) as active_conversations
-             FROM users u
-             LEFT JOIN user_departments ud ON ud.user_id = u.id
-             LEFT JOIN conversations c ON c.assigned_to = u.id AND c.status IN ('open', 'pending')
-             WHERE ud.department_id = ? 
-                   AND u.role IN ('agent', 'supervisor', 'admin')
-                   AND u.status = 'active'
-             GROUP BY u.id
-             ORDER BY active_conversations ASC, RAND()
-             LIMIT 1",
-            [$departmentId]
-        );
-
-        return $agents[0]['id'] ?? null;
-    }
-
-    /**
-     * Atribuir conversa via round-robin
-     */
-    private static function assignRoundRobin(int $conversationId): ?int
-    {
-        // Buscar agente com menos conversas ativas
-        // Filtrar por: ativo, online, habilitado na fila, respeitando limite de conversas
-        $agents = Database::fetchAll(
-            "SELECT u.id, u.name, 
-                    COUNT(c.id) as active_conversations
-             FROM users u
-             LEFT JOIN conversations c ON c.assigned_to = u.id AND c.status IN ('open', 'pending')
-             WHERE u.role IN ('agent', 'supervisor', 'admin')
-                   AND u.status = 'active'
-                   AND u.availability_status = 'online'
-                   AND (u.queue_enabled IS NULL OR u.queue_enabled = 1)
-             GROUP BY u.id
-             HAVING (u.max_conversations IS NULL OR active_conversations < u.max_conversations)
-             ORDER BY active_conversations ASC, RAND()
-             LIMIT 1"
-        );
-
-        return $agents[0]['id'] ?? null;
-    }
-
-    /**
-     * Atribuição automática (usa regras de distribuição do sistema)
-     */
-    private static function autoAssignAgent(int $conversationId): ?int
-    {
-        // Usar serviço de distribuição existente
-        return \App\Services\ConversationService::autoAssignAgent($conversationId);
-    }
-
-    /**
      * Notificar agente atribuído
      */
     private static function notifyAssignedAgent(int $agentId, int $conversationId, string $reason): void
@@ -1067,6 +1066,7 @@ class OpenAIService
     private static function executeFollowupTool(array $tool, array $arguments, int $conversationId, array $context): array
     {
         $functionName = $tool['name'] ?? '';
+        $config = is_string($tool['config'] ?? null) ? json_decode($tool['config'], true) : ($tool['config'] ?? []);
 
         switch ($functionName) {
             case 'verificar_status_conversa':
@@ -1075,25 +1075,52 @@ class OpenAIService
                     return ['error' => 'Conversa não encontrada'];
                 }
                 
-                // Buscar última mensagem
-                $lastMessage = Database::fetch(
-                    "SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 1",
-                    [$conversationId]
-                );
+                $includeLastMessage = $config['include_last_message'] ?? true;
+                $includeAgentInfo = $config['include_agent_info'] ?? true;
+                $includeTimestamps = $config['include_timestamps'] ?? true;
                 
-                return [
+                $result = [
                     'conversation_id' => $conversationId,
-                    'status' => $conversation['status'],
-                    'last_message' => $lastMessage ? [
+                    'status' => $conversation['status']
+                ];
+                
+                // Incluir última mensagem
+                if ($includeLastMessage) {
+                    $lastMessage = Database::fetch(
+                        "SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 1",
+                        [$conversationId]
+                    );
+                    
+                    $result['last_message'] = $lastMessage ? [
                         'content' => $lastMessage['content'],
                         'sender_type' => $lastMessage['sender_type'],
                         'created_at' => $lastMessage['created_at']
-                    ] : null,
-                    'created_at' => $conversation['created_at'],
-                    'updated_at' => $conversation['updated_at']
-                ];
+                    ] : null;
+                }
+                
+                // Incluir informações do agente
+                if ($includeAgentInfo && $conversation['assigned_user_id']) {
+                    $agent = \App\Models\User::find($conversation['assigned_user_id']);
+                    $result['agent'] = $agent ? [
+                        'id' => $agent['id'],
+                        'name' => $agent['name'],
+                        'email' => $agent['email']
+                    ] : null;
+                }
+                
+                // Incluir timestamps
+                if ($includeTimestamps) {
+                    $result['created_at'] = $conversation['created_at'];
+                    $result['updated_at'] = $conversation['updated_at'];
+                }
+                
+                return $result;
 
             case 'verificar_ultima_interacao':
+                $includeContent = $config['include_message_content'] ?? true;
+                $includeSender = $config['include_sender_info'] ?? true;
+                $calculateTime = $config['calculate_time_ago'] ?? true;
+                
                 $lastMessage = Database::fetch(
                     "SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 1",
                     [$conversationId]
@@ -1106,20 +1133,31 @@ class OpenAIService
                     ];
                 }
                 
-                $now = time();
-                $lastInteractionTime = strtotime($lastMessage['created_at']);
-                $minutesAgo = round(($now - $lastInteractionTime) / 60);
-                $hoursAgo = round($minutesAgo / 60);
-                $daysAgo = round($hoursAgo / 24);
+                $result = ['has_interaction' => true];
                 
-                return [
-                    'has_interaction' => true,
-                    'last_message' => [
+                // Incluir conteúdo da mensagem
+                if ($includeContent) {
+                    $result['last_message'] = [
                         'content' => $lastMessage['content'],
-                        'sender_type' => $lastMessage['sender_type'],
                         'created_at' => $lastMessage['created_at']
-                    ],
-                    'time_ago' => [
+                    ];
+                    
+                    // Incluir informações do remetente
+                    if ($includeSender) {
+                        $result['last_message']['sender_type'] = $lastMessage['sender_type'];
+                        $result['last_message']['sender_id'] = $lastMessage['sender_id'];
+                    }
+                }
+                
+                // Calcular tempo decorrido
+                if ($calculateTime) {
+                    $now = time();
+                    $lastInteractionTime = strtotime($lastMessage['created_at']);
+                    $minutesAgo = round(($now - $lastInteractionTime) / 60);
+                    $hoursAgo = round($minutesAgo / 60);
+                    $daysAgo = round($hoursAgo / 24);
+                    
+                    $result['time_ago'] = [
                         'minutes' => $minutesAgo,
                         'hours' => $hoursAgo,
                         'days' => $daysAgo,
@@ -1128,8 +1166,10 @@ class OpenAIService
                             : ($hoursAgo > 0 
                                 ? "{$hoursAgo} hora(s) atrás"
                                 : "{$minutesAgo} minuto(s) atrás")
-                    ]
-                ];
+                    ];
+                }
+                
+                return $result;
 
             default:
                 return ['error' => 'Followup tool não reconhecida: ' . $functionName];
@@ -1971,9 +2011,23 @@ class OpenAIService
             }
             
             // Atribuir conversa ao agente
-            Conversation::update($conversationId, [
-                'assigned_user_id' => $assignedAgentId
-            ]);
+            $updateData = [
+                'assigned_user_id' => $assignedAgentId,
+                'status' => 'open'
+            ];
+            
+            // Atualizar prioridade se configurado
+            if (!empty($config['priority'])) {
+                $updateData['priority'] = $config['priority'];
+            }
+            
+            Conversation::update($conversationId, $updateData);
+            
+            // Atualizar status da conversa de IA
+            $aiConversation = \App\Models\AIConversation::whereFirst('conversation_id', '=', $conversationId);
+            if ($aiConversation) {
+                \App\Models\AIConversation::updateStatus($aiConversation['id'], 'escalated', $assignedAgentId);
+            }
             
             // Remover IA da conversa se configurado
             if ($removeAIAfter) {

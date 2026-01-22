@@ -231,14 +231,25 @@ const selectedStageIds = <?= json_encode($agent['target_stage_ids'] ?? [], JSON_
 
 document.getElementById('execution_type').addEventListener('change', function() {
     const intervalContainer = document.getElementById('interval_hours_container');
+    const intervalInput = document.querySelector('input[name="execution_interval_hours"]');
     const helpText = document.getElementById('execution_type_help');
     const value = this.value;
     
     // Mostrar/ocultar intervalo
     if (value === 'interval') {
         intervalContainer.style.display = 'block';
+        // ✅ Habilitar campo quando visível (campos desabilitados não são validados)
+        if (intervalInput) {
+            intervalInput.disabled = false;
+            intervalInput.required = true;
+        }
     } else {
         intervalContainer.style.display = 'none';
+        // ✅ Desabilitar campo quando oculto (evita erro "is not focusable")
+        if (intervalInput) {
+            intervalInput.disabled = true;
+            intervalInput.required = false;
+        }
     }
     
     // Atualizar texto de ajuda

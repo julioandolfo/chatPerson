@@ -256,10 +256,24 @@ class DashboardController
                 'departmentStats' => [],
                 'funnelStats' => [],
                 'topAgents' => [],
+                'allAgentsMetrics' => [],
+                'teamsMetrics' => [],
+                'conversionRanking' => [],
+                'rankingByRevenue' => [],
+                'rankingByConversion' => [],
+                'rankingByTicket' => [],
                 'recentConversations' => [],
                 'recentActivity' => [],
                 'dateFrom' => $dateFrom,
-                'dateTo' => $dateTo
+                'dateTo' => $dateTo,
+                'goalsSummary' => [
+                    'total_goals' => 0,
+                    'achieved' => 0,
+                    'in_progress' => 0,
+                    'at_risk' => 0,
+                    'goals_by_level' => []
+                ],
+                'goalsOverview' => []
             ]);
         }
     }

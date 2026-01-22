@@ -887,6 +887,20 @@ $operatorLabels = \App\Models\GoalBonusCondition::OPERATORS;
                 $bonusPreview = $goal['bonus_preview'] ?? null;
                 $tiers = $goal['tiers'] ?? [];
                 $conditions = $goal['conditions'] ?? [];
+                $missingCritical = max(0, (float)($goal['flag_critical_threshold'] ?? 0) - $percentage);
+                $missingWarning = max(0, (float)($goal['flag_warning_threshold'] ?? 0) - $percentage);
+                $missingGood = max(0, (float)($goal['flag_good_threshold'] ?? 0) - $percentage);
+                $sortedTiers = $tiers;
+                usort($sortedTiers, function($a, $b) {
+                    return ($a['threshold_percentage'] ?? 0) <=> ($b['threshold_percentage'] ?? 0);
+                });
+                $nextTier = null;
+                foreach ($sortedTiers as $tier) {
+                    if ((float)($tier['threshold_percentage'] ?? 0) > $percentage) {
+                        $nextTier = $tier;
+                        break;
+                    }
+                }
             ?>
             <div class="accordion-item">
                 <h2 class="accordion-header" id="goalHeading<?= $goal['id'] ?>">
@@ -929,6 +943,9 @@ $operatorLabels = \App\Models\GoalBonusCondition::OPERATORS;
                                     <div class="mb-2">Flag Crítica: <strong><?= number_format($goal['flag_critical_threshold'], 1) ?>%</strong></div>
                                     <div class="mb-2">Flag Atenção: <strong><?= number_format($goal['flag_warning_threshold'], 1) ?>%</strong></div>
                                     <div class="mb-2">Flag Boa: <strong><?= number_format($goal['flag_good_threshold'], 1) ?>%</strong></div>
+                                    <div class="mb-2">Falta p/ Vermelha: <strong><?= number_format($missingCritical, 1) ?>%</strong></div>
+                                    <div class="mb-2">Falta p/ Amarela: <strong><?= number_format($missingWarning, 1) ?>%</strong></div>
+                                    <div class="mb-2">Falta p/ Verde: <strong><?= number_format($missingGood, 1) ?>%</strong></div>
                                     <div class="mb-2">Notificar em: <strong><?= intval($goal['notify_at_percentage']) ?>%</strong></div>
                                     <div class="mb-2">Prioridade: <strong><?= ucfirst($goal['priority']) ?></strong></div>
                                 </div>
@@ -952,6 +969,18 @@ $operatorLabels = \App\Models\GoalBonusCondition::OPERATORS;
                                             <?php if (!empty($bonusPreview['last_tier'])): ?>
                                                 <div class="fs-8 text-muted">Último tier: <?= htmlspecialchars($bonusPreview['last_tier']['tier_name'] ?? 'N/A') ?></div>
                                             <?php endif; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                    <?php if (!empty($nextTier)): ?>
+                                        <div class="mt-3 p-2 bg-light-warning rounded">
+                                            <div class="fs-8 text-muted">Próximo bônus</div>
+                                            <div class="fw-bold">
+                                                <?= htmlspecialchars($nextTier['tier_name'] ?? 'Tier') ?> —
+                                                <?= number_format((float)($nextTier['threshold_percentage'] ?? 0), 1) ?>%
+                                            </div>
+                                            <div class="fs-8 text-muted">
+                                                Falta <?= number_format(max(0, (float)($nextTier['threshold_percentage'] ?? 0) - $percentage), 1) ?>%
+                                            </div>
                                         </div>
                                     <?php endif; ?>
                                 </div>

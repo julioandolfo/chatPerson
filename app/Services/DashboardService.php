@@ -48,13 +48,42 @@ class DashboardService
             return $cached;
         }
 
-        $hasAgentId = \App\Helpers\Database::fetch("SHOW COLUMNS FROM conversation_assignments LIKE 'agent_id'");
-        $hasAssignedAt = \App\Helpers\Database::fetch("SHOW COLUMNS FROM conversation_assignments LIKE 'assigned_at'");
+        $columnNames = [];
+        try {
+            $columns = \App\Helpers\Database::fetchAll("SHOW COLUMNS FROM conversation_assignments");
+            $columnNames = array_map(static fn($col) => $col['Field'] ?? '', $columns);
+        } catch (\Exception $e) {
+            self::logDash("Erro ao listar colunas via SHOW COLUMNS: " . $e->getMessage());
+        }
+
+        if (empty($columnNames)) {
+            try {
+                $dbNameRow = \App\Helpers\Database::fetch("SELECT DATABASE() as db");
+                $dbName = $dbNameRow['db'] ?? null;
+                if ($dbName) {
+                    $infoCols = \App\Helpers\Database::fetchAll(
+                        "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'conversation_assignments'",
+                        [$dbName]
+                    );
+                    $columnNames = array_map(static fn($col) => $col['COLUMN_NAME'] ?? '', $infoCols);
+                }
+            } catch (\Exception $e) {
+                self::logDash("Erro ao listar colunas via information_schema: " . $e->getMessage());
+            }
+        }
+
+        $hasAgentId = in_array('agent_id', $columnNames, true);
+        $hasToAgentId = in_array('to_agent_id', $columnNames, true);
+        $hasAssignedAt = in_array('assigned_at', $columnNames, true);
+        $hasCreatedAt = in_array('created_at', $columnNames, true);
 
         $cached = [
-            'agent_column' => $hasAgentId ? 'agent_id' : 'to_agent_id',
-            'assigned_column' => $hasAssignedAt ? 'assigned_at' : 'created_at'
+            'agent_column' => $hasAgentId ? 'agent_id' : ($hasToAgentId ? 'to_agent_id' : 'agent_id'),
+            'assigned_column' => $hasAssignedAt ? 'assigned_at' : ($hasCreatedAt ? 'created_at' : 'assigned_at')
         ];
+
+        self::logDash("conversation_assignments columns=" . json_encode($columnNames));
+        self::logDash("assignments columns resolved: agent={$cached['agent_column']}, assigned={$cached['assigned_column']}");
 
         return $cached;
     }

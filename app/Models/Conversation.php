@@ -398,6 +398,9 @@ class Conversation extends Model
             $sql .= " LIMIT {$limit} OFFSET {$offset}";
         }
         
+        // Log dos filtros antes de executar (debug lista de conversas)
+        \App\Helpers\Log::context("Conversation::getAll filtros", $filters, 'conversas.log', 'DEBUG');
+        
         // Log da query SQL e parâmetros antes de executar
         \App\Helpers\Log::debug("SQL Query: " . substr($sql, 0, 500), 'conversas.log');
         \App\Helpers\Log::context("SQL Params", $params, 'conversas.log', 'DEBUG');

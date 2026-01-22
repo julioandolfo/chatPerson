@@ -899,13 +899,13 @@ class DashboardService
                         (SELECT MIN(m1.created_at) FROM messages m1 
                          WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact'),
                         (SELECT MIN(m2.created_at) FROM messages m2 
-                         WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent' AND m2.sender_id = ca.agent_id)
+                         WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent' AND m2.sender_id = ?)
                     )) as avg_first_response_seconds,
                     COUNT(DISTINCT CASE WHEN TIMESTAMPDIFF(SECOND, 
                         (SELECT MIN(m1.created_at) FROM messages m1 
                          WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact'),
                         (SELECT MIN(m2.created_at) FROM messages m2 
-                         WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent' AND m2.sender_id = ca.agent_id)
+                         WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent' AND m2.sender_id = ?)
                     ) <= ? THEN c.id END) as first_response_within_sla
                 FROM conversations c
                 INNER JOIN conversation_assignments ca 
@@ -919,6 +919,8 @@ class DashboardService
         $slaResponseSeconds = $slaResponseMinutes * 60;
         
         $metrics = \App\Helpers\Database::fetch($sql, [
+            $agentId,
+            $agentId,
             $slaFirstResponseSeconds,
             $agentId,
             $dateFrom,

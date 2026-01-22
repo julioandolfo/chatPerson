@@ -41,7 +41,7 @@ class GoalController
         
         // Adicionar progresso para cada meta
         foreach ($goals as &$goal) {
-            $progress = GoalProgress::getLatest($goal['id']);
+            $progress = GoalService::getMultiAgentProgress($goal);
             $goal['progress'] = $progress;
         }
         
@@ -164,7 +164,7 @@ class GoalController
         }
         
         // Progresso atual
-        $currentProgress = GoalProgress::getLatest($id);
+        $currentProgress = GoalService::getMultiAgentProgress($goal);
         
         // Histórico (últimos 30 dias)
         $history = GoalProgress::getHistory($id, 30);

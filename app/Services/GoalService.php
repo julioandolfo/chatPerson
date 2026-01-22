@@ -1118,6 +1118,25 @@ class GoalService
     }
 
     /**
+     * Progresso agregado para metas multi-agente (uso em listagem/detalhe)
+     */
+    public static function getMultiAgentProgress(array $goal): array
+    {
+        if (($goal['target_type'] ?? '') !== 'multi_agent') {
+            return GoalProgress::getLatest((int)$goal['id']) ?? [];
+        }
+
+        $agentIds = self::getTargetAgentIds('multi_agent', null, (int)$goal['id']);
+        $agents = self::getAgentsByIds($agentIds);
+        foreach ($agents as &$agent) {
+            $agent['current_value'] = self::calculateCurrentValueForAgent($goal, (int)$agent['id']);
+        }
+        unset($agent);
+
+        return self::buildOverviewProgress($goal, $agents, GoalProgress::getLatest((int)$goal['id']) ?? null);
+    }
+
+    /**
      * Obter resumo de bonificações do agente
      */
     public static function getBonusSummary(int $userId): array

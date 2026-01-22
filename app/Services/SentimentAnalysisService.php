@@ -337,19 +337,48 @@ PROMPT;
     }
 
     /**
-     * Fazer requisição à API OpenAI
+     * Verificar se o modelo suporta response_format json_object
+     */
+    private static function supportsJsonResponseFormat(string $model): bool
+    {
+        // Modelos que suportam response_format: json_object
+        $supportedModels = [
+            'gpt-4o',
+            'gpt-4o-mini',
+            'gpt-4-turbo',
+            'gpt-4-turbo-preview',
+            'gpt-3.5-turbo',
+            'gpt-3.5-turbo-1106',
+            'gpt-3.5-turbo-0125',
+        ];
+        
+        foreach ($supportedModels as $supported) {
+            if (stripos($model, $supported) === 0) {
+                return true;
+            }
+        }
+        
+        // gpt-4 base (sem sufixo turbo/o) não suporta
+        return false;
+    }
+
+    /**
+     * Fazer requisição à API OpenAI com retry para rate limits
      */
     private static function makeOpenAIRequest(string $apiKey, string $prompt, array $settings): array
     {
         $model = $settings['model'] ?? 'gpt-3.5-turbo';
         $temperature = (float)($settings['temperature'] ?? 0.3);
+        
+        $maxRetries = 3;
+        $retryDelay = 3; // segundos inicial
 
         $payload = [
             'model' => $model,
             'messages' => [
                 [
                     'role' => 'system',
-                    'content' => 'Você é um especialista em análise de sentimento e emoções em conversas de atendimento ao cliente. Analise o sentimento expresso e retorne APENAS JSON válido.'
+                    'content' => 'Você é um especialista em análise de sentimento e emoções em conversas de atendimento ao cliente. Analise o sentimento expresso e retorne APENAS JSON válido, sem markdown.'
                 ],
                 [
                     'role' => 'user',
@@ -358,43 +387,62 @@ PROMPT;
             ],
             'temperature' => $temperature,
             'max_tokens' => 800,
-            'response_format' => ['type' => 'json_object']
         ];
-
-        $ch = curl_init(self::API_URL);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($payload),
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'Authorization: Bearer ' . $apiKey
-            ],
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_CONNECTTIMEOUT => 10
-        ]);
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-
-        if ($error) {
-            throw new \Exception('Erro de conexão com OpenAI: ' . $error);
+        
+        // Só adicionar response_format se o modelo suportar
+        if (self::supportsJsonResponseFormat($model)) {
+            $payload['response_format'] = ['type' => 'json_object'];
         }
 
-        if ($httpCode !== 200) {
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            $ch = curl_init(self::API_URL);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($payload),
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . $apiKey
+                ],
+                CURLOPT_TIMEOUT => 60,
+                CURLOPT_CONNECTTIMEOUT => 15
+            ]);
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+
+            if ($error) {
+                throw new \Exception('Erro de conexão com OpenAI: ' . $error);
+            }
+
+            // Sucesso
+            if ($httpCode === 200) {
+                $data = json_decode($response, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    throw new \Exception('Resposta inválida da API OpenAI');
+                }
+                return $data;
+            }
+
+            // Rate limit - tentar novamente com backoff
+            if ($httpCode === 429) {
+                if ($attempt < $maxRetries) {
+                    Logger::log("SentimentAnalysisService - Rate limit (429), tentativa {$attempt}/{$maxRetries}, aguardando {$retryDelay}s...");
+                    sleep($retryDelay);
+                    $retryDelay *= 2; // Backoff exponencial
+                    continue;
+                }
+            }
+
+            // Erro definitivo
             $errorData = json_decode($response, true);
             $errorMessage = $errorData['error']['message'] ?? 'Erro desconhecido da API OpenAI';
             throw new \Exception('Erro da API OpenAI (' . $httpCode . '): ' . $errorMessage);
         }
 
-        $data = json_decode($response, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new \Exception('Resposta inválida da API OpenAI');
-        }
-
-        return $data;
+        throw new \Exception('Falha após ' . $maxRetries . ' tentativas devido a rate limit');
     }
 
     /**

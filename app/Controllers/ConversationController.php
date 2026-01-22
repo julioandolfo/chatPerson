@@ -113,6 +113,22 @@ class ConversationController
         
         // Log dos filtros após limpeza
         \App\Helpers\Log::context("Filtros após limpeza", $filters, 'conversas.log', 'DEBUG');
+        
+        // Debug específico para funil/etapa (problema de filtros na lista)
+        if (!empty($filters['funnel_id']) || !empty($filters['funnel_ids']) || !empty($filters['funnel_stage_id']) || !empty($filters['funnel_stage_ids'])) {
+            \App\Helpers\Log::context("Filtro funil/etapa (lista de conversas)", [
+                'user_id' => $userId,
+                'funnel_id' => $filters['funnel_id'] ?? null,
+                'funnel_ids' => $filters['funnel_ids'] ?? null,
+                'funnel_stage_id' => $filters['funnel_stage_id'] ?? null,
+                'funnel_stage_ids' => $filters['funnel_stage_ids'] ?? null,
+                'limit' => $filters['limit'] ?? null,
+                'offset' => $filters['offset'] ?? null,
+                'status' => $filters['status'] ?? null,
+                'is_ajax' => \App\Helpers\Request::isAjax(),
+                'format' => $_GET['format'] ?? null
+            ], 'conversas.log', 'DEBUG');
+        }
 
         try {
             // Verificar se é requisição JSON ANTES de processar dados

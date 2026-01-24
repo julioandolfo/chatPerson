@@ -2398,9 +2398,9 @@ ksort($uniqueTeams);
 <script>
 function filterGoalTeam(select, goalId) {
     const teamId = select.value;
-    const rows = document.querySelectorAll(`[data-goal-${goalId}-team]`);
+    const rows = document.querySelectorAll('[data-goal-' + goalId + '-team]');
     rows.forEach(row => {
-        if (!teamId || row.dataset[`goal${goalId}Team`] === teamId) {
+        if (!teamId || row.dataset['goal' + goalId + 'Team'] === teamId) {
             row.style.display = '';
         } else {
             row.style.display = 'none';
@@ -3462,7 +3462,7 @@ function loadAttendanceMetrics() {
     document.getElementById('attendance-loading').classList.remove('d-none');
     document.getElementById('attendance-table-container').classList.add('d-none');
     
-    fetch(`/dashboard/attendance-metrics?date_from=${dateFrom}&date_to=${dateTo}`)
+    fetch("/dashboard/attendance-metrics?date_from=" + dateFrom + "&date_to=" + dateTo)
         .then(response => response.json())
         .then(data => {
             // Esconder loading
@@ -3504,18 +3504,12 @@ function updateAttendanceTable(agents) {
     const tbody = document.getElementById('attendance-tbody');
     
     if (!agents || agents.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="11" class="text-center text-muted py-10">
-                    <i class="ki-duotone ki-information-5 fs-2x text-gray-400 mb-3">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                        <span class="path3"></span>
-                    </i>
-                    <div>Nenhum dado encontrado para o período selecionado</div>
-                </td>
-            </tr>
-        `;
+        tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-10">' +
+            '<i class="ki-duotone ki-information-5 fs-2x text-gray-400 mb-3">' +
+                '<span class="path1"></span><span class="path2"></span><span class="path3"></span>' +
+            '</i>' +
+            '<div>Nenhum dado encontrado para o período selecionado</div>' +
+        '</td></tr>';
         return;
     }
     
@@ -3546,75 +3540,51 @@ function updateAttendanceTable(agents) {
                            (agent.availability_status === 'away' ? 'warning' : 'secondary');
         
         const avatarHtml = agent.agent_avatar 
-            ? `<img src="${agent.agent_avatar}" alt="${escapeHtml(agent.agent_name)}">`
-            : `<span class="symbol-label bg-light-primary text-primary fw-bold">${(agent.agent_name || '?').charAt(0).toUpperCase()}</span>`;
+            ? '<img src="' + agent.agent_avatar + '" alt="' + escapeHtml(agent.agent_name) + '">'
+            : '<span class="symbol-label bg-light-primary text-primary fw-bold">' + (agent.agent_name || '?').charAt(0).toUpperCase() + '</span>';
         
-        html += `
-            <tr>
-                <td>
-                    <div class="d-flex align-items-center">
-                        <div class="symbol symbol-35px symbol-circle me-3">
-                            ${avatarHtml}
-                        </div>
-                        <div class="d-flex flex-column">
-                            <span class="text-gray-800 fw-bold">${escapeHtml(agent.agent_name)}</span>
-                            <span class="text-muted fs-8">
-                                <span class="badge badge-light-${statusClass} fs-9">
-                                    ${capitalize(agent.availability_status || 'offline')}
-                                </span>
-                            </span>
-                        </div>
-                    </div>
-                </td>
-                <td class="text-center">
-                    <span class="fw-bold text-gray-800">${formatNumber(agent.new_conversations || 0)}</span>
-                </td>
-                <td class="text-center">
-                    <span class="fw-bold text-gray-800">${formatNumber(agent.interacted_conversations || 0)}</span>
-                </td>
-                <td class="text-center">
-                    <span class="badge badge-light-primary fs-6 fw-bold">${formatNumber(agent.total_unique_conversations || 0)}</span>
-                </td>
-                <td class="text-center">
-                    <span class="badge badge-light-${firstResponseColor} fs-7">
-                        ${agent.avg_first_response_formatted || '-'}
-                    </span>
-                </td>
-                <td class="text-center">
-                    <span class="badge badge-light-${avgResponseColor} fs-7">
-                        ${agent.avg_response_formatted || '-'}
-                    </span>
-                </td>
-                <td class="text-center">
-                    <span class="text-gray-700">${formatNumber(agent.messages_sent || 0)}</span>
-                </td>
-                <td class="text-center">
-                    <span class="text-gray-700">${agent.messages_per_conversation || 0}</span>
-                </td>
-                <td class="text-center">
-                    <span class="fw-bold text-gray-800">${agent.conversations_per_day || 0}</span>
-                </td>
-                <td class="text-center">
-                    <div class="d-flex align-items-center justify-content-center gap-2">
-                        <span class="fw-bold text-${resolutionColor}">${resolutionRate}%</span>
-                        <div class="progress h-4px w-40px">
-                            <div class="progress-bar bg-${resolutionColor}" style="width: ${Math.min(100, resolutionRate)}%"></div>
-                        </div>
-                    </div>
-                </td>
-                <td class="text-center">
-                    <div class="d-flex flex-column align-items-center">
-                        <span class="badge badge-light-${perfLevel.color} fs-7 mb-1">${perfLevel.label}</span>
-                        <div class="d-flex align-items-center gap-1">
-                            <span class="fs-8 text-muted">${agent.performance_score || 0}/100</span>
-                            <div class="progress h-3px w-30px">
-                                <div class="progress-bar bg-${perfLevel.color}" style="width: ${agent.performance_score || 0}%"></div>
-                            </div>
-                        </div>
-                    </div>
-                </td>
-            </tr>
-        `;
+        html += '<tr>' +
+            '<td>' +
+                '<div class="d-flex align-items-center">' +
+                    '<div class="symbol symbol-35px symbol-circle me-3">' + avatarHtml + '</div>' +
+                    '<div class="d-flex flex-column">' +
+                        '<span class="text-gray-800 fw-bold">' + escapeHtml(agent.agent_name) + '</span>' +
+                        '<span class="text-muted fs-8">' +
+                            '<span class="badge badge-light-' + statusClass + ' fs-9">' +
+                                capitalize(agent.availability_status || 'offline') +
+                            '</span>' +
+                        '</span>' +
+                    '</div>' +
+                '</div>' +
+            '</td>' +
+            '<td class="text-center"><span class="fw-bold text-gray-800">' + formatNumber(agent.new_conversations || 0) + '</span></td>' +
+            '<td class="text-center"><span class="fw-bold text-gray-800">' + formatNumber(agent.interacted_conversations || 0) + '</span></td>' +
+            '<td class="text-center"><span class="badge badge-light-primary fs-6 fw-bold">' + formatNumber(agent.total_unique_conversations || 0) + '</span></td>' +
+            '<td class="text-center"><span class="badge badge-light-' + firstResponseColor + ' fs-7">' + (agent.avg_first_response_formatted || '-') + '</span></td>' +
+            '<td class="text-center"><span class="badge badge-light-' + avgResponseColor + ' fs-7">' + (agent.avg_response_formatted || '-') + '</span></td>' +
+            '<td class="text-center"><span class="text-gray-700">' + formatNumber(agent.messages_sent || 0) + '</span></td>' +
+            '<td class="text-center"><span class="text-gray-700">' + (agent.messages_per_conversation || 0) + '</span></td>' +
+            '<td class="text-center"><span class="fw-bold text-gray-800">' + (agent.conversations_per_day || 0) + '</span></td>' +
+            '<td class="text-center">' +
+                '<div class="d-flex align-items-center justify-content-center gap-2">' +
+                    '<span class="fw-bold text-' + resolutionColor + '">' + resolutionRate + '%</span>' +
+                    '<div class="progress h-4px w-40px">' +
+                        '<div class="progress-bar bg-' + resolutionColor + '" style="width: ' + Math.min(100, resolutionRate) + '%"></div>' +
+                    '</div>' +
+                '</div>' +
+            '</td>' +
+            '<td class="text-center">' +
+                '<div class="d-flex flex-column align-items-center">' +
+                    '<span class="badge badge-light-' + perfLevel.color + ' fs-7 mb-1">' + perfLevel.label + '</span>' +
+                    '<div class="d-flex align-items-center gap-1">' +
+                        '<span class="fs-8 text-muted">' + (agent.performance_score || 0) + '/100</span>' +
+                        '<div class="progress h-3px w-30px">' +
+                            '<div class="progress-bar bg-' + perfLevel.color + '" style="width: ' + (agent.performance_score || 0) + '%"></div>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+            '</td>' +
+        '</tr>';
     });
     
     tbody.innerHTML = html;

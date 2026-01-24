@@ -352,7 +352,7 @@ class Conversation extends Model
         }
         
         // ✅ FILTRO PADRÃO: Se usuário está logado E não aplicou filtro de agente explícito
-        // Mostrar apenas: conversas atribuídas a ELE + conversas NÃO ATRIBUÍDAS
+        // Mostrar apenas: conversas atribuídas a ELE + conversas NÃO ATRIBUÍDAS + conversas onde é AGENTE DO CONTATO
         // EXCETO se for Admin/Super Admin (eles podem ver TODAS as conversas)
         if (!empty($filters['current_user_id']) && !isset($filters['agent_id']) && !isset($filters['agent_ids'])) {
             $userId = (int)$filters['current_user_id'];
@@ -362,10 +362,20 @@ class Conversation extends Model
             $isSuperAdmin = \App\Services\PermissionService::isSuperAdmin($userId);
             
             if (!$isAdmin && !$isSuperAdmin) {
-                // Usuário comum: filtrar apenas conversas dele + não atribuídas
-                $sql .= " AND (c.agent_id = ? OR c.agent_id IS NULL OR c.agent_id = 0)";
+                // Usuário comum: filtrar conversas dele + não atribuídas + onde é agente do contato
+                $sql .= " AND (
+                    c.agent_id = ? 
+                    OR c.agent_id IS NULL 
+                    OR c.agent_id = 0
+                    OR EXISTS (
+                        SELECT 1 FROM contact_agents ca 
+                        WHERE ca.contact_id = c.contact_id 
+                        AND ca.agent_id = ?
+                    )
+                )";
                 $params[] = $userId;
-                \App\Helpers\Log::debug("🔒 [Conversation::getAll] Filtro padrão aplicado: userId={$userId} (mostrar apenas atribuídas a ele + não atribuídas)", 'conversas.log');
+                $params[] = $userId; // Para o EXISTS
+                \App\Helpers\Log::debug("🔒 [Conversation::getAll] Filtro padrão aplicado: userId={$userId} (atribuídas a ele + não atribuídas + onde é agente do contato)", 'conversas.log');
             } else {
                 // Admin/Super Admin: pode ver TODAS as conversas (sem filtro)
                 \App\Helpers\Log::debug("👑 [Conversation::getAll] Admin/Super Admin detectado: userId={$userId} - MOSTRANDO TODAS as conversas sem filtro", 'conversas.log');

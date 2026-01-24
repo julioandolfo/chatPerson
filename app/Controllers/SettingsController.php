@@ -787,6 +787,11 @@ class SettingsController
             ];
             @file_put_contents($logFile, json_encode($logMsg) . PHP_EOL, FILE_APPEND);
             
+            // Salvar configuração de horários de trabalho por dia da semana
+            if (isset($data['working_hours']) && is_array($data['working_hours'])) {
+                $this->saveWorkingHoursConfig($data['working_hours']);
+            }
+            
             if (ConversationSettingsService::saveSettings($settings)) {
                 @file_put_contents($logFile, '[' . date('Y-m-d H:i:s') . "] OK: settings salvos\n", FILE_APPEND);
                 Response::successOrRedirect(
@@ -947,6 +952,90 @@ class SettingsController
                 'success' => false,
                 'message' => 'Erro ao obter vozes: ' . $e->getMessage()
             ], 500);
+        }
+    }
+    
+    /**
+     * Salvar configuração de horários de trabalho por dia da semana
+     */
+    private function saveWorkingHoursConfig(array $workingHours): void
+    {
+        try {
+            $db = \App\Helpers\Database::getInstance();
+            
+            // Verificar se tabela existe
+            $tables = $db->query("SHOW TABLES LIKE 'working_hours_config'")->fetchAll();
+            if (empty($tables)) {
+                // Criar tabela se não existir
+                $sql = "CREATE TABLE IF NOT EXISTS working_hours_config (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    day_of_week TINYINT NOT NULL,
+                    is_working_day TINYINT(1) DEFAULT 1,
+                    start_time TIME DEFAULT '08:00:00',
+                    end_time TIME DEFAULT '18:00:00',
+                    lunch_enabled TINYINT(1) DEFAULT 0,
+                    lunch_start TIME DEFAULT '12:00:00',
+                    lunch_end TIME DEFAULT '13:00:00',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY unique_day (day_of_week)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+                $db->exec($sql);
+            }
+            
+            // Verificar se colunas de almoço existem
+            $columns = $db->query("SHOW COLUMNS FROM working_hours_config LIKE 'lunch_enabled'")->fetchAll();
+            if (empty($columns)) {
+                $db->exec("ALTER TABLE working_hours_config 
+                    ADD COLUMN lunch_enabled TINYINT(1) DEFAULT 0 AFTER end_time,
+                    ADD COLUMN lunch_start TIME DEFAULT '12:00:00' AFTER lunch_enabled,
+                    ADD COLUMN lunch_end TIME DEFAULT '13:00:00' AFTER lunch_start");
+            }
+            
+            // Salvar cada dia
+            foreach ($workingHours as $dayOfWeek => $config) {
+                $dayOfWeek = (int)$dayOfWeek;
+                $isWorkingDay = isset($config['is_working_day']) ? 1 : 0;
+                $startTime = $config['start_time'] ?? '08:00';
+                $endTime = $config['end_time'] ?? '18:00';
+                $lunchEnabled = isset($config['lunch_enabled']) ? 1 : 0;
+                $lunchStart = $config['lunch_start'] ?? '12:00';
+                $lunchEnd = $config['lunch_end'] ?? '13:00';
+                
+                // Formatar horários
+                if (strlen($startTime) === 5) $startTime .= ':00';
+                if (strlen($endTime) === 5) $endTime .= ':00';
+                if (strlen($lunchStart) === 5) $lunchStart .= ':00';
+                if (strlen($lunchEnd) === 5) $lunchEnd .= ':00';
+                
+                // Usar INSERT ... ON DUPLICATE KEY UPDATE
+                $sql = "INSERT INTO working_hours_config 
+                        (day_of_week, is_working_day, start_time, end_time, lunch_enabled, lunch_start, lunch_end)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ON DUPLICATE KEY UPDATE 
+                        is_working_day = VALUES(is_working_day),
+                        start_time = VALUES(start_time),
+                        end_time = VALUES(end_time),
+                        lunch_enabled = VALUES(lunch_enabled),
+                        lunch_start = VALUES(lunch_start),
+                        lunch_end = VALUES(lunch_end)";
+                
+                $db->prepare($sql)->execute([
+                    $dayOfWeek, 
+                    $isWorkingDay, 
+                    $startTime, 
+                    $endTime, 
+                    $lunchEnabled, 
+                    $lunchStart, 
+                    $lunchEnd
+                ]);
+            }
+            
+            // Limpar cache do WorkingHoursCalculator
+            \App\Helpers\WorkingHoursCalculator::clearCache();
+            
+        } catch (\Exception $e) {
+            error_log("Erro ao salvar configuração de horários: " . $e->getMessage());
         }
     }
 }

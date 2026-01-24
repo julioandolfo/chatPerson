@@ -77,37 +77,60 @@ class ContactAgentService
      */
     public static function shouldAutoAssignOnConversation(int $contactId, ?int $conversationId = null): ?int
     {
-        // Se há conversationId, verificar se é uma reabertura de conversa fechada
+        // ✅ CORREÇÃO: Sempre verificar se o contato tem agente principal
+        // Não importa o status da conversa atual - o que importa é se o contato já teve um agente antes
+        
+        // Verificar se há agente principal definido para o contato
+        $primaryAgent = ContactAgent::getPrimaryAgent($contactId);
+        
+        if (!$primaryAgent || !$primaryAgent['auto_assign_on_reopen']) {
+            // Não tem agente principal OU não está configurado para auto-atribuir
+            return null;
+        }
+        
+        // Verificar se deve aplicar auto-atribuição neste contexto
+        $shouldAutoAssign = false;
+        
         if ($conversationId) {
+            // Conversa específica fornecida - verificar se é reabertura ou nova conversa de contato conhecido
             $conversation = Conversation::find($conversationId);
-            if ($conversation && $conversation['status'] === 'closed') {
-                // Conversa fechada sendo reaberta - verificar agente do contato
-                $primaryAgent = ContactAgent::getPrimaryAgent($contactId);
-                if ($primaryAgent && $primaryAgent['auto_assign_on_reopen']) {
-                    // Verificar se agente está ativo
-                    $agent = \App\Models\User::find($primaryAgent['agent_id']);
-                    if ($agent && $agent['status'] === 'active') {
-                        return $primaryAgent['agent_id'];
-                    }
-                }
+            
+            // Verificar se há conversa anterior do contato (qualquer status)
+            $sql = "SELECT COUNT(*) as count FROM conversations 
+                    WHERE contact_id = ? AND id != ? AND id < ?";
+            $result = \App\Helpers\Database::fetch($sql, [$contactId, $conversationId, $conversationId]);
+            $hasPreviousConversations = ($result['count'] ?? 0) > 0;
+            
+            if ($hasPreviousConversations) {
+                // Contato já teve conversa antes - atribuir ao agente principal
+                $shouldAutoAssign = true;
             }
         } else {
-            // Nova conversa - verificar se há conversa fechada anterior
-            $sql = "SELECT * FROM conversations 
-                    WHERE contact_id = ? AND status = 'closed' 
-                    ORDER BY updated_at DESC LIMIT 1";
-            $closedConversation = \App\Helpers\Database::fetch($sql, [$contactId]);
+            // Nova conversa sem ID - verificar se há conversa anterior do contato
+            $sql = "SELECT COUNT(*) as count FROM conversations WHERE contact_id = ?";
+            $result = \App\Helpers\Database::fetch($sql, [$contactId]);
+            $hasPreviousConversations = ($result['count'] ?? 0) > 0;
             
-            if ($closedConversation) {
-                // Há conversa fechada anterior - verificar agente do contato
-                $primaryAgent = ContactAgent::getPrimaryAgent($contactId);
-                if ($primaryAgent && $primaryAgent['auto_assign_on_reopen']) {
-                    // Verificar se agente está ativo
-                    $agent = \App\Models\User::find($primaryAgent['agent_id']);
-                    if ($agent && $agent['status'] === 'active') {
-                        return $primaryAgent['agent_id'];
-                    }
-                }
+            if ($hasPreviousConversations) {
+                // Contato já teve conversa antes - atribuir ao agente principal
+                $shouldAutoAssign = true;
+            }
+        }
+        
+        if ($shouldAutoAssign) {
+            // Verificar se agente está ativo
+            $agent = \App\Models\User::find($primaryAgent['agent_id']);
+            if ($agent && $agent['status'] === 'active') {
+                \App\Helpers\Logger::debug(
+                    "shouldAutoAssignOnConversation: Contato #{$contactId} tem agente principal #{$primaryAgent['agent_id']} (auto_assign_on_reopen=1, agente ativo). Retornando para priorização.",
+                    'conversas.log'
+                );
+                return $primaryAgent['agent_id'];
+            } else {
+                \App\Helpers\Logger::debug(
+                    "shouldAutoAssignOnConversation: Contato #{$contactId} tem agente principal #{$primaryAgent['agent_id']}, MAS agente está INATIVO. Retornando null.",
+                    'conversas.log'
+                );
             }
         }
         

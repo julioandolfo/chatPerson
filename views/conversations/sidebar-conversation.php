@@ -2566,6 +2566,11 @@ function renderWooCommerceOrders(contactId) {
                 currency: 'BRL'
             });
             
+            // Gerar URL do painel WooCommerce
+            const adminUrl = order.integration_url 
+                ? `${order.integration_url}/wp-admin/post.php?post=${order.id}&action=edit` 
+                : null;
+            
             html += `
                 <div class="card card-flush card-hover">
                     <div class="card-body p-4">
@@ -2573,6 +2578,7 @@ function renderWooCommerceOrders(contactId) {
                             <div>
                                 <div class="fw-bold fs-6 text-gray-800">Pedido #${order.id}</div>
                                 <div class="fs-7 text-muted">${orderDate}</div>
+                                ${order.integration_name ? `<div class="fs-8 text-muted">${order.integration_name}</div>` : ''}
                             </div>
                             <span class="badge badge-light-${statusColor}">${statusLabel}</span>
                         </div>
@@ -2592,6 +2598,17 @@ function renderWooCommerceOrders(contactId) {
                                     `).join('')}
                                     ${order.line_items.length > 3 ? `<div class="fs-7 text-muted">+${order.line_items.length - 3} mais</div>` : ''}
                                 </div>
+                            </div>
+                        ` : ''}
+                        ${adminUrl ? `
+                            <div class="mt-3 pt-3 border-top">
+                                <a href="${adminUrl}" target="_blank" class="btn btn-sm btn-light-primary w-100">
+                                    <i class="ki-duotone ki-exit-right-corner fs-5 me-1">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    Ver no painel
+                                </a>
                             </div>
                         ` : ''}
                     </div>
@@ -2631,13 +2648,22 @@ window.loadWooCommerceIntegrations = function() {
         return;
     }
 
-    // Evitar recarregar se já fizemos uma carga bem-sucedida e não houve pedido de refresh
+    // Evitar recarregar se já fizemos uma carga bem-sucedida
     if (filterSelect.dataset.loaded === '1') {
         console.log('✅ Integrações já carregadas (cache em memória)');
         return;
     }
+    
+    // Evitar chamadas múltiplas durante carregamento (race condition)
+    if (filterSelect.dataset.loading === '1') {
+        console.log('⏳ Carregamento de integrações já em andamento...');
+        return;
+    }
 
     console.log('🔍 Carregando integrações WooCommerce...');
+    
+    // Marcar como "carregando" para evitar chamadas duplicadas
+    filterSelect.dataset.loading = '1';
 
     // Mostrar estado de carregamento e evitar interação
     const placeholder = filterSelect.options[0];
@@ -2657,26 +2683,30 @@ window.loadWooCommerceIntegrations = function() {
     .then(data => {
         console.log('📦 Dados recebidos:', data);
 
-        // Limpar opções anteriores mantendo apenas o placeholder
+        // Limpar TODAS as opções exceto a primeira (placeholder)
         while (filterSelect.options.length > 1) {
             filterSelect.remove(1);
         }
 
-        const seen = new Set();
         if (data.integrations && Array.isArray(data.integrations)) {
             console.log(`✅ ${data.integrations.length} integração(ões) encontrada(s)`);
+            
+            // Usar Map para garantir unicidade por ID
+            const uniqueIntegrations = new Map();
             data.integrations.forEach(integration => {
-                const key = `${integration.id}-${integration.name}`;
-                if (seen.has(key)) {
-                    return; // evita duplicados
+                if (integration.id && !uniqueIntegrations.has(integration.id)) {
+                    uniqueIntegrations.set(integration.id, integration);
                 }
-                seen.add(key);
+            });
+            
+            uniqueIntegrations.forEach(integration => {
                 const option = document.createElement('option');
                 option.value = integration.id;
                 option.textContent = integration.name;
                 filterSelect.appendChild(option);
                 console.log(`  ➕ Adicionada: ${integration.name} (ID: ${integration.id})`);
             });
+            
             // Marcar como carregado com sucesso
             filterSelect.dataset.loaded = '1';
         } else {
@@ -2691,6 +2721,7 @@ window.loadWooCommerceIntegrations = function() {
     .finally(() => {
         placeholder.textContent = 'Todas as lojas';
         filterSelect.disabled = false;
+        filterSelect.dataset.loading = '0';
     });
 }
 

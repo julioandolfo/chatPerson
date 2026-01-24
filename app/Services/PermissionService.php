@@ -195,6 +195,22 @@ class PermissionService
             return true;
         }
 
+        // ✅ NOVA PRIORIDADE: Agente do Contato SEMPRE pode ver
+        // Verificar se o usuário é um agente do contato (especialmente o agente principal)
+        if (!empty($conversation['contact_id'])) {
+            try {
+                $contactAgents = \App\Models\ContactAgent::getByContact($conversation['contact_id']);
+                foreach ($contactAgents as $ca) {
+                    if ($ca['agent_id'] == $userId) {
+                        \App\Helpers\Log::debug("✅ [canViewConversation] Usuário é Agente do Contato - userId={$userId}, contactId={$conversation['contact_id']}, isPrimary=" . ($ca['is_primary'] ? 'true' : 'false'), 'conversas.log');
+                        return true; // Agente do contato sempre pode ver
+                    }
+                }
+            } catch (\Exception $e) {
+                \App\Helpers\Log::error("Erro ao verificar agentes do contato: " . $e->getMessage(), 'conversas.log');
+            }
+        }
+
         // ⚠️ IMPORTANTE: Verificar permissão de FUNIL primeiro
         // Essa verificação se aplica a TODAS as conversas (atribuídas ou não)
         if (class_exists('\App\Models\AgentFunnelPermission')) {

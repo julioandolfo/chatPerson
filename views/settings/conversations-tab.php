@@ -148,26 +148,198 @@ $tts = $cs['text_to_speech'] ?? [];
         <div class="fv-row mb-7">
             <label class="d-flex align-items-center">
                 <input type="checkbox" name="sla_working_hours_enabled" class="form-check-input me-2" 
+                       id="sla_working_hours_enabled"
                        <?= ($sla['working_hours_enabled'] ?? false) ? 'checked' : '' ?> />
                 <span class="fw-semibold fs-6">Considerar apenas horário de atendimento</span>
             </label>
+            <div class="form-text">Quando habilitado, o SLA só conta durante os horários configurados abaixo</div>
         </div>
-        <div class="row">
-            <div class="col-lg-3">
-                <div class="fv-row mb-7">
-                    <label class="fw-semibold fs-6 mb-2">Início</label>
-                    <input type="time" name="sla_working_hours_start" class="form-control form-control-solid" 
-                           value="<?= $sla['working_hours_start'] ?? '08:00' ?>" />
+        
+        <!-- Configuração Avançada de Horários por Dia -->
+        <div id="working-hours-config" class="card card-bordered mb-7" style="display: <?= ($sla['working_hours_enabled'] ?? false) ? 'block' : 'none' ?>;">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ki-duotone ki-calendar fs-3 me-2"><span class="path1"></span><span class="path2"></span></i>
+                    Horários por Dia da Semana
+                </h3>
+                <div class="card-toolbar">
+                    <button type="button" class="btn btn-sm btn-light-primary" id="btn-manage-holidays">
+                        <i class="ki-duotone ki-calendar-add fs-5"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span><span class="path6"></span></i>
+                        Gerenciar Feriados
+                    </button>
                 </div>
             </div>
-            <div class="col-lg-3">
-                <div class="fv-row mb-7">
-                    <label class="fw-semibold fs-6 mb-2">Fim</label>
-                    <input type="time" name="sla_working_hours_end" class="form-control form-control-solid" 
-                           value="<?= $sla['working_hours_end'] ?? '18:00' ?>" />
+            <div class="card-body">
+                <?php
+                // Carregar configuração atual da tabela
+                $workingHoursConfig = [];
+                try {
+                    $tables = \App\Helpers\Database::getInstance()->query("SHOW TABLES LIKE 'working_hours_config'")->fetchAll();
+                    if (!empty($tables)) {
+                        $rows = \App\Helpers\Database::fetchAll("SELECT * FROM working_hours_config ORDER BY day_of_week");
+                        foreach ($rows as $row) {
+                            $workingHoursConfig[$row['day_of_week']] = $row;
+                        }
+                    }
+                } catch (\Exception $e) {}
+                
+                $dayNames = [
+                    0 => 'Domingo',
+                    1 => 'Segunda-feira',
+                    2 => 'Terça-feira',
+                    3 => 'Quarta-feira',
+                    4 => 'Quinta-feira',
+                    5 => 'Sexta-feira',
+                    6 => 'Sábado'
+                ];
+                
+                $defaultConfig = [
+                    0 => ['is_working_day' => false, 'start_time' => '08:00:00', 'end_time' => '18:00:00', 'lunch_enabled' => false, 'lunch_start' => '12:00:00', 'lunch_end' => '13:00:00'],
+                    1 => ['is_working_day' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00', 'lunch_enabled' => true, 'lunch_start' => '12:00:00', 'lunch_end' => '13:00:00'],
+                    2 => ['is_working_day' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00', 'lunch_enabled' => true, 'lunch_start' => '12:00:00', 'lunch_end' => '13:00:00'],
+                    3 => ['is_working_day' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00', 'lunch_enabled' => true, 'lunch_start' => '12:00:00', 'lunch_end' => '13:00:00'],
+                    4 => ['is_working_day' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00', 'lunch_enabled' => true, 'lunch_start' => '12:00:00', 'lunch_end' => '13:00:00'],
+                    5 => ['is_working_day' => true, 'start_time' => '08:00:00', 'end_time' => '17:00:00', 'lunch_enabled' => true, 'lunch_start' => '12:00:00', 'lunch_end' => '13:00:00'],
+                    6 => ['is_working_day' => false, 'start_time' => '08:00:00', 'end_time' => '12:00:00', 'lunch_enabled' => false, 'lunch_start' => '12:00:00', 'lunch_end' => '13:00:00'],
+                ];
+                ?>
+                
+                <div class="table-responsive">
+                    <table class="table table-row-bordered align-middle gs-0 gy-3">
+                        <thead>
+                            <tr class="fw-bold text-muted bg-light">
+                                <th class="ps-4 min-w-150px rounded-start">Dia</th>
+                                <th class="text-center min-w-80px">Ativo</th>
+                                <th class="text-center min-w-100px">Início</th>
+                                <th class="text-center min-w-100px">Fim</th>
+                                <th class="text-center min-w-80px">Almoço</th>
+                                <th class="text-center min-w-100px">Início Almoço</th>
+                                <th class="text-center min-w-100px rounded-end">Fim Almoço</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($dayNames as $dayNum => $dayName): 
+                                $config = $workingHoursConfig[$dayNum] ?? $defaultConfig[$dayNum];
+                                $isWorking = (bool)($config['is_working_day'] ?? false);
+                                $startTime = substr($config['start_time'] ?? '08:00:00', 0, 5);
+                                $endTime = substr($config['end_time'] ?? '18:00:00', 0, 5);
+                                $lunchEnabled = (bool)($config['lunch_enabled'] ?? false);
+                                $lunchStart = substr($config['lunch_start'] ?? '12:00:00', 0, 5);
+                                $lunchEnd = substr($config['lunch_end'] ?? '13:00:00', 0, 5);
+                            ?>
+                            <tr class="working-day-row <?= $isWorking ? '' : 'bg-light-secondary' ?>" data-day="<?= $dayNum ?>">
+                                <td class="ps-4">
+                                    <span class="fw-semibold"><?= $dayName ?></span>
+                                </td>
+                                <td class="text-center">
+                                    <div class="form-check form-switch form-check-custom form-check-solid justify-content-center">
+                                        <input type="checkbox" class="form-check-input day-active-toggle" 
+                                               name="working_hours[<?= $dayNum ?>][is_working_day]" value="1"
+                                               <?= $isWorking ? 'checked' : '' ?> />
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <input type="time" class="form-control form-control-sm form-control-solid text-center day-time-input" 
+                                           name="working_hours[<?= $dayNum ?>][start_time]" 
+                                           value="<?= $startTime ?>" 
+                                           <?= $isWorking ? '' : 'disabled' ?> />
+                                </td>
+                                <td class="text-center">
+                                    <input type="time" class="form-control form-control-sm form-control-solid text-center day-time-input" 
+                                           name="working_hours[<?= $dayNum ?>][end_time]" 
+                                           value="<?= $endTime ?>" 
+                                           <?= $isWorking ? '' : 'disabled' ?> />
+                                </td>
+                                <td class="text-center">
+                                    <div class="form-check form-switch form-check-custom form-check-solid justify-content-center">
+                                        <input type="checkbox" class="form-check-input lunch-toggle" 
+                                               name="working_hours[<?= $dayNum ?>][lunch_enabled]" value="1"
+                                               <?= $lunchEnabled ? 'checked' : '' ?>
+                                               <?= $isWorking ? '' : 'disabled' ?> />
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <input type="time" class="form-control form-control-sm form-control-solid text-center lunch-time-input" 
+                                           name="working_hours[<?= $dayNum ?>][lunch_start]" 
+                                           value="<?= $lunchStart ?>" 
+                                           <?= ($isWorking && $lunchEnabled) ? '' : 'disabled' ?> />
+                                </td>
+                                <td class="text-center">
+                                    <input type="time" class="form-control form-control-sm form-control-solid text-center lunch-time-input" 
+                                           name="working_hours[<?= $dayNum ?>][lunch_end]" 
+                                           value="<?= $lunchEnd ?>" 
+                                           <?= ($isWorking && $lunchEnabled) ? '' : 'disabled' ?> />
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="notice d-flex bg-light-info rounded border-info border border-dashed p-4 mt-4">
+                    <i class="ki-duotone ki-information fs-2tx text-info me-4">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div class="d-flex flex-stack flex-grow-1">
+                        <div class="fw-semibold">
+                            <div class="fs-6 text-gray-700">
+                                O SLA só será contado durante os horários configurados. 
+                                Finais de semana, feriados e horário de almoço <strong>não</strong> são contabilizados.
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
+        
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Toggle exibição da configuração de horários
+            const workingHoursEnabled = document.getElementById('sla_working_hours_enabled');
+            const workingHoursConfig = document.getElementById('working-hours-config');
+            
+            if (workingHoursEnabled && workingHoursConfig) {
+                workingHoursEnabled.addEventListener('change', function() {
+                    workingHoursConfig.style.display = this.checked ? 'block' : 'none';
+                });
+            }
+            
+            // Toggle ativo/inativo por dia
+            document.querySelectorAll('.day-active-toggle').forEach(toggle => {
+                toggle.addEventListener('change', function() {
+                    const row = this.closest('tr');
+                    const timeInputs = row.querySelectorAll('.day-time-input');
+                    const lunchToggle = row.querySelector('.lunch-toggle');
+                    const lunchInputs = row.querySelectorAll('.lunch-time-input');
+                    
+                    if (this.checked) {
+                        row.classList.remove('bg-light-secondary');
+                        timeInputs.forEach(input => input.disabled = false);
+                        if (lunchToggle) lunchToggle.disabled = false;
+                        if (lunchToggle && lunchToggle.checked) {
+                            lunchInputs.forEach(input => input.disabled = false);
+                        }
+                    } else {
+                        row.classList.add('bg-light-secondary');
+                        timeInputs.forEach(input => input.disabled = true);
+                        if (lunchToggle) lunchToggle.disabled = true;
+                        lunchInputs.forEach(input => input.disabled = true);
+                    }
+                });
+            });
+            
+            // Toggle almoço
+            document.querySelectorAll('.lunch-toggle').forEach(toggle => {
+                toggle.addEventListener('change', function() {
+                    const row = this.closest('tr');
+                    const lunchInputs = row.querySelectorAll('.lunch-time-input');
+                    lunchInputs.forEach(input => input.disabled = !this.checked);
+                });
+            });
+        });
+        </script>
         <div class="fv-row mb-7">
             <label class="d-flex align-items-center">
                 <input type="checkbox" name="auto_reassign_on_sla_breach" class="form-check-input me-2" 

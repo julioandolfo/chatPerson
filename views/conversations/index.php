@@ -20501,6 +20501,13 @@ document.addEventListener('DOMContentLoaded', function() {
             if (filterSelect.dataset.loaded === '1') {
                 return;
             }
+            
+            // Evitar chamadas múltiplas durante carregamento (race condition)
+            if (filterSelect.dataset.loading === '1') {
+                return;
+            }
+            
+            filterSelect.dataset.loading = '1';
 
             // Limpar opções anteriores mantendo placeholder
             while (filterSelect.options.length > 1) {
@@ -20520,12 +20527,15 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(r => r.json())
             .then(data => {
-                const seen = new Set();
+                // Usar Map para garantir unicidade por ID
+                const uniqueIntegrations = new Map();
                 if (data.integrations && Array.isArray(data.integrations)) {
                     data.integrations.forEach(integration => {
-                        const key = `${integration.id}-${integration.name}`;
-                        if (seen.has(key)) return;
-                        seen.add(key);
+                        if (integration.id && !uniqueIntegrations.has(integration.id)) {
+                            uniqueIntegrations.set(integration.id, integration);
+                        }
+                    });
+                    uniqueIntegrations.forEach(integration => {
                         const opt = document.createElement('option');
                         opt.value = integration.id;
                         opt.textContent = integration.name;
@@ -20543,6 +20553,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .finally(() => {
                 placeholder.textContent = 'Todas as lojas';
                 filterSelect.disabled = false;
+                filterSelect.dataset.loading = '0';
             });
         };
 
@@ -20614,6 +20625,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     };
                     const statusLabel = statusLabels[order.status] || order.status || '-';
                     const statusColor = statusColors[order.status] || 'secondary';
+                    
+                    // Gerar URL do painel WooCommerce
+                    const adminUrl = order.integration_url 
+                        ? `${order.integration_url}/wp-admin/post.php?post=${order.id}&action=edit` 
+                        : null;
+                    
                     html += `
                         <div class="card card-flush card-hover">
                             <div class="card-body p-4">
@@ -20621,6 +20638,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <div>
                                         <div class="fw-bold fs-6 text-gray-800">Pedido #${order.id || '-'}</div>
                                         <div class="fs-7 text-muted">${order.date_created || ''}</div>
+                                        ${order.integration_name ? `<div class="fs-8 text-muted">${order.integration_name}</div>` : ''}
                                     </div>
                                     <span class="badge badge-light-${statusColor}">${statusLabel}</span>
                                 </div>
@@ -20628,6 +20646,17 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <div class="fs-5 fw-bold text-primary">${total}</div>
                                     ${order.number ? `<div class="fs-7 text-muted">Nº ${order.number}</div>` : ''}
                                 </div>
+                                ${adminUrl ? `
+                                    <div class="mt-3 pt-3 border-top">
+                                        <a href="${adminUrl}" target="_blank" class="btn btn-sm btn-light-primary w-100">
+                                            <i class="ki-duotone ki-exit-right-corner fs-5 me-1">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                            </i>
+                                            Ver no painel
+                                        </a>
+                                    </div>
+                                ` : ''}
                             </div>
                         </div>
                     `;

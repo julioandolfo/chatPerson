@@ -629,6 +629,23 @@ class ConversationMentionService
         $isParticipant = ConversationParticipant::isParticipant($conversationId, $userId);
         \App\Helpers\Log::debug("🔍 [checkUserAccess] isParticipant=" . ($isParticipant ? 'true' : 'false'), 'conversas.log');
         
+        // ✅ NOVO: Verificar se é Agente do Contato
+        $isContactAgent = false;
+        if (!empty($conversation['contact_id'])) {
+            try {
+                $contactAgents = \App\Models\ContactAgent::getByContact($conversation['contact_id']);
+                foreach ($contactAgents as $ca) {
+                    if ($ca['agent_id'] == $userId) {
+                        $isContactAgent = true;
+                        break;
+                    }
+                }
+            } catch (\Exception $e) {
+                \App\Helpers\Log::error("Erro ao verificar agentes do contato: " . $e->getMessage(), 'conversas.log');
+            }
+        }
+        \App\Helpers\Log::debug("🔍 [checkUserAccess] isContactAgent=" . ($isContactAgent ? 'true' : 'false'), 'conversas.log');
+        
         // Verificar se tem solicitação pendente
         $hasPendingRequest = ConversationMention::hasPendingRequest($conversationId, $userId);
         \App\Helpers\Log::debug("🔍 [checkUserAccess] hasPendingRequest=" . ($hasPendingRequest ? 'true' : 'false'), 'conversas.log');
@@ -646,9 +663,9 @@ class ConversationMentionService
         }
         
         // Usuário pode ver se:
-        // 1. É atribuído OU participante
+        // 1. É atribuído OU participante OU agente do contato
         // 2. Conversa não atribuída E tem permissão de funil
-        $canView = ($isAssigned || $isParticipant) || ($isUnassigned && $hasFunnelPermission);
+        $canView = ($isAssigned || $isParticipant || $isContactAgent) || ($isUnassigned && $hasFunnelPermission);
         
         // Determinar motivo
         $reason = 'not_authorized';
@@ -657,6 +674,8 @@ class ConversationMentionService
                 $reason = 'assigned';
             } elseif ($isParticipant) {
                 $reason = 'participant';
+            } elseif ($isContactAgent) {
+                $reason = 'contact_agent';
             } elseif ($isUnassigned && $hasFunnelPermission) {
                 $reason = 'unassigned_with_funnel_permission';
             } else {
@@ -672,6 +691,7 @@ class ConversationMentionService
             'can_view' => $canView,
             'is_participant' => $isParticipant,
             'is_assigned' => $isAssigned,
+            'is_contact_agent' => $isContactAgent,
             'has_pending_request' => $hasPendingRequest,
             'has_funnel_permission' => $hasFunnelPermission,
             'is_unassigned' => $isUnassigned,

@@ -35,6 +35,11 @@ class WooCommerceIntegrationService
                 continue;
             }
             
+            // Dados da integração para incluir nos pedidos
+            $integrationUrl = rtrim($integration['woocommerce_url'] ?? '', '/');
+            $integrationName = $integration['name'] ?? 'Loja';
+            $integrationId = $integration['id'];
+            
             // 2. Verificar cache primeiro
             $cacheEnabled = $integration['cache_enabled'] ?? true;
             if ($cacheEnabled) {
@@ -44,6 +49,10 @@ class WooCommerceIntegrationService
                     foreach ($cachedOrders as $cached) {
                         $orderData = json_decode($cached['order_data'], true);
                         if ($orderData) {
+                            // Adicionar informações da integração ao pedido
+                            $orderData['integration_url'] = $integrationUrl;
+                            $orderData['integration_name'] = $integrationName;
+                            $orderData['integration_id'] = $integrationId;
                             $allOrders[] = $orderData;
                         }
                     }
@@ -60,6 +69,14 @@ class WooCommerceIntegrationService
             // 4. Buscar pedidos usando mapeamento configurado
             try {
                 $orders = self::searchOrders($integration, $contact);
+                
+                // Adicionar informações da integração a cada pedido
+                foreach ($orders as &$order) {
+                    $order['integration_url'] = $integrationUrl;
+                    $order['integration_name'] = $integrationName;
+                    $order['integration_id'] = $integrationId;
+                }
+                unset($order);
                 
                 // 5. Cachear resultados
                 if ($cacheEnabled && !empty($orders)) {

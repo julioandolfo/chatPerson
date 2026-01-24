@@ -19,6 +19,11 @@ class WorkingHoursCalculator
     
     /**
      * Calcular minutos dentro do horário de trabalho entre duas datas
+     * Considera:
+     * - Dias úteis configurados
+     * - Horário de início e fim por dia
+     * - Horário de almoço (intervalo não contado)
+     * - Feriados
      */
     public static function calculateWorkingMinutes(\DateTime $start, \DateTime $end): int
     {
@@ -73,7 +78,37 @@ class WorkingHoursCalculator
             
             if ($windowEnd > $windowStart) {
                 $minutes = ($windowEnd->getTimestamp() - $windowStart->getTimestamp()) / 60;
-                $totalMinutes += (int)$minutes;
+                
+                // Descontar horário de almoço se habilitado
+                if (!empty($dayConfig['lunch_enabled']) && 
+                    !empty($dayConfig['lunch_start']) && 
+                    !empty($dayConfig['lunch_end'])) {
+                    
+                    $lunchStart = clone $cursor;
+                    $lunchStart->setTime(
+                        (int)substr($dayConfig['lunch_start'], 0, 2),
+                        (int)substr($dayConfig['lunch_start'], 3, 2),
+                        0
+                    );
+                    
+                    $lunchEnd = clone $cursor;
+                    $lunchEnd->setTime(
+                        (int)substr($dayConfig['lunch_end'], 0, 2),
+                        (int)substr($dayConfig['lunch_end'], 3, 2),
+                        0
+                    );
+                    
+                    // Calcular sobreposição com o período de almoço
+                    $lunchOverlapStart = max($windowStart, $lunchStart);
+                    $lunchOverlapEnd = min($windowEnd, $lunchEnd);
+                    
+                    if ($lunchOverlapEnd > $lunchOverlapStart) {
+                        $lunchMinutes = ($lunchOverlapEnd->getTimestamp() - $lunchOverlapStart->getTimestamp()) / 60;
+                        $minutes -= $lunchMinutes;
+                    }
+                }
+                
+                $totalMinutes += max(0, (int)$minutes);
             }
             
             // Avançar para o próximo dia
@@ -126,9 +161,20 @@ class WorkingHoursCalculator
                 return;
             }
             
-            $sql = "SELECT day_of_week, is_working_day, start_time, end_time 
-                    FROM working_hours_config 
-                    ORDER BY day_of_week";
+            // Verificar se colunas de almoço existem
+            $columns = $db->query("SHOW COLUMNS FROM working_hours_config LIKE 'lunch_enabled'")->fetchAll();
+            $hasLunchColumns = !empty($columns);
+            
+            if ($hasLunchColumns) {
+                $sql = "SELECT day_of_week, is_working_day, start_time, end_time, 
+                               lunch_enabled, lunch_start, lunch_end 
+                        FROM working_hours_config 
+                        ORDER BY day_of_week";
+            } else {
+                $sql = "SELECT day_of_week, is_working_day, start_time, end_time 
+                        FROM working_hours_config 
+                        ORDER BY day_of_week";
+            }
             
             $rows = $db->query($sql)->fetchAll(\PDO::FETCH_ASSOC);
             
@@ -142,7 +188,10 @@ class WorkingHoursCalculator
                 self::$config[(int)$row['day_of_week']] = [
                     'is_working_day' => (bool)$row['is_working_day'],
                     'start_time' => $row['start_time'],
-                    'end_time' => $row['end_time']
+                    'end_time' => $row['end_time'],
+                    'lunch_enabled' => (bool)($row['lunch_enabled'] ?? false),
+                    'lunch_start' => $row['lunch_start'] ?? '12:00:00',
+                    'lunch_end' => $row['lunch_end'] ?? '13:00:00'
                 ];
             }
         } catch (\Exception $e) {
@@ -157,13 +206,13 @@ class WorkingHoursCalculator
     private static function loadDefaultConfig(): void
     {
         self::$config = [
-            0 => ['is_working_day' => false, 'start_time' => '08:00:00', 'end_time' => '18:00:00'], // Domingo
-            1 => ['is_working_day' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00'],  // Segunda
-            2 => ['is_working_day' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00'],  // Terça
-            3 => ['is_working_day' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00'],  // Quarta
-            4 => ['is_working_day' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00'],  // Quinta
-            5 => ['is_working_day' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00'],  // Sexta
-            6 => ['is_working_day' => false, 'start_time' => '08:00:00', 'end_time' => '18:00:00'], // Sábado
+            0 => ['is_working_day' => false, 'start_time' => '08:00:00', 'end_time' => '18:00:00', 'lunch_enabled' => false, 'lunch_start' => '12:00:00', 'lunch_end' => '13:00:00'], // Domingo
+            1 => ['is_working_day' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00', 'lunch_enabled' => true, 'lunch_start' => '12:00:00', 'lunch_end' => '13:00:00'],  // Segunda
+            2 => ['is_working_day' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00', 'lunch_enabled' => true, 'lunch_start' => '12:00:00', 'lunch_end' => '13:00:00'],  // Terça
+            3 => ['is_working_day' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00', 'lunch_enabled' => true, 'lunch_start' => '12:00:00', 'lunch_end' => '13:00:00'],  // Quarta
+            4 => ['is_working_day' => true, 'start_time' => '08:00:00', 'end_time' => '18:00:00', 'lunch_enabled' => true, 'lunch_start' => '12:00:00', 'lunch_end' => '13:00:00'],  // Quinta
+            5 => ['is_working_day' => true, 'start_time' => '08:00:00', 'end_time' => '17:00:00', 'lunch_enabled' => true, 'lunch_start' => '12:00:00', 'lunch_end' => '13:00:00'],  // Sexta (termina mais cedo)
+            6 => ['is_working_day' => false, 'start_time' => '08:00:00', 'end_time' => '12:00:00', 'lunch_enabled' => false, 'lunch_start' => '12:00:00', 'lunch_end' => '13:00:00'], // Sábado
         ];
     }
     

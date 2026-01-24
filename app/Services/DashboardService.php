@@ -706,21 +706,19 @@ class DashboardService
 
     /**
      * Obter tempo médio de primeira resposta APENAS HUMANOS (exclui IA)
-     * Considera apenas mensagens onde ai_agent_id IS NULL
+     * ATUALIZADO: Considera working hours e cliente respondeu ao bot
      */
     private static function getAverageFirstResponseTimeHuman(string $dateFrom, string $dateTo): ?float
     {
-        $sql = "SELECT AVG(TIMESTAMPDIFF(MINUTE, 
-                    (SELECT MIN(m1.created_at) 
-                     FROM messages m1 
-                     WHERE m1.conversation_id = c.id 
-                     AND m1.sender_type = 'contact'),
-                    (SELECT MIN(m2.created_at) 
-                     FROM messages m2 
-                     WHERE m2.conversation_id = c.id 
-                     AND m2.sender_type = 'agent'
-                     AND m2.ai_agent_id IS NULL)
-                )) as avg_time
+        $settings = ConversationSettingsService::getSettings();
+        $useWorkingHours = $settings['sla']['working_hours_enabled'] ?? false;
+        
+        $sql = "SELECT 
+                    c.id,
+                    (SELECT MIN(m1.created_at) FROM messages m1 
+                     WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact') as first_contact,
+                    (SELECT MIN(m2.created_at) FROM messages m2 
+                     WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent' AND m2.ai_agent_id IS NULL) as first_human
                 FROM conversations c
                 WHERE c.created_at >= ?
                 AND c.created_at <= ?
@@ -729,45 +727,124 @@ class DashboardService
                     WHERE m3.conversation_id = c.id 
                     AND m3.sender_type = 'agent'
                     AND m3.ai_agent_id IS NULL
-                )";
+                )
+                LIMIT 500";
         
-        $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
-        return $result && $result['avg_time'] !== null ? round((float)$result['avg_time'], 2) : null;
+        $conversations = \App\Helpers\Database::fetchAll($sql, [$dateFrom, $dateTo]);
+        
+        $totalMinutes = 0;
+        $count = 0;
+        
+        foreach ($conversations as $conv) {
+            if (!self::hasClientRespondedToBot((int)$conv['id'])) {
+                continue;
+            }
+            
+            if (empty($conv['first_contact']) || empty($conv['first_human'])) {
+                continue;
+            }
+            
+            $start = new \DateTime($conv['first_contact']);
+            $end = new \DateTime($conv['first_human']);
+            
+            if ($useWorkingHours) {
+                $minutes = self::calculateSLAMinutes($start, $end, true);
+            } else {
+                $minutes = ($end->getTimestamp() - $start->getTimestamp()) / 60;
+            }
+            
+            if ($minutes > 0 && $minutes < 10080) { // Menos de 1 semana
+                $totalMinutes += $minutes;
+                $count++;
+            }
+        }
+        
+        return $count > 0 ? round($totalMinutes / $count, 2) : null;
     }
 
     /**
      * Obter tempo médio geral de resposta APENAS HUMANOS (exclui IA)
-     * Considera apenas mensagens onde ai_agent_id IS NULL
+     * ATUALIZADO: Considera working hours, cliente respondeu ao bot e delay
      */
     private static function getAverageResponseTimeHuman(string $dateFrom, string $dateTo): ?float
     {
-        $sql = "SELECT AVG(response_time_minutes) as avg_time
-                FROM (
-                    SELECT 
-                        m1.conversation_id,
-                        AVG(TIMESTAMPDIFF(MINUTE, m1.created_at, m2.created_at)) as response_time_minutes
-                    FROM messages m1
-                    INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
-                        AND m2.sender_type = 'agent'
-                        AND m2.ai_agent_id IS NULL
-                        AND m2.created_at > m1.created_at
-                        AND m2.created_at = (
-                            SELECT MIN(m3.created_at)
-                            FROM messages m3
-                            WHERE m3.conversation_id = m1.conversation_id
-                            AND m3.sender_type = 'agent'
-                            AND m3.ai_agent_id IS NULL
-                            AND m3.created_at > m1.created_at
-                        )
-                    INNER JOIN conversations c ON c.id = m1.conversation_id
-                    WHERE m1.sender_type = 'contact'
-                    AND c.created_at >= ?
-                    AND c.created_at <= ?
-                    GROUP BY m1.conversation_id
-                ) as response_times";
+        $settings = ConversationSettingsService::getSettings();
+        $useWorkingHours = $settings['sla']['working_hours_enabled'] ?? false;
+        $delayEnabled = $settings['sla']['message_delay_enabled'] ?? true;
+        $delayMinutes = $settings['sla']['message_delay_minutes'] ?? 1;
         
-        $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
-        return $result && $result['avg_time'] !== null ? round((float)$result['avg_time'], 2) : null;
+        if (!$delayEnabled) {
+            $delayMinutes = 0;
+        }
+        
+        $sql = "SELECT DISTINCT c.id
+                FROM conversations c
+                WHERE c.created_at >= ?
+                AND c.created_at <= ?
+                AND EXISTS (
+                    SELECT 1 FROM messages m 
+                    WHERE m.conversation_id = c.id 
+                    AND m.sender_type = 'agent' 
+                    AND m.ai_agent_id IS NULL
+                )
+                LIMIT 300";
+        
+        $conversations = \App\Helpers\Database::fetchAll($sql, [$dateFrom, $dateTo]);
+        
+        $totalMinutes = 0;
+        $count = 0;
+        
+        foreach ($conversations as $conv) {
+            $convId = (int)$conv['id'];
+            
+            if (!self::hasClientRespondedToBot($convId)) {
+                continue;
+            }
+            
+            $messages = \App\Helpers\Database::fetchAll(
+                "SELECT sender_type, ai_agent_id, created_at
+                 FROM messages
+                 WHERE conversation_id = ?
+                 ORDER BY created_at ASC",
+                [$convId]
+            );
+            
+            $lastHumanAgentTime = null;
+            $pendingContactTime = null;
+            
+            foreach ($messages as $msg) {
+                if ($msg['sender_type'] === 'agent' && empty($msg['ai_agent_id'])) {
+                    if ($pendingContactTime) {
+                        $start = new \DateTime($pendingContactTime);
+                        $end = new \DateTime($msg['created_at']);
+                        
+                        if ($useWorkingHours) {
+                            $minutes = self::calculateSLAMinutes($start, $end, true);
+                        } else {
+                            $minutes = ($end->getTimestamp() - $start->getTimestamp()) / 60;
+                        }
+                        
+                        if ($minutes > 0 && $minutes < 10080) {
+                            $totalMinutes += $minutes;
+                            $count++;
+                        }
+                        $pendingContactTime = null;
+                    }
+                    $lastHumanAgentTime = $msg['created_at'];
+                    
+                } elseif ($msg['sender_type'] === 'contact' && $lastHumanAgentTime) {
+                    $lastHuman = new \DateTime($lastHumanAgentTime);
+                    $contact = new \DateTime($msg['created_at']);
+                    $diffMinutes = ($contact->getTimestamp() - $lastHuman->getTimestamp()) / 60;
+                    
+                    if ($diffMinutes >= $delayMinutes && !$pendingContactTime) {
+                        $pendingContactTime = $msg['created_at'];
+                    }
+                }
+            }
+        }
+        
+        return $count > 0 ? round($totalMinutes / $count, 2) : null;
     }
 
     /**

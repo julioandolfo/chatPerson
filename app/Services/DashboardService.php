@@ -545,38 +545,63 @@ class DashboardService
 
     /**
      * Obter tempo médio de primeira resposta (em minutos)
-     * Calcula o tempo entre a primeira mensagem do cliente e a primeira resposta do agente
-     * NOTA: Usa SEGUNDOS internamente e converte para minutos para maior precisão (IA responde em segundos)
+     * ATUALIZADO: Considera working hours e cliente respondeu ao bot
      */
     private static function getAverageFirstResponseTime(string $dateFrom, string $dateTo): ?array
     {
-        // Usar SEGUNDOS para maior precisão (IA responde em segundos, não minutos)
-        $sql = "SELECT AVG(time_diff_seconds) as avg_seconds
-                FROM (
-                    SELECT 
-                        c.id,
-                        TIMESTAMPDIFF(SECOND, 
-                            (SELECT MIN(m1.created_at) FROM messages m1 WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact'),
-                            (SELECT MIN(m2.created_at) FROM messages m2 WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent')
-                        ) as time_diff_seconds
-                    FROM conversations c
-                    WHERE c.created_at >= ?
-                    AND c.created_at <= ?
-                    AND EXISTS (SELECT 1 FROM messages m3 WHERE m3.conversation_id = c.id AND m3.sender_type = 'agent')
-                    AND EXISTS (SELECT 1 FROM messages m4 WHERE m4.conversation_id = c.id AND m4.sender_type = 'contact')
-                    HAVING time_diff_seconds IS NOT NULL AND time_diff_seconds > 0
-                ) as valid_times";
+        $settings = ConversationSettingsService::getSettings();
+        $useWorkingHours = $settings['sla']['working_hours_enabled'] ?? false;
         
-        $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
+        // Buscar conversas com primeira resposta
+        $sql = "SELECT 
+                    c.id,
+                    (SELECT MIN(m1.created_at) FROM messages m1 
+                     WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact') as first_contact,
+                    (SELECT MIN(m2.created_at) FROM messages m2 
+                     WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent') as first_agent
+                FROM conversations c
+                WHERE c.created_at >= ?
+                AND c.created_at <= ?
+                AND EXISTS (SELECT 1 FROM messages m3 WHERE m3.conversation_id = c.id AND m3.sender_type = 'agent')
+                AND EXISTS (SELECT 1 FROM messages m4 WHERE m4.conversation_id = c.id AND m4.sender_type = 'contact')
+                LIMIT 500";
         
-        self::logDash("getAverageFirstResponseTime result: " . json_encode($result));
+        $conversations = \App\Helpers\Database::fetchAll($sql, [$dateFrom, $dateTo]);
         
-        // Retornar segundos e minutos
-        if ($result && isset($result['avg_seconds']) && $result['avg_seconds'] !== null) {
-            $seconds = (float)$result['avg_seconds'];
-            $minutes = $seconds / 60;
-            self::logDash("getAverageFirstResponseTime: {$seconds}s = {$minutes}min");
-            return ['seconds' => round($seconds, 2), 'minutes' => round($minutes, 2)];
+        $totalSeconds = 0;
+        $count = 0;
+        
+        foreach ($conversations as $conv) {
+            // Verificar se cliente respondeu ao bot
+            if (!self::hasClientRespondedToBot((int)$conv['id'])) {
+                continue;
+            }
+            
+            if (empty($conv['first_contact']) || empty($conv['first_agent'])) {
+                continue;
+            }
+            
+            $start = new \DateTime($conv['first_contact']);
+            $end = new \DateTime($conv['first_agent']);
+            
+            if ($useWorkingHours) {
+                $minutes = self::calculateSLAMinutes($start, $end, true);
+                $seconds = $minutes * 60;
+            } else {
+                $seconds = $end->getTimestamp() - $start->getTimestamp();
+            }
+            
+            if ($seconds > 0 && $seconds < 604800) { // Menos de 1 semana
+                $totalSeconds += $seconds;
+                $count++;
+            }
+        }
+        
+        if ($count > 0) {
+            $avgSeconds = $totalSeconds / $count;
+            $avgMinutes = $avgSeconds / 60;
+            self::logDash("getAverageFirstResponseTime (with rules): {$avgSeconds}s = {$avgMinutes}min (n={$count})");
+            return ['seconds' => round($avgSeconds, 2), 'minutes' => round($avgMinutes, 2)];
         }
         
         return ['seconds' => 0, 'minutes' => 0];
@@ -584,49 +609,95 @@ class DashboardService
     
     /**
      * Obter tempo médio geral de resposta (em minutos)
-     * Calcula o tempo médio entre TODAS as mensagens do cliente e as respostas do agente
-     * NOTA: Usa SEGUNDOS internamente e converte para minutos para maior precisão
-     * ✅ Com cache de 5 minutos para evitar query pesada repetida
+     * ATUALIZADO: Considera working hours, cliente respondeu ao bot e delay
      */
     private static function getAverageResponseTime(string $dateFrom, string $dateTo): ?array
     {
-        // ✅ CACHE DE 5 MINUTOS (300 segundos)
-        $cacheKey = "avg_response_time_{$dateFrom}_{$dateTo}";
+        $cacheKey = "avg_response_time_v2_{$dateFrom}_{$dateTo}";
         
         return \App\Helpers\Cache::remember($cacheKey, 300, function() use ($dateFrom, $dateTo) {
-            // Usar SEGUNDOS para maior precisão (IA responde em segundos)
-            $sql = "SELECT AVG(response_time_seconds) as avg_seconds
-                    FROM (
-                        SELECT 
-                            TIMESTAMPDIFF(SECOND, m1.created_at, m2.created_at) as response_time_seconds
-                        FROM messages m1
-                        INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
-                            AND m2.sender_type = 'agent'
-                            AND m2.created_at > m1.created_at
-                            AND m2.created_at = (
-                                SELECT MIN(m3.created_at)
-                                FROM messages m3
-                                WHERE m3.conversation_id = m1.conversation_id
-                                AND m3.sender_type = 'agent'
-                                AND m3.created_at > m1.created_at
-                            )
-                        INNER JOIN conversations c ON c.id = m1.conversation_id
-                        WHERE m1.sender_type = 'contact'
-                        AND c.created_at >= ?
-                        AND c.created_at <= ?
-                        HAVING response_time_seconds IS NOT NULL AND response_time_seconds > 0
-                    ) as response_times";
+            $settings = ConversationSettingsService::getSettings();
+            $useWorkingHours = $settings['sla']['working_hours_enabled'] ?? false;
+            $delayEnabled = $settings['sla']['message_delay_enabled'] ?? true;
+            $delayMinutes = $settings['sla']['message_delay_minutes'] ?? 1;
             
-            $result = \App\Helpers\Database::fetch($sql, [$dateFrom, $dateTo]);
+            if (!$delayEnabled) {
+                $delayMinutes = 0;
+            }
             
-            self::logDash("getAverageResponseTime result: " . json_encode($result));
+            // Buscar conversas do período
+            $sql = "SELECT DISTINCT c.id
+                    FROM conversations c
+                    WHERE c.created_at >= ?
+                    AND c.created_at <= ?
+                    AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'agent')
+                    AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact')
+                    LIMIT 300";
             
-            // Retornar segundos e minutos
-            if ($result && isset($result['avg_seconds']) && $result['avg_seconds'] !== null) {
-                $seconds = (float)$result['avg_seconds'];
-                $minutes = $seconds / 60;
-                self::logDash("getAverageResponseTime: {$seconds}s = {$minutes}min");
-                return ['seconds' => round($seconds, 2), 'minutes' => round($minutes, 2)];
+            $conversations = \App\Helpers\Database::fetchAll($sql, [$dateFrom, $dateTo]);
+            
+            $totalSeconds = 0;
+            $count = 0;
+            
+            foreach ($conversations as $conv) {
+                $convId = (int)$conv['id'];
+                
+                // Verificar se cliente respondeu ao bot
+                if (!self::hasClientRespondedToBot($convId)) {
+                    continue;
+                }
+                
+                // Buscar mensagens
+                $messages = \App\Helpers\Database::fetchAll(
+                    "SELECT sender_type, created_at
+                     FROM messages
+                     WHERE conversation_id = ?
+                     ORDER BY created_at ASC",
+                    [$convId]
+                );
+                
+                $lastAgentTime = null;
+                $pendingContactTime = null;
+                
+                foreach ($messages as $msg) {
+                    if ($msg['sender_type'] === 'agent') {
+                        if ($pendingContactTime) {
+                            $start = new \DateTime($pendingContactTime);
+                            $end = new \DateTime($msg['created_at']);
+                            
+                            if ($useWorkingHours) {
+                                $minutes = self::calculateSLAMinutes($start, $end, true);
+                                $seconds = $minutes * 60;
+                            } else {
+                                $seconds = $end->getTimestamp() - $start->getTimestamp();
+                            }
+                            
+                            if ($seconds > 0 && $seconds < 604800) {
+                                $totalSeconds += $seconds;
+                                $count++;
+                            }
+                            $pendingContactTime = null;
+                        }
+                        $lastAgentTime = $msg['created_at'];
+                        
+                    } elseif ($msg['sender_type'] === 'contact' && $lastAgentTime) {
+                        // Verificar delay
+                        $lastAgent = new \DateTime($lastAgentTime);
+                        $contact = new \DateTime($msg['created_at']);
+                        $diffMinutes = ($contact->getTimestamp() - $lastAgent->getTimestamp()) / 60;
+                        
+                        if ($diffMinutes >= $delayMinutes && !$pendingContactTime) {
+                            $pendingContactTime = $msg['created_at'];
+                        }
+                    }
+                }
+            }
+            
+            if ($count > 0) {
+                $avgSeconds = $totalSeconds / $count;
+                $avgMinutes = $avgSeconds / 60;
+                self::logDash("getAverageResponseTime (with rules): {$avgSeconds}s = {$avgMinutes}min (n={$count})");
+                return ['seconds' => round($avgSeconds, 2), 'minutes' => round($avgMinutes, 2)];
             }
             
             return ['seconds' => 0, 'minutes' => 0];

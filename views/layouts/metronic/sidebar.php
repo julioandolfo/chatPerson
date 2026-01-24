@@ -140,9 +140,9 @@
                 </div>
                 <!--end:Menu item-->
                 
-                <!--begin:Menu item-->
-                <div class="menu-item">
-                    <a class="menu-link <?= isActive('/automations', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/automations') ?>" data-title="Automações">
+                <!--begin:Menu item - Automações-->
+                <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= isActive('/automations', $currentUri) || isActive('/settings/action-buttons', $currentUri) ? 'here show' : '' ?>">
+                    <span class="menu-link" data-title="Automações">
                         <span class="menu-icon">
                             <i class="ki-duotone ki-gear fs-2">
                                 <span class="path1"></span>
@@ -150,7 +150,28 @@
                             </i>
                         </span>
                         <span class="menu-title">Automações</span>
-                    </a>
+                        <span class="menu-arrow"></span>
+                    </span>
+                    <!--begin:Menu sub-->
+                    <div class="menu-sub menu-sub-accordion">
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/automations', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/automations') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Gerenciar Automações</span>
+                            </a>
+                        </div>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/settings/action-buttons', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/settings/action-buttons') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Botões de Ações</span>
+                            </a>
+                        </div>
+                    </div>
+                    <!--end:Menu sub-->
                 </div>
                 <!--end:Menu item-->
                 
@@ -274,22 +295,6 @@
                 <!--end:Menu item-->
                 <?php endif; ?>
                 
-                <!--begin:Menu item-->
-                <div class="menu-item">
-                    <a class="menu-link <?= isActive('/settings/action-buttons', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/settings/action-buttons') ?>" data-title="Botões de Ações">
-                        <span class="menu-icon">
-                            <i class="ki-duotone ki-element-11 fs-2">
-                                <span class="path1"></span>
-                                <span class="path2"></span>
-                                <span class="path3"></span>
-                                <span class="path4"></span>
-                            </i>
-                        </span>
-                        <span class="menu-title">Botões de Ações</span>
-                    </a>
-                </div>
-                <!--end:Menu item-->
-                
                 <!--begin:Menu item - Performance-->
                 <div data-kt-menu-trigger="click" class="menu-item menu-accordion <?= isActive('/agent-performance', $currentUri) || isActive('/agent-conversion', $currentUri) ? 'here show' : '' ?>">
                     <span class="menu-link" data-title="Performance">
@@ -373,6 +378,19 @@
                                     <span class="bullet bullet-dot"></span>
                                 </span>
                                 <span class="menu-title">🎯 Gerenciar Metas</span>
+                            </a>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (\App\Helpers\Permission::can('coaching.view')): ?>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/coaching', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/coaching/dashboard') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">🚀 Coaching IA</span>
+                                <span class="menu-badge">
+                                    <span class="badge badge-success badge-circle pulse pulse-success" style="width: 8px; height: 8px;"></span>
+                                </span>
                             </a>
                         </div>
                         <?php endif; ?>
@@ -474,25 +492,6 @@
                         <?php endif; ?>
                     </div>
                     <!--end:Menu sub-->
-                </div>
-                <!--end:Menu item-->
-                <?php endif; ?>
-                
-                <!--begin:Menu item - Coaching Dashboard -->
-                <?php if (\App\Helpers\Permission::can('coaching.view')): ?>
-                <div class="menu-item">
-                    <a class="menu-link <?= isActive('/coaching', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/coaching/dashboard') ?>">
-                        <span class="menu-icon">
-                            <i class="ki-duotone ki-rocket fs-2">
-                                <span class="path1"></span>
-                                <span class="path2"></span>
-                            </i>
-                        </span>
-                        <span class="menu-title">Coaching IA</span>
-                        <span class="menu-badge">
-                            <span class="badge badge-success badge-circle pulse pulse-success" style="width: 8px; height: 8px;"></span>
-                        </span>
-                    </a>
                 </div>
                 <!--end:Menu item-->
                 <?php endif; ?>

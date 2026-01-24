@@ -743,399 +743,217 @@ ob_start();
     $slaFirstResponse = $slaSettings['first_response_time'] ?? 15; // minutos
     $slaOngoingResponse = $slaSettings['ongoing_response_time'] ?? $slaFirstResponse; // SLA para respostas contínuas
 ?>
+<!--begin::Desempenho dos Agentes - Visual Compacto-->
 <div class="row g-5 mb-5">
     <div class="col-12">
         <div class="card">
             <div class="card-header border-0 pt-5">
                 <h3 class="card-title align-items-start flex-column">
-                    <span class="card-label fw-bold fs-3 mb-1">Métricas Individuais dos Agentes</span>
-                    <span class="text-muted mt-1 fw-semibold fs-7">SLA 1ª Resposta: <?= $slaFirstResponse ?>min | SLA Respostas: <?= $slaOngoingResponse ?>min</span>
+                    <span class="card-label fw-bold fs-3 mb-1">Desempenho dos Agentes</span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">Visão geral de performance e SLA</span>
                 </h3>
+                <div class="card-toolbar">
+                    <span class="badge badge-light-primary fs-8">
+                        <i class="ki-duotone ki-timer fs-7 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                        SLA: <?= $slaFirstResponse ?>min (1ª) | <?= $slaOngoingResponse ?>min (resp)
+                    </span>
+                </div>
             </div>
-            <div class="card-body pt-3">
+            <div class="card-body pt-0">
                 <?php if ($hasAgentsMetrics): ?>
-                <div class="row g-4">
-                    <?php foreach ($allAgentsMetrics as $agent): ?>
-                    <div class="col-xl-4 col-lg-6">
-                        <div class="card border border-gray-300 h-100">
-                            <div class="card-body">
-                                <!-- Header do Card -->
-                                <div class="d-flex align-items-center mb-4">
-                                    <div class="symbol symbol-50px me-3">
-                                        <?php if (!empty($agent['agent_avatar'])): ?>
-                                            <img src="<?= htmlspecialchars($agent['agent_avatar']) ?>" alt="<?= htmlspecialchars($agent['agent_name']) ?>" class="symbol-label" />
-                                        <?php else: ?>
-                                            <div class="symbol-label fs-2 fw-semibold text-primary bg-light-primary">
-                                                <?= mb_substr(htmlspecialchars($agent['agent_name'] ?? 'A'), 0, 1) ?>
-                                            </div>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="flex-grow-1">
-                                        <div class="fw-bold fs-5 text-gray-800"><?= htmlspecialchars($agent['agent_name']) ?></div>
-                                        <div class="d-flex align-items-center mt-1">
-                                            <?php
-                                            $statusColors = [
-                                                'online' => 'success',
-                                                'busy' => 'warning',
-                                                'away' => 'info',
-                                                'offline' => 'gray-400'
-                                            ];
-                                            $statusLabels = [
-                                                'online' => 'Online',
-                                                'busy' => 'Ocupado',
-                                                'away' => 'Ausente',
-                                                'offline' => 'Offline'
-                                            ];
-                                            $status = $agent['availability_status'] ?? 'offline';
-                                            $color = $statusColors[$status] ?? 'gray-400';
-                                            $label = $statusLabels[$status] ?? 'Offline';
-                                            ?>
-                                            <span class="bullet bullet-dot bg-<?= $color ?> me-2"></span>
-                                            <span class="text-muted fs-7"><?= $label ?></span>
+                
+                <!-- Tabela Compacta -->
+                <div class="table-responsive">
+                    <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
+                        <thead>
+                            <tr class="fw-bold text-muted bg-light">
+                                <th class="ps-4 rounded-start min-w-200px">Agente</th>
+                                <th class="text-center min-w-100px">Conversas</th>
+                                <th class="text-center min-w-120px">SLA 1ª Resp</th>
+                                <th class="text-center min-w-120px">SLA Respostas</th>
+                                <th class="text-center min-w-100px">Tempo Médio</th>
+                                <th class="text-center min-w-80px">Resolução</th>
+                                <th class="text-center pe-4 rounded-end min-w-80px">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($allAgentsMetrics as $agent): 
+                                // Status do agente
+                                $statusColors = ['online' => 'success', 'busy' => 'warning', 'away' => 'info', 'offline' => 'gray-400'];
+                                $status = $agent['availability_status'] ?? 'offline';
+                                $statusColor = $statusColors[$status] ?? 'gray-400';
+                                
+                                // Dados SLA 1ª Resposta
+                                $sla1Rate = $agent['sla_first_response_rate'] ?? 0;
+                                $sla1Within = $agent['first_response_within_sla'] ?? 0;
+                                $sla1Total = $agent['total_conversations_with_contact'] ?? $agent['total_conversations'] ?? 0;
+                                $sla1Color = $sla1Total == 0 ? 'secondary' : ($sla1Rate >= 80 ? 'success' : ($sla1Rate >= 50 ? 'warning' : 'danger'));
+                                
+                                // Dados SLA Respostas
+                                $sla2Rate = $agent['sla_response_rate'] ?? 0;
+                                $sla2Within = $agent['responses_within_sla'] ?? 0;
+                                $sla2Total = $agent['total_responses'] ?? 0;
+                                $sla2Color = $sla2Total == 0 ? 'secondary' : ($sla2Rate >= 80 ? 'success' : ($sla2Rate >= 50 ? 'warning' : 'danger'));
+                                
+                                // Tempo médio de resposta
+                                $avgRespMin = $agent['avg_response_minutes'] ?? 0;
+                                $avgRespSec = $agent['avg_response_seconds'] ?? 0;
+                                $avgRespFormatted = '-';
+                                if ($avgRespSec > 0) {
+                                    if ($avgRespSec < 60) $avgRespFormatted = number_format($avgRespSec, 0) . 's';
+                                    elseif ($avgRespMin < 60) $avgRespFormatted = number_format($avgRespMin, 1) . 'min';
+                                    else $avgRespFormatted = number_format($avgRespMin / 60, 1) . 'h';
+                                }
+                                
+                                // Taxa de resolução
+                                $resolutionRate = $agent['resolution_rate'] ?? 0;
+                                $resColor = $resolutionRate >= 70 ? 'success' : ($resolutionRate >= 40 ? 'warning' : 'danger');
+                            ?>
+                            <tr>
+                                <!-- Agente -->
+                                <td class="ps-4">
+                                    <div class="d-flex align-items-center">
+                                        <div class="symbol symbol-40px me-3">
+                                            <?php if (!empty($agent['agent_avatar'])): ?>
+                                                <img src="<?= htmlspecialchars($agent['agent_avatar']) ?>" alt="" class="symbol-label" />
+                                            <?php else: ?>
+                                                <div class="symbol-label fs-5 fw-semibold text-primary bg-light-primary">
+                                                    <?= mb_substr(htmlspecialchars($agent['agent_name'] ?? 'A'), 0, 1) ?>
+                                                </div>
+                                            <?php endif; ?>
+                                            <div class="symbol-badge bg-<?= $statusColor ?> start-100 top-100 border-4 h-10px w-10px ms-n2 mt-n2"></div>
+                                        </div>
+                                        <div>
+                                            <a href="<?= \App\Helpers\Url::to('/agent-performance/agent?id=' . $agent['agent_id']) ?>" 
+                                               class="text-gray-800 fw-bold text-hover-primary fs-6">
+                                                <?= htmlspecialchars($agent['agent_name']) ?>
+                                            </a>
                                         </div>
                                     </div>
-                                </div>
-                                
-                                <!-- Métricas -->
-                                <div class="separator separator-dashed my-4"></div>
+                                </td>
                                 
                                 <!-- Conversas -->
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <span class="text-muted fs-7">Conversas Totais</span>
-                                    <span class="fw-bold fs-5 text-gray-800"><?= number_format($agent['total_conversations'] ?? 0) ?></span>
-                                </div>
-                                
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <span class="text-muted fs-7">Em Aberto</span>
-                                    <span class="fw-bold text-warning"><?= number_format($agent['open_conversations'] ?? 0) ?></span>
-                                </div>
-                                
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <span class="text-muted fs-7">Fechadas</span>
-                                    <span class="fw-bold text-success"><?= number_format($agent['closed_conversations'] ?? 0) ?></span>
-                                </div>
-                                
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <span class="text-muted fs-7">Resolvidas</span>
-                                    <span class="fw-bold text-info"><?= number_format($agent['resolved_conversations'] ?? 0) ?></span>
-                                </div>
-                                
-                                <div class="separator separator-dashed my-4"></div>
-                                
-                                <!-- SLA e Tempos -->
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <span class="text-muted fs-7">Taxa de Resolução</span>
-                                    <span class="badge badge-light-success"><?= number_format($agent['resolution_rate'] ?? 0, 1) ?>%</span>
-                                </div>
-                                
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <span class="text-muted fs-7">Tempo Médio Resolução</span>
-                                    <span class="fw-bold text-gray-800">
-                                        <?php
-                                        $avgHours = $agent['avg_resolution_hours'] ?? 0;
-                                        if ($avgHours > 0) {
-                                            if ($avgHours < 1) {
-                                                echo number_format($avgHours * 60, 0) . ' min';
-                                            } else {
-                                                echo number_format($avgHours, 1) . 'h';
-                                            }
-                                        } else {
-                                            echo '-';
-                                        }
-                                        ?>
-                                    </span>
-                                </div>
-                                
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <span class="text-muted fs-7">Tempo Médio 1ª Resposta</span>
-                                    <span class="fw-bold text-gray-800">
-                                        <?php
-                                        $avgFirstSec = $agent['avg_first_response_seconds'] ?? 0;
-                                        $avgFirstMin = $agent['avg_first_response_minutes'] ?? 0;
-                                        if ($avgFirstSec > 0) {
-                                            if ($avgFirstSec < 60) {
-                                                echo number_format($avgFirstSec, 0) . 's';
-                                            } elseif ($avgFirstMin < 60) {
-                                                echo number_format($avgFirstMin, 1) . ' min';
-                                            } else {
-                                                echo number_format($avgFirstMin / 60, 1) . 'h';
-                                            }
-                                        } else {
-                                            echo '-';
-                                        }
-                                        ?>
-                                    </span>
-                                </div>
-                                
-                                <div class="separator separator-dashed my-4"></div>
-                                
-                                <!-- Estatísticas de Disponibilidade -->
-                                <div class="mb-3">
-                                    <span class="text-muted fs-7 fw-bold d-block mb-2">Tempo em Cada Status</span>
-                                    <?php
-                                    $availabilityStats = $agent['availability_stats'] ?? [];
-                                    $statusConfig = [
-                                        'online' => ['label' => 'Online', 'color' => 'success', 'icon' => 'check-circle'],
-                                        'away' => ['label' => 'Ausente', 'color' => 'info', 'icon' => 'clock'],
-                                        'busy' => ['label' => 'Ocupado', 'color' => 'warning', 'icon' => 'pause-circle'],
-                                        'offline' => ['label' => 'Offline', 'color' => 'secondary', 'icon' => 'x-circle']
-                                    ];
-                                    
-                                    foreach ($statusConfig as $status => $config):
-                                        $stats = $availabilityStats[$status] ?? ['formatted' => '0s', 'percentage' => 0];
-                                        if ($stats['seconds'] > 0 || $status === 'online'): // Sempre mostrar online, mesmo se 0
-                                    ?>
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <span class="text-muted fs-8">
-                                            <i class="ki-duotone ki-<?= $config['icon'] ?> fs-7 text-<?= $config['color'] ?> me-1">
-                                                <span class="path1"></span>
-                                                <span class="path2"></span>
-                                            </i>
-                                            <?= $config['label'] ?>
-                                        </span>
-                                        <div class="text-end">
-                                            <span class="fw-bold text-gray-800 fs-7"><?= $stats['formatted'] ?? '0s' ?></span>
-                                            <?php if (($stats['percentage'] ?? 0) > 0): ?>
-                                            <span class="text-muted fs-8 ms-1">(<?= number_format($stats['percentage'], 1) ?>%)</span>
-                                            <?php endif; ?>
+                                <td class="text-center">
+                                    <div class="d-flex flex-column align-items-center">
+                                        <span class="fw-bold fs-5 text-gray-800"><?= number_format($agent['total_conversations'] ?? 0) ?></span>
+                                        <div class="d-flex gap-2 mt-1">
+                                            <span class="badge badge-light-warning badge-sm" title="Em aberto">
+                                                <?= $agent['open_conversations'] ?? 0 ?>
+                                            </span>
+                                            <span class="badge badge-light-success badge-sm" title="Fechadas">
+                                                <?= $agent['closed_conversations'] ?? 0 ?>
+                                            </span>
                                         </div>
                                     </div>
-                                    <?php
-                                        endif;
-                                    endforeach;
-                                    ?>
-                                </div>
-                                
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <span class="text-muted fs-7">Tempo Médio de Resposta</span>
-                                    <span class="fw-bold text-gray-800">
-                                        <?php
-                                        $avgRespSec = $agent['avg_response_seconds'] ?? 0;
-                                        $avgRespMin = $agent['avg_response_minutes'] ?? 0;
-                                        if ($avgRespSec > 0) {
-                                            if ($avgRespSec < 60) {
-                                                echo number_format($avgRespSec, 0) . 's';
-                                            } elseif ($avgRespMin < 60) {
-                                                echo number_format($avgRespMin, 1) . ' min';
-                                            } else {
-                                                echo number_format($avgRespMin / 60, 1) . 'h';
-                                            }
-                                        } else {
-                                            echo '-';
-                                        }
-                                        ?>
-                                    </span>
-                                </div>
-                                
-                                <div class="separator separator-dashed my-4"></div>
+                                </td>
                                 
                                 <!-- SLA 1ª Resposta -->
-                                <?php
-                                // Dados do SLA de primeira resposta
-                                $slaFirstRespMinutes = $agent['sla_first_response_minutes'] ?? $slaFirstResponse;
-                                $slaFirstRespRate = $agent['sla_first_response_rate'] ?? 0;
-                                $avgFirstResponseSeconds = $agent['avg_first_response_seconds'] ?? 0;
-                                $avgFirstResponseMinutes = $agent['avg_first_response_minutes'] ?? 0;
-                                $firstRespWithinSla = $agent['first_response_within_sla'] ?? 0;
-                                $firstRespOutsideSla = ($agent['total_conversations'] ?? 0) - $firstRespWithinSla;
-                                
-                                // Definir status SLA 1ª Resposta
-                                if ($agent['total_conversations'] == 0) {
-                                    $sla1Status = 'secondary';
-                                    $sla1Icon = 'minus-circle';
-                                    $sla1Label = 'N/A';
-                                } elseif ($slaFirstRespRate >= 80) {
-                                    $sla1Status = 'success';
-                                    $sla1Icon = 'check-circle';
-                                    $sla1Label = 'Excelente';
-                                } elseif ($slaFirstRespRate >= 50) {
-                                    $sla1Status = 'warning';
-                                    $sla1Icon = 'information-circle';
-                                    $sla1Label = 'Regular';
-                                } else {
-                                    $sla1Status = 'danger';
-                                    $sla1Icon = 'cross-circle';
-                                    $sla1Label = 'Crítico';
-                                }
-                                
-                                $isFirstRespOnTime = $avgFirstResponseMinutes <= $slaFirstRespMinutes;
-                                ?>
-                                <div class="mb-3">
-                                    <div class="d-flex align-items-center justify-content-between mb-2">
-                                        <span class="text-muted fs-7 fw-bold">SLA 1ª Resposta (Meta: <?= $slaFirstRespMinutes ?>min)</span>
-                                    </div>
-                                    <?php if ($agent['total_conversations'] > 0): ?>
-                                    <div class="d-flex align-items-center justify-content-between mb-2 p-3 bg-light-<?= $sla1Status ?> rounded">
-                                        <div class="d-flex align-items-center">
-                                            <i class="ki-duotone ki-<?= $sla1Icon ?> fs-2x text-<?= $sla1Status ?> me-3">
-                                                <span class="path1"></span>
-                                                <span class="path2"></span>
-                                            </i>
-                                            <div>
-                                                <div class="fs-2 fw-bold text-<?= $sla1Status ?>"><?= number_format($slaFirstRespRate, 0) ?>%</div>
-                                                <div class="fs-8 text-muted"><?= $sla1Label ?></div>
-                                            </div>
-                                        </div>
-                                        <div class="text-end">
-                                            <div class="fs-6 fw-bold text-gray-800">
-                                                <span class="text-success"><?= $firstRespWithinSla ?></span>
-                                                <span class="text-muted">/</span>
-                                                <span class="text-gray-600"><?= $agent['total_conversations'] ?></span>
-                                            </div>
-                                            <div class="fs-8 text-muted">no prazo</div>
-                                        </div>
-                                    </div>
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <span class="text-muted fs-8">Tempo médio:</span>
-                                        <span class="fw-bold fs-7 <?= $isFirstRespOnTime ? 'text-success' : 'text-danger' ?>">
-                                            <?php
-                                            if ($avgFirstResponseSeconds > 0) {
-                                                if ($avgFirstResponseSeconds < 60) {
-                                                    echo number_format($avgFirstResponseSeconds, 0) . 's';
-                                                } elseif ($avgFirstResponseMinutes < 60) {
-                                                    echo number_format($avgFirstResponseMinutes, 1) . 'min';
-                                                } else {
-                                                    echo number_format($avgFirstResponseMinutes / 60, 1) . 'h';
-                                                }
-                                                echo $isFirstRespOnTime ? ' ✓' : ' ✗';
-                                            } else {
-                                                echo '-';
-                                            }
-                                            ?>
+                                <td class="text-center">
+                                    <?php if ($sla1Total > 0): ?>
+                                    <div class="d-flex flex-column align-items-center">
+                                        <span class="badge badge-light-<?= $sla1Color ?> fs-7 fw-bold px-3 py-2">
+                                            <?= number_format($sla1Rate, 0) ?>%
                                         </span>
+                                        <span class="text-muted fs-8 mt-1"><?= $sla1Within ?>/<?= $sla1Total ?></span>
                                     </div>
-                                    <?php if ($firstRespOutsideSla > 0): ?>
-                                    <div class="alert alert-warning d-flex align-items-center p-2 mt-2 mb-0">
-                                        <i class="ki-duotone ki-information fs-2x text-warning me-2">
-                                            <span class="path1"></span>
-                                            <span class="path2"></span>
-                                            <span class="path3"></span>
-                                        </i>
-                                        <span class="fs-8 fw-semibold"><?= $firstRespOutsideSla ?> conversa<?= $firstRespOutsideSla > 1 ? 's' : '' ?> fora do SLA</span>
-                                    </div>
-                                    <?php endif; ?>
                                     <?php else: ?>
-                                    <div class="text-center text-muted fs-7 py-3">
-                                        <i class="ki-duotone ki-information-2 fs-2x mb-2">
-                                            <span class="path1"></span>
-                                            <span class="path2"></span>
-                                            <span class="path3"></span>
-                                        </i>
-                                        <div>Sem dados no período</div>
-                                    </div>
+                                    <span class="text-muted fs-7">-</span>
                                     <?php endif; ?>
-                                </div>
+                                </td>
                                 
                                 <!-- SLA Respostas -->
-                                <?php
-                                // Dados do SLA de respostas contínuas
-                                $slaRespMinutes = $agent['sla_response_minutes'] ?? $slaOngoingResponse;
-                                $slaRespRate = $agent['sla_response_rate'] ?? 0;
-                                $avgResponseSeconds = $agent['avg_response_seconds'] ?? 0;
-                                $avgResponseMinutes = $agent['avg_response_minutes'] ?? 0;
-                                $totalResponses = $agent['total_responses'] ?? 0;
-                                $responsesWithinSla = $agent['responses_within_sla'] ?? 0;
-                                $responsesOutsideSla = $totalResponses - $responsesWithinSla;
-                                
-                                // Definir status SLA Respostas
-                                if ($totalResponses == 0) {
-                                    $sla2Status = 'secondary';
-                                    $sla2Icon = 'minus-circle';
-                                    $sla2Label = 'N/A';
-                                } elseif ($slaRespRate >= 80) {
-                                    $sla2Status = 'success';
-                                    $sla2Icon = 'check-circle';
-                                    $sla2Label = 'Excelente';
-                                } elseif ($slaRespRate >= 50) {
-                                    $sla2Status = 'warning';
-                                    $sla2Icon = 'information-circle';
-                                    $sla2Label = 'Regular';
-                                } else {
-                                    $sla2Status = 'danger';
-                                    $sla2Icon = 'cross-circle';
-                                    $sla2Label = 'Crítico';
-                                }
-                                
-                                $isRespOnTime = $avgResponseMinutes <= $slaRespMinutes;
-                                ?>
-                                <div class="mb-2">
-                                    <div class="d-flex align-items-center justify-content-between mb-2">
-                                        <span class="text-muted fs-7 fw-bold">SLA Respostas (Meta: <?= $slaRespMinutes ?>min)</span>
-                                    </div>
-                                    <?php if ($totalResponses > 0): ?>
-                                    <div class="d-flex align-items-center justify-content-between mb-2 p-3 bg-light-<?= $sla2Status ?> rounded">
-                                        <div class="d-flex align-items-center">
-                                            <i class="ki-duotone ki-<?= $sla2Icon ?> fs-2x text-<?= $sla2Status ?> me-3">
-                                                <span class="path1"></span>
-                                                <span class="path2"></span>
-                                            </i>
-                                            <div>
-                                                <div class="fs-2 fw-bold text-<?= $sla2Status ?>"><?= number_format($slaRespRate, 0) ?>%</div>
-                                                <div class="fs-8 text-muted"><?= $sla2Label ?></div>
-                                            </div>
-                                        </div>
-                                        <div class="text-end">
-                                            <div class="fs-6 fw-bold text-gray-800">
-                                                <span class="text-success"><?= $responsesWithinSla ?></span>
-                                                <span class="text-muted">/</span>
-                                                <span class="text-gray-600"><?= $totalResponses ?></span>
-                                            </div>
-                                            <div class="fs-8 text-muted">no prazo</div>
-                                        </div>
-                                    </div>
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <span class="text-muted fs-8">Tempo médio:</span>
-                                        <span class="fw-bold fs-7 <?= $isRespOnTime ? 'text-success' : 'text-danger' ?>">
-                                            <?php
-                                            if ($avgResponseSeconds > 0) {
-                                                if ($avgResponseSeconds < 60) {
-                                                    echo number_format($avgResponseSeconds, 0) . 's';
-                                                } elseif ($avgResponseMinutes < 60) {
-                                                    echo number_format($avgResponseMinutes, 1) . 'min';
-                                                } else {
-                                                    echo number_format($avgResponseMinutes / 60, 1) . 'h';
-                                                }
-                                                echo $isRespOnTime ? ' ✓' : ' ✗';
-                                            } else {
-                                                echo '-';
-                                            }
-                                            ?>
+                                <td class="text-center">
+                                    <?php if ($sla2Total > 0): ?>
+                                    <div class="d-flex flex-column align-items-center">
+                                        <span class="badge badge-light-<?= $sla2Color ?> fs-7 fw-bold px-3 py-2">
+                                            <?= number_format($sla2Rate, 0) ?>%
                                         </span>
+                                        <span class="text-muted fs-8 mt-1"><?= $sla2Within ?>/<?= $sla2Total ?></span>
                                     </div>
-                                    <?php if ($responsesOutsideSla > 0): ?>
-                                    <div class="alert alert-warning d-flex align-items-center p-2 mt-2 mb-0">
-                                        <i class="ki-duotone ki-information fs-2x text-warning me-2">
-                                            <span class="path1"></span>
-                                            <span class="path2"></span>
-                                            <span class="path3"></span>
-                                        </i>
-                                        <span class="fs-8 fw-semibold"><?= $responsesOutsideSla ?> resposta<?= $responsesOutsideSla > 1 ? 's' : '' ?> fora do SLA</span>
-                                    </div>
-                                    <?php endif; ?>
                                     <?php else: ?>
-                                    <div class="text-center text-muted fs-7 py-3">
-                                        <i class="ki-duotone ki-information-2 fs-2x mb-2">
+                                    <span class="text-muted fs-7">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                
+                                <!-- Tempo Médio -->
+                                <td class="text-center">
+                                    <span class="fw-bold text-gray-800"><?= $avgRespFormatted ?></span>
+                                </td>
+                                
+                                <!-- Resolução -->
+                                <td class="text-center">
+                                    <span class="badge badge-light-<?= $resColor ?> fs-8">
+                                        <?= number_format($resolutionRate, 0) ?>%
+                                    </span>
+                                </td>
+                                
+                                <!-- Ações -->
+                                <td class="text-center pe-4">
+                                    <a href="<?= \App\Helpers\Url::to('/agent-performance/agent?id=' . $agent['agent_id']) ?>" 
+                                       class="btn btn-sm btn-icon btn-light-primary" 
+                                       title="Ver detalhes">
+                                        <i class="ki-duotone ki-eye fs-4">
                                             <span class="path1"></span>
                                             <span class="path2"></span>
                                             <span class="path3"></span>
                                         </i>
-                                        <div>Sem respostas no período</div>
-                                    </div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <?php endforeach; ?>
+                                    </a>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
+                
+                <!-- Legenda -->
+                <div class="d-flex flex-wrap gap-4 mt-4 pt-4 border-top">
+                    <div class="d-flex align-items-center">
+                        <span class="bullet bullet-dot bg-success me-2 h-8px w-8px"></span>
+                        <span class="text-muted fs-8">Online</span>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <span class="bullet bullet-dot bg-warning me-2 h-8px w-8px"></span>
+                        <span class="text-muted fs-8">Ocupado</span>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <span class="bullet bullet-dot bg-info me-2 h-8px w-8px"></span>
+                        <span class="text-muted fs-8">Ausente</span>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <span class="bullet bullet-dot bg-gray-400 me-2 h-8px w-8px"></span>
+                        <span class="text-muted fs-8">Offline</span>
+                    </div>
+                    <div class="border-start ps-4 d-flex align-items-center">
+                        <span class="badge badge-light-success badge-sm me-2">80%+</span>
+                        <span class="text-muted fs-8">Excelente</span>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <span class="badge badge-light-warning badge-sm me-2">50-79%</span>
+                        <span class="text-muted fs-8">Regular</span>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <span class="badge badge-light-danger badge-sm me-2">&lt;50%</span>
+                        <span class="text-muted fs-8">Crítico</span>
+                    </div>
+                </div>
+                
                 <?php else: ?>
-                    <div class="text-muted fs-7">Sem métricas de agentes para o período.</div>
+                <div class="text-center py-10">
+                    <i class="ki-duotone ki-people fs-4x text-gray-400 mb-4">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                        <span class="path4"></span>
+                        <span class="path5"></span>
+                    </i>
+                    <div class="text-muted fs-6">Sem métricas de agentes para o período selecionado</div>
+                </div>
                 <?php endif; ?>
             </div>
         </div>
     </div>
 </div>
-<!--end::Row-->
+<!--end::Desempenho dos Agentes-->
 
 <!--begin::Row - Métricas de Times-->
 <?php $teamsMetricsCount = is_array($teamsMetrics) ? count($teamsMetrics) : 0; ?>

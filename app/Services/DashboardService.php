@@ -15,6 +15,9 @@ use App\Helpers\WorkingHoursCalculator;
 
 class DashboardService
 {
+    // Filtro de agentes atual (para uso nos métodos internos)
+    private static array $currentAgentFilter = [];
+    
     // =========================================================================
     // FUNÇÕES AUXILIARES PARA SLA (novas regras)
     // =========================================================================
@@ -159,8 +162,9 @@ class DashboardService
 
     /**
      * Obter estatísticas gerais do dashboard
+     * @param array $agentIds Array de IDs de agentes para filtrar (vazio = todos)
      */
-    public static function getGeneralStats(?int $userId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public static function getGeneralStats(?int $userId = null, ?string $dateFrom = null, ?string $dateTo = null, array $agentIds = []): array
     {
         $dateFrom = $dateFrom ?? date('Y-m-01'); // Primeiro dia do mês
         $dateTo = $dateTo ?? date('Y-m-d') . ' 23:59:59'; // Hoje até 23:59:59
@@ -170,7 +174,10 @@ class DashboardService
             $dateTo = $dateTo . ' 23:59:59';
         }
 
-        self::logDash("getGeneralStats: userId={$userId}, dateFrom={$dateFrom}, dateTo={$dateTo}");
+        self::logDash("getGeneralStats: userId={$userId}, dateFrom={$dateFrom}, dateTo={$dateTo}, agentIds=" . implode(',', $agentIds));
+        
+        // Armazenar filtro de agentes em variável estática para uso nos métodos internos
+        self::$currentAgentFilter = $agentIds;
 
         // Total de conversas
         $totalConversations = self::getTotalConversations($dateFrom, $dateTo);
@@ -545,7 +552,7 @@ class DashboardService
 
     /**
      * Obter tempo médio de primeira resposta (em minutos)
-     * ATUALIZADO: Considera working hours e cliente respondeu ao bot
+     * ATUALIZADO: Considera working hours, cliente respondeu ao bot e filtro de agentes
      */
     private static function getAverageFirstResponseTime(string $dateFrom, string $dateTo): ?array
     {
@@ -563,10 +570,20 @@ class DashboardService
                 WHERE c.created_at >= ?
                 AND c.created_at <= ?
                 AND EXISTS (SELECT 1 FROM messages m3 WHERE m3.conversation_id = c.id AND m3.sender_type = 'agent')
-                AND EXISTS (SELECT 1 FROM messages m4 WHERE m4.conversation_id = c.id AND m4.sender_type = 'contact')
-                LIMIT 500";
+                AND EXISTS (SELECT 1 FROM messages m4 WHERE m4.conversation_id = c.id AND m4.sender_type = 'contact')";
         
-        $conversations = \App\Helpers\Database::fetchAll($sql, [$dateFrom, $dateTo]);
+        $params = [$dateFrom, $dateTo];
+        
+        // Aplicar filtro de agentes se definido
+        if (!empty(self::$currentAgentFilter)) {
+            $placeholders = implode(',', array_fill(0, count(self::$currentAgentFilter), '?'));
+            $sql .= " AND c.agent_id IN ({$placeholders})";
+            $params = array_merge($params, self::$currentAgentFilter);
+        }
+        
+        $sql .= " LIMIT 500";
+        
+        $conversations = \App\Helpers\Database::fetchAll($sql, $params);
         
         $totalSeconds = 0;
         $count = 0;
@@ -609,13 +626,14 @@ class DashboardService
     
     /**
      * Obter tempo médio geral de resposta (em minutos)
-     * ATUALIZADO: Considera working hours, cliente respondeu ao bot e delay
+     * ATUALIZADO: Considera working hours, cliente respondeu ao bot, delay e filtro de agentes
      */
     private static function getAverageResponseTime(string $dateFrom, string $dateTo): ?array
     {
-        $cacheKey = "avg_response_time_v2_{$dateFrom}_{$dateTo}";
+        $agentFilter = self::$currentAgentFilter;
+        $cacheKey = "avg_response_time_v3_{$dateFrom}_{$dateTo}_" . md5(implode(',', $agentFilter));
         
-        return \App\Helpers\Cache::remember($cacheKey, 300, function() use ($dateFrom, $dateTo) {
+        return \App\Helpers\Cache::remember($cacheKey, 300, function() use ($dateFrom, $dateTo, $agentFilter) {
             $settings = ConversationSettingsService::getSettings();
             $useWorkingHours = $settings['sla']['working_hours_enabled'] ?? false;
             $delayEnabled = $settings['sla']['message_delay_enabled'] ?? true;
@@ -631,10 +649,20 @@ class DashboardService
                     WHERE c.created_at >= ?
                     AND c.created_at <= ?
                     AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'agent')
-                    AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact')
-                    LIMIT 300";
+                    AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact')";
             
-            $conversations = \App\Helpers\Database::fetchAll($sql, [$dateFrom, $dateTo]);
+            $params = [$dateFrom, $dateTo];
+            
+            // Aplicar filtro de agentes se definido
+            if (!empty($agentFilter)) {
+                $placeholders = implode(',', array_fill(0, count($agentFilter), '?'));
+                $sql .= " AND c.agent_id IN ({$placeholders})";
+                $params = array_merge($params, $agentFilter);
+            }
+            
+            $sql .= " LIMIT 300";
+            
+            $conversations = \App\Helpers\Database::fetchAll($sql, $params);
             
             $totalSeconds = 0;
             $count = 0;
@@ -706,7 +734,7 @@ class DashboardService
 
     /**
      * Obter tempo médio de primeira resposta APENAS HUMANOS (exclui IA)
-     * ATUALIZADO: Considera working hours e cliente respondeu ao bot
+     * ATUALIZADO: Considera working hours, cliente respondeu ao bot e filtro de agentes
      */
     private static function getAverageFirstResponseTimeHuman(string $dateFrom, string $dateTo): ?float
     {
@@ -727,10 +755,20 @@ class DashboardService
                     WHERE m3.conversation_id = c.id 
                     AND m3.sender_type = 'agent'
                     AND m3.ai_agent_id IS NULL
-                )
-                LIMIT 500";
+                )";
         
-        $conversations = \App\Helpers\Database::fetchAll($sql, [$dateFrom, $dateTo]);
+        $params = [$dateFrom, $dateTo];
+        
+        // Aplicar filtro de agentes se definido
+        if (!empty(self::$currentAgentFilter)) {
+            $placeholders = implode(',', array_fill(0, count(self::$currentAgentFilter), '?'));
+            $sql .= " AND c.agent_id IN ({$placeholders})";
+            $params = array_merge($params, self::$currentAgentFilter);
+        }
+        
+        $sql .= " LIMIT 500";
+        
+        $conversations = \App\Helpers\Database::fetchAll($sql, $params);
         
         $totalMinutes = 0;
         $count = 0;
@@ -764,7 +802,7 @@ class DashboardService
 
     /**
      * Obter tempo médio geral de resposta APENAS HUMANOS (exclui IA)
-     * ATUALIZADO: Considera working hours, cliente respondeu ao bot e delay
+     * ATUALIZADO: Considera working hours, cliente respondeu ao bot, delay e filtro de agentes
      */
     private static function getAverageResponseTimeHuman(string $dateFrom, string $dateTo): ?float
     {
@@ -786,10 +824,20 @@ class DashboardService
                     WHERE m.conversation_id = c.id 
                     AND m.sender_type = 'agent' 
                     AND m.ai_agent_id IS NULL
-                )
-                LIMIT 300";
+                )";
         
-        $conversations = \App\Helpers\Database::fetchAll($sql, [$dateFrom, $dateTo]);
+        $params = [$dateFrom, $dateTo];
+        
+        // Aplicar filtro de agentes se definido
+        if (!empty(self::$currentAgentFilter)) {
+            $placeholders = implode(',', array_fill(0, count(self::$currentAgentFilter), '?'));
+            $sql .= " AND c.agent_id IN ({$placeholders})";
+            $params = array_merge($params, self::$currentAgentFilter);
+        }
+        
+        $sql .= " LIMIT 300";
+        
+        $conversations = \App\Helpers\Database::fetchAll($sql, $params);
         
         $totalMinutes = 0;
         $count = 0;

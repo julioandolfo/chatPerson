@@ -29,17 +29,21 @@ class DashboardController
         $dateFrom = \App\Helpers\Request::get('date_from', date('Y-m-01'));
         $dateTo = \App\Helpers\Request::get('date_to', date('Y-m-d'));
         
+        // Filtro de agentes (array de IDs)
+        $agentsFilter = \App\Helpers\Request::get('agents', '');
+        $agentIds = !empty($agentsFilter) ? array_map('intval', explode(',', $agentsFilter)) : [];
+        
         // Garantir que dateTo inclui o dia inteiro (até 23:59:59)
         if (!str_contains($dateTo, ':')) {
             $dateTo = $dateTo . ' 23:59:59';
         }
         
-        self::logDash("Período: dateFrom={$dateFrom}, dateTo={$dateTo}");
+        self::logDash("Período: dateFrom={$dateFrom}, dateTo={$dateTo}, agents=" . implode(',', $agentIds));
         
         try {
-            // Estatísticas gerais
+            // Estatísticas gerais (com filtro de agentes)
             self::logDash("Carregando stats para userId={$userId}, dateFrom={$dateFrom}, dateTo={$dateTo}");
-            $generalStats = \App\Services\DashboardService::getGeneralStats($userId, $dateFrom, $dateTo);
+            $generalStats = \App\Services\DashboardService::getGeneralStats($userId, $dateFrom, $dateTo, $agentIds);
             self::logDash("generalStats = " . json_encode($generalStats));
             
             // Estatísticas por setor
@@ -238,6 +242,9 @@ class DashboardController
                 error_log("Erro ao carregar métricas de atendimento: " . $e->getMessage());
             }
             
+            // Lista de agentes para filtro
+            $agentsList = \App\Models\User::getSellers();
+            
             self::logDash("Passando dados para view");
             Response::view('dashboard/index', [
                 'stats' => $generalStats,
@@ -250,6 +257,7 @@ class DashboardController
                 'rankingByRevenue' => $rankingByRevenue,
                 'rankingByConversion' => $rankingByConversion,
                 'rankingByTicket' => $rankingByTicket,
+                'agentsList' => $agentsList,
                 'recentConversations' => $recentConversations,
                 'recentActivity' => $recentActivity,
                 'dateFrom' => $dateFrom,

@@ -5,16 +5,34 @@ $title = 'Dashboard';
 // Content
 ob_start();
 ?>
-<!--begin::Card - Filtros de Período-->
+<!--begin::Card - Filtros de Período e Agentes-->
 <div class="card mb-5">
     <div class="card-body">
-        <div class="d-flex align-items-center gap-3">
+        <div class="d-flex flex-wrap align-items-center gap-3">
             <label class="fw-semibold fs-6 mb-0">Período:</label>
             <input type="date" id="kt_dashboard_date_from" class="form-control form-control-solid" 
                    value="<?= htmlspecialchars($dateFrom) ?>" style="width: 150px;" />
             <span class="text-muted">até</span>
             <input type="date" id="kt_dashboard_date_to" class="form-control form-control-solid" 
                    value="<?= htmlspecialchars(date('Y-m-d', strtotime($dateTo))) ?>" style="width: 150px;" />
+            
+            <div class="separator separator-dashed mx-3 d-none d-md-block" style="height: 30px;"></div>
+            
+            <label class="fw-semibold fs-6 mb-0">Agentes:</label>
+            <select id="kt_dashboard_agents" class="form-select form-select-solid" 
+                    multiple="multiple" data-control="select2" 
+                    data-placeholder="Todos os agentes" 
+                    data-allow-clear="true"
+                    style="min-width: 250px;">
+                <?php 
+                $selectedAgents = isset($_GET['agents']) ? explode(',', $_GET['agents']) : [];
+                foreach ($agentsList ?? [] as $agent): 
+                    $isSelected = in_array($agent['id'], $selectedAgents) ? 'selected' : '';
+                ?>
+                <option value="<?= $agent['id'] ?>" <?= $isSelected ?>><?= htmlspecialchars($agent['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+            
             <button type="button" class="btn btn-sm btn-primary" onclick="loadDashboard()">
                 <i class="ki-duotone ki-magnifier fs-2">
                     <span class="path1"></span>
@@ -22,10 +40,20 @@ ob_start();
                 </i>
                 Filtrar
             </button>
+            
+            <?php if (!empty($selectedAgents)): ?>
+            <button type="button" class="btn btn-sm btn-light-danger" onclick="clearAgentFilter()">
+                <i class="ki-duotone ki-cross fs-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                Limpar Filtro
+            </button>
+            <?php endif; ?>
         </div>
     </div>
 </div>
-<!--end::Card - Filtros de Período-->
+<!--end::Card - Filtros de Período e Agentes-->
 
 <!--begin::Row-->
 <div class="row g-5 mb-5">
@@ -2972,6 +3000,24 @@ function loadDashboard() {
     const dateFrom = document.getElementById("kt_dashboard_date_from").value;
     const dateTo = document.getElementById("kt_dashboard_date_to").value;
     
+    // Obter agentes selecionados
+    const agentsSelect = document.getElementById("kt_dashboard_agents");
+    const selectedAgents = agentsSelect ? Array.from(agentsSelect.selectedOptions).map(opt => opt.value) : [];
+    
+    let url = {$dashboardUrlJson} + '?date_from=' + dateFrom + '&date_to=' + dateTo;
+    
+    if (selectedAgents.length > 0) {
+        url += '&agents=' + selectedAgents.join(',');
+    }
+    
+    window.location.href = url;
+}
+
+// Função para limpar filtro de agentes
+function clearAgentFilter() {
+    const dateFrom = document.getElementById("kt_dashboard_date_from").value;
+    const dateTo = document.getElementById("kt_dashboard_date_to").value;
+    
     window.location.href = {$dashboardUrlJson} + '?date_from=' + dateFrom + '&date_to=' + dateTo;
 }
 
@@ -2990,6 +3036,16 @@ function exportReport(format) {
 
 // Carregar gráficos quando a página carregar
 document.addEventListener("DOMContentLoaded", function() {
+    // Inicializar Select2 no filtro de agentes do dashboard
+    if ($("#kt_dashboard_agents").length) {
+        $("#kt_dashboard_agents").select2({
+            placeholder: "Todos os agentes",
+            allowClear: true,
+            width: "100%",
+            closeOnSelect: false
+        });
+    }
+    
     // ✅ NOVO: Inicializar Select2 nos filtros multiselect
     $("#chart_filter_teams").select2({
         placeholder: "Selecione times...",

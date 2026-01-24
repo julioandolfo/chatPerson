@@ -1454,6 +1454,241 @@ ob_start();
 <!--end::Row-->
 <?php endif; ?>
 
+<!--begin::Row - Métricas de Atendimento por Agente-->
+<?php 
+$attendanceAgents = $agentAttendanceMetrics['agents'] ?? [];
+$attendanceTotals = $agentAttendanceMetrics['totals'] ?? [];
+?>
+<?php if (!empty($attendanceAgents)): ?>
+<div class="row g-5 mb-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-3 mb-1">
+                        <i class="ki-duotone ki-messages fs-2 text-info me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                            <span class="path4"></span>
+                            <span class="path5"></span>
+                        </i>
+                        Desempenho de Atendimento
+                    </span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">Métricas de conversas por agente no período</span>
+                </h3>
+                <div class="card-toolbar">
+                    <!-- Cards de totais -->
+                    <div class="d-flex gap-5">
+                        <div class="border border-gray-300 border-dashed rounded min-w-80px py-2 px-3">
+                            <div class="fs-5 fw-bold text-gray-800"><?= number_format($attendanceTotals['new_conversations'] ?? 0) ?></div>
+                            <div class="fw-semibold text-muted fs-8">Novas</div>
+                        </div>
+                        <div class="border border-gray-300 border-dashed rounded min-w-80px py-2 px-3">
+                            <div class="fs-5 fw-bold text-gray-800"><?= number_format($attendanceTotals['interacted_conversations'] ?? 0) ?></div>
+                            <div class="fw-semibold text-muted fs-8">Interagidas</div>
+                        </div>
+                        <div class="border border-gray-300 border-dashed rounded min-w-80px py-2 px-3">
+                            <div class="fs-5 fw-bold text-primary"><?= number_format($attendanceTotals['total_unique_conversations'] ?? 0) ?></div>
+                            <div class="fw-semibold text-muted fs-8">Total</div>
+                        </div>
+                        <div class="border border-gray-300 border-dashed rounded min-w-100px py-2 px-3">
+                            <div class="fs-5 fw-bold text-info"><?= $attendanceTotals['avg_response_formatted'] ?? '-' ?></div>
+                            <div class="fw-semibold text-muted fs-8">Tempo Médio</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body pt-3">
+                <div class="table-responsive">
+                    <table class="table align-middle table-row-dashed fs-6 gy-5">
+                        <thead>
+                            <tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">
+                                <th class="min-w-150px">Agente</th>
+                                <th class="min-w-80px text-center">
+                                    Novas
+                                    <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" 
+                                       title="Conversas criadas no período e atribuídas ao agente"></i>
+                                </th>
+                                <th class="min-w-80px text-center">
+                                    Interagidas
+                                    <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" 
+                                       title="Conversas onde o agente enviou mensagem no período (inclui conversas anteriores)"></i>
+                                </th>
+                                <th class="min-w-80px text-center">
+                                    Total
+                                    <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" 
+                                       title="Total único de conversas (novas + interagidas, sem duplicatas)"></i>
+                                </th>
+                                <th class="min-w-100px text-center">
+                                    Tempo 1ª Resp.
+                                    <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" 
+                                       title="Tempo médio da primeira resposta do agente"></i>
+                                </th>
+                                <th class="min-w-100px text-center">
+                                    Tempo Médio
+                                    <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" 
+                                       title="Tempo médio de todas as respostas do agente"></i>
+                                </th>
+                                <th class="min-w-70px text-center">Msgs</th>
+                                <th class="min-w-80px text-center">
+                                    Msgs/Conv
+                                    <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" 
+                                       title="Média de mensagens enviadas por conversa"></i>
+                                </th>
+                                <th class="min-w-80px text-center">
+                                    Conv/Dia
+                                    <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" 
+                                       title="Média de conversas atendidas por dia"></i>
+                                </th>
+                                <th class="min-w-80px text-center">
+                                    Resolução
+                                    <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" 
+                                       title="Taxa de conversas resolvidas/fechadas"></i>
+                                </th>
+                                <th class="min-w-100px text-center">Performance</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-600 fw-semibold">
+                            <?php foreach ($attendanceAgents as $agent): ?>
+                            <?php
+                                $perfLevel = $agent['performance_level'] ?? ['color' => 'secondary', 'label' => '-'];
+                                $avgResponseColor = 'success';
+                                $avgResponseMinutes = $agent['avg_response_minutes'] ?? 0;
+                                if ($avgResponseMinutes > 15) {
+                                    $avgResponseColor = 'danger';
+                                } elseif ($avgResponseMinutes > 10) {
+                                    $avgResponseColor = 'warning';
+                                } elseif ($avgResponseMinutes > 5) {
+                                    $avgResponseColor = 'info';
+                                }
+                                
+                                $firstResponseColor = 'success';
+                                $firstResponseMinutes = $agent['avg_first_response_minutes'] ?? 0;
+                                if ($firstResponseMinutes > 10) {
+                                    $firstResponseColor = 'danger';
+                                } elseif ($firstResponseMinutes > 5) {
+                                    $firstResponseColor = 'warning';
+                                } elseif ($firstResponseMinutes > 2) {
+                                    $firstResponseColor = 'info';
+                                }
+                                
+                                $resolutionColor = 'danger';
+                                $resolutionRate = $agent['resolution_rate'] ?? 0;
+                                if ($resolutionRate >= 80) {
+                                    $resolutionColor = 'success';
+                                } elseif ($resolutionRate >= 50) {
+                                    $resolutionColor = 'warning';
+                                }
+                            ?>
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="symbol symbol-35px symbol-circle me-3">
+                                            <?php if (!empty($agent['agent_avatar'])): ?>
+                                                <img src="<?= $agent['agent_avatar'] ?>" alt="<?= htmlspecialchars($agent['agent_name']) ?>">
+                                            <?php else: ?>
+                                                <span class="symbol-label bg-light-primary text-primary fw-bold">
+                                                    <?= strtoupper(substr($agent['agent_name'] ?? '?', 0, 1)) ?>
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="d-flex flex-column">
+                                            <span class="text-gray-800 fw-bold"><?= htmlspecialchars($agent['agent_name']) ?></span>
+                                            <span class="text-muted fs-8">
+                                                <span class="badge badge-light-<?= $agent['availability_status'] === 'online' ? 'success' : ($agent['availability_status'] === 'away' ? 'warning' : 'secondary') ?> fs-9">
+                                                    <?= ucfirst($agent['availability_status'] ?? 'offline') ?>
+                                                </span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="fw-bold text-gray-800"><?= number_format($agent['new_conversations'] ?? 0) ?></span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="fw-bold text-gray-800"><?= number_format($agent['interacted_conversations'] ?? 0) ?></span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge badge-light-primary fs-6 fw-bold"><?= number_format($agent['total_unique_conversations'] ?? 0) ?></span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge badge-light-<?= $firstResponseColor ?> fs-7">
+                                        <?= $agent['avg_first_response_formatted'] ?? '-' ?>
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge badge-light-<?= $avgResponseColor ?> fs-7">
+                                        <?= $agent['avg_response_formatted'] ?? '-' ?>
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="text-gray-700"><?= number_format($agent['messages_sent'] ?? 0) ?></span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="text-gray-700"><?= $agent['messages_per_conversation'] ?? 0 ?></span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="fw-bold text-gray-800"><?= $agent['conversations_per_day'] ?? 0 ?></span>
+                                </td>
+                                <td class="text-center">
+                                    <div class="d-flex align-items-center justify-content-center gap-2">
+                                        <span class="fw-bold text-<?= $resolutionColor ?>"><?= $resolutionRate ?>%</span>
+                                        <div class="progress h-4px w-40px">
+                                            <div class="progress-bar bg-<?= $resolutionColor ?>" style="width: <?= min(100, $resolutionRate) ?>%"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="d-flex flex-column align-items-center">
+                                        <span class="badge badge-light-<?= $perfLevel['color'] ?> fs-7 mb-1"><?= $perfLevel['label'] ?></span>
+                                        <div class="d-flex align-items-center gap-1">
+                                            <span class="fs-8 text-muted"><?= $agent['performance_score'] ?? 0 ?>/100</span>
+                                            <div class="progress h-3px w-30px">
+                                                <div class="progress-bar bg-<?= $perfLevel['color'] ?>" style="width: <?= $agent['performance_score'] ?? 0 ?>%"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Legenda -->
+                <div class="border-top pt-4 mt-4">
+                    <div class="d-flex flex-wrap gap-4 fs-8 text-muted">
+                        <div class="d-flex align-items-center">
+                            <span class="bullet bullet-dot bg-success me-2"></span>
+                            Tempo resposta: &lt;5min (ótimo)
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <span class="bullet bullet-dot bg-info me-2"></span>
+                            5-10min (bom)
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <span class="bullet bullet-dot bg-warning me-2"></span>
+                            10-15min (regular)
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <span class="bullet bullet-dot bg-danger me-2"></span>
+                            &gt;15min (atenção)
+                        </div>
+                        <span class="separator separator-dashed"></span>
+                        <div class="d-flex align-items-center">
+                            <strong class="me-1">Performance:</strong>
+                            Combinação de tempo de resposta, resolução, volume e consistência
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+<!--end::Row - Métricas de Atendimento-->
+
 <?php if (!empty($rankingByRevenue) || !empty($rankingByConversion) || !empty($rankingByTicket)): ?>
 <!--begin::Row - Rankings de Vendas-->
 <div class="row g-5 g-xl-10 mb-5 mb-xl-10">

@@ -1703,5 +1703,398 @@ class DashboardService
             ]);
         }); // ✅ Fim do Cache::remember
     }
+    
+    /**
+     * Obter métricas de atendimento de conversas por agente
+     * Retorna dados para dashboard de desempenho de atendimento
+     * 
+     * Métricas incluídas:
+     * - Conversas novas (criadas no período e atribuídas ao agente)
+     * - Conversas interagidas (agente enviou mensagem no período)
+     * - Total de conversas (novas + interagidas únicas)
+     * - Tempo médio de resposta
+     * - Métricas adicionais de desempenho
+     */
+    public static function getAgentAttendanceMetrics(?string $dateFrom = null, ?string $dateTo = null): array
+    {
+        $dateFrom = $dateFrom ?? date('Y-m-01');
+        $dateTo = $dateTo ?? date('Y-m-d') . ' 23:59:59';
+        
+        // Garantir que dateTo inclui o dia inteiro
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
+        
+        self::logDash("getAgentAttendanceMetrics: dateFrom={$dateFrom}, dateTo={$dateTo}");
+        
+        // ✅ Cache de 3 minutos
+        $cacheKey = "dashboard_agent_attendance_metrics_" . md5($dateFrom . $dateTo);
+        return \App\Helpers\Cache::remember($cacheKey, 180, function() use ($dateFrom, $dateTo) {
+            
+            // Buscar todos os agentes ativos (humanos)
+            $sqlAgents = "SELECT id, name, avatar, availability_status 
+                          FROM users 
+                          WHERE role IN ('agent', 'admin', 'supervisor') 
+                          AND status = 'active'
+                          ORDER BY name ASC";
+            
+            $agents = \App\Helpers\Database::fetchAll($sqlAgents);
+            
+            $result = [];
+            $totals = [
+                'new_conversations' => 0,
+                'interacted_conversations' => 0,
+                'total_unique_conversations' => 0,
+                'total_messages_sent' => 0,
+                'total_response_time_seconds' => 0,
+                'response_count' => 0
+            ];
+            
+            foreach ($agents as $agent) {
+                $agentId = $agent['id'];
+                
+                // 1. Conversas NOVAS no período (atribuídas ao agente no período)
+                // Considera conversas onde o agente foi atribuído dentro do período
+                $sqlNewConversations = "SELECT COUNT(DISTINCT c.id) as total
+                    FROM conversations c
+                    WHERE c.agent_id = ?
+                    AND c.created_at >= ?
+                    AND c.created_at <= ?";
+                
+                $newConvResult = \App\Helpers\Database::fetch($sqlNewConversations, [$agentId, $dateFrom, $dateTo]);
+                $newConversations = (int)($newConvResult['total'] ?? 0);
+                
+                // 2. Conversas INTERAGIDAS no período (agente enviou mensagem no período)
+                // Inclui conversas criadas antes do período mas que tiveram interação
+                $sqlInteractedConversations = "SELECT COUNT(DISTINCT c.id) as total
+                    FROM conversations c
+                    INNER JOIN messages m ON m.conversation_id = c.id
+                    WHERE m.sender_type = 'agent'
+                    AND m.sender_id = ?
+                    AND m.ai_agent_id IS NULL
+                    AND m.created_at >= ?
+                    AND m.created_at <= ?";
+                
+                $interactedResult = \App\Helpers\Database::fetch($sqlInteractedConversations, [$agentId, $dateFrom, $dateTo]);
+                $interactedConversations = (int)($interactedResult['total'] ?? 0);
+                
+                // 3. Total de conversas ÚNICAS (união de novas + interagidas)
+                $sqlTotalUnique = "SELECT COUNT(DISTINCT conversation_id) as total FROM (
+                    -- Conversas novas
+                    SELECT c.id as conversation_id
+                    FROM conversations c
+                    WHERE c.agent_id = ?
+                    AND c.created_at >= ?
+                    AND c.created_at <= ?
+                    
+                    UNION
+                    
+                    -- Conversas interagidas
+                    SELECT DISTINCT m.conversation_id
+                    FROM messages m
+                    WHERE m.sender_type = 'agent'
+                    AND m.sender_id = ?
+                    AND m.ai_agent_id IS NULL
+                    AND m.created_at >= ?
+                    AND m.created_at <= ?
+                ) as all_conversations";
+                
+                $totalUniqueResult = \App\Helpers\Database::fetch($sqlTotalUnique, [
+                    $agentId, $dateFrom, $dateTo,
+                    $agentId, $dateFrom, $dateTo
+                ]);
+                $totalUniqueConversations = (int)($totalUniqueResult['total'] ?? 0);
+                
+                // 4. Total de mensagens enviadas pelo agente no período
+                $sqlMessagesSent = "SELECT COUNT(*) as total
+                    FROM messages m
+                    WHERE m.sender_type = 'agent'
+                    AND m.sender_id = ?
+                    AND m.ai_agent_id IS NULL
+                    AND m.created_at >= ?
+                    AND m.created_at <= ?";
+                
+                $messagesSentResult = \App\Helpers\Database::fetch($sqlMessagesSent, [$agentId, $dateFrom, $dateTo]);
+                $messagesSent = (int)($messagesSentResult['total'] ?? 0);
+                
+                // 5. Tempo médio de resposta (em segundos)
+                // Calcula o tempo entre mensagem do cliente e resposta do agente
+                $sqlAvgResponseTime = "SELECT 
+                        AVG(response_time_seconds) as avg_seconds,
+                        COUNT(*) as response_count
+                    FROM (
+                        SELECT 
+                            TIMESTAMPDIFF(SECOND, m1.created_at, m2.created_at) as response_time_seconds
+                        FROM messages m1
+                        INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
+                            AND m2.sender_type = 'agent'
+                            AND m2.sender_id = ?
+                            AND m2.ai_agent_id IS NULL
+                            AND m2.created_at > m1.created_at
+                            AND m2.created_at = (
+                                SELECT MIN(m3.created_at)
+                                FROM messages m3
+                                WHERE m3.conversation_id = m1.conversation_id
+                                AND m3.sender_type = 'agent'
+                                AND m3.sender_id = ?
+                                AND m3.ai_agent_id IS NULL
+                                AND m3.created_at > m1.created_at
+                            )
+                        WHERE m1.sender_type = 'contact'
+                        AND m1.created_at >= ?
+                        AND m1.created_at <= ?
+                        HAVING response_time_seconds IS NOT NULL AND response_time_seconds > 0 AND response_time_seconds < 86400
+                    ) as response_times";
+                
+                $avgResponseResult = \App\Helpers\Database::fetch($sqlAvgResponseTime, [
+                    $agentId, $agentId, $dateFrom, $dateTo
+                ]);
+                
+                $avgResponseSeconds = (float)($avgResponseResult['avg_seconds'] ?? 0);
+                $responseCount = (int)($avgResponseResult['response_count'] ?? 0);
+                
+                // 6. Tempo médio de primeira resposta
+                $sqlFirstResponse = "SELECT 
+                        AVG(first_response_seconds) as avg_seconds
+                    FROM (
+                        SELECT 
+                            TIMESTAMPDIFF(SECOND, 
+                                (SELECT MIN(m1.created_at) FROM messages m1 
+                                 WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact'),
+                                (SELECT MIN(m2.created_at) FROM messages m2 
+                                 WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent' 
+                                 AND m2.sender_id = ? AND m2.ai_agent_id IS NULL)
+                            ) as first_response_seconds
+                        FROM conversations c
+                        WHERE c.agent_id = ?
+                        AND c.created_at >= ?
+                        AND c.created_at <= ?
+                        AND EXISTS (SELECT 1 FROM messages m3 WHERE m3.conversation_id = c.id AND m3.sender_type = 'agent' AND m3.sender_id = ? AND m3.ai_agent_id IS NULL)
+                        AND EXISTS (SELECT 1 FROM messages m4 WHERE m4.conversation_id = c.id AND m4.sender_type = 'contact')
+                        HAVING first_response_seconds IS NOT NULL AND first_response_seconds > 0 AND first_response_seconds < 86400
+                    ) as first_responses";
+                
+                $firstResponseResult = \App\Helpers\Database::fetch($sqlFirstResponse, [
+                    $agentId, $agentId, $dateFrom, $dateTo, $agentId
+                ]);
+                
+                $avgFirstResponseSeconds = (float)($firstResponseResult['avg_seconds'] ?? 0);
+                
+                // 7. Taxa de resolução (conversas fechadas/resolvidas)
+                $sqlResolved = "SELECT 
+                        COUNT(DISTINCT CASE WHEN c.status IN ('closed', 'resolved') THEN c.id END) as resolved,
+                        COUNT(DISTINCT c.id) as total
+                    FROM conversations c
+                    WHERE c.agent_id = ?
+                    AND c.created_at >= ?
+                    AND c.created_at <= ?";
+                
+                $resolvedResult = \App\Helpers\Database::fetch($sqlResolved, [$agentId, $dateFrom, $dateTo]);
+                $resolvedConversations = (int)($resolvedResult['resolved'] ?? 0);
+                $resolutionRate = $newConversations > 0 
+                    ? round(($resolvedConversations / $newConversations) * 100, 1) 
+                    : 0;
+                
+                // Formatar tempo médio de resposta
+                $avgResponseMinutes = $avgResponseSeconds > 0 ? round($avgResponseSeconds / 60, 1) : 0;
+                $avgFirstResponseMinutes = $avgFirstResponseSeconds > 0 ? round($avgFirstResponseSeconds / 60, 1) : 0;
+                
+                // Formatar tempo para exibição
+                $avgResponseFormatted = self::formatDuration($avgResponseSeconds);
+                $avgFirstResponseFormatted = self::formatDuration($avgFirstResponseSeconds);
+                
+                // Calcular conversas por dia
+                $daysDiff = max(1, (strtotime($dateTo) - strtotime($dateFrom)) / 86400);
+                $conversationsPerDay = round($totalUniqueConversations / $daysDiff, 1);
+                
+                // Calcular mensagens por conversa
+                $messagesPerConversation = $totalUniqueConversations > 0 
+                    ? round($messagesSent / $totalUniqueConversations, 1) 
+                    : 0;
+                
+                // Determinar classificação de performance
+                $performanceScore = self::calculatePerformanceScore(
+                    $avgResponseMinutes,
+                    $resolutionRate,
+                    $totalUniqueConversations,
+                    $conversationsPerDay
+                );
+                
+                // Adicionar ao resultado
+                $result[] = [
+                    'agent_id' => $agentId,
+                    'agent_name' => $agent['name'],
+                    'agent_avatar' => $agent['avatar'],
+                    'availability_status' => $agent['availability_status'],
+                    
+                    // Métricas principais solicitadas
+                    'new_conversations' => $newConversations,
+                    'interacted_conversations' => $interactedConversations,
+                    'total_unique_conversations' => $totalUniqueConversations,
+                    
+                    // Tempo de resposta
+                    'avg_response_seconds' => round($avgResponseSeconds, 0),
+                    'avg_response_minutes' => $avgResponseMinutes,
+                    'avg_response_formatted' => $avgResponseFormatted,
+                    
+                    // Tempo de primeira resposta
+                    'avg_first_response_seconds' => round($avgFirstResponseSeconds, 0),
+                    'avg_first_response_minutes' => $avgFirstResponseMinutes,
+                    'avg_first_response_formatted' => $avgFirstResponseFormatted,
+                    
+                    // Métricas adicionais
+                    'messages_sent' => $messagesSent,
+                    'messages_per_conversation' => $messagesPerConversation,
+                    'resolved_conversations' => $resolvedConversations,
+                    'resolution_rate' => $resolutionRate,
+                    'conversations_per_day' => $conversationsPerDay,
+                    
+                    // Performance
+                    'performance_score' => $performanceScore,
+                    'performance_level' => self::getPerformanceLevel($performanceScore)
+                ];
+                
+                // Acumular totais
+                $totals['new_conversations'] += $newConversations;
+                $totals['interacted_conversations'] += $interactedConversations;
+                $totals['total_unique_conversations'] += $totalUniqueConversations;
+                $totals['total_messages_sent'] += $messagesSent;
+                if ($avgResponseSeconds > 0) {
+                    $totals['total_response_time_seconds'] += $avgResponseSeconds * $responseCount;
+                    $totals['response_count'] += $responseCount;
+                }
+            }
+            
+            // Ordenar por total de conversas (decrescente)
+            usort($result, function($a, $b) {
+                return $b['total_unique_conversations'] <=> $a['total_unique_conversations'];
+            });
+            
+            // Calcular médias totais
+            $avgTotalResponseSeconds = $totals['response_count'] > 0 
+                ? round($totals['total_response_time_seconds'] / $totals['response_count'], 0)
+                : 0;
+            
+            return [
+                'agents' => $result,
+                'totals' => [
+                    'new_conversations' => $totals['new_conversations'],
+                    'interacted_conversations' => $totals['interacted_conversations'],
+                    'total_unique_conversations' => $totals['total_unique_conversations'],
+                    'total_messages_sent' => $totals['total_messages_sent'],
+                    'avg_response_seconds' => $avgTotalResponseSeconds,
+                    'avg_response_formatted' => self::formatDuration($avgTotalResponseSeconds),
+                    'agents_count' => count($result)
+                ],
+                'period' => [
+                    'from' => $dateFrom,
+                    'to' => $dateTo
+                ]
+            ];
+        }); // ✅ Fim do Cache::remember
+    }
+    
+    /**
+     * Formatar duração em segundos para string legível
+     */
+    private static function formatDuration(float $seconds): string
+    {
+        if ($seconds <= 0) {
+            return '-';
+        }
+        
+        if ($seconds < 60) {
+            return round($seconds) . 's';
+        }
+        
+        $minutes = floor($seconds / 60);
+        $remainingSeconds = round($seconds % 60);
+        
+        if ($minutes < 60) {
+            if ($remainingSeconds > 0) {
+                return "{$minutes}m {$remainingSeconds}s";
+            }
+            return "{$minutes}m";
+        }
+        
+        $hours = floor($minutes / 60);
+        $remainingMinutes = $minutes % 60;
+        
+        if ($remainingMinutes > 0) {
+            return "{$hours}h {$remainingMinutes}m";
+        }
+        return "{$hours}h";
+    }
+    
+    /**
+     * Calcular score de performance do agente (0-100)
+     */
+    private static function calculatePerformanceScore(
+        float $avgResponseMinutes,
+        float $resolutionRate,
+        int $totalConversations,
+        float $conversationsPerDay
+    ): int {
+        $score = 0;
+        
+        // Tempo de resposta (40 pontos) - quanto menor, melhor
+        if ($avgResponseMinutes > 0) {
+            if ($avgResponseMinutes <= 2) {
+                $score += 40; // Excelente
+            } elseif ($avgResponseMinutes <= 5) {
+                $score += 35; // Muito bom
+            } elseif ($avgResponseMinutes <= 10) {
+                $score += 30; // Bom
+            } elseif ($avgResponseMinutes <= 15) {
+                $score += 20; // Regular
+            } elseif ($avgResponseMinutes <= 30) {
+                $score += 10; // Precisa melhorar
+            }
+            // Acima de 30 minutos = 0 pontos
+        }
+        
+        // Taxa de resolução (30 pontos)
+        $score += min(30, round($resolutionRate * 0.3));
+        
+        // Volume de atendimento (20 pontos) - baseado em conversas por dia
+        if ($conversationsPerDay >= 20) {
+            $score += 20;
+        } elseif ($conversationsPerDay >= 15) {
+            $score += 18;
+        } elseif ($conversationsPerDay >= 10) {
+            $score += 15;
+        } elseif ($conversationsPerDay >= 5) {
+            $score += 10;
+        } elseif ($conversationsPerDay >= 1) {
+            $score += 5;
+        }
+        
+        // Consistência (10 pontos) - ter pelo menos algumas conversas
+        if ($totalConversations >= 10) {
+            $score += 10;
+        } elseif ($totalConversations >= 5) {
+            $score += 7;
+        } elseif ($totalConversations >= 1) {
+            $score += 3;
+        }
+        
+        return min(100, max(0, $score));
+    }
+    
+    /**
+     * Obter nível de performance baseado no score
+     */
+    private static function getPerformanceLevel(int $score): array
+    {
+        if ($score >= 80) {
+            return ['level' => 'excellent', 'label' => 'Excelente', 'color' => 'success'];
+        } elseif ($score >= 60) {
+            return ['level' => 'good', 'label' => 'Bom', 'color' => 'primary'];
+        } elseif ($score >= 40) {
+            return ['level' => 'regular', 'label' => 'Regular', 'color' => 'warning'];
+        } else {
+            return ['level' => 'needs_improvement', 'label' => 'A Melhorar', 'color' => 'danger'];
+        }
+    }
 }
 

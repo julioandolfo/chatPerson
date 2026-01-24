@@ -228,6 +228,15 @@ class DashboardController
             $goalsSummary = GoalService::getDashboardSummary($userId);
             $goalsOverview = GoalService::getDashboardGoalsOverview($userId, $canViewAllGoals);
             
+            // Métricas de atendimento por agente
+            $agentAttendanceMetrics = [];
+            try {
+                $agentAttendanceMetrics = \App\Services\DashboardService::getAgentAttendanceMetrics($dateFrom, str_replace(' 23:59:59', '', $dateTo));
+                self::logDash("agentAttendanceMetrics_agents_count=" . count($agentAttendanceMetrics['agents'] ?? []));
+            } catch (\Exception $e) {
+                error_log("Erro ao carregar métricas de atendimento: " . $e->getMessage());
+            }
+            
             self::logDash("Passando dados para view");
             Response::view('dashboard/index', [
                 'stats' => $generalStats,
@@ -245,7 +254,8 @@ class DashboardController
                 'dateFrom' => $dateFrom,
                 'dateTo' => $dateTo,
                 'goalsSummary' => $goalsSummary,
-                'goalsOverview' => $goalsOverview
+                'goalsOverview' => $goalsOverview,
+                'agentAttendanceMetrics' => $agentAttendanceMetrics
             ]);
         } catch (\Exception $e) {
             self::logDash("ERRO CRÍTICO: " . $e->getMessage());
@@ -285,7 +295,8 @@ class DashboardController
                     'at_risk' => 0,
                     'goals_by_level' => []
                 ],
-                'goalsOverview' => []
+                'goalsOverview' => [],
+                'agentAttendanceMetrics' => ['agents' => [], 'totals' => []]
             ]);
         }
     }

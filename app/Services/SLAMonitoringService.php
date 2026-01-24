@@ -170,15 +170,30 @@ class SLAMonitoringService
         // ========== VERIFICAR SLA DE RESPOSTA CONTÍNUA (ONGOING) ==========
         // Verifica se já houve primeira resposta e agora está aguardando nova resposta do agente
         if ($firstResponseOK && !$settings['sla']['enable_resolution_sla']) {
-            // Verificar última mensagem do contato vs última do agente
-            $lastMessages = Database::fetch(
-                "SELECT 
-                    MAX(CASE WHEN sender_type = 'contact' THEN created_at END) as last_contact,
-                    MAX(CASE WHEN sender_type = 'agent' THEN created_at END) as last_agent
-                 FROM messages 
-                 WHERE conversation_id = ?",
-                [$conversationId]
-            );
+            // Obter agente atribuído à conversa
+            $assignedAgentId = $conversation['agent_id'] ?? null;
+            
+            // Verificar última mensagem do contato vs última do agente ATRIBUÍDO
+            if ($assignedAgentId) {
+                $lastMessages = Database::fetch(
+                    "SELECT 
+                        MAX(CASE WHEN sender_type = 'contact' THEN created_at END) as last_contact,
+                        MAX(CASE WHEN sender_type = 'agent' AND sender_id = ? THEN created_at END) as last_agent
+                     FROM messages 
+                     WHERE conversation_id = ?",
+                    [$assignedAgentId, $conversationId]
+                );
+            } else {
+                // Se não há agente atribuído, considera qualquer agente
+                $lastMessages = Database::fetch(
+                    "SELECT 
+                        MAX(CASE WHEN sender_type = 'contact' THEN created_at END) as last_contact,
+                        MAX(CASE WHEN sender_type = 'agent' THEN created_at END) as last_agent
+                     FROM messages 
+                     WHERE conversation_id = ?",
+                    [$conversationId]
+                );
+            }
             
             if ($lastMessages && $lastMessages['last_contact'] && $lastMessages['last_agent']) {
                 $lastContact = new \DateTime($lastMessages['last_contact']);

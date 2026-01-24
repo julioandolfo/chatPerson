@@ -694,33 +694,71 @@ class AgentPerformanceController
             
             // Enriquecer dados com informações adicionais
             // IMPORTANTE: Recalcula usando working hours e filtra conversas dentro do SLA
+            // TAMBÉM: Considera quando o agente foi desatribuído (transferiu conversa)
             $filteredConversations = [];
             
             foreach ($conversations as &$conv) {
+                $convId = (int)$conv['id'];
+                
+                // Buscar período em que o agente estava atribuído a esta conversa
+                $assignmentPeriod = $this->getAgentAssignmentPeriod($convId, $agentId);
+                $agentAssignedAt = $assignmentPeriod['assigned_at'] ?? null;
+                $agentUnassignedAt = $assignmentPeriod['unassigned_at'] ?? null; // null = ainda atribuído
+                
                 if ($type === 'ongoing') {
                     $elapsedMinutes = $this->calculateOngoingMaxResponseMinutes(
-                        (int)$conv['id'],
+                        $convId,
                         $settings,
                         $agentId,
-                        $conv['status'] ?? null
+                        $conv['status'] ?? null,
+                        $agentUnassignedAt // Passar limite de tempo
                     );
                     $slaBaseMinutes = $slaOngoingMinutes;
                 } else {
-                    // Para tipo 'first', também usar working hours se habilitado
-                    if ($useWorkingHours && !empty($conv['first_contact_at']) && !empty($conv['first_agent_at'])) {
-                        $start = new \DateTime($conv['first_contact_at']);
-                        $end = new \DateTime($conv['first_agent_at']);
-                        $elapsedMinutes = (float)\App\Helpers\WorkingHoursCalculator::calculateMinutes($start, $end);
-                    } elseif ($useWorkingHours && !empty($conv['first_contact_at']) && empty($conv['first_agent_at'])) {
-                        // Sem resposta ainda - calcular até agora
-                        $start = new \DateTime($conv['first_contact_at']);
-                        $end = new \DateTime();
-                        $elapsedMinutes = (float)\App\Helpers\WorkingHoursCalculator::calculateMinutes($start, $end);
-                    } else {
-                        $responseSeconds = (int)($conv['response_seconds'] ?? 0);
-                        $elapsedMinutes = $responseSeconds > 0 ? round($responseSeconds / 60, 1) : 0;
+                    // Para tipo 'first', também considerar período de atribuição
+                    $startTime = !empty($conv['first_contact_at']) ? new \DateTime($conv['first_contact_at']) : null;
+                    
+                    if (!$startTime) {
+                        continue; // Sem mensagem do cliente
                     }
+                    
+                    // Se agente foi atribuído após a primeira mensagem do cliente, usar momento da atribuição
+                    if ($agentAssignedAt) {
+                        $assignedTime = new \DateTime($agentAssignedAt);
+                        if ($assignedTime > $startTime) {
+                            $startTime = $assignedTime;
+                        }
+                    }
+                    
+                    // Determinar fim: resposta do agente, transferência, ou agora
+                    if (!empty($conv['first_agent_at'])) {
+                        $endTime = new \DateTime($conv['first_agent_at']);
+                    } elseif ($agentUnassignedAt) {
+                        // Agente transferiu sem responder - usar momento da transferência
+                        $endTime = new \DateTime($agentUnassignedAt);
+                    } else {
+                        // Ainda atribuído, sem resposta
+                        $endTime = new \DateTime();
+                    }
+                    
+                    // Calcular minutos
+                    if ($useWorkingHours) {
+                        $elapsedMinutes = (float)\App\Helpers\WorkingHoursCalculator::calculateMinutes($startTime, $endTime);
+                    } else {
+                        $elapsedMinutes = max(0, ($endTime->getTimestamp() - $startTime->getTimestamp()) / 60);
+                    }
+                    
                     $slaBaseMinutes = $slaMinutes;
+                    
+                    // Se o agente transferiu antes de exceder o SLA, não mostrar
+                    if ($agentUnassignedAt && empty($conv['first_agent_at'])) {
+                        if ($elapsedMinutes <= $slaBaseMinutes) {
+                            continue; // Transferiu dentro do SLA
+                        }
+                        // Marcar como transferido
+                        $conv['status_label'] = 'Transferido s/ resposta';
+                        $conv['status_class'] = 'warning';
+                    }
                 }
 
                 // Filtrar: só incluir se realmente excedeu o SLA
@@ -735,16 +773,18 @@ class AgentPerformanceController
                     ? round(($elapsedMinutes / $slaBaseMinutes) * 100, 1)
                     : 0;
                 
-                // Status visual
-                if ($type === 'first' && empty($conv['first_agent_at'])) {
-                    $conv['status_label'] = 'Sem resposta';
-                    $conv['status_class'] = 'danger';
-                } elseif ($conv['status'] === 'closed' || $conv['status'] === 'resolved') {
-                    $conv['status_label'] = 'Fechada';
-                    $conv['status_class'] = 'secondary';
-                } else {
-                    $conv['status_label'] = $type === 'ongoing' ? 'Resposta lenta' : 'Respondida fora do SLA';
-                    $conv['status_class'] = 'warning';
+                // Status visual (se não já definido)
+                if (!isset($conv['status_label'])) {
+                    if ($type === 'first' && empty($conv['first_agent_at'])) {
+                        $conv['status_label'] = 'Sem resposta';
+                        $conv['status_class'] = 'danger';
+                    } elseif ($conv['status'] === 'closed' || $conv['status'] === 'resolved') {
+                        $conv['status_label'] = 'Fechada';
+                        $conv['status_class'] = 'secondary';
+                    } else {
+                        $conv['status_label'] = $type === 'ongoing' ? 'Resposta lenta' : 'Respondida fora do SLA';
+                        $conv['status_class'] = 'warning';
+                    }
                 }
                 
                 $filteredConversations[] = $conv;
@@ -887,10 +927,11 @@ class AgentPerformanceController
     /**
      * Calcular o maior tempo de resposta (SLA de respostas) por conversa.
      * Considera delay configurado e horário de atendimento quando habilitado.
+     * @param string|null $untilTime Limite de tempo (quando agente foi desatribuído)
      */
-    private function calculateOngoingMaxResponseMinutes(int $conversationId, array $settings, int $agentId, ?string $status = null): float
+    private function calculateOngoingMaxResponseMinutes(int $conversationId, array $settings, int $agentId, ?string $status = null, ?string $untilTime = null): float
     {
-        $intervals = $this->buildOngoingIntervals($conversationId, $settings, $agentId, $status);
+        $intervals = $this->buildOngoingIntervals($conversationId, $settings, $agentId, $status, $untilTime);
         if (!$intervals) {
             return 0;
         }
@@ -905,8 +946,9 @@ class AgentPerformanceController
 
     /**
      * Construir intervalos de resposta (cliente -> agente) para SLA contínuo.
+     * @param string|null $untilTime Limite de tempo (quando agente foi desatribuído)
      */
-    private function buildOngoingIntervals(int $conversationId, array $settings, int $agentId, ?string $status = null): array
+    private function buildOngoingIntervals(int $conversationId, array $settings, int $agentId, ?string $status = null, ?string $untilTime = null): array
     {
         $delayEnabled = $settings['sla']['message_delay_enabled'] ?? true;
         $delayMinutes = $settings['sla']['message_delay_minutes'] ?? 1;
@@ -981,21 +1023,38 @@ class AgentPerformanceController
             }
         }
         
-        // Se ficou pendente e a conversa está aberta, calcular até agora
-        if ($pendingContactAt && in_array($status, ['open', 'pending'], true)) {
-            $now = new \DateTime();
-            $minutes = $this->calculateMinutesDiff($pendingContactAt, $now, $useWorkingHours);
-            $agentName = $this->getUserNameById($lastAgentId ?? 0);
+        // Se ficou pendente, calcular até:
+        // 1. Momento da transferência (untilTime) se agente foi desatribuído
+        // 2. Agora, se conversa ainda está aberta
+        if ($pendingContactAt) {
+            $shouldCalculate = false;
+            $endTime = null;
             
-            $intervals[] = [
-                'contact_time' => $pendingContactAt->format('Y-m-d H:i:s'),
-                'contact_preview' => mb_substr($pendingContactContent ?? '', 0, 120),
-                'agent_time' => null,
-                'agent_name' => $agentName,
-                'agent_preview' => null,
-                'minutes' => round($minutes, 1),
-                'pending' => true
-            ];
+            if ($untilTime) {
+                // Agente foi desatribuído - calcular até momento da transferência
+                $endTime = new \DateTime($untilTime);
+                $shouldCalculate = true;
+            } elseif (in_array($status, ['open', 'pending'], true)) {
+                // Conversa aberta e agente ainda atribuído - calcular até agora
+                $endTime = new \DateTime();
+                $shouldCalculate = true;
+            }
+            
+            if ($shouldCalculate && $endTime) {
+                $minutes = $this->calculateMinutesDiff($pendingContactAt, $endTime, $useWorkingHours);
+                $agentName = $this->getUserNameById($lastAgentId ?? 0);
+                
+                $intervals[] = [
+                    'contact_time' => $pendingContactAt->format('Y-m-d H:i:s'),
+                    'contact_preview' => mb_substr($pendingContactContent ?? '', 0, 120),
+                    'agent_time' => null,
+                    'agent_name' => $agentName,
+                    'agent_preview' => null,
+                    'minutes' => round($minutes, 1),
+                    'pending' => true,
+                    'transferred' => $untilTime ? true : false
+                ];
+            }
         }
         
         return $intervals;
@@ -1029,5 +1088,66 @@ class AgentPerformanceController
         }
         
         return max(0, ($end->getTimestamp() - $start->getTimestamp()) / 60);
+    }
+    
+    /**
+     * Obter período em que um agente estava atribuído a uma conversa
+     * Retorna: ['assigned_at' => datetime, 'unassigned_at' => datetime|null]
+     */
+    private function getAgentAssignmentPeriod(int $conversationId, int $agentId): array
+    {
+        // Buscar primeiro assignment deste agente para esta conversa
+        $firstAssignment = \App\Helpers\Database::fetch(
+            "SELECT assigned_at 
+             FROM conversation_assignments 
+             WHERE conversation_id = ? AND agent_id = ?
+             ORDER BY assigned_at ASC
+             LIMIT 1",
+            [$conversationId, $agentId]
+        );
+        
+        if (!$firstAssignment) {
+            return ['assigned_at' => null, 'unassigned_at' => null];
+        }
+        
+        $assignedAt = $firstAssignment['assigned_at'];
+        
+        // Buscar próximo assignment de OUTRO agente após este (indica transferência)
+        $nextAssignment = \App\Helpers\Database::fetch(
+            "SELECT assigned_at 
+             FROM conversation_assignments 
+             WHERE conversation_id = ? 
+             AND agent_id != ?
+             AND assigned_at > ?
+             ORDER BY assigned_at ASC
+             LIMIT 1",
+            [$conversationId, $agentId, $assignedAt]
+        );
+        
+        $unassignedAt = $nextAssignment ? $nextAssignment['assigned_at'] : null;
+        
+        // Verificar se o agente foi reatribuído depois (volta a ser responsável)
+        if ($unassignedAt) {
+            $reAssignment = \App\Helpers\Database::fetch(
+                "SELECT assigned_at 
+                 FROM conversation_assignments 
+                 WHERE conversation_id = ? 
+                 AND agent_id = ?
+                 AND assigned_at > ?
+                 ORDER BY assigned_at ASC
+                 LIMIT 1",
+                [$conversationId, $agentId, $unassignedAt]
+            );
+            
+            // Se foi reatribuído, considerar como ainda responsável
+            if ($reAssignment) {
+                $unassignedAt = null;
+            }
+        }
+        
+        return [
+            'assigned_at' => $assignedAt,
+            'unassigned_at' => $unassignedAt
+        ];
     }
 }

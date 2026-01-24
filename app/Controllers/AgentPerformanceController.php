@@ -700,6 +700,12 @@ class AgentPerformanceController
             foreach ($conversations as &$conv) {
                 $convId = (int)$conv['id'];
                 
+                // Verificar se cliente respondeu ao BOT
+                // Se o cliente não respondeu após a última mensagem do bot, não conta SLA
+                if (!$this->hasClientRespondedToBot($convId)) {
+                    continue; // Cliente não interagiu após bot - não conta SLA
+                }
+                
                 // Buscar período em que o agente estava atribuído a esta conversa
                 $assignmentPeriod = $this->getAgentAssignmentPeriod($convId, $agentId);
                 $agentAssignedAt = $assignmentPeriod['assigned_at'] ?? null;
@@ -1112,6 +1118,48 @@ class AgentPerformanceController
         }
         
         return max(0, ($end->getTimestamp() - $start->getTimestamp()) / 60);
+    }
+    
+    /**
+     * Verificar se o cliente respondeu ao BOT/agente
+     * Retorna true se existe mensagem do cliente APÓS uma mensagem do bot/agente
+     * Isso evita contar SLA para conversas onde o cliente ainda não interagiu após o menu do bot
+     */
+    private function hasClientRespondedToBot(int $conversationId): bool
+    {
+        // Buscar a última mensagem do bot/agente
+        $lastAgentMessage = \App\Helpers\Database::fetch(
+            "SELECT created_at 
+             FROM messages 
+             WHERE conversation_id = ? 
+             AND sender_type = 'agent'
+             ORDER BY created_at DESC 
+             LIMIT 1",
+            [$conversationId]
+        );
+        
+        // Se não há mensagem de agente/bot, verificar se há mensagem de cliente
+        if (!$lastAgentMessage) {
+            // Sem resposta de bot ainda - verificar se há pelo menos uma msg de cliente
+            $hasContact = \App\Helpers\Database::fetch(
+                "SELECT 1 FROM messages WHERE conversation_id = ? AND sender_type = 'contact' LIMIT 1",
+                [$conversationId]
+            );
+            return (bool)$hasContact;
+        }
+        
+        // Verificar se existe mensagem do cliente APÓS a última do agente
+        $clientAfterAgent = \App\Helpers\Database::fetch(
+            "SELECT 1 
+             FROM messages 
+             WHERE conversation_id = ? 
+             AND sender_type = 'contact'
+             AND created_at > ?
+             LIMIT 1",
+            [$conversationId, $lastAgentMessage['created_at']]
+        );
+        
+        return (bool)$clientAfterAgent;
     }
     
     /**

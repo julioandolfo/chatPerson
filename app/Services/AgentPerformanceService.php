@@ -2,6 +2,12 @@
 /**
  * Service AgentPerformanceService
  * Cálculo de métricas e performance de agentes
+ * 
+ * REGRAS DE SLA APLICADAS:
+ * 1. Considera período de atribuição do agente
+ * 2. Não conta se cliente não respondeu ao bot
+ * 3. Considera working hours quando habilitado
+ * 4. Aplica delay mínimo de mensagem
  */
 
 namespace App\Services;
@@ -10,9 +16,54 @@ use App\Models\User;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\Activity;
+use App\Helpers\WorkingHoursCalculator;
 
 class AgentPerformanceService
 {
+    // =========================================================================
+    // FUNÇÕES AUXILIARES PARA SLA
+    // =========================================================================
+    
+    /**
+     * Verificar se cliente respondeu ao bot
+     */
+    private static function hasClientRespondedToBot(int $conversationId): bool
+    {
+        $lastAgentMessage = \App\Helpers\Database::fetch(
+            "SELECT created_at 
+             FROM messages 
+             WHERE conversation_id = ? 
+             AND sender_type = 'agent'
+             ORDER BY created_at DESC 
+             LIMIT 1",
+            [$conversationId]
+        );
+        
+        if (!$lastAgentMessage) {
+            $hasContact = \App\Helpers\Database::fetch(
+                "SELECT 1 FROM messages WHERE conversation_id = ? AND sender_type = 'contact' LIMIT 1",
+                [$conversationId]
+            );
+            return (bool)$hasContact;
+        }
+        
+        $clientAfterAgent = \App\Helpers\Database::fetch(
+            "SELECT 1 
+             FROM messages 
+             WHERE conversation_id = ? 
+             AND sender_type = 'contact'
+             AND created_at > ?
+             LIMIT 1",
+            [$conversationId, $lastAgentMessage['created_at']]
+        );
+        
+        return (bool)$clientAfterAgent;
+    }
+    
+    // =========================================================================
+    // MÉTODOS PRINCIPAIS
+    // =========================================================================
+
     /**
      * Obter estatísticas de performance do agente
      */

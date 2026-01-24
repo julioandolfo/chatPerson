@@ -3282,13 +3282,21 @@ class ConversationController
             
             // Obter SLA aplicável para esta conversa
             $slaConfig = \App\Models\SLARule::getSLAForConversation($conversation);
+            $settings = \App\Services\ConversationSettingsService::getSettings();
             
             // Obter agente atribuído à conversa
-            $assignedAgentId = $conversation['agent_id'] ?? null;
+            $assignedAgentId = (int)($conversation['agent_id'] ?? 0);
+            
+            // ========== REGRA: Verificar se cliente respondeu ao bot ==========
+            $clientRespondedToBot = $this->hasClientRespondedToBot($conversationId);
+            
+            // Buscar períodos de atribuição do agente
+            $assignmentPeriods = $assignedAgentId > 0 
+                ? $this->getAllAgentAssignmentPeriods($conversationId, $assignedAgentId)
+                : [];
             
             // Verificar se já houve primeira resposta do agente ATRIBUÍDO
-            // Se não houver agente atribuído, considera qualquer agente humano
-            if ($assignedAgentId) {
+            if ($assignedAgentId > 0) {
                 $firstAgentMessage = \App\Helpers\Database::fetch(
                     "SELECT MIN(created_at) as first_response 
                      FROM messages 
@@ -3305,28 +3313,7 @@ class ConversationController
             }
             $hasFirstResponse = !empty($firstAgentMessage['first_response']);
             
-            // Verificar última mensagem do contato e do agente ATRIBUÍDO (para SLA contínuo)
-            if ($assignedAgentId) {
-                $lastMessages = \App\Helpers\Database::fetch(
-                    "SELECT 
-                        MAX(CASE WHEN sender_type = 'contact' THEN created_at END) as last_contact,
-                        MAX(CASE WHEN sender_type = 'agent' AND sender_id = ? THEN created_at END) as last_agent
-                     FROM messages 
-                     WHERE conversation_id = ?",
-                    [$assignedAgentId, $conversationId]
-                );
-            } else {
-                $lastMessages = \App\Helpers\Database::fetch(
-                    "SELECT 
-                        MAX(CASE WHEN sender_type = 'contact' THEN created_at END) as last_contact,
-                        MAX(CASE WHEN sender_type = 'agent' THEN created_at END) as last_agent
-                     FROM messages 
-                     WHERE conversation_id = ?",
-                    [$conversationId]
-                );
-            }
-            
-            // Definir tipo de SLA (primeira resposta vs respostas contínuas)
+            // Definir tipo de SLA
             $slaType = $hasFirstResponse ? 'ongoing' : 'first';
             $slaLabel = $hasFirstResponse ? 'Respostas' : '1ª Resposta';
             $slaMinutes = $hasFirstResponse ? $slaConfig['ongoing_response_time'] : $slaConfig['first_response_time'];
@@ -3336,7 +3323,10 @@ class ConversationController
             $startTime = null;
             $isWithinSla = true;
             
-            if ($slaType === 'ongoing') {
+            // Se cliente não respondeu ao bot, SLA não conta
+            if (!$clientRespondedToBot) {
+                $shouldStart = false;
+            } elseif ($slaType === 'ongoing') {
                 $delayEnabled = ($settings['sla']['message_delay_enabled'] ?? true);
                 $delayMinutes = $settings['sla']['message_delay_minutes'] ?? 1;
                 
@@ -3344,29 +3334,61 @@ class ConversationController
                     $delayMinutes = 0;
                 }
                 
-                if (!empty($lastMessages['last_contact']) && !empty($lastMessages['last_agent'])) {
-                    $lastContact = new \DateTime($lastMessages['last_contact']);
-                    $lastAgent = new \DateTime($lastMessages['last_agent']);
-                    
-                    if ($lastContact > $lastAgent) {
-                        $diffSeconds = $lastContact->getTimestamp() - $lastAgent->getTimestamp();
-                        $diffMinutes = $diffSeconds / 60;
+                // Buscar mensagens para calcular SLA considerando período de atribuição
+                $messages = \App\Helpers\Database::fetchAll(
+                    "SELECT sender_type, sender_id, created_at
+                     FROM messages
+                     WHERE conversation_id = ?
+                     ORDER BY created_at ASC",
+                    [$conversationId]
+                );
+                
+                $lastAgentMessage = null;
+                $pendingContactMessage = null;
+                
+                foreach ($messages as $msg) {
+                    if ($msg['sender_type'] === 'agent') {
+                        // Só considerar mensagens do agente atribuído
+                        if ($assignedAgentId > 0 && (int)$msg['sender_id'] !== $assignedAgentId) {
+                            continue;
+                        }
+                        $lastAgentMessage = $msg;
+                        $pendingContactMessage = null;
                         
-                        if ($diffMinutes >= $delayMinutes) {
-                            $shouldStart = true;
-                            $startTime = $lastContact; // SLA começa na mensagem do cliente
-                            
-                            $now = new \DateTime();
-                            if ($conversation['sla_paused_at']) {
-                                $now = new \DateTime($conversation['sla_paused_at']);
-                            }
-                            
-                            $elapsedMinutes = \App\Helpers\WorkingHoursCalculator::calculateMinutes($startTime, $now);
-                            $elapsedMinutes -= (int)($conversation['sla_paused_duration'] ?? 0);
-                            $elapsedMinutes = max(0, $elapsedMinutes);
-                            $isWithinSla = $elapsedMinutes < $slaMinutes;
+                    } elseif ($msg['sender_type'] === 'contact' && $lastAgentMessage) {
+                        // Verificar período de atribuição
+                        if (!empty($assignmentPeriods) && !$this->isMessageInAgentPeriod($msg['created_at'], $assignmentPeriods)) {
+                            continue;
+                        }
+                        
+                        // Verificar delay
+                        $lastAgentTime = new \DateTime($lastAgentMessage['created_at']);
+                        $contactTime = new \DateTime($msg['created_at']);
+                        $diffMinutes = ($contactTime->getTimestamp() - $lastAgentTime->getTimestamp()) / 60;
+                        
+                        if ($diffMinutes < $delayMinutes) {
+                            continue;
+                        }
+                        
+                        if (!$pendingContactMessage) {
+                            $pendingContactMessage = $msg;
                         }
                     }
+                }
+                
+                if ($pendingContactMessage) {
+                    $shouldStart = true;
+                    $startTime = new \DateTime($pendingContactMessage['created_at']);
+                    
+                    $now = new \DateTime();
+                    if ($conversation['sla_paused_at']) {
+                        $now = new \DateTime($conversation['sla_paused_at']);
+                    }
+                    
+                    $elapsedMinutes = \App\Helpers\WorkingHoursCalculator::calculateMinutes($startTime, $now);
+                    $elapsedMinutes -= (int)($conversation['sla_paused_duration'] ?? 0);
+                    $elapsedMinutes = max(0, $elapsedMinutes);
+                    $isWithinSla = $elapsedMinutes < $slaMinutes;
                 }
             } else {
                 // SLA de 1ª resposta
@@ -3473,6 +3495,109 @@ class ConversationController
             $this->restoreAfterJsonResponse($config);
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
         }
+    }
+    
+    // =========================================================================
+    // FUNÇÕES AUXILIARES PARA SLA
+    // =========================================================================
+    
+    /**
+     * Verificar se cliente respondeu ao bot
+     */
+    private function hasClientRespondedToBot(int $conversationId): bool
+    {
+        $lastAgentMessage = \App\Helpers\Database::fetch(
+            "SELECT created_at 
+             FROM messages 
+             WHERE conversation_id = ? 
+             AND sender_type = 'agent'
+             ORDER BY created_at DESC 
+             LIMIT 1",
+            [$conversationId]
+        );
+        
+        if (!$lastAgentMessage) {
+            $hasContact = \App\Helpers\Database::fetch(
+                "SELECT 1 FROM messages WHERE conversation_id = ? AND sender_type = 'contact' LIMIT 1",
+                [$conversationId]
+            );
+            return (bool)$hasContact;
+        }
+        
+        $clientAfterAgent = \App\Helpers\Database::fetch(
+            "SELECT 1 
+             FROM messages 
+             WHERE conversation_id = ? 
+             AND sender_type = 'contact'
+             AND created_at > ?
+             LIMIT 1",
+            [$conversationId, $lastAgentMessage['created_at']]
+        );
+        
+        return (bool)$clientAfterAgent;
+    }
+    
+    /**
+     * Obter todos os períodos de atribuição de um agente
+     */
+    private function getAllAgentAssignmentPeriods(int $conversationId, int $agentId): array
+    {
+        $allAssignments = \App\Helpers\Database::fetchAll(
+            "SELECT agent_id, assigned_at 
+             FROM conversation_assignments 
+             WHERE conversation_id = ?
+             ORDER BY assigned_at ASC",
+            [$conversationId]
+        );
+        
+        if (empty($allAssignments)) {
+            return [];
+        }
+        
+        $periods = [];
+        $currentPeriodStart = null;
+        
+        foreach ($allAssignments as $assignment) {
+            $isTargetAgent = ((int)$assignment['agent_id'] === $agentId);
+            
+            if ($isTargetAgent && $currentPeriodStart === null) {
+                $currentPeriodStart = $assignment['assigned_at'];
+            } elseif (!$isTargetAgent && $currentPeriodStart !== null) {
+                $periods[] = [
+                    'assigned_at' => $currentPeriodStart,
+                    'unassigned_at' => $assignment['assigned_at']
+                ];
+                $currentPeriodStart = null;
+            }
+        }
+        
+        if ($currentPeriodStart !== null) {
+            $periods[] = [
+                'assigned_at' => $currentPeriodStart,
+                'unassigned_at' => null
+            ];
+        }
+        
+        return $periods;
+    }
+    
+    /**
+     * Verificar se mensagem está dentro do período de atribuição
+     */
+    private function isMessageInAgentPeriod(string $messageTime, array $periods): bool
+    {
+        $msgTime = strtotime($messageTime);
+        
+        foreach ($periods as $period) {
+            $start = strtotime($period['assigned_at']);
+            $end = $period['unassigned_at'] ? strtotime($period['unassigned_at']) : PHP_INT_MAX;
+            
+            if ($msgTime >= $start && $msgTime <= $end) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 }
 

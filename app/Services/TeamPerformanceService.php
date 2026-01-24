@@ -2,15 +2,65 @@
 /**
  * Service TeamPerformanceService
  * Métricas agregadas de performance de times
+ * 
+ * REGRAS DE SLA APLICADAS:
+ * 1. Considera período de atribuição do agente
+ * 2. Não conta se cliente não respondeu ao bot
+ * 3. Considera working hours quando habilitado
  */
 
 namespace App\Services;
 
 use App\Models\Team;
 use App\Helpers\Database;
+use App\Helpers\WorkingHoursCalculator;
 
 class TeamPerformanceService
 {
+    // =========================================================================
+    // FUNÇÕES AUXILIARES PARA SLA
+    // =========================================================================
+    
+    /**
+     * Verificar se cliente respondeu ao bot
+     */
+    private static function hasClientRespondedToBot(int $conversationId): bool
+    {
+        $lastAgentMessage = Database::fetch(
+            "SELECT created_at 
+             FROM messages 
+             WHERE conversation_id = ? 
+             AND sender_type = 'agent'
+             ORDER BY created_at DESC 
+             LIMIT 1",
+            [$conversationId]
+        );
+        
+        if (!$lastAgentMessage) {
+            $hasContact = Database::fetch(
+                "SELECT 1 FROM messages WHERE conversation_id = ? AND sender_type = 'contact' LIMIT 1",
+                [$conversationId]
+            );
+            return (bool)$hasContact;
+        }
+        
+        $clientAfterAgent = Database::fetch(
+            "SELECT 1 
+             FROM messages 
+             WHERE conversation_id = ? 
+             AND sender_type = 'contact'
+             AND created_at > ?
+             LIMIT 1",
+            [$conversationId, $lastAgentMessage['created_at']]
+        );
+        
+        return (bool)$clientAfterAgent;
+    }
+    
+    // =========================================================================
+    // MÉTODOS PRINCIPAIS
+    // =========================================================================
+
     /**
      * Obter estatísticas de performance do time (agregadas de todos os membros)
      */

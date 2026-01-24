@@ -17,6 +17,49 @@ use App\Helpers\WorkingHoursCalculator;
 class ConversationSettingsService
 {
     const SETTINGS_KEY = 'conversation_settings';
+    
+    // =========================================================================
+    // FUNÇÕES AUXILIARES PARA SLA
+    // =========================================================================
+    
+    /**
+     * Verificar se cliente respondeu ao bot
+     * Retorna true se existe mensagem do cliente APÓS uma mensagem do bot/agente
+     */
+    public static function hasClientRespondedToBot(int $conversationId): bool
+    {
+        $lastAgentMessage = Database::fetch(
+            "SELECT created_at 
+             FROM messages 
+             WHERE conversation_id = ? 
+             AND sender_type = 'agent'
+             ORDER BY created_at DESC 
+             LIMIT 1",
+            [$conversationId]
+        );
+        
+        if (!$lastAgentMessage) {
+            $hasContact = Database::fetch(
+                "SELECT 1 FROM messages WHERE conversation_id = ? AND sender_type = 'contact' LIMIT 1",
+                [$conversationId]
+            );
+            return (bool)$hasContact;
+        }
+        
+        $clientAfterAgent = Database::fetch(
+            "SELECT 1 
+             FROM messages 
+             WHERE conversation_id = ? 
+             AND sender_type = 'contact'
+             AND created_at > ?
+             LIMIT 1",
+            [$conversationId, $lastAgentMessage['created_at']]
+        );
+        
+        return (bool)$clientAfterAgent;
+    }
+    
+    // =========================================================================
 
     /**
      * Obter todas as configurações
@@ -862,7 +905,7 @@ class ConversationSettingsService
 
     /**
      * Verificar SLA de primeira resposta
-     * ATUALIZADO: Agora considera working hours, SLA por contexto e delay de 1 minuto
+     * ATUALIZADO: Considera working hours, SLA por contexto, delay e cliente respondeu ao bot
      */
     public static function checkFirstResponseSLA(int $conversationId, bool $humanOnly = false): bool
     {
@@ -875,6 +918,11 @@ class ConversationSettingsService
         $conversation = \App\Models\Conversation::find($conversationId);
         if (!$conversation) {
             return false;
+        }
+        
+        // ✅ REGRA: Se cliente não respondeu ao bot, SLA está OK (não conta)
+        if (!self::hasClientRespondedToBot($conversationId)) {
+            return true;
         }
         
         // Obter agente atribuído à conversa

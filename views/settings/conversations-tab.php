@@ -338,7 +338,163 @@ $tts = $cs['text_to_speech'] ?? [];
                     lunchInputs.forEach(input => input.disabled = !this.checked);
                 });
             });
+            
+            // Gerenciar feriados
+            const btnManageHolidays = document.getElementById('btn-manage-holidays');
+            if (btnManageHolidays) {
+                btnManageHolidays.addEventListener('click', function() {
+                    openHolidaysModal();
+                });
+            }
         });
+        
+        // Funções para gerenciar feriados
+        function openHolidaysModal() {
+            // Criar modal se não existir
+            let modal = document.getElementById('holidaysModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'holidaysModal';
+                modal.className = 'modal fade';
+                modal.setAttribute('tabindex', '-1');
+                modal.innerHTML = `
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3 class="modal-title">
+                                    <i class="ki-duotone ki-calendar fs-2 me-2"><span class="path1"></span><span class="path2"></span></i>
+                                    Gerenciar Feriados
+                                </h3>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-5">
+                                    <div class="d-flex justify-content-between align-items-center mb-4">
+                                        <h5 class="fw-semibold mb-0">Adicionar Novo Feriado</h5>
+                                    </div>
+                                    <div class="row g-3">
+                                        <div class="col-md-5">
+                                            <input type="text" id="holiday-name" class="form-control form-control-solid" placeholder="Nome do feriado" />
+                                        </div>
+                                        <div class="col-md-3">
+                                            <input type="date" id="holiday-date" class="form-control form-control-solid" />
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-check form-check-custom form-check-solid">
+                                                <input type="checkbox" id="holiday-recurring" class="form-check-input" />
+                                                <span class="form-check-label">Anual</span>
+                                            </label>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <button type="button" class="btn btn-primary w-100" onclick="addHoliday()">
+                                                <i class="ki-duotone ki-plus fs-4"></i> Adicionar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="separator my-5"></div>
+                                <h5 class="fw-semibold mb-4">Feriados Cadastrados</h5>
+                                <div id="holidays-list">
+                                    <div class="text-center py-5">
+                                        <span class="spinner-border spinner-border-sm"></span> Carregando...
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            }
+            
+            // Abrir modal
+            const bsModal = new bootstrap.Modal(modal);
+            bsModal.show();
+            
+            // Carregar feriados
+            loadHolidays();
+        }
+        
+        function loadHolidays() {
+            fetch('<?= \App\Helpers\Url::to('/settings/holidays') ?>')
+                .then(r => r.json())
+                .then(data => {
+                    const container = document.getElementById('holidays-list');
+                    if (!data.success || !data.holidays || data.holidays.length === 0) {
+                        container.innerHTML = '<div class="text-center text-muted py-5">Nenhum feriado cadastrado</div>';
+                        return;
+                    }
+                    
+                    let html = '<div class="table-responsive"><table class="table table-row-bordered align-middle gy-3">';
+                    html += '<thead><tr class="fw-bold text-muted bg-light"><th class="ps-4">Nome</th><th>Data</th><th>Tipo</th><th class="text-end pe-4">Ações</th></tr></thead><tbody>';
+                    
+                    data.holidays.forEach(h => {
+                        const dateFormatted = new Date(h.date + 'T00:00:00').toLocaleDateString('pt-BR');
+                        html += `<tr>
+                            <td class="ps-4">${h.name}</td>
+                            <td>${dateFormatted}</td>
+                            <td><span class="badge badge-light-${h.is_recurring ? 'primary' : 'secondary'}">${h.is_recurring ? 'Anual' : 'Único'}</span></td>
+                            <td class="text-end pe-4">
+                                <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="deleteHoliday(${h.id})">
+                                    <i class="ki-duotone ki-trash fs-5"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
+                                </button>
+                            </td>
+                        </tr>`;
+                    });
+                    
+                    html += '</tbody></table></div>';
+                    container.innerHTML = html;
+                })
+                .catch(err => {
+                    document.getElementById('holidays-list').innerHTML = '<div class="alert alert-danger">Erro ao carregar feriados</div>';
+                });
+        }
+        
+        function addHoliday() {
+            const name = document.getElementById('holiday-name').value.trim();
+            const date = document.getElementById('holiday-date').value;
+            const isRecurring = document.getElementById('holiday-recurring').checked;
+            
+            if (!name || !date) {
+                alert('Preencha o nome e a data do feriado');
+                return;
+            }
+            
+            fetch('<?= \App\Helpers\Url::to('/settings/holidays') ?>', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, date, is_recurring: isRecurring })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('holiday-name').value = '';
+                    document.getElementById('holiday-date').value = '';
+                    document.getElementById('holiday-recurring').checked = false;
+                    loadHolidays();
+                } else {
+                    alert(data.message || 'Erro ao adicionar feriado');
+                }
+            });
+        }
+        
+        function deleteHoliday(id) {
+            if (!confirm('Deseja remover este feriado?')) return;
+            
+            fetch('<?= \App\Helpers\Url::to('/settings/holidays') ?>?id=' + id, {
+                method: 'DELETE'
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    loadHolidays();
+                } else {
+                    alert(data.message || 'Erro ao remover feriado');
+                }
+            });
+        }
         </script>
         <div class="fv-row mb-7">
             <label class="d-flex align-items-center">

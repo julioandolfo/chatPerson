@@ -434,6 +434,11 @@ Router::post('/settings/sounds/test', [SoundSettingsController::class, 'testSoun
 Router::get('/settings/sounds/event/{event}', [SoundSettingsController::class, 'getSoundForEvent'], ['Authentication']);
 Router::get('/api/elevenlabs/voices', [SettingsController::class, 'getElevenLabsVoices'], ['Authentication']); // API para obter vozes do ElevenLabs
 
+// Feriados
+Router::get('/settings/holidays', [SettingsController::class, 'getHolidays'], ['Authentication']);
+Router::post('/settings/holidays', [SettingsController::class, 'saveHoliday'], ['Authentication']);
+Router::delete('/settings/holidays', [SettingsController::class, 'deleteHoliday'], ['Authentication']);
+
 // Rotas de Agentes de IA
 // IMPORTANTE: Rotas específicas DEVEM vir ANTES de rotas com parâmetros dinâmicos
 Router::get('/ai-agents/available', [ConversationController::class, 'getAvailableAIAgents'], ['Authentication']);

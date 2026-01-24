@@ -956,6 +956,109 @@ class SettingsController
     }
     
     /**
+     * Obter lista de feriados
+     */
+    public function getHolidays(): void
+    {
+        Permission::abortIfCannot('admin.settings');
+        
+        try {
+            $db = \App\Helpers\Database::getInstance();
+            
+            // Verificar se tabela existe
+            $tables = $db->query("SHOW TABLES LIKE 'holidays'")->fetchAll();
+            if (empty($tables)) {
+                Response::json(['success' => true, 'holidays' => []]);
+                return;
+            }
+            
+            $holidays = \App\Helpers\Database::fetchAll(
+                "SELECT * FROM holidays ORDER BY date ASC"
+            );
+            
+            Response::json(['success' => true, 'holidays' => $holidays]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+    
+    /**
+     * Salvar um feriado
+     */
+    public function saveHoliday(): void
+    {
+        Permission::abortIfCannot('admin.settings');
+        
+        try {
+            $data = json_decode(file_get_contents('php://input'), true);
+            
+            $name = trim($data['name'] ?? '');
+            $date = $data['date'] ?? '';
+            $isRecurring = !empty($data['is_recurring']) ? 1 : 0;
+            
+            if (empty($name) || empty($date)) {
+                Response::json(['success' => false, 'message' => 'Nome e data são obrigatórios'], 400);
+                return;
+            }
+            
+            $db = \App\Helpers\Database::getInstance();
+            
+            // Criar tabela se não existir
+            $tables = $db->query("SHOW TABLES LIKE 'holidays'")->fetchAll();
+            if (empty($tables)) {
+                $db->exec("CREATE TABLE IF NOT EXISTS holidays (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL,
+                    date DATE NOT NULL,
+                    is_recurring TINYINT(1) DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_date (date)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+            }
+            
+            // Inserir feriado
+            $stmt = $db->prepare("INSERT INTO holidays (name, date, is_recurring) VALUES (?, ?, ?)");
+            $stmt->execute([$name, $date, $isRecurring]);
+            
+            // Limpar cache do WorkingHoursCalculator
+            \App\Helpers\WorkingHoursCalculator::clearCache();
+            
+            Response::json(['success' => true, 'id' => $db->lastInsertId()]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+    
+    /**
+     * Excluir um feriado
+     */
+    public function deleteHoliday(): void
+    {
+        Permission::abortIfCannot('admin.settings');
+        
+        try {
+            $id = (int)($_GET['id'] ?? 0);
+            
+            if (!$id) {
+                Response::json(['success' => false, 'message' => 'ID não fornecido'], 400);
+                return;
+            }
+            
+            $db = \App\Helpers\Database::getInstance();
+            $stmt = $db->prepare("DELETE FROM holidays WHERE id = ?");
+            $stmt->execute([$id]);
+            
+            // Limpar cache do WorkingHoursCalculator
+            \App\Helpers\WorkingHoursCalculator::clearCache();
+            
+            Response::json(['success' => true]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+    
+    /**
      * Salvar configuração de horários de trabalho por dia da semana
      */
     private function saveWorkingHoursConfig(array $workingHours): void

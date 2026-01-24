@@ -877,23 +877,46 @@ class ConversationSettingsService
             return false;
         }
         
-        // Verificar se já houve primeira resposta do agente
+        // Obter agente atribuído à conversa
+        $assignedAgentId = $conversation['agent_id'] ?? null;
+        
+        // Verificar se já houve primeira resposta do agente ATRIBUÍDO
         if ($humanOnly) {
             // Apenas respostas de agentes humanos
-            $firstAgentMessage = Database::fetch(
-                "SELECT MIN(created_at) as first_response 
-                 FROM messages 
-                 WHERE conversation_id = ? AND sender_type = 'agent' AND ai_agent_id IS NULL",
-                [$conversationId]
-            );
+            if ($assignedAgentId) {
+                // Filtrar pelo agente atribuído
+                $firstAgentMessage = Database::fetch(
+                    "SELECT MIN(created_at) as first_response 
+                     FROM messages 
+                     WHERE conversation_id = ? AND sender_type = 'agent' AND sender_id = ? AND ai_agent_id IS NULL",
+                    [$conversationId, $assignedAgentId]
+                );
+            } else {
+                // Se não há agente atribuído, considera qualquer agente humano
+                $firstAgentMessage = Database::fetch(
+                    "SELECT MIN(created_at) as first_response 
+                     FROM messages 
+                     WHERE conversation_id = ? AND sender_type = 'agent' AND ai_agent_id IS NULL",
+                    [$conversationId]
+                );
+            }
         } else {
-            // Qualquer resposta (IA ou humano)
-            $firstAgentMessage = Database::fetch(
-                "SELECT MIN(created_at) as first_response 
-                 FROM messages 
-                 WHERE conversation_id = ? AND sender_type = 'agent'",
-                [$conversationId]
-            );
+            // Qualquer resposta (IA ou humano) - mas do agente atribuído se houver
+            if ($assignedAgentId) {
+                $firstAgentMessage = Database::fetch(
+                    "SELECT MIN(created_at) as first_response 
+                     FROM messages 
+                     WHERE conversation_id = ? AND sender_type = 'agent' AND sender_id = ?",
+                    [$conversationId, $assignedAgentId]
+                );
+            } else {
+                $firstAgentMessage = Database::fetch(
+                    "SELECT MIN(created_at) as first_response 
+                     FROM messages 
+                     WHERE conversation_id = ? AND sender_type = 'agent'",
+                    [$conversationId]
+                );
+            }
         }
         
         if ($firstAgentMessage && $firstAgentMessage['first_response']) {
@@ -926,6 +949,7 @@ class ConversationSettingsService
     /**
      * Verificar se SLA deve começar a contar (delay de 1 minuto após última mensagem do agente)
      * Evita contar mensagens automáticas, despedidas rápidas ("ok", "obrigado", etc)
+     * NOTA: Considera apenas mensagens do agente ATRIBUÍDO à conversa
      */
     public static function shouldStartSLACount(int $conversationId): bool
     {
@@ -943,19 +967,39 @@ class ConversationSettingsService
             return true;
         }
         
-        // Buscar última mensagem do agente e primeira mensagem do cliente após ela
-        $sql = "SELECT 
-                    (SELECT MAX(created_at) FROM messages 
-                     WHERE conversation_id = ? AND sender_type = 'agent') as last_agent_message,
-                    (SELECT MIN(created_at) FROM messages 
-                     WHERE conversation_id = ? AND sender_type = 'contact' 
-                     AND created_at > COALESCE(
-                         (SELECT MAX(created_at) FROM messages 
-                          WHERE conversation_id = ? AND sender_type = 'agent'), 
-                         '1970-01-01'
-                     )) as first_contact_after_agent";
+        // Obter agente atribuído à conversa
+        $conversation = \App\Models\Conversation::find($conversationId);
+        $assignedAgentId = $conversation['agent_id'] ?? null;
         
-        $result = Database::fetch($sql, [$conversationId, $conversationId, $conversationId]);
+        // Buscar última mensagem do agente ATRIBUÍDO e primeira mensagem do cliente após ela
+        if ($assignedAgentId) {
+            $sql = "SELECT 
+                        (SELECT MAX(created_at) FROM messages 
+                         WHERE conversation_id = ? AND sender_type = 'agent' AND sender_id = ?) as last_agent_message,
+                        (SELECT MIN(created_at) FROM messages 
+                         WHERE conversation_id = ? AND sender_type = 'contact' 
+                         AND created_at > COALESCE(
+                             (SELECT MAX(created_at) FROM messages 
+                              WHERE conversation_id = ? AND sender_type = 'agent' AND sender_id = ?), 
+                             '1970-01-01'
+                         )) as first_contact_after_agent";
+            
+            $result = Database::fetch($sql, [$conversationId, $assignedAgentId, $conversationId, $conversationId, $assignedAgentId]);
+        } else {
+            // Se não há agente atribuído, considera qualquer agente
+            $sql = "SELECT 
+                        (SELECT MAX(created_at) FROM messages 
+                         WHERE conversation_id = ? AND sender_type = 'agent') as last_agent_message,
+                        (SELECT MIN(created_at) FROM messages 
+                         WHERE conversation_id = ? AND sender_type = 'contact' 
+                         AND created_at > COALESCE(
+                             (SELECT MAX(created_at) FROM messages 
+                              WHERE conversation_id = ? AND sender_type = 'agent'), 
+                             '1970-01-01'
+                         )) as first_contact_after_agent";
+            
+            $result = Database::fetch($sql, [$conversationId, $conversationId, $conversationId]);
+        }
         
         // Se não há mensagem do agente ainda, começar a contar desde a criação
         if (!$result || !$result['last_agent_message']) {
@@ -980,7 +1024,7 @@ class ConversationSettingsService
     
     /**
      * Obter momento em que SLA deve começar a contar
-     * Considera delay de 1 minuto após última mensagem do agente
+     * Considera delay de 1 minuto após última mensagem do agente ATRIBUÍDO
      */
     public static function getSLAStartTime(int $conversationId): \DateTime
     {
@@ -998,19 +1042,38 @@ class ConversationSettingsService
             return new \DateTime($conversation['created_at']);
         }
         
-        // Buscar última mensagem do agente e primeira do contato após ela
-        $sql = "SELECT 
-                    (SELECT MAX(created_at) FROM messages 
-                     WHERE conversation_id = ? AND sender_type = 'agent') as last_agent_message,
-                    (SELECT MIN(created_at) FROM messages 
-                     WHERE conversation_id = ? AND sender_type = 'contact' 
-                     AND created_at > COALESCE(
-                         (SELECT MAX(created_at) FROM messages 
-                          WHERE conversation_id = ? AND sender_type = 'agent'), 
-                         '1970-01-01'
-                     )) as first_contact_after_agent";
+        // Obter agente atribuído à conversa
+        $assignedAgentId = $conversation['agent_id'] ?? null;
         
-        $result = Database::fetch($sql, [$conversationId, $conversationId, $conversationId]);
+        // Buscar última mensagem do agente ATRIBUÍDO e primeira do contato após ela
+        if ($assignedAgentId) {
+            $sql = "SELECT 
+                        (SELECT MAX(created_at) FROM messages 
+                         WHERE conversation_id = ? AND sender_type = 'agent' AND sender_id = ?) as last_agent_message,
+                        (SELECT MIN(created_at) FROM messages 
+                         WHERE conversation_id = ? AND sender_type = 'contact' 
+                         AND created_at > COALESCE(
+                             (SELECT MAX(created_at) FROM messages 
+                              WHERE conversation_id = ? AND sender_type = 'agent' AND sender_id = ?), 
+                             '1970-01-01'
+                         )) as first_contact_after_agent";
+            
+            $result = Database::fetch($sql, [$conversationId, $assignedAgentId, $conversationId, $conversationId, $assignedAgentId]);
+        } else {
+            // Se não há agente atribuído, considera qualquer agente
+            $sql = "SELECT 
+                        (SELECT MAX(created_at) FROM messages 
+                         WHERE conversation_id = ? AND sender_type = 'agent') as last_agent_message,
+                        (SELECT MIN(created_at) FROM messages 
+                         WHERE conversation_id = ? AND sender_type = 'contact' 
+                         AND created_at > COALESCE(
+                             (SELECT MAX(created_at) FROM messages 
+                              WHERE conversation_id = ? AND sender_type = 'agent'), 
+                             '1970-01-01'
+                         )) as first_contact_after_agent";
+            
+            $result = Database::fetch($sql, [$conversationId, $conversationId, $conversationId]);
+        }
         
         // Se não há mensagem do agente, usar created_at
         if (!$result || !$result['last_agent_message']) {

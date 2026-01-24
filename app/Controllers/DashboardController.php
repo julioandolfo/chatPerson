@@ -228,10 +228,11 @@ class DashboardController
             $goalsSummary = GoalService::getDashboardSummary($userId);
             $goalsOverview = GoalService::getDashboardGoalsOverview($userId, $canViewAllGoals);
             
-            // Métricas de atendimento por agente
+            // Métricas de atendimento por agente (padrão: hoje)
             $agentAttendanceMetrics = [];
             try {
-                $agentAttendanceMetrics = \App\Services\DashboardService::getAgentAttendanceMetrics($dateFrom, str_replace(' 23:59:59', '', $dateTo));
+                $today = date('Y-m-d');
+                $agentAttendanceMetrics = \App\Services\DashboardService::getAgentAttendanceMetrics($today, $today);
                 self::logDash("agentAttendanceMetrics_agents_count=" . count($agentAttendanceMetrics['agents'] ?? []));
             } catch (\Exception $e) {
                 error_log("Erro ao carregar métricas de atendimento: " . $e->getMessage());
@@ -469,6 +470,36 @@ class DashboardController
             Response::json([
                 'success' => false,
                 'error' => 'Erro ao carregar dados do gráfico',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Obter métricas de atendimento por agente (AJAX)
+     * Retorna dados filtrados por período para atualização dinâmica
+     */
+    public function getAttendanceMetrics(): void
+    {
+        $dateFrom = \App\Helpers\Request::get('date_from', date('Y-m-d'));
+        $dateTo = \App\Helpers\Request::get('date_to', date('Y-m-d'));
+        
+        self::logDash("getAttendanceMetrics: dateFrom={$dateFrom}, dateTo={$dateTo}");
+        
+        try {
+            $metrics = \App\Services\DashboardService::getAgentAttendanceMetrics($dateFrom, $dateTo);
+            
+            self::logDash("getAttendanceMetrics: agents_count=" . count($metrics['agents'] ?? []));
+            
+            Response::json([
+                'success' => true,
+                'data' => $metrics
+            ]);
+        } catch (\Exception $e) {
+            self::logDash("ERRO getAttendanceMetrics: " . $e->getMessage());
+            Response::json([
+                'success' => false,
+                'error' => 'Erro ao carregar métricas de atendimento',
                 'message' => $e->getMessage()
             ], 500);
         }

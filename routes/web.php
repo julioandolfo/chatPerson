@@ -70,6 +70,7 @@ Router::get('/profile/sounds/custom', [ProfileController::class, 'getCustomSound
 Router::get('/dashboard', [DashboardController::class, 'index'], ['Authentication']);
 Router::get('/dashboard/ai', [DashboardController::class, 'aiDashboard'], ['Authentication']);
 Router::get('/dashboard/chart-data', [DashboardController::class, 'getChartData'], ['Authentication']);
+Router::get('/dashboard/attendance-metrics', [DashboardController::class, 'getAttendanceMetrics'], ['Authentication']);
 Router::get('/dashboard/export', [DashboardController::class, 'exportReport'], ['Authentication']);
 Router::get('/conversations', [ConversationController::class, 'index'], ['Authentication']);
 Router::get('/conversations/metrics/current-agent', [ConversationController::class, 'getCurrentAgentMetrics'], ['Authentication']);

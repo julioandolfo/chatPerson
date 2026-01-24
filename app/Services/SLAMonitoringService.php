@@ -342,23 +342,27 @@ class SLAMonitoringService
         $resolvedWithinSLA = Database::fetch($sql, [$resolutionSLA]);
         
         // =========== ESTATÍSTICAS APENAS HUMANOS (exclui IA) ===========
+        // NOTA: Considera apenas respostas do agente ATRIBUÍDO à conversa
         
-        // Conversas dentro do SLA de primeira resposta (HUMANO)
+        // Conversas dentro do SLA de primeira resposta (HUMANO - agente atribuído)
         $sqlHuman = "SELECT COUNT(*) as total
                      FROM conversations c
                      WHERE c.status IN ('open', 'pending')
+                     AND c.agent_id IS NOT NULL
+                     AND c.agent_id > 0
                      AND EXISTS (
                          SELECT 1 FROM messages m 
                          WHERE m.conversation_id = c.id 
                          AND m.sender_type = 'agent'
+                         AND m.sender_id = c.agent_id
                          AND m.ai_agent_id IS NULL
                          AND TIMESTAMPDIFF(MINUTE, c.created_at, m.created_at) <= ?
                      )";
         
         $withinSLAHuman = Database::fetch($sqlHuman, [$firstResponseSLA]);
         
-        // Conversas excedendo SLA de primeira resposta (HUMANO)
-        // Considera apenas conversas que têm agente humano atribuído mas sem resposta humana
+        // Conversas excedendo SLA de primeira resposta (HUMANO - agente atribuído)
+        // Considera apenas conversas que têm agente humano atribuído mas sem resposta DELE
         $sqlHumanExceeded = "SELECT COUNT(*) as total
                             FROM conversations c
                             WHERE c.status IN ('open', 'pending')
@@ -369,6 +373,7 @@ class SLAMonitoringService
                                 SELECT 1 FROM messages m 
                                 WHERE m.conversation_id = c.id 
                                 AND m.sender_type = 'agent'
+                                AND m.sender_id = c.agent_id
                                 AND m.ai_agent_id IS NULL
                             )";
         

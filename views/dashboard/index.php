@@ -1459,8 +1459,7 @@ ob_start();
 $attendanceAgents = $agentAttendanceMetrics['agents'] ?? [];
 $attendanceTotals = $agentAttendanceMetrics['totals'] ?? [];
 ?>
-<?php if (!empty($attendanceAgents)): ?>
-<div class="row g-5 mb-5">
+<div class="row g-5 mb-5" id="attendance-metrics-section">
     <div class="col-12">
         <div class="card">
             <div class="card-header border-0 pt-5">
@@ -1478,30 +1477,74 @@ $attendanceTotals = $agentAttendanceMetrics['totals'] ?? [];
                     <span class="text-muted mt-1 fw-semibold fs-7">Métricas de conversas por agente no período</span>
                 </h3>
                 <div class="card-toolbar">
-                    <!-- Cards de totais -->
-                    <div class="d-flex gap-5">
-                        <div class="border border-gray-300 border-dashed rounded min-w-80px py-2 px-3">
-                            <div class="fs-5 fw-bold text-gray-800"><?= number_format($attendanceTotals['new_conversations'] ?? 0) ?></div>
-                            <div class="fw-semibold text-muted fs-8">Novas</div>
+                    <div class="d-flex flex-wrap align-items-center gap-3">
+                        <!-- Filtros Rápidos de Período -->
+                        <div class="btn-group" role="group" id="attendance-period-buttons">
+                            <button type="button" class="btn btn-sm btn-light-primary active" data-period="today">Hoje</button>
+                            <button type="button" class="btn btn-sm btn-light" data-period="yesterday">Ontem</button>
+                            <button type="button" class="btn btn-sm btn-light" data-period="this_week">Esta Semana</button>
+                            <button type="button" class="btn btn-sm btn-light" data-period="this_month">Este Mês</button>
+                            <button type="button" class="btn btn-sm btn-light" data-period="last_month">Mês Anterior</button>
                         </div>
-                        <div class="border border-gray-300 border-dashed rounded min-w-80px py-2 px-3">
-                            <div class="fs-5 fw-bold text-gray-800"><?= number_format($attendanceTotals['interacted_conversations'] ?? 0) ?></div>
-                            <div class="fw-semibold text-muted fs-8">Interagidas</div>
-                        </div>
-                        <div class="border border-gray-300 border-dashed rounded min-w-80px py-2 px-3">
-                            <div class="fs-5 fw-bold text-primary"><?= number_format($attendanceTotals['total_unique_conversations'] ?? 0) ?></div>
-                            <div class="fw-semibold text-muted fs-8">Total</div>
-                        </div>
-                        <div class="border border-gray-300 border-dashed rounded min-w-100px py-2 px-3">
-                            <div class="fs-5 fw-bold text-info"><?= $attendanceTotals['avg_response_formatted'] ?? '-' ?></div>
-                            <div class="fw-semibold text-muted fs-8">Tempo Médio</div>
+                        
+                        <!-- Filtro Personalizado -->
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="date" id="attendance-date-from" class="form-control form-control-sm form-control-solid" 
+                                   value="<?= date('Y-m-d') ?>" style="width: 130px;">
+                            <span class="text-muted fs-8">até</span>
+                            <input type="date" id="attendance-date-to" class="form-control form-control-sm form-control-solid" 
+                                   value="<?= date('Y-m-d') ?>" style="width: 130px;">
+                            <button type="button" class="btn btn-sm btn-icon btn-light-primary" onclick="loadAttendanceMetrics()" title="Filtrar">
+                                <i class="ki-duotone ki-magnifier fs-4">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
+            
+            <!-- Cards de Totais -->
+            <div class="card-body py-3 border-bottom">
+                <div class="d-flex flex-wrap justify-content-center gap-5" id="attendance-totals">
+                    <div class="border border-gray-300 border-dashed rounded min-w-100px py-3 px-4 text-center">
+                        <div class="fs-4 fw-bold text-gray-800" id="total-new"><?= number_format($attendanceTotals['new_conversations'] ?? 0) ?></div>
+                        <div class="fw-semibold text-muted fs-7">Conversas Novas</div>
+                    </div>
+                    <div class="border border-gray-300 border-dashed rounded min-w-100px py-3 px-4 text-center">
+                        <div class="fs-4 fw-bold text-gray-800" id="total-interacted"><?= number_format($attendanceTotals['interacted_conversations'] ?? 0) ?></div>
+                        <div class="fw-semibold text-muted fs-7">Interagidas</div>
+                    </div>
+                    <div class="border border-gray-300 border-dashed rounded min-w-100px py-3 px-4 text-center">
+                        <div class="fs-4 fw-bold text-primary" id="total-unique"><?= number_format($attendanceTotals['total_unique_conversations'] ?? 0) ?></div>
+                        <div class="fw-semibold text-muted fs-7">Total Único</div>
+                    </div>
+                    <div class="border border-gray-300 border-dashed rounded min-w-100px py-3 px-4 text-center">
+                        <div class="fs-4 fw-bold text-success" id="total-messages"><?= number_format($attendanceTotals['total_messages_sent'] ?? 0) ?></div>
+                        <div class="fw-semibold text-muted fs-7">Mensagens</div>
+                    </div>
+                    <div class="border border-gray-300 border-dashed rounded min-w-100px py-3 px-4 text-center">
+                        <div class="fs-4 fw-bold text-info" id="total-avg-response"><?= $attendanceTotals['avg_response_formatted'] ?? '-' ?></div>
+                        <div class="fw-semibold text-muted fs-7">Tempo Médio</div>
+                    </div>
+                    <div class="border border-gray-300 border-dashed rounded min-w-80px py-3 px-4 text-center">
+                        <div class="fs-4 fw-bold text-dark" id="total-agents"><?= $attendanceTotals['agents_count'] ?? 0 ?></div>
+                        <div class="fw-semibold text-muted fs-7">Agentes</div>
+                    </div>
+                </div>
+            </div>
             <div class="card-body pt-3">
-                <div class="table-responsive">
-                    <table class="table align-middle table-row-dashed fs-6 gy-5">
+                <!-- Loading Overlay -->
+                <div id="attendance-loading" class="d-none">
+                    <div class="d-flex justify-content-center align-items-center py-10">
+                        <span class="spinner-border text-primary" role="status"></span>
+                        <span class="ms-3 text-muted">Carregando métricas...</span>
+                    </div>
+                </div>
+                
+                <div class="table-responsive" id="attendance-table-container">
+                    <table class="table align-middle table-row-dashed fs-6 gy-5" id="attendance-table">
                         <thead>
                             <tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">
                                 <th class="min-w-150px">Agente</th>
@@ -1549,7 +1592,19 @@ $attendanceTotals = $agentAttendanceMetrics['totals'] ?? [];
                                 <th class="min-w-100px text-center">Performance</th>
                             </tr>
                         </thead>
-                        <tbody class="text-gray-600 fw-semibold">
+                        <tbody class="text-gray-600 fw-semibold" id="attendance-tbody">
+                            <?php if (empty($attendanceAgents)): ?>
+                            <tr>
+                                <td colspan="11" class="text-center text-muted py-10">
+                                    <i class="ki-duotone ki-information-5 fs-2x text-gray-400 mb-3">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                    <div>Nenhum dado encontrado para o período selecionado</div>
+                                </td>
+                            </tr>
+                            <?php else: ?>
                             <?php foreach ($attendanceAgents as $agent): ?>
                             <?php
                                 $perfLevel = $agent['performance_level'] ?? ['color' => 'secondary', 'label' => '-'];
@@ -1652,6 +1707,7 @@ $attendanceTotals = $agentAttendanceMetrics['totals'] ?? [];
                                 </td>
                             </tr>
                             <?php endforeach; ?>
+                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
@@ -1686,8 +1742,160 @@ $attendanceTotals = $agentAttendanceMetrics['totals'] ?? [];
         </div>
     </div>
 </div>
-<?php endif; ?>
 <!--end::Row - Métricas de Atendimento-->
+
+<!--begin::Row - Gráfico de Conversas ao Longo do Tempo-->
+<div class="row g-5 mb-5">
+    <div class="col-xl-12">
+        <div class="card">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-3 mb-1">
+                        <i class="ki-duotone ki-graph-up fs-2 text-primary me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                            <span class="path4"></span>
+                            <span class="path5"></span>
+                            <span class="path6"></span>
+                        </i>
+                        Conversas ao Longo do Tempo
+                    </span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">
+                        Evolução de conversas <strong>novas</strong> (criadas) no período
+                        <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" 
+                           title="Este gráfico mostra CONVERSAS NOVAS criadas no período, não conversas interagidas. Para ver métricas de interação, consulte a tabela de Desempenho de Atendimento acima."></i>
+                    </span>
+                </h3>
+                <div class="card-toolbar d-flex gap-3">
+                    <!--begin::Modo de Visualização-->
+                    <div class="btn-group" role="group">
+                        <input type="radio" class="btn-check" name="chart_view_mode" id="view_mode_aggregated" value="aggregated" checked>
+                        <label class="btn btn-sm btn-light-primary" for="view_mode_aggregated" title="Agregar todos os dados">
+                            <i class="ki-duotone ki-abstract-10 fs-4">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Agregado
+                        </label>
+                        
+                        <input type="radio" class="btn-check" name="chart_view_mode" id="view_mode_comparative" value="comparative">
+                        <label class="btn btn-sm btn-light-primary" for="view_mode_comparative" title="Comparar separadamente">
+                            <i class="ki-duotone ki-chart-line-up fs-4">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Comparativo
+                        </label>
+                    </div>
+                    <!--end::Modo de Visualização-->
+                    
+                    <!--begin::Agrupamento Temporal-->
+                    <div class="btn-group" role="group">
+                        <input type="radio" class="btn-check" name="chart_group_by" id="group_by_day" value="day" checked>
+                        <label class="btn btn-sm btn-light" for="group_by_day">Dia</label>
+                        
+                        <input type="radio" class="btn-check" name="chart_group_by" id="group_by_week" value="week">
+                        <label class="btn btn-sm btn-light" for="group_by_week">Semana</label>
+                        
+                        <input type="radio" class="btn-check" name="chart_group_by" id="group_by_month" value="month">
+                        <label class="btn btn-sm btn-light" for="group_by_month">Mês</label>
+                    </div>
+                    <!--end::Agrupamento Temporal-->
+                </div>
+            </div>
+            
+            <!--begin::Card body - Filtros Avançados-->
+            <div class="card-body border-top pt-6">
+                <div class="row g-3 mb-5">
+                    <div class="col-md-3">
+                        <label class="form-label fs-7 fw-semibold mb-2">Setor:</label>
+                        <select id="chart_filter_department" class="form-select form-select-sm form-select-solid">
+                            <option value="">Todos os Setores</option>
+                            <?php
+                            $departments = \App\Models\Department::getActive();
+                            foreach ($departments as $dept):
+                            ?>
+                                <option value="<?= $dept['id'] ?>"><?= htmlspecialchars($dept['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <label class="form-label fs-7 fw-semibold mb-2">Times:</label>
+                        <select id="chart_filter_teams" class="form-select form-select-sm form-select-solid" multiple data-control="select2" data-placeholder="Selecione times...">
+                            <?php
+                            $teams = \App\Models\Team::getActive();
+                            foreach ($teams as $team):
+                            ?>
+                                <option value="<?= $team['id'] ?>"><?= htmlspecialchars($team['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <label class="form-label fs-7 fw-semibold mb-2">Agentes:</label>
+                        <select id="chart_filter_agents" class="form-select form-select-sm form-select-solid" multiple data-control="select2" data-placeholder="Selecione agentes...">
+                            <?php
+                            $agents = \App\Helpers\Database::fetchAll(
+                                "SELECT id, name FROM users WHERE role IN ('agent', 'admin', 'supervisor') AND status = 'active' ORDER BY name ASC"
+                            );
+                            foreach ($agents as $agent):
+                            ?>
+                                <option value="<?= $agent['id'] ?>"><?= htmlspecialchars($agent['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <label class="form-label fs-7 fw-semibold mb-2">Canal:</label>
+                        <select id="chart_filter_channel" class="form-select form-select-sm form-select-solid">
+                            <option value="">Todos os Canais</option>
+                            <option value="whatsapp">WhatsApp</option>
+                            <option value="instagram">Instagram</option>
+                            <option value="messenger">Messenger</option>
+                            <option value="webchat">Webchat</option>
+                            <option value="api">API</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <div class="text-muted fs-7 mb-2">
+                            <i class="ki-duotone ki-information-5 fs-6 text-primary">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            Use os filtros acima para segmentar as conversas. Este gráfico mostra apenas conversas <strong>novas</strong> (created_at).
+                        </div>
+                        <div class="text-muted fs-8">
+                            <i class="ki-duotone ki-chart-line-up fs-6 text-success">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <strong>Modo Comparativo:</strong> Selecione times ou agentes para comparar performances com legendas coloridas
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-light-primary" onclick="clearChartFilters()">
+                        <i class="ki-duotone ki-arrows-circle fs-5">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Limpar Filtros
+                    </button>
+                </div>
+                
+                <div style="position: relative; height: 300px; width: 100%;">
+                    <canvas id="kt_chart_conversations_over_time"></canvas>
+                </div>
+            </div>
+            <!--end::Card body-->
+        </div>
+    </div>
+</div>
+<!--end::Row - Gráfico de Conversas-->
 
 <?php if (!empty($rankingByRevenue) || !empty($rankingByConversion) || !empty($rankingByTicket)): ?>
 <!--begin::Row - Rankings de Vendas-->
@@ -2216,147 +2424,6 @@ document.getElementById('goals-team-filter')?.addEventListener('change', functio
 });
 </script>
 <?php endif; ?>
-
-<!--begin::Row - Gráficos-->
-<div class="row g-5 mb-5">
-    <!--begin::Col - Gráfico de Conversas ao Longo do Tempo-->
-    <div class="col-xl-12">
-        <div class="card">
-            <div class="card-header border-0 pt-5">
-                <h3 class="card-title align-items-start flex-column">
-                    <span class="card-label fw-bold fs-3 mb-1">Conversas ao Longo do Tempo</span>
-                    <span class="text-muted mt-1 fw-semibold fs-7">Evolução de conversas no período</span>
-                </h3>
-                <div class="card-toolbar d-flex gap-3">
-                    <!--begin::Modo de Visualização-->
-                    <div class="btn-group" role="group">
-                        <input type="radio" class="btn-check" name="chart_view_mode" id="view_mode_aggregated" value="aggregated" checked>
-                        <label class="btn btn-sm btn-light-primary" for="view_mode_aggregated" title="Agregar todos os dados">
-                            <i class="ki-duotone ki-abstract-10 fs-4">
-                                <span class="path1"></span>
-                                <span class="path2"></span>
-                            </i>
-                            Agregado
-                        </label>
-                        
-                        <input type="radio" class="btn-check" name="chart_view_mode" id="view_mode_comparative" value="comparative">
-                        <label class="btn btn-sm btn-light-primary" for="view_mode_comparative" title="Comparar separadamente">
-                            <i class="ki-duotone ki-chart-line-up fs-4">
-                                <span class="path1"></span>
-                                <span class="path2"></span>
-                            </i>
-                            Comparativo
-                        </label>
-                    </div>
-                    <!--end::Modo de Visualização-->
-                    
-                    <!--begin::Agrupamento Temporal-->
-                    <div class="btn-group" role="group">
-                        <input type="radio" class="btn-check" name="chart_group_by" id="group_by_day" value="day" checked>
-                        <label class="btn btn-sm btn-light" for="group_by_day">Dia</label>
-                        
-                        <input type="radio" class="btn-check" name="chart_group_by" id="group_by_week" value="week">
-                        <label class="btn btn-sm btn-light" for="group_by_week">Semana</label>
-                        
-                        <input type="radio" class="btn-check" name="chart_group_by" id="group_by_month" value="month">
-                        <label class="btn btn-sm btn-light" for="group_by_month">Mês</label>
-                    </div>
-                    <!--end::Agrupamento Temporal-->
-                </div>
-            </div>
-            
-            <!--begin::Card body - Filtros Avançados-->
-            <div class="card-body border-top pt-6">
-                <div class="row g-3 mb-5">
-                    <div class="col-md-3">
-                        <label class="form-label fs-7 fw-semibold mb-2">Setor:</label>
-                        <select id="chart_filter_department" class="form-select form-select-sm form-select-solid">
-                            <option value="">Todos os Setores</option>
-                            <?php
-                            $departments = \App\Models\Department::getActive();
-                            foreach ($departments as $dept):
-                            ?>
-                                <option value="<?= $dept['id'] ?>"><?= htmlspecialchars($dept['name']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    
-                    <div class="col-md-3">
-                        <label class="form-label fs-7 fw-semibold mb-2">Times:</label>
-                        <select id="chart_filter_teams" class="form-select form-select-sm form-select-solid" multiple data-control="select2" data-placeholder="Selecione times...">
-                            <?php
-                            $teams = \App\Models\Team::getActive();
-                            foreach ($teams as $team):
-                            ?>
-                                <option value="<?= $team['id'] ?>"><?= htmlspecialchars($team['name']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    
-                    <div class="col-md-3">
-                        <label class="form-label fs-7 fw-semibold mb-2">Agentes:</label>
-                        <select id="chart_filter_agents" class="form-select form-select-sm form-select-solid" multiple data-control="select2" data-placeholder="Selecione agentes...">
-                            <?php
-                            $agents = \App\Helpers\Database::fetchAll(
-                                "SELECT id, name FROM users WHERE role IN ('agent', 'admin', 'supervisor') AND status = 'active' ORDER BY name ASC"
-                            );
-                            foreach ($agents as $agent):
-                            ?>
-                                <option value="<?= $agent['id'] ?>"><?= htmlspecialchars($agent['name']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    
-                    <div class="col-md-3">
-                        <label class="form-label fs-7 fw-semibold mb-2">Canal:</label>
-                        <select id="chart_filter_channel" class="form-select form-select-sm form-select-solid">
-                            <option value="">Todos os Canais</option>
-                            <option value="whatsapp">WhatsApp</option>
-                            <option value="instagram">Instagram</option>
-                            <option value="messenger">Messenger</option>
-                            <option value="webchat">Webchat</option>
-                            <option value="api">API</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div>
-                        <div class="text-muted fs-7 mb-2">
-                            <i class="ki-duotone ki-information-5 fs-6 text-primary">
-                                <span class="path1"></span>
-                                <span class="path2"></span>
-                                <span class="path3"></span>
-                            </i>
-                            Use os filtros acima para segmentar as conversas
-                        </div>
-                        <div class="text-muted fs-8">
-                            <i class="ki-duotone ki-chart-line-up fs-6 text-success">
-                                <span class="path1"></span>
-                                <span class="path2"></span>
-                            </i>
-                            <strong>Modo Comparativo:</strong> Selecione times ou agentes para comparar performances com legendas coloridas
-                        </div>
-                    </div>
-                    <button type="button" class="btn btn-sm btn-light-primary" onclick="clearChartFilters()">
-                        <i class="ki-duotone ki-arrows-circle fs-5">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                        </i>
-                        Limpar Filtros
-                    </button>
-                </div>
-                
-                <div style="position: relative; height: 300px; width: 100%;">
-                    <canvas id="kt_chart_conversations_over_time"></canvas>
-                </div>
-            </div>
-            <!--end::Card body-->
-        </div>
-    </div>
-    <!--end::Col-->
-</div>
-<!--end::Row-->
 
 <!--begin::Row - Gráficos de Distribuição-->
 <div class="row g-5 mb-5">
@@ -3281,6 +3348,286 @@ function syncWooCommerceOrders() {
         });
         console.error("Erro:", error);
     });
+}
+
+// ========================================
+// MÉTRICAS DE ATENDIMENTO POR AGENTE
+// ========================================
+
+// Estado atual do período de atendimento
+let currentAttendancePeriod = 'today';
+
+// Inicializar filtros de atendimento
+document.addEventListener('DOMContentLoaded', function() {
+    initAttendanceFilters();
+});
+
+function initAttendanceFilters() {
+    const buttons = document.querySelectorAll('#attendance-period-buttons button');
+    
+    buttons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            // Atualizar estado ativo
+            buttons.forEach(b => b.classList.remove('active', 'btn-light-primary'));
+            buttons.forEach(b => b.classList.add('btn-light'));
+            this.classList.remove('btn-light');
+            this.classList.add('active', 'btn-light-primary');
+            
+            const period = this.dataset.period;
+            currentAttendancePeriod = period;
+            
+            // Calcular datas
+            const dates = calculatePeriodDates(period);
+            
+            // Atualizar inputs de data
+            document.getElementById('attendance-date-from').value = dates.from;
+            document.getElementById('attendance-date-to').value = dates.to;
+            
+            // Carregar dados
+            loadAttendanceMetrics();
+        });
+    });
+    
+    // Listener para mudança manual de datas
+    document.getElementById('attendance-date-from').addEventListener('change', function() {
+        clearPeriodButtons();
+    });
+    document.getElementById('attendance-date-to').addEventListener('change', function() {
+        clearPeriodButtons();
+    });
+}
+
+function clearPeriodButtons() {
+    const buttons = document.querySelectorAll('#attendance-period-buttons button');
+    buttons.forEach(b => {
+        b.classList.remove('active', 'btn-light-primary');
+        b.classList.add('btn-light');
+    });
+    currentAttendancePeriod = 'custom';
+}
+
+function calculatePeriodDates(period) {
+    const today = new Date();
+    let from, to;
+    
+    switch(period) {
+        case 'today':
+            from = to = formatDate(today);
+            break;
+            
+        case 'yesterday':
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            from = to = formatDate(yesterday);
+            break;
+            
+        case 'this_week':
+            const weekStart = new Date(today);
+            const dayOfWeek = today.getDay();
+            const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Segunda como início da semana
+            weekStart.setDate(today.getDate() - diff);
+            from = formatDate(weekStart);
+            to = formatDate(today);
+            break;
+            
+        case 'this_month':
+            const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+            from = formatDate(monthStart);
+            to = formatDate(today);
+            break;
+            
+        case 'last_month':
+            const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+            from = formatDate(lastMonthStart);
+            to = formatDate(lastMonthEnd);
+            break;
+            
+        default:
+            from = to = formatDate(today);
+    }
+    
+    return { from, to };
+}
+
+function formatDate(date) {
+    return date.toISOString().split('T')[0];
+}
+
+function loadAttendanceMetrics() {
+    const dateFrom = document.getElementById('attendance-date-from').value;
+    const dateTo = document.getElementById('attendance-date-to').value;
+    
+    // Mostrar loading
+    document.getElementById('attendance-loading').classList.remove('d-none');
+    document.getElementById('attendance-table-container').classList.add('d-none');
+    
+    fetch(`/dashboard/attendance-metrics?date_from=${dateFrom}&date_to=${dateTo}`)
+        .then(response => response.json())
+        .then(data => {
+            // Esconder loading
+            document.getElementById('attendance-loading').classList.add('d-none');
+            document.getElementById('attendance-table-container').classList.remove('d-none');
+            
+            if (data.success) {
+                updateAttendanceTotals(data.data.totals);
+                updateAttendanceTable(data.data.agents);
+                
+                // Re-inicializar tooltips
+                const tooltips = document.querySelectorAll('#attendance-metrics-section [data-bs-toggle="tooltip"]');
+                tooltips.forEach(t => new bootstrap.Tooltip(t));
+            } else {
+                console.error('Erro ao carregar métricas:', data.message);
+            }
+        })
+        .catch(error => {
+            document.getElementById('attendance-loading').classList.add('d-none');
+            document.getElementById('attendance-table-container').classList.remove('d-none');
+            console.error('Erro:', error);
+        });
+}
+
+function updateAttendanceTotals(totals) {
+    document.getElementById('total-new').textContent = formatNumber(totals.new_conversations || 0);
+    document.getElementById('total-interacted').textContent = formatNumber(totals.interacted_conversations || 0);
+    document.getElementById('total-unique').textContent = formatNumber(totals.total_unique_conversations || 0);
+    document.getElementById('total-messages').textContent = formatNumber(totals.total_messages_sent || 0);
+    document.getElementById('total-avg-response').textContent = totals.avg_response_formatted || '-';
+    document.getElementById('total-agents').textContent = totals.agents_count || 0;
+}
+
+function formatNumber(num) {
+    return new Intl.NumberFormat('pt-BR').format(num);
+}
+
+function updateAttendanceTable(agents) {
+    const tbody = document.getElementById('attendance-tbody');
+    
+    if (!agents || agents.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="11" class="text-center text-muted py-10">
+                    <i class="ki-duotone ki-information-5 fs-2x text-gray-400 mb-3">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div>Nenhum dado encontrado para o período selecionado</div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    let html = '';
+    
+    agents.forEach(agent => {
+        const perfLevel = agent.performance_level || {color: 'secondary', label: '-'};
+        
+        // Determinar cores
+        const avgResponseMinutes = agent.avg_response_minutes || 0;
+        let avgResponseColor = 'success';
+        if (avgResponseMinutes > 15) avgResponseColor = 'danger';
+        else if (avgResponseMinutes > 10) avgResponseColor = 'warning';
+        else if (avgResponseMinutes > 5) avgResponseColor = 'info';
+        
+        const firstResponseMinutes = agent.avg_first_response_minutes || 0;
+        let firstResponseColor = 'success';
+        if (firstResponseMinutes > 10) firstResponseColor = 'danger';
+        else if (firstResponseMinutes > 5) firstResponseColor = 'warning';
+        else if (firstResponseMinutes > 2) firstResponseColor = 'info';
+        
+        const resolutionRate = agent.resolution_rate || 0;
+        let resolutionColor = 'danger';
+        if (resolutionRate >= 80) resolutionColor = 'success';
+        else if (resolutionRate >= 50) resolutionColor = 'warning';
+        
+        const statusClass = agent.availability_status === 'online' ? 'success' : 
+                           (agent.availability_status === 'away' ? 'warning' : 'secondary');
+        
+        const avatarHtml = agent.agent_avatar 
+            ? `<img src="${agent.agent_avatar}" alt="${escapeHtml(agent.agent_name)}">`
+            : `<span class="symbol-label bg-light-primary text-primary fw-bold">${(agent.agent_name || '?').charAt(0).toUpperCase()}</span>`;
+        
+        html += `
+            <tr>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <div class="symbol symbol-35px symbol-circle me-3">
+                            ${avatarHtml}
+                        </div>
+                        <div class="d-flex flex-column">
+                            <span class="text-gray-800 fw-bold">${escapeHtml(agent.agent_name)}</span>
+                            <span class="text-muted fs-8">
+                                <span class="badge badge-light-${statusClass} fs-9">
+                                    ${capitalize(agent.availability_status || 'offline')}
+                                </span>
+                            </span>
+                        </div>
+                    </div>
+                </td>
+                <td class="text-center">
+                    <span class="fw-bold text-gray-800">${formatNumber(agent.new_conversations || 0)}</span>
+                </td>
+                <td class="text-center">
+                    <span class="fw-bold text-gray-800">${formatNumber(agent.interacted_conversations || 0)}</span>
+                </td>
+                <td class="text-center">
+                    <span class="badge badge-light-primary fs-6 fw-bold">${formatNumber(agent.total_unique_conversations || 0)}</span>
+                </td>
+                <td class="text-center">
+                    <span class="badge badge-light-${firstResponseColor} fs-7">
+                        ${agent.avg_first_response_formatted || '-'}
+                    </span>
+                </td>
+                <td class="text-center">
+                    <span class="badge badge-light-${avgResponseColor} fs-7">
+                        ${agent.avg_response_formatted || '-'}
+                    </span>
+                </td>
+                <td class="text-center">
+                    <span class="text-gray-700">${formatNumber(agent.messages_sent || 0)}</span>
+                </td>
+                <td class="text-center">
+                    <span class="text-gray-700">${agent.messages_per_conversation || 0}</span>
+                </td>
+                <td class="text-center">
+                    <span class="fw-bold text-gray-800">${agent.conversations_per_day || 0}</span>
+                </td>
+                <td class="text-center">
+                    <div class="d-flex align-items-center justify-content-center gap-2">
+                        <span class="fw-bold text-${resolutionColor}">${resolutionRate}%</span>
+                        <div class="progress h-4px w-40px">
+                            <div class="progress-bar bg-${resolutionColor}" style="width: ${Math.min(100, resolutionRate)}%"></div>
+                        </div>
+                    </div>
+                </td>
+                <td class="text-center">
+                    <div class="d-flex flex-column align-items-center">
+                        <span class="badge badge-light-${perfLevel.color} fs-7 mb-1">${perfLevel.label}</span>
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="fs-8 text-muted">${agent.performance_score || 0}/100</span>
+                            <div class="progress h-3px w-30px">
+                                <div class="progress-bar bg-${perfLevel.color}" style="width: ${agent.performance_score || 0}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+    
+    tbody.innerHTML = html;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function capitalize(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
 }
 </script>
 SCRIPT;

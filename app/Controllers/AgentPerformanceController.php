@@ -689,7 +689,13 @@ class AgentPerformanceController
                 ]);
             }
 
-            // Enriquecer dados com informações adicionais (mesma base do dashboard)
+            // Verificar se working hours está habilitado
+            $useWorkingHours = $settings['sla']['working_hours_enabled'] ?? false;
+            
+            // Enriquecer dados com informações adicionais
+            // IMPORTANTE: Recalcula usando working hours e filtra conversas dentro do SLA
+            $filteredConversations = [];
+            
             foreach ($conversations as &$conv) {
                 if ($type === 'ongoing') {
                     $elapsedMinutes = $this->calculateOngoingMaxResponseMinutes(
@@ -700,12 +706,29 @@ class AgentPerformanceController
                     );
                     $slaBaseMinutes = $slaOngoingMinutes;
                 } else {
-                    $responseSeconds = (int)($conv['response_seconds'] ?? 0);
-                    $elapsedMinutes = $responseSeconds > 0 ? round($responseSeconds / 60, 1) : 0;
+                    // Para tipo 'first', também usar working hours se habilitado
+                    if ($useWorkingHours && !empty($conv['first_contact_at']) && !empty($conv['first_agent_at'])) {
+                        $start = new \DateTime($conv['first_contact_at']);
+                        $end = new \DateTime($conv['first_agent_at']);
+                        $elapsedMinutes = (float)\App\Helpers\WorkingHoursCalculator::calculateMinutes($start, $end);
+                    } elseif ($useWorkingHours && !empty($conv['first_contact_at']) && empty($conv['first_agent_at'])) {
+                        // Sem resposta ainda - calcular até agora
+                        $start = new \DateTime($conv['first_contact_at']);
+                        $end = new \DateTime();
+                        $elapsedMinutes = (float)\App\Helpers\WorkingHoursCalculator::calculateMinutes($start, $end);
+                    } else {
+                        $responseSeconds = (int)($conv['response_seconds'] ?? 0);
+                        $elapsedMinutes = $responseSeconds > 0 ? round($responseSeconds / 60, 1) : 0;
+                    }
                     $slaBaseMinutes = $slaMinutes;
                 }
 
-                $conv['elapsed_minutes'] = $elapsedMinutes;
+                // Filtrar: só incluir se realmente excedeu o SLA
+                if ($elapsedMinutes <= $slaBaseMinutes) {
+                    continue; // Dentro do SLA quando considerando working hours
+                }
+
+                $conv['elapsed_minutes'] = round($elapsedMinutes, 1);
                 $conv['sla_minutes'] = $slaBaseMinutes;
                 $conv['exceeded_by'] = max(0, round($elapsedMinutes - $slaBaseMinutes, 1));
                 $conv['percentage'] = $slaBaseMinutes > 0 
@@ -723,17 +746,26 @@ class AgentPerformanceController
                     $conv['status_label'] = $type === 'ongoing' ? 'Resposta lenta' : 'Respondida fora do SLA';
                     $conv['status_class'] = 'warning';
                 }
+                
+                $filteredConversations[] = $conv;
             }
+            
+            $conversations = $filteredConversations;
+            
+            // Nota: O total é aproximado porque o filtro com working hours acontece no PHP
+            // Para uma contagem exata, seria necessário processar todas as conversas
+            $actualTotal = count($conversations);
             
             Response::json([
                 'success' => true,
                 'conversations' => $conversations,
-                'total' => $totalRows ?? count($conversations),
+                'total' => $actualTotal,
                 'page' => $page,
                 'per_page' => $perPage,
-                'total_pages' => isset($totalRows) ? (int)ceil($totalRows / $perPage) : 1,
+                'total_pages' => max(1, (int)ceil($actualTotal / $perPage)),
                 'sla_minutes' => $type === 'ongoing' ? $slaOngoingMinutes : $slaMinutes,
                 'type' => $type,
+                'working_hours_enabled' => $useWorkingHours,
                 'period' => [
                     'from' => $dateFrom,
                     'to' => $dateTo

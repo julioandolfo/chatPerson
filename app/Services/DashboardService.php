@@ -2004,11 +2004,11 @@ class DashboardService
         }
         
         if ($seconds < 60) {
-            return round($seconds) . 's';
+            return (int)round($seconds) . 's';
         }
         
-        $minutes = floor($seconds / 60);
-        $remainingSeconds = round($seconds % 60);
+        $minutes = (int)floor($seconds / 60);
+        $remainingSeconds = (int)round(fmod($seconds, 60));
         
         if ($minutes < 60) {
             if ($remainingSeconds > 0) {
@@ -2017,7 +2017,7 @@ class DashboardService
             return "{$minutes}m";
         }
         
-        $hours = floor($minutes / 60);
+        $hours = (int)floor($minutes / 60);
         $remainingMinutes = $minutes % 60;
         
         if ($remainingMinutes > 0) {

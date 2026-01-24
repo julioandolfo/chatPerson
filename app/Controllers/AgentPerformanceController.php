@@ -946,7 +946,8 @@ class AgentPerformanceController
 
     /**
      * Construir intervalos de resposta (cliente -> agente) para SLA contínuo.
-     * @param string|null $untilTime Limite de tempo (quando agente foi desatribuído)
+     * IMPORTANTE: Considera apenas mensagens dentro dos períodos de atribuição do agente
+     * @param string|null $untilTime Limite de tempo (quando agente foi desatribuído) - deprecated, agora usa períodos
      */
     private function buildOngoingIntervals(int $conversationId, array $settings, int $agentId, ?string $status = null, ?string $untilTime = null): array
     {
@@ -956,6 +957,14 @@ class AgentPerformanceController
         
         if (!$delayEnabled) {
             $delayMinutes = 0;
+        }
+        
+        // Buscar todos os períodos de atribuição deste agente
+        $assignmentPeriods = $this->getAllAgentAssignmentPeriods($conversationId, $agentId);
+        
+        // Se não há períodos de atribuição, não há SLA para calcular
+        if (empty($assignmentPeriods)) {
+            return [];
         }
         
         $messages = \App\Helpers\Database::fetchAll(
@@ -976,14 +985,19 @@ class AgentPerformanceController
         $lastAgentId = null;
         $pendingContactAt = null;
         $pendingContactContent = null;
+        $pendingContactPeriodEnd = null; // Fim do período quando a msg do cliente foi recebida
         
         foreach ($messages as $msg) {
             $currentAt = new \DateTime($msg['created_at']);
+            $msgTimeStr = $msg['created_at'];
             
             if ($msg['sender_type'] === 'agent') {
+                // Só considerar mensagens do agente específico
                 if ($agentId > 0 && (int)($msg['sender_id'] ?? 0) !== $agentId) {
                     continue;
                 }
+                
+                // Agente respondeu - fechar intervalo pendente
                 if ($pendingContactAt) {
                     $minutes = $this->calculateMinutesDiff($pendingContactAt, $currentAt, $useWorkingHours);
                     $agentName = $this->getUserNameById((int)($msg['sender_id'] ?? 0));
@@ -999,6 +1013,7 @@ class AgentPerformanceController
                     
                     $pendingContactAt = null;
                     $pendingContactContent = null;
+                    $pendingContactPeriodEnd = null;
                 }
                 
                 $lastAgentAt = $currentAt;
@@ -1007,10 +1022,16 @@ class AgentPerformanceController
             }
             
             if ($msg['sender_type'] === 'contact') {
+                // Verificar se mensagem está dentro de um período de atribuição do agente
+                if (!$this->isMessageInAgentPeriod($msgTimeStr, $assignmentPeriods)) {
+                    continue; // Mensagem fora do período - não conta para este agente
+                }
+                
                 if (!$lastAgentAt) {
                     continue;
                 }
                 
+                // Verificar delay mínimo desde última resposta do agente
                 $diffSinceAgent = ($currentAt->getTimestamp() - $lastAgentAt->getTimestamp()) / 60;
                 if ($delayMinutes > 0 && $diffSinceAgent < $delayMinutes) {
                     continue;
@@ -1019,21 +1040,24 @@ class AgentPerformanceController
                 if (!$pendingContactAt) {
                     $pendingContactAt = $currentAt;
                     $pendingContactContent = $msg['content'] ?? '';
+                    $pendingContactPeriodEnd = $this->getPeriodEndForMessage($msgTimeStr, $assignmentPeriods);
                 }
             }
         }
         
         // Se ficou pendente, calcular até:
-        // 1. Momento da transferência (untilTime) se agente foi desatribuído
-        // 2. Agora, se conversa ainda está aberta
+        // 1. Momento da transferência (fim do período) se agente foi desatribuído
+        // 2. Agora, se conversa ainda está aberta e agente ainda atribuído
         if ($pendingContactAt) {
             $shouldCalculate = false;
             $endTime = null;
+            $wasTransferred = false;
             
-            if ($untilTime) {
+            if ($pendingContactPeriodEnd) {
                 // Agente foi desatribuído - calcular até momento da transferência
-                $endTime = new \DateTime($untilTime);
+                $endTime = new \DateTime($pendingContactPeriodEnd);
                 $shouldCalculate = true;
+                $wasTransferred = true;
             } elseif (in_array($status, ['open', 'pending'], true)) {
                 // Conversa aberta e agente ainda atribuído - calcular até agora
                 $endTime = new \DateTime();
@@ -1052,7 +1076,7 @@ class AgentPerformanceController
                     'agent_preview' => null,
                     'minutes' => round($minutes, 1),
                     'pending' => true,
-                    'transferred' => $untilTime ? true : false
+                    'transferred' => $wasTransferred
                 ];
             }
         }
@@ -1092,62 +1116,106 @@ class AgentPerformanceController
     
     /**
      * Obter período em que um agente estava atribuído a uma conversa
-     * Retorna: ['assigned_at' => datetime, 'unassigned_at' => datetime|null]
+     * Retorna o ÚLTIMO período de atribuição (mais relevante para SLA atual)
      */
     private function getAgentAssignmentPeriod(int $conversationId, int $agentId): array
     {
-        // Buscar primeiro assignment deste agente para esta conversa
-        $firstAssignment = \App\Helpers\Database::fetch(
-            "SELECT assigned_at 
-             FROM conversation_assignments 
-             WHERE conversation_id = ? AND agent_id = ?
-             ORDER BY assigned_at ASC
-             LIMIT 1",
-            [$conversationId, $agentId]
-        );
+        $periods = $this->getAllAgentAssignmentPeriods($conversationId, $agentId);
         
-        if (!$firstAssignment) {
+        if (empty($periods)) {
             return ['assigned_at' => null, 'unassigned_at' => null];
         }
         
-        $assignedAt = $firstAssignment['assigned_at'];
-        
-        // Buscar próximo assignment de OUTRO agente após este (indica transferência)
-        $nextAssignment = \App\Helpers\Database::fetch(
-            "SELECT assigned_at 
+        // Retornar o último período (mais recente)
+        return end($periods);
+    }
+    
+    /**
+     * Obter TODOS os períodos em que um agente estava atribuído a uma conversa
+     * Retorna array de ['assigned_at' => datetime, 'unassigned_at' => datetime|null]
+     */
+    private function getAllAgentAssignmentPeriods(int $conversationId, int $agentId): array
+    {
+        // Buscar todos os assignments ordenados por data
+        $allAssignments = \App\Helpers\Database::fetchAll(
+            "SELECT agent_id, assigned_at 
              FROM conversation_assignments 
-             WHERE conversation_id = ? 
-             AND agent_id != ?
-             AND assigned_at > ?
-             ORDER BY assigned_at ASC
-             LIMIT 1",
-            [$conversationId, $agentId, $assignedAt]
+             WHERE conversation_id = ?
+             ORDER BY assigned_at ASC",
+            [$conversationId]
         );
         
-        $unassignedAt = $nextAssignment ? $nextAssignment['assigned_at'] : null;
+        if (empty($allAssignments)) {
+            return [];
+        }
         
-        // Verificar se o agente foi reatribuído depois (volta a ser responsável)
-        if ($unassignedAt) {
-            $reAssignment = \App\Helpers\Database::fetch(
-                "SELECT assigned_at 
-                 FROM conversation_assignments 
-                 WHERE conversation_id = ? 
-                 AND agent_id = ?
-                 AND assigned_at > ?
-                 ORDER BY assigned_at ASC
-                 LIMIT 1",
-                [$conversationId, $agentId, $unassignedAt]
-            );
+        $periods = [];
+        $currentPeriodStart = null;
+        
+        foreach ($allAssignments as $i => $assignment) {
+            $isTargetAgent = ((int)$assignment['agent_id'] === $agentId);
             
-            // Se foi reatribuído, considerar como ainda responsável
-            if ($reAssignment) {
-                $unassignedAt = null;
+            if ($isTargetAgent && $currentPeriodStart === null) {
+                // Início de um período do agente
+                $currentPeriodStart = $assignment['assigned_at'];
+            } elseif (!$isTargetAgent && $currentPeriodStart !== null) {
+                // Fim de um período do agente (outro agente assumiu)
+                $periods[] = [
+                    'assigned_at' => $currentPeriodStart,
+                    'unassigned_at' => $assignment['assigned_at']
+                ];
+                $currentPeriodStart = null;
+            }
+            // Se é o mesmo agente consecutivamente, continua o mesmo período
+        }
+        
+        // Se ainda está em um período aberto, adicionar sem data de fim
+        if ($currentPeriodStart !== null) {
+            $periods[] = [
+                'assigned_at' => $currentPeriodStart,
+                'unassigned_at' => null
+            ];
+        }
+        
+        return $periods;
+    }
+    
+    /**
+     * Verificar se uma mensagem está dentro de algum período de atribuição do agente
+     */
+    private function isMessageInAgentPeriod(string $messageTime, array $periods): bool
+    {
+        $msgTime = strtotime($messageTime);
+        
+        foreach ($periods as $period) {
+            $start = strtotime($period['assigned_at']);
+            $end = $period['unassigned_at'] ? strtotime($period['unassigned_at']) : PHP_INT_MAX;
+            
+            if ($msgTime >= $start && $msgTime <= $end) {
+                return true;
             }
         }
         
-        return [
-            'assigned_at' => $assignedAt,
-            'unassigned_at' => $unassignedAt
-        ];
+        return false;
+    }
+    
+    /**
+     * Obter o fim do período de atribuição para uma mensagem específica
+     * Retorna null se o agente ainda está atribuído nesse período
+     */
+    private function getPeriodEndForMessage(string $messageTime, array $periods): ?string
+    {
+        $msgTime = strtotime($messageTime);
+        
+        foreach ($periods as $period) {
+            $start = strtotime($period['assigned_at']);
+            $end = $period['unassigned_at'] ? strtotime($period['unassigned_at']) : PHP_INT_MAX;
+            
+            if ($msgTime >= $start && $msgTime <= $end) {
+                return $period['unassigned_at']; // null se ainda atribuído
+            }
+        }
+        
+        return null;
     }
 }

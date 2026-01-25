@@ -5,6 +5,7 @@
 
 // Lista de arquivos de log para verificar
 $logFiles = [
+    'External Sources (Google Maps/WooCommerce)' => __DIR__ . '/../logs/external_sources.log',
     'Dashboard' => __DIR__ . '/../logs/dash.log',
     'Metas e OTE (Goals)' => __DIR__ . '/../logs/goals.log',
     'Coaching em Tempo Real' => __DIR__ . '/../logs/coaching.log',

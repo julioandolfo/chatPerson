@@ -674,15 +674,35 @@ class GoogleMapsProspectService
      */
     public static function preview(array $searchConfig, string $provider = 'google_places', int $limit = 5): array
     {
+        $logFile = 'external_sources.log';
+        Logger::log("=== GoogleMapsProspectService::preview INICIADO ===", $logFile);
+        Logger::log("Provider: " . $provider, $logFile);
+        Logger::log("SearchConfig: " . json_encode($searchConfig), $logFile);
+        Logger::log("Limit: " . $limit, $logFile);
+        
         try {
             $originalLimit = $searchConfig['max_results'] ?? 100;
             $searchConfig['max_results'] = $limit;
             
             if ($provider === 'outscraper') {
+                Logger::log("Usando Outscraper API", $logFile);
                 $results = self::fetchFromOutscraper($searchConfig, null);
             } else {
+                Logger::log("Usando Google Places API", $logFile);
+                
+                // Verificar API Key
+                $apiKey = self::getGoogleApiKey();
+                if (empty($apiKey)) {
+                    Logger::log("ERRO: API Key do Google Places não configurada!", $logFile);
+                    throw new \Exception("API Key do Google Places não configurada. Vá em Configurações → Prospecção para configurar.");
+                }
+                Logger::log("API Key encontrada: " . substr($apiKey, 0, 10) . "...", $logFile);
+                
                 $results = self::fetchFromGooglePlaces($searchConfig, null);
             }
+            
+            Logger::log("Resultados obtidos: " . count($results['results'] ?? []), $logFile);
+            Logger::log("=== GoogleMapsProspectService::preview SUCESSO ===", $logFile);
             
             return [
                 'success' => true,
@@ -692,6 +712,10 @@ class GoogleMapsProspectService
             ];
             
         } catch (\Exception $e) {
+            Logger::log("EXCEÇÃO no preview: " . $e->getMessage(), $logFile);
+            Logger::log("Stack: " . $e->getTraceAsString(), $logFile);
+            Logger::log("=== GoogleMapsProspectService::preview ERRO ===", $logFile);
+            
             return [
                 'success' => false,
                 'message' => $e->getMessage(),

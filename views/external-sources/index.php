@@ -100,6 +100,9 @@ ob_start();
                                 <?php endif; ?>
                             </td>
                             <td class="text-end">
+                                <a href="<?= \App\Helpers\Url::to('/external-sources/' . $source['id'] . '/edit') ?>" class="btn btn-sm btn-light-primary" title="Editar">
+                                    <i class="ki-duotone ki-pencil fs-6"><span class="path1"></span><span class="path2"></span></i>
+                                </a>
                                 <button class="btn btn-sm btn-light-success" onclick="openSyncModal(<?= $source['id'] ?>, '<?= htmlspecialchars($source['name']) ?>')" title="Sincronizar agora">
                                     <i class="ki-duotone ki-arrows-circle fs-6"><span class="path1"></span><span class="path2"></span></i>
                                 </button>

@@ -9,6 +9,23 @@ class Router
 {
     private static array $routes = [];
     private static array $middlewares = [];
+    
+    /**
+     * Log para external_sources.log (debug)
+     */
+    private static function logExternalSources(string $message): void
+    {
+        $logDir = __DIR__ . '/../../logs';
+        if (!is_dir($logDir)) {
+            @mkdir($logDir, 0777, true);
+        }
+        
+        $logFile = $logDir . '/external_sources.log';
+        $timestamp = date('Y-m-d H:i:s');
+        $logMessage = "[{$timestamp}] [Router] {$message}\n";
+        
+        @file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
+    }
 
     /**
      * Registrar rota GET
@@ -87,6 +104,17 @@ class Router
 
         // Debug temporário (DESABILITADO para APIs JSON)
         $debug = false; // ($_ENV['APP_DEBUG'] ?? 'true') === 'true';
+        
+        // Debug específico para external-sources
+        if (strpos($uri, 'external-sources') !== false) {
+            self::logExternalSources("=== ROUTER DEBUG ===");
+            self::logExternalSources("Method: {$method}");
+            self::logExternalSources("URI Original: " . parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
+            self::logExternalSources("URI Processado: {$uri}");
+            self::logExternalSources("BasePath: {$basePath}");
+            self::logExternalSources("Total Routes: " . count(self::$routes));
+        }
+        
         if ($debug) {
             error_log("Router: Method={$method}, URI={$uri}, BasePath={$basePath}, Routes=" . count(self::$routes));
         }
@@ -109,15 +137,31 @@ class Router
                 if ($debug) {
                     error_log("Router: Route #{$routeIndex} MATCHED! Executing handler...");
                 }
+                
+                // Log para external-sources
+                if (strpos($uri, 'external-sources') !== false) {
+                    self::logExternalSources("ROTA ENCONTRADA: {$route['path']}");
+                    self::logExternalSources("Middlewares: " . implode(', ', $route['middlewares']));
+                }
+                
                 // Executar middlewares
                 foreach ($route['middlewares'] as $middleware) {
                     $middlewareClass = "App\\Middleware\\{$middleware}";
+                    
+                    if (strpos($uri, 'external-sources') !== false) {
+                        self::logExternalSources("Executando middleware: {$middlewareClass}");
+                    }
+                    
                     if (class_exists($middlewareClass)) {
                         $middlewareInstance = new $middlewareClass();
                         if (method_exists($middlewareInstance, 'handle')) {
                             $middlewareInstance->handle();
                         }
                     }
+                }
+                
+                if (strpos($uri, 'external-sources') !== false) {
+                    self::logExternalSources("Middlewares executados, chamando controller...");
                 }
 
                 // Extrair parâmetros
@@ -151,6 +195,9 @@ class Router
         }
 
         // Rota não encontrada
+        if (strpos($uri, 'external-sources') !== false) {
+            self::logExternalSources("!!! ROTA NAO ENCONTRADA !!! URI: {$uri}");
+        }
         Response::notFound();
     }
 

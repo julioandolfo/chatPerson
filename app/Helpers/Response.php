@@ -248,8 +248,11 @@ class Response
                   strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
         $acceptJson = !empty($_SERVER['HTTP_ACCEPT']) && 
                       strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false;
+        $contentTypeJson = !empty($_SERVER['CONTENT_TYPE']) && 
+                          strpos($_SERVER['CONTENT_TYPE'], 'application/json') !== false;
+        $isApiRoute = strpos($_SERVER['REQUEST_URI'] ?? '', '/api/') !== false;
         
-        if ($isAjax || $acceptJson) {
+        if ($isAjax || $acceptJson || $contentTypeJson || $isApiRoute) {
             self::json([
                 'success' => false,
                 'message' => $message

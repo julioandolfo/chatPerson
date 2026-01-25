@@ -649,6 +649,8 @@ Router::put('/contact-lists/{id}/send-order', [ContactListController::class, 'up
 Router::get('/external-sources', [\App\Controllers\ExternalDataSourceController::class, 'index'], ['Authentication']);
 Router::get('/external-sources/create', [\App\Controllers\ExternalDataSourceController::class, 'create'], ['Authentication']);
 Router::post('/external-sources', [\App\Controllers\ExternalDataSourceController::class, 'store'], ['Authentication']);
+Router::get('/external-sources/{id}/edit', [\App\Controllers\ExternalDataSourceController::class, 'edit'], ['Authentication']);
+Router::put('/external-sources/{id}', [\App\Controllers\ExternalDataSourceController::class, 'update'], ['Authentication']);
 Router::delete('/external-sources/{id}', [\App\Controllers\ExternalDataSourceController::class, 'destroy'], ['Authentication']);
 Router::post('/external-sources/{id}/sync', [\App\Controllers\ExternalDataSourceController::class, 'sync'], ['Authentication']);
 

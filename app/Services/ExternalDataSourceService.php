@@ -53,6 +53,11 @@ class ExternalDataSourceService
         if (isset($data['search_config']) && is_array($data['search_config'])) {
             $data['search_config'] = json_encode($data['search_config']);
         }
+        
+        // Definir valor padrão para connection_config se não fornecido (Google Maps, WooCommerce)
+        if (!isset($data['connection_config']) || empty($data['connection_config'])) {
+            $data['connection_config'] = '{}';
+        }
 
         return ExternalDataSource::create($data);
     }

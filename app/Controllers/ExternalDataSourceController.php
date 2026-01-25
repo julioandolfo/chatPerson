@@ -67,6 +67,83 @@ class ExternalDataSourceController
             ], 400);
         }
     }
+    
+    /**
+     * Formulário de edição
+     */
+    public function edit(int $id): void
+    {
+        Permission::abortIfCannot('campaigns.edit');
+
+        $source = ExternalDataSource::find($id);
+        
+        if (!$source) {
+            Response::notFound('Fonte não encontrada');
+            return;
+        }
+
+        Response::view('external-sources/edit', [
+            'source' => $source,
+            'title' => 'Editar Fonte de Dados'
+        ]);
+    }
+    
+    /**
+     * Atualizar fonte
+     */
+    public function update(int $id): void
+    {
+        Permission::abortIfCannot('campaigns.edit');
+
+        try {
+            $source = ExternalDataSource::find($id);
+            
+            if (!$source) {
+                throw new \Exception('Fonte não encontrada');
+            }
+            
+            $data = Request::json();
+            
+            // Preparar dados para atualização
+            $updateData = [
+                'name' => $data['name'] ?? $source['name'],
+                'status' => $data['status'] ?? $source['status'],
+                'sync_frequency' => $data['sync_frequency'] ?? $source['sync_frequency'],
+            ];
+            
+            // Atualizar provider se fornecido
+            if (isset($data['provider'])) {
+                $updateData['provider'] = $data['provider'];
+            }
+            
+            // Atualizar search_config se fornecido
+            if (isset($data['search_config'])) {
+                $updateData['search_config'] = json_encode($data['search_config']);
+            }
+            
+            // Atualizar connection_config se fornecido
+            if (isset($data['connection_config'])) {
+                $updateData['connection_config'] = json_encode($data['connection_config']);
+            }
+            
+            // Atualizar table_name se fornecido
+            if (isset($data['table_name'])) {
+                $updateData['table_name'] = $data['table_name'];
+            }
+            
+            ExternalDataSource::update($id, $updateData);
+
+            Response::json([
+                'success' => true,
+                'message' => 'Fonte atualizada com sucesso!'
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
 
     /**
      * Testar conexão
@@ -245,20 +322,45 @@ class ExternalDataSourceController
      */
     public function previewGoogleMaps(): void
     {
-        Permission::abortIfCannot('campaigns.view');
-
+        $logFile = 'external_sources.log';
+        \App\Helpers\Logger::log("=== previewGoogleMaps INICIADO ===", $logFile);
+        
         try {
+            // Log da requisição bruta
+            $rawInput = file_get_contents('php://input');
+            \App\Helpers\Logger::log("Raw input: " . substr($rawInput, 0, 500), $logFile);
+            
+            // Verificar permissão
+            \App\Helpers\Logger::log("Verificando permissão campaigns.view", $logFile);
+            Permission::abortIfCannot('campaigns.view');
+            \App\Helpers\Logger::log("Permissão OK", $logFile);
+            
             $data = Request::json();
+            \App\Helpers\Logger::log("Data recebido: " . json_encode($data), $logFile);
+            
             $searchConfig = $data['search_config'] ?? [];
             $provider = $data['provider'] ?? 'google_places';
             
+            \App\Helpers\Logger::log("searchConfig: " . json_encode($searchConfig), $logFile);
+            \App\Helpers\Logger::log("provider: " . $provider, $logFile);
+            
             if (empty($searchConfig['keyword']) || empty($searchConfig['location'])) {
+                \App\Helpers\Logger::log("ERRO: Campos obrigatórios vazios", $logFile);
                 throw new \Exception('Palavra-chave e localização são obrigatórios');
             }
             
+            \App\Helpers\Logger::log("Chamando ExternalDataSourceService::previewGoogleMaps", $logFile);
             $result = ExternalDataSourceService::previewGoogleMaps($searchConfig, $provider, 5);
+            
+            \App\Helpers\Logger::log("Resultado: " . json_encode($result), $logFile);
+            \App\Helpers\Logger::log("=== previewGoogleMaps SUCESSO ===", $logFile);
+            
             Response::json($result);
         } catch (\Exception $e) {
+            \App\Helpers\Logger::log("EXCEÇÃO: " . $e->getMessage(), $logFile);
+            \App\Helpers\Logger::log("Stack: " . $e->getTraceAsString(), $logFile);
+            \App\Helpers\Logger::log("=== previewGoogleMaps ERRO ===", $logFile);
+            
             Response::json([
                 'success' => false,
                 'message' => $e->getMessage()

@@ -15,7 +15,8 @@ class ExternalDataSource extends Model
     protected array $fillable = [
         'name', 'type', 'connection_config', 'table_name', 'column_mapping',
         'query_config', 'sync_frequency', 'last_sync_at', 'last_sync_status',
-        'last_sync_message', 'total_records', 'status', 'created_by'
+        'last_sync_message', 'total_records', 'status', 'created_by',
+        'search_config', 'provider', 'total_synced'
     ];
     protected bool $timestamps = true;
 

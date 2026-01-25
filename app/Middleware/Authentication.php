@@ -33,13 +33,28 @@ class Authentication
      */
     public function handle(): void
     {
+        $uri = $_SERVER['REQUEST_URI'] ?? 'unknown';
+        
+        // Log também no external_sources para debug
+        if (strpos($uri, 'external-sources') !== false) {
+            self::logExternal("=== MIDDLEWARE AUTH - URI: {$uri} ===");
+            self::logExternal("isAjax: " . (self::isAjaxRequest() ? 'SIM' : 'NAO'));
+        }
+        
         self::logAuth("Verificando autenticação...");
         
         if (!Auth::check()) {
             self::logAuth("Usuário NÃO autenticado - redirecionando para /login");
             
+            if (strpos($uri, 'external-sources') !== false) {
+                self::logExternal("USUARIO NAO AUTENTICADO!");
+            }
+            
             // Se for requisição AJAX/API, retornar JSON em vez de redirecionar
             if (self::isAjaxRequest()) {
+                if (strpos($uri, 'external-sources') !== false) {
+                    self::logExternal("Retornando JSON 401 (sessao expirada)");
+                }
                 Response::json([
                     'success' => false,
                     'message' => 'Sessão expirada. Por favor, faça login novamente.',
@@ -52,7 +67,28 @@ class Authentication
         } else {
             $userId = Auth::id();
             self::logAuth("Usuário autenticado: userId={$userId}");
+            
+            if (strpos($uri, 'external-sources') !== false) {
+                self::logExternal("Usuario autenticado: ID={$userId}");
+            }
         }
+    }
+    
+    /**
+     * Log para external_sources.log
+     */
+    private static function logExternal(string $message): void
+    {
+        $logDir = __DIR__ . '/../../logs';
+        if (!is_dir($logDir)) {
+            @mkdir($logDir, 0777, true);
+        }
+        
+        $logFile = $logDir . '/external_sources.log';
+        $timestamp = date('Y-m-d H:i:s');
+        $logMessage = "[{$timestamp}] [Middleware] {$message}\n";
+        
+        @file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
     }
     
     /**

@@ -26,7 +26,11 @@ class ContactListService
             throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));
         }
 
-        $data['is_dynamic'] = $data['is_dynamic'] ?? false;
+        // Garantir que campos booleanos sejam inteiros (0 ou 1)
+        $data['is_dynamic'] = !empty($data['is_dynamic']) ? 1 : 0;
+        if (isset($data['sync_enabled'])) {
+            $data['sync_enabled'] = !empty($data['sync_enabled']) ? 1 : 0;
+        }
         $data['total_contacts'] = 0;
 
         if (isset($data['filter_config']) && is_array($data['filter_config'])) {

@@ -394,10 +394,15 @@ class GoogleMapsProspectService
      */
     private static function fetchFromOutscraper(array $config, ?string $pageToken = null): array
     {
+        $logFile = 'external_sources.log';
+        Logger::log("fetchFromOutscraper INICIADO", $logFile);
+        
         $apiKey = self::getOutscraperApiKey();
         if (empty($apiKey)) {
-            throw new \Exception("API Key do Outscraper não configurada");
+            Logger::log("ERRO: API Key do Outscraper não configurada!", $logFile);
+            throw new \Exception("API Key do Outscraper não configurada. Vá em Configurações → Prospecção para configurar.");
         }
+        Logger::log("API Key encontrada: " . substr($apiKey, 0, 10) . "...", $logFile);
         
         $client = self::getClient();
         $results = [];
@@ -417,7 +422,12 @@ class GoogleMapsProspectService
             'async' => false
         ];
         
+        Logger::log("Query: {$query}", $logFile);
+        Logger::log("Params: " . json_encode($params), $logFile);
+        
         try {
+            Logger::log("Fazendo requisição para Outscraper API...", $logFile);
+            
             $response = $client->get(self::OUTSCRAPER_BASE_URL, [
                 'query' => $params,
                 'headers' => [
@@ -425,9 +435,17 @@ class GoogleMapsProspectService
                 ]
             ]);
             
-            $data = json_decode($response->getBody()->getContents(), true);
+            $statusCode = $response->getStatusCode();
+            Logger::log("Status Code: {$statusCode}", $logFile);
+            
+            $body = $response->getBody()->getContents();
+            Logger::log("Response (primeiros 500 chars): " . substr($body, 0, 500), $logFile);
+            
+            $data = json_decode($body, true);
             
             if (!empty($data['data'])) {
+                Logger::log("Dados recebidos, processando " . count($data['data']) . " grupos", $logFile);
+                
                 foreach ($data['data'] as $places) {
                     foreach ($places as $place) {
                         if (!empty($place['phone'])) {
@@ -447,11 +465,22 @@ class GoogleMapsProspectService
                         }
                     }
                 }
+                
+                Logger::log("Total de resultados com telefone: " . count($results), $logFile);
+            } else {
+                Logger::log("Nenhum dado retornado ou formato inesperado", $logFile);
+                Logger::log("Estrutura data: " . json_encode(array_keys($data ?? [])), $logFile);
             }
             
         } catch (RequestException $e) {
+            Logger::log("RequestException: " . $e->getMessage(), $logFile);
             throw new \Exception("Erro na requisição Outscraper: " . $e->getMessage());
+        } catch (\Exception $e) {
+            Logger::log("Exception geral: " . $e->getMessage(), $logFile);
+            throw $e;
         }
+        
+        Logger::log("fetchFromOutscraper FINALIZADO com " . count($results) . " resultados", $logFile);
         
         return [
             'results' => $results,

@@ -16,7 +16,8 @@ class ContactList extends Model
         'name', 'description',
         'is_dynamic', 'filter_config',
         'total_contacts', 'last_calculated_at',
-        'created_by'
+        'created_by',
+        'external_source_id', 'sync_enabled'
     ];
     protected bool $timestamps = true;
 

@@ -19,19 +19,19 @@ class ExternalDataSourceService
      */
     public static function create(array $data): int
     {
-        // Validação diferente para google_maps
+        // Validação diferente para google_maps e woocommerce
         $type = $data['type'] ?? '';
         
-        if ($type === 'google_maps') {
+        if ($type === 'google_maps' || $type === 'woocommerce') {
             $errors = Validator::validate($data, [
                 'name' => 'required|string|max:255',
-                'type' => 'required|string|in:mysql,postgresql,api,google_maps',
+                'type' => 'required|string|in:mysql,postgresql,api,google_maps,woocommerce',
                 'search_config' => 'required|array'
             ]);
         } else {
             $errors = Validator::validate($data, [
                 'name' => 'required|string|max:255',
-                'type' => 'required|string|in:mysql,postgresql,api,google_maps',
+                'type' => 'required|string|in:mysql,postgresql,api,google_maps,woocommerce',
                 'connection_config' => 'required|array'
             ]);
         }
@@ -66,6 +66,14 @@ class ExternalDataSourceService
         if ($type === 'google_maps') {
             $provider = $provider ?? 'google_places';
             return GoogleMapsProspectService::testConnection($provider);
+        }
+        
+        // Para WooCommerce, delegar para o service específico
+        if ($type === 'woocommerce') {
+            $storeUrl = $connectionConfig['store_url'] ?? '';
+            $consumerKey = $connectionConfig['consumer_key'] ?? '';
+            $consumerSecret = $connectionConfig['consumer_secret'] ?? '';
+            return WooCommerceProspectService::testConnection($storeUrl, $consumerKey, $consumerSecret);
         }
         
         $logInfo = json_encode([
@@ -340,6 +348,11 @@ class ExternalDataSourceService
             if ($source['type'] === 'google_maps') {
                 return GoogleMapsProspectService::sync($sourceId, $contactListId);
             }
+            
+            // Para WooCommerce, delegar para o service específico
+            if ($source['type'] === 'woocommerce') {
+                return WooCommerceProspectService::sync($sourceId, $contactListId);
+            }
 
             if (empty($source['table_name']) || empty($source['column_mapping'])) {
                 throw new \Exception('Fonte não configurada corretamente');
@@ -504,6 +517,8 @@ class ExternalDataSourceService
                     // Delegar para o service apropriado baseado no tipo
                     if ($source['type'] === 'google_maps') {
                         GoogleMapsProspectService::sync($source['id'], $list['id']);
+                    } elseif ($source['type'] === 'woocommerce') {
+                        WooCommerceProspectService::sync($source['id'], $list['id']);
                     } else {
                         self::sync($source['id'], $list['id']);
                     }
@@ -521,6 +536,14 @@ class ExternalDataSourceService
     public static function previewGoogleMaps(array $searchConfig, string $provider = 'google_places', int $limit = 5): array
     {
         return GoogleMapsProspectService::preview($searchConfig, $provider, $limit);
+    }
+    
+    /**
+     * Preview de clientes do WooCommerce (sem salvar)
+     */
+    public static function previewWooCommerce(string $storeUrl, string $consumerKey, string $consumerSecret, int $limit = 10): array
+    {
+        return WooCommerceProspectService::preview($storeUrl, $consumerKey, $consumerSecret, $limit);
     }
 
     /**

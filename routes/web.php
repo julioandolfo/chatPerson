@@ -656,6 +656,8 @@ Router::post('/external-sources/{id}/sync', [\App\Controllers\ExternalDataSource
 Router::post('/api/external-sources/test-connection', [\App\Controllers\ExternalDataSourceController::class, 'testConnection'], ['Authentication']);
 Router::post('/api/external-sources/test-google-maps', [\App\Controllers\ExternalDataSourceController::class, 'testGoogleMapsConnection'], ['Authentication']);
 Router::post('/api/external-sources/preview-google-maps', [\App\Controllers\ExternalDataSourceController::class, 'previewGoogleMaps'], ['Authentication']);
+Router::post('/api/external-sources/test-woocommerce', [\App\Controllers\ExternalDataSourceController::class, 'testWooCommerceConnection'], ['Authentication']);
+Router::post('/api/external-sources/preview-woocommerce', [\App\Controllers\ExternalDataSourceController::class, 'previewWooCommerce'], ['Authentication']);
 Router::get('/api/external-sources/{id}/tables', [\App\Controllers\ExternalDataSourceController::class, 'listTables'], ['Authentication']);
 Router::get('/api/external-sources/{id}/columns', [\App\Controllers\ExternalDataSourceController::class, 'listColumns'], ['Authentication']);
 Router::get('/api/external-sources/{id}/preview', [\App\Controllers\ExternalDataSourceController::class, 'preview'], ['Authentication']);

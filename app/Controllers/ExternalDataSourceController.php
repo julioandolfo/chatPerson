@@ -265,4 +265,58 @@ class ExternalDataSourceController
             ], 400);
         }
     }
+    
+    /**
+     * Testar conexão com WooCommerce
+     */
+    public function testWooCommerceConnection(): void
+    {
+        Permission::abortIfCannot('campaigns.create');
+
+        try {
+            $data = Request::json();
+            $storeUrl = $data['store_url'] ?? '';
+            $consumerKey = $data['consumer_key'] ?? '';
+            $consumerSecret = $data['consumer_secret'] ?? '';
+            
+            if (empty($storeUrl) || empty($consumerKey) || empty($consumerSecret)) {
+                throw new \Exception('URL da loja, Consumer Key e Consumer Secret são obrigatórios');
+            }
+            
+            $result = \App\Services\WooCommerceProspectService::testConnection($storeUrl, $consumerKey, $consumerSecret);
+            Response::json($result);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+    
+    /**
+     * Preview de clientes do WooCommerce
+     */
+    public function previewWooCommerce(): void
+    {
+        Permission::abortIfCannot('campaigns.view');
+
+        try {
+            $data = Request::json();
+            $storeUrl = $data['store_url'] ?? '';
+            $consumerKey = $data['consumer_key'] ?? '';
+            $consumerSecret = $data['consumer_secret'] ?? '';
+            
+            if (empty($storeUrl) || empty($consumerKey) || empty($consumerSecret)) {
+                throw new \Exception('URL da loja, Consumer Key e Consumer Secret são obrigatórios');
+            }
+            
+            $result = ExternalDataSourceService::previewWooCommerce($storeUrl, $consumerKey, $consumerSecret, 10);
+            Response::json($result);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
 }

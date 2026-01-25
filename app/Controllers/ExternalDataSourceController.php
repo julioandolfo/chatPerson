@@ -218,4 +218,51 @@ class ExternalDataSourceController
             ], 400);
         }
     }
+    
+    /**
+     * Testar conexão com Google Maps API
+     */
+    public function testGoogleMapsConnection(): void
+    {
+        Permission::abortIfCannot('campaigns.create');
+
+        try {
+            $data = Request::json();
+            $provider = $data['provider'] ?? 'google_places';
+            
+            $result = \App\Services\GoogleMapsProspectService::testConnection($provider);
+            Response::json($result);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+    
+    /**
+     * Preview de busca no Google Maps
+     */
+    public function previewGoogleMaps(): void
+    {
+        Permission::abortIfCannot('campaigns.view');
+
+        try {
+            $data = Request::json();
+            $searchConfig = $data['search_config'] ?? [];
+            $provider = $data['provider'] ?? 'google_places';
+            
+            if (empty($searchConfig['keyword']) || empty($searchConfig['location'])) {
+                throw new \Exception('Palavra-chave e localização são obrigatórios');
+            }
+            
+            $result = ExternalDataSourceService::previewGoogleMaps($searchConfig, $provider, 5);
+            Response::json($result);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
 }

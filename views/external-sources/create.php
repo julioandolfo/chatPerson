@@ -13,7 +13,7 @@ ob_start();
         <div class="alert alert-info d-flex align-items-center mb-10">
             <i class="ki-duotone ki-information-5 fs-2 me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
             <div>
-                <strong>Sincronização Automática:</strong> Conecte bancos de dados externos (MySQL, PostgreSQL) para importar contatos automaticamente.
+                <strong>Sincronização Automática:</strong> Conecte bancos de dados externos ou busque leads do Google Maps para importar contatos automaticamente.
             </div>
         </div>
         
@@ -25,17 +25,111 @@ ob_start();
                 
                 <div class="mb-5">
                     <label class="form-label required">Nome da Fonte</label>
-                    <input type="text" class="form-control" name="name" placeholder="Ex: CRM Principal" required />
+                    <input type="text" class="form-control" name="name" placeholder="Ex: Restaurantes SP" required />
                 </div>
                 
                 <div class="mb-5">
-                    <label class="form-label required">Tipo de Banco</label>
+                    <label class="form-label required">Tipo de Fonte</label>
                     <select class="form-select" name="type" id="db_type" required>
-                        <option value="mysql">MySQL</option>
-                        <option value="postgresql">PostgreSQL</option>
+                        <option value="">Selecione...</option>
+                        <option value="google_maps">Google Maps (Prospecção de Leads)</option>
+                        <option value="mysql">MySQL (Banco de Dados)</option>
+                        <option value="postgresql">PostgreSQL (Banco de Dados)</option>
                     </select>
                 </div>
             </div>
+            
+            <!-- ========== SEÇÃO GOOGLE MAPS ========== -->
+            <div id="section_google_maps" style="display:none;">
+                
+                <div class="separator my-10"></div>
+                
+                <div class="mb-10">
+                    <h4 class="mb-5">2. Configuração de Busca no Google Maps</h4>
+                    
+                    <div class="alert alert-warning mb-5">
+                        <i class="ki-duotone ki-information fs-2 me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                        <strong>Prospecção B2B:</strong> Busque empresas por categoria e região. Apenas contatos com telefone serão importados.
+                    </div>
+                    
+                    <div class="mb-5">
+                        <label class="form-label required">Palavra-chave</label>
+                        <input type="text" class="form-control" id="gm_keyword" placeholder="Ex: dentistas, restaurantes, advogados" />
+                        <div class="form-text">Categoria ou tipo de negócio que deseja prospectar</div>
+                    </div>
+                    
+                    <div class="row g-3 mb-5">
+                        <div class="col-md-8">
+                            <label class="form-label required">Localização</label>
+                            <input type="text" class="form-control" id="gm_location" placeholder="Ex: São Paulo, SP ou CEP 01310-100" />
+                            <div class="form-text">Cidade, bairro, CEP ou endereço de referência</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Raio (metros)</label>
+                            <input type="number" class="form-control" id="gm_radius" value="5000" min="100" max="50000" />
+                            <div class="form-text">5000 = 5km</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row g-3 mb-5">
+                        <div class="col-md-6">
+                            <label class="form-label">Limite de Resultados por Sync</label>
+                            <input type="number" class="form-control" id="gm_max_results" value="60" min="10" max="500" />
+                            <div class="form-text">Máximo 60 por busca (Google Places API)</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Provider</label>
+                            <select class="form-select" id="gm_provider">
+                                <option value="google_places">Google Places API (Oficial)</option>
+                                <option value="outscraper">Outscraper (Terceiros - Mais Barato)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex gap-3">
+                        <button type="button" class="btn btn-light-primary" onclick="testGoogleMapsConnection()">
+                            <i class="ki-duotone ki-flash fs-3"></i>
+                            Testar Conexão API
+                        </button>
+                        <button type="button" class="btn btn-light-info" onclick="previewGoogleMaps()">
+                            <i class="ki-duotone ki-eye fs-3"></i>
+                            Preview de Busca
+                        </button>
+                    </div>
+                    <span id="gm_connection_status" class="ms-3"></span>
+                    
+                    <div id="gm_preview_container" class="mt-5" style="display:none;"></div>
+                </div>
+                
+                <div class="separator my-10"></div>
+                
+                <div class="mb-10">
+                    <h4 class="mb-5">3. Configurar Sincronização Automática</h4>
+                    
+                    <div class="mb-5">
+                        <label class="form-label">Frequência de Sincronização</label>
+                        <select class="form-select" id="gm_sync_frequency">
+                            <option value="manual">Manual (sob demanda)</option>
+                            <option value="daily" selected>Diariamente</option>
+                            <option value="weekly">Semanalmente</option>
+                        </select>
+                        <div class="form-text">A cada sincronização, novos leads serão adicionados automaticamente</div>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-end mt-10">
+                    <button type="button" class="btn btn-light me-3" onclick="window.history.back()">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btn_save_gm" onclick="saveGoogleMapsSource()">
+                        <span class="indicator-label">Criar Fonte Google Maps</span>
+                        <span class="indicator-progress">Salvando...
+                        <span class="spinner-border spinner-border-sm align-middle ms-2"></span></span>
+                    </button>
+                </div>
+            </div>
+            <!-- ========== FIM SEÇÃO GOOGLE MAPS ========== -->
+            
+            <!-- ========== SEÇÃO BANCO DE DADOS ========== -->
+            <div id="section_database" style="display:none;">
             
             <div class="separator my-10"></div>
             
@@ -171,11 +265,14 @@ ob_start();
             <div class="d-flex justify-content-end mt-10">
                 <button type="button" class="btn btn-light me-3" onclick="window.history.back()">Cancelar</button>
                 <button type="button" class="btn btn-primary" id="btn_save" onclick="saveSource()" disabled>
-                    <span class="indicator-label">Criar Fonte</span>
+                    <span class="indicator-label">Criar Fonte de Banco</span>
                     <span class="indicator-progress">Salvando...
                     <span class="spinner-border spinner-border-sm align-middle ms-2"></span></span>
                 </button>
             </div>
+            </div>
+            <!-- ========== FIM SEÇÃO BANCO DE DADOS ========== -->
+            
         </form>
         
     </div>
@@ -185,11 +282,207 @@ ob_start();
 let tempSourceId = null;
 let availableColumns = [];
 
-// Mudar porta padrão ao trocar tipo
+// Mudar visibilidade das seções ao trocar tipo
 document.getElementById('db_type').addEventListener('change', function() {
-    const port = this.value === 'postgresql' ? 5432 : 3306;
-    document.getElementById('db_port').value = port;
+    const type = this.value;
+    const sectionGoogleMaps = document.getElementById('section_google_maps');
+    const sectionDatabase = document.getElementById('section_database');
+    
+    if (type === 'google_maps') {
+        sectionGoogleMaps.style.display = 'block';
+        sectionDatabase.style.display = 'none';
+    } else if (type === 'mysql' || type === 'postgresql') {
+        sectionGoogleMaps.style.display = 'none';
+        sectionDatabase.style.display = 'block';
+        
+        // Atualizar porta padrão
+        const port = type === 'postgresql' ? 5432 : 3306;
+        document.getElementById('db_port').value = port;
+    } else {
+        sectionGoogleMaps.style.display = 'none';
+        sectionDatabase.style.display = 'none';
+    }
 });
+
+// ========== FUNÇÕES GOOGLE MAPS ==========
+
+// Testar conexão com API do Google Maps
+function testGoogleMapsConnection() {
+    const btn = event.target;
+    btn.setAttribute('data-kt-indicator', 'on');
+    btn.disabled = true;
+    
+    const provider = document.getElementById('gm_provider').value;
+    
+    fetch('/api/external-sources/test-google-maps', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ provider: provider })
+    })
+    .then(r => r.json())
+    .then(result => {
+        btn.removeAttribute('data-kt-indicator');
+        btn.disabled = false;
+        
+        const status = document.getElementById('gm_connection_status');
+        if (result.success) {
+            status.innerHTML = '<span class="badge badge-light-success"><i class="ki-duotone ki-check fs-6"></i> API Conectada</span>';
+            toastr.success(result.message);
+        } else {
+            status.innerHTML = '<span class="badge badge-light-danger"><i class="ki-duotone ki-cross fs-6"></i> Erro</span>';
+            toastr.error(result.message);
+        }
+    })
+    .catch(err => {
+        btn.removeAttribute('data-kt-indicator');
+        btn.disabled = false;
+        toastr.error('Erro de rede: ' + err.message);
+    });
+}
+
+// Preview de busca no Google Maps
+function previewGoogleMaps() {
+    const keyword = document.getElementById('gm_keyword').value;
+    const location = document.getElementById('gm_location').value;
+    
+    if (!keyword || !location) {
+        toastr.warning('Preencha a palavra-chave e localização');
+        return;
+    }
+    
+    const btn = event.target;
+    btn.setAttribute('data-kt-indicator', 'on');
+    btn.disabled = true;
+    
+    const searchConfig = {
+        keyword: keyword,
+        location: location,
+        radius: parseInt(document.getElementById('gm_radius').value) || 5000,
+        max_results: 5
+    };
+    
+    const provider = document.getElementById('gm_provider').value;
+    
+    fetch('/api/external-sources/preview-google-maps', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ search_config: searchConfig, provider: provider })
+    })
+    .then(r => r.json())
+    .then(result => {
+        btn.removeAttribute('data-kt-indicator');
+        btn.disabled = false;
+        
+        if (result.success) {
+            renderGoogleMapsPreview(result.results);
+            if (result.results.length > 0) {
+                toastr.success(`${result.results.length} empresa(s) encontrada(s)!`);
+            } else {
+                toastr.info('Nenhuma empresa com telefone encontrada. Tente outra busca.');
+            }
+        } else {
+            toastr.error(result.message || 'Erro ao buscar preview');
+        }
+    })
+    .catch(err => {
+        btn.removeAttribute('data-kt-indicator');
+        btn.disabled = false;
+        toastr.error('Erro: ' + err.message);
+    });
+}
+
+// Renderizar preview do Google Maps
+function renderGoogleMapsPreview(results) {
+    const container = document.getElementById('gm_preview_container');
+    
+    if (!results || results.length === 0) {
+        container.innerHTML = '<div class="alert alert-warning">Nenhuma empresa com telefone encontrada. Tente outra palavra-chave ou localização.</div>';
+        container.style.display = 'block';
+        return;
+    }
+    
+    let html = '<div class="card card-flush bg-light">';
+    html += '<div class="card-header"><h5 class="card-title">Preview: ' + results.length + ' empresa(s) encontrada(s)</h5></div>';
+    html += '<div class="card-body p-0"><div class="table-responsive">';
+    html += '<table class="table table-sm table-row-bordered align-middle gs-0 gy-3 mb-0">';
+    html += '<thead><tr class="fw-bold text-muted bg-light">';
+    html += '<th class="ps-4">Nome</th><th>Telefone</th><th>Endereço</th><th>Categoria</th><th>Avaliação</th>';
+    html += '</tr></thead><tbody>';
+    
+    results.forEach(r => {
+        const rating = r.rating ? '⭐ ' + r.rating : '-';
+        html += '<tr>';
+        html += '<td class="ps-4"><strong>' + escapeHtml(r.name || '') + '</strong></td>';
+        html += '<td><code>' + escapeHtml(r.phone || r.international_phone || '-') + '</code></td>';
+        html += '<td class="text-muted">' + escapeHtml(r.address || '-').substring(0, 50) + '</td>';
+        html += '<td><span class="badge badge-light">' + escapeHtml(r.category || '-') + '</span></td>';
+        html += '<td>' + rating + '</td>';
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table></div></div></div>';
+    
+    container.innerHTML = html;
+    container.style.display = 'block';
+}
+
+// Salvar fonte Google Maps
+function saveGoogleMapsSource() {
+    const keyword = document.getElementById('gm_keyword').value;
+    const location = document.getElementById('gm_location').value;
+    const name = document.querySelector('[name="name"]').value;
+    
+    if (!name || !keyword || !location) {
+        toastr.warning('Preencha todos os campos obrigatórios');
+        return;
+    }
+    
+    const btn = document.getElementById('btn_save_gm');
+    btn.setAttribute('data-kt-indicator', 'on');
+    btn.disabled = true;
+    
+    const data = {
+        name: name,
+        type: 'google_maps',
+        provider: document.getElementById('gm_provider').value,
+        search_config: {
+            keyword: keyword,
+            location: location,
+            radius: parseInt(document.getElementById('gm_radius').value) || 5000,
+            max_results: parseInt(document.getElementById('gm_max_results').value) || 60,
+            language: 'pt-BR'
+        },
+        sync_frequency: document.getElementById('gm_sync_frequency').value,
+        status: 'active'
+    };
+    
+    fetch('/external-sources', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(result => {
+        btn.removeAttribute('data-kt-indicator');
+        btn.disabled = false;
+        
+        if (result.success) {
+            toastr.success('Fonte Google Maps criada com sucesso!');
+            setTimeout(() => {
+                window.location.href = '/external-sources';
+            }, 1000);
+        } else {
+            toastr.error(result.message || 'Erro ao criar fonte');
+        }
+    })
+    .catch(err => {
+        btn.removeAttribute('data-kt-indicator');
+        btn.disabled = false;
+        toastr.error('Erro de rede: ' + err.message);
+    });
+}
+
+// ========== FUNÇÕES BANCO DE DADOS ==========
 
 // Testar conexão
 function testConnection() {

@@ -19,11 +19,22 @@ class ExternalDataSourceService
      */
     public static function create(array $data): int
     {
-        $errors = Validator::validate($data, [
-            'name' => 'required|string|max:255',
-            'type' => 'required|string|in:mysql,postgresql,api',
-            'connection_config' => 'required|array'
-        ]);
+        // Validação diferente para google_maps
+        $type = $data['type'] ?? '';
+        
+        if ($type === 'google_maps') {
+            $errors = Validator::validate($data, [
+                'name' => 'required|string|max:255',
+                'type' => 'required|string|in:mysql,postgresql,api,google_maps',
+                'search_config' => 'required|array'
+            ]);
+        } else {
+            $errors = Validator::validate($data, [
+                'name' => 'required|string|max:255',
+                'type' => 'required|string|in:mysql,postgresql,api,google_maps',
+                'connection_config' => 'required|array'
+            ]);
+        }
 
         if (!empty($errors)) {
             throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));
@@ -39,6 +50,9 @@ class ExternalDataSourceService
         if (isset($data['query_config']) && is_array($data['query_config'])) {
             $data['query_config'] = json_encode($data['query_config']);
         }
+        if (isset($data['search_config']) && is_array($data['search_config'])) {
+            $data['search_config'] = json_encode($data['search_config']);
+        }
 
         return ExternalDataSource::create($data);
     }
@@ -46,8 +60,14 @@ class ExternalDataSourceService
     /**
      * Testar conexão com fonte externa
      */
-    public static function testConnection(array $connectionConfig, string $type): array
+    public static function testConnection(array $connectionConfig, string $type, ?string $provider = null): array
     {
+        // Para Google Maps, delegar para o service específico
+        if ($type === 'google_maps') {
+            $provider = $provider ?? 'google_places';
+            return GoogleMapsProspectService::testConnection($provider);
+        }
+        
         $logInfo = json_encode([
             'type' => $type,
             'host' => $connectionConfig['host'] ?? 'não definido',
@@ -316,6 +336,11 @@ class ExternalDataSourceService
                 throw new \Exception('Fonte não encontrada');
             }
 
+            // Para Google Maps, delegar para o service específico
+            if ($source['type'] === 'google_maps') {
+                return GoogleMapsProspectService::sync($sourceId, $contactListId);
+            }
+
             if (empty($source['table_name']) || empty($source['column_mapping'])) {
                 throw new \Exception('Fonte não configurada corretamente');
             }
@@ -474,14 +499,28 @@ class ExternalDataSourceService
                 $lists = \App\Helpers\Database::fetchAll($sql, [$source['id']]);
                 
                 foreach ($lists as $list) {
-                    Logger::info("Sincronizando fonte #{$source['id']} para lista #{$list['id']}");
-                    self::sync($source['id'], $list['id']);
+                    Logger::info("Sincronizando fonte #{$source['id']} (tipo: {$source['type']}) para lista #{$list['id']}");
+                    
+                    // Delegar para o service apropriado baseado no tipo
+                    if ($source['type'] === 'google_maps') {
+                        GoogleMapsProspectService::sync($source['id'], $list['id']);
+                    } else {
+                        self::sync($source['id'], $list['id']);
+                    }
                 }
                 
             } catch (\Exception $e) {
                 Logger::error("Erro ao processar fonte #{$source['id']}: " . $e->getMessage());
             }
         }
+    }
+    
+    /**
+     * Preview de busca do Google Maps (sem salvar)
+     */
+    public static function previewGoogleMaps(array $searchConfig, string $provider = 'google_places', int $limit = 5): array
+    {
+        return GoogleMapsProspectService::preview($searchConfig, $provider, $limit);
     }
 
     /**

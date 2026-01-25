@@ -1024,11 +1024,19 @@ class KanbanAgentService
             
             // Condições que NÃO precisam de IA
             if (in_array($type, [
-                'conversation_status', 'conversation_priority', // Status e prioridade da conversa
-                'last_message_hours', 'last_message_from', // Informações da última mensagem
-                'stage_duration_hours', 'has_tag', 'no_tag', 'assigned_to', 'unassigned', 'has_messages',
-                'has_agent_message', 'has_client_message',
-                'last_message_content', 'last_agent_message_content', 'last_client_message_content', 'any_message_contains'
+                // Dados básicos da conversa
+                'conversation_status', 'conversation_priority', 'conversation_channel',
+                'conversation_funnel', 'conversation_stage', 'conversation_assigned', 'conversation_department',
+                // Tempo e mensagens
+                'last_message_hours', 'last_message_from', 'client_no_response_minutes', 'agent_no_response_minutes',
+                'stage_duration_hours',
+                // Tags e atribuição
+                'has_tag', 'no_tag', 'assigned_to', 'unassigned',
+                // Verificação de mensagens
+                'has_messages', 'has_agent_message', 'has_client_message', 'message_count',
+                'last_message_content', 'last_agent_message_content', 'last_client_message_content', 'any_message_contains',
+                // Tempo/Idade
+                'conversation_age_hours'
             ])) {
                 $conditionsWithoutAI[] = $condition;
             } else {
@@ -1137,6 +1145,129 @@ class KanbanAgentService
             
             case 'conversation_priority':
                 return self::compare($conversation['priority'] ?? 'normal', $operator, $value);
+            
+            case 'conversation_channel':
+                $actualChannel = $conversation['channel'] ?? '';
+                $result = self::compare($actualChannel, $operator, $value);
+                self::logInfo("conversation_channel: actual='{$actualChannel}', expected='{$value}', result=" . ($result ? 'TRUE' : 'FALSE'));
+                return $result;
+            
+            case 'conversation_funnel':
+                $actualFunnel = (string)($conversation['funnel_id'] ?? '');
+                $result = self::compare($actualFunnel, $operator, $value);
+                self::logInfo("conversation_funnel: actual='{$actualFunnel}', expected='{$value}', result=" . ($result ? 'TRUE' : 'FALSE'));
+                return $result;
+            
+            case 'conversation_stage':
+                $actualStage = (string)($conversation['funnel_stage_id'] ?? '');
+                $result = self::compare($actualStage, $operator, $value);
+                self::logInfo("conversation_stage: actual='{$actualStage}', expected='{$value}', result=" . ($result ? 'TRUE' : 'FALSE'));
+                return $result;
+            
+            case 'conversation_assigned':
+                $actualAgent = (string)($conversation['agent_id'] ?? '');
+                // Operador is_empty verifica se não tem agente
+                if ($operator === 'is_empty') {
+                    $result = empty($actualAgent) || $actualAgent === '0';
+                    self::logInfo("conversation_assigned: is_empty check, actual='{$actualAgent}', result=" . ($result ? 'TRUE' : 'FALSE'));
+                    return $result;
+                }
+                $result = self::compare($actualAgent, $operator, $value);
+                self::logInfo("conversation_assigned: actual='{$actualAgent}', expected='{$value}', result=" . ($result ? 'TRUE' : 'FALSE'));
+                return $result;
+            
+            case 'conversation_department':
+                $actualDept = (string)($conversation['department_id'] ?? '');
+                $result = self::compare($actualDept, $operator, $value);
+                self::logInfo("conversation_department: actual='{$actualDept}', expected='{$value}', result=" . ($result ? 'TRUE' : 'FALSE'));
+                return $result;
+            
+            case 'has_tag':
+                // Verificar se a conversa tem uma tag específica
+                $tagsData = Database::fetchAll(
+                    "SELECT t.name, t.id FROM conversation_tags ct 
+                     JOIN tags t ON t.id = ct.tag_id 
+                     WHERE ct.conversation_id = ?",
+                    [$conversation['id']]
+                );
+                $tagNames = array_map(fn($t) => strtolower($t['name']), $tagsData);
+                $tagIds = array_map(fn($t) => (string)$t['id'], $tagsData);
+                
+                // Value pode ser ID ou nome da tag
+                $searchValue = strtolower($value ?? '');
+                $hasTag = in_array($searchValue, $tagNames) || in_array($value, $tagIds);
+                
+                if ($operator === 'equals') {
+                    return $hasTag;
+                } elseif ($operator === 'not_equals') {
+                    return !$hasTag;
+                }
+                return $hasTag;
+            
+            case 'no_tag':
+                // Verificar se a conversa NÃO tem uma tag específica (inverso de has_tag)
+                $tagsData = Database::fetchAll(
+                    "SELECT t.name, t.id FROM conversation_tags ct 
+                     JOIN tags t ON t.id = ct.tag_id 
+                     WHERE ct.conversation_id = ?",
+                    [$conversation['id']]
+                );
+                $tagNames = array_map(fn($t) => strtolower($t['name']), $tagsData);
+                $tagIds = array_map(fn($t) => (string)$t['id'], $tagsData);
+                
+                $searchValue = strtolower($value ?? '');
+                $hasTag = in_array($searchValue, $tagNames) || in_array($value, $tagIds);
+                return !$hasTag; // Retorna true se NÃO tem a tag
+            
+            case 'assigned_to':
+                // Verifica se está atribuída a um agente específico
+                $actualAgent = (string)($conversation['agent_id'] ?? '');
+                return self::compare($actualAgent, $operator, $value);
+            
+            case 'unassigned':
+                // Verifica se a conversa não está atribuída a nenhum agente
+                $agentId = $conversation['agent_id'] ?? null;
+                $isUnassigned = empty($agentId) || $agentId == 0;
+                
+                if ($operator === 'equals') {
+                    return $value === 'true' ? $isUnassigned : !$isUnassigned;
+                }
+                return $isUnassigned;
+            
+            case 'has_messages':
+                // Verifica se a conversa tem mensagens
+                $msgCount = Database::fetch(
+                    "SELECT COUNT(*) as count FROM messages WHERE conversation_id = ?",
+                    [$conversation['id']]
+                );
+                $hasMessages = isset($msgCount['count']) && (int)$msgCount['count'] > 0;
+                
+                if ($operator === 'equals') {
+                    return $value === 'true' ? $hasMessages : !$hasMessages;
+                }
+                return $hasMessages;
+            
+            case 'message_count':
+                // Conta total de mensagens na conversa
+                $msgCount = Database::fetch(
+                    "SELECT COUNT(*) as count FROM messages WHERE conversation_id = ?",
+                    [$conversation['id']]
+                );
+                $count = (int)($msgCount['count'] ?? 0);
+                $result = self::compare($count, $operator, (int)$value);
+                self::logInfo("message_count: count={$count}, operator={$operator}, value={$value}, result=" . ($result ? 'TRUE' : 'FALSE'));
+                return $result;
+            
+            case 'conversation_age_hours':
+                // Calcula idade da conversa em horas (desde a criação)
+                $createdAt = $conversation['created_at'] ?? null;
+                if (!$createdAt) {
+                    return false;
+                }
+                $ageHours = (time() - strtotime($createdAt)) / 3600;
+                $result = self::compare($ageHours, $operator, (float)$value);
+                self::logInfo("conversation_age_hours: age=" . round($ageHours, 2) . "h, operator={$operator}, value={$value}, result=" . ($result ? 'TRUE' : 'FALSE'));
+                return $result;
             
             case 'last_message_hours':
                 $lastMessage = Message::whereFirst('conversation_id', '=', $conversation['id'], 'ORDER BY created_at DESC');
@@ -1456,6 +1587,18 @@ class KanbanAgentService
             case 'send_internal_message':
                 Logger::info("KanbanAgentService::executeSingleAction - Ação 'send_internal_message': enviando mensagem interna para conversa {$conversation['id']}");
                 return self::actionSendInternalMessage($conversation, $analysis, $config);
+            
+            case 'remove_tag':
+                Logger::info("KanbanAgentService::executeSingleAction - Ação 'remove_tag': removendo tags " . json_encode($config['tags'] ?? []) . " da conversa {$conversation['id']}");
+                return self::actionRemoveTag($conversation, $config);
+            
+            case 'change_priority':
+                Logger::info("KanbanAgentService::executeSingleAction - Ação 'change_priority': alterando prioridade da conversa {$conversation['id']} para " . ($config['priority'] ?? 'N/A'));
+                return self::actionChangePriority($conversation, $config);
+            
+            case 'change_status':
+                Logger::info("KanbanAgentService::executeSingleAction - Ação 'change_status': alterando status da conversa {$conversation['id']} para " . ($config['status'] ?? 'N/A'));
+                return self::actionChangeStatus($conversation, $config);
             
             default:
                 Logger::error("KanbanAgentService::executeSingleAction - Tipo de ação desconhecido: $type");
@@ -1974,6 +2117,169 @@ class KanbanAgentService
             Logger::error("KanbanAgentService::actionSendInternalMessage - Erro: " . $e->getMessage());
             throw new \Exception('Erro ao criar mensagem interna: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Ação: Remover tag
+     */
+    private static function actionRemoveTag(array $conversation, array $config): array
+    {
+        $tags = $config['tags'] ?? [];
+        Logger::info("KanbanAgentService::actionRemoveTag - Tags a remover: " . json_encode($tags));
+        
+        if (empty($tags)) {
+            Logger::error("KanbanAgentService::actionRemoveTag - ERRO: Nenhuma tag especificada");
+            throw new \Exception('Nenhuma tag especificada');
+        }
+
+        $removedTags = [];
+        $errors = [];
+
+        foreach ($tags as $tag) {
+            try {
+                $tagId = null;
+                $tagName = $tag;
+                
+                // Se for ID numérico, usar diretamente
+                if (is_numeric($tag)) {
+                    $tagId = (int)$tag;
+                    $tagObj = \App\Models\Tag::find($tagId);
+                    $tagName = $tagObj ? $tagObj['name'] : "Tag #{$tag}";
+                } else {
+                    // Se for nome, buscar tag por nome
+                    $tagObj = \App\Models\Tag::whereFirst('name', '=', $tag);
+                    if ($tagObj) {
+                        $tagId = $tagObj['id'];
+                        $tagName = $tagObj['name'];
+                    }
+                }
+                
+                if ($tagId) {
+                    // Remover associação tag-conversa
+                    $deleted = Database::execute(
+                        "DELETE FROM conversation_tags WHERE conversation_id = ? AND tag_id = ?",
+                        [$conversation['id'], $tagId]
+                    );
+                    
+                    if ($deleted > 0) {
+                        $removedTags[] = $tagName;
+                        Logger::info("KanbanAgentService::actionRemoveTag - Tag '$tagName' removida com sucesso");
+                    } else {
+                        Logger::info("KanbanAgentService::actionRemoveTag - Tag '$tagName' não estava associada à conversa");
+                    }
+                } else {
+                    $errorMsg = "Tag '{$tag}' não encontrada";
+                    $errors[] = $errorMsg;
+                    Logger::warning("KanbanAgentService::actionRemoveTag - $errorMsg");
+                }
+            } catch (\Exception $e) {
+                $errorMsg = "Erro ao remover tag '{$tag}': " . $e->getMessage();
+                $errors[] = $errorMsg;
+                Logger::error("KanbanAgentService::actionRemoveTag - $errorMsg");
+            }
+        }
+
+        $resultMessage = !empty($removedTags) ? 'Tags removidas: ' . implode(', ', $removedTags) : 'Nenhuma tag removida';
+        Logger::info("KanbanAgentService::actionRemoveTag - Resultado: $resultMessage");
+        
+        // Notificar via WebSocket se tags foram removidas
+        if (!empty($removedTags)) {
+            self::notifyConversationChange($conversation['id'], 'tags_updated', [
+                'removed_tags' => $removedTags
+            ]);
+        }
+
+        return [
+            'message' => $resultMessage,
+            'removed_tags' => $removedTags,
+            'errors' => $errors
+        ];
+    }
+
+    /**
+     * Ação: Alterar prioridade
+     */
+    private static function actionChangePriority(array $conversation, array $config): array
+    {
+        $newPriority = $config['priority'] ?? null;
+        
+        if (!$newPriority) {
+            throw new \Exception('Prioridade não especificada');
+        }
+        
+        $validPriorities = ['low', 'normal', 'medium', 'high', 'urgent'];
+        if (!in_array($newPriority, $validPriorities)) {
+            throw new \Exception("Prioridade inválida: {$newPriority}. Valores aceitos: " . implode(', ', $validPriorities));
+        }
+        
+        $oldPriority = $conversation['priority'] ?? 'normal';
+        
+        // Atualizar prioridade
+        Conversation::update($conversation['id'], [
+            'priority' => $newPriority
+        ]);
+        
+        Logger::info("KanbanAgentService::actionChangePriority - Conversa {$conversation['id']}: prioridade alterada de '{$oldPriority}' para '{$newPriority}'");
+        
+        // Notificar via WebSocket
+        self::notifyConversationChange($conversation['id'], 'priority_changed', [
+            'old_priority' => $oldPriority,
+            'new_priority' => $newPriority
+        ]);
+        
+        return [
+            'message' => "Prioridade alterada de '{$oldPriority}' para '{$newPriority}'",
+            'old_priority' => $oldPriority,
+            'new_priority' => $newPriority
+        ];
+    }
+
+    /**
+     * Ação: Alterar status
+     */
+    private static function actionChangeStatus(array $conversation, array $config): array
+    {
+        $newStatus = $config['status'] ?? null;
+        
+        if (!$newStatus) {
+            throw new \Exception('Status não especificado');
+        }
+        
+        $validStatuses = ['open', 'closed', 'resolved', 'pending', 'spam'];
+        if (!in_array($newStatus, $validStatuses)) {
+            throw new \Exception("Status inválido: {$newStatus}. Valores aceitos: " . implode(', ', $validStatuses));
+        }
+        
+        $oldStatus = $conversation['status'] ?? 'open';
+        
+        // Atualizar status
+        $updateData = ['status' => $newStatus];
+        
+        // Se fechando, adicionar closed_at
+        if (in_array($newStatus, ['closed', 'resolved']) && !in_array($oldStatus, ['closed', 'resolved'])) {
+            $updateData['closed_at'] = date('Y-m-d H:i:s');
+        }
+        
+        // Se reabrindo, limpar closed_at
+        if (!in_array($newStatus, ['closed', 'resolved']) && in_array($oldStatus, ['closed', 'resolved'])) {
+            $updateData['closed_at'] = null;
+        }
+        
+        Conversation::update($conversation['id'], $updateData);
+        
+        Logger::info("KanbanAgentService::actionChangeStatus - Conversa {$conversation['id']}: status alterado de '{$oldStatus}' para '{$newStatus}'");
+        
+        // Notificar via WebSocket
+        self::notifyConversationChange($conversation['id'], 'status_changed', [
+            'old_status' => $oldStatus,
+            'new_status' => $newStatus
+        ]);
+        
+        return [
+            'message' => "Status alterado de '{$oldStatus}' para '{$newStatus}'",
+            'old_status' => $oldStatus,
+            'new_status' => $newStatus
+        ];
     }
 
     /**

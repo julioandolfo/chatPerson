@@ -509,6 +509,14 @@ class AIAgentService
             
             \App\Helpers\Logger::info("AIAgentService::processMessage - ANTES de sendMessage (contentLen=" . strlen($messageContent) . ", attachments=" . count($attachments) . ", type={$messageType})");
             
+            // ✅ CORREÇÃO: Verificar se há conteúdo para enviar
+            // Se mensagem vazia E sem attachments, não enviar (pode ser resultado de tool de escalação)
+            if (empty(trim($messageContent)) && empty($attachments)) {
+                \App\Helpers\Logger::warning("AIAgentService::processMessage - ⚠️ Conteúdo vazio e sem attachments, pulando envio de mensagem (provavelmente tool de escalação foi executada)");
+                \App\Helpers\Logger::info("═══ AIAgentService::processMessage SUCESSO (sem mensagem) ═══ conv={$conversationId}");
+                return $response;
+            }
+            
             // ✅ CORREÇÃO: Buscar timestamp da última mensagem do cliente para manter ordem cronológica
             // Garantir que estamos usando o timezone correto (America/Sao_Paulo)
             $originalTimezone = date_default_timezone_get();

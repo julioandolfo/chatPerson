@@ -194,7 +194,10 @@ class KanbanAgentController
                 'execution_schedule' => !empty($data['execution_schedule']) ? json_decode($data['execution_schedule'], true) : null,
                 'conditions' => !empty($data['conditions']) ? json_decode($data['conditions'], true) : ['operator' => 'AND', 'conditions' => []],
                 'actions' => !empty($data['actions']) ? json_decode($data['actions'], true) : [],
-                'settings' => !empty($data['settings']) ? json_decode($data['settings'], true) : null
+                'settings' => !empty($data['settings']) ? json_decode($data['settings'], true) : null,
+                // Campos de cooldown
+                'cooldown_hours' => isset($data['cooldown_hours']) ? (int)$data['cooldown_hours'] : 24,
+                'allow_reexecution_on_change' => isset($data['allow_reexecution_on_change']) ? true : false
             ];
             
             // Calcular próxima execução se necessário
@@ -304,7 +307,10 @@ class KanbanAgentController
                 'execution_schedule' => !empty($data['execution_schedule']) ? json_decode($data['execution_schedule'], true) : null,
                 'conditions' => !empty($data['conditions']) ? json_decode($data['conditions'], true) : ['operator' => 'AND', 'conditions' => []],
                 'actions' => !empty($data['actions']) ? json_decode($data['actions'], true) : [],
-                'settings' => !empty($data['settings']) ? json_decode($data['settings'], true) : null
+                'settings' => !empty($data['settings']) ? json_decode($data['settings'], true) : null,
+                // Campos de cooldown
+                'cooldown_hours' => isset($data['cooldown_hours']) ? (int)$data['cooldown_hours'] : 24,
+                'allow_reexecution_on_change' => isset($data['allow_reexecution_on_change']) ? true : false
             ];
             
             AIKanbanAgent::update($id, $updateData);

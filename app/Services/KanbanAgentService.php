@@ -1511,6 +1511,7 @@ class KanbanAgentService
     /**
      * Ação: Atribuir Agente de IA
      * Usa ConversationAIService para criar registro correto em ai_conversations
+     * Se já tiver IA ativa e process_immediately=true, executa follow-up mesmo assim
      */
     private static function actionAssignAIAgent(array $conversation, array $config): array
     {
@@ -1523,6 +1524,64 @@ class KanbanAgentService
         
         self::logInfo("KanbanAgentService::actionAssignAIAgent - Atribuindo agente {$aiAgentId} à conversa {$conversation['id']} (process_immediately: " . ($processImmediately ? 'true' : 'false') . ")");
         
+        // Verificar se já tem IA ativa na conversa
+        $existingAI = \App\Models\AIConversation::getByConversationId($conversation['id']);
+        $hasActiveAI = $existingAI && $existingAI['status'] === 'active';
+        
+        if ($hasActiveAI) {
+            self::logInfo("KanbanAgentService::actionAssignAIAgent - Conversa {$conversation['id']} já possui IA ativa (agent_id: {$existingAI['ai_agent_id']})");
+            
+            // Se process_immediately está marcado, executar follow-up com o agente existente
+            if ($processImmediately) {
+                $activeAgentId = (int)$existingAI['ai_agent_id'];
+                $aiAgent = \App\Models\AIAgent::find($activeAgentId);
+                $agentName = $aiAgent ? $aiAgent['name'] : "ID {$activeAgentId}";
+                
+                self::logInfo("KanbanAgentService::actionAssignAIAgent - Executando follow-up com agente ativo '{$agentName}' na conversa {$conversation['id']}");
+                
+                try {
+                    // Buscar última mensagem do contato para contexto
+                    $lastMessageSql = "SELECT * FROM messages 
+                                      WHERE conversation_id = ? 
+                                      AND sender_type = 'contact'
+                                      ORDER BY created_at DESC 
+                                      LIMIT 1";
+                    $lastMessage = \App\Helpers\Database::fetch($lastMessageSql, [$conversation['id']]);
+                    
+                    if ($lastMessage) {
+                        // Processar mensagem com contexto de follow-up
+                        \App\Services\AIAgentService::processMessage(
+                            $conversation['id'],
+                            $activeAgentId,
+                            $lastMessage['content']
+                        );
+                        self::logInfo("KanbanAgentService::actionAssignAIAgent - Follow-up executado com sucesso para conversa {$conversation['id']}");
+                    } else {
+                        // Se não há mensagem do contato, processar conversa (pode enviar boas-vindas)
+                        \App\Services\AIAgentService::processConversation($conversation['id'], $activeAgentId);
+                        self::logInfo("KanbanAgentService::actionAssignAIAgent - Conversa processada (sem mensagem do contato) para {$conversation['id']}");
+                    }
+                    
+                    return [
+                        'message' => "Follow-up executado com agente ativo '{$agentName}'",
+                        'ai_already_active' => true,
+                        'ai_agent_id' => $activeAgentId
+                    ];
+                    
+                } catch (\Exception $e) {
+                    self::logError("KanbanAgentService::actionAssignAIAgent - Erro ao executar follow-up: " . $e->getMessage());
+                    return [
+                        'message' => "IA já ativa, mas erro ao executar follow-up: " . $e->getMessage(),
+                        'ai_already_active' => true
+                    ];
+                }
+            } else {
+                // Se não quer processar imediatamente, apenas informar que já tem IA
+                return ['message' => 'Conversa já possui agente de IA ativo', 'ai_already_active' => true];
+            }
+        }
+        
+        // Se não tem IA ativa, adicionar normalmente
         try {
             // Usar ConversationAIService para adicionar corretamente o agente
             // Isso cria o registro em ai_conversations e permite que o sidebar mostre corretamente
@@ -1557,12 +1616,6 @@ class KanbanAgentService
             ];
             
         } catch (\Exception $e) {
-            // Se já tem IA ativa, não é erro crítico
-            if (strpos($e->getMessage(), 'já possui um agente de IA ativo') !== false) {
-                self::logWarning("KanbanAgentService::actionAssignAIAgent - Conversa {$conversation['id']} já possui IA ativa, pulando");
-                return ['message' => 'Conversa já possui agente de IA ativo'];
-            }
-            
             self::logError("KanbanAgentService::actionAssignAIAgent - Erro: " . $e->getMessage());
             throw $e;
         }

@@ -444,43 +444,49 @@ class KanbanAgentService
                 self::logInfo("KanbanAgentService::executeAgent - Sem condições básicas, todas as conversas serão analisadas");
             }
 
-            // PASSO 3: Limitar conversas para análise com IA
-            $maxConversations = $agent['max_conversations_per_execution'] ?? 50;
-            $totalBeforeLimit = count($filteredConversations);
-            $conversationsToAnalyze = array_slice($filteredConversations, 0, $maxConversations);
-            
-            if ($totalBeforeLimit > $maxConversations) {
-                self::logInfo("KanbanAgentService::executeAgent - Limitando análise a $maxConversations conversas (total filtradas: $totalBeforeLimit)");
-            }
-
-            self::logInfo("KanbanAgentService::executeAgent - Iniciando análise de " . count($conversationsToAnalyze) . " conversas com IA");
-
-            // PASSO 4: Aplicar filtro de cooldown
+            // PASSO 3: Aplicar filtro de cooldown ANTES de limitar
+            // Isso garante que conversas novas (não processadas) tenham prioridade
             $forceExecution = $executionType === 'manual_force'; // Permitir forçar execução
             $conversationsAfterCooldown = [];
             $skippedByCooldown = 0;
             
-            foreach ($conversationsToAnalyze as $conversation) {
+            self::logInfo("KanbanAgentService::executeAgent - Aplicando filtro de cooldown em " . count($filteredConversations) . " conversas...");
+            
+            foreach ($filteredConversations as $conversation) {
                 [$shouldSkip, $reason] = self::shouldSkipConversation($agent, $conversation, $forceExecution);
                 
                 if ($shouldSkip) {
                     $skippedByCooldown++;
-                    self::logInfo("Conversa {$conversation['id']}: PULADA - motivo: $reason");
+                    // Só logar as primeiras 5 para não poluir
+                    if ($skippedByCooldown <= 5) {
+                        self::logInfo("Conversa {$conversation['id']}: PULADA - motivo: $reason");
+                    }
                     continue;
                 }
                 
                 $conversationsAfterCooldown[] = $conversation;
             }
             
-            self::logInfo("KanbanAgentService::executeAgent - Conversas após filtro de cooldown: " . count($conversationsAfterCooldown) . " de " . count($conversationsToAnalyze) . " (puladas: $skippedByCooldown)");
+            self::logInfo("KanbanAgentService::executeAgent - Conversas após filtro de cooldown: " . count($conversationsAfterCooldown) . " de " . count($filteredConversations) . " (puladas: $skippedByCooldown)");
             
-            // IMPORTANTE: Se todas foram puladas pelo cooldown, avisar
-            if (count($conversationsAfterCooldown) === 0 && $skippedByCooldown > 0) {
-                self::logWarning("⚠️ TODAS as conversas foram puladas pelo cooldown! Cooldown configurado: {$agent['cooldown_hours']}h. Use 'Forçar Execução' para ignorar o cooldown.");
+            // PASSO 4: Limitar conversas para análise com IA (APÓS cooldown)
+            $maxConversations = $agent['max_conversations_per_execution'] ?? 50;
+            $totalBeforeLimitAfterCooldown = count($conversationsAfterCooldown);
+            $conversationsToAnalyze = array_slice($conversationsAfterCooldown, 0, $maxConversations);
+            
+            if ($totalBeforeLimitAfterCooldown > $maxConversations) {
+                self::logInfo("KanbanAgentService::executeAgent - Limitando análise a $maxConversations conversas (disponíveis após cooldown: $totalBeforeLimitAfterCooldown)");
             }
 
-            // PASSO 5: Analisar conversas que passaram pelo cooldown com IA
-            foreach ($conversationsAfterCooldown as $index => $conversation) {
+            self::logInfo("KanbanAgentService::executeAgent - Conversas prontas para análise com IA: " . count($conversationsToAnalyze));
+            
+            // IMPORTANTE: Se todas foram puladas pelo cooldown, avisar
+            if (count($conversationsToAnalyze) === 0 && $skippedByCooldown > 0) {
+                self::logWarning("⚠️ TODAS as " . count($filteredConversations) . " conversas foram puladas pelo cooldown! Cooldown configurado: {$agent['cooldown_hours']}h. Use 'Forçar Execução' para ignorar o cooldown.");
+            }
+
+            // PASSO 5: Analisar conversas prontas
+            foreach ($conversationsToAnalyze as $index => $conversation) {
                 try {
                     $stats['conversations_analyzed']++;
                     self::logInfo("KanbanAgentService::executeAgent - ===== Conversa " . ($index + 1) . "/" . count($conversationsToAnalyze) . " =====");

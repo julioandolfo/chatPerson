@@ -1644,20 +1644,38 @@ class KanbanAgentService
                 self::logInfo("KanbanAgentService::actionAssignAIAgent - Executando follow-up com agente ativo '{$agentName}' na conversa {$conversation['id']}");
                 
                 try {
-                    // Buscar última mensagem do contato para contexto
-                    $lastMessageSql = "SELECT * FROM messages 
+                    // Buscar última mensagem do contato e calcular tempo
+                    $lastMessageSql = "SELECT *, 
+                                       TIMESTAMPDIFF(HOUR, created_at, NOW()) as hours_ago,
+                                       TIMESTAMPDIFF(DAY, created_at, NOW()) as days_ago
+                                      FROM messages 
                                       WHERE conversation_id = ? 
                                       AND sender_type = 'contact'
                                       ORDER BY created_at DESC 
                                       LIMIT 1";
                     $lastMessage = \App\Helpers\Database::fetch($lastMessageSql, [$conversation['id']]);
                     
+                    // Montar mensagem de follow-up com contexto temporal
+                    $followupContext = "[FOLLOW-UP AUTOMÁTICO]\n";
+                    $followupContext .= "Esta é uma ação de follow-up automático. Analise o histórico da conversa e retome o atendimento de forma natural.\n";
+                    
                     if ($lastMessage) {
-                        // Processar mensagem com contexto de follow-up
+                        $hoursAgo = (int)($lastMessage['hours_ago'] ?? 0);
+                        $daysAgo = (int)($lastMessage['days_ago'] ?? 0);
+                        
+                        if ($daysAgo > 0) {
+                            $followupContext .= "Última mensagem do cliente foi há {$daysAgo} dia(s).\n";
+                        } elseif ($hoursAgo > 0) {
+                            $followupContext .= "Última mensagem do cliente foi há {$hoursAgo} hora(s).\n";
+                        }
+                        
+                        $followupContext .= "Conteúdo: " . mb_substr($lastMessage['content'], 0, 200);
+                        
+                        // Processar com contexto de follow-up
                         \App\Services\AIAgentService::processMessage(
                             $conversation['id'],
                             $activeAgentId,
-                            $lastMessage['content']
+                            $followupContext
                         );
                         self::logInfo("KanbanAgentService::actionAssignAIAgent - Follow-up executado com sucesso para conversa {$conversation['id']}");
                     } else {

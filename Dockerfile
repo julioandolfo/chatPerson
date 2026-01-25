@@ -30,13 +30,16 @@ RUN sed -i 's!/var/www/html!/var/www/html/public!g' \
 # Pasta de trabalho
 WORKDIR /var/www/html
 
-# (Opcional, mas bom) copia composer e instala deps
-COPY composer.json composer.lock* ./
-
+# Instalar Composer
 RUN php -r "copy('https://getcomposer.org/installer','composer-setup.php');" \
  && php composer-setup.php --install-dir=/usr/local/bin --filename=composer \
- && rm composer-setup.php \
- && composer install --no-dev --no-interaction --prefer-dist --no-progress || true
+ && rm composer-setup.php
+
+# Copiar composer files primeiro (para cache do Docker)
+COPY composer.json composer.lock ./
+
+# Instalar dependências do Composer
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
 # Copia o resto do projeto
 COPY . .

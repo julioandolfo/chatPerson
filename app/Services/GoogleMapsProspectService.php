@@ -145,11 +145,7 @@ class GoogleMapsProspectService
             
             $provider = $source['provider'] ?? 'google_places';
             
-            Logger::info("GoogleMapsProspectService::sync - Iniciando busca via {$provider}", [
-                'source_id' => $sourceId,
-                'keyword' => $searchConfig['keyword'] ?? '',
-                'location' => $searchConfig['location'] ?? ''
-            ]);
+            Logger::info("GoogleMapsProspectService::sync - Iniciando busca via {$provider} - Source: {$sourceId}, Keyword: " . ($searchConfig['keyword'] ?? '') . ", Location: " . ($searchConfig['location'] ?? ''));
             
             // Buscar leads baseado no provider
             if ($provider === 'outscraper') {

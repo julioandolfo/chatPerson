@@ -115,7 +115,7 @@ class WooCommerceProspectService
         $errors = [];
         
         try {
-            ExternalDataSource::updateStatus($sourceId, 'syncing');
+            ExternalDataSource::updateSyncStatus($sourceId, 'syncing', 'Sincronização em andamento...');
             
             $client = self::getClient();
             $page = 1;
@@ -191,10 +191,10 @@ class WooCommerceProspectService
             }
             
             // Atualizar status
-            ExternalDataSource::updateStatus($sourceId, 'active');
-            ExternalDataSource::updateSyncStats($sourceId, $imported + $updated);
-            
+            $totalSynced = $imported + $updated;
             $message = "Sincronização concluída: {$imported} importados, {$updated} atualizados, {$skipped} ignorados";
+            ExternalDataSource::updateSyncStatus($sourceId, 'success', $message, $totalSynced);
+            ExternalDataSource::update($sourceId, ['total_synced' => ($source['total_synced'] ?? 0) + $totalSynced]);
             Logger::info("WooCommerceProspectService::sync - " . $message);
             
             return [
@@ -207,7 +207,7 @@ class WooCommerceProspectService
             ];
             
         } catch (\Exception $e) {
-            ExternalDataSource::updateStatus($sourceId, 'error');
+            ExternalDataSource::updateSyncStatus($sourceId, 'error', $e->getMessage());
             Logger::error("WooCommerceProspectService::sync - Erro: " . $e->getMessage());
             
             return [
@@ -400,7 +400,7 @@ class WooCommerceProspectService
         }
         
         // Buscar pelo telefone normalizado
-        return Database::fetchOne(
+        return Database::fetch(
             "SELECT * FROM contacts WHERE phone = ? OR phone LIKE ? LIMIT 1",
             [$phone, '%' . substr($phone, -10)]
         );
@@ -415,7 +415,7 @@ class WooCommerceProspectService
             return null;
         }
         
-        return Database::fetchOne(
+        return Database::fetch(
             "SELECT * FROM contacts WHERE email = ? LIMIT 1",
             [$email]
         );
@@ -426,7 +426,7 @@ class WooCommerceProspectService
      */
     private static function addToListIfNotExists(int $contactId, int $listId): void
     {
-        $exists = Database::fetchOne(
+        $exists = Database::fetch(
             "SELECT 1 FROM contact_list_items WHERE contact_list_id = ? AND contact_id = ?",
             [$listId, $contactId]
         );

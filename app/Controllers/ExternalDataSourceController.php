@@ -253,20 +253,53 @@ class ExternalDataSourceController
      */
     public function sync(int $sourceId): void
     {
-        Permission::abortIfCannot('campaigns.create');
-
+        $logFile = 'external_sources.log';
+        \App\Helpers\Logger::log("=== SYNC INICIADO - Source ID: {$sourceId} ===", $logFile);
+        
+        // Desabilitar exibição de erros HTML
+        ini_set('display_errors', '0');
+        error_reporting(E_ALL);
+        
+        // Capturar qualquer output indesejado
+        ob_start();
+        
         try {
+            Permission::abortIfCannot('campaigns.create');
+            
             $data = Request::json();
             $listId = $data['list_id'] ?? null;
+            
+            \App\Helpers\Logger::log("List ID: " . ($listId ?? 'null'), $logFile);
             
             if (empty($listId)) {
                 throw new \Exception('ID da lista é obrigatório');
             }
             
+            \App\Helpers\Logger::log("Chamando ExternalDataSourceService::sync...", $logFile);
             $result = ExternalDataSourceService::sync($sourceId, (int)$listId);
+            
+            // Limpar qualquer output buffered
+            $unexpectedOutput = ob_get_clean();
+            if (!empty($unexpectedOutput)) {
+                \App\Helpers\Logger::log("WARNING - Output inesperado: " . substr($unexpectedOutput, 0, 500), $logFile);
+            }
+            
+            \App\Helpers\Logger::log("Resultado: " . json_encode($result), $logFile);
+            \App\Helpers\Logger::log("=== SYNC SUCESSO ===", $logFile);
+            
             Response::json($result);
-        } catch (\Exception $e) {
-            \App\Helpers\Logger::error('Erro ao sincronizar fonte: ' . $e->getMessage());
+        } catch (\Throwable $e) {
+            // Limpar qualquer output buffered
+            $unexpectedOutput = ob_get_clean();
+            if (!empty($unexpectedOutput)) {
+                \App\Helpers\Logger::log("WARNING - Output inesperado no erro: " . substr($unexpectedOutput, 0, 500), $logFile);
+            }
+            
+            \App\Helpers\Logger::log("EXCEÇÃO: " . $e->getMessage(), $logFile);
+            \App\Helpers\Logger::log("File: " . $e->getFile() . ":" . $e->getLine(), $logFile);
+            \App\Helpers\Logger::log("Stack: " . $e->getTraceAsString(), $logFile);
+            \App\Helpers\Logger::log("=== SYNC ERRO ===", $logFile);
+            
             Response::json([
                 'success' => false,
                 'message' => $e->getMessage()

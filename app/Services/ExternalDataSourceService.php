@@ -334,6 +334,10 @@ class ExternalDataSourceService
      */
     public static function sync(int $sourceId, int $contactListId): array
     {
+        $logFile = 'external_sources.log';
+        Logger::log("=== ExternalDataSourceService::sync INICIADO ===", $logFile);
+        Logger::log("Source ID: {$sourceId}, List ID: {$contactListId}", $logFile);
+        
         $startTime = microtime(true);
         $logData = [
             'started_at' => date('Y-m-d H:i:s'),
@@ -346,16 +350,21 @@ class ExternalDataSourceService
         try {
             $source = ExternalDataSource::find($sourceId);
             if (!$source) {
+                Logger::log("ERRO: Fonte não encontrada", $logFile);
                 throw new \Exception('Fonte não encontrada');
             }
+            
+            Logger::log("Tipo da fonte: " . $source['type'], $logFile);
 
             // Para Google Maps, delegar para o service específico
             if ($source['type'] === 'google_maps') {
+                Logger::log("Delegando para GoogleMapsProspectService::sync", $logFile);
                 return GoogleMapsProspectService::sync($sourceId, $contactListId);
             }
             
             // Para WooCommerce, delegar para o service específico
             if ($source['type'] === 'woocommerce') {
+                Logger::log("Delegando para WooCommerceProspectService::sync", $logFile);
                 return WooCommerceProspectService::sync($sourceId, $contactListId);
             }
 

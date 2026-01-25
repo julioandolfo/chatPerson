@@ -3,6 +3,12 @@
  * Autoloader Simples
  */
 
+// ✅ CRÍTICO: Carregar autoloader do Composer PRIMEIRO (para dependências externas)
+$composerAutoload = __DIR__ . '/../../vendor/autoload.php';
+if (file_exists($composerAutoload)) {
+    require_once $composerAutoload;
+}
+
 spl_autoload_register(function ($class) {
     // Converter namespace para caminho
     $prefix = 'App\\';

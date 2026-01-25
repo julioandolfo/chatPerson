@@ -39,10 +39,14 @@ RUN php -r "copy('https://getcomposer.org/installer','composer-setup.php');" \
 COPY composer.json composer.lock ./
 
 # Instalar dependências do Composer
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader \
+ && composer dump-autoload --optimize --no-dev
 
 # Copia o resto do projeto
 COPY . .
+
+# Regenerar autoloader após copiar tudo
+RUN composer dump-autoload --optimize --no-dev --classmap-authoritative
 
 # Permissões (se for tipo Laravel, funciona; se não for, ignora com || true)
 RUN chown -R www-data:www-data /var/www/html \

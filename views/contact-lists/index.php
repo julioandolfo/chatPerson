@@ -102,13 +102,18 @@ function renderLists(lists) {
                     </div>
                 </div>
                 <div class="card-footer d-flex gap-2">
-                    <button class="btn btn-light-info btn-sm flex-fill" onclick="openSendOrderModal(${list.id})" title="Configurar ordem de envio">
-                        <i class="ki-duotone ki-sort fs-6"></i>
-                        Ordem
-                    </button>
-                    <a href="<?= \App\Helpers\Url::to('/contact-lists/') ?>${list.id}" class="btn btn-light-primary btn-sm flex-fill">
-                        Ver Contatos
+                    <a href="<?= \App\Helpers\Url::to('/contact-lists/') ?>${list.id}" class="btn btn-light-primary btn-sm flex-fill" title="Ver Contatos">
+                        <i class="ki-duotone ki-eye fs-6"><span class="path1"></span><span class="path2"></span></i>
                     </a>
+                    <a href="<?= \App\Helpers\Url::to('/contact-lists/') ?>${list.id}/edit" class="btn btn-light-warning btn-sm" title="Editar">
+                        <i class="ki-duotone ki-pencil fs-6"><span class="path1"></span><span class="path2"></span></i>
+                    </a>
+                    <button class="btn btn-light-info btn-sm" onclick="openSendOrderModal(${list.id})" title="Ordem de Envio">
+                        <i class="ki-duotone ki-sort fs-6"><span class="path1"></span><span class="path2"></span></i>
+                    </button>
+                    <button class="btn btn-light-danger btn-sm" onclick="deleteList(${list.id}, '${escapeHtml(list.name)}')" title="Deletar">
+                        <i class="ki-duotone ki-trash fs-6"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
+                    </button>
                 </div>
             </div>
         </div>
@@ -125,6 +130,30 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function deleteList(listId, listName) {
+    if (!confirm(`Tem certeza que deseja deletar a lista "${listName}"?\n\nIsso removerá todos os contatos vinculados a esta lista.`)) {
+        return;
+    }
+    
+    fetch(`<?= \App\Helpers\Url::to('/contact-lists/') ?>${listId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin'
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            toastr.success('Lista deletada com sucesso!');
+            loadLists(); // Recarrega a lista
+        } else {
+            toastr.error(data.message || 'Erro ao deletar lista');
+        }
+    })
+    .catch(err => {
+        toastr.error('Erro de rede ao deletar');
+    });
 }
 
 document.addEventListener('DOMContentLoaded', () => {

@@ -2,6 +2,8 @@
 $layout = 'layouts.metronic.app';
 $title = $list['name'] ?? 'Lista';
 $pageTitle = 'Detalhes da Lista';
+
+ob_start();
 ?>
 
 <div class="d-flex flex-column flex-column-fluid">
@@ -377,3 +379,8 @@ function importCSV() {
     });
 }
 </script>
+
+<?php
+$content = ob_get_clean();
+require __DIR__ . '/../layouts/metronic/app.php';
+?>

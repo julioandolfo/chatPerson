@@ -43,7 +43,8 @@ class ContactListController
             
             Response::json([
                 'success' => true,
-                'lists' => $lists
+                'data' => $lists,
+                'lists' => $lists // compatibilidade
             ]);
         } catch (\Exception $e) {
             Response::json([

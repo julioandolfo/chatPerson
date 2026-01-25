@@ -402,52 +402,82 @@ class GoogleMapsProspectService
             Logger::log("ERRO: API Key do Outscraper não configurada!", $logFile);
             throw new \Exception("API Key do Outscraper não configurada. Vá em Configurações → Prospecção para configurar.");
         }
-        Logger::log("API Key encontrada: " . substr($apiKey, 0, 10) . "...", $logFile);
+        Logger::log("API Key encontrada: " . substr(base64_encode($apiKey), 0, 10) . "...", $logFile);
         
-        $client = self::getClient();
         $results = [];
         
-        $keyword = $config['keyword'] ?? '';
-        $location = $config['location'] ?? 'São Paulo, SP';
-        $maxResults = $config['max_results'] ?? 100;
-        
-        // Outscraper usa query no formato "keyword, location"
-        $query = "{$keyword}, {$location}";
-        
-        $params = [
-            'query' => $query,
-            'limit' => min($maxResults, 500), // Outscraper max 500
-            'language' => $config['language'] ?? 'pt',
-            'region' => 'br',
-            'async' => false
-        ];
-        
-        Logger::log("Query: {$query}", $logFile);
-        Logger::log("Params: " . json_encode($params), $logFile);
-        
         try {
-            Logger::log("Fazendo requisição para Outscraper API...", $logFile);
+            Logger::log("Preparando parâmetros...", $logFile);
+            
+            $keyword = $config['keyword'] ?? '';
+            $location = $config['location'] ?? 'São Paulo, SP';
+            $maxResults = $config['max_results'] ?? 100;
+            
+            // Outscraper usa query no formato "keyword, location"
+            $query = "{$keyword}, {$location}";
+            
+            $params = [
+                'query' => $query,
+                'limit' => min($maxResults, 500), // Outscraper max 500
+                'language' => $config['language'] ?? 'pt',
+                'region' => 'br',
+                'async' => 'false' // String para evitar problemas
+            ];
+            
+            Logger::log("Query: {$query}", $logFile);
+            Logger::log("Params: " . json_encode($params), $logFile);
+            
+            // Construir URL manualmente para debug
+            $url = self::OUTSCRAPER_BASE_URL . '?' . http_build_query($params);
+            Logger::log("URL completa: " . $url, $logFile);
+            
+            Logger::log("Criando cliente HTTP...", $logFile);
+            $client = self::getClient();
+            
+            Logger::log("Fazendo requisição para Outscraper API (timeout: 60s)...", $logFile);
             
             $response = $client->get(self::OUTSCRAPER_BASE_URL, [
                 'query' => $params,
                 'headers' => [
-                    'X-API-KEY' => $apiKey
-                ]
+                    'X-API-KEY' => $apiKey,
+                    'Accept' => 'application/json'
+                ],
+                'timeout' => 60, // Aumentar timeout para 60s
+                'connect_timeout' => 10
             ]);
             
             $statusCode = $response->getStatusCode();
             Logger::log("Status Code: {$statusCode}", $logFile);
             
             $body = $response->getBody()->getContents();
-            Logger::log("Response (primeiros 500 chars): " . substr($body, 0, 500), $logFile);
+            Logger::log("Response length: " . strlen($body), $logFile);
+            Logger::log("Response (primeiros 1000 chars): " . substr($body, 0, 1000), $logFile);
             
             $data = json_decode($body, true);
+            
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Logger::log("ERRO JSON decode: " . json_last_error_msg(), $logFile);
+                throw new \Exception("Resposta inválida da API: " . json_last_error_msg());
+            }
+            
+            // Verificar se é erro da API
+            if (isset($data['error'])) {
+                Logger::log("ERRO da API Outscraper: " . json_encode($data), $logFile);
+                throw new \Exception("Erro da API Outscraper: " . ($data['error']['message'] ?? $data['error'] ?? 'Erro desconhecido'));
+            }
             
             if (!empty($data['data'])) {
                 Logger::log("Dados recebidos, processando " . count($data['data']) . " grupos", $logFile);
                 
                 foreach ($data['data'] as $places) {
+                    if (!is_array($places)) {
+                        Logger::log("Formato inesperado em places: " . gettype($places), $logFile);
+                        continue;
+                    }
+                    
                     foreach ($places as $place) {
+                        if (!is_array($place)) continue;
+                        
                         if (!empty($place['phone'])) {
                             $results[] = [
                                 'place_id' => $place['place_id'] ?? $place['google_id'] ?? '',
@@ -468,15 +498,28 @@ class GoogleMapsProspectService
                 
                 Logger::log("Total de resultados com telefone: " . count($results), $logFile);
             } else {
-                Logger::log("Nenhum dado retornado ou formato inesperado", $logFile);
-                Logger::log("Estrutura data: " . json_encode(array_keys($data ?? [])), $logFile);
+                Logger::log("Nenhum dado retornado", $logFile);
+                Logger::log("Estrutura response: " . json_encode(array_keys($data ?? [])), $logFile);
+                
+                // Verificar se a API retornou status pendente (async)
+                if (isset($data['status']) && $data['status'] === 'Pending') {
+                    throw new \Exception("A busca está em processamento. Tente novamente em alguns segundos.");
+                }
             }
             
         } catch (RequestException $e) {
             Logger::log("RequestException: " . $e->getMessage(), $logFile);
+            if ($e->hasResponse()) {
+                $errorBody = $e->getResponse()->getBody()->getContents();
+                Logger::log("Error Response: " . substr($errorBody, 0, 500), $logFile);
+            }
             throw new \Exception("Erro na requisição Outscraper: " . $e->getMessage());
+        } catch (\GuzzleHttp\Exception\ConnectException $e) {
+            Logger::log("ConnectException: " . $e->getMessage(), $logFile);
+            throw new \Exception("Erro de conexão com Outscraper: " . $e->getMessage());
         } catch (\Exception $e) {
             Logger::log("Exception geral: " . $e->getMessage(), $logFile);
+            Logger::log("Exception class: " . get_class($e), $logFile);
             throw $e;
         }
         
@@ -709,8 +752,15 @@ class GoogleMapsProspectService
         Logger::log("SearchConfig: " . json_encode($searchConfig), $logFile);
         Logger::log("Limit: " . $limit, $logFile);
         
+        // Registrar handler de erro fatal
+        register_shutdown_function(function() use ($logFile) {
+            $error = error_get_last();
+            if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+                Logger::log("FATAL ERROR: " . json_encode($error), $logFile);
+            }
+        });
+        
         try {
-            $originalLimit = $searchConfig['max_results'] ?? 100;
             $searchConfig['max_results'] = $limit;
             
             if ($provider === 'outscraper') {
@@ -730,18 +780,20 @@ class GoogleMapsProspectService
                 $results = self::fetchFromGooglePlaces($searchConfig, null);
             }
             
-            Logger::log("Resultados obtidos: " . count($results['results'] ?? []), $logFile);
+            $resultCount = count($results['results'] ?? []);
+            Logger::log("Resultados obtidos: " . $resultCount, $logFile);
             Logger::log("=== GoogleMapsProspectService::preview SUCESSO ===", $logFile);
             
             return [
                 'success' => true,
                 'results' => array_slice($results['results'], 0, $limit),
-                'total_found' => count($results['results']),
-                'has_more' => !empty($results['next_page_token']) || count($results['results']) >= $limit
+                'total_found' => $resultCount,
+                'has_more' => !empty($results['next_page_token']) || $resultCount >= $limit
             ];
             
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Logger::log("EXCEÇÃO no preview: " . $e->getMessage(), $logFile);
+            Logger::log("Exception class: " . get_class($e), $logFile);
             Logger::log("Stack: " . $e->getTraceAsString(), $logFile);
             Logger::log("=== GoogleMapsProspectService::preview ERRO ===", $logFile);
             

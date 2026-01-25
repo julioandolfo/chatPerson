@@ -638,6 +638,7 @@ Router::post('/contact-lists', [ContactListController::class, 'store'], ['Authen
 Router::get('/contact-lists/{id}', [ContactListController::class, 'show'], ['Authentication']);
 Router::get('/contact-lists/{id}/edit', [ContactListController::class, 'edit'], ['Authentication']);
 Router::post('/contact-lists/{id}', [ContactListController::class, 'update'], ['Authentication']);
+Router::put('/contact-lists/{id}', [ContactListController::class, 'update'], ['Authentication']);
 Router::delete('/contact-lists/{id}', [ContactListController::class, 'destroy'], ['Authentication']);
 Router::post('/contact-lists/{id}/contacts', [ContactListController::class, 'addContact'], ['Authentication']);
 Router::delete('/contact-lists/{id}/contacts', [ContactListController::class, 'removeContact'], ['Authentication']);

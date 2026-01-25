@@ -126,6 +126,66 @@ ob_start();
                 </div>
             </div>
             
+            <!-- Configurações de Horário de Funcionamento -->
+            <div class="separator separator-dashed my-8"></div>
+            
+            <div class="d-flex align-items-center mb-5">
+                <i class="ki-duotone ki-calendar fs-2x text-warning me-3">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                <div>
+                    <h3 class="mb-1">Horário de Funcionamento</h3>
+                    <div class="text-muted fs-7">Defina quando o agente pode executar (fora desse horário, não executa)</div>
+                </div>
+            </div>
+            
+            <div class="row mb-5">
+                <div class="col-md-12">
+                    <div class="form-check form-switch mb-4">
+                        <input class="form-check-input" type="checkbox" name="working_hours_enabled" id="working_hours_enabled">
+                        <label class="form-check-label" for="working_hours_enabled">
+                            <strong>Restringir horário de execução</strong>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="working_hours_config" class="d-none">
+                <div class="row mb-5">
+                    <div class="col-md-6">
+                        <label class="form-label">Dias da Semana</label>
+                        <div class="d-flex flex-wrap gap-3">
+                            <?php 
+                            $dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+                            $defaultDays = [1,2,3,4,5]; // Seg-Sex por padrão
+                            foreach ($dayNames as $i => $day): 
+                            ?>
+                            <div class="form-check">
+                                <input class="form-check-input working-day-check" type="checkbox" value="<?= $i ?>" id="working_day_<?= $i ?>" <?= in_array($i, $defaultDays) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="working_day_<?= $i ?>"><?= $day ?></label>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Horário Inicial</label>
+                        <input type="time" name="working_start_time" id="working_start_time" class="form-control" value="08:00">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Horário Final</label>
+                        <input type="time" name="working_end_time" id="working_end_time" class="form-control" value="18:00">
+                    </div>
+                </div>
+                <div class="alert alert-info d-flex align-items-center p-3">
+                    <i class="ki-duotone ki-information fs-2x text-info me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                    <div class="fs-7">
+                        <strong>Exemplo:</strong> Seg-Sex, 08:00 às 18:00 significa que o agente só executará em dias úteis dentro do horário comercial.
+                        Execuções fora desse período serão ignoradas.
+                    </div>
+                </div>
+            </div>
+            
             <div class="separator separator-dashed my-10"></div>
             
             <h4 class="fw-bold mb-5">Funis e Etapas Alvo</h4>
@@ -1061,6 +1121,19 @@ document.addEventListener('DOMContentLoaded', async function() {
     await loadSystemData();
     loadConditions();
     loadActions();
+    
+    // Toggle horário de funcionamento
+    const workingHoursToggle = document.getElementById('working_hours_enabled');
+    const workingHoursConfig = document.getElementById('working_hours_config');
+    if (workingHoursToggle && workingHoursConfig) {
+        workingHoursToggle.addEventListener('change', function() {
+            if (this.checked) {
+                workingHoursConfig.classList.remove('d-none');
+            } else {
+                workingHoursConfig.classList.add('d-none');
+            }
+        });
+    }
 });
 
 document.getElementById('kt_form_kanban_agent').addEventListener('submit', function(e) {
@@ -1109,6 +1182,31 @@ document.getElementById('kt_form_kanban_agent').addEventListener('submit', funct
         conditions: conditions
     });
     data.actions = JSON.stringify(actions);
+    
+    // Processar horário de funcionamento
+    const workingHoursEnabled = document.getElementById('working_hours_enabled').checked;
+    const workingHours = {
+        enabled: workingHoursEnabled,
+        days: [],
+        start_time: document.getElementById('working_start_time').value || '08:00',
+        end_time: document.getElementById('working_end_time').value || '18:00'
+    };
+    
+    if (workingHoursEnabled) {
+        document.querySelectorAll('.working-day-check:checked').forEach(cb => {
+            workingHours.days.push(parseInt(cb.value));
+        });
+    }
+    
+    // Incluir working_hours nas settings
+    let existingSettings = {};
+    try {
+        existingSettings = data.settings ? JSON.parse(data.settings) : {};
+    } catch(e) {
+        existingSettings = {};
+    }
+    existingSettings.working_hours = workingHours;
+    data.settings = JSON.stringify(existingSettings);
     
     fetch('/kanban-agents', {
         method: 'POST',

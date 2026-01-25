@@ -42,6 +42,55 @@ class KanbanAgentService
     }
     
     /**
+     * Verificar se o agente está dentro do horário de funcionamento configurado
+     * @return array ['allowed' => bool, 'reason' => string]
+     */
+    private static function isWithinWorkingHours(array $agent): array
+    {
+        $settings = $agent['settings'] ?? [];
+        if (is_string($settings)) {
+            $settings = json_decode($settings, true) ?? [];
+        }
+        
+        $workingHours = $settings['working_hours'] ?? null;
+        
+        // Se não tem configuração de horário ou não está habilitado, permite
+        if (!$workingHours || !($workingHours['enabled'] ?? false)) {
+            return ['allowed' => true, 'reason' => 'Sem restrição de horário'];
+        }
+        
+        // Obter data/hora atual no timezone do sistema
+        date_default_timezone_set('America/Sao_Paulo');
+        $now = new \DateTime();
+        $currentDay = (int)$now->format('w'); // 0 = Domingo, 6 = Sábado
+        $currentTime = $now->format('H:i');
+        
+        // Verificar dia da semana
+        $allowedDays = $workingHours['days'] ?? [1, 2, 3, 4, 5]; // Padrão: Seg-Sex
+        if (!in_array($currentDay, $allowedDays)) {
+            $dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+            return [
+                'allowed' => false, 
+                'reason' => "Dia não permitido ({$dayNames[$currentDay]}). Dias permitidos: " . 
+                           implode(', ', array_map(fn($d) => $dayNames[$d], $allowedDays))
+            ];
+        }
+        
+        // Verificar horário
+        $startTime = $workingHours['start_time'] ?? '08:00';
+        $endTime = $workingHours['end_time'] ?? '18:00';
+        
+        if ($currentTime < $startTime || $currentTime > $endTime) {
+            return [
+                'allowed' => false, 
+                'reason' => "Horário não permitido (atual: {$currentTime}). Horário permitido: {$startTime} às {$endTime}"
+            ];
+        }
+        
+        return ['allowed' => true, 'reason' => "Dentro do horário de funcionamento"];
+    }
+    
+    /**
      * Executar agentes instantâneos para uma mensagem específica
      * Chamado quando uma mensagem é enviada (cliente ou agente)
      */
@@ -102,6 +151,19 @@ class KanbanAgentService
                         self::logInfo("Conversa {$conversationId} não está nas etapas alvo do agente {$agent['id']}");
                         continue;
                     }
+                }
+                
+                // Verificar horário de funcionamento
+                $workingHoursCheck = self::isWithinWorkingHours($agent);
+                if (!$workingHoursCheck['allowed']) {
+                    self::logWarning("KanbanAgentService::executeInstantAgents - Agente {$agent['id']} fora do horário: " . $workingHoursCheck['reason']);
+                    $results[] = [
+                        'agent_id' => $agent['id'],
+                        'agent_name' => $agent['name'],
+                        'success' => false,
+                        'message' => 'Fora do horário de funcionamento'
+                    ];
+                    continue;
                 }
                 
                 self::logInfo("KanbanAgentService::executeInstantAgents - Executando agente {$agent['id']} para conversa $conversationId");
@@ -306,6 +368,21 @@ class KanbanAgentService
         }
 
         self::logInfo("KanbanAgentService::executeAgent - Agente '{$agent['name']}' (ID: $agentId) carregado com sucesso");
+        
+        // Verificar horário de funcionamento (exceto se for manual_force)
+        if ($executionType !== 'manual_force') {
+            $workingHoursCheck = self::isWithinWorkingHours($agent);
+            if (!$workingHoursCheck['allowed']) {
+                self::logWarning("KanbanAgentService::executeAgent - Agente $agentId fora do horário de funcionamento: " . $workingHoursCheck['reason']);
+                return [
+                    'success' => false,
+                    'message' => 'Fora do horário de funcionamento: ' . $workingHoursCheck['reason'],
+                    'skipped_reason' => 'working_hours',
+                    'stats' => []
+                ];
+            }
+            self::logInfo("KanbanAgentService::executeAgent - Horário de funcionamento OK: " . $workingHoursCheck['reason']);
+        }
 
         // Criar registro de execução
         $executionId = AIKanbanAgentExecution::createExecution($agentId, $executionType);
@@ -928,6 +1005,8 @@ class KanbanAgentService
             
             // Condições que NÃO precisam de IA
             if (in_array($type, [
+                'conversation_status', 'conversation_priority', // Status e prioridade da conversa
+                'last_message_hours', 'last_message_from', // Informações da última mensagem
                 'stage_duration_hours', 'has_tag', 'no_tag', 'assigned_to', 'unassigned', 'has_messages',
                 'has_agent_message', 'has_client_message',
                 'last_message_content', 'last_agent_message_content', 'last_client_message_content', 'any_message_contains'

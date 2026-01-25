@@ -133,6 +133,28 @@ ob_start();
             </div>
         </div>
         
+        <?php 
+        $workingHours = $agent['settings']['working_hours'] ?? null;
+        if ($workingHours && ($workingHours['enabled'] ?? false)):
+            $dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+            $selectedDays = $workingHours['days'] ?? [1,2,3,4,5];
+            $daysText = implode(', ', array_map(fn($d) => $dayNames[$d], $selectedDays));
+        ?>
+        <div class="row mb-10">
+            <div class="col-md-12">
+                <div class="d-flex flex-column">
+                    <span class="text-muted fs-7 mb-1">
+                        <i class="ki-duotone ki-calendar fs-7 text-warning me-1"><span class="path1"></span><span class="path2"></span></i>
+                        Horário de Funcionamento
+                    </span>
+                    <span class="text-gray-800 fw-semibold">
+                        <?= $daysText ?>, <?= $workingHours['start_time'] ?? '08:00' ?> às <?= $workingHours['end_time'] ?? '18:00' ?>
+                    </span>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+        
         <!-- Funis e Etapas Alvo -->
         <?php if (!empty($funnels) || !empty($stages)): ?>
         <div class="separator separator-dashed my-10"></div>

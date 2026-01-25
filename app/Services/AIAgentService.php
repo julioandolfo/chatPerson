@@ -531,9 +531,20 @@ class AIAgentService
             $clientMessageTimestamp = null;
             
             if ($lastClientMessage && !empty($lastClientMessage['created_at'])) {
-                // Converter created_at para timestamp e adicionar 1 segundo
-                $clientMessageTimestamp = strtotime($lastClientMessage['created_at']) + 1;
-                \App\Helpers\Logger::info("AIAgentService::processMessage - Usando timestamp baseado na mensagem do cliente: " . date('Y-m-d H:i:s', $clientMessageTimestamp) . " (timezone: America/Sao_Paulo)");
+                $lastMessageTime = strtotime($lastClientMessage['created_at']);
+                $now = time();
+                $timeDiffMinutes = ($now - $lastMessageTime) / 60;
+                
+                // Se a última mensagem do cliente foi há mais de 5 minutos, usar timestamp atual
+                // Isso evita que follow-ups de Kanban Agents fiquem com data antiga
+                if ($timeDiffMinutes > 5) {
+                    $clientMessageTimestamp = null; // Usar timestamp atual (default do sendMessage)
+                    \App\Helpers\Logger::info("AIAgentService::processMessage - Última mensagem do cliente foi há " . round($timeDiffMinutes) . " min, usando timestamp ATUAL");
+                } else {
+                    // Converter created_at para timestamp e adicionar 1 segundo (para respostas imediatas)
+                    $clientMessageTimestamp = $lastMessageTime + 1;
+                    \App\Helpers\Logger::info("AIAgentService::processMessage - Usando timestamp baseado na mensagem do cliente: " . date('Y-m-d H:i:s', $clientMessageTimestamp) . " (timezone: America/Sao_Paulo)");
+                }
             }
             
             // Restaurar timezone original

@@ -418,9 +418,17 @@ class KanbanAgentService
             
             if ($hasConditionsWithoutAI) {
                 self::logInfo("KanbanAgentService::executeAgent - Filtrando conversas com condições básicas (sem IA)...");
+                self::logInfo("KanbanAgentService::executeAgent - Condições a avaliar: " . json_encode($separatedConditions['without_ai']));
                 
+                $debugCount = 0;
                 foreach ($conversations as $conversation) {
                     $basicConditionsMet = self::evaluateConditionsWithoutAI($separatedConditions['without_ai'], $conversation);
+                    
+                    // Log detalhado para as primeiras 5 conversas
+                    if ($debugCount < 5) {
+                        self::logInfo("DEBUG Conversa {$conversation['id']}: status='{$conversation['status']}', condição atendida=" . ($basicConditionsMet['met'] ? 'SIM' : 'NÃO') . ", detalhes=" . json_encode($basicConditionsMet['details']));
+                        $debugCount++;
+                    }
                     
                     if ($basicConditionsMet['met']) {
                         $filteredConversations[] = $conversation;
@@ -465,6 +473,11 @@ class KanbanAgentService
             }
             
             self::logInfo("KanbanAgentService::executeAgent - Conversas após filtro de cooldown: " . count($conversationsAfterCooldown) . " de " . count($conversationsToAnalyze) . " (puladas: $skippedByCooldown)");
+            
+            // IMPORTANTE: Se todas foram puladas pelo cooldown, avisar
+            if (count($conversationsAfterCooldown) === 0 && $skippedByCooldown > 0) {
+                self::logWarning("⚠️ TODAS as conversas foram puladas pelo cooldown! Cooldown configurado: {$agent['cooldown_hours']}h. Use 'Forçar Execução' para ignorar o cooldown.");
+            }
 
             // PASSO 5: Analisar conversas que passaram pelo cooldown com IA
             foreach ($conversationsAfterCooldown as $index => $conversation) {
@@ -1105,10 +1118,16 @@ class KanbanAgentService
         $type = $condition['type'] ?? '';
         $operator = $condition['operator'] ?? '';
         $value = $condition['value'] ?? null;
+        
+        // Log para debug
+        self::logInfo("evaluateSingleCondition - type={$type}, operator={$operator}, value=" . json_encode($value) . ", conv_id={$conversation['id']}");
 
         switch ($type) {
             case 'conversation_status':
-                return self::compare($conversation['status'] ?? '', $operator, $value);
+                $actualStatus = $conversation['status'] ?? '';
+                $result = self::compare($actualStatus, $operator, $value);
+                self::logInfo("conversation_status: actual='{$actualStatus}', expected='{$value}', result=" . ($result ? 'TRUE' : 'FALSE'));
+                return $result;
             
             case 'conversation_priority':
                 return self::compare($conversation['priority'] ?? 'normal', $operator, $value);

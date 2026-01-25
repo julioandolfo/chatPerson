@@ -135,6 +135,16 @@ ob_start();
                     PostgreSQL (RAG)
                 </a>
             </li>
+            <li class="nav-item mt-2">
+                <a class="nav-link text-active-primary me-10 <?= $activeTab === 'prospecting' ? 'active' : '' ?>" 
+                   href="<?= \App\Helpers\Url::to('/settings?tab=prospecting') ?>">
+                    <i class="ki-duotone ki-geolocation fs-2 me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Prospecção
+                </a>
+            </li>
         </ul>
         <!--end::Tabs-->
         
@@ -573,6 +583,14 @@ ob_start();
             include __DIR__ . '/postgres-tab.php';
             ?>
             <!--end::Form PostgreSQL-->
+        <?php endif; ?>
+        
+        <?php if ($activeTab === 'prospecting'): ?>
+            <!--begin::Form Prospecção-->
+            <?php
+            include __DIR__ . '/prospecting-tab.php';
+            ?>
+            <!--end::Form Prospecção-->
         <?php endif; ?>
         <!--end::Tab Content-->
     </div>

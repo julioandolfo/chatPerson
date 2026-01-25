@@ -40,6 +40,12 @@ class SettingsController
         $businessHoursSettings = \App\Services\AvailabilityService::getBusinessHoursSettings();
         $postgresSettings = PostgreSQLSettingsService::getSettings();
         
+        // Configurações de prospecção
+        $prospectingSettings = [
+            'google_places_api_key' => SettingService::get('google_places_api_key', ''),
+            'outscraper_api_key' => SettingService::get('outscraper_api_key', ''),
+        ];
+        
         // Obter dados para preencher selects
         $users = \App\Helpers\Database::fetchAll(
             "SELECT id, name FROM users WHERE status = 'active' AND role IN ('agent', 'admin', 'supervisor') ORDER BY name ASC"
@@ -84,7 +90,8 @@ class SettingsController
             'aiAgents' => $aiAgents ?? [],
             'availabilitySettings' => $availabilitySettings,
             'businessHoursSettings' => $businessHoursSettings,
-            'postgresSettings' => $postgresSettings
+            'postgresSettings' => $postgresSettings,
+            'prospectingSettings' => $prospectingSettings
         ]);
     }
 
@@ -1139,6 +1146,35 @@ class SettingsController
             
         } catch (\Exception $e) {
             error_log("Erro ao salvar configuração de horários: " . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Salvar configurações de prospecção
+     */
+    public function saveProspecting(): void
+    {
+        Permission::abortIfCannot('admin.settings');
+        
+        try {
+            $data = Request::post();
+            
+            SettingService::set('google_places_api_key', $data['google_places_api_key'] ?? '', 'string', 'prospecting');
+            SettingService::set('outscraper_api_key', $data['outscraper_api_key'] ?? '', 'string', 'prospecting');
+            
+            Response::successOrRedirect(
+                'Configurações de prospecção salvas com sucesso!',
+                '/settings?tab=prospecting'
+            );
+        } catch (\Exception $e) {
+            if (Request::isAjax()) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro ao salvar configurações: ' . $e->getMessage()
+                ], 500);
+            } else {
+                Response::redirect('/settings?tab=prospecting&error=' . urlencode('Erro ao salvar configurações: ' . $e->getMessage()));
+            }
         }
     }
 }

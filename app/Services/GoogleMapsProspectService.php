@@ -59,7 +59,17 @@ class GoogleMapsProspectService
      */
     private static function getGoogleApiKey(): ?string
     {
-        // Tentar obter do config
+        // 1. Tentar obter do banco de dados (configurações do sistema)
+        try {
+            $dbKey = \App\Models\Setting::get('google_places_api_key', '');
+            if (!empty($dbKey)) {
+                return $dbKey;
+            }
+        } catch (\Exception $e) {
+            // Ignorar erro se tabela não existir
+        }
+        
+        // 2. Tentar obter do arquivo de config
         $configPath = __DIR__ . '/../../config/services.php';
         if (file_exists($configPath)) {
             $config = include $configPath;
@@ -68,7 +78,7 @@ class GoogleMapsProspectService
             }
         }
         
-        // Tentar obter de variável de ambiente
+        // 3. Tentar obter de variável de ambiente
         return $_ENV['GOOGLE_PLACES_API_KEY'] ?? getenv('GOOGLE_PLACES_API_KEY') ?: null;
     }
     
@@ -77,6 +87,17 @@ class GoogleMapsProspectService
      */
     private static function getOutscraperApiKey(): ?string
     {
+        // 1. Tentar obter do banco de dados (configurações do sistema)
+        try {
+            $dbKey = \App\Models\Setting::get('outscraper_api_key', '');
+            if (!empty($dbKey)) {
+                return $dbKey;
+            }
+        } catch (\Exception $e) {
+            // Ignorar erro se tabela não existir
+        }
+        
+        // 2. Tentar obter do arquivo de config
         $configPath = __DIR__ . '/../../config/services.php';
         if (file_exists($configPath)) {
             $config = include $configPath;

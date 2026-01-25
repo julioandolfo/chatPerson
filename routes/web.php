@@ -401,6 +401,7 @@ Router::post('/settings/availability', [SettingsController::class, 'saveAvailabi
 Router::post('/settings/ai', [SettingsController::class, 'saveAI'], ['Authentication']);
 Router::post('/settings/postgres', [SettingsController::class, 'savePostgreSQL'], ['Authentication']);
 Router::post('/settings/postgres/test', [SettingsController::class, 'testPostgreSQL'], ['Authentication']);
+Router::post('/settings/prospecting', [SettingsController::class, 'saveProspecting'], ['Authentication']);
 Router::get('/api/settings/sla', [SettingsController::class, 'getSLAConfig'], ['Authentication']); // API para obter config de SLA
 
 // Rotas de API Tokens (Configurações)

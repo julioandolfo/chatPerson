@@ -602,7 +602,7 @@ class OpenAIService
             try {
                 // Buscar tool pelo nome da function
                 $tool = AITool::findBySlug($functionName);
-                \App\Helpers\Logger::aiTools("[TOOL EXECUTION] Tool encontrada: " . ($tool ? "ID={$tool['id']}, tipo={$tool['tool_type']}" : "NÃO ENCONTRADA"));
+                \App\Helpers\Logger::aiTools("[TOOL EXECUTION] Tool encontrada: " . ($tool ? "ID={$tool['id']}, name='{$tool['name']}', slug='{$tool['slug']}', tipo={$tool['tool_type']}" : "NÃO ENCONTRADA para functionName='{$functionName}'"));
                 
                 if (!$tool || !$tool['enabled']) {
                     \App\Helpers\Logger::aiTools("[TOOL EXECUTION ERROR] Tool não encontrada ou inativa: {$functionName}");
@@ -731,7 +731,10 @@ class OpenAIService
      */
     private static function executeSystemTool(array $tool, array $arguments, int $conversationId, array $context): array
     {
-        $functionName = $tool['name'] ?? '';
+        // IMPORTANTE: Usar slug ao invés de name para identificar a tool
+        $functionName = $tool['slug'] ?? $tool['name'] ?? '';
+        
+        \App\Helpers\Logger::aiTools("[SYSTEM TOOL] Executando: slug='{$functionName}', name='{$tool['name']}', id={$tool['id']}");
 
         switch ($functionName) {
             case 'buscar_conversas_anteriores':
@@ -867,7 +870,8 @@ class OpenAIService
                 return self::executeHumanEscalationTool($tool, $arguments, $config, $conversationId, $context);
 
             default:
-                return ['error' => 'System tool não reconhecida: ' . $functionName];
+                \App\Helpers\Logger::aiTools("[SYSTEM TOOL ERROR] Tool não reconhecida no switch: slug='{$functionName}', name='{$tool['name']}'. Cases disponíveis: buscar_conversas_anteriores, buscar_informacoes_contato, adicionar_tag, mover_para_estagio, escalar_para_humano");
+                return ['error' => 'System tool não reconhecida: ' . $functionName . ' (slug: ' . ($tool['slug'] ?? 'N/A') . ')'];
         }
     }
 
@@ -1065,8 +1069,11 @@ class OpenAIService
      */
     private static function executeFollowupTool(array $tool, array $arguments, int $conversationId, array $context): array
     {
-        $functionName = $tool['name'] ?? '';
+        // IMPORTANTE: Usar slug ao invés de name para identificar a tool
+        $functionName = $tool['slug'] ?? $tool['name'] ?? '';
         $config = is_string($tool['config'] ?? null) ? json_decode($tool['config'], true) : ($tool['config'] ?? []);
+        
+        \App\Helpers\Logger::aiTools("[FOLLOWUP TOOL] Executando: slug='{$functionName}', name='{$tool['name']}', id={$tool['id']}");
 
         switch ($functionName) {
             case 'verificar_status_conversa':
@@ -1172,7 +1179,8 @@ class OpenAIService
                 return $result;
 
             default:
-                return ['error' => 'Followup tool não reconhecida: ' . $functionName];
+                \App\Helpers\Logger::aiTools("[FOLLOWUP TOOL ERROR] Tool não reconhecida no switch: slug='{$functionName}', name='{$tool['name']}'. Cases disponíveis: verificar_status_conversa, verificar_ultima_interacao");
+                return ['error' => 'Followup tool não reconhecida: ' . $functionName . ' (slug: ' . ($tool['slug'] ?? 'N/A') . ')'];
         }
     }
 

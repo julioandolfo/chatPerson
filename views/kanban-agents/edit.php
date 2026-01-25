@@ -873,12 +873,24 @@ function getActionConfigHTML(actionData, index) {
             const aiAgentsOptions = (systemData.ai_agents || []).map(a => 
                 `<option value="${a.id}" ${config.ai_agent_id == a.id ? 'selected' : ''}>${a.name}</option>`
             ).join('');
+            // Por padrão, process_immediately é true (se não definido)
+            const processImmediately = config.process_immediately !== false;
             return `
                 <label class="form-label">Agente de IA</label>
                 <select class="form-select action-config-ai_agent_id">
                     <option value="">Selecione um agente de IA...</option>
                     ${aiAgentsOptions}
                 </select>
+                <div class="form-check mt-3">
+                    <input class="form-check-input" type="checkbox" id="process_immediately_${index}" ${processImmediately ? 'checked' : ''}>
+                    <label class="form-check-label" for="process_immediately_${index}">
+                        <strong>Enviar mensagem de follow-up automaticamente</strong>
+                    </label>
+                </div>
+                <div class="form-text mt-1 ms-6">
+                    <i class="ki-duotone ki-information-5 fs-2 text-primary"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                    Se marcado, o agente de IA irá analisar o contexto da conversa e enviar uma mensagem de reengajamento automaticamente.
+                </div>
             `;
         case 'add_tag':
         case 'remove_tag':
@@ -1118,6 +1130,13 @@ function collectActions() {
             const isInternal = item.querySelector(`#is_internal_${index}`);
             if (isInternal) {
                 config.is_internal = isInternal.checked;
+            }
+        }
+        // Coletar process_immediately para assign_ai_agent
+        if (type === 'assign_ai_agent') {
+            const processImmediately = item.querySelector(`#process_immediately_${index}`);
+            if (processImmediately) {
+                config.process_immediately = processImmediately.checked;
             }
         }
         

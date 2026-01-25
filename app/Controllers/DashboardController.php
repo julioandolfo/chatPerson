@@ -29,9 +29,19 @@ class DashboardController
         $dateFrom = \App\Helpers\Request::get('date_from', date('Y-m-01'));
         $dateTo = \App\Helpers\Request::get('date_to', date('Y-m-d'));
         
-        // Filtro de agentes (array de IDs)
+        // Lista de agentes com role 'agent' (para filtro padrão e select)
+        $agentsList = \App\Models\User::getAgentsWithRoleAgent();
+        $defaultAgentIds = array_map(fn($a) => $a['id'], $agentsList);
+        
+        // Filtro de agentes (array de IDs) - por padrão usa todos os agentes com role 'agent'
         $agentsFilter = \App\Helpers\Request::get('agents', '');
-        $agentIds = !empty($agentsFilter) ? array_map('intval', explode(',', $agentsFilter)) : [];
+        if (!empty($agentsFilter)) {
+            // Usuário selecionou agentes específicos
+            $agentIds = array_map('intval', explode(',', $agentsFilter));
+        } else {
+            // Padrão: todos os agentes com role 'agent'
+            $agentIds = $defaultAgentIds;
+        }
         
         // Garantir que dateTo inclui o dia inteiro (até 23:59:59)
         if (!str_contains($dateTo, ':')) {
@@ -241,9 +251,6 @@ class DashboardController
             } catch (\Exception $e) {
                 error_log("Erro ao carregar métricas de atendimento: " . $e->getMessage());
             }
-            
-            // Lista de agentes para filtro
-            $agentsList = \App\Models\User::getSellers();
             
             self::logDash("Passando dados para view");
             Response::view('dashboard/index', [

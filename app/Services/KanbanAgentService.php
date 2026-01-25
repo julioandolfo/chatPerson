@@ -1510,44 +1510,62 @@ class KanbanAgentService
 
     /**
      * Ação: Atribuir Agente de IA
+     * Usa ConversationAIService para criar registro correto em ai_conversations
      */
     private static function actionAssignAIAgent(array $conversation, array $config): array
     {
         $aiAgentId = $config['ai_agent_id'] ?? null;
+        $processImmediately = $config['process_immediately'] ?? true; // Por padrão, processa imediatamente
         
         if (!$aiAgentId) {
             throw new \Exception('Nenhum agente de IA especificado');
         }
         
-        // Verificar se o agente de IA existe e está ativo
-        $aiAgent = \App\Models\AIAgent::find($aiAgentId);
-        if (!$aiAgent || !$aiAgent['enabled']) {
-            throw new \Exception('Agente de IA não encontrado ou inativo');
+        self::logInfo("KanbanAgentService::actionAssignAIAgent - Atribuindo agente {$aiAgentId} à conversa {$conversation['id']} (process_immediately: " . ($processImmediately ? 'true' : 'false') . ")");
+        
+        try {
+            // Usar ConversationAIService para adicionar corretamente o agente
+            // Isso cria o registro em ai_conversations e permite que o sidebar mostre corretamente
+            $result = \App\Services\ConversationAIService::addAIAgent($conversation['id'], [
+                'ai_agent_id' => $aiAgentId,
+                'process_immediately' => $processImmediately, // IA analisa contexto e envia mensagem
+                'assume_conversation' => false, // Não remove agente humano se houver
+                'only_if_unassigned' => false   // Permite mesmo se tiver agente humano
+            ]);
+            
+            // Buscar nome do agente para log
+            $aiAgent = \App\Models\AIAgent::find($aiAgentId);
+            $agentName = $aiAgent ? $aiAgent['name'] : "ID {$aiAgentId}";
+            
+            self::logInfo("KanbanAgentService::actionAssignAIAgent - Agente de IA '{$agentName}' atribuído com sucesso à conversa {$conversation['id']}");
+            
+            // Notificar via WebSocket (complementar à notificação do ConversationAIService)
+            self::notifyConversationChange($conversation['id'], 'ai_agent_assigned', [
+                'ai_agent_id' => $aiAgentId,
+                'ai_agent_name' => $agentName,
+                'process_immediately' => $processImmediately
+            ]);
+            
+            $message = "Agente de IA '{$agentName}' atribuído à conversa";
+            if ($processImmediately) {
+                $message .= " e mensagem de follow-up enviada";
+            }
+            
+            return [
+                'message' => $message,
+                'ai_conversation_id' => $result['ai_conversation_id'] ?? null
+            ];
+            
+        } catch (\Exception $e) {
+            // Se já tem IA ativa, não é erro crítico
+            if (strpos($e->getMessage(), 'já possui um agente de IA ativo') !== false) {
+                self::logWarning("KanbanAgentService::actionAssignAIAgent - Conversa {$conversation['id']} já possui IA ativa, pulando");
+                return ['message' => 'Conversa já possui agente de IA ativo'];
+            }
+            
+            self::logError("KanbanAgentService::actionAssignAIAgent - Erro: " . $e->getMessage());
+            throw $e;
         }
-        
-        // Atribuir o agente de IA à conversa
-        Conversation::update($conversation['id'], [
-            'ai_agent_id' => $aiAgentId
-        ]);
-        
-        // Adicionar mensagem do sistema informando a atribuição
-        \App\Services\ConversationService::sendMessage(
-            $conversation['id'],
-            "🤖 Agente de IA '{$aiAgent['name']}' foi adicionado à conversa.",
-            'system',
-            null,
-            []
-        );
-        
-        // Notificar via WebSocket
-        self::notifyConversationChange($conversation['id'], 'ai_agent_assigned', [
-            'ai_agent_id' => $aiAgentId,
-            'ai_agent_name' => $aiAgent['name']
-        ]);
-        
-        Logger::info("KanbanAgentService::actionAssignAIAgent - Agente de IA {$aiAgent['name']} (ID: {$aiAgentId}) atribuído à conversa {$conversation['id']}");
-        
-        return ['message' => "Agente de IA '{$aiAgent['name']}' atribuído à conversa"];
     }
 
     /**

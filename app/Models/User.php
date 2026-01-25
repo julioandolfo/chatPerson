@@ -292,6 +292,20 @@ class User extends Model
     }
     
     /**
+     * Obter apenas agentes com role 'agent' (para filtro padrão do dashboard)
+     */
+    public static function getAgentsWithRoleAgent(): array
+    {
+        $sql = "SELECT u.id, u.name, u.email
+                FROM users u
+                WHERE u.status = 'active' 
+                  AND u.role = 'agent'
+                ORDER BY u.name ASC";
+        
+        return \App\Helpers\Database::fetchAll($sql);
+    }
+    
+    /**
      * Buscar agente por ID do WooCommerce Seller
      */
     public static function findByWooCommerceSellerId(int $sellerId): ?array

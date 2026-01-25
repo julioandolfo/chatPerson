@@ -21,13 +21,16 @@ ob_start();
             <label class="fw-semibold fs-6 mb-0">Agentes:</label>
             <select id="kt_dashboard_agents" class="form-select form-select-solid" 
                     multiple="multiple" data-control="select2" 
-                    data-placeholder="Todos os agentes" 
+                    data-placeholder="Selecione agentes..." 
                     data-allow-clear="true"
                     style="min-width: 250px;">
                 <?php 
-                $selectedAgents = isset($_GET['agents']) ? explode(',', $_GET['agents']) : [];
+                // Se não há filtro na URL, todos os agentes vêm selecionados por padrão
+                $hasAgentsParam = isset($_GET['agents']);
+                $selectedAgents = $hasAgentsParam ? explode(',', $_GET['agents']) : [];
                 foreach ($agentsList ?? [] as $agent): 
-                    $isSelected = in_array($agent['id'], $selectedAgents) ? 'selected' : '';
+                    // Seleciona se: não tem param (padrão = todos) ou está na lista explícita
+                    $isSelected = (!$hasAgentsParam || in_array($agent['id'], $selectedAgents)) ? 'selected' : '';
                 ?>
                 <option value="<?= $agent['id'] ?>" <?= $isSelected ?>><?= htmlspecialchars($agent['name']) ?></option>
                 <?php endforeach; ?>
@@ -41,7 +44,7 @@ ob_start();
                 Filtrar
             </button>
             
-            <?php if (!empty($selectedAgents)): ?>
+            <?php if ($hasAgentsParam && !empty($selectedAgents)): ?>
             <button type="button" class="btn btn-sm btn-light-danger" onclick="clearAgentFilter()">
                 <i class="ki-duotone ki-cross fs-2">
                     <span class="path1"></span>

@@ -823,7 +823,9 @@ function updateReviewSummary() {
     const formData = new FormData(document.getElementById('campaign_form'));
     const accounts = formData.getAll('integration_account_ids[]');
     const daysSelected = formData.getAll('send_days[]');
-    const createConversation = formData.get('create_conversation') === '1';
+    // Verificar checkbox diretamente (formData.get pega o hidden, não o checkbox)
+    const createConversationCheckbox = document.querySelector('input[name="create_conversation"][type="checkbox"]');
+    const createConversation = createConversationCheckbox?.checked ?? false;
     const funnelName = document.querySelector('#funnel_id option:checked')?.text || 'Não definido';
     const stageName = document.querySelector('#initial_stage_id option:checked')?.text || 'Não definido';
     const daysMap = {
@@ -858,7 +860,9 @@ function updateReviewSummary() {
     // Tipo de mensagem
     const messageType = formData.get('message_type');
     const aiEnabled = messageType === 'ai';
-    const executeAutomations = formData.get('execute_automations') === '1';
+    // Verificar checkbox diretamente (formData.get pega o hidden, não o checkbox)
+    const executeAutomationsCheckbox = document.querySelector('input[name="execute_automations"][type="checkbox"]');
+    const executeAutomations = executeAutomationsCheckbox?.checked ?? false;
     
     // Lotes
     const batchSize = formData.get('batch_size');

@@ -118,5 +118,27 @@ class Request
         $jsonData = self::getJsonBody();
         return $jsonData ?? [];
     }
+    
+    /**
+     * Obter todos os dados da requisição (POST, JSON ou GET)
+     * Útil para APIs que aceitam múltiplos formatos
+     */
+    public static function all(): array
+    {
+        // Tentar obter dados JSON primeiro
+        $jsonData = self::getJsonBody();
+        
+        if ($jsonData !== null && !empty($jsonData)) {
+            return $jsonData;
+        }
+        
+        // Requisição POST normal
+        if (!empty($_POST)) {
+            return $_POST;
+        }
+        
+        // Fallback para GET
+        return $_GET;
+    }
 }
 

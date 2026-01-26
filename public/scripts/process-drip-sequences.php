@@ -21,7 +21,7 @@ try {
     echo "  - Contatos processados: {$result['processed']}\n";
     echo "  - Erros: {$result['errors']}\n";
     
-    Logger::info("Drip sequences processadas", $result);
+    Logger::info("Drip sequences processadas: processed={$result['processed']}, errors={$result['errors']}");
     
 } catch (\Exception $e) {
     echo "[" . date('Y-m-d H:i:s') . "] ERRO: " . $e->getMessage() . "\n";

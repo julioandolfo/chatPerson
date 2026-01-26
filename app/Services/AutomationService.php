@@ -205,7 +205,7 @@ class AutomationService
                 if (empty($accountId)) continue;
                 
                 // Verificar se é uma conta WhatsApp na integration_accounts
-                $integrationAccount = \App\Helpers\Database::fetchOne(
+                $integrationAccount = \App\Helpers\Database::fetch(
                     "SELECT ia.id, ia.channel, ia.phone_number, wa.id as whatsapp_id 
                      FROM integration_accounts ia 
                      LEFT JOIN whatsapp_accounts wa ON ia.phone_number = wa.phone_number 
@@ -246,7 +246,7 @@ class AutomationService
             \App\Helpers\Logger::automation("🔍 Recebido integration_account_id (legado): " . $nodeData['integration_account_id']);
             
             // Verificar se é uma conta WhatsApp na integration_accounts
-            $integrationAccount = \App\Helpers\Database::fetchOne(
+            $integrationAccount = \App\Helpers\Database::fetch(
                 "SELECT ia.id, ia.channel, ia.phone_number, wa.id as whatsapp_id 
                  FROM integration_accounts ia 
                  LEFT JOIN whatsapp_accounts wa ON ia.phone_number = wa.phone_number 

@@ -252,7 +252,7 @@ class Automation extends Model
         // Verificar correspondência cruzada (WhatsApp ID pode estar em integration_account_ids via migração)
         if (!empty($configIntegrationIds) && !empty($dataWhatsappId)) {
             // Buscar integration_account correspondente ao whatsapp_account
-            $integrationAccount = \App\Helpers\Database::fetchOne(
+            $integrationAccount = \App\Helpers\Database::fetch(
                 "SELECT ia.id FROM integration_accounts ia 
                  JOIN whatsapp_accounts wa ON ia.phone_number = wa.phone_number 
                  WHERE wa.id = ?",

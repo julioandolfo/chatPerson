@@ -278,12 +278,21 @@ class WhatsAppService
     /**
      * Verificar status da conexão
      * Verifica no banco e também tenta consultar a API Quepasa diretamente
+     * 
+     * @param int $accountId ID da conta
+     * @param bool $forceRealCheck Se true, sempre verifica na API (não confia no banco)
      */
-    public static function getConnectionStatus(int $accountId): array
+    public static function getConnectionStatus(int $accountId, bool $forceRealCheck = false): array
     {
         $account = WhatsAppAccount::find($accountId);
         if (!$account) {
             throw new \InvalidArgumentException('Conta não encontrada');
+        }
+
+        // Se forçar verificação real, usar método dedicado
+        if ($forceRealCheck) {
+            Logger::quepasa("getConnectionStatus - Forçando verificação real para conta {$accountId}");
+            return self::verifyRealConnection($accountId, true);
         }
 
         // Se tiver chatid no banco, está conectado
@@ -502,6 +511,247 @@ class WhatsAppService
         ]);
 
         return true;
+    }
+
+    /**
+     * Verificar conexão REAL com a API Quepasa
+     * Diferente de getConnectionStatus, este método sempre faz uma chamada à API
+     * para verificar se a conexão está realmente ativa (não apenas verifica o banco)
+     * 
+     * @param int $accountId ID da conta WhatsApp
+     * @param bool $updateStatus Se true, atualiza o status no banco de dados
+     * @return array ['connected' => bool, 'status' => string, 'message' => string, 'details' => array]
+     */
+    public static function verifyRealConnection(int $accountId, bool $updateStatus = true): array
+    {
+        $account = WhatsAppAccount::find($accountId);
+        if (!$account) {
+            return [
+                'connected' => false,
+                'status' => 'error',
+                'message' => 'Conta não encontrada',
+                'details' => []
+            ];
+        }
+
+        Logger::quepasa("verifyRealConnection - Verificando conta ID={$accountId}, nome={$account['name']}");
+
+        // Verificar se tem token configurado
+        if (empty($account['quepasa_token'])) {
+            Logger::quepasa("verifyRealConnection - Conta sem token configurado");
+            
+            if ($updateStatus && $account['status'] !== 'disconnected') {
+                WhatsAppAccount::update($accountId, ['status' => 'disconnected']);
+            }
+            
+            return [
+                'connected' => false,
+                'status' => 'disconnected',
+                'message' => 'Token não configurado - escaneie o QR Code',
+                'details' => ['reason' => 'no_token']
+            ];
+        }
+
+        // Verificar se tem URL da API configurada
+        if (empty($account['api_url'])) {
+            Logger::quepasa("verifyRealConnection - Conta sem URL da API configurada");
+            
+            return [
+                'connected' => false,
+                'status' => 'error',
+                'message' => 'URL da API não configurada',
+                'details' => ['reason' => 'no_api_url']
+            ];
+        }
+
+        $apiUrl = rtrim($account['api_url'], '/');
+        $connected = false;
+        $responseDetails = [];
+        $errorMessage = '';
+
+        // Tentar diferentes endpoints para verificar conexão real
+        // Prioridade: /info (mais confiável), /status, /me
+        $endpoints = ['/info', '/status', '/me'];
+        
+        foreach ($endpoints as $endpoint) {
+            try {
+                $url = "{$apiUrl}{$endpoint}";
+                
+                $headers = [
+                    'Accept: application/json',
+                    'X-QUEPASA-USER: ' . ($account['quepasa_user'] ?? 'default'),
+                    'X-QUEPASA-TOKEN: ' . $account['quepasa_token']
+                ];
+                if (!empty($account['quepasa_trackid'])) {
+                    $headers[] = 'X-QUEPASA-TRACKID: ' . $account['quepasa_trackid'];
+                }
+                
+                $ch = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 15, // Timeout curto para verificação
+                    CURLOPT_CONNECTTIMEOUT => 10,
+                    CURLOPT_HTTPGET => true,
+                    CURLOPT_HTTPHEADER => $headers,
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_SSL_VERIFYHOST => false,
+                    CURLOPT_FOLLOWLOCATION => true
+                ]);
+                
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $curlError = curl_error($ch);
+                curl_close($ch);
+                
+                Logger::quepasa("verifyRealConnection - {$endpoint} HTTP {$httpCode}");
+                
+                // Se deu erro de conexão (timeout, DNS, etc)
+                if (!empty($curlError)) {
+                    Logger::quepasa("verifyRealConnection - cURL error: {$curlError}");
+                    $errorMessage = "Erro de conexão com API: {$curlError}";
+                    continue;
+                }
+                
+                // Se a API retornou erro 401/403, token inválido
+                if ($httpCode === 401 || $httpCode === 403) {
+                    Logger::quepasa("verifyRealConnection - Token inválido ou expirado (HTTP {$httpCode})");
+                    
+                    if ($updateStatus) {
+                        WhatsAppAccount::update($accountId, [
+                            'status' => 'disconnected',
+                            'quepasa_chatid' => null
+                        ]);
+                    }
+                    
+                    return [
+                        'connected' => false,
+                        'status' => 'disconnected',
+                        'message' => 'Token inválido ou expirado - reconecte via QR Code',
+                        'details' => ['reason' => 'token_invalid', 'http_code' => $httpCode]
+                    ];
+                }
+                
+                // Se retornou 200, analisar resposta
+                if ($httpCode === 200 && !empty($response)) {
+                    $jsonResponse = @json_decode($response, true);
+                    
+                    if ($jsonResponse !== null) {
+                        $responseDetails = $jsonResponse;
+                        
+                        // Verificar se está realmente conectado
+                        // Procurar por indicadores de conexão ativa
+                        
+                        // 1. Verificar campo connected/status
+                        $status = $jsonResponse['status'] ?? $jsonResponse['state'] ?? null;
+                        $isConnected = $jsonResponse['connected'] ?? null;
+                        
+                        // Status que indicam desconexão
+                        $disconnectedStatuses = ['disconnected', 'waiting', 'unpaired', 'qr', 'need_qr', 'pending'];
+                        
+                        // Status que indicam conexão
+                        $connectedStatuses = ['connected', 'ready', 'authenticated', 'follow server information', 'active'];
+                        
+                        if ($isConnected === false || in_array(strtolower($status ?? ''), $disconnectedStatuses)) {
+                            Logger::quepasa("verifyRealConnection - API indica desconectado: status={$status}");
+                            $connected = false;
+                            $errorMessage = 'WhatsApp desconectado - escaneie o QR Code novamente';
+                            break;
+                        }
+                        
+                        // 2. Verificar se tem chatid/wid (indica conexão ativa)
+                        $chatid = $jsonResponse['chatid'] ?? $jsonResponse['chat_id'] ?? $jsonResponse['wid'] ?? null;
+                        if (empty($chatid) && isset($jsonResponse['server']['wid'])) {
+                            $chatid = $jsonResponse['server']['wid'];
+                        }
+                        
+                        // 3. Se tem chatid ou status conectado, está conectado
+                        if (!empty($chatid) || $isConnected === true || in_array(strtolower($status ?? ''), $connectedStatuses)) {
+                            Logger::quepasa("verifyRealConnection - Conexão ativa confirmada via {$endpoint}");
+                            $connected = true;
+                            
+                            // Atualizar chatid se encontrado e diferente do atual
+                            if (!empty($chatid) && $chatid !== $account['quepasa_chatid']) {
+                                if ($updateStatus) {
+                                    WhatsAppAccount::update($accountId, ['quepasa_chatid' => $chatid]);
+                                }
+                            }
+                            
+                            break;
+                        }
+                        
+                        // Se não encontrou indicadores claros, continuar para próximo endpoint
+                        Logger::quepasa("verifyRealConnection - {$endpoint} sem indicador claro, tentando próximo");
+                    }
+                }
+                
+                // Se chegou aqui, não conseguiu determinar, tentar próximo endpoint
+                
+            } catch (\Exception $e) {
+                Logger::quepasa("verifyRealConnection - Erro em {$endpoint}: " . $e->getMessage());
+                $errorMessage = $e->getMessage();
+                continue;
+            }
+        }
+        
+        // Atualizar status no banco se necessário
+        if ($updateStatus) {
+            $newStatus = $connected ? 'active' : 'disconnected';
+            $updateData = ['status' => $newStatus];
+            
+            // Se desconectou, limpar chatid
+            if (!$connected && !empty($account['quepasa_chatid'])) {
+                $updateData['quepasa_chatid'] = null;
+            }
+            
+            // Apenas atualizar se status mudou
+            if ($account['status'] !== $newStatus) {
+                WhatsAppAccount::update($accountId, $updateData);
+                Logger::quepasa("verifyRealConnection - Status atualizado: {$account['status']} -> {$newStatus}");
+            }
+        }
+        
+        if ($connected) {
+            return [
+                'connected' => true,
+                'status' => 'connected',
+                'message' => 'WhatsApp conectado e funcionando',
+                'details' => $responseDetails
+            ];
+        }
+        
+        return [
+            'connected' => false,
+            'status' => 'disconnected',
+            'message' => $errorMessage ?: 'WhatsApp desconectado - escaneie o QR Code',
+            'details' => $responseDetails
+        ];
+    }
+
+    /**
+     * Verificar conexão de todas as contas WhatsApp ativas
+     * Usado para monitoramento periódico
+     * 
+     * @return array Resultado da verificação de cada conta
+     */
+    public static function verifyAllConnections(): array
+    {
+        $results = [];
+        $accounts = WhatsAppAccount::all();
+        
+        foreach ($accounts as $account) {
+            $result = self::verifyRealConnection($account['id'], true);
+            $results[] = [
+                'account_id' => $account['id'],
+                'account_name' => $account['name'],
+                'phone_number' => $account['phone_number'],
+                'previous_status' => $account['status'],
+                'current_connected' => $result['connected'],
+                'current_status' => $result['status'],
+                'message' => $result['message']
+            ];
+        }
+        
+        return $results;
     }
 
     /**

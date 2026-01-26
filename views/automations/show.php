@@ -990,11 +990,22 @@ const logsEndpoint = <?= $logsUrl ?>;
 const integrationAccountsByChannel = <?= json_encode($integrationAccountsOptions ?? [], JSON_UNESCAPED_UNICODE) ?>;
 
 // Função para atualizar opções de contas baseado no canal selecionado
-function updateAccountOptions(channel) {
+function updateAccountOptions(channel, preserveSelection = false) {
     const select = document.getElementById('kt_trigger_integration_account');
     if (!select) return;
     
-    let options = '<option value="">Todas as Contas</option>';
+    // Preservar seleções atuais se necessário
+    let currentSelections = [];
+    if (preserveSelection && $(select).data('select2')) {
+        currentSelections = $(select).val() || [];
+    }
+    
+    // Destruir Select2 antes de modificar as opções
+    if ($(select).data('select2')) {
+        $(select).select2('destroy');
+    }
+    
+    let options = '';
     
     // 🔥 Para instagram_comment, usar contas de instagram
     let effectiveChannel = channel;
@@ -1013,6 +1024,30 @@ function updateAccountOptions(channel) {
     }
     
     select.innerHTML = options;
+    
+    // Reinicializar Select2
+    initAccountSelect2(select);
+    
+    // Restaurar seleções que ainda são válidas
+    if (preserveSelection && currentSelections.length > 0) {
+        const validSelections = currentSelections.filter(val => {
+            return select.querySelector(`option[value="${val}"]`) !== null;
+        });
+        $(select).val(validSelections).trigger('change');
+    }
+}
+
+// Função para inicializar Select2 no campo de contas
+function initAccountSelect2(selectElement) {
+    if (!selectElement) return;
+    
+    $(selectElement).select2({
+        dropdownParent: $('#kt_modal_node_config'),
+        placeholder: 'Selecione as contas (deixe vazio para todas)',
+        allowClear: true,
+        closeOnSelect: false,
+        width: '100%'
+    });
 }
 const stageOptionsHtml = <?= json_encode($stageOptions, JSON_UNESCAPED_UNICODE) ?>;
 const agentOptionsHtml = <?= json_encode($agentOptions, JSON_UNESCAPED_UNICODE) ?>;
@@ -1572,7 +1607,8 @@ function openNodeConfig(nodeId) {
             `;
             
             // Construir opções de contas (legacy WhatsApp + novas integrações)
-            let accountOptions = '<option value="">Todas as Contas</option>';
+            // Com seleção múltipla, deixar vazio = todas as contas
+            let accountOptions = '';
             accountOptions += whatsappOptionsHtml || '';
             
             // Adicionar contas de integração
@@ -1583,37 +1619,71 @@ function openNodeConfig(nodeId) {
             
             // Obter valores existentes do node
             const existingChannel = node.node_data.channel || '';
+            
+            // Suporte a múltiplas contas de integração (array ou valor único)
+            let existingIntegrationAccountIds = node.node_data.integration_account_ids || [];
             const existingIntegrationAccountId = node.node_data.integration_account_id || '';
+            let existingWhatsappAccountIds = node.node_data.whatsapp_account_ids || [];
             const existingWhatsappAccountId = node.node_data.whatsapp_account_id || '';
             
-            // Determinar valor do select de conta
-            let selectedAccountValue = '';
-            if (existingIntegrationAccountId) {
-                selectedAccountValue = 'integration_' + existingIntegrationAccountId;
-            } else if (existingWhatsappAccountId) {
-                selectedAccountValue = 'whatsapp_' + existingWhatsappAccountId;
+            // Normalizar arrays de IDs existentes para o formato do select (com prefixo)
+            let selectedAccountValues = [];
+            
+            // Processar integration_account_ids
+            if (Array.isArray(existingIntegrationAccountIds) && existingIntegrationAccountIds.length > 0) {
+                existingIntegrationAccountIds.forEach(id => {
+                    if (id) {
+                        const strId = String(id);
+                        if (!strId.includes('_')) {
+                            selectedAccountValues.push('integration_' + strId);
+                        } else {
+                            selectedAccountValues.push(strId);
+                        }
+                    }
+                });
+            } else if (existingIntegrationAccountId) {
+                selectedAccountValues.push('integration_' + existingIntegrationAccountId);
             }
+            
+            // Processar whatsapp_account_ids
+            if (Array.isArray(existingWhatsappAccountIds) && existingWhatsappAccountIds.length > 0) {
+                existingWhatsappAccountIds.forEach(id => {
+                    if (id) {
+                        const strId = String(id);
+                        if (!strId.includes('_')) {
+                            selectedAccountValues.push('whatsapp_' + strId);
+                        } else {
+                            selectedAccountValues.push(strId);
+                        }
+                    }
+                });
+            } else if (existingWhatsappAccountId && selectedAccountValues.length === 0) {
+                // Só adicionar whatsapp_account_id legado se não tiver outras seleções
+                selectedAccountValues.push('whatsapp_' + existingWhatsappAccountId);
+            }
+            
+            // Marcar opções selecionadas
+            let accountOptionsWithSelected = accountOptions;
+            selectedAccountValues.forEach(selectedVal => {
+                accountOptionsWithSelected = accountOptionsWithSelected.replace(
+                    `value="${selectedVal}"`,
+                    `value="${selectedVal}" selected`
+                );
+            });
             
             formContent = `
                 <div class="fv-row mb-7">
                     <label class="fw-semibold fs-6 mb-2">Canal</label>
-                    <select name="channel" id="kt_trigger_channel" class="form-select form-select-solid" onchange="updateAccountOptions(this.value)" value="${existingChannel}">
+                    <select name="channel" id="kt_trigger_channel" class="form-select form-select-solid" onchange="updateAccountOptions(this.value)">
                         ${channelOptions.replace(`value="${existingChannel}"`, `value="${existingChannel}" selected`)}
                     </select>
                 </div>
                 <div class="fv-row mb-7">
-                    <label class="fw-semibold fs-6 mb-2">Conta de Integração</label>
-                    <select name="integration_account_id" id="kt_trigger_integration_account" class="form-select form-select-solid">
-                        ${accountOptions.replace(`value="${selectedAccountValue}"`, `value="${selectedAccountValue}" selected`)}
+                    <label class="fw-semibold fs-6 mb-2">Contas de Integração</label>
+                    <select name="integration_account_ids[]" id="kt_trigger_integration_account" class="form-select form-select-solid" multiple data-control="select2" data-placeholder="Selecione as contas (deixe vazio para todas)" data-allow-clear="true" data-close-on-select="false">
+                        ${accountOptionsWithSelected}
                     </select>
-                    <div class="form-text">Selecione uma conta específica ou deixe "Todas as Contas" para qualquer conta do canal</div>
-                </div>
-                <div class="fv-row mb-7" style="display: none;">
-                    <label class="fw-semibold fs-6 mb-2">Conta WhatsApp (Legacy)</label>
-                    <select name="whatsapp_account_id" id="kt_trigger_whatsapp_account" class="form-select form-select-solid">
-                        <option value="">Todas as Contas</option>
-                        ${whatsappOptionsHtml || ''}
-                    </select>
+                    <div class="form-text">Selecione uma ou mais contas específicas, ou deixe vazio para aplicar a todas as contas do canal</div>
                 </div>
             `;
             
@@ -2726,20 +2796,70 @@ function openNodeConfig(nodeId) {
     if (node.node_type === 'trigger' && node.node_data) {
         setTimeout(() => {
             const channelSelect = document.getElementById('kt_trigger_channel');
+            const accountSelect = document.getElementById('kt_trigger_integration_account');
+            
+            // Inicializar Select2 primeiro
+            if (accountSelect) {
+                initAccountSelect2(accountSelect);
+            }
+            
+            // Função helper para obter valores selecionados do node
+            const getSelectedAccountValues = () => {
+                let selectedValues = [];
+                
+                // Processar integration_account_ids
+                if (node.node_data.integration_account_ids && Array.isArray(node.node_data.integration_account_ids)) {
+                    node.node_data.integration_account_ids.forEach(id => {
+                        if (id) {
+                            const strId = String(id);
+                            if (!strId.includes('_')) {
+                                selectedValues.push('integration_' + strId);
+                            } else {
+                                selectedValues.push(strId);
+                            }
+                        }
+                    });
+                } else if (node.node_data.integration_account_id) {
+                    selectedValues.push('integration_' + node.node_data.integration_account_id);
+                }
+                
+                // Processar whatsapp_account_ids
+                if (node.node_data.whatsapp_account_ids && Array.isArray(node.node_data.whatsapp_account_ids)) {
+                    node.node_data.whatsapp_account_ids.forEach(id => {
+                        if (id) {
+                            const strId = String(id);
+                            if (!strId.includes('_')) {
+                                selectedValues.push('whatsapp_' + strId);
+                            } else {
+                                selectedValues.push(strId);
+                            }
+                        }
+                    });
+                } else if (node.node_data.whatsapp_account_id && selectedValues.length === 0) {
+                    selectedValues.push('whatsapp_' + node.node_data.whatsapp_account_id);
+                }
+                
+                return selectedValues;
+            };
+            
             if (channelSelect && node.node_data.channel) {
                 channelSelect.value = node.node_data.channel;
-                updateAccountOptions(node.node_data.channel);
+                updateAccountOptions(node.node_data.channel, false);
                 
                 setTimeout(() => {
-                    const accountSelect = document.getElementById('kt_trigger_integration_account');
                     if (accountSelect) {
-                        if (node.node_data.integration_account_id) {
-                            accountSelect.value = 'integration_' + node.node_data.integration_account_id;
-                        } else if (node.node_data.whatsapp_account_id) {
-                            accountSelect.value = 'whatsapp_' + node.node_data.whatsapp_account_id;
+                        const selectedValues = getSelectedAccountValues();
+                        if (selectedValues.length > 0) {
+                            $(accountSelect).val(selectedValues).trigger('change');
                         }
                     }
-                }, 200);
+                }, 300);
+            } else if (accountSelect) {
+                // Mesmo sem canal, preencher valores se existirem
+                const selectedValues = getSelectedAccountValues();
+                if (selectedValues.length > 0) {
+                    $(accountSelect).val(selectedValues).trigger('change');
+                }
             }
         }, 200);
     }
@@ -3438,39 +3558,80 @@ document.addEventListener("DOMContentLoaded", function() {
                 }
             }
             
-            // Processar integration_account_id e whatsapp_account_id do trigger
+            // Processar integration_account_ids (array) do trigger
             if (node.node_type === "trigger") {
-                const integrationAccountId = nodeData.integration_account_id || '';
+                const integrationAccountIds = nodeData.integration_account_ids || [];
                 const whatsappAccountId = nodeData.whatsapp_account_id || '';
                 
                 console.log('🔍 TRIGGER - Valores originais:', {
-                    integration_account_id: integrationAccountId,
+                    integration_account_ids: integrationAccountIds,
                     whatsapp_account_id: whatsappAccountId
                 });
                 
-                // Se integration_account_id começa com "integration_", extrair o ID
-                if (integrationAccountId && integrationAccountId.startsWith('integration_')) {
-                    nodeData.integration_account_id = integrationAccountId.replace('integration_', '');
-                    console.log('🔍 TRIGGER - Tipo: Integration, ID extraído:', nodeData.integration_account_id);
-                } else if (integrationAccountId && integrationAccountId.startsWith('whatsapp_')) {
-                    // Se selecionou conta WhatsApp legacy, converter para whatsapp_account_id
-                    nodeData.whatsapp_account_id = integrationAccountId.replace('whatsapp_', '');
-                    nodeData.integration_account_id = null;
-                    console.log('🔍 TRIGGER - Tipo: WhatsApp, ID extraído:', nodeData.whatsapp_account_id);
-                } else if (!integrationAccountId && whatsappAccountId) {
+                // Processar array de IDs selecionados
+                if (Array.isArray(integrationAccountIds) && integrationAccountIds.length > 0) {
+                    const processedIntegrationIds = [];
+                    const processedWhatsappIds = [];
+                    
+                    integrationAccountIds.forEach(id => {
+                        if (id && id.startsWith('integration_')) {
+                            processedIntegrationIds.push(id.replace('integration_', ''));
+                        } else if (id && id.startsWith('whatsapp_')) {
+                            processedWhatsappIds.push(id.replace('whatsapp_', ''));
+                        }
+                    });
+                    
+                    // Salvar como array de IDs de integração
+                    if (processedIntegrationIds.length > 0) {
+                        nodeData.integration_account_ids = processedIntegrationIds;
+                        // Manter compatibilidade: se só um ID, salvar também no campo singular
+                        if (processedIntegrationIds.length === 1) {
+                            nodeData.integration_account_id = processedIntegrationIds[0];
+                        } else {
+                            nodeData.integration_account_id = null;
+                        }
+                    } else {
+                        nodeData.integration_account_ids = [];
+                        nodeData.integration_account_id = null;
+                    }
+                    
+                    // Processar WhatsApp IDs
+                    if (processedWhatsappIds.length > 0) {
+                        nodeData.whatsapp_account_ids = processedWhatsappIds;
+                        // Manter compatibilidade
+                        if (processedWhatsappIds.length === 1) {
+                            nodeData.whatsapp_account_id = processedWhatsappIds[0];
+                        } else {
+                            nodeData.whatsapp_account_id = null;
+                        }
+                    } else {
+                        nodeData.whatsapp_account_ids = [];
+                        nodeData.whatsapp_account_id = null;
+                    }
+                    
+                    console.log('🔍 TRIGGER - IDs processados:', {
+                        integration_account_ids: nodeData.integration_account_ids,
+                        whatsapp_account_ids: nodeData.whatsapp_account_ids
+                    });
+                } else if (whatsappAccountId) {
                     // Manter compatibilidade com whatsapp_account_id legacy
                     nodeData.whatsapp_account_id = whatsappAccountId;
-                    console.log('🔍 TRIGGER - Usando whatsapp_account_id direto:', nodeData.whatsapp_account_id);
-                } else if (!integrationAccountId) {
-                    // Se não selecionou nenhuma conta, limpar ambos
+                    nodeData.whatsapp_account_ids = [whatsappAccountId];
                     nodeData.integration_account_id = null;
+                    nodeData.integration_account_ids = [];
+                    console.log('🔍 TRIGGER - Usando whatsapp_account_id direto:', nodeData.whatsapp_account_id);
+                } else {
+                    // Se não selecionou nenhuma conta, limpar todos
+                    nodeData.integration_account_id = null;
+                    nodeData.integration_account_ids = [];
                     nodeData.whatsapp_account_id = null;
-                    console.log('🔍 TRIGGER - Nenhuma conta selecionada, limpando ambos');
+                    nodeData.whatsapp_account_ids = [];
+                    console.log('🔍 TRIGGER - Nenhuma conta selecionada, aplicar a todas');
                 }
                 
                 console.log('🔍 TRIGGER - Valores finais:', {
-                    integration_account_id: nodeData.integration_account_id,
-                    whatsapp_account_id: nodeData.whatsapp_account_id
+                    integration_account_ids: nodeData.integration_account_ids,
+                    whatsapp_account_ids: nodeData.whatsapp_account_ids
                 });
             }
             

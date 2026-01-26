@@ -73,6 +73,42 @@ ob_start();
                                         <span class="fw-semibold"><?= htmlspecialchars($account['instance_id']) ?></span>
                                     </div>
                                     <?php endif; ?>
+                                    
+                                    <?php 
+                                    // Mostrar última verificação de conexão
+                                    $lastCheck = $account['last_connection_check'] ?? null;
+                                    $lastResult = $account['last_connection_result'] ?? null;
+                                    $consecutiveFailures = (int)($account['consecutive_failures'] ?? 0);
+                                    ?>
+                                    <?php if ($lastCheck): ?>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="ki-duotone ki-time fs-5 text-gray-500 me-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        <span class="text-muted fw-semibold fs-7 me-2">Última verificação:</span>
+                                        <span class="fs-8 text-gray-600" title="<?= htmlspecialchars($lastCheck) ?>"><?= date('d/m H:i', strtotime($lastCheck)) ?></span>
+                                        <?php if ($lastResult === 'connected'): ?>
+                                        <span class="badge badge-circle badge-success ms-2" style="width: 8px; height: 8px;"></span>
+                                        <?php elseif ($lastResult === 'disconnected'): ?>
+                                        <span class="badge badge-circle badge-danger ms-2" style="width: 8px; height: 8px;"></span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <?php endif; ?>
+                                    
+                                    <?php if ($consecutiveFailures > 0): ?>
+                                    <div class="alert alert-danger d-flex align-items-center p-3 mb-2">
+                                        <i class="ki-duotone ki-disconnect fs-3 text-danger me-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        <div class="d-flex flex-column">
+                                            <span class="fw-semibold fs-7">Conexão com problema</span>
+                                            <span class="fs-8"><?= $consecutiveFailures ?> falha(s) consecutiva(s)</span>
+                                        </div>
+                                    </div>
+                                    <?php endif; ?>
+                                    
                                     <?php if (!empty($account['default_funnel_name'])): ?>
                                     <div class="separator separator-dashed my-3"></div>
                                     <div class="d-flex align-items-center mb-2">
@@ -837,8 +873,17 @@ function refreshQRCode() {
     }
 }
 
-function checkStatus(accountId) {
-    fetch("' . \App\Helpers\Url::to('/integrations/whatsapp') . '/" + accountId + "/status", {
+function checkStatus(accountId, forceReal = true) {
+    // Mostrar indicador de loading
+    const btn = event.currentTarget;
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status"></span>`;
+    
+    // Usar verificação REAL (force_real_check=1) para verificar de verdade na API Quepasa
+    const url = "' . \App\Helpers\Url::to('/integrations/whatsapp') . '/" + accountId + "/status" + (forceReal ? "?force_real_check=1" : "");
+    
+    fetch(url, {
         headers: {
             "X-Requested-With": "XMLHttpRequest",
             "Accept": "application/json"
@@ -846,13 +891,32 @@ function checkStatus(accountId) {
     })
         .then(response => response.json())
         .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            
             if (data.success) {
                 const status = data.status;
-                let message = "Status: " + (status.connected ? "Conectado" : "Desconectado");
-                if (status.phone_number) {
-                    message += "\\nNúmero: " + status.phone_number;
+                const checkType = status.check_type === "real" ? "(verificação real)" : "(cache)";
+                
+                let title = status.connected ? "✅ WhatsApp Conectado" : "❌ WhatsApp Desconectado";
+                let message = checkType + "\\n\\n";
+                
+                if (status.connected) {
+                    message += "A conexão está funcionando corretamente.";
+                } else {
+                    message += "Motivo: " + (status.message || "Desconhecido");
+                    message += "\\n\\n⚠️ Escaneie o QR Code para reconectar.";
                 }
-                alert(message);
+                
+                if (status.phone_number) {
+                    message += "\\n\\nNúmero: " + status.phone_number;
+                }
+                
+                if (status.checked_at) {
+                    message += "\\nVerificado em: " + status.checked_at;
+                }
+                
+                alert(title + "\\n" + message);
                 location.reload();
             } else {
                 alert("Erro: " + (data.message || "Erro ao verificar status"));

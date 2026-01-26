@@ -159,13 +159,28 @@ class IntegrationController
 
     /**
      * Verificar status da conexão
+     * @param int $id ID da conta WhatsApp
+     * Query params:
+     *   - force_real_check: Se "1" ou "true", força verificação real na API (não apenas no banco)
      */
     public function getConnectionStatus(int $id): void
     {
         Permission::abortIfCannot('whatsapp.view');
         
         try {
-            $status = WhatsAppService::getConnectionStatus($id);
+            // Verificar se deve forçar verificação real
+            $forceRealCheck = Request::get('force_real_check', '0');
+            $forceRealCheck = in_array($forceRealCheck, ['1', 'true', true], true);
+            
+            $status = WhatsAppService::getConnectionStatus($id, $forceRealCheck);
+            
+            // Se forçou verificação real, adicionar timestamp da verificação
+            if ($forceRealCheck) {
+                $status['checked_at'] = date('Y-m-d H:i:s');
+                $status['check_type'] = 'real';
+            } else {
+                $status['check_type'] = 'cached';
+            }
             
             Response::json([
                 'success' => true,

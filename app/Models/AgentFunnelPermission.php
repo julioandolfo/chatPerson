@@ -95,6 +95,17 @@ class AgentFunnelPermission extends Model
     }
 
     /**
+     * Verificar se permissão específica já existe
+     */
+    public static function hasPermission(int $userId, ?int $funnelId, ?int $stageId, string $permissionType = 'view'): bool
+    {
+        $sql = "SELECT COUNT(*) as count FROM agent_funnel_permissions 
+                WHERE user_id = ? AND funnel_id <=> ? AND stage_id <=> ? AND permission_type = ?";
+        $result = Database::fetch($sql, [$userId, $funnelId, $stageId, $permissionType]);
+        return ($result['count'] ?? 0) > 0;
+    }
+
+    /**
      * Verificar se agente pode mover conversas para estágio
      */
     public static function canMoveToStage(int $userId, int $stageId): bool

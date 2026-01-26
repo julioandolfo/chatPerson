@@ -561,13 +561,13 @@ ob_start();
 <?php endif; ?>
 <!--end::Modal - Adicionar Setor-->
 
-<!--begin::Modal - Adicionar Permissão de Funil/Estágio-->
+<!--begin::Modal - Adicionar Permissão de Funil/Estágio (Seleção Múltipla)-->
 <?php if (\App\Helpers\Permission::can('users.edit')): ?>
 <div class="modal fade" id="kt_modal_assign_funnel_permission" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered mw-650px">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="fw-bold">Adicionar Permissão de Funil/Estágio</h2>
+                <h2 class="fw-bold">Gerenciar Permissões de Funis e Estágios</h2>
                 <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
                     <i class="ki-duotone ki-cross fs-1">
                         <span class="path1"></span>
@@ -576,37 +576,126 @@ ob_start();
                 </div>
             </div>
             <form id="kt_modal_assign_funnel_permission_form" class="form">
-                <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
-                    <div class="fv-row mb-7">
-                        <label class="fw-semibold fs-6 mb-2">Funil</label>
-                        <select name="funnel_id" id="kt_funnel_select" class="form-select form-select-solid">
-                            <option value="">Todos os Funis</option>
-                            <?php foreach ($allFunnels as $funnel): ?>
-                                <option value="<?= $funnel['id'] ?>"><?= htmlspecialchars($funnel['name']) ?></option>
+                <div class="modal-body scroll-y" style="max-height: 70vh;">
+                    <!-- Tipo de Permissão Global -->
+                    <div class="card bg-light-primary mb-5">
+                        <div class="card-body py-4">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                                <div>
+                                    <span class="fw-bold fs-5">Tipo de Permissão para os itens selecionados:</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-3">
+                                    <select name="permission_type" id="kt_bulk_permission_type" class="form-select form-select-solid w-200px">
+                                        <option value="view">Visualizar</option>
+                                        <option value="edit">Editar</option>
+                                        <option value="move">Mover Conversas</option>
+                                    </select>
+                                    <button type="button" class="btn btn-sm btn-light-success" onclick="selectAllFunnels()">
+                                        <i class="ki-duotone ki-check-square fs-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        Selecionar Todos
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-light-danger" onclick="deselectAllFunnels()">
+                                        <i class="ki-duotone ki-cross-square fs-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        Desmarcar Todos
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Lista de Funis com Estágios -->
+                    <div class="row g-4">
+                        <?php if (empty($funnelsWithStages)): ?>
+                            <div class="col-12 text-center py-10">
+                                <i class="ki-duotone ki-element-11 fs-3x text-gray-400 mb-5">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                    <span class="path4"></span>
+                                </i>
+                                <h3 class="text-gray-600">Nenhum funil disponível</h3>
+                            </div>
+                        <?php else: ?>
+                            <?php foreach ($funnelsWithStages as $funnel): ?>
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="card card-bordered h-100">
+                                        <div class="card-header py-3" style="min-height: auto;">
+                                            <div class="card-title m-0">
+                                                <div class="form-check form-check-custom form-check-solid">
+                                                    <input class="form-check-input funnel-checkbox" 
+                                                           type="checkbox" 
+                                                           id="funnel_<?= $funnel['id'] ?>" 
+                                                           data-funnel-id="<?= $funnel['id'] ?>"
+                                                           onchange="toggleFunnelStages(<?= $funnel['id'] ?>)" />
+                                                    <label class="form-check-label fw-bold fs-6" for="funnel_<?= $funnel['id'] ?>">
+                                                        <?= htmlspecialchars($funnel['name']) ?>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="card-toolbar">
+                                                <span class="badge badge-light-primary"><?= count($funnel['stages']) ?> estágios</span>
+                                            </div>
+                                        </div>
+                                        <div class="card-body py-3">
+                                            <?php if (empty($funnel['stages'])): ?>
+                                                <div class="text-muted fs-7 text-center py-3">Nenhum estágio</div>
+                                            <?php else: ?>
+                                                <div class="d-flex flex-column gap-2">
+                                                    <?php foreach ($funnel['stages'] as $stage): ?>
+                                                        <div class="form-check form-check-custom form-check-solid">
+                                                            <input class="form-check-input stage-checkbox stage-of-funnel-<?= $funnel['id'] ?>" 
+                                                                   type="checkbox" 
+                                                                   name="stages[]"
+                                                                   value="<?= $funnel['id'] ?>_<?= $stage['id'] ?>"
+                                                                   id="stage_<?= $stage['id'] ?>"
+                                                                   data-funnel-id="<?= $funnel['id'] ?>"
+                                                                   data-stage-id="<?= $stage['id'] ?>" />
+                                                            <label class="form-check-label fs-7" for="stage_<?= $stage['id'] ?>">
+                                                                <?= htmlspecialchars($stage['name']) ?>
+                                                            </label>
+                                                        </div>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
                             <?php endforeach; ?>
-                        </select>
-                        <div class="form-text">Deixe vazio para permitir acesso a todos os funis</div>
+                        <?php endif; ?>
                     </div>
-                    <div class="fv-row mb-7">
-                        <label class="fw-semibold fs-6 mb-2">Estágio</label>
-                        <select name="stage_id" id="kt_stage_select" class="form-select form-select-solid" disabled>
-                            <option value="">Todos os Estágios</option>
-                        </select>
-                        <div class="form-text">Deixe vazio para permitir acesso a todos os estágios do funil selecionado</div>
-                    </div>
-                    <div class="fv-row mb-7">
-                        <label class="required fw-semibold fs-6 mb-2">Tipo de Permissão</label>
-                        <select name="permission_type" class="form-select form-select-solid" required>
-                            <option value="view">Visualizar</option>
-                            <option value="edit">Editar</option>
-                            <option value="move">Mover Conversas</option>
-                        </select>
+                    
+                    <!-- Resumo da Seleção -->
+                    <div class="card bg-light mt-5">
+                        <div class="card-body py-3">
+                            <div class="d-flex align-items-center">
+                                <i class="ki-duotone ki-information fs-2x text-primary me-3">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                <div>
+                                    <span id="selection_summary" class="fw-semibold">Nenhum item selecionado</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="modal-footer flex-center">
+                <div class="modal-footer">
                     <button type="reset" data-bs-dismiss="modal" class="btn btn-light me-3">Cancelar</button>
                     <button type="submit" id="kt_modal_assign_funnel_permission_submit" class="btn btn-primary">
-                        <span class="indicator-label">Adicionar</span>
+                        <span class="indicator-label">
+                            <i class="ki-duotone ki-check fs-2 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Salvar Permissões Selecionadas
+                        </span>
                         <span class="indicator-progress">Aguarde...
                         <span class="spinner-border spinner-border-sm align-middle ms-2"></span></span>
                     </button>
@@ -977,51 +1066,112 @@ function removeDepartment(userId, departmentId) {
     });
 }
 
-// Carregar estágios quando funil for selecionado
-document.addEventListener("DOMContentLoaded", function() {
-    const funnelSelect = document.getElementById("kt_funnel_select");
-    const stageSelect = document.getElementById("kt_stage_select");
+// Funções para seleção múltipla de funis/estágios
+function toggleFunnelStages(funnelId) {
+    const funnelCheckbox = document.getElementById("funnel_" + funnelId);
+    const stageCheckboxes = document.querySelectorAll(".stage-of-funnel-" + funnelId);
     
-    if (funnelSelect && stageSelect) {
-        funnelSelect.addEventListener("change", function() {
-            const funnelId = this.value;
-            stageSelect.innerHTML = "<option value=\"\">Todos os Estágios</option>";
-            stageSelect.disabled = !funnelId;
-            
-            if (funnelId) {
-                fetch("' . \App\Helpers\Url::to('/funnels') . '/" + funnelId + "/stages")
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.stages) {
-                            data.stages.forEach(stage => {
-                                const option = document.createElement("option");
-                                option.value = stage.id;
-                                option.textContent = stage.name;
-                                stageSelect.appendChild(option);
-                            });
-                        }
-                    })
-                    .catch(() => {
-                        // Se não houver endpoint, tentar buscar do DOM ou deixar vazio
-                    });
-            }
+    stageCheckboxes.forEach(cb => {
+        cb.checked = funnelCheckbox.checked;
+    });
+    
+    updateSelectionSummary();
+}
+
+function selectAllFunnels() {
+    document.querySelectorAll(".funnel-checkbox").forEach(cb => {
+        cb.checked = true;
+        const funnelId = cb.dataset.funnelId;
+        document.querySelectorAll(".stage-of-funnel-" + funnelId).forEach(stageCb => {
+            stageCb.checked = true;
         });
-    }
+    });
+    updateSelectionSummary();
+}
+
+function deselectAllFunnels() {
+    document.querySelectorAll(".funnel-checkbox").forEach(cb => {
+        cb.checked = false;
+    });
+    document.querySelectorAll(".stage-checkbox").forEach(cb => {
+        cb.checked = false;
+    });
+    updateSelectionSummary();
+}
+
+function updateSelectionSummary() {
+    const selectedStages = document.querySelectorAll(".stage-checkbox:checked").length;
+    const totalStages = document.querySelectorAll(".stage-checkbox").length;
+    const summary = document.getElementById("selection_summary");
     
+    if (selectedStages === 0) {
+        summary.textContent = "Nenhum estágio selecionado";
+        summary.className = "fw-semibold text-muted";
+    } else if (selectedStages === totalStages) {
+        summary.textContent = "Todos os " + totalStages + " estágios selecionados";
+        summary.className = "fw-semibold text-success";
+    } else {
+        summary.textContent = selectedStages + " de " + totalStages + " estágios selecionados";
+        summary.className = "fw-semibold text-primary";
+    }
+}
+
+// Atualizar checkbox do funil quando estágios são selecionados individualmente
+document.addEventListener("DOMContentLoaded", function() {
+    document.querySelectorAll(".stage-checkbox").forEach(cb => {
+        cb.addEventListener("change", function() {
+            const funnelId = this.dataset.funnelId;
+            const funnelCheckbox = document.getElementById("funnel_" + funnelId);
+            const stageCheckboxes = document.querySelectorAll(".stage-of-funnel-" + funnelId);
+            const checkedStages = document.querySelectorAll(".stage-of-funnel-" + funnelId + ":checked");
+            
+            // Se todos estágios marcados, marcar funil; se nenhum, desmarcar
+            funnelCheckbox.checked = checkedStages.length === stageCheckboxes.length;
+            funnelCheckbox.indeterminate = checkedStages.length > 0 && checkedStages.length < stageCheckboxes.length;
+            
+            updateSelectionSummary();
+        });
+    });
+    
+    // Inicializar resumo
+    updateSelectionSummary();
+    
+    // Formulário de permissões em lote
     const funnelPermissionForm = document.getElementById("kt_modal_assign_funnel_permission_form");
     if (funnelPermissionForm) {
         funnelPermissionForm.addEventListener("submit", function(e) {
             e.preventDefault();
             
+            const selectedStages = document.querySelectorAll(".stage-checkbox:checked");
+            if (selectedStages.length === 0) {
+                alert("Selecione pelo menos um estágio para adicionar permissões.");
+                return;
+            }
+            
             const submitBtn = document.getElementById("kt_modal_assign_funnel_permission_submit");
             submitBtn.setAttribute("data-kt-indicator", "on");
             submitBtn.disabled = true;
             
-            const formData = new FormData(funnelPermissionForm);
+            const permissionType = document.getElementById("kt_bulk_permission_type").value;
             
-            fetch("' . \App\Helpers\Url::to('/users/' . $user['id'] . '/funnel-permissions') . '", {
+            // Coletar todas as seleções
+            const permissions = [];
+            selectedStages.forEach(cb => {
+                permissions.push({
+                    funnel_id: cb.dataset.funnelId,
+                    stage_id: cb.dataset.stageId,
+                    permission_type: permissionType
+                });
+            });
+            
+            // Enviar todas as permissões de uma vez
+            fetch("' . \App\Helpers\Url::to('/users/' . $user['id'] . '/funnel-permissions/bulk') . '", {
                 method: "POST",
-                body: formData
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: JSON.stringify({ permissions: permissions })
             })
             .then(response => response.json())
             .then(data => {
@@ -1033,13 +1183,14 @@ document.addEventListener("DOMContentLoaded", function() {
                     modal.hide();
                     location.reload();
                 } else {
-                    alert("Erro: " + (data.message || "Erro ao adicionar permissão"));
+                    alert("Erro: " + (data.message || "Erro ao adicionar permissões"));
                 }
             })
             .catch(error => {
                 submitBtn.removeAttribute("data-kt-indicator");
                 submitBtn.disabled = false;
-                alert("Erro ao adicionar permissão");
+                console.error(error);
+                alert("Erro ao adicionar permissões");
             });
         });
     }

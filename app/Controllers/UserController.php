@@ -82,6 +82,24 @@ class UserController
             $allFunnels = Funnel::where('status', '=', 'active');
             $funnelPermissions = AgentFunnelPermission::getUserPermissions($id);
             
+            // Buscar estágios de cada funil para interface de seleção múltipla
+            $funnelsWithStages = [];
+            foreach ($allFunnels as $funnel) {
+                $stages = \App\Models\FunnelStage::where('funnel_id', '=', $funnel['id'], 'ORDER BY `order` ASC');
+                $funnelsWithStages[] = [
+                    'id' => $funnel['id'],
+                    'name' => $funnel['name'],
+                    'stages' => $stages
+                ];
+            }
+            
+            // Mapear permissões existentes para verificação rápida
+            $existingPermissions = [];
+            foreach ($funnelPermissions as $perm) {
+                $key = ($perm['funnel_id'] ?? 'all') . '_' . ($perm['stage_id'] ?? 'all') . '_' . $perm['permission_type'];
+                $existingPermissions[$key] = true;
+            }
+            
             // Obter estatísticas de performance se for agente
             $performanceStats = null;
             if ($user['role'] === 'agent' || $user['role'] === 'admin' || $user['role'] === 'supervisor') {
@@ -99,7 +117,9 @@ class UserController
                 'allRoles' => $allRoles,
                 'allDepartments' => $allDepartments,
                 'allFunnels' => $allFunnels,
+                'funnelsWithStages' => $funnelsWithStages,
                 'funnelPermissions' => $funnelPermissions,
+                'existingPermissions' => $existingPermissions,
                 'performanceStats' => $performanceStats
             ]);
         } catch (\Exception $e) {
@@ -365,6 +385,73 @@ class UserController
                     'message' => 'Falha ao atribuir permissão.'
                 ], 500);
             }
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Atribuir múltiplas permissões de funil/estágio em lote
+     */
+    public function assignFunnelPermissionsBulk(int $id): void
+    {
+        Permission::abortIfCannot('users.edit');
+        
+        try {
+            // Ler JSON do body
+            $json = file_get_contents('php://input');
+            $data = json_decode($json, true);
+            
+            if (empty($data['permissions']) || !is_array($data['permissions'])) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Nenhuma permissão enviada.'
+                ], 400);
+                return;
+            }
+            
+            $added = 0;
+            $skipped = 0;
+            $errors = [];
+            
+            foreach ($data['permissions'] as $perm) {
+                $funnelId = $perm['funnel_id'] ?? null;
+                $stageId = $perm['stage_id'] ?? null;
+                $permissionType = $perm['permission_type'] ?? 'view';
+                
+                try {
+                    // Verificar se já existe
+                    $exists = AgentFunnelPermission::hasPermission($id, $funnelId, $stageId, $permissionType);
+                    
+                    if ($exists) {
+                        $skipped++;
+                        continue;
+                    }
+                    
+                    if (AgentFunnelPermission::addPermission($id, $funnelId, $stageId, $permissionType)) {
+                        $added++;
+                    }
+                } catch (\Exception $e) {
+                    $errors[] = "Funil {$funnelId}, Estágio {$stageId}: " . $e->getMessage();
+                }
+            }
+            
+            $message = "{$added} permissão(ões) adicionada(s)";
+            if ($skipped > 0) {
+                $message .= ", {$skipped} já existia(m)";
+            }
+            
+            Response::json([
+                'success' => true,
+                'message' => $message,
+                'added' => $added,
+                'skipped' => $skipped,
+                'errors' => $errors
+            ]);
+            
         } catch (\Exception $e) {
             Response::json([
                 'success' => false,

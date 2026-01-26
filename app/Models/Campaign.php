@@ -19,6 +19,16 @@ class Campaign extends Model
         'channel', 'integration_account_ids', 'rotation_strategy',
         'scheduled_at', 'send_strategy', 'send_rate_per_minute', 'send_interval_seconds',
         'send_window_start', 'send_window_end', 'send_days', 'timezone',
+        // Controles avançados de taxa de envio
+        'daily_limit', 'hourly_limit', 'daily_limit_per_account',
+        'random_interval_enabled', 'random_interval_min', 'random_interval_max',
+        'batch_size', 'batch_pause_minutes',
+        'sent_today', 'sent_this_hour', 'last_counter_reset', 'last_hourly_reset',
+        // Geração de mensagem com IA
+        'ai_message_enabled', 'ai_message_prompt', 'ai_temperature',
+        // Execução de automações
+        'execute_automations',
+        // Funil
         'funnel_id', 'initial_stage_id', 'auto_move_on_reply', 'reply_stage_id',
         'status', 'priority',
         'skip_duplicates', 'skip_recent_conversations', 'skip_recent_hours',

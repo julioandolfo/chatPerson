@@ -454,4 +454,26 @@ class ExternalDataSourceController
             ], 400);
         }
     }
+    
+    /**
+     * Visualizar logs de sincronização de uma fonte
+     */
+    public function syncLogs(int $id): void
+    {
+        Permission::abortIfCannot('campaigns.view');
+
+        $source = ExternalDataSource::find($id);
+        if (!$source) {
+            Response::json(['error' => 'Fonte não encontrada'], 404);
+            return;
+        }
+        
+        $logs = ExternalDataSource::getSyncLogs($id, 50);
+        
+        Response::view('external-sources/logs', [
+            'source' => $source,
+            'logs' => $logs,
+            'title' => 'Logs de Sincronização - ' . $source['name']
+        ]);
+    }
 }

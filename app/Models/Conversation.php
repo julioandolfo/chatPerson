@@ -631,5 +631,38 @@ class Conversation extends Model
         // Usar fetch ao invés de fetchOne (que não existe)
         return Database::fetch($sql, $params);
     }
+    
+    /**
+     * Buscar conversa ABERTA por contato e canal
+     * Retorna apenas conversas com status 'open'
+     */
+    public static function findOpenByContactAndChannel(int $contactId, string $channel, ?int $whatsappAccountId = null): ?array
+    {
+        $sql = "SELECT c.*, u.name as agent_name 
+                FROM conversations c
+                LEFT JOIN users u ON c.agent_id = u.id
+                WHERE c.contact_id = ? AND c.channel = ? AND c.status = 'open'";
+        $params = [$contactId, $channel];
+        
+        if ($whatsappAccountId) {
+            $sql .= " AND c.whatsapp_account_id = ?";
+            $params[] = $whatsappAccountId;
+        }
+        
+        $sql .= " ORDER BY c.created_at DESC LIMIT 1";
+        
+        return Database::fetch($sql, $params);
+    }
+    
+    /**
+     * Verificar se existem APENAS conversas fechadas para um contato/canal
+     * Retorna true se todas as conversas estão fechadas (ou não existem conversas)
+     */
+    public static function hasOnlyClosedConversations(int $contactId, string $channel, ?int $whatsappAccountId = null): bool
+    {
+        // Verificar se existe alguma conversa aberta
+        $openConversation = self::findOpenByContactAndChannel($contactId, $channel, $whatsappAccountId);
+        return $openConversation === null;
+    }
 }
 

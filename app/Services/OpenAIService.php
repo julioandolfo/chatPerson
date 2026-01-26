@@ -2725,4 +2725,134 @@ PROMPT;
             return null;
         }
     }
+    
+    /**
+     * Gerar texto simples com OpenAI
+     * Usado para gerar mensagens personalizadas em campanhas
+     * 
+     * @param string $prompt Prompt do sistema (instruções)
+     * @param array $variables Variáveis disponíveis para o prompt
+     * @param float $temperature Criatividade (0.0 = determinístico, 1.0 = criativo)
+     * @param string $model Modelo a usar (default: gpt-4o-mini por custo)
+     * @return string|null Texto gerado ou null em caso de erro
+     */
+    public static function generateText(string $prompt, array $variables = [], float $temperature = 0.7, string $model = 'gpt-4o-mini'): ?string
+    {
+        $apiKey = self::getApiKey();
+        if (empty($apiKey)) {
+            \App\Helpers\Logger::error('OpenAIService::generateText - API Key não configurada');
+            return null;
+        }
+        
+        // Substituir variáveis no prompt
+        $processedPrompt = $prompt;
+        foreach ($variables as $key => $value) {
+            $processedPrompt = str_replace('{{' . $key . '}}', $value ?? '', $processedPrompt);
+        }
+        
+        // Montar contexto com informações do contato
+        $contactInfo = [];
+        foreach ($variables as $key => $value) {
+            if (!empty($value)) {
+                $contactInfo[] = ucfirst(str_replace('_', ' ', $key)) . ": " . $value;
+            }
+        }
+        
+        $systemPrompt = "Você é um assistente que gera mensagens personalizadas para campanhas de WhatsApp.
+REGRAS IMPORTANTES:
+1. Gere APENAS o texto da mensagem, sem aspas, sem prefixos, sem explicações
+2. A mensagem deve parecer natural e humana
+3. Use as informações do contato quando disponíveis
+4. Seja criativo e varie o estilo para não parecer robótico
+5. Mantenha um tom amigável e profissional
+6. NÃO use emojis em excesso (máximo 2)
+7. A mensagem deve ser direta e objetiva
+
+Informações do contato:
+" . (!empty($contactInfo) ? implode("\n", $contactInfo) : "Nenhuma informação adicional");
+
+        $messages = [
+            [
+                'role' => 'system',
+                'content' => $systemPrompt
+            ],
+            [
+                'role' => 'user',
+                'content' => "Gere uma mensagem seguindo estas instruções:\n\n" . $processedPrompt
+            ]
+        ];
+        
+        $payload = [
+            'model' => $model,
+            'messages' => $messages,
+            'temperature' => max(0, min(1, $temperature)),
+            'max_tokens' => 500
+        ];
+        
+        try {
+            $response = self::makeRequest($apiKey, $payload);
+            $content = $response['choices'][0]['message']['content'] ?? null;
+            
+            if (!$content) {
+                \App\Helpers\Logger::error('OpenAIService::generateText - Resposta vazia');
+                return null;
+            }
+            
+            // Limpar aspas externas se houver
+            $content = trim($content);
+            if ((str_starts_with($content, '"') && str_ends_with($content, '"')) ||
+                (str_starts_with($content, "'") && str_ends_with($content, "'"))) {
+                $content = substr($content, 1, -1);
+            }
+            
+            \App\Helpers\Logger::info("OpenAIService::generateText - Mensagem gerada com sucesso (len=" . strlen($content) . ")");
+            
+            return $content;
+            
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error('OpenAIService::generateText - Erro: ' . $e->getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Gerar mensagem de campanha personalizada para um contato
+     * 
+     * @param string $prompt Prompt base da campanha
+     * @param array $contact Dados do contato
+     * @param string|null $baseMessage Mensagem base para referência (opcional)
+     * @param float $temperature Temperatura da IA
+     * @return string|null Mensagem gerada
+     */
+    public static function generateCampaignMessage(string $prompt, array $contact, ?string $baseMessage = null, float $temperature = 0.7): ?string
+    {
+        // Preparar variáveis do contato
+        $variables = [
+            'nome' => $contact['name'] ?? '',
+            'primeiro_nome' => !empty($contact['name']) ? explode(' ', $contact['name'])[0] : '',
+            'sobrenome' => $contact['last_name'] ?? '',
+            'email' => $contact['email'] ?? '',
+            'telefone' => $contact['phone'] ?? '',
+            'cidade' => $contact['city'] ?? '',
+            'empresa' => $contact['company'] ?? '',
+        ];
+        
+        // Adicionar custom attributes se existirem
+        if (!empty($contact['custom_attributes'])) {
+            $customAttrs = is_string($contact['custom_attributes']) 
+                ? json_decode($contact['custom_attributes'], true) 
+                : $contact['custom_attributes'];
+            if (is_array($customAttrs)) {
+                $variables = array_merge($variables, $customAttrs);
+            }
+        }
+        
+        // Incluir mensagem base no prompt se fornecida
+        $finalPrompt = $prompt;
+        if (!empty($baseMessage)) {
+            $finalPrompt .= "\n\nMensagem de referência (use como base, mas varie o estilo):\n" . $baseMessage;
+        }
+        
+        return self::generateText($finalPrompt, $variables, $temperature);
+    }
 }

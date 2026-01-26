@@ -55,8 +55,25 @@ class CampaignSchedulerService
                     continue;
                 }
 
-                // 3. Buscar mensagens pendentes
-                $messages = CampaignMessage::getPending($campaignId, $limit);
+                // 2.1. Resetar contadores se necessário (diário/horário)
+                self::resetCountersIfNeeded($campaignId);
+                
+                // 2.2. Verificar limites antes de continuar
+                $limitCheck = self::checkLimits($campaignId);
+                if (!$limitCheck['can_send']) {
+                    Logger::info("Campanha {$campaignId}: {$limitCheck['reason']}");
+                    continue;
+                }
+
+                // 3. Calcular quantas mensagens podemos enviar
+                $effectiveLimit = self::calculateEffectiveLimit($campaignId, $limit);
+                if ($effectiveLimit <= 0) {
+                    Logger::info("Campanha {$campaignId}: Limite atingido para este ciclo");
+                    continue;
+                }
+
+                // 4. Buscar mensagens pendentes
+                $messages = CampaignMessage::getPending($campaignId, $effectiveLimit);
                 
                 if (empty($messages)) {
                     // Nenhuma mensagem pendente, verificar se completou
@@ -70,15 +87,37 @@ class CampaignSchedulerService
                     continue;
                 }
 
-                Logger::info("Campanha {$campaignId}: {count} mensagens pendentes", ['count' => count($messages)]);
+                Logger::info("Campanha {$campaignId}: " . count($messages) . " mensagens a processar (limite efetivo: {$effectiveLimit})");
 
-                // 4. Processar cada mensagem
+                // 5. Processar cada mensagem
+                $sentInBatch = 0;
                 foreach ($messages as $message) {
                     try {
+                        // Verificar limite de lote
+                        if (!empty($campaign['batch_size']) && $sentInBatch >= $campaign['batch_size']) {
+                            $pauseMinutes = $campaign['batch_pause_minutes'] ?? 5;
+                            Logger::info("Campanha {$campaignId}: Lote de {$campaign['batch_size']} msgs enviado, pausando {$pauseMinutes} min");
+                            sleep($pauseMinutes * 60);
+                            $sentInBatch = 0;
+                        }
+                        
+                        // Re-verificar limites após cada envio (podem ter sido atingidos)
+                        $limitCheck = self::checkLimits($campaignId);
+                        if (!$limitCheck['can_send']) {
+                            Logger::info("Campanha {$campaignId}: {$limitCheck['reason']} - parando processamento");
+                            break;
+                        }
+                        
                         $result = self::processMessage($campaignId, $message);
                         $processed[] = $result;
+                        
+                        // Incrementar contadores de limite
+                        if ($result['status'] === 'sent') {
+                            self::incrementSendCounters($campaignId);
+                            $sentInBatch++;
+                        }
 
-                        // 5. Aplicar cadência (delay entre envios)
+                        // 6. Aplicar cadência (delay entre envios)
                         self::applyCadence($campaignId);
 
                     } catch (\Exception $e) {
@@ -90,7 +129,7 @@ class CampaignSchedulerService
                     }
                 }
 
-                // 6. Atualizar último processamento
+                // 7. Atualizar último processamento
                 Campaign::updateLastProcessed($campaignId);
 
             } catch (\Exception $e) {
@@ -102,12 +141,123 @@ class CampaignSchedulerService
 
         return $processed;
     }
+    
+    /**
+     * Resetar contadores diários/horários se necessário
+     */
+    private static function resetCountersIfNeeded(int $campaignId): void
+    {
+        $campaign = Campaign::find($campaignId);
+        if (!$campaign) return;
+        
+        $today = date('Y-m-d');
+        $currentHour = date('Y-m-d H:00:00');
+        
+        $updates = [];
+        
+        // Reset diário
+        if (empty($campaign['last_counter_reset']) || $campaign['last_counter_reset'] !== $today) {
+            $updates['sent_today'] = 0;
+            $updates['last_counter_reset'] = $today;
+            Logger::info("Campanha {$campaignId}: Contador diário resetado");
+        }
+        
+        // Reset horário
+        if (empty($campaign['last_hourly_reset']) || $campaign['last_hourly_reset'] < $currentHour) {
+            $updates['sent_this_hour'] = 0;
+            $updates['last_hourly_reset'] = $currentHour;
+        }
+        
+        if (!empty($updates)) {
+            Campaign::update($campaignId, $updates);
+        }
+    }
+    
+    /**
+     * Verificar se os limites permitem enviar
+     */
+    private static function checkLimits(int $campaignId): array
+    {
+        $campaign = Campaign::find($campaignId);
+        if (!$campaign) {
+            return ['can_send' => false, 'reason' => 'Campanha não encontrada'];
+        }
+        
+        // Verificar limite diário
+        if (!empty($campaign['daily_limit'])) {
+            $sentToday = (int)($campaign['sent_today'] ?? 0);
+            if ($sentToday >= $campaign['daily_limit']) {
+                return [
+                    'can_send' => false, 
+                    'reason' => "Limite diário atingido ({$sentToday}/{$campaign['daily_limit']})"
+                ];
+            }
+        }
+        
+        // Verificar limite por hora
+        if (!empty($campaign['hourly_limit'])) {
+            $sentThisHour = (int)($campaign['sent_this_hour'] ?? 0);
+            if ($sentThisHour >= $campaign['hourly_limit']) {
+                return [
+                    'can_send' => false, 
+                    'reason' => "Limite por hora atingido ({$sentThisHour}/{$campaign['hourly_limit']})"
+                ];
+            }
+        }
+        
+        return ['can_send' => true, 'reason' => null];
+    }
+    
+    /**
+     * Calcular limite efetivo considerando limites configurados
+     */
+    private static function calculateEffectiveLimit(int $campaignId, int $defaultLimit): int
+    {
+        $campaign = Campaign::find($campaignId);
+        if (!$campaign) return $defaultLimit;
+        
+        $limit = $defaultLimit;
+        
+        // Ajustar pelo limite diário restante
+        if (!empty($campaign['daily_limit'])) {
+            $remaining = $campaign['daily_limit'] - (int)($campaign['sent_today'] ?? 0);
+            $limit = min($limit, max(0, $remaining));
+        }
+        
+        // Ajustar pelo limite horário restante
+        if (!empty($campaign['hourly_limit'])) {
+            $remaining = $campaign['hourly_limit'] - (int)($campaign['sent_this_hour'] ?? 0);
+            $limit = min($limit, max(0, $remaining));
+        }
+        
+        // Ajustar pelo tamanho do lote
+        if (!empty($campaign['batch_size'])) {
+            $limit = min($limit, (int)$campaign['batch_size']);
+        }
+        
+        return $limit;
+    }
+    
+    /**
+     * Incrementar contadores de envio
+     */
+    private static function incrementSendCounters(int $campaignId): void
+    {
+        $sql = "UPDATE campaigns 
+                SET sent_today = COALESCE(sent_today, 0) + 1,
+                    sent_this_hour = COALESCE(sent_this_hour, 0) + 1
+                WHERE id = ?";
+        \App\Helpers\Database::execute($sql, [$campaignId]);
+    }
 
     /**
      * Processar uma mensagem individual
      */
     private static function processMessage(int $campaignId, array $message): array
     {
+        // Definir campanha atual para verificações de limite por conta
+        self::$currentCampaignId = $campaignId;
+        
         $campaign = Campaign::find($campaignId);
         $contact = Contact::find($message['contact_id']);
 
@@ -140,8 +290,34 @@ class CampaignSchedulerService
             throw new \Exception("Nenhuma conta ativa disponível");
         }
 
-        // 3. CRIAR CONVERSA (se configurado)
+        // 3. GERAR MENSAGEM COM IA (se configurado)
+        $messageContent = $message['content'];
+        if (!empty($campaign['ai_message_enabled']) && !empty($campaign['ai_message_prompt'])) {
+            Logger::info("Campanha {$campaignId}: Gerando mensagem com IA para contato {$contact['id']}");
+            try {
+                $aiMessage = \App\Services\OpenAIService::generateCampaignMessage(
+                    $campaign['ai_message_prompt'],
+                    $contact,
+                    $message['content'], // Mensagem original como referência
+                    (float)($campaign['ai_temperature'] ?? 0.7)
+                );
+                
+                if ($aiMessage) {
+                    $messageContent = $aiMessage;
+                    Logger::info("Campanha {$campaignId}: Mensagem gerada com IA (len=" . strlen($aiMessage) . ")");
+                } else {
+                    Logger::warning("Campanha {$campaignId}: IA não gerou mensagem, usando conteúdo original");
+                }
+            } catch (\Exception $e) {
+                Logger::error("Campanha {$campaignId}: Erro ao gerar mensagem com IA: " . $e->getMessage());
+                // Continua com a mensagem original
+            }
+        }
+
+        // 4. CRIAR CONVERSA (se configurado)
         $conversationId = null;
+        $executeAutomations = !empty($campaign['execute_automations']);
+        
         if ($campaign['create_conversation']) {
             $conversationData = [
                 'contact_id' => $contact['id'],
@@ -153,18 +329,23 @@ class CampaignSchedulerService
             ];
 
             try {
-                $conversation = ConversationService::create($conversationData, false); // Não executar automações
+                // Passar executeAutomations para definir se deve executar automações da etapa
+                $conversation = ConversationService::create($conversationData, $executeAutomations);
                 $conversationId = $conversation['id'];
+                
+                if ($executeAutomations) {
+                    Logger::info("Campanha {$campaignId}: Automações executadas para conversa {$conversationId}");
+                }
             } catch (\Exception $e) {
                 Logger::error("Erro ao criar conversa: " . $e->getMessage());
             }
         }
 
-        // 4. ENVIAR MENSAGEM
+        // 5. ENVIAR MENSAGEM
         $sendResult = IntegrationService::sendMessage(
             $integrationAccountId,
             $contact['phone'],
-            $message['content'],
+            $messageContent,
             [
                 'attachments' => !empty($message['attachments']) ? json_decode($message['attachments'], true) : []
             ]
@@ -174,12 +355,12 @@ class CampaignSchedulerService
             throw new \Exception("Falha ao enviar mensagem: " . ($sendResult['error'] ?? 'Erro desconhecido'));
         }
 
-        // 5. CRIAR REGISTRO NA TABELA MESSAGES
+        // 6. CRIAR REGISTRO NA TABELA MESSAGES
         $messageData = [
             'conversation_id' => $conversationId,
             'sender_type' => 'agent',
             'sender_id' => $campaign['created_by'] ?? 1,
-            'content' => $message['content'],
+            'content' => $messageContent, // Usar mensagem gerada (IA ou original)
             'message_type' => 'text',
             'status' => 'sent',
             'external_id' => $sendResult['id'] ?? null,
@@ -230,23 +411,76 @@ class CampaignSchedulerService
      */
 
     /**
+     * ID da campanha atual (para verificar limite por conta)
+     */
+    private static ?int $currentCampaignId = null;
+    
+    /**
      * Selecionar conta baseado na estratégia
      */
     private static function selectAccount(array $accountIds, string $strategy = 'round_robin'): ?int
     {
+        // Filtrar contas que ainda não atingiram o limite diário
+        $availableAccounts = self::filterAccountsByDailyLimit($accountIds);
+        
+        if (empty($availableAccounts)) {
+            Logger::info("Nenhuma conta disponível - todas atingiram limite diário");
+            return null;
+        }
+        
         switch ($strategy) {
             case 'round_robin':
-                return self::selectAccountRoundRobin($accountIds);
+                return self::selectAccountRoundRobin($availableAccounts);
             
             case 'random':
-                return self::selectAccountRandom($accountIds);
+                return self::selectAccountRandom($availableAccounts);
             
             case 'by_load':
-                return self::selectAccountByLoad($accountIds);
+                return self::selectAccountByLoad($availableAccounts);
             
             default:
-                return self::selectAccountRoundRobin($accountIds);
+                return self::selectAccountRoundRobin($availableAccounts);
         }
+    }
+    
+    /**
+     * Filtrar contas que ainda não atingiram o limite diário
+     */
+    private static function filterAccountsByDailyLimit(array $accountIds): array
+    {
+        if (empty(self::$currentCampaignId)) {
+            return $accountIds;
+        }
+        
+        $campaign = Campaign::find(self::$currentCampaignId);
+        if (!$campaign || empty($campaign['daily_limit_per_account'])) {
+            return $accountIds;
+        }
+        
+        $limit = (int)$campaign['daily_limit_per_account'];
+        $availableAccounts = [];
+        $today = date('Y-m-d');
+        
+        foreach ($accountIds as $accountId) {
+            // Contar mensagens enviadas hoje por esta conta nesta campanha
+            $sql = "SELECT COUNT(*) as total 
+                    FROM campaign_messages 
+                    WHERE campaign_id = ? 
+                    AND integration_account_id = ? 
+                    AND DATE(sent_at) = ?
+                    AND status = 'sent'";
+            
+            $result = \App\Helpers\Database::fetch($sql, [self::$currentCampaignId, $accountId, $today]);
+            $sentToday = (int)($result['total'] ?? 0);
+            
+            if ($sentToday < $limit) {
+                $availableAccounts[] = $accountId;
+            } else {
+                Logger::info("Conta {$accountId} atingiu limite diário ({$sentToday}/{$limit})");
+            }
+        }
+        
+        return $availableAccounts;
     }
 
     /**
@@ -453,6 +687,7 @@ class CampaignSchedulerService
 
     /**
      * Aplicar cadência (delay entre mensagens)
+     * Suporta intervalo fixo ou aleatório
      */
     private static function applyCadence(int $campaignId): void
     {
@@ -461,10 +696,28 @@ class CampaignSchedulerService
             return;
         }
 
-        $intervalSeconds = $campaign['send_interval_seconds'] ?? 6;
+        // Verificar se usa intervalo aleatório
+        if (!empty($campaign['random_interval_enabled'])) {
+            $minInterval = (int)($campaign['random_interval_min'] ?? 30);
+            $maxInterval = (int)($campaign['random_interval_max'] ?? 120);
+            
+            // Garantir que min <= max
+            if ($minInterval > $maxInterval) {
+                $temp = $minInterval;
+                $minInterval = $maxInterval;
+                $maxInterval = $temp;
+            }
+            
+            // Gerar intervalo aleatório
+            $intervalSeconds = rand($minInterval, $maxInterval);
+            Logger::info("Campanha {$campaignId}: Intervalo aleatório de {$intervalSeconds}s (range: {$minInterval}s - {$maxInterval}s)");
+        } else {
+            // Intervalo fixo
+            $intervalSeconds = (int)($campaign['send_interval_seconds'] ?? 6);
+        }
         
         if ($intervalSeconds > 0) {
-            usleep($intervalSeconds * 1000000); // Converter para microsegundos
+            sleep($intervalSeconds);
         }
     }
 

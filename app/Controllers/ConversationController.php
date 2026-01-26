@@ -677,33 +677,23 @@ class ConversationController
                 }
             }
             
-            // Verificar se já existe conversa com esse contato e canal
+            // Verificar se já existe conversa ABERTA com esse contato e canal
             $whatsappAccountIdForSearch = ($channel === 'whatsapp') ? $whatsappAccountId : null;
-            $existingConversation = \App\Models\Conversation::findByContactAndChannel(
+            $existingOpenConversation = \App\Models\Conversation::findOpenByContactAndChannel(
                 $contact['id'], 
                 $channel, 
                 $whatsappAccountIdForSearch
             );
             
-            // Se existe conversa, bloquear criação se houver conversa ABERTA para o mesmo contato/canal
-            if ($existingConversation && ($existingConversation['status'] ?? '') === 'open') {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Já existe uma conversa aberta para este contato.',
-                    'existing_conversation_id' => $existingConversation['id'],
-                    'existing_agent_id' => $existingConversation['agent_id'] ?? null
-                ], 400);
-                return;
-            }
-            
-            // Se existe conversa, verificar se está atribuída a outro agente humano
-            if ($existingConversation) {
-                $existingAgentId = $existingConversation['agent_id'] ?? null;
+            // Se existe conversa ABERTA, verificar atribuição
+            if ($existingOpenConversation) {
+                $existingAgentId = $existingOpenConversation['agent_id'] ?? null;
+                $existingAgentName = $existingOpenConversation['agent_name'] ?? null;
                 
                 // Verificar se está atribuída a agente de IA (não considerar IA como agente)
                 $isAIAssigned = false;
                 try {
-                    $aiConversation = \App\Models\AIConversation::getByConversationId($existingConversation['id']);
+                    $aiConversation = \App\Models\AIConversation::getByConversationId($existingOpenConversation['id']);
                     if ($aiConversation && $aiConversation['status'] === 'active') {
                         $isAIAssigned = true;
                     }
@@ -713,22 +703,42 @@ class ConversationController
                 
                 // Se está atribuída a outro agente humano (não IA e não é o usuário atual)
                 if ($existingAgentId && $existingAgentId != $currentUserId && !$isAIAssigned) {
-                    $existingAgent = \App\Models\User::find($existingAgentId);
-                    $existingAgentName = $existingAgent ? $existingAgent['name'] : 'Outro agente';
+                    if (!$existingAgentName) {
+                        $existingAgent = \App\Models\User::find($existingAgentId);
+                        $existingAgentName = $existingAgent ? $existingAgent['name'] : 'Outro agente';
+                    }
                     
-                    // Apenas avisar, não criar
+                    // Retornar informações completas para o frontend mostrar opções
                     Response::json([
                         'success' => false,
-                        'message' => "Já existe uma conversa com este contato atribuída ao agente: {$existingAgentName}",
-                        'existing_agent' => $existingAgentName,
-                        'existing_conversation_id' => $existingConversation['id']
+                        'code' => 'conversation_exists_other_agent',
+                        'message' => "Já existe uma conversa aberta com este contato atribuída ao agente: {$existingAgentName}",
+                        'existing_agent_id' => $existingAgentId,
+                        'existing_agent_name' => $existingAgentName,
+                        'existing_conversation_id' => $existingOpenConversation['id'],
+                        'can_request_participation' => true
+                    ], 400);
+                    return;
+                }
+                
+                // Se não está atribuída a ninguém
+                if (!$existingAgentId) {
+                    // Conversa aberta não atribuída - retornar info para o frontend
+                    Response::json([
+                        'success' => false,
+                        'code' => 'conversation_exists_unassigned',
+                        'message' => 'Já existe uma conversa aberta com este contato (não atribuída).',
+                        'existing_conversation_id' => $existingOpenConversation['id'],
+                        'can_view' => true
                     ], 400);
                     return;
                 }
                 
                 // Se está atribuída ao usuário atual ou é IA, usar a conversa existente
-                $conversationId = $existingConversation['id'];
+                $conversationId = $existingOpenConversation['id'];
             } else {
+                // ✅ NOVO: Não existe conversa ABERTA - permitir criar nova
+                // (mesmo que existam conversas fechadas)
                 // Criar nova conversa
                 $conversationData = [
                     'contact_id' => $contact['id'],

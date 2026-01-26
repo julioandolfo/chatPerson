@@ -1630,37 +1630,70 @@ class WhatsAppService
             $filename = $quepasaData['fileName'] ?? $quepasaData['filename'] ?? $payload['filename'] ?? $payload['media_name'] ?? null;
             $size = $quepasaData['size'] ?? $payload['size'] ?? null;
 
-            // Possíveis contêineres de mídia (media/audio/attachment/extra)
+            // Possíveis contêineres de mídia (media/audio/document/image/video/attachment/extra/file/sticker)
             $candidates = [
+                // Quepasa data containers
                 $quepasaData['media'] ?? null,
                 $quepasaData['audio'] ?? null,
+                $quepasaData['document'] ?? null,  // ✅ NOVO: Para PDFs e documentos
+                $quepasaData['image'] ?? null,      // ✅ NOVO: Para imagens
+                $quepasaData['video'] ?? null,      // ✅ NOVO: Para vídeos
+                $quepasaData['sticker'] ?? null,    // ✅ NOVO: Para stickers
+                $quepasaData['file'] ?? null,       // ✅ NOVO: Campo genérico de arquivo
                 $quepasaData['attachment'] ?? null,
                 $quepasaData['extra'] ?? null,
+                // Payload containers
                 $payload['media'] ?? null,
                 $payload['audio'] ?? null,
+                $payload['document'] ?? null,       // ✅ NOVO: Para PDFs e documentos
+                $payload['image'] ?? null,          // ✅ NOVO: Para imagens
+                $payload['video'] ?? null,          // ✅ NOVO: Para vídeos
+                $payload['sticker'] ?? null,        // ✅ NOVO: Para stickers
+                $payload['file'] ?? null,           // ✅ NOVO: Campo genérico de arquivo
                 $payload['attachment'] ?? null,
                 $payload['extra'] ?? null,
+                // Payload data containers
                 $payload['data']['media'] ?? null,
                 $payload['data']['audio'] ?? null,
+                $payload['data']['document'] ?? null,   // ✅ NOVO
+                $payload['data']['image'] ?? null,      // ✅ NOVO
+                $payload['data']['video'] ?? null,      // ✅ NOVO
+                $payload['data']['file'] ?? null,       // ✅ NOVO
                 $payload['data']['attachment'] ?? null,
                 $payload['data']['extra'] ?? null,
+                // Payload message containers
                 $payload['message']['media'] ?? null,
                 $payload['message']['audio'] ?? null,
+                $payload['message']['document'] ?? null,    // ✅ NOVO
+                $payload['message']['image'] ?? null,       // ✅ NOVO
+                $payload['message']['video'] ?? null,       // ✅ NOVO
+                $payload['message']['file'] ?? null,        // ✅ NOVO
                 $payload['message']['attachment'] ?? null,
                 $payload['message']['extra'] ?? null,
             ];
             foreach ($candidates as $cand) {
                 if (isset($cand) && is_array($cand)) {
-                    $mediaUrl = $cand['url'] ?? $mediaUrl;
-                    $mimetype = $cand['mimeType'] ?? $cand['mimetype'] ?? $mimetype;
-                    $filename = $cand['fileName'] ?? $cand['filename'] ?? $filename;
-                    $size = $cand['size'] ?? $size;
+                    $mediaUrl = $cand['url'] ?? $cand['link'] ?? $mediaUrl;  // ✅ NOVO: Também verificar 'link'
+                    $mimetype = $cand['mimeType'] ?? $cand['mimetype'] ?? $cand['mime_type'] ?? $mimetype;
+                    $filename = $cand['fileName'] ?? $cand['filename'] ?? $cand['file_name'] ?? $cand['name'] ?? $filename;
+                    $size = $cand['size'] ?? $cand['fileSize'] ?? $cand['file_size'] ?? $size;
                 }
             }
 
             // Se mídia (áudio/imagem/vídeo/documento) vier sem URL mas com attachment, tentar baixar via API
             $downloadedFile = null; // Inicializar variável para armazenar arquivo já baixado
-            $needsDownload = in_array($messageType, ['audio', 'image', 'video', 'document', 'ptt', 'sticker']) && !$mediaUrl && isset($payload['attachment']);
+            
+            // ✅ MELHORADO: Verificar múltiplos indicadores de que há um arquivo para baixar
+            $hasAttachmentIndicator = isset($payload['attachment']) 
+                || isset($quepasaData['attachment']) 
+                || isset($payload['document']) 
+                || isset($quepasaData['document'])
+                || isset($payload['file'])
+                || isset($quepasaData['file'])
+                || !empty($mimetype)  // Se tem mimetype, há um arquivo
+                || !empty($filename); // Se tem filename, há um arquivo
+            
+            $needsDownload = in_array($messageType, ['audio', 'image', 'video', 'document', 'ptt', 'sticker']) && !$mediaUrl && $hasAttachmentIndicator;
             
             if ($needsDownload) {
                 $attachmentKeys = isset($payload['attachment']) && is_array($payload['attachment']) ? implode(',', array_keys($payload['attachment'])) : 'NULL';
@@ -1878,12 +1911,39 @@ class WhatsAppService
             if (empty($message) && !empty($payload['caption'])) {
                 $message = $payload['caption'];
             }
+            
+            // ✅ NOVO: Se é um tipo de mídia mas não tem mensagem, usar placeholder
+            // Isso garante que documentos/imagens/vídeos sem caption não sejam rejeitados
+            if (empty($message) && in_array($messageType, ['document', 'image', 'video', 'audio', 'ptt', 'sticker'])) {
+                // Usar o nome do arquivo como mensagem, ou um placeholder genérico
+                if (!empty($filename)) {
+                    $message = $filename;
+                } else {
+                    $typeLabels = [
+                        'document' => 'Documento',
+                        'image' => 'Imagem',
+                        'video' => 'Vídeo',
+                        'audio' => 'Áudio',
+                        'ptt' => 'Mensagem de voz',
+                        'sticker' => 'Figurinha'
+                    ];
+                    $message = $typeLabels[$messageType] ?? 'Mídia';
+                }
+                Logger::quepasa("processWebhook - Mensagem de mídia sem texto, usando placeholder: {$message}");
+            }
 
             Logger::quepasa("processWebhook - Processando mensagem: fromPhone={$fromPhone}, message=" . substr($message, 0, 100) . ", messageId={$messageId}, isGroup=" . ($isGroup ? 'true' : 'false') . ", isMessageFromConnectedNumber=" . ($isMessageFromConnectedNumber ? 'true' : 'false'));
             Logger::quepasa("processWebhook - Campos de detecção: chatid={$chatid}, from={$from}, fromme=" . ($payload['fromme'] ?? 'null') . ", participant=" . ($payload['participant'] ?? 'null'));
             
+            // ✅ DEBUG: Log extra para tipos de mídia/documento
+            if (in_array($messageType, ['document', 'image', 'video', 'audio', 'ptt', 'sticker'])) {
+                Logger::quepasa("processWebhook - 📎 Tipo de mídia: {$messageType}, mediaUrl=" . ($mediaUrl ?: 'NULL') . ", filename=" . ($filename ?: 'NULL') . ", mimetype=" . ($mimetype ?: 'NULL'));
+            }
+            
             if (!$fromPhone || (empty($message) && !$mediaUrl && empty($location))) {
-                Logger::error("WhatsApp webhook: dados incompletos (fromPhone: " . ($fromPhone ?? 'NULL') . ", message: " . ($message ?? 'NULL') . ", mediaUrl: " . ($mediaUrl ?? 'NULL') . ")");
+                // ✅ MELHORADO: Log mais detalhado para debug de documentos
+                Logger::error("WhatsApp webhook: dados incompletos - fromPhone=" . ($fromPhone ?? 'NULL') . ", message=" . ($message ?? 'NULL') . ", mediaUrl=" . ($mediaUrl ?? 'NULL') . ", messageType={$messageType}, filename=" . ($filename ?? 'NULL'));
+                Logger::error("WhatsApp webhook: payload keys=" . implode(',', array_keys($payload)));
                 return;
             }
 

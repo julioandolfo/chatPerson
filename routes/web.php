@@ -654,6 +654,7 @@ Router::post('/external-sources', [\App\Controllers\ExternalDataSourceController
 Router::get('/external-sources/{id}/edit', [\App\Controllers\ExternalDataSourceController::class, 'edit'], ['Authentication']);
 Router::put('/external-sources/{id}', [\App\Controllers\ExternalDataSourceController::class, 'update'], ['Authentication']);
 Router::delete('/external-sources/{id}', [\App\Controllers\ExternalDataSourceController::class, 'destroy'], ['Authentication']);
+Router::get('/external-sources/{id}/logs', [\App\Controllers\ExternalDataSourceController::class, 'syncLogs'], ['Authentication']);
 Router::post('/external-sources/{id}/sync', [\App\Controllers\ExternalDataSourceController::class, 'sync'], ['Authentication']);
 
 // API Fontes Externas
@@ -711,6 +712,7 @@ Router::get('/api/campaigns/export', [CampaignController::class, 'exportCSV'], [
 Router::get('/api/campaigns/notifications', [CampaignController::class, 'getNotifications'], ['Authentication']);
 Router::post('/api/campaigns/notifications/read', [CampaignController::class, 'markNotificationsRead'], ['Authentication']);
 Router::get('/api/campaigns/{id}/stats', [CampaignController::class, 'stats'], ['Authentication']);
+Router::post('/api/campaigns/preview-ai-message', [CampaignController::class, 'previewAIMessage'], ['Authentication']);
 Router::get('/api/contact-lists', [ContactListController::class, 'listAPI'], ['Authentication']);
 Router::get('/api/contact-lists/{id}/contacts', [ContactListController::class, 'contacts'], ['Authentication']);
 Router::get('/api/contacts/search', [ContactListController::class, 'searchContacts'], ['Authentication']);

@@ -1088,4 +1088,64 @@ class CampaignController
             ], 400);
         }
     }
+    
+    /**
+     * Preview de mensagem gerada por IA
+     * POST /api/campaigns/preview-ai-message
+     */
+    public function previewAIMessage(): void
+    {
+        Permission::abortIfCannot('campaigns.create');
+        
+        try {
+            $data = Request::all();
+            
+            $prompt = $data['prompt'] ?? null;
+            if (empty($prompt)) {
+                Response::json([
+                    'success' => false,
+                    'error' => 'Prompt é obrigatório'
+                ], 400);
+                return;
+            }
+            
+            $contact = $data['contact'] ?? [
+                'name' => 'Cliente Exemplo',
+                'email' => 'cliente@email.com',
+                'phone' => '11999999999',
+                'company' => 'Empresa Exemplo'
+            ];
+            
+            $referenceMessage = $data['reference_message'] ?? null;
+            $temperature = isset($data['temperature']) ? (float)$data['temperature'] : 0.7;
+            
+            // Gerar mensagem com IA
+            $message = \App\Services\OpenAIService::generateCampaignMessage(
+                $prompt,
+                $contact,
+                $referenceMessage,
+                $temperature
+            );
+            
+            if (!$message) {
+                Response::json([
+                    'success' => false,
+                    'error' => 'Não foi possível gerar a mensagem. Verifique se a API Key da OpenAI está configurada.'
+                ], 500);
+                return;
+            }
+            
+            Response::json([
+                'success' => true,
+                'message' => $message
+            ]);
+            
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error("CampaignController::previewAIMessage - Erro: " . $e->getMessage());
+            Response::json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

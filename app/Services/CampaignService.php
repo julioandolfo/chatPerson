@@ -68,6 +68,33 @@ class CampaignService
         $data['send_interval_seconds'] = $data['send_interval_seconds'] ?? 6;
         $data['timezone'] = $data['timezone'] ?? 'America/Sao_Paulo';
         
+        // Processar controles avançados de taxa de envio
+        // Limites (converter string vazia para null)
+        $data['daily_limit'] = !empty($data['daily_limit']) ? (int)$data['daily_limit'] : null;
+        $data['hourly_limit'] = !empty($data['hourly_limit']) ? (int)$data['hourly_limit'] : null;
+        $data['daily_limit_per_account'] = !empty($data['daily_limit_per_account']) ? (int)$data['daily_limit_per_account'] : null;
+        
+        // Intervalo aleatório
+        $data['random_interval_enabled'] = !empty($data['random_interval_enabled']) && $data['random_interval_enabled'] !== '0';
+        $data['random_interval_min'] = (int)($data['random_interval_min'] ?? 30);
+        $data['random_interval_max'] = (int)($data['random_interval_max'] ?? 120);
+        
+        // Lotes
+        $data['batch_size'] = !empty($data['batch_size']) ? (int)$data['batch_size'] : null;
+        $data['batch_pause_minutes'] = (int)($data['batch_pause_minutes'] ?? 5);
+        
+        // Contadores inicializados em zero
+        $data['sent_today'] = 0;
+        $data['sent_this_hour'] = 0;
+        
+        // Geração de mensagem com IA
+        $data['ai_message_enabled'] = !empty($data['ai_message_enabled']) && $data['ai_message_enabled'] !== '0';
+        $data['ai_message_prompt'] = $data['ai_message_prompt'] ?? null;
+        $data['ai_temperature'] = isset($data['ai_temperature']) ? (float)$data['ai_temperature'] : 0.7;
+        
+        // Execução de automações
+        $data['execute_automations'] = !empty($data['execute_automations']) && $data['execute_automations'] !== '0';
+        
         // Criar campanha
         $campaignId = Campaign::create($data);
         

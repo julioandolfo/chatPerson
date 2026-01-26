@@ -19351,8 +19351,87 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 } else {
                     console.error('Erro na resposta:', data);
-                    // Mostrar aviso sobre agente atribuído
-                    if (data.existing_agent) {
+                    
+                    // ✅ NOVO: Tratamento específico por código de erro
+                    if (data.code === 'conversation_exists_other_agent' && data.can_request_participation) {
+                        // Conversa existe e está atribuída a outro agente - oferecer opções
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                icon: 'info',
+                                title: 'Conversa já existe',
+                                html: `
+                                    <div class="text-start">
+                                        <p class="mb-3">${data.message}</p>
+                                        <div class="d-flex align-items-center mb-3 p-3 bg-light-primary rounded">
+                                            <i class="ki-duotone ki-profile-user fs-2x text-primary me-3">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                                <span class="path3"></span>
+                                            </i>
+                                            <div>
+                                                <div class="fw-bold">Agente atribuído:</div>
+                                                <div class="text-gray-600">${data.existing_agent_name || 'Não identificado'}</div>
+                                            </div>
+                                        </div>
+                                        <p class="text-muted fs-7">Você pode solicitar participação nesta conversa ou visualizá-la.</p>
+                                    </div>
+                                `,
+                                showDenyButton: true,
+                                showCancelButton: true,
+                                confirmButtonText: '<i class="ki-duotone ki-send fs-4 me-1"><span class="path1"></span><span class="path2"></span></i> Solicitar Participação',
+                                denyButtonText: '<i class="ki-duotone ki-eye fs-4 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i> Ver Conversa',
+                                cancelButtonText: 'Cancelar',
+                                confirmButtonColor: '#009ef7',
+                                denyButtonColor: '#50cd89',
+                                customClass: {
+                                    confirmButton: 'btn btn-primary',
+                                    denyButton: 'btn btn-success',
+                                    cancelButton: 'btn btn-light'
+                                }
+                            }).then((result) => {
+                                if (result.isConfirmed && data.existing_conversation_id) {
+                                    // Solicitar participação
+                                    requestParticipation(data.existing_conversation_id, data.existing_agent_name);
+                                } else if (result.isDenied && data.existing_conversation_id) {
+                                    // Ir para a conversa
+                                    const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_new_conversation'));
+                                    if (modal) modal.hide();
+                                    window.location.href = '<?= \App\Helpers\Url::to("/conversations") ?>?id=' + data.existing_conversation_id;
+                                }
+                            });
+                        } else {
+                            if (confirm(data.message + '\n\nDeseja ver a conversa existente?')) {
+                                window.location.href = '<?= \App\Helpers\Url::to("/conversations") ?>?id=' + data.existing_conversation_id;
+                            }
+                        }
+                    } else if (data.code === 'conversation_exists_unassigned' && data.can_view) {
+                        // Conversa existe mas não está atribuída - oferecer ir para ela
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                icon: 'info',
+                                title: 'Conversa já existe',
+                                html: `
+                                    <p>${data.message}</p>
+                                    <p class="text-muted fs-7">Deseja ir para esta conversa?</p>
+                                `,
+                                showCancelButton: true,
+                                confirmButtonText: '<i class="ki-duotone ki-arrow-right fs-4 me-1"><span class="path1"></span><span class="path2"></span></i> Ir para Conversa',
+                                cancelButtonText: 'Cancelar',
+                                confirmButtonColor: '#009ef7'
+                            }).then((result) => {
+                                if (result.isConfirmed && data.existing_conversation_id) {
+                                    const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_new_conversation'));
+                                    if (modal) modal.hide();
+                                    window.location.href = '<?= \App\Helpers\Url::to("/conversations") ?>?id=' + data.existing_conversation_id;
+                                }
+                            });
+                        } else {
+                            if (confirm(data.message + '\n\nDeseja ir para esta conversa?')) {
+                                window.location.href = '<?= \App\Helpers\Url::to("/conversations") ?>?id=' + data.existing_conversation_id;
+                            }
+                        }
+                    } else if (data.existing_agent) {
+                        // Fallback: tratamento antigo para compatibilidade
                         if (typeof Swal !== 'undefined') {
                             Swal.fire({
                                 icon: 'warning',

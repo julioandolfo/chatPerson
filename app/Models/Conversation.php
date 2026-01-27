@@ -675,6 +675,9 @@ class Conversation extends Model
 
     /**
      * Buscar conversa por contato e canal
+     * ✅ ATUALIZADO: Busca por whatsapp_account_id OU integration_account_id
+     * para garantir que encontre conversas criadas via campanha (integration_account_id)
+     * ou via webhook (whatsapp_account_id)
      */
     public static function findByContactAndChannel(int $contactId, string $channel, ?int $whatsappAccountId = null): ?array
     {
@@ -683,7 +686,9 @@ class Conversation extends Model
         $params = [$contactId, $channel];
         
         if ($whatsappAccountId) {
-            $sql .= " AND whatsapp_account_id = ?";
+            // Buscar por qualquer um dos campos de conta (legado ou novo)
+            $sql .= " AND (whatsapp_account_id = ? OR integration_account_id = ?)";
+            $params[] = $whatsappAccountId;
             $params[] = $whatsappAccountId;
         }
         
@@ -696,6 +701,7 @@ class Conversation extends Model
     /**
      * Buscar conversa ABERTA por contato e canal
      * Retorna apenas conversas com status 'open'
+     * ✅ ATUALIZADO: Busca por whatsapp_account_id OU integration_account_id
      */
     public static function findOpenByContactAndChannel(int $contactId, string $channel, ?int $whatsappAccountId = null): ?array
     {
@@ -706,7 +712,9 @@ class Conversation extends Model
         $params = [$contactId, $channel];
         
         if ($whatsappAccountId) {
-            $sql .= " AND c.whatsapp_account_id = ?";
+            // Buscar por qualquer um dos campos de conta (legado ou novo)
+            $sql .= " AND (c.whatsapp_account_id = ? OR c.integration_account_id = ?)";
+            $params[] = $whatsappAccountId;
             $params[] = $whatsappAccountId;
         }
         

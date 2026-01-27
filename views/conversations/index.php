@@ -3116,11 +3116,28 @@ function getChannelInfo(channel) {
                                             <?php endforeach; ?>
                                         <?php endif; ?>
                                         <?php 
-                                        // Verificar se o conteúdo é apenas um nome de arquivo de áudio (não exibir)
+                                        // Verificar se o conteúdo é apenas um nome de arquivo técnico (não exibir)
                                         $contentToShow = $isQuoted ? $actualContent : $msgContent;
-                                        $isAudioFilename = preg_match('/^audio_[A-Za-z0-9_]+\.(ogg|mp3|wav|webm|opus|m4a)$/i', trim($contentToShow));
-                                        $isMediaPlaceholder = in_array(trim($contentToShow), ['Documento', 'Imagem', 'Vídeo', 'Áudio', 'Mensagem de voz', 'Figurinha', 'Mídia']);
-                                        $shouldShowContent = !empty($msgContent) && !$isAudioFilename && !($hasOnlyAudio && $isMediaPlaceholder);
+                                        $trimmedContent = trim($contentToShow);
+                                        
+                                        // Detectar nomes de arquivo técnicos gerados automaticamente
+                                        // Padrões: audio_*, document_*, image_*, video_*, IMG_*, VID_*, etc.
+                                        $isTechnicalFilename = preg_match('/^(audio|document|video|image|img|vid|file|sticker|ptt)_[A-Za-z0-9_-]+\.[a-z0-9]+$/i', $trimmedContent);
+                                        
+                                        // Também detectar se é apenas o nome do arquivo igual ao anexo
+                                        $hasMatchingAttachment = false;
+                                        if (!empty($msg['attachments']) && is_array($msg['attachments'])) {
+                                            foreach ($msg['attachments'] as $att) {
+                                                $attFilename = $att['original_name'] ?? $att['filename'] ?? $att['name'] ?? '';
+                                                if ($trimmedContent === $attFilename) {
+                                                    $hasMatchingAttachment = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        
+                                        $isMediaPlaceholder = in_array($trimmedContent, ['Documento', 'Imagem', 'Vídeo', 'Áudio', 'Mensagem de voz', 'Figurinha', 'Mídia']);
+                                        $shouldShowContent = !empty($msgContent) && !$isTechnicalFilename && !$hasMatchingAttachment && !$isMediaPlaceholder;
                                         ?>
                                         <?php if ($shouldShowContent): ?>
                                             <div class="<?= (!empty($msg['attachments']) || $isQuoted) ? 'mt-2' : '' ?>">
@@ -12500,10 +12517,24 @@ function addMessageToChat(message) {
         const isAudioOnly = attachmentsHtml && attachmentsHtml.includes('audio-attachment') && !actualContent && !quotedHtml;
         const bubbleClass = isAudioOnly ? 'message-bubble audio-only' : 'message-bubble';
         
-        // Verificar se o conteúdo é apenas um nome de arquivo de áudio (não exibir)
-        const isAudioFilename = actualContent && /^audio_[A-Za-z0-9_]+\.(ogg|mp3|wav|webm|opus|m4a)$/i.test(actualContent.trim());
-        const isMediaPlaceholder = ['Documento', 'Imagem', 'Vídeo', 'Áudio', 'Mensagem de voz', 'Figurinha', 'Mídia'].includes(actualContent.trim());
-        const shouldShowContent = actualContent && !isAudioFilename && !(isAudioOnly && isMediaPlaceholder);
+        // Verificar se o conteúdo é apenas um nome de arquivo técnico (não exibir)
+        const trimmedContent = actualContent ? actualContent.trim() : '';
+        
+        // Detectar nomes de arquivo técnicos gerados automaticamente
+        // Padrões: audio_*, document_*, image_*, video_*, IMG_*, VID_*, etc.
+        const isTechnicalFilename = trimmedContent && /^(audio|document|video|image|img|vid|file|sticker|ptt)_[A-Za-z0-9_-]+\.[a-z0-9]+$/i.test(trimmedContent);
+        
+        // Também detectar se é apenas o nome do arquivo igual ao anexo
+        let hasMatchingAttachment = false;
+        if (message.attachments && Array.isArray(message.attachments)) {
+            hasMatchingAttachment = message.attachments.some(att => {
+                const attFilename = att.original_name || att.filename || att.name || '';
+                return trimmedContent === attFilename;
+            });
+        }
+        
+        const isMediaPlaceholder = ['Documento', 'Imagem', 'Vídeo', 'Áudio', 'Mensagem de voz', 'Figurinha', 'Mídia'].includes(trimmedContent);
+        const shouldShowContent = actualContent && !isTechnicalFilename && !hasMatchingAttachment && !isMediaPlaceholder;
         
         messageDiv.innerHTML = `
             ${avatarHtml}

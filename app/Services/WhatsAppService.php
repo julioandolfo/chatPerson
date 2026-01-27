@@ -1962,22 +1962,11 @@ class WhatsAppService
                 $message = $payload['caption'];
             }
             
-            // ✅ NOVO: Se é um tipo de mídia mas não tem mensagem, usar placeholder
-            // Isso garante que documentos/imagens/vídeos sem caption não sejam rejeitados
-            // ⚠️ Para áudio/ptt/sticker, NÃO usar placeholder - o player já é exibido
-            if (empty($message) && in_array($messageType, ['document', 'image', 'video'])) {
-                // Usar o nome do arquivo como mensagem, ou um placeholder genérico
-                if (!empty($filename)) {
-                    $message = $filename;
-                } else {
-                    $typeLabels = [
-                        'document' => 'Documento',
-                        'image' => 'Imagem',
-                        'video' => 'Vídeo'
-                    ];
-                    $message = $typeLabels[$messageType] ?? 'Mídia';
-                }
-                Logger::quepasa("processWebhook - Mensagem de mídia sem texto, usando placeholder: {$message}");
+            // ✅ ATUALIZADO: Mídias (áudio, documento, imagem, vídeo) não precisam de placeholder
+            // O anexo já é exibido visualmente - não precisa duplicar o nome do arquivo como texto
+            // Apenas log para debug
+            if (empty($message) && in_array($messageType, ['document', 'image', 'video', 'audio', 'ptt', 'sticker'])) {
+                Logger::quepasa("processWebhook - Mensagem de mídia sem texto (tipo: {$messageType}, filename: " . ($filename ?: 'N/A') . ")");
             }
 
             Logger::quepasa("processWebhook - Processando mensagem: fromPhone={$fromPhone}, message=" . substr($message, 0, 100) . ", messageId={$messageId}, isGroup=" . ($isGroup ? 'true' : 'false') . ", isMessageFromConnectedNumber=" . ($isMessageFromConnectedNumber ? 'true' : 'false'));
@@ -2534,7 +2523,14 @@ class WhatsAppService
                     
                     Logger::quepasa("processWebhook - Buscando conversa existente (com lock): contact_id={$contact['id']}, channel=whatsapp, account_id={$account['id']}");
                     $conversation = \App\Models\Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['id']);
-                    Logger::quepasa("processWebhook - Resultado da busca: " . ($conversation ? "Encontrada (ID={$conversation['id']}, status={$conversation['status']})" : "Não encontrada"));
+                    Logger::quepasa("processWebhook - Resultado da busca: " . ($conversation ? "Encontrada (ID={$conversation['id']}, status={$conversation['status']}, wa_id={$conversation['whatsapp_account_id']}, int_id={$conversation['integration_account_id']})" : "Não encontrada"));
+                    
+                    // ✅ Sincronizar whatsapp_account_id se a conversa foi encontrada via integration_account_id
+                    if ($conversation && empty($conversation['whatsapp_account_id']) && !empty($account['id'])) {
+                        \App\Models\Conversation::update($conversation['id'], ['whatsapp_account_id' => $account['id']]);
+                        $conversation['whatsapp_account_id'] = $account['id'];
+                        Logger::quepasa("processWebhook - Sincronizado whatsapp_account_id={$account['id']} na conversa {$conversation['id']}");
+                    }
                 }
             } catch (\Throwable $e) {
                 Logger::quepasa("processWebhook - ⚠️ Falha ao aplicar lock no contato, seguindo sem transação. Erro: " . $e->getMessage());
@@ -2549,6 +2545,13 @@ class WhatsAppService
                 if (!$usedLock) {
                     Logger::quepasa("processWebhook - Buscando conversa existente (sem lock): contact_id={$contact['id']}, channel=whatsapp, account_id={$account['id']}");
                     $conversation = \App\Models\Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['id']);
+                    
+                    // ✅ Sincronizar whatsapp_account_id se a conversa foi encontrada via integration_account_id
+                    if ($conversation && empty($conversation['whatsapp_account_id']) && !empty($account['id'])) {
+                        \App\Models\Conversation::update($conversation['id'], ['whatsapp_account_id' => $account['id']]);
+                        $conversation['whatsapp_account_id'] = $account['id'];
+                        Logger::quepasa("processWebhook - Sincronizado whatsapp_account_id={$account['id']} na conversa {$conversation['id']}");
+                    }
                 }
             }
             

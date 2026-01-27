@@ -86,6 +86,39 @@ ob_start();
                             </button>
                         <?php endif; ?>
                     </div>
+                    
+                    <!--begin::Ações de Conversa-->
+                    <?php
+                    // Buscar conversa ABERTA do contato
+                    $openConversation = \App\Helpers\Database::fetch(
+                        "SELECT id, agent_id FROM conversations 
+                         WHERE contact_id = ? AND status = 'open' 
+                         ORDER BY updated_at DESC LIMIT 1",
+                        [$contact['id']]
+                    );
+                    ?>
+                    <div class="d-flex justify-content-center gap-2 mt-5">
+                        <?php if ($openConversation): ?>
+                            <a href="<?= \App\Helpers\Url::to('/conversations?id=' . $openConversation['id']) ?>" class="btn btn-success">
+                                <i class="ki-duotone ki-message-text-2 fs-2 me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                Ir para Conversa
+                            </a>
+                        <?php else: ?>
+                            <button type="button" class="btn btn-primary" onclick="openNewConversationModal(<?= $contact['id'] ?>, '<?= htmlspecialchars(addslashes($contact['name'] ?? ''), ENT_QUOTES) ?>', '<?= htmlspecialchars($contact['phone'] ?? '', ENT_QUOTES) ?>')">
+                                <i class="ki-duotone ki-message-add fs-2 me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                Iniciar Nova Conversa
+                            </button>
+                        <?php endif; ?>
+                    </div>
+                    <!--end::Ações de Conversa-->
                 </div>
             </div>
         </div>
@@ -439,6 +472,130 @@ function uploadAvatar(contactId, file) {
     })
     .catch(error => {
         alert("Erro ao fazer upload do avatar");
+    });
+}
+
+// ✅ NOVO: Abrir modal de nova conversa com dados do contato
+function openNewConversationModal(contactId, contactName, contactPhone) {
+    if (typeof Swal === 'undefined') {
+        alert('Erro: SweetAlert não carregado');
+        return;
+    }
+    
+    // Buscar integrações WhatsApp disponíveis
+    fetch('<?= \App\Helpers\Url::to('/api/whatsapp/accounts') ?>', {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(accountsData => {
+        const accounts = accountsData.accounts || [];
+        let accountsOptions = '<option value="">Selecione uma integração</option>';
+        accounts.forEach(acc => {
+            if (acc.status === 'active') {
+                accountsOptions += `<option value="${acc.id}">${acc.name} (${acc.phone_number || 'Sem número'})</option>`;
+            }
+        });
+        
+        Swal.fire({
+            title: 'Iniciar Nova Conversa',
+            html: `
+                <div class="text-start">
+                    <div class="mb-4 p-3 bg-light-primary rounded">
+                        <div class="d-flex align-items-center">
+                            <i class="ki-duotone ki-profile-user fs-2x text-primary me-3">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            <div>
+                                <div class="fw-bold">${contactName || 'Contato'}</div>
+                                <div class="text-muted fs-7">${contactPhone || 'Sem telefone'}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label required">Integração WhatsApp</label>
+                        <select id="swal_whatsapp_account" class="form-select">
+                            ${accountsOptions}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label required">Mensagem inicial</label>
+                        <textarea id="swal_message" class="form-control" rows="3" placeholder="Digite a mensagem..."></textarea>
+                    </div>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: '<i class="ki-duotone ki-send fs-4 me-1"><span class="path1"></span><span class="path2"></span></i> Enviar',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#009ef7',
+            showLoaderOnConfirm: true,
+            preConfirm: () => {
+                const whatsappAccountId = document.getElementById('swal_whatsapp_account').value;
+                const message = document.getElementById('swal_message').value.trim();
+                
+                if (!whatsappAccountId) {
+                    Swal.showValidationMessage('Selecione uma integração WhatsApp');
+                    return false;
+                }
+                if (!message) {
+                    Swal.showValidationMessage('Digite uma mensagem');
+                    return false;
+                }
+                
+                return fetch('<?= \App\Helpers\Url::to('/conversations/new') ?>', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({
+                        channel: 'whatsapp',
+                        whatsapp_account_id: whatsappAccountId,
+                        name: contactName,
+                        phone: contactPhone,
+                        message: message
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.message || 'Erro ao criar conversa');
+                    }
+                    return data;
+                })
+                .catch(error => {
+                    Swal.showValidationMessage(error.message);
+                });
+            },
+            allowOutsideClick: () => !Swal.isLoading()
+        }).then((result) => {
+            if (result.isConfirmed && result.value) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Conversa iniciada!',
+                    text: 'Redirecionando...',
+                    timer: 1500,
+                    showConfirmButton: false
+                }).then(() => {
+                    if (result.value.conversation_id) {
+                        window.location.href = '<?= \App\Helpers\Url::to('/conversations') ?>?id=' + result.value.conversation_id;
+                    } else {
+                        window.location.href = '<?= \App\Helpers\Url::to('/conversations') ?>';
+                    }
+                });
+            }
+        });
+    })
+    .catch(error => {
+        console.error('Erro ao carregar integrações:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Não foi possível carregar as integrações WhatsApp'
+        });
     });
 }
 </script>

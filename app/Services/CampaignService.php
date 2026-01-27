@@ -22,13 +22,24 @@ class CampaignService
      */
     public static function create(array $data): int
     {
+        // Verificar se está usando IA para gerar mensagem
+        $aiMessageEnabled = !empty($data['ai_message_enabled']) && $data['ai_message_enabled'] !== '0';
+        
         // Validar dados básicos
-        $errors = Validator::validate($data, [
+        $validationRules = [
             'name' => 'required|string|max:255',
             'channel' => 'required|string|in:whatsapp',
             'integration_account_ids' => 'required|array',
-            'message_content' => 'required|string'
-        ]);
+        ];
+        
+        // Se IA está habilitada, exigir prompt; senão, exigir message_content
+        if ($aiMessageEnabled) {
+            $validationRules['ai_message_prompt'] = 'required|string';
+        } else {
+            $validationRules['message_content'] = 'required|string';
+        }
+        
+        $errors = Validator::validate($data, $validationRules);
 
         if (!empty($errors)) {
             throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));
@@ -68,6 +79,17 @@ class CampaignService
         $data['send_interval_seconds'] = $data['send_interval_seconds'] ?? 6;
         $data['timezone'] = $data['timezone'] ?? 'America/Sao_Paulo';
         
+        // Converter campos de data vazios para NULL
+        if (isset($data['scheduled_at']) && $data['scheduled_at'] === '') {
+            $data['scheduled_at'] = null;
+        }
+        if (isset($data['send_window_start']) && $data['send_window_start'] === '') {
+            $data['send_window_start'] = null;
+        }
+        if (isset($data['send_window_end']) && $data['send_window_end'] === '') {
+            $data['send_window_end'] = null;
+        }
+        
         // Processar controles avançados de taxa de envio
         // Limites (converter string vazia para null)
         $data['daily_limit'] = !empty($data['daily_limit']) ? (int)$data['daily_limit'] : null;
@@ -91,6 +113,12 @@ class CampaignService
         $data['ai_message_enabled'] = !empty($data['ai_message_enabled']) && $data['ai_message_enabled'] !== '0';
         $data['ai_message_prompt'] = $data['ai_message_prompt'] ?? null;
         $data['ai_temperature'] = isset($data['ai_temperature']) ? (float)$data['ai_temperature'] : 0.7;
+        
+        // Se IA está habilitada e message_content está vazio, usar o prompt como fallback
+        if ($data['ai_message_enabled'] && empty($data['message_content'])) {
+            // Usar a mensagem de referência se existir, ou um placeholder
+            $data['message_content'] = $data['ai_reference_message'] ?? '[Mensagem gerada por IA]';
+        }
         
         // Execução de automações
         $data['execute_automations'] = !empty($data['execute_automations']) && $data['execute_automations'] !== '0';

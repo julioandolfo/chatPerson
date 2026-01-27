@@ -172,8 +172,11 @@ ob_start();
                 <form id="form_add_contact">
                     <div class="mb-5">
                         <label class="form-label required">Buscar Contato</label>
-                        <select class="form-select" id="contact_select" name="contact_id" required>
-                            <option value="">Digite para buscar...</option>
+                        <select class="form-select" id="contact_select" name="contact_id" required 
+                                data-control="select2"
+                                data-placeholder="Digite para buscar..."
+                                data-allow-clear="true"
+                                data-dropdown-parent="#modal_add_contact">
                         </select>
                         <div class="form-text">Digite o nome ou telefone do contato</div>
                     </div>
@@ -242,35 +245,99 @@ ob_start();
 <script>
 const listId = <?php echo $list['id']; ?>;
 
-// Busca de contatos
-let contactSearchTimeout;
-document.getElementById('contact_select')?.addEventListener('input', function(e) {
-    clearTimeout(contactSearchTimeout);
-    const query = e.target.value;
-    
-    if (query.length < 2) return;
-    
-    contactSearchTimeout = setTimeout(() => {
-        fetch(`/api/contacts/search?q=${encodeURIComponent(query)}`)
-            .then(r => r.json())
-            .then(data => {
-                const select = document.getElementById('contact_select');
-                select.innerHTML = '<option value="">Selecione...</option>';
-                
-                if (data.contacts && data.contacts.length > 0) {
-                    data.contacts.forEach(contact => {
-                        const option = document.createElement('option');
-                        option.value = contact.id;
-                        option.textContent = `${contact.name} (${contact.phone || contact.email})`;
-                        select.appendChild(option);
-                    });
-                }
-            });
-    }, 300);
+// Inicializar Select2 para busca de contatos quando o modal abrir
+document.getElementById('modal_add_contact')?.addEventListener('shown.bs.modal', function() {
+    initContactSelect2();
 });
 
+function initContactSelect2() {
+    const $select = $('#contact_select');
+    
+    // Destruir instância anterior se existir
+    if ($select.hasClass('select2-hidden-accessible')) {
+        $select.select2('destroy');
+    }
+    
+    $select.select2({
+        dropdownParent: $('#modal_add_contact'),
+        placeholder: 'Digite para buscar contato...',
+        allowClear: true,
+        minimumInputLength: 2,
+        language: {
+            inputTooShort: function() {
+                return 'Digite pelo menos 2 caracteres para buscar...';
+            },
+            noResults: function() {
+                return 'Nenhum contato encontrado';
+            },
+            searching: function() {
+                return 'Buscando...';
+            }
+        },
+        ajax: {
+            url: '/api/contacts/search',
+            dataType: 'json',
+            delay: 300,
+            data: function(params) {
+                return {
+                    q: params.term,
+                    limit: 20
+                };
+            },
+            processResults: function(data) {
+                if (!data.success || !data.contacts) {
+                    return { results: [] };
+                }
+                
+                return {
+                    results: data.contacts.map(function(contact) {
+                        return {
+                            id: contact.id,
+                            text: contact.name + ' (' + (contact.phone || contact.email || 'Sem contato') + ')',
+                            contact: contact
+                        };
+                    })
+                };
+            },
+            cache: true
+        },
+        templateResult: function(contact) {
+            if (contact.loading) {
+                return contact.text;
+            }
+            
+            const data = contact.contact || contact;
+            const initials = (data.name || 'NC').substring(0, 2).toUpperCase();
+            
+            return $(`
+                <div class="d-flex align-items-center">
+                    <div class="symbol symbol-circle symbol-35px me-3">
+                        ${data.avatar 
+                            ? '<img src="' + data.avatar + '" alt="">' 
+                            : '<div class="symbol-label bg-light-primary text-primary fw-bold">' + initials + '</div>'
+                        }
+                    </div>
+                    <div>
+                        <div class="fw-bold">${data.name || 'Sem nome'}</div>
+                        <div class="text-muted fs-7">${data.phone || ''} ${data.email ? '• ' + data.email : ''}</div>
+                    </div>
+                </div>
+            `);
+        },
+        templateSelection: function(contact) {
+            if (!contact.id) {
+                return contact.text;
+            }
+            const data = contact.contact || contact;
+            return data.name || contact.text;
+        }
+    });
+}
+
 function addContact() {
-    const contactId = document.getElementById('contact_select').value;
+    const $select = $('#contact_select');
+    const contactId = $select.val();
+    
     if (!contactId) {
         toastr.error('Selecione um contato');
         return;
@@ -285,9 +352,11 @@ function addContact() {
     .then(data => {
         if (data.success) {
             toastr.success('Contato adicionado!');
+            // Limpar seleção
+            $select.val(null).trigger('change');
             setTimeout(() => location.reload(), 1000);
         } else {
-            toastr.error(data.message);
+            toastr.error(data.message || 'Erro ao adicionar contato');
         }
     })
     .catch(err => toastr.error('Erro de rede'));

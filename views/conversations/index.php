@@ -3115,9 +3115,16 @@ function getChannelInfo(channel) {
                                                 <?= renderAttachment($attachment) ?>
                                             <?php endforeach; ?>
                                         <?php endif; ?>
-                                        <?php if (!empty($msgContent)): ?>
+                                        <?php 
+                                        // Verificar se o conteúdo é apenas um nome de arquivo de áudio (não exibir)
+                                        $contentToShow = $isQuoted ? $actualContent : $msgContent;
+                                        $isAudioFilename = preg_match('/^audio_[A-Za-z0-9_]+\.(ogg|mp3|wav|webm|opus|m4a)$/i', trim($contentToShow));
+                                        $isMediaPlaceholder = in_array(trim($contentToShow), ['Documento', 'Imagem', 'Vídeo', 'Áudio', 'Mensagem de voz', 'Figurinha', 'Mídia']);
+                                        $shouldShowContent = !empty($msgContent) && !$isAudioFilename && !($hasOnlyAudio && $isMediaPlaceholder);
+                                        ?>
+                                        <?php if ($shouldShowContent): ?>
                                             <div class="<?= (!empty($msg['attachments']) || $isQuoted) ? 'mt-2' : '' ?>">
-                                                <?= str_replace("\n", "<br>", htmlspecialchars($isQuoted ? $actualContent : $msgContent)) ?>
+                                                <?= str_replace("\n", "<br>", htmlspecialchars($contentToShow)) ?>
                                             </div>
                                         <?php endif; ?>
                                     </div>
@@ -12493,6 +12500,11 @@ function addMessageToChat(message) {
         const isAudioOnly = attachmentsHtml && attachmentsHtml.includes('audio-attachment') && !actualContent && !quotedHtml;
         const bubbleClass = isAudioOnly ? 'message-bubble audio-only' : 'message-bubble';
         
+        // Verificar se o conteúdo é apenas um nome de arquivo de áudio (não exibir)
+        const isAudioFilename = actualContent && /^audio_[A-Za-z0-9_]+\.(ogg|mp3|wav|webm|opus|m4a)$/i.test(actualContent.trim());
+        const isMediaPlaceholder = ['Documento', 'Imagem', 'Vídeo', 'Áudio', 'Mensagem de voz', 'Figurinha', 'Mídia'].includes(actualContent.trim());
+        const shouldShowContent = actualContent && !isAudioFilename && !(isAudioOnly && isMediaPlaceholder);
+        
         messageDiv.innerHTML = `
             ${avatarHtml}
             <div class="message-content">
@@ -12501,7 +12513,7 @@ function addMessageToChat(message) {
                 <div class="${bubbleClass} ${isAIMessage ? 'ai-message' : ''}">
                     ${quotedHtml}
                     ${attachmentsHtml}
-                    ${actualContent ? '<div class="' + ((attachmentsHtml || quotedHtml) ? 'mt-2' : '') + '">' + nl2br(escapeHtml(actualContent)) + '</div>' : ''}
+                    ${shouldShowContent ? '<div class="' + ((attachmentsHtml || quotedHtml) ? 'mt-2' : '') + '">' + nl2br(escapeHtml(actualContent)) + '</div>' : ''}
                 </div>
                 <div class="message-time">
                     ${formatTime(message.created_at)}${statusHtml}

@@ -352,7 +352,7 @@ class Conversation extends Model
         }
         
         // ✅ FILTRO PADRÃO: Se usuário está logado E não aplicou filtro de agente explícito
-        // Mostrar apenas: conversas atribuídas a ELE + conversas NÃO ATRIBUÍDAS + conversas onde é AGENTE DO CONTATO
+        // Mostrar apenas: conversas atribuídas a ELE + conversas NÃO ATRIBUÍDAS (com permissão de funil) + conversas onde é AGENTE DO CONTATO
         // EXCETO se for Admin/Super Admin (eles podem ver TODAS as conversas)
         if (!empty($filters['current_user_id']) && !isset($filters['agent_id']) && !isset($filters['agent_ids'])) {
             $userId = (int)$filters['current_user_id'];
@@ -362,20 +362,81 @@ class Conversation extends Model
             $isSuperAdmin = \App\Services\PermissionService::isSuperAdmin($userId);
             
             if (!$isAdmin && !$isSuperAdmin) {
-                // Usuário comum: filtrar conversas dele + não atribuídas + onde é agente do contato
-                $sql .= " AND (
-                    c.agent_id = ? 
-                    OR c.agent_id IS NULL 
-                    OR c.agent_id = 0
-                    OR EXISTS (
-                        SELECT 1 FROM contact_agents ca 
-                        WHERE ca.contact_id = c.contact_id 
-                        AND ca.agent_id = ?
-                    )
-                )";
-                $params[] = $userId;
-                $params[] = $userId; // Para o EXISTS
-                \App\Helpers\Log::debug("🔒 [Conversation::getAll] Filtro padrão aplicado: userId={$userId} (atribuídas a ele + não atribuídas + onde é agente do contato)", 'conversas.log');
+                // ✅ CORREÇÃO: Obter funis e etapas permitidos para o usuário
+                $allowedFunnelIds = null;
+                $allowedStageIds = null;
+                
+                if (class_exists('\App\Models\AgentFunnelPermission')) {
+                    $allowedFunnelIds = \App\Models\AgentFunnelPermission::getAllowedFunnelIds($userId);
+                    $allowedStageIds = \App\Models\AgentFunnelPermission::getAllowedStageIds($userId);
+                }
+                
+                // Construir condição de permissão de funil para conversas não atribuídas
+                $funnelCondition = "";
+                if ($allowedFunnelIds !== null && !empty($allowedFunnelIds)) {
+                    // Usuário tem funis específicos permitidos
+                    $funnelPlaceholders = implode(',', array_fill(0, count($allowedFunnelIds), '?'));
+                    $funnelCondition = "(c.funnel_id IS NULL OR c.funnel_id IN ({$funnelPlaceholders}))";
+                    
+                    // Se também tem etapas específicas, adicionar verificação
+                    if ($allowedStageIds !== null && !empty($allowedStageIds)) {
+                        $stagePlaceholders = implode(',', array_fill(0, count($allowedStageIds), '?'));
+                        $funnelCondition = "(
+                            c.funnel_id IS NULL 
+                            OR (c.funnel_id IN ({$funnelPlaceholders}) AND (c.funnel_stage_id IS NULL OR c.funnel_stage_id IN ({$stagePlaceholders})))
+                        )";
+                    }
+                } elseif ($allowedFunnelIds !== null && empty($allowedFunnelIds)) {
+                    // Usuário não tem permissão para nenhum funil - só pode ver conversas sem funil
+                    $funnelCondition = "(c.funnel_id IS NULL)";
+                }
+                // Se $allowedFunnelIds === null, usuário pode ver todos os funis (sem restrição)
+                
+                // Usuário comum: filtrar conversas dele + não atribuídas (COM permissão de funil) + onde é agente do contato
+                if (!empty($funnelCondition)) {
+                    $sql .= " AND (
+                        c.agent_id = ? 
+                        OR (
+                            (c.agent_id IS NULL OR c.agent_id = 0)
+                            AND {$funnelCondition}
+                        )
+                        OR EXISTS (
+                            SELECT 1 FROM contact_agents ca 
+                            WHERE ca.contact_id = c.contact_id 
+                            AND ca.agent_id = ?
+                        )
+                    )";
+                    $params[] = $userId;
+                    // Adicionar parâmetros dos funis
+                    if ($allowedFunnelIds !== null && !empty($allowedFunnelIds)) {
+                        foreach ($allowedFunnelIds as $funnelId) {
+                            $params[] = $funnelId;
+                        }
+                        // Se tem etapas, adicionar também
+                        if ($allowedStageIds !== null && !empty($allowedStageIds)) {
+                            foreach ($allowedStageIds as $stageId) {
+                                $params[] = $stageId;
+                            }
+                        }
+                    }
+                    $params[] = $userId; // Para o EXISTS
+                    \App\Helpers\Log::debug("🔒 [Conversation::getAll] Filtro com permissões de funil aplicado: userId={$userId}, funnels=" . json_encode($allowedFunnelIds) . ", stages=" . json_encode($allowedStageIds), 'conversas.log');
+                } else {
+                    // Sem restrição de funil - usuário pode ver todos
+                    $sql .= " AND (
+                        c.agent_id = ? 
+                        OR c.agent_id IS NULL 
+                        OR c.agent_id = 0
+                        OR EXISTS (
+                            SELECT 1 FROM contact_agents ca 
+                            WHERE ca.contact_id = c.contact_id 
+                            AND ca.agent_id = ?
+                        )
+                    )";
+                    $params[] = $userId;
+                    $params[] = $userId; // Para o EXISTS
+                    \App\Helpers\Log::debug("🔒 [Conversation::getAll] Filtro padrão aplicado (sem restrição de funil): userId={$userId}", 'conversas.log');
+                }
             } else {
                 // Admin/Super Admin: pode ver TODAS as conversas (sem filtro)
                 \App\Helpers\Log::debug("👑 [Conversation::getAll] Admin/Super Admin detectado: userId={$userId} - MOSTRANDO TODAS as conversas sem filtro", 'conversas.log');

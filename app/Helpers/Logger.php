@@ -87,6 +87,14 @@ class Logger
     }
 
     /**
+     * Log específico para Campanhas
+     */
+    public static function campaign(string $message): void
+    {
+        self::log($message, 'campaigns.log');
+    }
+
+    /**
      * Log de debug
      */
     public static function debug(string $message, string $file = null): void

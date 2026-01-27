@@ -31,32 +31,43 @@ class CampaignSchedulerService
      */
     public static function forceSendNext(int $campaignId): array
     {
-        Logger::info("=== FORÇAR DISPARO - Campanha {$campaignId} ===");
+        Logger::campaign("=== FORÇAR DISPARO - Campanha {$campaignId} ===");
 
         $campaign = Campaign::find($campaignId);
         if (!$campaign) {
+            Logger::campaign("Forçar disparo: Campanha {$campaignId} não encontrada");
             return ['success' => false, 'message' => 'Campanha não encontrada'];
         }
 
+        Logger::campaign("Forçar disparo: Campanha '{$campaign['name']}' - Status: {$campaign['status']}");
+
         // Verificar se a campanha está em um status válido para envio
         if (!in_array($campaign['status'], ['running', 'scheduled', 'paused', 'draft'])) {
+            Logger::campaign("Forçar disparo: Status inválido para envio: {$campaign['status']}");
             return ['success' => false, 'message' => 'Campanha não está em status válido para envio'];
         }
 
         // Buscar próxima mensagem pendente
         $message = CampaignMessage::getNextPending($campaignId);
         if (!$message) {
+            Logger::campaign("Forçar disparo: Nenhuma mensagem pendente na campanha {$campaignId}");
             return ['success' => false, 'message' => 'Nenhuma mensagem pendente na campanha'];
         }
 
+        Logger::campaign("Forçar disparo: Mensagem #{$message['id']} encontrada - Contact ID: {$message['contact_id']}");
+
         $contact = Contact::find($message['contact_id']);
         $contactName = $contact['name'] ?? 'Contato #' . $message['contact_id'];
+        $contactPhone = $contact['phone'] ?? 'N/A';
+
+        Logger::campaign("Forçar disparo: Contato '{$contactName}' ({$contactPhone})");
 
         try {
             // Processar a mensagem imediatamente
+            Logger::campaign("Forçar disparo: Iniciando processMessage...");
             $result = self::processMessage($campaignId, $message);
             
-            Logger::info("Forçar disparo: Mensagem {$message['id']} enviada para {$contactName}");
+            Logger::campaign("Forçar disparo: Mensagem {$message['id']} enviada para {$contactName} - Status: " . ($result['status'] ?? 'unknown'));
 
             return [
                 'success' => true,
@@ -67,7 +78,8 @@ class CampaignSchedulerService
                 'external_id' => $result['external_id'] ?? null
             ];
         } catch (\Exception $e) {
-            Logger::error("Forçar disparo: Erro - " . $e->getMessage());
+            Logger::campaign("Forçar disparo: ERRO - " . $e->getMessage());
+            Logger::campaign("Forçar disparo: Stack trace - " . $e->getTraceAsString());
             return [
                 'success' => false,
                 'message' => $e->getMessage(),
@@ -82,7 +94,7 @@ class CampaignSchedulerService
      */
     public static function processPending(int $limit = 50): array
     {
-        Logger::info("=== INICIANDO PROCESSAMENTO DE CAMPANHAS ===");
+        Logger::campaign("=== INICIANDO PROCESSAMENTO DE CAMPANHAS ===");
 
         $processed = [];
 
@@ -90,11 +102,11 @@ class CampaignSchedulerService
         $campaigns = Campaign::getActive();
         
         if (empty($campaigns)) {
-            Logger::info("Nenhuma campanha ativa encontrada");
+            Logger::campaign("Nenhuma campanha ativa encontrada");
             return $processed;
         }
 
-        Logger::info("Campanhas ativas: " . count($campaigns));
+        Logger::campaign("Campanhas ativas: " . count($campaigns));
 
         foreach ($campaigns as $campaign) {
             $campaignId = $campaign['id'];
@@ -102,7 +114,7 @@ class CampaignSchedulerService
             try {
                 // 2. Verificar se pode enviar agora (janela de horário)
                 if (!self::canSendNow($campaignId)) {
-                    Logger::info("Campanha {$campaignId} fora da janela de envio");
+                    Logger::campaign("Campanha {$campaignId} fora da janela de envio");
                     continue;
                 }
 
@@ -112,14 +124,14 @@ class CampaignSchedulerService
                 // 2.2. Verificar limites antes de continuar
                 $limitCheck = self::checkLimits($campaignId);
                 if (!$limitCheck['can_send']) {
-                    Logger::info("Campanha {$campaignId}: {$limitCheck['reason']}");
+                    Logger::campaign("Campanha {$campaignId}: {$limitCheck['reason']}");
                     continue;
                 }
 
                 // 3. Calcular quantas mensagens podemos enviar
                 $effectiveLimit = self::calculateEffectiveLimit($campaignId, $limit);
                 if ($effectiveLimit <= 0) {
-                    Logger::info("Campanha {$campaignId}: Limite atingido para este ciclo");
+                    Logger::campaign("Campanha {$campaignId}: Limite atingido para este ciclo");
                     continue;
                 }
 
@@ -133,12 +145,12 @@ class CampaignSchedulerService
                             'status' => 'completed',
                             'completed_at' => date('Y-m-d H:i:s')
                         ]);
-                        Logger::info("Campanha {$campaignId} concluída!");
+                        Logger::campaign("Campanha {$campaignId} concluída!");
                     }
                     continue;
                 }
 
-                Logger::info("Campanha {$campaignId}: " . count($messages) . " mensagens a processar (limite efetivo: {$effectiveLimit})");
+                Logger::campaign("Campanha {$campaignId}: " . count($messages) . " mensagens a processar (limite efetivo: {$effectiveLimit})");
 
                 // 5. Processar cada mensagem
                 $sentInBatch = 0;
@@ -147,7 +159,7 @@ class CampaignSchedulerService
                         // Verificar limite de lote
                         if (!empty($campaign['batch_size']) && $sentInBatch >= $campaign['batch_size']) {
                             $pauseMinutes = $campaign['batch_pause_minutes'] ?? 5;
-                            Logger::info("Campanha {$campaignId}: Lote de {$campaign['batch_size']} msgs enviado, pausando {$pauseMinutes} min");
+                            Logger::campaign("Campanha {$campaignId}: Lote de {$campaign['batch_size']} msgs enviado, pausando {$pauseMinutes} min");
                             sleep($pauseMinutes * 60);
                             $sentInBatch = 0;
                         }
@@ -155,7 +167,7 @@ class CampaignSchedulerService
                         // Re-verificar limites após cada envio (podem ter sido atingidos)
                         $limitCheck = self::checkLimits($campaignId);
                         if (!$limitCheck['can_send']) {
-                            Logger::info("Campanha {$campaignId}: {$limitCheck['reason']} - parando processamento");
+                            Logger::campaign("Campanha {$campaignId}: {$limitCheck['reason']} - parando processamento");
                             break;
                         }
                         
@@ -172,7 +184,7 @@ class CampaignSchedulerService
                         self::applyCadence($campaignId);
 
                     } catch (\Exception $e) {
-                        Logger::error("Erro ao processar mensagem {$message['id']}: " . $e->getMessage());
+                        Logger::campaign("[ERRO] Erro ao processar mensagem {$message['id']}: " . $e->getMessage());
                         
                         // Marcar como falha
                         CampaignMessage::markAsFailed($message['id'], $e->getMessage());
@@ -184,11 +196,11 @@ class CampaignSchedulerService
                 Campaign::updateLastProcessed($campaignId);
 
             } catch (\Exception $e) {
-                Logger::error("Erro ao processar campanha {$campaignId}: " . $e->getMessage());
+                Logger::campaign("[ERRO] Erro ao processar campanha {$campaignId}: " . $e->getMessage());
             }
         }
 
-        Logger::info("=== PROCESSAMENTO CONCLUÍDO: " . count($processed) . " mensagens ===");
+        Logger::campaign("=== PROCESSAMENTO CONCLUÍDO: " . count($processed) . " mensagens ===");
 
         return $processed;
     }
@@ -210,7 +222,7 @@ class CampaignSchedulerService
         if (empty($campaign['last_counter_reset']) || $campaign['last_counter_reset'] !== $today) {
             $updates['sent_today'] = 0;
             $updates['last_counter_reset'] = $today;
-            Logger::info("Campanha {$campaignId}: Contador diário resetado");
+            Logger::campaign("Campanha {$campaignId}: Contador diário resetado");
         }
         
         // Reset horário
@@ -344,7 +356,7 @@ class CampaignSchedulerService
         // 3. GERAR MENSAGEM COM IA (se configurado)
         $messageContent = $message['content'];
         if (!empty($campaign['ai_message_enabled']) && !empty($campaign['ai_message_prompt'])) {
-            Logger::info("Campanha {$campaignId}: Gerando mensagem com IA para contato {$contact['id']}");
+            Logger::campaign("Campanha {$campaignId}: [IA] Gerando mensagem para contato {$contact['id']} ({$contact['name']})");
             try {
                 $aiMessage = \App\Services\OpenAIService::generateCampaignMessage(
                     $campaign['ai_message_prompt'],
@@ -355,44 +367,111 @@ class CampaignSchedulerService
                 
                 if ($aiMessage) {
                     $messageContent = $aiMessage;
-                    Logger::info("Campanha {$campaignId}: Mensagem gerada com IA (len=" . strlen($aiMessage) . ")");
+                    Logger::campaign("Campanha {$campaignId}: [IA] Mensagem gerada com sucesso (len=" . strlen($aiMessage) . ") - Preview: " . substr($aiMessage, 0, 100) . "...");
                 } else {
-                    Logger::warning("Campanha {$campaignId}: IA não gerou mensagem, usando conteúdo original");
+                    Logger::campaign("Campanha {$campaignId}: [IA] AVISO - IA não gerou mensagem, usando conteúdo original");
                 }
             } catch (\Exception $e) {
-                Logger::error("Campanha {$campaignId}: Erro ao gerar mensagem com IA: " . $e->getMessage());
+                Logger::campaign("Campanha {$campaignId}: [IA] ERRO ao gerar mensagem - " . $e->getMessage());
                 // Continua com a mensagem original
             }
         }
 
-        // 4. CRIAR CONVERSA (se configurado)
+        // 4. CRIAR OU REUTILIZAR CONVERSA (se configurado)
         $conversationId = null;
         $executeAutomations = !empty($campaign['execute_automations']);
+        $conversationReused = false;
+        
+        Logger::campaign("Campanha {$campaignId}: create_conversation=" . ($campaign['create_conversation'] ? 'SIM' : 'NÃO') . ", execute_automations=" . ($executeAutomations ? 'SIM' : 'NÃO'));
         
         if ($campaign['create_conversation']) {
-            $conversationData = [
-                'contact_id' => $contact['id'],
-                'channel' => 'whatsapp',
-                'integration_account_id' => $integrationAccountId,
-                'status' => 'open',
-                'funnel_id' => $campaign['funnel_id'],
-                'stage_id' => $campaign['initial_stage_id']
-            ];
-
             try {
-                // Passar executeAutomations para definir se deve executar automações da etapa
-                $conversation = ConversationService::create($conversationData, $executeAutomations);
-                $conversationId = $conversation['id'];
+                // PRIMEIRO: Verificar se já existe conversa ABERTA para este contato
+                $existingConversation = \App\Helpers\Database::fetch(
+                    "SELECT id, status, funnel_id, funnel_stage_id, integration_account_id 
+                     FROM conversations 
+                     WHERE contact_id = ? AND status = 'open' 
+                     ORDER BY created_at DESC LIMIT 1",
+                    [$contact['id']]
+                );
                 
-                if ($executeAutomations) {
-                    Logger::info("Campanha {$campaignId}: Automações executadas para conversa {$conversationId}");
+                if ($existingConversation) {
+                    // Reutilizar conversa existente
+                    $conversationId = $existingConversation['id'];
+                    $conversationReused = true;
+                    
+                    Logger::campaign("Campanha {$campaignId}: [CONVERSA] Reutilizando conversa existente ID: {$conversationId} (status: {$existingConversation['status']}, conta_atual: {$existingConversation['integration_account_id']})");
+                    
+                    // Verificar o que precisa atualizar na conversa
+                    $updateData = [];
+                    
+                    // IMPORTANTE: Atualizar o número WhatsApp (integration_account_id) para o da campanha
+                    // Isso garante que a conversa reflita o número pelo qual foi feito o último contato
+                    if ($existingConversation['integration_account_id'] != $integrationAccountId) {
+                        $updateData['integration_account_id'] = $integrationAccountId;
+                        Logger::campaign("Campanha {$campaignId}: [CONVERSA] Atualizando conta de integração: {$existingConversation['integration_account_id']} -> {$integrationAccountId}");
+                    }
+                    
+                    // Se a campanha tem funil/etapa específicos e a conversa está em outro, mover
+                    if (!empty($campaign['funnel_id']) && !empty($campaign['initial_stage_id'])) {
+                        if ($existingConversation['funnel_id'] != $campaign['funnel_id']) {
+                            $updateData['funnel_id'] = $campaign['funnel_id'];
+                        }
+                        if ($existingConversation['funnel_stage_id'] != $campaign['initial_stage_id']) {
+                            $updateData['funnel_stage_id'] = $campaign['initial_stage_id'];
+                        }
+                    }
+                    
+                    // Aplicar atualizações se houver
+                    if (!empty($updateData)) {
+                        \App\Models\Conversation::update($conversationId, $updateData);
+                        
+                        if (isset($updateData['funnel_id']) || isset($updateData['funnel_stage_id'])) {
+                            Logger::campaign("Campanha {$campaignId}: [CONVERSA] Conversa movida para Funil: {$campaign['funnel_id']}, Etapa: {$campaign['initial_stage_id']}");
+                            
+                            // Se marcou para executar automações, executar da nova etapa
+                            if ($executeAutomations && isset($updateData['funnel_stage_id'])) {
+                                try {
+                                    \App\Services\AutomationService::executeForStageChange($conversationId, $campaign['initial_stage_id']);
+                                    Logger::campaign("Campanha {$campaignId}: [AUTOMAÇÃO] Automações executadas para conversa existente {$conversationId}");
+                                } catch (\Exception $e) {
+                                    Logger::campaign("Campanha {$campaignId}: [ERRO] Erro ao executar automações: " . $e->getMessage());
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Criar nova conversa
+                    $conversationData = [
+                        'contact_id' => $contact['id'],
+                        'channel' => 'whatsapp',
+                        'integration_account_id' => $integrationAccountId,
+                        'status' => 'open',
+                        'funnel_id' => $campaign['funnel_id'],
+                        'stage_id' => $campaign['initial_stage_id']
+                    ];
+
+                    Logger::campaign("Campanha {$campaignId}: [CONVERSA] Criando nova conversa - Contato: {$contact['id']}, Funil: {$campaign['funnel_id']}, Etapa: {$campaign['initial_stage_id']}");
+
+                    // Passar executeAutomations para definir se deve executar automações da etapa
+                    $conversation = ConversationService::create($conversationData, $executeAutomations);
+                    $conversationId = $conversation['id'];
+                    
+                    Logger::campaign("Campanha {$campaignId}: [CONVERSA] Conversa criada com sucesso - ID: {$conversationId}");
+                    
+                    if ($executeAutomations) {
+                        Logger::campaign("Campanha {$campaignId}: [AUTOMAÇÃO] Automações executadas para nova conversa {$conversationId}");
+                    }
                 }
             } catch (\Exception $e) {
-                Logger::error("Erro ao criar conversa: " . $e->getMessage());
+                Logger::campaign("Campanha {$campaignId}: [ERRO] Erro ao criar/reutilizar conversa: " . $e->getMessage());
             }
         }
 
         // 5. ENVIAR MENSAGEM
+        Logger::campaign("Campanha {$campaignId}: [ENVIO] Iniciando envio para {$contact['phone']} via conta {$integrationAccountId}");
+        Logger::campaign("Campanha {$campaignId}: [ENVIO] Conteúdo: " . substr($messageContent, 0, 100) . "...");
+        
         $sendResult = IntegrationService::sendMessage(
             $integrationAccountId,
             $contact['phone'],
@@ -402,9 +481,19 @@ class CampaignSchedulerService
             ]
         );
 
-        if (!$sendResult || empty($sendResult['id'])) {
-            throw new \Exception("Falha ao enviar mensagem: " . ($sendResult['error'] ?? 'Erro desconhecido'));
+        Logger::campaign("Campanha {$campaignId}: [ENVIO] Resultado: " . json_encode($sendResult));
+
+        // Verificar sucesso - WhatsAppService retorna 'success' e 'message_id'
+        $isSuccess = !empty($sendResult['success']) || !empty($sendResult['id']) || !empty($sendResult['message_id']);
+        $externalId = $sendResult['id'] ?? $sendResult['message_id'] ?? null;
+        
+        if (!$sendResult || !$isSuccess) {
+            $errorMsg = $sendResult['error'] ?? ($sendResult['message'] ?? 'Erro desconhecido');
+            Logger::campaign("Campanha {$campaignId}: [ENVIO] FALHA - {$errorMsg}");
+            throw new \Exception("Falha ao enviar mensagem: " . $errorMsg);
         }
+        
+        Logger::campaign("Campanha {$campaignId}: [ENVIO] SUCESSO - ID externo: " . ($externalId ?? 'N/A'));
 
         // 6. CRIAR REGISTRO NA TABELA MESSAGES
         $messageData = [
@@ -414,7 +503,7 @@ class CampaignSchedulerService
             'content' => $messageContent, // Usar mensagem gerada (IA ou original)
             'message_type' => 'text',
             'status' => 'sent',
-            'external_id' => $sendResult['id'] ?? null,
+            'external_id' => $externalId,
             'created_at' => date('Y-m-d H:i:s')
         ];
 
@@ -439,14 +528,14 @@ class CampaignSchedulerService
                     \App\Models\Tag::addToConversation($conversationId, $tag['id']);
                 }
             } catch (\Exception $e) {
-                Logger::error("Erro ao adicionar tag: " . $e->getMessage());
+                Logger::campaign("[ERRO] Erro ao adicionar tag: " . $e->getMessage());
             }
         }
 
         // 9. REGISTRAR NO LOG DE ROTAÇÃO
         self::logRotation($campaignId, $integrationAccountId, $message['id']);
 
-        Logger::info("Mensagem enviada: CampanhaID={$campaignId}, ContatoID={$contact['id']}, Conta={$integrationAccountId}");
+        Logger::campaign("[ENVIADO] CampanhaID={$campaignId}, Contato={$contact['name']} ({$contact['phone']}), ContaID={$integrationAccountId}");
 
         return [
             'message_id' => $message['id'],
@@ -475,7 +564,7 @@ class CampaignSchedulerService
         $availableAccounts = self::filterAccountsByDailyLimit($accountIds);
         
         if (empty($availableAccounts)) {
-            Logger::info("Nenhuma conta disponível - todas atingiram limite diário");
+            Logger::campaign("[ROTAÇÃO] Nenhuma conta disponível - todas atingiram limite diário");
             return null;
         }
         
@@ -527,7 +616,7 @@ class CampaignSchedulerService
             if ($sentToday < $limit) {
                 $availableAccounts[] = $accountId;
             } else {
-                Logger::info("Conta {$accountId} atingiu limite diário ({$sentToday}/{$limit})");
+                Logger::campaign("[ROTAÇÃO] Conta {$accountId} atingiu limite diário ({$sentToday}/{$limit})");
             }
         }
         
@@ -568,7 +657,7 @@ class CampaignSchedulerService
 
         self::$lastAccountIndex[$key]++;
 
-        Logger::info("Rotação Round Robin: Conta selecionada={$selectedId}, Índice={$index}");
+        Logger::campaign("[ROTAÇÃO] Round Robin: Conta selecionada={$selectedId}, Índice={$index}");
 
         return $selectedId;
     }
@@ -597,7 +686,7 @@ class CampaignSchedulerService
 
         $selectedId = $activeAccounts[array_rand($activeAccounts)];
         
-        Logger::info("Rotação Random: Conta selecionada={$selectedId}");
+        Logger::campaign("[ROTAÇÃO] Random: Conta selecionada={$selectedId}");
         
         return $selectedId;
     }
@@ -637,7 +726,7 @@ class CampaignSchedulerService
         asort($loads);
         $selectedId = array_key_first($loads);
 
-        Logger::info("Rotação By Load: Conta selecionada={$selectedId}, Carga={$loads[$selectedId]}");
+        Logger::campaign("[ROTAÇÃO] By Load: Conta selecionada={$selectedId}, Carga={$loads[$selectedId]}");
 
         return $selectedId;
     }
@@ -761,7 +850,7 @@ class CampaignSchedulerService
             
             // Gerar intervalo aleatório
             $intervalSeconds = rand($minInterval, $maxInterval);
-            Logger::info("Campanha {$campaignId}: Intervalo aleatório de {$intervalSeconds}s (range: {$minInterval}s - {$maxInterval}s)");
+            Logger::campaign("Campanha {$campaignId}: [CADÊNCIA] Intervalo aleatório de {$intervalSeconds}s (range: {$minInterval}s - {$maxInterval}s)");
         } else {
             // Intervalo fixo
             $intervalSeconds = (int)($campaign['send_interval_seconds'] ?? 6);
@@ -787,7 +876,7 @@ class CampaignSchedulerService
             
             \App\Helpers\Database::execute($sql, [$campaignId, $integrationAccountId, $messageId]);
         } catch (\Exception $e) {
-            Logger::error("Erro ao registrar log de rotação: " . $e->getMessage());
+            Logger::campaign("[ERRO] Erro ao registrar log de rotação: " . $e->getMessage());
         }
     }
 }

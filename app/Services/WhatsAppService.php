@@ -1914,7 +1914,8 @@ class WhatsAppService
             
             // ✅ NOVO: Se é um tipo de mídia mas não tem mensagem, usar placeholder
             // Isso garante que documentos/imagens/vídeos sem caption não sejam rejeitados
-            if (empty($message) && in_array($messageType, ['document', 'image', 'video', 'audio', 'ptt', 'sticker'])) {
+            // ⚠️ Para áudio/ptt/sticker, NÃO usar placeholder - o player já é exibido
+            if (empty($message) && in_array($messageType, ['document', 'image', 'video'])) {
                 // Usar o nome do arquivo como mensagem, ou um placeholder genérico
                 if (!empty($filename)) {
                     $message = $filename;
@@ -1922,10 +1923,7 @@ class WhatsAppService
                     $typeLabels = [
                         'document' => 'Documento',
                         'image' => 'Imagem',
-                        'video' => 'Vídeo',
-                        'audio' => 'Áudio',
-                        'ptt' => 'Mensagem de voz',
-                        'sticker' => 'Figurinha'
+                        'video' => 'Vídeo'
                     ];
                     $message = $typeLabels[$messageType] ?? 'Mídia';
                 }

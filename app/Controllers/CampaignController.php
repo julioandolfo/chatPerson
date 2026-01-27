@@ -117,10 +117,44 @@ class CampaignController
         }
 
         $stats = CampaignService::getStats($id);
+        
+        // Buscar lista de contatos associada
+        $contactList = null;
+        if (!empty($campaign['contact_list_id'])) {
+            $contactList = ContactList::find($campaign['contact_list_id']);
+        }
+        
+        // Buscar mensagens da campanha (paginado)
+        $page = (int)Request::get('page', 1);
+        $limit = 50;
+        $offset = ($page - 1) * $limit;
+        $statusFilter = Request::get('status_filter');
+        
+        $messages = \App\Models\CampaignMessage::getAllWithContacts($id, $limit, $offset, $statusFilter);
+        $totalMessages = \App\Models\CampaignMessage::countAll($id, $statusFilter);
+        $totalPages = ceil($totalMessages / $limit);
+        
+        // Contagem por status
+        $statusCounts = [
+            'pending' => \App\Models\CampaignMessage::countByStatus($id, 'pending'),
+            'sent' => \App\Models\CampaignMessage::countByStatus($id, 'sent'),
+            'delivered' => \App\Models\CampaignMessage::countByStatus($id, 'delivered'),
+            'read' => \App\Models\CampaignMessage::countByStatus($id, 'read'),
+            'replied' => \App\Models\CampaignMessage::countByStatus($id, 'replied'),
+            'failed' => \App\Models\CampaignMessage::countByStatus($id, 'failed'),
+            'skipped' => \App\Models\CampaignMessage::countByStatus($id, 'skipped'),
+        ];
 
         Response::view('campaigns/show', [
             'campaign' => $campaign,
             'stats' => $stats,
+            'contactList' => $contactList,
+            'messages' => $messages,
+            'statusCounts' => $statusCounts,
+            'currentPage' => $page,
+            'totalPages' => $totalPages,
+            'totalMessages' => $totalMessages,
+            'statusFilter' => $statusFilter,
             'title' => $campaign['name']
         ]);
     }
@@ -298,8 +332,12 @@ class CampaignController
     {
         Permission::abortIfCannot('campaigns.edit');
 
+        \App\Helpers\Logger::campaign("Controller::forceSend - Iniciando para campanha {$id}");
+
         try {
             $result = CampaignSchedulerService::forceSendNext($id);
+
+            \App\Helpers\Logger::campaign("Controller::forceSend - Resultado: " . json_encode($result));
 
             if ($result['success']) {
                 Response::json([
@@ -313,7 +351,9 @@ class CampaignController
                     'message' => $result['message'] ?? 'Nenhuma mensagem pendente'
                 ], 400);
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            \App\Helpers\Logger::campaign("Controller::forceSend - ERRO: " . $e->getMessage());
+            \App\Helpers\Logger::campaign("Controller::forceSend - Trace: " . $e->getTraceAsString());
             Response::json([
                 'success' => false,
                 'message' => $e->getMessage()
@@ -334,6 +374,33 @@ class CampaignController
             Response::json([
                 'success' => true,
                 'message' => 'Campanha cancelada com sucesso!'
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Reiniciar campanha
+     */
+    public function restart(int $id): void
+    {
+        Permission::abortIfCannot('campaigns.edit');
+
+        try {
+            $keepSent = Request::post('keep_sent') === '1' || Request::post('keep_sent') === 'true';
+            
+            $result = CampaignService::restart($id, $keepSent);
+
+            Response::json([
+                'success' => true,
+                'message' => $keepSent 
+                    ? "Campanha reiniciada! {$result['messages_reset']} mensagens com falha serão reenviadas."
+                    : "Campanha reiniciada completamente! Pronta para iniciar novamente.",
+                'result' => $result
             ]);
         } catch (\Exception $e) {
             Response::json([

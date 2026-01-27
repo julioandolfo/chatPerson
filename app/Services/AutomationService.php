@@ -1259,8 +1259,15 @@ class AutomationService
                             
                             \App\Helpers\Logger::automation("executeAssignAdvanced - Regras de %: " . json_encode($rules));
                             
-                            // Selecionar agente baseado em porcentagem
-                            $agentId = self::selectAgentByPercentage($rules, $filterDepartmentId, $considerAvailability, $considerMaxConversations);
+                            // Selecionar agente baseado em porcentagem (com validação de permissões de funil/etapa)
+                            $agentId = self::selectAgentByPercentage(
+                                $rules, 
+                                $filterDepartmentId, 
+                                $considerAvailability, 
+                                $considerMaxConversations,
+                                $conversation['funnel_id'] ?? null,
+                                $conversation['funnel_stage_id'] ?? null
+                            );
                         }
                     } else {
                         // Usar método padrão (round-robin, by_load, etc)
@@ -1485,8 +1492,9 @@ class AutomationService
     
     /**
      * Selecionar agente por porcentagem
+     * ✅ ATUALIZADO: Agora recebe funnelId e stageId para validar permissões
      */
-    private static function selectAgentByPercentage(array $rules, ?int $departmentId, bool $considerAvailability, bool $considerMaxConversations): ?int
+    private static function selectAgentByPercentage(array $rules, ?int $departmentId, bool $considerAvailability, bool $considerMaxConversations, ?int $funnelId = null, ?int $stageId = null): ?int
     {
         if (empty($rules)) {
             return null;
@@ -1526,15 +1534,15 @@ class AutomationService
                     continue;
                 }
                 
-                // Verificar limites
+                // Verificar limites E permissões de funil/etapa
                 if ($considerMaxConversations) {
-                    if (!\App\Services\ConversationSettingsService::canAssignToAgent($agentId, $departmentId, null, null)) {
-                        \App\Helpers\Logger::automation("selectAgentByPercentage - Agente {$agentId} no limite, pulando");
+                    if (!\App\Services\ConversationSettingsService::canAssignToAgent($agentId, $departmentId, $funnelId, $stageId)) {
+                        \App\Helpers\Logger::automation("selectAgentByPercentage - Agente {$agentId} no limite ou sem permissão para funil/etapa, pulando");
                         continue;
                     }
                 }
                 
-                \App\Helpers\Logger::automation("selectAgentByPercentage - Selecionado: {$agentId}");
+                \App\Helpers\Logger::automation("selectAgentByPercentage - Selecionado: {$agentId} (funnelId={$funnelId}, stageId={$stageId})");
                 return $agentId;
             }
         }

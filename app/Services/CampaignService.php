@@ -126,7 +126,7 @@ class CampaignService
         // Criar campanha
         $campaignId = Campaign::create($data);
         
-        Logger::info("Campanha criada: ID={$campaignId}, Nome={$data['name']}");
+        Logger::campaign("Campanha criada: ID={$campaignId}, Nome={$data['name']}");
         
         return $campaignId;
     }
@@ -240,7 +240,7 @@ class CampaignService
         // Atualizar total de contatos da campanha
         Campaign::update($campaignId, ['total_contacts' => $created]);
 
-        Logger::info("Campanha preparada: ID={$campaignId}, Criadas={$created}, Puladas={$skipped}");
+        Logger::campaign("Campanha preparada: ID={$campaignId}, Criadas={$created}, Puladas={$skipped}");
 
         return [
             'created' => $created,
@@ -286,6 +286,7 @@ class CampaignService
 
     /**
      * Iniciar campanha
+     * Prepara automaticamente se ainda não foi preparada
      */
     public static function start(int $campaignId): bool
     {
@@ -294,14 +295,23 @@ class CampaignService
             throw new \InvalidArgumentException('Campanha não encontrada');
         }
 
-        if ($campaign['status'] !== 'draft' && $campaign['status'] !== 'paused') {
+        if ($campaign['status'] !== 'draft' && $campaign['status'] !== 'paused' && $campaign['status'] !== 'scheduled') {
             throw new \Exception('Campanha não pode ser iniciada. Status atual: ' . $campaign['status']);
         }
 
-        // Validar se tem mensagens preparadas
+        // Verificar se tem mensagens preparadas
         $pendingCount = CampaignMessage::countByStatus($campaignId, 'pending');
+        
+        // Se não tem mensagens pendentes, preparar automaticamente
         if ($pendingCount === 0) {
-            throw new \Exception('Nenhuma mensagem pendente. Prepare a campanha primeiro.');
+            \App\Helpers\Logger::campaign("Campanha {$campaignId}: Preparando automaticamente antes de iniciar");
+            $prepareResult = self::prepare($campaignId);
+            
+            if ($prepareResult['created'] === 0) {
+                throw new \Exception('Nenhum contato disponível para envio');
+            }
+            
+            \App\Helpers\Logger::campaign("Campanha {$campaignId}: {$prepareResult['created']} mensagens criadas");
         }
 
         return Campaign::update($campaignId, [
@@ -356,6 +366,92 @@ class CampaignService
             'status' => 'cancelled',
             'cancelled_at' => date('Y-m-d H:i:s')
         ]);
+    }
+
+    /**
+     * Reiniciar campanha
+     * Reseta contadores, mensagens e permite reenviar para todos os contatos
+     * 
+     * @param int $campaignId ID da campanha
+     * @param bool $keepSent Se true, mantém registros de enviados com sucesso e só reenvia falhas
+     */
+    public static function restart(int $campaignId, bool $keepSent = false): array
+    {
+        $campaign = Campaign::find($campaignId);
+        if (!$campaign) {
+            throw new \InvalidArgumentException('Campanha não encontrada');
+        }
+
+        // Não permite reiniciar campanhas em execução
+        if ($campaign['status'] === 'running') {
+            throw new \Exception('Pause a campanha antes de reiniciar');
+        }
+
+        // Contar registros antes
+        $totalMessages = CampaignMessage::countByStatus($campaignId, null); // Todos
+        $sentMessages = CampaignMessage::countByStatus($campaignId, 'sent');
+        $failedMessages = CampaignMessage::countByStatus($campaignId, 'failed');
+        $pendingMessages = CampaignMessage::countByStatus($campaignId, 'pending');
+        
+        $resetCount = 0;
+        $deletedCount = 0;
+
+        if ($keepSent) {
+            // Apenas resetar mensagens com falha para pending
+            \App\Helpers\Database::execute(
+                "UPDATE campaign_messages 
+                 SET status = 'pending', 
+                     sent_at = NULL, 
+                     delivered_at = NULL, 
+                     read_at = NULL, 
+                     replied_at = NULL,
+                     error_message = NULL,
+                     attempts = 0
+                 WHERE campaign_id = ? AND status = 'failed'",
+                [$campaignId]
+            );
+            $resetCount = $failedMessages;
+            
+            Logger::campaign("Campanha {$campaignId}: Reiniciada (apenas falhas) - {$resetCount} mensagens resetadas");
+        } else {
+            // Deletar todas as mensagens e preparar novamente
+            \App\Helpers\Database::execute(
+                "DELETE FROM campaign_messages WHERE campaign_id = ?",
+                [$campaignId]
+            );
+            $deletedCount = $totalMessages;
+            
+            Logger::campaign("Campanha {$campaignId}: Reiniciada (completa) - {$deletedCount} mensagens deletadas");
+        }
+
+        // Resetar contadores da campanha
+        Campaign::update($campaignId, [
+            'status' => 'draft',
+            'total_sent' => $keepSent ? $sentMessages : 0,
+            'total_delivered' => $keepSent ? ($campaign['total_delivered'] ?? 0) : 0,
+            'total_read' => $keepSent ? ($campaign['total_read'] ?? 0) : 0,
+            'total_replied' => $keepSent ? ($campaign['total_replied'] ?? 0) : 0,
+            'total_failed' => 0,
+            'total_skipped' => 0,
+            'sent_today' => 0,
+            'sent_this_hour' => 0,
+            'last_counter_reset' => null,
+            'last_hourly_reset' => null,
+            'started_at' => null,
+            'completed_at' => null,
+            'cancelled_at' => null,
+            'paused_at' => null
+        ]);
+
+        Logger::campaign("Campanha {$campaignId}: Contadores resetados, status=draft");
+
+        return [
+            'success' => true,
+            'mode' => $keepSent ? 'retry_failed' : 'full_restart',
+            'messages_reset' => $resetCount,
+            'messages_deleted' => $deletedCount,
+            'messages_kept' => $keepSent ? $sentMessages : 0
+        ];
     }
 
     /**

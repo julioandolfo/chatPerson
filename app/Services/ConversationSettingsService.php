@@ -450,13 +450,35 @@ class ConversationSettingsService
     }
 
     /**
-     * Verificar se pode atribuir conversa a agente considerando limites
+     * Verificar se pode atribuir conversa a agente considerando limites e permissões
      */
     public static function canAssignToAgent(int $agentId, ?int $departmentId = null, ?int $funnelId = null, ?int $stageId = null): bool
     {
         $agent = User::find($agentId);
         if (!$agent || $agent['status'] !== 'active') {
             return false;
+        }
+        
+        // ✅ NOVO: Verificar permissões de funil/etapa ANTES de verificar disponibilidade
+        // Admin e super admin podem ser atribuídos a qualquer funil
+        $isAdmin = ($agent['role'] === 'admin' || \App\Services\PermissionService::isSuperAdmin($agentId));
+        
+        if (!$isAdmin && class_exists('\App\Models\AgentFunnelPermission')) {
+            // Verificar permissão de funil (se fornecido)
+            if ($funnelId !== null) {
+                if (!\App\Models\AgentFunnelPermission::canViewFunnel($agentId, $funnelId)) {
+                    \App\Helpers\Log::debug("🚫 [canAssignToAgent] Agente {$agentId} não tem permissão para funil {$funnelId}", 'conversas.log');
+                    return false;
+                }
+            }
+            
+            // Verificar permissão de etapa (se fornecido)
+            if ($stageId !== null) {
+                if (!\App\Models\AgentFunnelPermission::canViewStage($agentId, $stageId)) {
+                    \App\Helpers\Log::debug("🚫 [canAssignToAgent] Agente {$agentId} não tem permissão para etapa {$stageId}", 'conversas.log');
+                    return false;
+                }
+            }
         }
         
         // Verificar disponibilidade
@@ -837,6 +859,7 @@ class ConversationSettingsService
 
     /**
      * Obter agentes disponíveis para atribuição (humanos e IA)
+     * ✅ ATUALIZADO: Agora filtra por permissões de funil/etapa
      */
     private static function getAvailableAgents(
         ?int $departmentId = null, 
@@ -851,7 +874,7 @@ class ConversationSettingsService
         $agents = [];
         
         // Agentes humanos
-        $sql = "SELECT u.id, u.name, u.current_conversations, u.max_conversations, u.availability_status, u.queue_enabled,
+        $sql = "SELECT u.id, u.name, u.role, u.current_conversations, u.max_conversations, u.availability_status, u.queue_enabled,
                        MAX(c.updated_at) as last_assignment_at, 'human' as agent_type
                 FROM users u
                 LEFT JOIN conversations c ON u.id = c.agent_id AND c.status IN ('open', 'pending')
@@ -873,6 +896,35 @@ class ConversationSettingsService
             $params[] = $departmentId;
         }
         
+        // ✅ NOVO: Filtrar por permissões de funil/etapa
+        // Incluir apenas agentes que têm permissão para o funil/etapa da conversa
+        // Admin e supervisor não precisam de permissão específica
+        if ($funnelId !== null && class_exists('\App\Models\AgentFunnelPermission')) {
+            $sql .= " AND (
+                u.role IN ('admin', 'supervisor')
+                OR EXISTS (
+                    SELECT 1 FROM agent_funnel_permissions afp 
+                    WHERE afp.user_id = u.id 
+                    AND afp.permission_type = 'view'
+                    AND (afp.funnel_id IS NULL OR afp.funnel_id = ?)
+                )
+            )";
+            $params[] = $funnelId;
+        }
+        
+        if ($stageId !== null && class_exists('\App\Models\AgentFunnelPermission')) {
+            $sql .= " AND (
+                u.role IN ('admin', 'supervisor')
+                OR EXISTS (
+                    SELECT 1 FROM agent_funnel_permissions afp 
+                    WHERE afp.user_id = u.id 
+                    AND afp.permission_type = 'view'
+                    AND (afp.stage_id IS NULL OR afp.stage_id = ?)
+                )
+            )";
+            $params[] = $stageId;
+        }
+        
         $sql .= " GROUP BY u.id";
         
         // Filtrar por limite de conversas apenas se considerMaxConversations = true
@@ -882,6 +934,8 @@ class ConversationSettingsService
         
         $humanAgents = Database::fetchAll($sql, $params);
         $agents = array_merge($agents, $humanAgents);
+        
+        \App\Helpers\Log::debug("🔍 [getAvailableAgents] funnelId={$funnelId}, stageId={$stageId}, agentsFound=" . count($humanAgents), 'conversas.log');
         
         // Agentes de IA (se habilitado)
         if ($includeAI && $settings['distribution']['assign_to_ai_agent']) {

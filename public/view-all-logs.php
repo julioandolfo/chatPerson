@@ -24,6 +24,7 @@ try {
 
 // Lista de arquivos de log para verificar
 $logFiles = [
+    'Campanhas (Disparo em Massa)' => __DIR__ . '/../logs/campaigns.log',
     'External Sources (Google Maps/WooCommerce)' => __DIR__ . '/../logs/external_sources.log',
     'Dashboard' => __DIR__ . '/../logs/dash.log',
     'Metas e OTE (Goals)' => __DIR__ . '/../logs/goals.log',

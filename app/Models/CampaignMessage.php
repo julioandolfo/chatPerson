@@ -21,6 +21,68 @@ class CampaignMessage extends Model
     protected bool $timestamps = true;
 
     /**
+     * Obter todas as mensagens de uma campanha com detalhes do contato
+     */
+    public static function getAllWithContacts(int $campaignId, int $limit = 100, int $offset = 0, ?string $statusFilter = null): array
+    {
+        $params = [$campaignId];
+        $statusCondition = '';
+        
+        if ($statusFilter) {
+            $statusCondition = 'AND cm.status = ?';
+            $params[] = $statusFilter;
+        }
+        
+        $params[] = $limit;
+        $params[] = $offset;
+        
+        $sql = "SELECT cm.*, 
+                       c.name as contact_name, 
+                       c.phone as contact_phone, 
+                       c.email as contact_email,
+                       c.avatar as contact_avatar,
+                       ia.name as account_name
+                FROM campaign_messages cm
+                INNER JOIN contacts c ON cm.contact_id = c.id
+                LEFT JOIN integration_accounts ia ON cm.integration_account_id = ia.id
+                WHERE cm.campaign_id = ? 
+                {$statusCondition}
+                ORDER BY 
+                    CASE cm.status 
+                        WHEN 'pending' THEN 1 
+                        WHEN 'sent' THEN 2 
+                        WHEN 'delivered' THEN 3 
+                        WHEN 'read' THEN 4 
+                        WHEN 'replied' THEN 5 
+                        WHEN 'failed' THEN 6 
+                        WHEN 'skipped' THEN 7 
+                        ELSE 8 
+                    END,
+                    cm.id ASC
+                LIMIT ? OFFSET ?";
+        
+        return Database::fetchAll($sql, $params);
+    }
+
+    /**
+     * Contar total de mensagens de uma campanha
+     */
+    public static function countAll(int $campaignId, ?string $statusFilter = null): int
+    {
+        $params = [$campaignId];
+        $statusCondition = '';
+        
+        if ($statusFilter) {
+            $statusCondition = 'AND status = ?';
+            $params[] = $statusFilter;
+        }
+        
+        $sql = "SELECT COUNT(*) as total FROM campaign_messages WHERE campaign_id = ? {$statusCondition}";
+        $result = Database::fetch($sql, $params);
+        return (int)($result['total'] ?? 0);
+    }
+
+    /**
      * Obter mensagens pendentes de uma campanha
      */
     public static function getPending(int $campaignId, int $limit = 50): array

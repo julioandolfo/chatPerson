@@ -776,6 +776,24 @@ class WhatsAppService
             if (empty($account['quepasa_token']) && !empty($account['api_token'])) {
                 $account['quepasa_token'] = $account['api_token'];
             }
+            
+            // Se ainda não tem token, buscar na whatsapp_accounts pelo phone_number
+            if (empty($account['quepasa_token']) && !empty($account['phone_number'])) {
+                Logger::quepasa("sendMessage - Token vazio em integration_accounts, buscando em whatsapp_accounts pelo phone...");
+                $legacyAccount = \App\Helpers\Database::fetch(
+                    "SELECT * FROM whatsapp_accounts WHERE phone_number = ? LIMIT 1",
+                    [$account['phone_number']]
+                );
+                
+                if ($legacyAccount && !empty($legacyAccount['quepasa_token'])) {
+                    $account['quepasa_token'] = $legacyAccount['quepasa_token'];
+                    // Também pegar api_url da conta legada se não tiver
+                    if (empty($account['api_url']) && !empty($legacyAccount['api_url'])) {
+                        $account['api_url'] = $legacyAccount['api_url'];
+                    }
+                    Logger::quepasa("sendMessage - Token obtido de whatsapp_accounts (phone match): {$legacyAccount['name']}");
+                }
+            }
         } else {
             // FALLBACK: Buscar em whatsapp_accounts (tabela legada)
             Logger::quepasa("sendMessage - Conta não encontrada em integration_accounts, tentando whatsapp_accounts...");
@@ -793,7 +811,8 @@ class WhatsAppService
 
         $token = $account['quepasa_token'] ?? $account['api_token'] ?? null;
         if (empty($token)) {
-            Logger::quepasa("sendMessage - ERRO: Token não encontrado para conta {$accountId}");
+            Logger::quepasa("sendMessage - ERRO: Token não encontrado para conta {$accountId} (campos vazios: quepasa_token, api_token)");
+            Logger::quepasa("sendMessage - DEBUG: api_token=" . ($account['api_token'] ?? 'NULL') . ", phone=" . ($account['phone_number'] ?? 'NULL'));
             throw new \Exception('Conta não está conectada. Escaneie o QR Code primeiro.');
         }
         

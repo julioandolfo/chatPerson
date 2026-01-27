@@ -123,6 +123,12 @@ class CampaignService
         // Execução de automações
         $data['execute_automations'] = !empty($data['execute_automations']) && $data['execute_automations'] !== '0';
         
+        // Filtros de contatos
+        $data['skip_duplicates'] = !empty($data['skip_duplicates']) && $data['skip_duplicates'] !== '0';
+        $data['skip_recent_conversations'] = !empty($data['skip_recent_conversations']) && $data['skip_recent_conversations'] !== '0';
+        $data['skip_recent_hours'] = (int)($data['skip_recent_hours'] ?? 24);
+        $data['respect_blacklist'] = !empty($data['respect_blacklist']) && $data['respect_blacklist'] !== '0';
+        
         // Criar campanha
         $campaignId = Campaign::create($data);
         

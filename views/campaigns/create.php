@@ -248,6 +248,43 @@ $pageTitle = 'Nova Campanha';
                                                 <br><span class="text-warning"><strong>Atenção:</strong> Isso pode incluir atribuição de agentes, envio de mensagens adicionais, etc.</span>
                                             </div>
                                         </div>
+                                        
+                                        <!-- Filtros de Contatos -->
+                                        <div class="separator separator-dashed my-8"></div>
+                                        <h4 class="fw-bold mb-5">Filtros de Contatos</h4>
+                                        
+                                        <div class="mb-5">
+                                            <input type="hidden" name="skip_duplicates" value="0" />
+                                            <label class="form-check form-check-custom form-check-solid">
+                                                <input class="form-check-input" type="checkbox" name="skip_duplicates" value="1" checked />
+                                                <span class="form-check-label">Pular duplicatas (contatos que já receberam nesta campanha)</span>
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="mb-5">
+                                            <input type="hidden" name="skip_recent_conversations" value="0" />
+                                            <label class="form-check form-check-custom form-check-solid">
+                                                <input class="form-check-input" type="checkbox" name="skip_recent_conversations" value="1" id="skip_recent_check" onchange="toggleSkipRecentHours(this.checked)" />
+                                                <span class="form-check-label">Pular contatos com conversa ativa recente</span>
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="mb-5 ms-10" id="skip_recent_hours_config" style="display: none;">
+                                            <label class="form-label">Pular se teve conversa nas últimas:</label>
+                                            <div class="input-group" style="max-width: 200px;">
+                                                <input type="number" class="form-control" name="skip_recent_hours" value="24" min="1" max="720" />
+                                                <span class="input-group-text">horas</span>
+                                            </div>
+                                            <div class="form-text">Contatos com conversa aberta nesse período serão pulados</div>
+                                        </div>
+                                        
+                                        <div class="mb-5">
+                                            <input type="hidden" name="respect_blacklist" value="0" />
+                                            <label class="form-check form-check-custom form-check-solid">
+                                                <input class="form-check-input" type="checkbox" name="respect_blacklist" value="1" checked />
+                                                <span class="form-check-label">Respeitar blacklist (não enviar para contatos bloqueados)</span>
+                                            </label>
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -789,6 +826,12 @@ function updateStages() {
 
 function toggleConversationConfig(enabled) {
     const container = document.getElementById('conversation_config');
+    if (!container) return;
+    container.style.display = enabled ? 'block' : 'none';
+}
+
+function toggleSkipRecentHours(enabled) {
+    const container = document.getElementById('skip_recent_hours_config');
     if (!container) return;
     container.style.display = enabled ? 'block' : 'none';
 }

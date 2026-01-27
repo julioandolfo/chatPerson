@@ -207,15 +207,23 @@ class CampaignMessage extends Model
     }
 
     /**
-     * Contar por status
+     * Contar por status (ou total se status for null)
      */
-    public static function countByStatus(int $campaignId, string $status): int
+    public static function countByStatus(int $campaignId, ?string $status = null): int
     {
-        $sql = "SELECT COUNT(*) as total 
-                FROM campaign_messages 
-                WHERE campaign_id = ? AND status = ?";
+        if ($status === null) {
+            // Contar todas as mensagens da campanha
+            $sql = "SELECT COUNT(*) as total 
+                    FROM campaign_messages 
+                    WHERE campaign_id = ?";
+            $result = Database::fetch($sql, [$campaignId]);
+        } else {
+            $sql = "SELECT COUNT(*) as total 
+                    FROM campaign_messages 
+                    WHERE campaign_id = ? AND status = ?";
+            $result = Database::fetch($sql, [$campaignId, $status]);
+        }
         
-        $result = Database::fetch($sql, [$campaignId, $status]);
         return (int)($result['total'] ?? 0);
     }
 

@@ -1445,6 +1445,25 @@ class WhatsAppService
             
             Logger::quepasa("processWebhook - Conta encontrada: ID={$account['id']}, Nome={$account['name']}, Phone={$account['phone_number']}");
 
+            // ✅ IMPORTANTE: Buscar ID correspondente em integration_accounts
+            // Campanhas usam integration_account_id, mas webhook usa whatsapp_accounts
+            // Precisamos ter ambos os IDs para buscar conversas corretamente
+            $integrationAccountId = null;
+            if (!empty($account['phone_number'])) {
+                $integrationAccount = \App\Helpers\Database::fetch(
+                    "SELECT id FROM integration_accounts WHERE phone_number = ? AND channel = 'whatsapp' LIMIT 1",
+                    [$account['phone_number']]
+                );
+                if ($integrationAccount) {
+                    $integrationAccountId = $integrationAccount['id'];
+                    Logger::quepasa("processWebhook - Integration Account correspondente: ID={$integrationAccountId}");
+                } else {
+                    Logger::quepasa("processWebhook - Nenhum integration_account encontrado para phone={$account['phone_number']}");
+                }
+            }
+            // Guardar no array da conta para uso posterior
+            $account['integration_account_id'] = $integrationAccountId;
+
             // Atualizar chatid/wid se necessário
             $wid = $payload['wid'] ?? null;
             if ($wid && empty($account['quepasa_chatid'])) {
@@ -2521,15 +2540,32 @@ class WhatsAppService
                     // Lock no contato para serializar criação de conversas desse contato
                     $db->query("SELECT id FROM contacts WHERE id = :id FOR UPDATE", ['id' => $contact['id']]);
                     
-                    Logger::quepasa("processWebhook - Buscando conversa existente (com lock): contact_id={$contact['id']}, channel=whatsapp, account_id={$account['id']}");
-                    $conversation = \App\Models\Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['id']);
-                    Logger::quepasa("processWebhook - Resultado da busca: " . ($conversation ? "Encontrada (ID={$conversation['id']}, status={$conversation['status']}, wa_id={$conversation['whatsapp_account_id']}, int_id={$conversation['integration_account_id']})" : "Não encontrada"));
+                    Logger::quepasa("processWebhook - Buscando conversa existente (com lock): contact_id={$contact['id']}, channel=whatsapp, wa_id={$account['id']}, int_id=" . ($account['integration_account_id'] ?? 'NULL'));
                     
-                    // ✅ Sincronizar whatsapp_account_id se a conversa foi encontrada via integration_account_id
-                    if ($conversation && empty($conversation['whatsapp_account_id']) && !empty($account['id'])) {
-                        \App\Models\Conversation::update($conversation['id'], ['whatsapp_account_id' => $account['id']]);
-                        $conversation['whatsapp_account_id'] = $account['id'];
-                        Logger::quepasa("processWebhook - Sincronizado whatsapp_account_id={$account['id']} na conversa {$conversation['id']}");
+                    // Buscar por whatsapp_account_id primeiro
+                    $conversation = \App\Models\Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['id']);
+                    
+                    // Se não encontrou e temos integration_account_id, buscar por ele também
+                    if (!$conversation && !empty($account['integration_account_id'])) {
+                        Logger::quepasa("processWebhook - Não encontrou por wa_id, tentando por integration_account_id={$account['integration_account_id']}");
+                        $conversation = \App\Models\Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['integration_account_id']);
+                    }
+                    
+                    Logger::quepasa("processWebhook - Resultado da busca: " . ($conversation ? "Encontrada (ID={$conversation['id']}, status={$conversation['status']}, wa_id=" . ($conversation['whatsapp_account_id'] ?? 'NULL') . ", int_id=" . ($conversation['integration_account_id'] ?? 'NULL') . ")" : "Não encontrada"));
+                    
+                    // ✅ Sincronizar IDs se a conversa foi encontrada mas faltam campos
+                    if ($conversation) {
+                        $updateFields = [];
+                        if (empty($conversation['whatsapp_account_id']) && !empty($account['id'])) {
+                            $updateFields['whatsapp_account_id'] = $account['id'];
+                        }
+                        if (empty($conversation['integration_account_id']) && !empty($account['integration_account_id'])) {
+                            $updateFields['integration_account_id'] = $account['integration_account_id'];
+                        }
+                        if (!empty($updateFields)) {
+                            \App\Models\Conversation::update($conversation['id'], $updateFields);
+                            Logger::quepasa("processWebhook - Sincronizado IDs na conversa {$conversation['id']}: " . json_encode($updateFields));
+                        }
                     }
                 }
             } catch (\Throwable $e) {
@@ -2543,14 +2579,30 @@ class WhatsAppService
             // Se não encontrou (ou não conseguiu lock), buscar normalmente
             if (!$conversation) {
                 if (!$usedLock) {
-                    Logger::quepasa("processWebhook - Buscando conversa existente (sem lock): contact_id={$contact['id']}, channel=whatsapp, account_id={$account['id']}");
+                    Logger::quepasa("processWebhook - Buscando conversa existente (sem lock): contact_id={$contact['id']}, channel=whatsapp, wa_id={$account['id']}, int_id=" . ($account['integration_account_id'] ?? 'NULL'));
+                    
+                    // Buscar por whatsapp_account_id primeiro
                     $conversation = \App\Models\Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['id']);
                     
-                    // ✅ Sincronizar whatsapp_account_id se a conversa foi encontrada via integration_account_id
-                    if ($conversation && empty($conversation['whatsapp_account_id']) && !empty($account['id'])) {
-                        \App\Models\Conversation::update($conversation['id'], ['whatsapp_account_id' => $account['id']]);
-                        $conversation['whatsapp_account_id'] = $account['id'];
-                        Logger::quepasa("processWebhook - Sincronizado whatsapp_account_id={$account['id']} na conversa {$conversation['id']}");
+                    // Se não encontrou e temos integration_account_id, buscar por ele também
+                    if (!$conversation && !empty($account['integration_account_id'])) {
+                        Logger::quepasa("processWebhook - Não encontrou por wa_id, tentando por integration_account_id={$account['integration_account_id']}");
+                        $conversation = \App\Models\Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['integration_account_id']);
+                    }
+                    
+                    // ✅ Sincronizar IDs se a conversa foi encontrada mas faltam campos
+                    if ($conversation) {
+                        $updateFields = [];
+                        if (empty($conversation['whatsapp_account_id']) && !empty($account['id'])) {
+                            $updateFields['whatsapp_account_id'] = $account['id'];
+                        }
+                        if (empty($conversation['integration_account_id']) && !empty($account['integration_account_id'])) {
+                            $updateFields['integration_account_id'] = $account['integration_account_id'];
+                        }
+                        if (!empty($updateFields)) {
+                            \App\Models\Conversation::update($conversation['id'], $updateFields);
+                            Logger::quepasa("processWebhook - Sincronizado IDs na conversa {$conversation['id']}: " . json_encode($updateFields));
+                        }
                     }
                 }
             }

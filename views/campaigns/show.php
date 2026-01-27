@@ -2,6 +2,8 @@
 $layout = 'layouts.metronic.app';
 $title = $campaign['name'] ?? 'Campanha';
 $pageTitle = 'Detalhes da Campanha';
+
+ob_start();
 ?>
 
 <div class="d-flex flex-column flex-column-fluid">
@@ -51,6 +53,13 @@ $pageTitle = 'Detalhes da Campanha';
                 <button class="btn btn-sm btn-primary" onclick="resumeCampaign()">
                     <i class="ki-duotone ki-play fs-3"></i>
                     Retomar
+                </button>
+                <?php endif; ?>
+                
+                <?php if (in_array($campaign['status'], ['running', 'scheduled', 'paused', 'draft'])): ?>
+                <button class="btn btn-sm btn-info" onclick="forceSend()" title="Envia imediatamente para o próximo contato (ignora limites)">
+                    <i class="ki-duotone ki-send fs-3"></i>
+                    Forçar Disparo
                 </button>
                 <?php endif; ?>
                 
@@ -376,8 +385,40 @@ function resumeCampaign() {
         .catch(err => toastr.error('Erro de rede'));
 }
 
+function forceSend() {
+    if (!confirm('Enviar imediatamente para o próximo contato da lista?\n\nIsso ignora limites e intervalos configurados.')) return;
+    
+    const btn = event.target.closest('button');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Enviando...';
+    btn.disabled = true;
+    
+    fetch(`/campaigns/${campaignId}/force-send`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                toastr.success(data.message);
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                toastr.error(data.message);
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        })
+        .catch(err => {
+            toastr.error('Erro de rede');
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        });
+}
+
 // Auto-refresh se estiver rodando
 <?php if ($campaign['status'] === 'running'): ?>
 setInterval(() => location.reload(), 30000); // 30 segundos
 <?php endif; ?>
 </script>
+
+<?php
+$content = ob_get_clean();
+require __DIR__ . '/../layouts/metronic/app.php';
+?>

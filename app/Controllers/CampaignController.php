@@ -7,6 +7,7 @@
 namespace App\Controllers;
 
 use App\Services\CampaignService;
+use App\Services\CampaignSchedulerService;
 use App\Services\ContactListService;
 use App\Services\CampaignNotificationService;
 use App\Models\Campaign;
@@ -281,6 +282,37 @@ class CampaignController
                 'success' => true,
                 'message' => 'Campanha retomada com sucesso!'
             ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Forçar disparo imediato (para testes)
+     * Envia imediatamente a próxima mensagem pendente da campanha
+     */
+    public function forceSend(int $id): void
+    {
+        Permission::abortIfCannot('campaigns.edit');
+
+        try {
+            $result = CampaignSchedulerService::forceSendNext($id);
+
+            if ($result['success']) {
+                Response::json([
+                    'success' => true,
+                    'message' => "Mensagem enviada para {$result['contact_name']}!",
+                    'result' => $result
+                ]);
+            } else {
+                Response::json([
+                    'success' => false,
+                    'message' => $result['message'] ?? 'Nenhuma mensagem pendente'
+                ], 400);
+            }
         } catch (\Exception $e) {
             Response::json([
                 'success' => false,

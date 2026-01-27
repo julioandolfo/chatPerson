@@ -26,6 +26,57 @@ class CampaignSchedulerService
     private static array $lastAccountIndex = [];
 
     /**
+     * Forçar envio imediato da próxima mensagem pendente (para testes)
+     * Ignora intervalos, limites e configurações de taxa
+     */
+    public static function forceSendNext(int $campaignId): array
+    {
+        Logger::info("=== FORÇAR DISPARO - Campanha {$campaignId} ===");
+
+        $campaign = Campaign::find($campaignId);
+        if (!$campaign) {
+            return ['success' => false, 'message' => 'Campanha não encontrada'];
+        }
+
+        // Verificar se a campanha está em um status válido para envio
+        if (!in_array($campaign['status'], ['running', 'scheduled', 'paused', 'draft'])) {
+            return ['success' => false, 'message' => 'Campanha não está em status válido para envio'];
+        }
+
+        // Buscar próxima mensagem pendente
+        $message = CampaignMessage::getNextPending($campaignId);
+        if (!$message) {
+            return ['success' => false, 'message' => 'Nenhuma mensagem pendente na campanha'];
+        }
+
+        $contact = Contact::find($message['contact_id']);
+        $contactName = $contact['name'] ?? 'Contato #' . $message['contact_id'];
+
+        try {
+            // Processar a mensagem imediatamente
+            $result = self::processMessage($campaignId, $message);
+            
+            Logger::info("Forçar disparo: Mensagem {$message['id']} enviada para {$contactName}");
+
+            return [
+                'success' => true,
+                'message_id' => $message['id'],
+                'contact_id' => $message['contact_id'],
+                'contact_name' => $contactName,
+                'status' => $result['status'] ?? 'sent',
+                'external_id' => $result['external_id'] ?? null
+            ];
+        } catch (\Exception $e) {
+            Logger::error("Forçar disparo: Erro - " . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+                'contact_name' => $contactName
+            ];
+        }
+    }
+
+    /**
      * Processar mensagens pendentes de todas as campanhas ativas
      * Este método é chamado pelo cron job a cada 1 minuto
      */

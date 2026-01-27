@@ -127,7 +127,7 @@ ob_start();
                                     </td>
                                     <td><?php echo htmlspecialchars($contact['phone'] ?? '-'); ?></td>
                                     <td><?php echo htmlspecialchars($contact['email'] ?? '-'); ?></td>
-                                    <td class="text-muted"><?php echo date('d/m/Y', strtotime($contact['added_at'])); ?></td>
+                                    <td class="text-muted"><?php echo !empty($contact['added_at']) ? date('d/m/Y', strtotime($contact['added_at'])) : '-'; ?></td>
                                     <td class="text-end pe-4">
                                         <button class="btn btn-sm btn-light-danger" 
                                                 onclick="removeContact(<?php echo $contact['id']; ?>)">

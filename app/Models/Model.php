@@ -15,6 +15,12 @@ abstract class Model
     protected array $fillable = [];
     protected array $hidden = [];
     protected bool $timestamps = true;
+    
+    /**
+     * Campos que são do tipo JSON no banco de dados
+     * Strings vazias serão convertidas para NULL
+     */
+    protected array $jsonFields = [];
 
     /**
      * Obter todos os registros
@@ -43,6 +49,34 @@ abstract class Model
     }
 
     /**
+     * Sanitizar campos JSON (converter strings vazias para NULL)
+     */
+    protected static function sanitizeJsonFields(array $data, array $jsonFields): array
+    {
+        foreach ($jsonFields as $field) {
+            if (array_key_exists($field, $data)) {
+                $value = $data[$field];
+                // Se for string vazia ou null, definir como null
+                if ($value === '' || $value === null) {
+                    $data[$field] = null;
+                }
+                // Se for array, converter para JSON
+                elseif (is_array($value)) {
+                    $data[$field] = json_encode($value);
+                }
+                // Se for string mas não for JSON válido, converter para null
+                elseif (is_string($value) && !empty($value)) {
+                    json_decode($value);
+                    if (json_last_error() !== JSON_ERROR_NONE) {
+                        $data[$field] = null;
+                    }
+                }
+            }
+        }
+        return $data;
+    }
+
+    /**
      * Criar novo registro
      */
     public static function create(array $data): int
@@ -51,6 +85,11 @@ abstract class Model
         
         // Filtrar apenas campos fillable
         $data = array_intersect_key($data, array_flip($instance->fillable));
+        
+        // Sanitizar campos JSON
+        if (!empty($instance->jsonFields)) {
+            $data = self::sanitizeJsonFields($data, $instance->jsonFields);
+        }
         
         // Adicionar timestamps (somente se não foram fornecidos)
         if ($instance->timestamps) {
@@ -86,6 +125,11 @@ abstract class Model
         
         // Filtrar apenas campos fillable
         $data = array_intersect_key($data, array_flip($instance->fillable));
+        
+        // Sanitizar campos JSON
+        if (!empty($instance->jsonFields)) {
+            $data = self::sanitizeJsonFields($data, $instance->jsonFields);
+        }
         
         // Adicionar updated_at
         if ($instance->timestamps) {

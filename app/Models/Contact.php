@@ -28,6 +28,11 @@ class Contact extends Model
     ];
     protected array $hidden = [];
     protected bool $timestamps = true;
+    
+    /**
+     * Campos do tipo JSON no banco
+     */
+    protected array $jsonFields = ['social_media', 'custom_attributes'];
 
     /**
      * Buscar por telefone (busca exata)

@@ -26,7 +26,7 @@ class ContactList extends Model
      */
     public static function getContacts(int $listId, int $limit = 1000, int $offset = 0): array
     {
-        $sql = "SELECT c.*, cli.custom_variables
+        $sql = "SELECT c.*, cli.custom_variables, cli.added_at
                 FROM contact_list_items cli
                 INNER JOIN contacts c ON cli.contact_id = c.id
                 WHERE cli.contact_list_id = ?

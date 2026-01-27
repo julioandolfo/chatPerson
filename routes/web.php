@@ -694,6 +694,7 @@ Router::post('/campaigns/{id}/start', [CampaignController::class, 'start'], ['Au
 Router::post('/campaigns/{id}/pause', [CampaignController::class, 'pause'], ['Authentication']);
 Router::post('/campaigns/{id}/resume', [CampaignController::class, 'resume'], ['Authentication']);
 Router::post('/campaigns/{id}/cancel', [CampaignController::class, 'cancel'], ['Authentication']);
+Router::post('/campaigns/{id}/force-send', [CampaignController::class, 'forceSend'], ['Authentication']);
 
 // Drip Sequences
 Router::get('/drip-sequences', [DripSequenceController::class, 'index'], ['Authentication']);

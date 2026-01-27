@@ -388,12 +388,19 @@ class CampaignController
      */
     public function restart(int $id): void
     {
-        Permission::abortIfCannot('campaigns.edit');
-
+        \App\Helpers\Logger::campaign("Controller::restart - Iniciando reinício da campanha ID: {$id}");
+        
         try {
-            $keepSent = Request::post('keep_sent') === '1' || Request::post('keep_sent') === 'true';
+            Permission::abortIfCannot('campaigns.edit');
+            
+            $keepSentRaw = Request::post('keep_sent');
+            $keepSent = $keepSentRaw === '1' || $keepSentRaw === 'true';
+            
+            \App\Helpers\Logger::campaign("Controller::restart - Campanha {$id}: keep_sent_raw={$keepSentRaw}, keep_sent=" . ($keepSent ? 'true' : 'false'));
             
             $result = CampaignService::restart($id, $keepSent);
+
+            \App\Helpers\Logger::campaign("Controller::restart - Campanha {$id}: Sucesso - " . json_encode($result));
 
             Response::json([
                 'success' => true,
@@ -402,7 +409,10 @@ class CampaignController
                     : "Campanha reiniciada completamente! Pronta para iniciar novamente.",
                 'result' => $result
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            \App\Helpers\Logger::campaign("Controller::restart - Campanha {$id}: ERRO - " . $e->getMessage());
+            \App\Helpers\Logger::campaign("Controller::restart - Campanha {$id}: Trace - " . $e->getTraceAsString());
+            
             Response::json([
                 'success' => false,
                 'message' => $e->getMessage()

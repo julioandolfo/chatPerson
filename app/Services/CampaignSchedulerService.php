@@ -348,10 +348,30 @@ class CampaignSchedulerService
             throw new \Exception("Nenhuma conta configurada para a campanha");
         }
 
+        // Log das contas configuradas na campanha
+        Logger::campaign("Campanha {$campaignId}: [CONTA] Contas configuradas: " . json_encode($accountIds));
+        Logger::campaign("Campanha {$campaignId}: [CONTA] Estratégia de rotação: {$campaign['rotation_strategy']}");
+        
+        // Buscar nomes das contas para log mais claro
+        foreach ($accountIds as $accId) {
+            $acc = IntegrationAccount::find($accId);
+            if ($acc) {
+                Logger::campaign("Campanha {$campaignId}: [CONTA] ID {$accId}: {$acc['name']} ({$acc['phone_number']}) - Status: {$acc['status']}");
+            } else {
+                Logger::campaign("Campanha {$campaignId}: [CONTA] ID {$accId}: NÃO ENCONTRADA no banco");
+            }
+        }
+
         $integrationAccountId = self::selectAccount($accountIds, $campaign['rotation_strategy']);
+        
         if (!$integrationAccountId) {
+            Logger::campaign("Campanha {$campaignId}: [CONTA] ERRO - Nenhuma conta ativa disponível!");
             throw new \Exception("Nenhuma conta ativa disponível");
         }
+        
+        // Log da conta selecionada
+        $selectedAccount = IntegrationAccount::find($integrationAccountId);
+        Logger::campaign("Campanha {$campaignId}: [CONTA] SELECIONADA: ID {$integrationAccountId} - {$selectedAccount['name']} ({$selectedAccount['phone_number']})");
 
         // 3. GERAR MENSAGEM COM IA (se configurado)
         $messageContent = $message['content'];
@@ -628,7 +648,10 @@ class CampaignSchedulerService
      */
     private static function selectAccountRoundRobin(array $accountIds): ?int
     {
+        Logger::campaign("[ROTAÇÃO] Round Robin: Recebido IDs=" . json_encode($accountIds));
+        
         if (empty($accountIds)) {
+            Logger::campaign("[ROTAÇÃO] Round Robin: Lista de IDs vazia!");
             return null;
         }
 
@@ -645,10 +668,16 @@ class CampaignSchedulerService
             $account = IntegrationAccount::find($accountId);
             if ($account && $account['status'] === 'active') {
                 $activeAccounts[] = $accountId;
+                Logger::campaign("[ROTAÇÃO] Round Robin: Conta {$accountId} ({$account['name']}) está ATIVA");
+            } else {
+                $status = $account ? $account['status'] : 'NÃO ENCONTRADA';
+                $name = $account ? $account['name'] : 'N/A';
+                Logger::campaign("[ROTAÇÃO] Round Robin: Conta {$accountId} ({$name}) IGNORADA - status: {$status}");
             }
         }
 
         if (empty($activeAccounts)) {
+            Logger::campaign("[ROTAÇÃO] Round Robin: NENHUMA conta ativa encontrada!");
             return null;
         }
 
@@ -657,7 +686,7 @@ class CampaignSchedulerService
 
         self::$lastAccountIndex[$key]++;
 
-        Logger::campaign("[ROTAÇÃO] Round Robin: Conta selecionada={$selectedId}, Índice={$index}");
+        Logger::campaign("[ROTAÇÃO] Round Robin: Conta selecionada={$selectedId}, Índice={$index}, Total ativas=" . count($activeAccounts));
 
         return $selectedId;
     }

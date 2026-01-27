@@ -760,16 +760,47 @@ class WhatsAppService
      */
     public static function sendMessage(int $accountId, string $to, string $message, array $options = []): array
     {
-        $account = WhatsAppAccount::find($accountId);
+        Logger::quepasa("sendMessage - Iniciando envio: accountId={$accountId}, to={$to}");
+        
+        // PRIMEIRO: Tentar buscar em integration_accounts (tabela nova)
+        $account = \App\Models\IntegrationAccount::find($accountId);
+        $usingIntegrationAccount = false;
+        
+        if ($account) {
+            $usingIntegrationAccount = true;
+            Logger::quepasa("sendMessage - Conta encontrada em integration_accounts: ID={$accountId}, nome={$account['name']}, phone={$account['phone_number']}");
+            
+            // Mapear campos de integration_accounts para formato esperado
+            // integration_accounts usa: api_token, api_url
+            // whatsapp_accounts usa: quepasa_token, api_url
+            if (empty($account['quepasa_token']) && !empty($account['api_token'])) {
+                $account['quepasa_token'] = $account['api_token'];
+            }
+        } else {
+            // FALLBACK: Buscar em whatsapp_accounts (tabela legada)
+            Logger::quepasa("sendMessage - Conta não encontrada em integration_accounts, tentando whatsapp_accounts...");
+            $account = WhatsAppAccount::find($accountId);
+            
+            if ($account) {
+                Logger::quepasa("sendMessage - Conta encontrada em whatsapp_accounts (legado): ID={$accountId}, nome={$account['name']}");
+            }
+        }
+        
         if (!$account) {
-            Logger::quepasa("sendMessage - Conta não encontrada: {$accountId}");
+            Logger::quepasa("sendMessage - ERRO: Conta não encontrada em NENHUMA tabela: {$accountId}");
             throw new \InvalidArgumentException('Conta não encontrada');
         }
 
-        if (empty($account['quepasa_token'])) {
-            Logger::quepasa("sendMessage - Token não encontrado para conta {$accountId}");
+        $token = $account['quepasa_token'] ?? $account['api_token'] ?? null;
+        if (empty($token)) {
+            Logger::quepasa("sendMessage - ERRO: Token não encontrado para conta {$accountId}");
             throw new \Exception('Conta não está conectada. Escaneie o QR Code primeiro.');
         }
+        
+        // Garantir que usamos o token correto
+        $account['quepasa_token'] = $token;
+        
+        Logger::quepasa("sendMessage - Usando conta: {$account['name']} ({$account['phone_number']}) - Provider: {$account['provider']}");
 
         try {
             $apiUrl = rtrim($account['api_url'], '/');

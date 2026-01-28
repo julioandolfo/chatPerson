@@ -1390,8 +1390,15 @@ class ConversationService
             }
         }
 
+        // ✅ CORREÇÃO: Salvar apenas o PRIMEIRO anexo na primeira mensagem
+        // Os anexos restantes serão enviados como mensagens separadas (cada um com seu external_id)
         if (!empty($attachmentsData)) {
-            $messageData['attachments'] = $attachmentsData;
+            // Apenas o primeiro anexo vai na primeira mensagem
+            $messageData['attachments'] = [$attachmentsData[0]];
+            
+            if (count($attachmentsData) > 1) {
+                \App\Helpers\Logger::info("ConversationService::sendMessage - " . count($attachmentsData) . " anexos detectados. Primeiro vai nesta mensagem, restantes serão mensagens separadas.");
+            }
         }
 
         \App\Helpers\Logger::info("ConversationService::sendMessage - Criando mensagem no banco (keys: " . implode(', ', array_keys($messageData)) . ")");
@@ -1653,9 +1660,10 @@ class ConversationService
                             'status' => 'sent'
                         ]);
                         
-                        // ✅ ENVIAR ANEXOS RESTANTES (do 2º em diante) como mensagens separadas
+                        // ✅ CORREÇÃO: ENVIAR ANEXOS RESTANTES (do 2º em diante) como MENSAGENS SEPARADAS NO BANCO
+                        // Cada anexo terá seu próprio registro e external_id
                         if (!empty($attachmentsData) && count($attachmentsData) > 1) {
-                            Logger::quepasa("ConversationService::sendMessage - Enviando anexos restantes (" . (count($attachmentsData) - 1) . " anexos)");
+                            Logger::quepasa("ConversationService::sendMessage - Enviando anexos restantes (" . (count($attachmentsData) - 1) . " anexos) como mensagens separadas");
                             
                             $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
                             $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
@@ -1666,9 +1674,27 @@ class ConversationService
                                 $attachment = $attachmentsData[$i];
                                 $attachmentNum = $i + 1;
                                 
-                                Logger::quepasa("ConversationService::sendMessage - Enviando anexo {$attachmentNum}/" . count($attachmentsData));
+                                Logger::quepasa("ConversationService::sendMessage - Criando mensagem separada para anexo {$attachmentNum}/" . count($attachmentsData));
                                 
                                 try {
+                                    // ✅ CRIAR MENSAGEM SEPARADA NO BANCO PARA ESTE ANEXO
+                                    $extraMessageData = [
+                                        'conversation_id' => $conversationId,
+                                        'sender_type' => $senderType,
+                                        'sender_id' => $senderId,
+                                        'content' => '', // Sem texto, apenas mídia
+                                        'message_type' => $attachment['type'] ?? 'document',
+                                        'attachments' => [$attachment], // Apenas este anexo
+                                        'status' => 'pending'
+                                    ];
+                                    
+                                    if ($aiAgentId) {
+                                        $extraMessageData['ai_agent_id'] = $aiAgentId;
+                                    }
+                                    
+                                    $extraMessageId = Message::createMessage($extraMessageData);
+                                    Logger::quepasa("ConversationService::sendMessage - Mensagem criada para anexo {$attachmentNum}: ID={$extraMessageId}");
+                                    
                                     // Construir URL do anexo
                                     $attachmentPath = '/' . ltrim($attachment['path'], '/');
                                     $attachmentUrl = $baseUrl . $attachmentPath;
@@ -1701,9 +1727,17 @@ class ConversationService
                                         );
                                     }
                                     
+                                    // ✅ ATUALIZAR MENSAGEM COM external_id
                                     if ($extraSendResult && ($extraSendResult['success'] ?? false)) {
-                                        Logger::quepasa("ConversationService::sendMessage - ✅ Anexo {$attachmentNum} enviado com sucesso");
+                                        Message::update($extraMessageId, [
+                                            'external_id' => $extraSendResult['message_id'] ?? null,
+                                            'status' => 'sent'
+                                        ]);
+                                        Logger::quepasa("ConversationService::sendMessage - ✅ Anexo {$attachmentNum} enviado com sucesso, external_id=" . ($extraSendResult['message_id'] ?? 'NULL'));
                                     } else {
+                                        Message::update($extraMessageId, [
+                                            'status' => 'failed'
+                                        ]);
                                         Logger::quepasa("ConversationService::sendMessage - ❌ Falha ao enviar anexo {$attachmentNum}: " . ($extraSendResult['error'] ?? 'Erro desconhecido'));
                                     }
                                 } catch (\Exception $e) {

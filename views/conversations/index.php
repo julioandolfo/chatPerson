@@ -4258,10 +4258,16 @@ function getChannelInfo(channel) {
 /* Lightbox backdrop escuro */
 #kt_modal_image_lightbox.modal {
     background-color: rgba(0, 0, 0, 0.92) !important;
+    z-index: 99999 !important; /* Garantir que fique acima do header */
+}
+
+#kt_modal_image_lightbox .modal-dialog {
+    z-index: 100000 !important;
 }
 
 #kt_modal_image_lightbox .modal-backdrop {
     background-color: rgba(0, 0, 0, 0.95) !important;
+    z-index: 99998 !important;
 }
 
 /* Animação suave para a imagem */

@@ -43,12 +43,19 @@ class AgentMemoryService
             // Salvar memórias
             foreach ($extractedInfo as $info) {
                 try {
+                    // ✅ CORREÇÃO: Converter value para string se for array
+                    $value = $info['value'] ?? '';
+                    if (is_array($value)) {
+                        $value = json_encode($value, JSON_UNESCAPED_UNICODE);
+                    }
+                    $value = (string) $value;
+                    
                     AIAgentMemory::saveOrUpdate(
                         $agentId,
                         $conversationId,
-                        $info['type'],
-                        $info['key'],
-                        $info['value'],
+                        $info['type'] ?? 'extracted_info',
+                        $info['key'] ?? 'unknown',
+                        $value,
                         $info['importance'] ?? 0.5,
                         $info['expires_at'] ?? null
                     );

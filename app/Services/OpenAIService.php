@@ -866,8 +866,32 @@ class OpenAIService
 
             case 'escalar_para_humano':
                 // ✅ USAR IMPLEMENTAÇÃO COMPLETA (executeHumanEscalationTool)
-                $tool = ['name' => 'escalar_para_humano', 'tool_type' => 'human_escalation'];
-                return self::executeHumanEscalationTool($tool, $arguments, $config, $conversationId, $context);
+                // Buscar config da tool do banco ou usar valores padrão
+                $escalationTool = $tool; // Manter referência original
+                $escalationTool['tool_type'] = 'human_escalation';
+                
+                // Buscar configuração da tool se disponível
+                $toolConfig = [];
+                if (!empty($tool['id'])) {
+                    $toolData = \App\Models\AITool::find($tool['id']);
+                    if ($toolData && !empty($toolData['config'])) {
+                        $toolConfig = is_array($toolData['config']) ? $toolData['config'] : json_decode($toolData['config'], true) ?? [];
+                    }
+                }
+                
+                // Valores padrão se não houver config
+                if (empty($toolConfig)) {
+                    $toolConfig = [
+                        'escalation_type' => 'auto',
+                        'distribution_method' => 'round_robin',
+                        'consider_availability' => true,
+                        'consider_limits' => true,
+                        'remove_ai_after' => true,
+                        'send_notification' => true
+                    ];
+                }
+                
+                return self::executeHumanEscalationTool($escalationTool, $arguments, $toolConfig, $conversationId, $context);
 
             default:
                 \App\Helpers\Logger::aiTools("[SYSTEM TOOL ERROR] Tool não reconhecida no switch: slug='{$functionName}', name='{$tool['name']}'. Cases disponíveis: buscar_conversas_anteriores, buscar_informacoes_contato, adicionar_tag, mover_para_estagio, escalar_para_humano");

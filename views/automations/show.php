@@ -661,6 +661,71 @@ ob_start();
                         <textarea name="description" class="form-control form-control-solid" rows="3"><?= htmlspecialchars($automation['description'] ?? '') ?></textarea>
                     </div>
                     <div class="fv-row mb-7">
+                        <label class="required fw-semibold fs-6 mb-2">Gatilho</label>
+                        <select name="trigger_type" id="kt_edit_trigger_type" class="form-select form-select-solid" required>
+                            <option value="new_conversation" <?= $triggerType === 'new_conversation' ? 'selected' : '' ?>>Nova Conversa</option>
+                            <option value="message_received" <?= $triggerType === 'message_received' ? 'selected' : '' ?>>Mensagem do Cliente (Instantâneo)</option>
+                            <option value="agent_message_sent" <?= $triggerType === 'agent_message_sent' ? 'selected' : '' ?>>Mensagem do Agente (Instantâneo)</option>
+                            <option value="conversation_updated" <?= $triggerType === 'conversation_updated' ? 'selected' : '' ?>>Conversa Atualizada</option>
+                            <option value="conversation_moved" <?= $triggerType === 'conversation_moved' ? 'selected' : '' ?>>Conversa Movida no Funil</option>
+                            <option value="conversation_resolved" <?= $triggerType === 'conversation_resolved' ? 'selected' : '' ?>>Conversa Resolvida</option>
+                            <option value="no_customer_response" <?= $triggerType === 'no_customer_response' ? 'selected' : '' ?>>Tempo sem Resposta do Cliente</option>
+                            <option value="no_agent_response" <?= $triggerType === 'no_agent_response' ? 'selected' : '' ?>>Tempo sem Resposta do Agente</option>
+                            <option value="time_based" <?= $triggerType === 'time_based' ? 'selected' : '' ?>>Baseado em Tempo (Agendado)</option>
+                            <option value="contact_created" <?= $triggerType === 'contact_created' ? 'selected' : '' ?>>Contato Criado</option>
+                            <option value="contact_updated" <?= $triggerType === 'contact_updated' ? 'selected' : '' ?>>Contato Atualizado</option>
+                            <option value="agent_activity" <?= $triggerType === 'agent_activity' ? 'selected' : '' ?>>Atividade do Agente</option>
+                            <option value="webhook" <?= $triggerType === 'webhook' ? 'selected' : '' ?>>Webhook Externo</option>
+                        </select>
+                    </div>
+                    <!-- Configuração de Tempo (para gatilhos de tempo sem resposta) -->
+                    <div class="fv-row mb-7" id="kt_edit_time_config_container" style="display: <?= in_array($triggerType, ['no_customer_response', 'no_agent_response']) ? 'block' : 'none' ?>;">
+                        <label class="required fw-semibold fs-6 mb-2">Tempo de Espera</label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <input type="number" name="trigger_config[wait_time_value]" id="kt_edit_wait_time_value" class="form-control form-control-solid" placeholder="Quantidade" value="<?= (int)$waitTimeValue ?>" min="1" />
+                            </div>
+                            <div class="col-md-6">
+                                <select name="trigger_config[wait_time_unit]" id="kt_edit_wait_time_unit" class="form-select form-select-solid">
+                                    <option value="minutes" <?= $waitTimeUnit === 'minutes' ? 'selected' : '' ?>>Minutos</option>
+                                    <option value="hours" <?= $waitTimeUnit === 'hours' ? 'selected' : '' ?>>Horas</option>
+                                    <option value="days" <?= $waitTimeUnit === 'days' ? 'selected' : '' ?>>Dias</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-text mt-2" id="kt_edit_time_config_help">Executar automação após este tempo sem resposta</div>
+                    </div>
+                    <!-- Configuração de Agendamento (para time_based) -->
+                    <div class="fv-row mb-7" id="kt_edit_schedule_config_container" style="display: <?= $triggerType === 'time_based' ? 'block' : 'none' ?>;">
+                        <label class="required fw-semibold fs-6 mb-2">Tipo de Agendamento</label>
+                        <select name="trigger_config[schedule_type]" id="kt_edit_schedule_type" class="form-select form-select-solid mb-3">
+                            <option value="daily" <?= $scheduleType === 'daily' ? 'selected' : '' ?>>Diário</option>
+                            <option value="weekly" <?= $scheduleType === 'weekly' ? 'selected' : '' ?>>Semanal</option>
+                        </select>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="fw-semibold fs-6 mb-2">Hora</label>
+                                <input type="number" name="trigger_config[schedule_hour]" class="form-control form-control-solid" placeholder="Hora (0-23)" value="<?= (int)$scheduleHour ?>" min="0" max="23" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-semibold fs-6 mb-2">Minuto</label>
+                                <input type="number" name="trigger_config[schedule_minute]" class="form-control form-control-solid" placeholder="Minuto (0-59)" value="<?= (int)$scheduleMinute ?>" min="0" max="59" />
+                            </div>
+                        </div>
+                        <div id="kt_edit_schedule_day_container" style="display: <?= $scheduleType === 'weekly' ? 'block' : 'none' ?>;" class="mt-3">
+                            <label class="fw-semibold fs-6 mb-2">Dia da Semana</label>
+                            <select name="trigger_config[schedule_day_of_week]" class="form-select form-select-solid">
+                                <option value="1" <?= $scheduleDayOfWeek == 1 ? 'selected' : '' ?>>Segunda-feira</option>
+                                <option value="2" <?= $scheduleDayOfWeek == 2 ? 'selected' : '' ?>>Terça-feira</option>
+                                <option value="3" <?= $scheduleDayOfWeek == 3 ? 'selected' : '' ?>>Quarta-feira</option>
+                                <option value="4" <?= $scheduleDayOfWeek == 4 ? 'selected' : '' ?>>Quinta-feira</option>
+                                <option value="5" <?= $scheduleDayOfWeek == 5 ? 'selected' : '' ?>>Sexta-feira</option>
+                                <option value="6" <?= $scheduleDayOfWeek == 6 ? 'selected' : '' ?>>Sábado</option>
+                                <option value="7" <?= $scheduleDayOfWeek == 7 ? 'selected' : '' ?>>Domingo</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="fv-row mb-7">
                         <label class="fw-semibold fs-6 mb-2">Vincular a Funil/Estágio</label>
                         <div class="text-muted fs-7 mb-3">Deixe vazio para aplicar a todos os funis/estágios</div>
                         <select name="funnel_id" id="kt_edit_funnel_select" class="form-select form-select-solid mb-3">
@@ -867,6 +932,18 @@ if (!empty($automation['nodes']) && is_array($automation['nodes'])) {
 }
 $triggerType = $automation['trigger_type'] ?? 'new_conversation';
 $triggerTypeJson = json_encode($triggerType);
+
+// Extrair configurações do trigger para o formulário de edição
+$triggerConfig = $automation['trigger_config'] ?? [];
+if (is_string($triggerConfig)) {
+    $triggerConfig = json_decode($triggerConfig, true) ?? [];
+}
+$waitTimeValue = $triggerConfig['wait_time_value'] ?? 30;
+$waitTimeUnit = $triggerConfig['wait_time_unit'] ?? 'minutes';
+$scheduleType = $triggerConfig['schedule_type'] ?? 'daily';
+$scheduleHour = $triggerConfig['schedule_hour'] ?? 9;
+$scheduleMinute = $triggerConfig['schedule_minute'] ?? 0;
+$scheduleDayOfWeek = $triggerConfig['schedule_day_of_week'] ?? 1;
 $stageIdJson = json_encode($automation['stage_id'] ?? null);
 $funnelsUrl = json_encode(\App\Helpers\Url::to('/funnels'));
 $layoutUrl = json_encode(\App\Helpers\Url::to('/automations/' . $automation['id'] . '/layout'));
@@ -3902,6 +3979,48 @@ document.addEventListener("DOMContentLoaded", function() {
         if (!editFunnelSelect.value) {
             loadEditStages(null);
         }
+    }
+
+    // Controlar visibilidade dos campos condicionais de gatilho no modal de edição
+    const editTriggerSelect = document.getElementById("kt_edit_trigger_type");
+    const editTimeConfigContainer = document.getElementById("kt_edit_time_config_container");
+    const editScheduleConfigContainer = document.getElementById("kt_edit_schedule_config_container");
+    const editScheduleType = document.getElementById("kt_edit_schedule_type");
+    const editScheduleDayContainer = document.getElementById("kt_edit_schedule_day_container");
+    
+    if (editTriggerSelect) {
+        editTriggerSelect.addEventListener("change", function() {
+            const triggerType = this.value;
+            
+            // Mostrar/ocultar configuração de tempo
+            if (editTimeConfigContainer) {
+                if (triggerType === "no_customer_response" || triggerType === "no_agent_response") {
+                    editTimeConfigContainer.style.display = "block";
+                } else {
+                    editTimeConfigContainer.style.display = "none";
+                }
+            }
+            
+            // Mostrar/ocultar configuração de agendamento
+            if (editScheduleConfigContainer) {
+                if (triggerType === "time_based") {
+                    editScheduleConfigContainer.style.display = "block";
+                } else {
+                    editScheduleConfigContainer.style.display = "none";
+                }
+            }
+        });
+    }
+    
+    // Controlar visibilidade do dia da semana no agendamento
+    if (editScheduleType && editScheduleDayContainer) {
+        editScheduleType.addEventListener("change", function() {
+            if (this.value === "weekly") {
+                editScheduleDayContainer.style.display = "block";
+            } else {
+                editScheduleDayContainer.style.display = "none";
+            }
+        });
     }
 
     // Salvar configurações da automação (modal Editar)

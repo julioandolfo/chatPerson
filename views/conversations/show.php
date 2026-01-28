@@ -350,8 +350,8 @@ exit;
         <!--end::Modal - Galeria de Anexos-->
         
         <!--begin::Modal - Lightbox de Imagem-->
-        <div class="modal fade" id="kt_modal_image_lightbox" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered modal-fullscreen">
+        <div class="modal fade" id="kt_modal_image_lightbox" tabindex="-1" aria-hidden="true" style="z-index: 99999 !important;">
+            <div class="modal-dialog modal-dialog-centered modal-fullscreen" style="z-index: 100000 !important;">
                 <div class="modal-content bg-dark">
                     <div class="modal-header border-0">
                         <h2 class="fw-bold text-white" id="kt_lightbox_image_title">Imagem</h2>

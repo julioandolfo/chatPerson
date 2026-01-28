@@ -1192,46 +1192,54 @@ class AutomationService
             $agentId = null;
             $currentAgentId = $conversation['agent_id'] ?? null;
             
+            // Verificar se deve ignorar o agente do contato
+            $ignoreContactAgent = (bool)($nodeData['ignore_contact_agent'] ?? false);
+            
             \App\Helpers\Logger::automation("executeAssignAdvanced - Tipo: {$assignmentType}, Conversa: {$conversationId}");
             \App\Helpers\Logger::automation("executeAssignAdvanced - Agente atual na conversa: " . ($currentAgentId ? $currentAgentId : 'NENHUM'));
+            \App\Helpers\Logger::automation("executeAssignAdvanced - Ignorar agente do contato: " . ($ignoreContactAgent ? 'SIM' : 'NÃO'));
             
             // ✅ PRIORIDADE 1: Verificar se contato tem Agente Principal
-            // Sempre respeitar o agente do contato, mesmo em automações
-            try {
-                if (!empty($conversation['contact_id'])) {
-                    $contactAgentId = \App\Services\ContactAgentService::shouldAutoAssignOnConversation(
-                        $conversation['contact_id'],
-                        $conversationId
-                    );
-                    
-                    if ($contactAgentId) {
-                        \App\Helpers\Logger::automation("executeAssignAdvanced - 👤 Contato tem Agente Principal (#{$contactAgentId}). Priorizando sobre regras de automação.");
+            // Somente se NÃO estiver marcado para ignorar
+            if (!$ignoreContactAgent) {
+                try {
+                    if (!empty($conversation['contact_id'])) {
+                        $contactAgentId = \App\Services\ContactAgentService::shouldAutoAssignOnConversation(
+                            $conversation['contact_id'],
+                            $conversationId
+                        );
                         
-                        // Verificar se já está atribuído ao agente principal
-                        if ($currentAgentId && $currentAgentId == $contactAgentId) {
-                            \App\Helpers\Logger::automation("executeAssignAdvanced - ✅ Já atribuído ao Agente Principal. Mantendo.");
-                            return; // Já está com o agente correto, não fazer nada
+                        if ($contactAgentId) {
+                            \App\Helpers\Logger::automation("executeAssignAdvanced - 👤 Contato tem Agente Principal (#{$contactAgentId}). Priorizando sobre regras de automação.");
+                            
+                            // Verificar se já está atribuído ao agente principal
+                            if ($currentAgentId && $currentAgentId == $contactAgentId) {
+                                \App\Helpers\Logger::automation("executeAssignAdvanced - ✅ Já atribuído ao Agente Principal. Mantendo.");
+                                return; // Já está com o agente correto, não fazer nada
+                            }
+                            
+                            // Atribuir ao agente principal
+                            try {
+                                \App\Services\ConversationService::assignToAgent($conversationId, $contactAgentId, false);
+                                \App\Helpers\Logger::automation("executeAssignAdvanced - ✅ Conversa atribuída ao Agente Principal (#{$contactAgentId})");
+                                return; // Atribuição concluída, não processar regras de automação
+                            } catch (\Exception $e) {
+                                \App\Helpers\Logger::automation("executeAssignAdvanced - ⚠️ Erro ao atribuir ao Agente Principal: " . $e->getMessage());
+                                // Continuar com fluxo normal se falhar
+                            }
+                        } else {
+                            \App\Helpers\Logger::automation("executeAssignAdvanced - Contato não tem Agente Principal definido. Continuando com regras de automação.");
                         }
-                        
-                        // Atribuir ao agente principal
-                        try {
-                            \App\Services\ConversationService::assignToAgent($conversationId, $contactAgentId, false);
-                            \App\Helpers\Logger::automation("executeAssignAdvanced - ✅ Conversa atribuída ao Agente Principal (#{$contactAgentId})");
-                            return; // Atribuição concluída, não processar regras de automação
-                        } catch (\Exception $e) {
-                            \App\Helpers\Logger::automation("executeAssignAdvanced - ⚠️ Erro ao atribuir ao Agente Principal: " . $e->getMessage());
-                            // Continuar com fluxo normal se falhar
-                        }
-                    } else {
-                        \App\Helpers\Logger::automation("executeAssignAdvanced - Contato não tem Agente Principal definido. Continuando com regras de automação.");
                     }
+                } catch (\Exception $e) {
+                    \App\Helpers\Logger::automation("executeAssignAdvanced - ⚠️ Erro ao verificar Agente do Contato: " . $e->getMessage());
+                    // Continuar com fluxo normal se falhar
                 }
-            } catch (\Exception $e) {
-                \App\Helpers\Logger::automation("executeAssignAdvanced - ⚠️ Erro ao verificar Agente do Contato: " . $e->getMessage());
-                // Continuar com fluxo normal se falhar
+            } else {
+                \App\Helpers\Logger::automation("executeAssignAdvanced - ⏭️ Verificação de Agente do Contato IGNORADA conforme configuração.");
             }
             
-            // ✅ PRIORIDADE 2: Se não tem agente do contato, processar regras de automação
+            // ✅ PRIORIDADE 2: Processar regras de automação
             \App\Helpers\Logger::automation("executeAssignAdvanced - Processando regras de atribuição da automação...");
             
             switch ($assignmentType) {

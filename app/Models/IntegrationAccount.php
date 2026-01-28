@@ -215,5 +215,87 @@ class IntegrationAccount extends Model
         
         return null;
     }
+
+    // ========================================
+    // SINCRONIZAÇÃO AUTOMÁTICA COM WHATSAPP_ACCOUNTS
+    // ========================================
+
+    /**
+     * Criar conta de integração COM sincronização automática
+     * Se for canal WhatsApp, também cria/atualiza em whatsapp_accounts
+     * 
+     * @param array $data Dados da conta
+     * @return int ID da conta criada
+     */
+    public static function createWithSync(array $data): int
+    {
+        // Criar em integration_accounts
+        $integrationId = self::create($data);
+        
+        // Se for WhatsApp, sincronizar com whatsapp_accounts
+        if (($data['channel'] ?? '') === 'whatsapp' && !empty($data['phone_number'])) {
+            try {
+                self::syncToWhatsAppAccounts($integrationId, $data);
+            } catch (\Exception $e) {
+                \App\Helpers\Logger::error("IntegrationAccount::createWithSync - Erro ao sincronizar: " . $e->getMessage());
+            }
+        }
+        
+        return $integrationId;
+    }
+
+    /**
+     * Sincronizar conta de integração com whatsapp_accounts
+     * Cria ou atualiza a entrada correspondente em whatsapp_accounts
+     * 
+     * @param int $integrationId ID da conta de integração
+     * @param array $data Dados da conta
+     */
+    public static function syncToWhatsAppAccounts(int $integrationId, array $data): void
+    {
+        // Verificar se já existe em whatsapp_accounts pelo phone_number
+        $existingWa = WhatsAppAccount::findByPhone($data['phone_number']);
+        
+        if ($existingWa) {
+            // Atualizar whatsapp_id na integration_accounts se não estiver definido
+            $integration = self::find($integrationId);
+            if ($integration && empty($integration['whatsapp_id'])) {
+                self::update($integrationId, ['whatsapp_id' => $existingWa['id']]);
+            }
+        } else {
+            // Criar nova entrada em whatsapp_accounts
+            $waData = [
+                'name' => $data['name'],
+                'phone_number' => $data['phone_number'],
+                'provider' => $data['provider'] ?? 'quepasa',
+                'api_url' => $data['api_url'] ?? null,
+                'api_key' => $data['api_token'] ?? null,
+                'quepasa_token' => $data['api_token'] ?? null,
+                'status' => $data['status'] ?? 'inactive',
+                'default_funnel_id' => $data['default_funnel_id'] ?? null,
+                'default_stage_id' => $data['default_stage_id'] ?? null,
+            ];
+            
+            // Extrair dados do config se existir
+            $config = is_string($data['config'] ?? null) 
+                ? json_decode($data['config'], true) 
+                : ($data['config'] ?? []);
+            
+            if (!empty($config['quepasa_user'])) {
+                $waData['quepasa_user'] = $config['quepasa_user'];
+            }
+            if (!empty($config['quepasa_trackid'])) {
+                $waData['quepasa_trackid'] = $config['quepasa_trackid'];
+            }
+            if (!empty($config['quepasa_chatid'])) {
+                $waData['quepasa_chatid'] = $config['quepasa_chatid'];
+            }
+            
+            $waId = WhatsAppAccount::create($waData);
+            
+            // Atualizar whatsapp_id na integration_accounts
+            self::update($integrationId, ['whatsapp_id' => $waId]);
+        }
+    }
 }
 

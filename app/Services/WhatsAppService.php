@@ -92,7 +92,53 @@ class WhatsAppService
             $data['quepasa_token'] = self::generateQuepasaToken();
         }
 
-        return WhatsAppAccount::create($data);
+        $whatsappAccountId = WhatsAppAccount::create($data);
+        
+        // ========================================
+        // SINCRONIZAÇÃO AUTOMÁTICA: Criar também em integration_accounts
+        // Isso garante que ambas as tabelas fiquem sincronizadas
+        // ========================================
+        try {
+            // Verificar se já existe em integration_accounts pelo phone_number
+            $existingIntegration = \App\Models\IntegrationAccount::findByPhone($data['phone_number'], 'whatsapp');
+            
+            if ($existingIntegration) {
+                // Atualizar o whatsapp_id se ainda não estiver definido
+                if (empty($existingIntegration['whatsapp_id'])) {
+                    \App\Models\IntegrationAccount::update($existingIntegration['id'], [
+                        'whatsapp_id' => $whatsappAccountId
+                    ]);
+                    Logger::quepasa("createAccount - integration_accounts atualizado com whatsapp_id={$whatsappAccountId}");
+                }
+            } else {
+                // Criar nova entrada em integration_accounts
+                $integrationData = [
+                    'name' => $data['name'],
+                    'provider' => $data['provider'],
+                    'channel' => 'whatsapp',
+                    'phone_number' => $data['phone_number'],
+                    'api_url' => $data['api_url'],
+                    'api_token' => $data['quepasa_token'] ?? $data['api_key'] ?? null,
+                    'status' => $data['status'] ?? 'inactive',
+                    'default_funnel_id' => $data['default_funnel_id'] ?? null,
+                    'default_stage_id' => $data['default_stage_id'] ?? null,
+                    'whatsapp_id' => $whatsappAccountId, // Ligação com whatsapp_accounts
+                    'config' => json_encode([
+                        'quepasa_user' => $data['quepasa_user'] ?? null,
+                        'quepasa_trackid' => $data['quepasa_trackid'] ?? null,
+                        'quepasa_chatid' => $data['quepasa_chatid'] ?? null,
+                    ])
+                ];
+                
+                $integrationAccountId = \App\Models\IntegrationAccount::create($integrationData);
+                Logger::quepasa("createAccount - integration_accounts criado: ID={$integrationAccountId}, whatsapp_id={$whatsappAccountId}");
+            }
+        } catch (\Exception $e) {
+            // Log do erro mas não falha a criação principal
+            Logger::error("createAccount - Erro ao sincronizar integration_accounts: " . $e->getMessage());
+        }
+        
+        return $whatsappAccountId;
     }
 
     /**

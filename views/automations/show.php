@@ -2107,6 +2107,7 @@ function openNodeConfig(nodeId) {
             const considerAvailability = node.node_data.consider_availability ?? true;
             const considerMax = node.node_data.consider_max_conversations ?? true;
             const allowAI = node.node_data.allow_ai_agents ?? false;
+            const ignoreContactAgent = node.node_data.ignore_contact_agent ?? false;
             const percentageAgentIds = node.node_data.percentage_agent_ids || [];
             const percentageValues = node.node_data.percentage_values || [];
 
@@ -2153,6 +2154,17 @@ function openNodeConfig(nodeId) {
                         <option value="custom_method" ${assignType === 'custom_method' ? 'selected' : ''}>Método Personalizado</option>
                     </select>
                     <div class="form-text">Escolha como a conversa será atribuída</div>
+                </div>
+
+                <div class="fv-row mb-7">
+                    <label class="d-flex align-items-center">
+                        <input type="checkbox" name="ignore_contact_agent" class="form-check-input me-2" ${ignoreContactAgent ? 'checked' : ''} />
+                        <span class="fw-semibold fs-6">Ignorar agente do contato</span>
+                    </label>
+                    <div class="form-text text-warning">
+                        <i class="ki-duotone ki-information-5 fs-6 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                        Se habilitado, ignora o agente principal vinculado ao contato e usa as regras desta automação
+                    </div>
                 </div>
 
                 <!-- Container: Agente Específico -->
@@ -3725,7 +3737,8 @@ document.addEventListener("DOMContentLoaded", function() {
                 'consider_max_conversations',
                 'allow_ai_agents',
                 'force_assign',
-                'force_reassign'
+                'force_reassign',
+                'ignore_contact_agent'
             ];
             checkboxKeys.forEach(k => {
                 if (!formData.has(k)) {

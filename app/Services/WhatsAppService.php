@@ -1360,43 +1360,62 @@ class WhatsAppService
 
             // Buscar conta
             $account = null;
+            $accountFoundBy = 'nenhum'; // Para rastrear como a conta foi encontrada
             
             // 1. Tentar por trackid
+            Logger::quepasa("🔍 Tentativa 1: Buscando por trackid='{$trackid}'");
             if ($trackid) {
                 $accounts = WhatsAppAccount::where('quepasa_trackid', '=', $trackid);
                 $account = !empty($accounts) ? $accounts[0] : null;
                 if ($account) {
-                    Logger::quepasa("processWebhook - Conta encontrada por trackid: {$trackid}");
+                    $accountFoundBy = 'trackid';
+                    Logger::quepasa("✅ Conta encontrada por trackid: {$trackid} -> ID={$account['id']}, Nome={$account['name']}");
+                } else {
+                    Logger::quepasa("❌ Nenhuma conta encontrada por trackid");
                 }
+            } else {
+                Logger::quepasa("⚠️ trackid não fornecido no payload");
             }
             
             // 2. Tentar por chatid/wid (WhatsApp ID do bot)
             if (!$account && $chatid) {
+                Logger::quepasa("🔍 Tentativa 2: Buscando por chatid='{$chatid}'");
                 // Remover @s.whatsapp.net se presente
                 $chatidClean = str_replace('@s.whatsapp.net', '', $chatid);
                 // Extrair número antes dos dois pontos (ex: "553591970289:86@s.whatsapp.net" -> "553591970289")
                 $chatidNumber = explode(':', $chatidClean)[0];
+                Logger::quepasa("🔍   chatidNumber extraído: '{$chatidNumber}'");
                 
                 $accounts = WhatsAppAccount::where('quepasa_chatid', 'LIKE', $chatidNumber . '%');
+                Logger::quepasa("🔍   Contas encontradas por quepasa_chatid LIKE: " . count($accounts));
                 if (empty($accounts)) {
                     // Tentar buscar pelo número do WhatsApp
+                    Logger::quepasa("🔍   Tentando findByPhone com: '{$chatidNumber}'");
                     $account = WhatsAppAccount::findByPhone($chatidNumber);
                 } else {
                     $account = $accounts[0];
                 }
                 
                 if ($account) {
-                    Logger::quepasa("processWebhook - Conta encontrada por chatid/wid: {$chatid}");
+                    $accountFoundBy = 'chatid/wid';
+                    Logger::quepasa("✅ Conta encontrada por chatid/wid: {$chatid} -> ID={$account['id']}, Nome={$account['name']}");
+                } else {
+                    Logger::quepasa("❌ Nenhuma conta encontrada por chatid/wid");
                 }
             }
             
             // 3. Tentar por wid do payload (WhatsApp ID do bot que recebeu)
             if (!$account && isset($payload['wid'])) {
+                Logger::quepasa("🔍 Tentativa 3: Buscando por wid='{$payload['wid']}'");
                 $widClean = str_replace('@s.whatsapp.net', '', $payload['wid']);
                 $widNumber = explode(':', $widClean)[0];
+                Logger::quepasa("🔍   widNumber extraído: '{$widNumber}'");
                 $account = WhatsAppAccount::findByPhone($widNumber);
                 if ($account) {
-                    Logger::quepasa("processWebhook - Conta encontrada por wid: {$payload['wid']}");
+                    $accountFoundBy = 'wid';
+                    Logger::quepasa("✅ Conta encontrada por wid: {$payload['wid']} -> ID={$account['id']}, Nome={$account['name']}");
+                } else {
+                    Logger::quepasa("❌ Nenhuma conta encontrada por wid");
                 }
             }
             
@@ -1443,7 +1462,17 @@ class WhatsAppService
                 }
             }
             
-            Logger::quepasa("processWebhook - Conta encontrada: ID={$account['id']}, Nome={$account['name']}, Phone={$account['phone_number']}");
+            // 🔍 LOG DETALHADO: Conta identificada para rastreamento
+            Logger::quepasa("📱 ==========================================");
+            Logger::quepasa("📱 CONTA IDENTIFICADA PARA WEBHOOK:");
+            Logger::quepasa("📱   ID: {$account['id']}");
+            Logger::quepasa("📱   Nome: {$account['name']}");
+            Logger::quepasa("📱   Telefone: {$account['phone_number']}");
+            Logger::quepasa("📱   trackid recebido: " . ($trackid ?? 'NULL'));
+            Logger::quepasa("📱   chatid recebido: " . ($chatid ?? 'NULL'));
+            Logger::quepasa("📱   wid recebido: " . ($payload['wid'] ?? 'NULL'));
+            Logger::quepasa("📱   from/cliente: " . ($from ?? 'NULL'));
+            Logger::quepasa("📱 ==========================================");
 
             // ✅ IMPORTANTE: Buscar ID correspondente em integration_accounts
             // Campanhas usam integration_account_id, mas webhook usa whatsapp_accounts

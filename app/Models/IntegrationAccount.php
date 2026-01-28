@@ -15,7 +15,8 @@ class IntegrationAccount extends Model
         'account_id', 'phone_number', 'username', 'status', 
         'config', 'webhook_url', 'webhook_secret', 
         'default_funnel_id', 'default_stage_id', 
-        'last_sync_at', 'error_message'
+        'last_sync_at', 'error_message',
+        'whatsapp_id' // ID correspondente em whatsapp_accounts
     ];
     protected bool $timestamps = true;
 
@@ -118,6 +119,101 @@ class IntegrationAccount extends Model
     public function setConfig(array $config): void
     {
         $this->attributes['config'] = json_encode($config);
+    }
+
+    // ========================================
+    // MÉTODOS DE TRADUÇÃO WHATSAPP_ACCOUNTS <-> INTEGRATION_ACCOUNTS
+    // ========================================
+
+    /**
+     * Buscar integration_account pelo whatsapp_account_id
+     * Usa o campo whatsapp_id para tradução direta
+     * 
+     * @param int $whatsappAccountId ID da tabela whatsapp_accounts
+     * @return array|null Conta de integração correspondente
+     */
+    public static function findByWhatsAppAccountId(int $whatsappAccountId): ?array
+    {
+        // Primeiro tenta pelo campo whatsapp_id (mais confiável)
+        $sql = "SELECT * FROM integration_accounts WHERE whatsapp_id = ? LIMIT 1";
+        $account = \App\Helpers\Database::fetch($sql, [$whatsappAccountId]);
+        
+        if ($account) {
+            return $account;
+        }
+        
+        // Fallback: buscar pelo phone_number da whatsapp_accounts
+        $waAccount = WhatsAppAccount::find($whatsappAccountId);
+        if ($waAccount && !empty($waAccount['phone_number'])) {
+            return self::findByPhone($waAccount['phone_number'], 'whatsapp');
+        }
+        
+        return null;
+    }
+
+    /**
+     * Obter o integration_account_id a partir do whatsapp_account_id
+     * 
+     * @param int $whatsappAccountId ID da tabela whatsapp_accounts
+     * @return int|null ID da tabela integration_accounts
+     */
+    public static function getIntegrationIdFromWhatsAppId(int $whatsappAccountId): ?int
+    {
+        $account = self::findByWhatsAppAccountId($whatsappAccountId);
+        return $account ? (int)$account['id'] : null;
+    }
+
+    /**
+     * Obter o whatsapp_account_id a partir do integration_account_id
+     * 
+     * @param int $integrationAccountId ID da tabela integration_accounts
+     * @return int|null ID da tabela whatsapp_accounts
+     */
+    public static function getWhatsAppIdFromIntegrationId(int $integrationAccountId): ?int
+    {
+        $account = self::find($integrationAccountId);
+        
+        if (!$account) {
+            return null;
+        }
+        
+        // Primeiro verifica o campo whatsapp_id
+        if (!empty($account['whatsapp_id'])) {
+            return (int)$account['whatsapp_id'];
+        }
+        
+        // Fallback: buscar pelo phone_number
+        if (!empty($account['phone_number'])) {
+            $waAccount = WhatsAppAccount::findByPhone($account['phone_number']);
+            return $waAccount ? (int)$waAccount['id'] : null;
+        }
+        
+        return null;
+    }
+
+    /**
+     * Resolver qual conta usar para envio de mensagens
+     * Sempre retorna o integration_account_id correto
+     * 
+     * @param array $conversation Array da conversa com whatsapp_account_id e/ou integration_account_id
+     * @return int|null ID da tabela integration_accounts para usar no envio
+     */
+    public static function resolveAccountForSending(array $conversation): ?int
+    {
+        // Prioridade 1: integration_account_id (já é o ID correto)
+        if (!empty($conversation['integration_account_id'])) {
+            return (int)$conversation['integration_account_id'];
+        }
+        
+        // Prioridade 2: traduzir whatsapp_account_id para integration_account_id
+        if (!empty($conversation['whatsapp_account_id'])) {
+            $integrationId = self::getIntegrationIdFromWhatsAppId((int)$conversation['whatsapp_account_id']);
+            if ($integrationId) {
+                return $integrationId;
+            }
+        }
+        
+        return null;
     }
 }
 

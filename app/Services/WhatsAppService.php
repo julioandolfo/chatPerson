@@ -2728,9 +2728,10 @@ class WhatsAppService
                 Logger::quepasa("🕐 Updated_at: {$conversation['updated_at']}");
                 
                 // Obter período de graça das configurações (padrão: 10 minutos)
-                // ATENÇÃO: Período de graça agora é o tempo MÍNIMO para reabrir
+                // Se passou mais tempo que o período de graça, trata como NOVA conversa (aplica regras completas)
+                // Se passou menos, apenas REABRE mantendo configurações anteriores
                 $gracePeriodMinutes = (int)\App\Models\Setting::get('conversation_reopen_grace_period_minutes', 10);
-                Logger::quepasa("⚙️  Período mínimo para reabertura: {$gracePeriodMinutes} minutos");
+                Logger::quepasa("⚙️  Período de graça: {$gracePeriodMinutes} minutos");
                 
                 // Calcular tempo desde última atualização
                 $updatedAt = strtotime($conversation['updated_at']);
@@ -2741,8 +2742,8 @@ class WhatsAppService
                 Logger::quepasa("🔢 Cálculo: {$minutesSinceClosure} >= {$gracePeriodMinutes} ?");
                 
                 if ($minutesSinceClosure >= $gracePeriodMinutes) {
-                    // Passou do período mínimo - REABRIR como NOVA conversa
-                    Logger::quepasa("✅ SIM → Tempo suficiente passou");
+                    // Passou do período de graça - REABRIR como NOVA conversa
+                    Logger::quepasa("✅ SIM → Passou do período de graça");
                     Logger::quepasa("🔄 Ação: REABRIR como NOVA conversa (aplicar regras completas)");
                     Logger::quepasa("   - Auto-atribuição: SIM");
                     Logger::quepasa("   - Funil/Etapa padrão: SIM");
@@ -2751,15 +2752,27 @@ class WhatsAppService
                     $conversation = null; // Forçar criação de nova conversa
                     $shouldReopenAsNew = true;
                 } else {
-                    // Dentro do período mínimo - NÃO reabrir (mensagem rápida tipo "ok")
-                    Logger::quepasa("❌ NÃO → Dentro do período mínimo");
-                    Logger::quepasa("🚫 Ação: NÃO reabrir conversa (ignorar reabertura)");
-                    Logger::quepasa("   - Conversa continua: {$conversation['status']}");
-                    Logger::quepasa("   - Mensagem será salva mas conversa NÃO reabre");
-                    Logger::quepasa("   - Ideal para: 'Ok', 'Obrigado', confirmações rápidas");
+                    // Dentro do período de graça - REABRIR mantendo configurações anteriores
+                    Logger::quepasa("⏳ Dentro do período de graça");
+                    Logger::quepasa("🔄 Ação: REABRIR conversa existente (manter configurações)");
+                    Logger::quepasa("   - Mantém agente atribuído");
+                    Logger::quepasa("   - Mantém funil/etapa atual");
+                    Logger::quepasa("   - NÃO executa automações de nova conversa");
                     Logger::quepasa("========================================");
-                    // NÃO fazer nada - conversa continua fechada
-                    // A mensagem será salva normalmente no processo abaixo
+                    
+                    // REABRIR a conversa existente
+                    try {
+                        \App\Services\ConversationService::reopen($conversation['id']);
+                        // Recarregar a conversa após reabertura
+                        $conversation = \App\Models\Conversation::find($conversation['id']);
+                        Logger::quepasa("✅ Conversa {$conversation['id']} reaberta com sucesso! Novo status: {$conversation['status']}");
+                    } catch (\Exception $e) {
+                        Logger::quepasa("❌ Erro ao reabrir conversa: " . $e->getMessage());
+                        // Fallback: atualizar status diretamente
+                        \App\Models\Conversation::update($conversation['id'], ['status' => 'open']);
+                        $conversation['status'] = 'open';
+                        Logger::quepasa("⚠️ Fallback: Status atualizado diretamente para 'open'");
+                    }
                 }
             }
             

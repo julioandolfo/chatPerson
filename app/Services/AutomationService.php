@@ -1914,15 +1914,20 @@ class AutomationService
                     throw new \Exception("Contato não encontrado: {$conversation['contact_id']}");
                 }
                 
-                $whatsappAccountId = $conversation['whatsapp_account_id'];
-                if (!$whatsappAccountId) {
-                    throw new \Exception("Conversa sem conta WhatsApp vinculada");
+                // Resolver qual conta usar para envio (centralizado no IntegrationAccount)
+                // Isso traduz automaticamente whatsapp_account_id -> integration_account_id se necessário
+                $integrationAccountId = \App\Models\IntegrationAccount::resolveAccountForSending($conversation);
+                
+                if (!$integrationAccountId) {
+                    throw new \Exception("Conversa sem conta de integração vinculada (integration_account_id e whatsapp_account_id ausentes)");
                 }
                 
-                // Enviar via API do WhatsApp
-                \App\Helpers\Logger::automation("    Enviando via WhatsApp para: {$contact['phone']}");
+                \App\Helpers\Logger::automation("    ✅ Conta resolvida: integration_account_id={$integrationAccountId}");
+                
+                // Enviar via API do WhatsApp usando integration_account_id
+                \App\Helpers\Logger::automation("    Enviando via WhatsApp para: {$contact['phone']} (integration_account_id={$integrationAccountId})");
                 $response = \App\Services\WhatsAppService::sendMessage(
-                    $whatsappAccountId,
+                    $integrationAccountId,
                     $contact['phone'],
                     $message
                 );
@@ -1983,7 +1988,7 @@ class AutomationService
                             // Enviar opções via WhatsApp
                             \App\Helpers\Logger::automation("    Enviando opções do menu via WhatsApp...");
                             $response = \App\Services\WhatsAppService::sendMessage(
-                                $whatsappAccountId,
+                                $integrationAccountId,
                                 $contact['phone'],
                                 $optionsText
                             );

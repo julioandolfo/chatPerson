@@ -679,22 +679,34 @@ class Conversation extends Model
      * para garantir que encontre conversas criadas via campanha (integration_account_id)
      * ou via webhook (whatsapp_account_id)
      */
-    public static function findByContactAndChannel(int $contactId, string $channel, ?int $whatsappAccountId = null): ?array
+    public static function findByContactAndChannel(int $contactId, string $channel, ?int $whatsappAccountId = null, ?int $integrationAccountId = null): ?array
     {
         $sql = "SELECT * FROM conversations 
                 WHERE contact_id = ? AND channel = ?";
         $params = [$contactId, $channel];
         
-        if ($whatsappAccountId) {
-            // Buscar por qualquer um dos campos de conta (legado ou novo)
-            $sql .= " AND (whatsapp_account_id = ? OR integration_account_id = ?)";
-            $params[] = $whatsappAccountId;
-            $params[] = $whatsappAccountId;
+        // ✅ CORREÇÃO: Buscar pelos IDs corretos de cada tabela
+        // NÃO misturar whatsapp_account_id com integration_account_id (são tabelas diferentes!)
+        if ($whatsappAccountId || $integrationAccountId) {
+            $conditions = [];
+            
+            if ($whatsappAccountId) {
+                $conditions[] = "whatsapp_account_id = ?";
+                $params[] = $whatsappAccountId;
+            }
+            
+            if ($integrationAccountId) {
+                $conditions[] = "integration_account_id = ?";
+                $params[] = $integrationAccountId;
+            }
+            
+            if (!empty($conditions)) {
+                $sql .= " AND (" . implode(" OR ", $conditions) . ")";
+            }
         }
         
         $sql .= " ORDER BY created_at DESC LIMIT 1";
         
-        // Usar fetch ao invés de fetchOne (que não existe)
         return Database::fetch($sql, $params);
     }
     
@@ -703,7 +715,7 @@ class Conversation extends Model
      * Retorna apenas conversas com status 'open'
      * ✅ ATUALIZADO: Busca por whatsapp_account_id OU integration_account_id
      */
-    public static function findOpenByContactAndChannel(int $contactId, string $channel, ?int $whatsappAccountId = null): ?array
+    public static function findOpenByContactAndChannel(int $contactId, string $channel, ?int $whatsappAccountId = null, ?int $integrationAccountId = null): ?array
     {
         $sql = "SELECT c.*, u.name as agent_name 
                 FROM conversations c
@@ -711,11 +723,23 @@ class Conversation extends Model
                 WHERE c.contact_id = ? AND c.channel = ? AND c.status = 'open'";
         $params = [$contactId, $channel];
         
-        if ($whatsappAccountId) {
-            // Buscar por qualquer um dos campos de conta (legado ou novo)
-            $sql .= " AND (c.whatsapp_account_id = ? OR c.integration_account_id = ?)";
-            $params[] = $whatsappAccountId;
-            $params[] = $whatsappAccountId;
+        // ✅ CORREÇÃO: Buscar pelos IDs corretos de cada tabela
+        if ($whatsappAccountId || $integrationAccountId) {
+            $conditions = [];
+            
+            if ($whatsappAccountId) {
+                $conditions[] = "c.whatsapp_account_id = ?";
+                $params[] = $whatsappAccountId;
+            }
+            
+            if ($integrationAccountId) {
+                $conditions[] = "c.integration_account_id = ?";
+                $params[] = $integrationAccountId;
+            }
+            
+            if (!empty($conditions)) {
+                $sql .= " AND (" . implode(" OR ", $conditions) . ")";
+            }
         }
         
         $sql .= " ORDER BY c.created_at DESC LIMIT 1";

@@ -2168,8 +2168,13 @@ class WhatsAppService
                 }
                 
                 // Buscar conversa existente com esse contato
-                Logger::quepasa("processWebhook - Buscando conversa existente: contact_id={$contact['id']}, channel=whatsapp, account_id={$account['id']}");
-                $conversation = \App\Models\Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['id']);
+                Logger::quepasa("processWebhook - Buscando conversa existente: contact_id={$contact['id']}, channel=whatsapp, wa_id={$account['id']}, int_id=" . ($account['integration_account_id'] ?? 'NULL'));
+                $conversation = \App\Models\Conversation::findByContactAndChannel(
+                    $contact['id'], 
+                    'whatsapp', 
+                    $account['id'],  // whatsapp_account_id
+                    $account['integration_account_id'] ?? null  // integration_account_id
+                );
                 
                 if (!$conversation) {
                     Logger::quepasa("processWebhook - Conversa não encontrada, criando nova para mensagem enviada...");
@@ -2617,14 +2622,13 @@ class WhatsAppService
                     
                     Logger::quepasa("processWebhook - Buscando conversa existente (com lock): contact_id={$contact['id']}, channel=whatsapp, wa_id={$account['id']}, int_id=" . ($account['integration_account_id'] ?? 'NULL'));
                     
-                    // Buscar por whatsapp_account_id primeiro
-                    $conversation = \App\Models\Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['id']);
-                    
-                    // Se não encontrou e temos integration_account_id, buscar por ele também
-                    if (!$conversation && !empty($account['integration_account_id'])) {
-                        Logger::quepasa("processWebhook - Não encontrou por wa_id, tentando por integration_account_id={$account['integration_account_id']}");
-                        $conversation = \App\Models\Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['integration_account_id']);
-                    }
+                    // ✅ Buscar por whatsapp_account_id E/OU integration_account_id (uma única chamada)
+                    $conversation = \App\Models\Conversation::findByContactAndChannel(
+                        $contact['id'], 
+                        'whatsapp', 
+                        $account['id'],  // whatsapp_account_id
+                        $account['integration_account_id'] ?? null  // integration_account_id
+                    );
                     
                     Logger::quepasa("processWebhook - Resultado da busca: " . ($conversation ? "Encontrada (ID={$conversation['id']}, status={$conversation['status']}, wa_id=" . ($conversation['whatsapp_account_id'] ?? 'NULL') . ", int_id=" . ($conversation['integration_account_id'] ?? 'NULL') . ")" : "Não encontrada"));
                     
@@ -2656,14 +2660,13 @@ class WhatsAppService
                 if (!$usedLock) {
                     Logger::quepasa("processWebhook - Buscando conversa existente (sem lock): contact_id={$contact['id']}, channel=whatsapp, wa_id={$account['id']}, int_id=" . ($account['integration_account_id'] ?? 'NULL'));
                     
-                    // Buscar por whatsapp_account_id primeiro
-                    $conversation = \App\Models\Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['id']);
-                    
-                    // Se não encontrou e temos integration_account_id, buscar por ele também
-                    if (!$conversation && !empty($account['integration_account_id'])) {
-                        Logger::quepasa("processWebhook - Não encontrou por wa_id, tentando por integration_account_id={$account['integration_account_id']}");
-                        $conversation = \App\Models\Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['integration_account_id']);
-                    }
+                    // ✅ Buscar por whatsapp_account_id E/OU integration_account_id (uma única chamada)
+                    $conversation = \App\Models\Conversation::findByContactAndChannel(
+                        $contact['id'], 
+                        'whatsapp', 
+                        $account['id'],  // whatsapp_account_id
+                        $account['integration_account_id'] ?? null  // integration_account_id
+                    );
                     
                     // ✅ Sincronizar IDs se a conversa foi encontrada mas faltam campos
                     if ($conversation) {

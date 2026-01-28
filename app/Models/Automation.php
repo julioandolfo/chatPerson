@@ -199,25 +199,35 @@ class Automation extends Model
      */
     private static function matchesAccountConfig(array $config, array $data): bool
     {
+        \App\Helpers\Logger::automation("    🔍 matchesAccountConfig: INICIANDO verificação de conta");
+        \App\Helpers\Logger::automation("    🔍 Config recebido: " . json_encode($config));
+        \App\Helpers\Logger::automation("    🔍 Data recebido: " . json_encode($data));
+        
         // Obter contas de integração configuradas (array ou valor único)
         $configIntegrationIds = [];
         if (!empty($config['integration_account_ids']) && is_array($config['integration_account_ids'])) {
             $configIntegrationIds = $config['integration_account_ids'];
+            \App\Helpers\Logger::automation("    🔍 Encontrou integration_account_ids (array): " . json_encode($configIntegrationIds));
         } elseif (!empty($config['integration_account_id'])) {
             $configIntegrationIds = [$config['integration_account_id']];
+            \App\Helpers\Logger::automation("    🔍 Encontrou integration_account_id (único): {$config['integration_account_id']}");
         }
         
         // Obter contas WhatsApp configuradas (array ou valor único)
         $configWhatsappIds = [];
         if (!empty($config['whatsapp_account_ids']) && is_array($config['whatsapp_account_ids'])) {
             $configWhatsappIds = $config['whatsapp_account_ids'];
+            \App\Helpers\Logger::automation("    🔍 Encontrou whatsapp_account_ids (array): " . json_encode($configWhatsappIds));
         } elseif (!empty($config['whatsapp_account_id'])) {
             $configWhatsappIds = [$config['whatsapp_account_id']];
+            \App\Helpers\Logger::automation("    🔍 Encontrou whatsapp_account_id (único): {$config['whatsapp_account_id']}");
         }
+        
+        \App\Helpers\Logger::automation("    🔍 Resumo: configIntegrationIds=" . json_encode($configIntegrationIds) . ", configWhatsappIds=" . json_encode($configWhatsappIds));
         
         // Se nenhuma conta está configurada, aceitar qualquer conta
         if (empty($configIntegrationIds) && empty($configWhatsappIds)) {
-            \App\Helpers\Logger::automation("    ✓ Nenhuma conta configurada, aceitando qualquer conta");
+            \App\Helpers\Logger::automation("    ⚠️ NENHUMA conta configurada na automação! Aceitando QUALQUER conta");
             return true;
         }
         

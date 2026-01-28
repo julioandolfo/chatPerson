@@ -16,9 +16,14 @@ class ContactService
      */
     public static function createOrUpdate(array $data): array
     {
+        \App\Helpers\Logger::info("[ContactService::createOrUpdate] === INÍCIO ===");
+        \App\Helpers\Logger::info("[ContactService::createOrUpdate] Dados recebidos: " . json_encode($data, JSON_UNESCAPED_UNICODE));
+        
         // Normalizar número de telefone ANTES de validar
         if (!empty($data['phone'])) {
+            $originalPhone = $data['phone'];
             $data['phone'] = Contact::normalizePhoneNumber($data['phone']);
+            \App\Helpers\Logger::info("[ContactService::createOrUpdate] Telefone normalizado: '{$originalPhone}' -> '{$data['phone']}'");
         }
         
         // Validar dados (após normalização)
@@ -45,40 +50,65 @@ class ContactService
         }
         
         if (!empty($flatErrors)) {
+            \App\Helpers\Logger::info("[ContactService::createOrUpdate] ERRO DE VALIDAÇÃO: " . implode(', ', $flatErrors));
             throw new \Exception('Dados inválidos: ' . implode(', ', $flatErrors));
         }
+        
+        \App\Helpers\Logger::info("[ContactService::createOrUpdate] Validação passou. Phone vazio? " . (empty($data['phone']) ? 'SIM' : 'NÃO'));
 
         // Buscar ou criar contato (usar busca normalizada para evitar duplicatas)
         if (!empty($data['phone'])) {
+            \App\Helpers\Logger::info("[ContactService::createOrUpdate] Buscando contato existente por telefone normalizado: {$data['phone']}");
             $existing = Contact::findByPhoneNormalized($data['phone']);
             if ($existing) {
+                \App\Helpers\Logger::info("[ContactService::createOrUpdate] Contato EXISTENTE encontrado! ID: {$existing['id']}");
                 // Atualizar contato existente
                 Contact::update($existing['id'], $data);
                 $contact = Contact::find($existing['id']);
+                \App\Helpers\Logger::info("[ContactService::createOrUpdate] Contato atualizado");
             } else {
+                \App\Helpers\Logger::info("[ContactService::createOrUpdate] Nenhum contato existente, criando NOVO...");
                 // Criar novo contato
                 $contactId = Contact::create($data);
+                \App\Helpers\Logger::info("[ContactService::createOrUpdate] Contact::create() retornou ID: {$contactId}");
                 $contact = Contact::find($contactId);
+                if ($contact) {
+                    \App\Helpers\Logger::info("[ContactService::createOrUpdate] Contato criado e encontrado com sucesso!");
+                } else {
+                    \App\Helpers\Logger::info("[ContactService::createOrUpdate] ERRO: Contact::find({$contactId}) retornou NULL!");
+                }
             }
         } else {
             // Se não tem telefone, usar método padrão
+            \App\Helpers\Logger::info("[ContactService::createOrUpdate] Sem telefone, usando Contact::findOrCreate()...");
             $contact = Contact::findOrCreate($data);
+            \App\Helpers\Logger::info("[ContactService::createOrUpdate] findOrCreate retornou: " . json_encode($contact, JSON_UNESCAPED_UNICODE));
+        }
+        
+        // Verificar se o contato foi criado/encontrado
+        if (empty($contact)) {
+            \App\Helpers\Logger::info("[ContactService::createOrUpdate] ERRO CRÍTICO: \$contact está vazio!");
+            throw new \Exception('Erro ao criar/encontrar contato: resultado vazio');
         }
         
         // Se foi criado novo contato, executar automações
         if ($contact && isset($contact['id'])) {
             // Verificar se é novo (comparar created_at com agora)
             $isNew = strtotime($contact['created_at']) > (time() - 5); // Criado há menos de 5 segundos
+            \App\Helpers\Logger::info("[ContactService::createOrUpdate] Contato é novo? " . ($isNew ? 'SIM' : 'NÃO') . " (created_at: {$contact['created_at']})");
             
             if ($isNew) {
                 try {
+                    \App\Helpers\Logger::info("[ContactService::createOrUpdate] Executando automações para contato criado...");
                     \App\Services\AutomationService::executeForContactCreated($contact['id']);
                 } catch (\Exception $e) {
+                    \App\Helpers\Logger::info("[ContactService::createOrUpdate] Erro ao executar automações: " . $e->getMessage());
                     error_log("Erro ao executar automações: " . $e->getMessage());
                 }
             }
         }
         
+        \App\Helpers\Logger::info("[ContactService::createOrUpdate] === FIM === Retornando contato ID: " . ($contact['id'] ?? 'NULL'));
         return $contact;
     }
 
@@ -104,6 +134,13 @@ class ContactService
                     // Gerar variantes do número de busca (com/sem 9º dígito, com/sem código do país)
                     $searchVariants = self::generatePhoneVariants($normalizedSearch);
                     
+                    // Adicionar parâmetros para busca de texto PRIMEIRO (na ordem do SQL)
+                    $textSearch = "%{$search}%";
+                    $params[] = $textSearch; // name
+                    $params[] = $textSearch; // last_name
+                    $params[] = $textSearch; // email
+                    $params[] = $textSearch; // company
+                    
                     // Buscar por nome, email, empresa normalmente
                     $sql .= " AND (name LIKE ? OR last_name LIKE ? OR email LIKE ? OR company LIKE ?";
                     
@@ -119,13 +156,6 @@ class ContactService
                     }
                     
                     $sql .= ")";
-                    
-                    // Adicionar parâmetros para busca de texto
-                    $textSearch = "%{$search}%";
-                    $params[] = $textSearch;
-                    $params[] = $textSearch;
-                    $params[] = $textSearch;
-                    $params[] = $textSearch;
                 } else {
                     // Se não conseguiu normalizar, busca simples
                     $sql .= " AND (name LIKE ? OR last_name LIKE ? OR email LIKE ? OR phone LIKE ? OR company LIKE ?)";
@@ -182,6 +212,13 @@ class ContactService
                     // Gerar variantes do número de busca (com/sem 9º dígito, com/sem código do país)
                     $searchVariants = self::generatePhoneVariants($normalizedSearch);
                     
+                    // Adicionar parâmetros para busca de texto PRIMEIRO (na ordem do SQL)
+                    $textSearch = "%{$search}%";
+                    $params[] = $textSearch; // name
+                    $params[] = $textSearch; // last_name
+                    $params[] = $textSearch; // email
+                    $params[] = $textSearch; // company
+                    
                     // Buscar por nome, email, empresa normalmente
                     $whereClause .= " AND (name LIKE ? OR last_name LIKE ? OR email LIKE ? OR company LIKE ?";
                     
@@ -197,13 +234,6 @@ class ContactService
                     }
                     
                     $whereClause .= ")";
-                    
-                    // Adicionar parâmetros para busca de texto
-                    $textSearch = "%{$search}%";
-                    $params[] = $textSearch;
-                    $params[] = $textSearch;
-                    $params[] = $textSearch;
-                    $params[] = $textSearch;
                 } else {
                     // Se não conseguiu normalizar, busca simples
                     $whereClause .= " AND (name LIKE ? OR last_name LIKE ? OR email LIKE ? OR phone LIKE ? OR company LIKE ?)";

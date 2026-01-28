@@ -120,8 +120,12 @@ class ContactController
     {
         Permission::abortIfCannot('contacts.create');
         
+        \App\Helpers\Logger::info("[ContactController::store] === INÍCIO DA CRIAÇÃO DE CONTATO ===");
+        
         try {
             $request = \App\Helpers\Request::post();
+            
+            \App\Helpers\Logger::info("[ContactController::store] Dados recebidos do POST: " . json_encode($request, JSON_UNESCAPED_UNICODE));
             
             $data = [
                 'name' => $request['name'] ?? '',
@@ -137,6 +141,8 @@ class ContactController
                 'avatar' => $request['avatar'] ?? null
             ];
             
+            \App\Helpers\Logger::info("[ContactController::store] Dados preparados: " . json_encode($data, JSON_UNESCAPED_UNICODE));
+            
             // Processar social_media se for string JSON
             if (isset($data['social_media']) && is_string($data['social_media'])) {
                 $data['social_media'] = json_decode($data['social_media'], true) ?? [];
@@ -145,18 +151,31 @@ class ContactController
             }
             
             // Criar contato primeiro
+            \App\Helpers\Logger::info("[ContactController::store] Chamando ContactService::createOrUpdate()...");
             $contact = ContactService::createOrUpdate($data);
+            
+            \App\Helpers\Logger::info("[ContactController::store] Retorno do createOrUpdate: " . json_encode($contact, JSON_UNESCAPED_UNICODE));
+            
+            if (empty($contact) || !isset($contact['id'])) {
+                \App\Helpers\Logger::info("[ContactController::store] ERRO: Contato retornado está vazio ou sem ID!");
+                throw new \Exception('Erro ao criar contato: retorno vazio ou sem ID');
+            }
             
             // Processar upload de avatar se houver
             if (!empty($_FILES['avatar_file']) && $_FILES['avatar_file']['error'] === UPLOAD_ERR_OK && isset($contact['id'])) {
+                \App\Helpers\Logger::info("[ContactController::store] Processando upload de avatar...");
                 $data['avatar'] = ContactService::uploadAvatar($contact['id'], $_FILES['avatar_file']);
                 $contact = ContactService::update($contact['id'], ['avatar' => $data['avatar']]);
             }
             
             // Atualizar social_media se necessário
             if (isset($contact['id']) && !empty($data['social_media'])) {
+                \App\Helpers\Logger::info("[ContactController::store] Atualizando social_media...");
                 $contact = ContactService::update($contact['id'], ['social_media' => $data['social_media']]);
             }
+            
+            \App\Helpers\Logger::info("[ContactController::store] SUCESSO! Contato criado com ID: " . $contact['id']);
+            \App\Helpers\Logger::info("[ContactController::store] === FIM DA CRIAÇÃO DE CONTATO ===");
             
             Response::json([
                 'success' => true,
@@ -164,6 +183,8 @@ class ContactController
                 'contact' => $contact
             ]);
         } catch (\Exception $e) {
+            \App\Helpers\Logger::info("[ContactController::store] EXCEÇÃO: " . $e->getMessage());
+            \App\Helpers\Logger::info("[ContactController::store] Trace: " . $e->getTraceAsString());
             Response::json([
                 'success' => false,
                 'message' => $e->getMessage()

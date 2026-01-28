@@ -350,6 +350,24 @@ class AutomationService
             'integration_account_id' => $conversation['integration_account_id'] ?? null
         ];
 
+        // 🔍 LOG DETALHADO: Dados da conversa para rastreamento de conta
+        \App\Helpers\Logger::automation("📱 === DADOS DA CONVERSA PARA AUTOMAÇÃO (new_conversation) ===");
+        \App\Helpers\Logger::automation("📱 Conversa ID: {$conversation['id']}");
+        \App\Helpers\Logger::automation("📱 Canal: " . ($conversation['channel'] ?? 'NULL'));
+        \App\Helpers\Logger::automation("📱 whatsapp_account_id: " . ($conversation['whatsapp_account_id'] ?? 'NULL'));
+        \App\Helpers\Logger::automation("📱 integration_account_id: " . ($conversation['integration_account_id'] ?? 'NULL'));
+        
+        // Buscar informações detalhadas das contas
+        if (!empty($conversation['whatsapp_account_id'])) {
+            $waAccount = \App\Models\WhatsAppAccount::find($conversation['whatsapp_account_id']);
+            \App\Helpers\Logger::automation("📱 WhatsApp Account: " . ($waAccount ? "ID={$waAccount['id']}, Nome={$waAccount['name']}, Telefone={$waAccount['phone_number']}" : 'NÃO ENCONTRADA!'));
+        }
+        if (!empty($conversation['integration_account_id'])) {
+            $intAccount = \App\Models\IntegrationAccount::find($conversation['integration_account_id']);
+            \App\Helpers\Logger::automation("📱 Integration Account: " . ($intAccount ? "ID={$intAccount['id']}, Nome={$intAccount['name']}, Telefone={$intAccount['phone_number']}" : 'NÃO ENCONTRADA!'));
+        }
+        \App\Helpers\Logger::automation("📱 ============================================================");
+
         // Filtrar por funil/estágio se a conversa já estiver em um
         $funnelId = $conversation['funnel_id'] ?? null;
         $stageId = $conversation['funnel_stage_id'] ?? null;
@@ -651,6 +669,25 @@ class AutomationService
             'integration_account_id' => $conversation['integration_account_id'] ?? null,
             'contact_id' => $conversation['contact_id'] ?? null
         ];
+        
+        // 🔍 LOG DETALHADO: Dados da conversa para rastreamento de conta
+        \App\Helpers\Logger::automation("📱 === DADOS DA CONVERSA PARA AUTOMAÇÃO ===");
+        \App\Helpers\Logger::automation("📱 Conversa ID: {$conversation['id']}");
+        \App\Helpers\Logger::automation("📱 Canal: " . ($conversation['channel'] ?? 'NULL'));
+        \App\Helpers\Logger::automation("📱 whatsapp_account_id: " . ($conversation['whatsapp_account_id'] ?? 'NULL'));
+        \App\Helpers\Logger::automation("📱 integration_account_id: " . ($conversation['integration_account_id'] ?? 'NULL'));
+        
+        // Buscar informações detalhadas das contas
+        if (!empty($conversation['whatsapp_account_id'])) {
+            $waAccount = \App\Models\WhatsAppAccount::find($conversation['whatsapp_account_id']);
+            \App\Helpers\Logger::automation("📱 WhatsApp Account: " . ($waAccount ? "ID={$waAccount['id']}, Nome={$waAccount['name']}, Telefone={$waAccount['phone_number']}" : 'NÃO ENCONTRADA!'));
+        }
+        if (!empty($conversation['integration_account_id'])) {
+            $intAccount = \App\Models\IntegrationAccount::find($conversation['integration_account_id']);
+            \App\Helpers\Logger::automation("📱 Integration Account: " . ($intAccount ? "ID={$intAccount['id']}, Nome={$intAccount['name']}, Telefone={$intAccount['phone_number']}" : 'NÃO ENCONTRADA!'));
+        }
+        \App\Helpers\Logger::automation("📱 triggerData completo: " . json_encode($triggerData));
+        \App\Helpers\Logger::automation("📱 ==========================================");
 
         $automations = Automation::getActiveByTrigger('message_received', $triggerData);
 
@@ -1030,6 +1067,29 @@ class AutomationService
         if (empty($message)) {
             return;
         }
+
+        // 🔍 LOG: Rastrear qual conta será usada para envio
+        $conversation = Conversation::find($conversationId);
+        \App\Helpers\Logger::automation("📤 === executeSendMessage: ENVIANDO MENSAGEM ===");
+        \App\Helpers\Logger::automation("📤 Conversa ID: {$conversationId}");
+        if ($conversation) {
+            \App\Helpers\Logger::automation("📤 Canal: " . ($conversation['channel'] ?? 'NULL'));
+            \App\Helpers\Logger::automation("📤 whatsapp_account_id: " . ($conversation['whatsapp_account_id'] ?? 'NULL'));
+            \App\Helpers\Logger::automation("📤 integration_account_id: " . ($conversation['integration_account_id'] ?? 'NULL'));
+            
+            // Buscar detalhes das contas
+            if (!empty($conversation['whatsapp_account_id'])) {
+                $waAccount = \App\Models\WhatsAppAccount::find($conversation['whatsapp_account_id']);
+                \App\Helpers\Logger::automation("📤 WhatsApp Account: " . ($waAccount ? "{$waAccount['name']} ({$waAccount['phone_number']})" : 'NÃO ENCONTRADA'));
+            }
+            if (!empty($conversation['integration_account_id'])) {
+                $intAccount = \App\Models\IntegrationAccount::find($conversation['integration_account_id']);
+                \App\Helpers\Logger::automation("📤 Integration Account: " . ($intAccount ? "{$intAccount['name']} ({$intAccount['phone_number']})" : 'NÃO ENCONTRADA'));
+            }
+        } else {
+            \App\Helpers\Logger::automation("📤 ⚠️ CONVERSA NÃO ENCONTRADA!");
+        }
+        \App\Helpers\Logger::automation("📤 ==============================================");
 
         // Processar variáveis e templates
         $message = self::processVariables($message, $conversationId);

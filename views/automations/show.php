@@ -2,6 +2,19 @@
 $layout = 'layouts.metronic.app';
 $title = 'Automação - ' . htmlspecialchars($automation['name'] ?? '');
 
+// Extrair configurações do trigger para o formulário de edição (definir ANTES do modal)
+$triggerType = $automation['trigger_type'] ?? 'new_conversation';
+$triggerConfig = $automation['trigger_config'] ?? [];
+if (is_string($triggerConfig)) {
+    $triggerConfig = json_decode($triggerConfig, true) ?? [];
+}
+$waitTimeValue = $triggerConfig['wait_time_value'] ?? 30;
+$waitTimeUnit = $triggerConfig['wait_time_unit'] ?? 'minutes';
+$scheduleType = $triggerConfig['schedule_type'] ?? 'daily';
+$scheduleHour = $triggerConfig['schedule_hour'] ?? 9;
+$scheduleMinute = $triggerConfig['schedule_minute'] ?? 0;
+$scheduleDayOfWeek = $triggerConfig['schedule_day_of_week'] ?? 1;
+
 $scriptsPreload = <<<HTML
 <script>
 // Fallback para evitar ReferenceError caso scripts principais não carreguem
@@ -930,20 +943,7 @@ if (!empty($automation['nodes']) && is_array($automation['nodes'])) {
         $nextNodeId = max($numericIds) + 1;
     }
 }
-$triggerType = $automation['trigger_type'] ?? 'new_conversation';
 $triggerTypeJson = json_encode($triggerType);
-
-// Extrair configurações do trigger para o formulário de edição
-$triggerConfig = $automation['trigger_config'] ?? [];
-if (is_string($triggerConfig)) {
-    $triggerConfig = json_decode($triggerConfig, true) ?? [];
-}
-$waitTimeValue = $triggerConfig['wait_time_value'] ?? 30;
-$waitTimeUnit = $triggerConfig['wait_time_unit'] ?? 'minutes';
-$scheduleType = $triggerConfig['schedule_type'] ?? 'daily';
-$scheduleHour = $triggerConfig['schedule_hour'] ?? 9;
-$scheduleMinute = $triggerConfig['schedule_minute'] ?? 0;
-$scheduleDayOfWeek = $triggerConfig['schedule_day_of_week'] ?? 1;
 $stageIdJson = json_encode($automation['stage_id'] ?? null);
 $funnelsUrl = json_encode(\App\Helpers\Url::to('/funnels'));
 $layoutUrl = json_encode(\App\Helpers\Url::to('/automations/' . $automation['id'] . '/layout'));

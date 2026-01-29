@@ -875,6 +875,35 @@ class ConversationController
             // Atribuir forçadamente (ignora limites) quando é atribuição manual
             $conversation = ConversationService::assignToAgent($id, $agentId, true);
             
+            // Processar nota interna para o próximo agente (se fornecida)
+            $internalNote = \App\Helpers\Request::post('internal_note');
+            if (!empty($internalNote)) {
+                try {
+                    // Criar mensagem de nota interna
+                    $currentUser = \App\Helpers\Auth::user();
+                    $agentName = $currentUser['name'] ?? 'Agente';
+                    $targetAgent = User::find($agentId);
+                    $targetAgentName = $targetAgent['name'] ?? 'Agente';
+                    
+                    // Formatar a nota com contexto
+                    $noteContent = "📋 **Nota de transferência de {$agentName} para {$targetAgentName}:**\n\n{$internalNote}";
+                    
+                    \App\Models\Message::createMessage([
+                        'conversation_id' => $id,
+                        'sender_type' => 'agent',
+                        'sender_id' => $currentUserId,
+                        'content' => $noteContent,
+                        'message_type' => 'note', // Nota interna
+                        'status' => 'sent'
+                    ]);
+                    
+                    \App\Helpers\Logger::info("Nota interna criada na atribuição: conv={$id}, de={$currentUserId}, para={$agentId}");
+                } catch (\Exception $noteError) {
+                    \App\Helpers\Logger::error("Erro ao criar nota interna na atribuição: " . $noteError->getMessage());
+                    // Não interrompe a atribuição se a nota falhar
+                }
+            }
+            
             Response::json([
                 'success' => true,
                 'message' => 'Conversa atribuída com sucesso',

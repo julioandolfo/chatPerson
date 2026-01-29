@@ -745,6 +745,65 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     flex-wrap: wrap;
 }
 
+/* Banner de Mesclar Conversas */
+.chat-merge-alert {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%);
+    border-bottom: 2px solid #ffc107;
+    padding: 12px 20px;
+    flex-shrink: 0;
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.chat-merge-alert-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.chat-merge-alert-icon {
+    color: #856404;
+    flex-shrink: 0;
+}
+
+.chat-merge-alert-text {
+    flex: 1;
+    min-width: 200px;
+    color: #856404;
+    font-size: 13px;
+}
+
+.chat-merge-alert-text strong {
+    display: block;
+    font-size: 14px;
+    margin-bottom: 2px;
+}
+
+[data-bs-theme="dark"] .chat-merge-alert {
+    background: linear-gradient(135deg, #3d3520 0%, #4a3f1f 100%);
+    border-color: #b38600;
+}
+
+[data-bs-theme="dark"] .chat-merge-alert-icon,
+[data-bs-theme="dark"] .chat-merge-alert-text {
+    color: #ffc107;
+}
+
+[data-bs-theme="dark"] .chat-merge-alert-text strong {
+    color: #ffe066;
+}
+
 .chat-messages {
     flex: 1;
     overflow-y: auto;
@@ -2929,6 +2988,36 @@ function getChannelInfo(channel) {
             </div>
         </div>
         
+        <!-- Banner de Outras Conversas (Mesclar) -->
+        <div id="chat-merge-alert" class="chat-merge-alert" style="display: none;">
+            <div class="chat-merge-alert-content">
+                <div class="chat-merge-alert-icon">
+                    <i class="ki-duotone ki-information-2 fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                </div>
+                <div class="chat-merge-alert-text">
+                    <strong>Existem outras conversas deste contato!</strong>
+                    <span id="chat-merge-alert-info"></span>
+                </div>
+                <button type="button" class="btn btn-sm btn-warning" onclick="openMergeModal()">
+                    <i class="ki-duotone ki-arrows-loop fs-5 me-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Mesclar
+                </button>
+                <button type="button" class="btn btn-sm btn-icon btn-light" onclick="dismissMergeAlert()" title="Dispensar">
+                    <i class="ki-duotone ki-cross fs-4">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </button>
+            </div>
+        </div>
+        
         <!-- Mensagens (sempre presente) -->
         <div class="chat-messages <?= !empty($accessRestricted) ? 'access-restricted' : '' ?>" 
              id="chatMessages" 
@@ -4065,6 +4154,36 @@ function getChannelInfo(channel) {
                             <?php endif; ?>
                                     </select>
                                 </div>
+                    
+                    <!-- Campo de Nota Interna para o próximo agente -->
+                    <div class="mb-5">
+                        <label class="form-label fw-semibold">
+                            <i class="ki-duotone ki-message-notif fs-5 me-1 text-warning">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                                <span class="path4"></span>
+                                <span class="path5"></span>
+                            </i>
+                            Nota para o próximo agente (opcional):
+                        </label>
+                        <textarea 
+                            id="assignInternalNote" 
+                            class="form-control form-control-solid" 
+                            rows="3" 
+                            placeholder="Ex: Cliente precisa de informações sobre o produto X, já foi enviado orçamento..."
+                        ></textarea>
+                        <div class="form-text text-muted">
+                            <i class="ki-duotone ki-eye-slash fs-7 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                                <span class="path4"></span>
+                            </i>
+                            Esta nota será visível apenas para agentes (não será enviada ao cliente)
+                        </div>
+                    </div>
+                    
                     <div class="d-flex justify-content-end">
                         <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Cancelar</button>
                         <button type="submit" class="btn btn-primary">Atribuir</button>
@@ -5418,8 +5537,8 @@ function sendMentionInvite() {
             if (modal) modal.hide();
             
             // Atualizar sidebar se estiver aberto (para mostrar nova menção)
-            if (typeof loadConversationDetails === 'function') {
-                loadConversationDetails(conversationId);
+            if (typeof selectConversation === 'function') {
+                selectConversation(conversationId);
             }
         } else {
             Swal.fire({
@@ -6187,8 +6306,8 @@ function setupInviteWebSocketListeners() {
             loadParticipantsForConversation(mentionData.conversation_id);
             
             // Atualizar sidebar
-            if (typeof loadConversationDetails === 'function') {
-                loadConversationDetails(mentionData.conversation_id);
+            if (typeof selectConversation === 'function') {
+                selectConversation(mentionData.conversation_id);
             }
         }
     });
@@ -6300,8 +6419,8 @@ function setupInviteWebSocketListeners() {
         }
         
         // Recarregar lista de conversas
-        if (typeof loadConversations === 'function') {
-            loadConversations();
+        if (typeof refreshConversationList === 'function') {
+            refreshConversationList();
         }
         
         // Se estiver vendo a conversa que foi aprovada, recarregar
@@ -9099,9 +9218,11 @@ function updateConversationSidebar(conversation, tags) {
     if (conversation.id && conversation.channel === 'whatsapp') {
         checkOtherOpenConversations(conversation.id);
     } else {
-        // Esconder aviso se não for WhatsApp
+        // Esconder avisos se não for WhatsApp
         const alertEl = document.getElementById('sidebar-multiple-conversations-alert');
         if (alertEl) alertEl.style.display = 'none';
+        const chatMergeAlert = document.getElementById('chat-merge-alert');
+        if (chatMergeAlert) chatMergeAlert.style.display = 'none';
     }
     
     // ✅ Mostrar números vinculados (se conversa mesclada)
@@ -9117,8 +9238,12 @@ function updateConversationSidebar(conversation, tags) {
 async function checkOtherOpenConversations(conversationId) {
     const alertEl = document.getElementById('sidebar-multiple-conversations-alert');
     const infoEl = document.getElementById('sidebar-other-conversations-info');
+    const chatMergeAlert = document.getElementById('chat-merge-alert');
+    const chatMergeInfo = document.getElementById('chat-merge-alert-info');
     
-    if (!alertEl || !infoEl) return;
+    // Verificar se já foi dispensado para esta conversa
+    const dismissedKey = `merge_dismissed_${conversationId}`;
+    const wasDismissed = sessionStorage.getItem(dismissedKey) === 'true';
     
     try {
         const response = await fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/check-others`, {
@@ -9139,15 +9264,42 @@ async function checkOtherOpenConversations(conversationId) {
             
             // Montar texto informativo
             const numbers = convs.map(c => c.account_phone || c.account_name).join(', ');
-            infoEl.innerHTML = `${count} conversa${count > 1 ? 's' : ''} em: ${numbers}`;
+            const infoText = `${count} conversa${count > 1 ? 's' : ''} em: ${numbers}`;
             
-            alertEl.style.display = 'block';
+            // Atualizar sidebar
+            if (alertEl && infoEl) {
+                infoEl.innerHTML = infoText;
+                alertEl.style.display = 'block';
+            }
+            
+            // Atualizar banner do chat (se não foi dispensado)
+            if (chatMergeAlert && chatMergeInfo && !wasDismissed) {
+                chatMergeInfo.textContent = infoText;
+                chatMergeAlert.style.display = 'block';
+                // Guardar ID da conversa atual para o dismiss
+                chatMergeAlert.dataset.conversationId = conversationId;
+            }
         } else {
-            alertEl.style.display = 'none';
+            // Esconder alertas
+            if (alertEl) alertEl.style.display = 'none';
+            if (chatMergeAlert) chatMergeAlert.style.display = 'none';
         }
     } catch (error) {
         console.error('Erro ao verificar outras conversas:', error);
-        alertEl.style.display = 'none';
+        if (alertEl) alertEl.style.display = 'none';
+        if (chatMergeAlert) chatMergeAlert.style.display = 'none';
+    }
+}
+
+// Dispensar alerta de mesclar (apenas para sessão atual)
+function dismissMergeAlert() {
+    const chatMergeAlert = document.getElementById('chat-merge-alert');
+    if (chatMergeAlert) {
+        const conversationId = chatMergeAlert.dataset.conversationId;
+        if (conversationId) {
+            sessionStorage.setItem(`merge_dismissed_${conversationId}`, 'true');
+        }
+        chatMergeAlert.style.display = 'none';
     }
 }
 
@@ -9266,8 +9418,8 @@ async function executeMerge() {
             
             // Recarregar conversa e lista
             setTimeout(() => {
-                loadConversation(conversationId);
-                loadConversations();
+                selectConversation(conversationId);
+                refreshConversationList();
             }, 500);
         } else {
             toastr.error(data.message || 'Erro ao mesclar conversas');
@@ -9398,8 +9550,8 @@ async function confirmChangeAccount() {
             const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_change_account'));
             if (modal) modal.hide();
             
-            // Recarregar sidebar
-            loadConversation(conversationId);
+            // Recarregar conversa
+            selectConversation(conversationId);
         } else {
             toastr.error(data.message || 'Erro ao alterar número');
         }
@@ -10572,7 +10724,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Recarregar detalhes da conversa
                     if (currentConversationId) {
-                        loadConversationDetails(currentConversationId);
+                        selectConversation(currentConversationId);
                     }
                     
                     // Recarregar lista de conversas (preservando filtros)
@@ -15982,6 +16134,7 @@ document.getElementById('assignForm')?.addEventListener('submit', function(e) {
     const conversationId = this.dataset.conversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
     const agentId = document.getElementById('assignAgent').value;
     const departmentId = document.getElementById('assignDepartment').value;
+    const internalNote = document.getElementById('assignInternalNote').value.trim();
     
     if (agentId === '' || agentId === null || agentId === undefined) {
         alert('Selecione um agente');
@@ -16001,7 +16154,8 @@ document.getElementById('assignForm')?.addEventListener('submit', function(e) {
         },
         body: JSON.stringify({
             agent_id: agentId === '0' ? 0 : parseInt(agentId, 10),
-            department_id: departmentId ? parseInt(departmentId) : null
+            department_id: departmentId ? parseInt(departmentId) : null,
+            internal_note: internalNote || null
         })
     })
     .then(response => {
@@ -16086,8 +16240,8 @@ document.getElementById('changeDepartmentForm')?.addEventListener('submit', func
             
             // Recarregar detalhes da conversa
             if (window.currentConversationId) {
-                if (typeof loadConversationDetails === 'function') {
-                    loadConversationDetails(window.currentConversationId);
+                if (typeof selectConversation === 'function') {
+                    selectConversation(window.currentConversationId);
                 }
             }
             
@@ -16540,10 +16694,8 @@ function removeParticipant(conversationId, userId, skipConfirm = false) {
             loadParticipantsForConversation(conversationId);
             // Recarregar a conversa inteira para atualizar sidebar
             if (window.currentConversationId == conversationId) {
-                if (typeof loadConversationDetails === 'function') {
-                    loadConversationDetails(conversationId);
-                } else if (typeof loadConversation === 'function') {
-                    loadConversation(conversationId);
+                if (typeof selectConversation === 'function') {
+                    selectConversation(conversationId);
                 }
             }
             // Atualizar apenas a seção de participantes do sidebar, se existir (sempre tenta)

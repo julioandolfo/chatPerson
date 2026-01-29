@@ -102,6 +102,10 @@ Router::post('/conversations/{id}/close', [ConversationController::class, 'close
 Router::post('/conversations/{id}/reopen', [ConversationController::class, 'reopen'], ['Authentication']);
 Router::post('/conversations/{id}/spam', [ConversationController::class, 'spam'], ['Authentication']);
 Router::post('/conversations/{id}/notes', [ConversationController::class, 'createNote'], ['Authentication']);
+Router::get('/conversations/{id}/check-others', [ConversationController::class, 'checkOtherConversations'], ['Authentication']);
+Router::post('/conversations/{id}/merge', [ConversationController::class, 'mergeConversations'], ['Authentication']);
+Router::get('/conversations/{id}/linked-accounts', [ConversationController::class, 'getLinkedAccounts'], ['Authentication']);
+Router::post('/conversations/{id}/change-account', [ConversationController::class, 'changeAccount'], ['Authentication']);
 Router::get('/conversations/{id}/notes', [ConversationController::class, 'getNotes'], ['Authentication']);
 Router::post('/conversations/{id}/move-stage', [ConversationController::class, 'moveStage'], ['Authentication']);
 Router::put('/conversations/{id}/notes/{noteId}', [ConversationController::class, 'updateNote'], ['Authentication']);
@@ -718,4 +722,40 @@ Router::post('/api/campaigns/preview-ai-message', [CampaignController::class, 'p
 Router::get('/api/contact-lists', [ContactListController::class, 'listAPI'], ['Authentication']);
 Router::get('/api/contact-lists/{id}/contacts', [ContactListController::class, 'contacts'], ['Authentication']);
 Router::get('/api/contacts/search', [ContactListController::class, 'searchContacts'], ['Authentication']);
+
+// API para listar contas de integração WhatsApp
+Router::get('/api/integration-accounts/whatsapp', function() {
+    // Buscar contas de integração ativas (WhatsApp)
+    $integrationAccounts = \App\Models\IntegrationAccount::getActive('whatsapp');
+    
+    // Também buscar contas legacy WhatsApp
+    $legacyAccounts = \App\Models\WhatsAppAccount::getActive();
+    
+    // Combinar as duas listas, removendo duplicatas por phone_number
+    $allAccounts = [];
+    $seenPhones = [];
+    
+    foreach ($integrationAccounts as $acc) {
+        $phone = $acc['phone_number'] ?? '';
+        if ($phone && !in_array($phone, $seenPhones)) {
+            $allAccounts[] = $acc;
+            $seenPhones[] = $phone;
+        }
+    }
+    
+    foreach ($legacyAccounts as $acc) {
+        $phone = $acc['phone_number'] ?? '';
+        if ($phone && !in_array($phone, $seenPhones)) {
+            // Marcar como conta legacy
+            $acc['is_legacy'] = true;
+            $allAccounts[] = $acc;
+            $seenPhones[] = $phone;
+        }
+    }
+    
+    \App\Helpers\Response::json([
+        'success' => true,
+        'data' => $allAccounts
+    ]);
+}, ['Authentication']);
 

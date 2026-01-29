@@ -857,9 +857,12 @@ class WhatsAppService
 
         $token = $account['quepasa_token'] ?? $account['api_token'] ?? null;
         if (empty($token)) {
+            $accountName = $account['name'] ?? 'Sem nome';
+            $accountPhone = $account['phone_number'] ?? 'Sem número';
+            $accountProvider = $account['provider'] ?? 'Desconhecido';
             Logger::quepasa("sendMessage - ERRO: Token não encontrado para conta {$accountId} (campos vazios: quepasa_token, api_token)");
             Logger::quepasa("sendMessage - DEBUG: api_token=" . ($account['api_token'] ?? 'NULL') . ", phone=" . ($account['phone_number'] ?? 'NULL'));
-            throw new \Exception('Conta não está conectada. Escaneie o QR Code primeiro.');
+            throw new \Exception("Conta não está conectada. Escaneie o QR Code primeiro. [Conta: {$accountName} | Número: {$accountPhone} | Provedor: {$accountProvider} | ID: {$accountId}]");
         }
         
         // Garantir que usamos o token correto
@@ -1288,8 +1291,10 @@ class WhatsAppService
         }
 
         if (empty($account['quepasa_token'])) {
+            $accountName = $account['name'] ?? 'Sem nome';
+            $accountPhone = $account['phone_number'] ?? 'Sem número';
             Logger::quepasa("configureWebhook - Token não encontrado para conta {$accountId}");
-            throw new \Exception('Conta não está conectada. Escaneie o QR Code primeiro.');
+            throw new \Exception("Conta não está conectada. Escaneie o QR Code primeiro. [Conta: {$accountName} | Número: {$accountPhone} | ID: {$accountId}]");
         }
 
         try {
@@ -2622,13 +2627,23 @@ class WhatsAppService
                     
                     Logger::quepasa("processWebhook - Buscando conversa existente (com lock): contact_id={$contact['id']}, channel=whatsapp, wa_id={$account['id']}, int_id=" . ($account['integration_account_id'] ?? 'NULL'));
                     
-                    // ✅ Buscar por whatsapp_account_id E/OU integration_account_id (uma única chamada)
-                    $conversation = \App\Models\Conversation::findByContactAndChannel(
-                        $contact['id'], 
-                        'whatsapp', 
-                        $account['id'],  // whatsapp_account_id
-                        $account['integration_account_id'] ?? null  // integration_account_id
-                    );
+                    // ✅ PRIMEIRO: Verificar se existe conversa MESCLADA para este contato
+                    $accountIdForMerge = $account['integration_account_id'] ?? $account['id'];
+                    $conversation = \App\Services\ConversationMergeService::findMergedConversation($contact['id'], $accountIdForMerge);
+                    
+                    if ($conversation) {
+                        Logger::quepasa("processWebhook - ✅ Conversa MESCLADA encontrada: ID={$conversation['id']}");
+                        // Atualizar último número usado pelo cliente
+                        \App\Services\ConversationMergeService::updateLastCustomerAccount($conversation['id'], $accountIdForMerge);
+                    } else {
+                        // Buscar por whatsapp_account_id E/OU integration_account_id (uma única chamada)
+                        $conversation = \App\Models\Conversation::findByContactAndChannel(
+                            $contact['id'], 
+                            'whatsapp', 
+                            $account['id'],  // whatsapp_account_id
+                            $account['integration_account_id'] ?? null  // integration_account_id
+                        );
+                    }
                     
                     Logger::quepasa("processWebhook - Resultado da busca: " . ($conversation ? "Encontrada (ID={$conversation['id']}, status={$conversation['status']}, wa_id=" . ($conversation['whatsapp_account_id'] ?? 'NULL') . ", int_id=" . ($conversation['integration_account_id'] ?? 'NULL') . ")" : "Não encontrada"));
                     
@@ -2660,16 +2675,26 @@ class WhatsAppService
                 if (!$usedLock) {
                     Logger::quepasa("processWebhook - Buscando conversa existente (sem lock): contact_id={$contact['id']}, channel=whatsapp, wa_id={$account['id']}, int_id=" . ($account['integration_account_id'] ?? 'NULL'));
                     
-                    // ✅ Buscar por whatsapp_account_id E/OU integration_account_id (uma única chamada)
-                    $conversation = \App\Models\Conversation::findByContactAndChannel(
-                        $contact['id'], 
-                        'whatsapp', 
-                        $account['id'],  // whatsapp_account_id
-                        $account['integration_account_id'] ?? null  // integration_account_id
-                    );
+                    // ✅ PRIMEIRO: Verificar se existe conversa MESCLADA para este contato
+                    $accountIdForMerge = $account['integration_account_id'] ?? $account['id'];
+                    $conversation = \App\Services\ConversationMergeService::findMergedConversation($contact['id'], $accountIdForMerge);
+                    
+                    if ($conversation) {
+                        Logger::quepasa("processWebhook - ✅ Conversa MESCLADA encontrada (sem lock): ID={$conversation['id']}");
+                        // Atualizar último número usado pelo cliente
+                        \App\Services\ConversationMergeService::updateLastCustomerAccount($conversation['id'], $accountIdForMerge);
+                    } else {
+                        // Buscar por whatsapp_account_id E/OU integration_account_id (uma única chamada)
+                        $conversation = \App\Models\Conversation::findByContactAndChannel(
+                            $contact['id'], 
+                            'whatsapp', 
+                            $account['id'],  // whatsapp_account_id
+                            $account['integration_account_id'] ?? null  // integration_account_id
+                        );
+                    }
                     
                     // ✅ Sincronizar IDs se a conversa foi encontrada mas faltam campos
-                    if ($conversation) {
+                    if ($conversation && empty($conversation['is_merged'])) {
                         $updateFields = [];
                         if (empty($conversation['whatsapp_account_id']) && !empty($account['id'])) {
                             $updateFields['whatsapp_account_id'] = $account['id'];

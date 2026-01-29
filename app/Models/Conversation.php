@@ -37,7 +37,10 @@ class Conversation extends Model
         'last_reassignment_at',
         'assigned_at',
         'resolved_at',
-        'moved_at'
+        'moved_at',
+        'linked_account_ids',
+        'last_customer_account_id',
+        'is_merged'
     ];
     protected array $hidden = [];
     protected bool $timestamps = true;

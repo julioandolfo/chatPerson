@@ -1053,7 +1053,40 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     <div class="sidebar-info-item" id="sidebar-whatsapp-phone" style="display: none;">
                         <span class="sidebar-info-label">Número WhatsApp:</span>
-                        <span class="sidebar-info-value" data-field="whatsapp_account_phone">-</span>
+                        <span class="sidebar-info-value d-flex align-items-center gap-2">
+                            <span data-field="whatsapp_account_phone">-</span>
+                            <button type="button" class="btn btn-icon btn-sm btn-light-primary" onclick="openChangeAccountModal()" title="Trocar número de envio">
+                                <i class="ki-duotone ki-arrows-circle fs-5">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                            </button>
+                        </span>
+                    </div>
+                    
+                    <!-- Números vinculados (quando mesclado) -->
+                    <div class="sidebar-info-item" id="sidebar-linked-accounts" style="display: none;">
+                        <span class="sidebar-info-label">Outros Números:</span>
+                        <span class="sidebar-info-value" data-field="linked_accounts">-</span>
+                    </div>
+                    
+                    <!-- Aviso de múltiplas conversas abertas -->
+                    <div class="alert alert-warning py-2 px-3 mb-3" id="sidebar-multiple-conversations-alert" style="display: none;">
+                        <div class="d-flex align-items-center">
+                            <i class="ki-duotone ki-information-5 fs-2 text-warning me-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            <div class="flex-grow-1">
+                                <span class="fw-bold fs-7">Conversas em outros números</span>
+                                <div class="fs-8 text-muted" id="sidebar-other-conversations-info"></div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-warning mt-2 w-100" onclick="openMergeModal()">
+                            <i class="ki-duotone ki-arrows-loop fs-5 me-1"></i>
+                            Mesclar Conversas
+                        </button>
                     </div>
                     
                     <div class="sidebar-info-item" id="sidebar-department-item" style="display: none;">

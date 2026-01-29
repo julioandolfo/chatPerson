@@ -1505,8 +1505,26 @@ class ConversationService
         }
 
         // **ENVIAR PARA INTEGRAÇÃO** se a mensagem for do agente (MAS NÃO SE FOR NOTA INTERNA)
+        // ✅ Para conversas MESCLADAS, usar o último número que o cliente usou (last_customer_account_id)
         $integrationAccountId = $conversation['integration_account_id'] ?? null;
         $whatsappAccountId = $conversation['whatsapp_account_id'] ?? null; // Legacy
+        
+        if (!empty($conversation['is_merged']) && !empty($conversation['last_customer_account_id'])) {
+            $lastAccountId = (int)$conversation['last_customer_account_id'];
+            \App\Helpers\Logger::info("ConversationService::sendMessage - Conversa MESCLADA, usando último número do cliente: account_id={$lastAccountId}");
+            $integrationAccountId = $lastAccountId;
+            // Verificar se é uma conta de integração válida
+            $lastAccount = \App\Models\IntegrationAccount::find($lastAccountId);
+            if (!$lastAccount) {
+                // Pode ser ID de whatsapp_accounts, verificar lá
+                $waAccount = \App\Models\WhatsAppAccount::find($lastAccountId);
+                if ($waAccount) {
+                    $whatsappAccountId = $lastAccountId;
+                    $integrationAccountId = null;
+                    \App\Helpers\Logger::info("ConversationService::sendMessage - Conta é WhatsApp legacy: wa_id={$lastAccountId}");
+                }
+            }
+        }
         
         \App\Helpers\Logger::info("ConversationService::sendMessage - Verificando envio (type={$senderType}, messageType={$messageType}, channel={$conversation['channel']}, integration_id=" . ($integrationAccountId ?? 'NULL') . ", wa_id=" . ($whatsappAccountId ?? 'NULL') . ")");
         

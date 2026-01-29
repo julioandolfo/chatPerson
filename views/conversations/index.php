@@ -248,6 +248,34 @@ function renderMessageStatus($msg) {
     // Se houver erro
     if ($status === 'failed' || !empty($errorMessage)) {
         $errorText = htmlspecialchars($errorMessage ?? 'Erro ao enviar');
+        
+        // Verificar se é erro de número sem WhatsApp (no LID found)
+        $isNoWhatsApp = !empty($errorMessage) && (
+            stripos($errorMessage, 'no LID found') !== false ||
+            stripos($errorMessage, 'not a valid whatsapp') !== false ||
+            stripos($errorMessage, 'invalid whatsapp') !== false
+        );
+        
+        if ($isNoWhatsApp) {
+            return '<div class="message-error-container">
+                <span class="message-status message-status-error" title="' . $errorText . '">
+                    <i class="ki-duotone ki-cross-circle fs-6">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    <span class="message-status-label">Erro</span>
+                </span>
+                <div class="message-error-alert mt-2">
+                    <i class="ki-duotone ki-information-3 fs-5 me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <span>Esse número não possui WhatsApp vinculado!</span>
+                </div>
+            </div>';
+        }
+        
         return '<span class="message-status message-status-error" title="' . $errorText . '">
             <i class="ki-duotone ki-cross-circle fs-6">
                 <span class="path1"></span>
@@ -1333,6 +1361,48 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     opacity: 1;
 }
 
+/* Container de erro de mensagem */
+.message-error-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+/* Alerta de erro de número sem WhatsApp */
+.message-error-alert {
+    display: inline-flex;
+    align-items: center;
+    background: linear-gradient(135deg, #fff5f5 0%, #ffe0e0 100%);
+    border: 1px solid #f8b4b4;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #c53030;
+    font-weight: 500;
+    box-shadow: 0 2px 8px rgba(197, 48, 48, 0.15);
+    animation: shake 0.5s ease-in-out;
+}
+
+.message-error-alert i {
+    color: #e53e3e;
+}
+
+[data-bs-theme="dark"] .message-error-alert {
+    background: linear-gradient(135deg, #2d1f1f 0%, #3d2020 100%);
+    border-color: #7c3030;
+    color: #feb2b2;
+}
+
+[data-bs-theme="dark"] .message-error-alert i {
+    color: #fc8181;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+    20%, 40%, 60%, 80% { transform: translateX(2px); }
+}
+
 /* Mensagem Citada/Reply */
 .quoted-message {
     border-left: 2px solid rgba(255, 255, 255, 0.2);
@@ -2372,10 +2442,10 @@ function getChannelInfo(channel) {
                         <div class="accordion-body" style="padding: 12px;">
                             <div class="d-flex flex-wrap align-items-center gap-2">
                                 <select id="filter_status" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 120px;">
-                                    <option value="">Todas</option>
-                                    <option value="open" <?= ($filters['status'] ?? 'open') === 'open' ? 'selected' : '' ?>>Abertas</option>
-                                    <option value="resolved" <?= ($filters['status'] ?? 'open') === 'resolved' ? 'selected' : '' ?>>Resolvidas</option>
-                                    <option value="closed" <?= ($filters['status'] ?? 'open') === 'closed' ? 'selected' : '' ?>>Fechadas</option>
+                                    <option value="" <?= empty($filters['status']) && empty($filters['is_spam']) && empty($filters['unanswered']) ? 'selected' : '' ?>>Todas</option>
+                                    <option value="open" <?= ($filters['status'] ?? '') === 'open' ? 'selected' : '' ?>>Abertas</option>
+                                    <option value="resolved" <?= ($filters['status'] ?? '') === 'resolved' ? 'selected' : '' ?>>Resolvidas</option>
+                                    <option value="closed" <?= ($filters['status'] ?? '') === 'closed' ? 'selected' : '' ?>>Fechadas</option>
                                     <option value="spam" <?= !empty($filters['is_spam']) ? 'selected' : '' ?>>⚠️ Spam</option>
                                     <option value="unanswered" <?= !empty($filters['unanswered']) ? 'selected' : '' ?>>🔴 Não respondidas</option>
                                 </select>
@@ -3027,7 +3097,12 @@ function getChannelInfo(channel) {
                                 <?php endif; ?>
                                 <div class="message-content">
                                     <div class="message-actions">
-                                        <button class="message-actions-btn" onclick="replyToMessage(<?= $msg['id'] ?? 0 ?>, '<?= htmlspecialchars($msgSenderName, ENT_QUOTES) ?>', '<?= htmlspecialchars(substr($msgContent, 0, 100), ENT_QUOTES) ?>')" title="Responder">
+                                        <?php
+                                        // Escapar corretamente para JavaScript (remover quebras de linha e caracteres problemáticos)
+                                        $jsEscapedSender = addslashes(preg_replace('/[\r\n]+/', ' ', $msgSenderName));
+                                        $jsEscapedContent = addslashes(preg_replace('/[\r\n]+/', ' ', substr($msgContent, 0, 100)));
+                                        ?>
+                                        <button class="message-actions-btn" onclick="replyToMessage(<?= $msg['id'] ?? 0 ?>, '<?= $jsEscapedSender ?>', '<?= $jsEscapedContent ?>')" title="Responder">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                 <polyline points="9 10 4 15 9 20"></polyline>
                                                 <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
@@ -3400,6 +3475,94 @@ function getChannelInfo(channel) {
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Trocar Número de Envio -->
+<div class="modal fade" id="kt_modal_change_account" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-450px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Trocar Número de Envio</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info mb-5 py-3">
+                    <div class="d-flex align-items-center">
+                        <i class="ki-duotone ki-information-5 fs-2 text-info me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <span class="fs-7">A próxima mensagem será enviada pelo número selecionado.</span>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Número atual:</label>
+                    <div id="change-account-current" class="text-muted fs-7">-</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Selecione o novo número:</label>
+                    <div id="change-account-list" class="border rounded" style="max-height: 250px; overflow-y: auto;">
+                        <div class="text-muted p-3">Carregando...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="confirmChangeAccount()">
+                    <i class="ki-duotone ki-check fs-4 me-1"></i>
+                    Confirmar Troca
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Mesclar Conversas -->
+<div class="modal fade" id="kt_modal_merge_conversations" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-500px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Mesclar Conversas</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info mb-5">
+                    <div class="d-flex">
+                        <i class="ki-duotone ki-information-5 fs-2 text-info me-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div>
+                            <strong>O que vai acontecer:</strong>
+                            <ul class="mb-0 mt-2 ps-3">
+                                <li>Mensagens serão movidas para esta conversa</li>
+                                <li>Conversas duplicadas serão removidas</li>
+                                <li>Histórico será unificado</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-5">
+                    <label class="form-label fw-bold">Conversas a mesclar:</label>
+                    <div id="merge-conversations-list" class="border rounded p-3" style="max-height: 250px; overflow-y: auto;">
+                        <div class="text-muted">Carregando...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" onclick="executeMerge()">
+                    <i class="ki-duotone ki-arrows-loop fs-4 me-1"></i>
+                    Mesclar Conversas
+                </button>
             </div>
         </div>
     </div>
@@ -8931,6 +9094,319 @@ function updateConversationSidebar(conversation, tags) {
     } else {
         console.error('❌ Função loadConversationSLA NÃO encontrada!', 'Type:', typeof window.loadConversationSLA);
     }
+    
+    // ✅ Verificar se há outras conversas abertas do mesmo contato (para mesclar)
+    if (conversation.id && conversation.channel === 'whatsapp') {
+        checkOtherOpenConversations(conversation.id);
+    } else {
+        // Esconder aviso se não for WhatsApp
+        const alertEl = document.getElementById('sidebar-multiple-conversations-alert');
+        if (alertEl) alertEl.style.display = 'none';
+    }
+    
+    // ✅ Mostrar números vinculados (se conversa mesclada)
+    if (conversation.is_merged && conversation.linked_account_ids) {
+        loadLinkedAccounts(conversation.id);
+    } else {
+        const linkedEl = document.getElementById('sidebar-linked-accounts');
+        if (linkedEl) linkedEl.style.display = 'none';
+    }
+}
+
+// Verificar outras conversas abertas do mesmo contato
+async function checkOtherOpenConversations(conversationId) {
+    const alertEl = document.getElementById('sidebar-multiple-conversations-alert');
+    const infoEl = document.getElementById('sidebar-other-conversations-info');
+    
+    if (!alertEl || !infoEl) return;
+    
+    try {
+        const response = await fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/check-others`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success && data.data && data.data.has_others) {
+            const convs = data.data.conversations;
+            const count = data.data.count;
+            
+            // Guardar IDs para mesclagem
+            window.otherConversationsToMerge = convs.map(c => c.id);
+            
+            // Montar texto informativo
+            const numbers = convs.map(c => c.account_phone || c.account_name).join(', ');
+            infoEl.innerHTML = `${count} conversa${count > 1 ? 's' : ''} em: ${numbers}`;
+            
+            alertEl.style.display = 'block';
+        } else {
+            alertEl.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Erro ao verificar outras conversas:', error);
+        alertEl.style.display = 'none';
+    }
+}
+
+// Carregar contas vinculadas (conversa mesclada)
+async function loadLinkedAccounts(conversationId) {
+    const linkedEl = document.getElementById('sidebar-linked-accounts');
+    const valueEl = linkedEl?.querySelector('[data-field="linked_accounts"]');
+    
+    if (!linkedEl || !valueEl) return;
+    
+    try {
+        const response = await fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/linked-accounts`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success && data.data && data.data.length > 1) {
+            // Pular o primeiro (é o principal)
+            const others = data.data.slice(1);
+            valueEl.textContent = others.map(a => a.phone_number).join(', ');
+            linkedEl.style.display = 'flex';
+        } else {
+            linkedEl.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Erro ao carregar contas vinculadas:', error);
+        linkedEl.style.display = 'none';
+    }
+}
+
+// Abrir modal de mesclagem
+function openMergeModal() {
+    const conversationId = window.currentConversationId;
+    if (!conversationId) {
+        toastr.error('Nenhuma conversa selecionada');
+        return;
+    }
+    
+    const listEl = document.getElementById('merge-conversations-list');
+    if (!listEl) return;
+    
+    // Mostrar conversas a mesclar
+    if (window.otherConversationsToMerge && window.otherConversationsToMerge.length > 0) {
+        fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/check-others`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.data && data.data.conversations) {
+                const convs = data.data.conversations;
+                listEl.innerHTML = convs.map(c => `
+                    <div class="d-flex align-items-center justify-content-between py-2 border-bottom">
+                        <div>
+                            <div class="fw-bold">${escapeHtml(c.account_name)}</div>
+                            <div class="text-muted fs-7">${escapeHtml(c.account_phone)} • ${c.message_count} mensagens</div>
+                        </div>
+                        <label class="form-check form-check-custom form-check-solid">
+                            <input class="form-check-input merge-conv-checkbox" type="checkbox" value="${c.id}" checked>
+                        </label>
+                    </div>
+                `).join('');
+            }
+        });
+    } else {
+        listEl.innerHTML = '<div class="text-muted">Nenhuma conversa para mesclar</div>';
+    }
+    
+    // Abrir modal
+    const modal = new bootstrap.Modal(document.getElementById('kt_modal_merge_conversations'));
+    modal.show();
+}
+
+// Executar mesclagem
+async function executeMerge() {
+    const conversationId = window.currentConversationId;
+    if (!conversationId) {
+        toastr.error('Nenhuma conversa selecionada');
+        return;
+    }
+    
+    // Pegar IDs marcados
+    const checkboxes = document.querySelectorAll('.merge-conv-checkbox:checked');
+    const sourceIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+    
+    if (sourceIds.length === 0) {
+        toastr.warning('Selecione pelo menos uma conversa para mesclar');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/merge`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ source_conversation_ids: sourceIds })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            toastr.success(data.message);
+            
+            // Fechar modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_merge_conversations'));
+            if (modal) modal.hide();
+            
+            // Recarregar conversa e lista
+            setTimeout(() => {
+                loadConversation(conversationId);
+                loadConversations();
+            }, 500);
+        } else {
+            toastr.error(data.message || 'Erro ao mesclar conversas');
+        }
+    } catch (error) {
+        console.error('Erro ao mesclar:', error);
+        toastr.error('Erro de conexão ao mesclar conversas');
+    }
+}
+
+// =====================================================
+// TROCA DE NÚMERO DE ENVIO
+// =====================================================
+
+// Variável para armazenar a conta selecionada
+window.selectedNewAccountId = null;
+
+// Abrir modal de troca de conta
+async function openChangeAccountModal() {
+    const conversationId = window.currentConversationId;
+    if (!conversationId) {
+        toastr.error('Nenhuma conversa selecionada');
+        return;
+    }
+    
+    const listEl = document.getElementById('change-account-list');
+    const currentEl = document.getElementById('change-account-current');
+    
+    if (!listEl || !currentEl) return;
+    
+    // Mostrar loading
+    listEl.innerHTML = '<div class="text-muted p-3">Carregando números...</div>';
+    
+    // Abrir modal
+    const modal = new bootstrap.Modal(document.getElementById('kt_modal_change_account'));
+    modal.show();
+    
+    try {
+        // Buscar conversa atual e contas disponíveis em paralelo
+        const [convResponse, accountsResponse] = await Promise.all([
+            fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+            }),
+            fetch(`<?= \App\Helpers\Url::to('/api/integration-accounts/whatsapp') ?>`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+            })
+        ]);
+        
+        const convData = await convResponse.json();
+        const accountsData = await accountsResponse.json();
+        
+        const conversation = convData.data || convData.conversation || convData;
+        const accounts = accountsData.data || accountsData.accounts || accountsData || [];
+        
+        // Mostrar conta atual
+        const currentAccountId = conversation.integration_account_id || conversation.whatsapp_account_id;
+        const currentPhone = conversation.whatsapp_account_phone || conversation.account_phone || 'Não definido';
+        const currentName = conversation.whatsapp_account_name || conversation.account_name || '';
+        currentEl.innerHTML = `<strong>${escapeHtml(currentPhone)}</strong> ${currentName ? '(' + escapeHtml(currentName) + ')' : ''}`;
+        
+        // Listar contas disponíveis
+        if (!Array.isArray(accounts) || accounts.length === 0) {
+            listEl.innerHTML = '<div class="text-muted p-3">Nenhum número disponível</div>';
+            return;
+        }
+        
+        window.selectedNewAccountId = null;
+        
+        listEl.innerHTML = accounts.map(acc => {
+            const isCurrentAccount = (acc.id == currentAccountId);
+            const statusBadge = acc.status === 'active' 
+                ? '<span class="badge badge-success ms-2">Conectado</span>' 
+                : '<span class="badge badge-danger ms-2">Desconectado</span>';
+            
+            return `
+                <label class="d-flex align-items-center p-3 border-bottom cursor-pointer hover-bg-light ${isCurrentAccount ? 'bg-light-primary' : ''}" style="cursor: pointer;">
+                    <input type="radio" name="new_account" value="${acc.id}" class="form-check-input me-3" 
+                           ${isCurrentAccount ? 'checked' : ''} 
+                           onchange="window.selectedNewAccountId = ${acc.id}">
+                    <div class="flex-grow-1">
+                        <div class="fw-bold">${escapeHtml(acc.name || 'Sem nome')}</div>
+                        <div class="text-muted fs-7">${escapeHtml(acc.phone_number || '')}</div>
+                    </div>
+                    ${statusBadge}
+                    ${isCurrentAccount ? '<span class="badge badge-light-primary ms-2">Atual</span>' : ''}
+                </label>
+            `;
+        }).join('');
+        
+    } catch (error) {
+        console.error('Erro ao carregar contas:', error);
+        listEl.innerHTML = '<div class="text-danger p-3">Erro ao carregar números</div>';
+    }
+}
+
+// Confirmar troca de conta
+async function confirmChangeAccount() {
+    const conversationId = window.currentConversationId;
+    const newAccountId = window.selectedNewAccountId;
+    
+    if (!conversationId) {
+        toastr.error('Nenhuma conversa selecionada');
+        return;
+    }
+    
+    if (!newAccountId) {
+        toastr.warning('Selecione um número');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/change-account`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ account_id: newAccountId })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            toastr.success(data.message || 'Número alterado com sucesso!');
+            
+            // Fechar modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_change_account'));
+            if (modal) modal.hide();
+            
+            // Recarregar sidebar
+            loadConversation(conversationId);
+        } else {
+            toastr.error(data.message || 'Erro ao alterar número');
+        }
+    } catch (error) {
+        console.error('Erro ao alterar conta:', error);
+        toastr.error('Erro de conexão');
+    }
 }
 
 // Atualizar timeline da conversa
@@ -12400,6 +12876,34 @@ function addMessageToChat(message) {
             // Se houver erro
             if (status === 'failed' || errorMessage) {
                 const errorText = escapeHtml(errorMessage || 'Erro ao enviar');
+                
+                // Verificar se é erro de número sem WhatsApp (no LID found)
+                const isNoWhatsApp = errorMessage && (
+                    errorMessage.toLowerCase().includes('no lid found') ||
+                    errorMessage.toLowerCase().includes('not a valid whatsapp') ||
+                    errorMessage.toLowerCase().includes('invalid whatsapp')
+                );
+                
+                if (isNoWhatsApp) {
+                    return `<div class="message-error-container">
+                        <span class="message-status message-status-error" title="${errorText}">
+                            <i class="ki-duotone ki-cross-circle fs-6">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <span class="message-status-label">Erro</span>
+                        </span>
+                        <div class="message-error-alert mt-2">
+                            <i class="ki-duotone ki-information-3 fs-5 me-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                            </i>
+                            <span>Esse número não possui WhatsApp vinculado!</span>
+                        </div>
+                    </div>`;
+                }
+                
                 return `<span class="message-status message-status-error" title="${errorText}">
                     <i class="ki-duotone ki-cross-circle fs-6">
                         <span class="path1"></span>
@@ -12499,8 +13003,17 @@ function addMessageToChat(message) {
         
         // Adicionar botÁes de ação
         const msgId = message.id || 0;
-        const senderName = (message.sender_name || 'Remetente').replace(/'/g, "\\'");
-        const msgContent = ((message.content || '').substring(0, 100)).replace(/'/g, "\\'");
+        // Escapar corretamente para JavaScript: remover quebras de linha, escapar aspas e barras
+        const escapeForJs = (str) => {
+            return (str || '')
+                .replace(/\\/g, '\\\\')
+                .replace(/'/g, "\\'")
+                .replace(/"/g, '\\"')
+                .replace(/\r?\n/g, ' ')
+                .replace(/\t/g, ' ');
+        };
+        const senderName = escapeForJs(message.sender_name || 'Remetente');
+        const msgContent = escapeForJs((message.content || '').substring(0, 100));
         
         const replyBtn = `
             <div class="message-actions">

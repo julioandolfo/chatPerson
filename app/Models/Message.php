@@ -11,7 +11,7 @@ class Message extends Model
 {
     protected string $table = 'messages';
     protected string $primaryKey = 'id';
-    protected array $fillable = ['conversation_id', 'sender_id', 'sender_type', 'content', 'message_type', 'attachments', 'status', 'delivered_at', 'read_at', 'error_message', 'external_id', 'quoted_message_id', 'quoted_sender_name', 'quoted_text', 'ai_agent_id', 'created_at'];
+    protected array $fillable = ['conversation_id', 'via_account_id', 'sender_id', 'sender_type', 'content', 'message_type', 'attachments', 'status', 'delivered_at', 'read_at', 'error_message', 'external_id', 'quoted_message_id', 'quoted_sender_name', 'quoted_text', 'ai_agent_id', 'created_at'];
     protected array $hidden = [];
     protected bool $timestamps = false; // Tabela messages não tem updated_at (created_at é gerenciado manualmente)
 

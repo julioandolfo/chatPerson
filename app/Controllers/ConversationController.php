@@ -65,8 +65,14 @@ class ConversationController
         \App\Helpers\Log::context("GET params", $_GET, 'conversas.log', 'DEBUG');
         
         // Obter filtros da requisição
+        // Se status for vazio ou 'all', significa "Todas" - não filtrar por status
+        $statusFilter = $_GET['status'] ?? 'open';
+        if ($statusFilter === '' || $statusFilter === 'all') {
+            $statusFilter = null; // Não filtrar por status = mostrar todas
+        }
+        
         $filters = [
-            'status' => $_GET['status'] ?? 'open', // Padrão: Abertas
+            'status' => $statusFilter,
             'channel' => $_GET['channel'] ?? null,
             'channels' => isset($_GET['channels']) && is_array($_GET['channels']) ? $_GET['channels'] : (!empty($_GET['channel']) ? [$_GET['channel']] : null),
             'search' => $_GET['search'] ?? null,
@@ -3608,6 +3614,143 @@ class ConversationController
         }
         
         return false;
+    }
+    
+    /**
+     * Verificar se há outras conversas abertas do mesmo contato (API)
+     */
+    public function checkOtherConversations(int $id): void
+    {
+        Permission::abortIfCannot('conversations.view');
+        
+        try {
+            $result = \App\Services\ConversationMergeService::checkMultipleConversations($id);
+            
+            Response::json([
+                'success' => true,
+                'data' => $result
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+    
+    /**
+     * Mesclar conversas (API)
+     */
+    public function mergeConversations(int $id): void
+    {
+        Permission::abortIfCannot('conversations.edit');
+        
+        try {
+            $data = Request::json();
+            $sourceIds = $data['source_conversation_ids'] ?? [];
+            
+            if (empty($sourceIds)) {
+                throw new \Exception('Nenhuma conversa para mesclar');
+            }
+            
+            $result = \App\Services\ConversationMergeService::merge($id, $sourceIds);
+            
+            Response::json([
+                'success' => true,
+                'message' => "Conversas mescladas com sucesso! {$result['messages_moved']} mensagens movidas.",
+                'data' => $result
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+    
+    /**
+     * Obter contas vinculadas a uma conversa (API)
+     */
+    public function getLinkedAccounts(int $id): void
+    {
+        Permission::abortIfCannot('conversations.view');
+        
+        try {
+            $accounts = \App\Services\ConversationMergeService::getLinkedAccounts($id);
+            
+            Response::json([
+                'success' => true,
+                'data' => $accounts
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+    
+    /**
+     * Alterar conta de integração da conversa (trocar número de envio)
+     */
+    public function changeAccount(int $id): void
+    {
+        Permission::abortIfCannot('conversations.edit');
+        
+        try {
+            $data = Request::json();
+            $newAccountId = $data['account_id'] ?? null;
+            
+            if (empty($newAccountId)) {
+                throw new \Exception('ID da conta não informado');
+            }
+            
+            $conversation = Conversation::find($id);
+            if (!$conversation) {
+                throw new \Exception('Conversa não encontrada');
+            }
+            
+            // Verificar se a conta existe
+            $account = \App\Models\IntegrationAccount::find($newAccountId);
+            if (!$account) {
+                // Tentar buscar em whatsapp_accounts (legacy)
+                $account = \App\Models\WhatsAppAccount::find($newAccountId);
+                if (!$account) {
+                    throw new \Exception('Conta não encontrada');
+                }
+                // É uma conta legacy
+                Conversation::update($id, [
+                    'whatsapp_account_id' => $newAccountId,
+                    'last_customer_account_id' => $newAccountId
+                ]);
+            } else {
+                // É uma conta de integração
+                Conversation::update($id, [
+                    'integration_account_id' => $newAccountId,
+                    'last_customer_account_id' => $newAccountId
+                ]);
+            }
+            
+            $accountPhone = $account['phone_number'] ?? 'Desconhecido';
+            $accountName = $account['name'] ?? '';
+            
+            \App\Helpers\Logger::info("ConversationController::changeAccount - Conversa {$id} alterada para conta {$newAccountId} ({$accountPhone})");
+            
+            Response::json([
+                'success' => true,
+                'message' => "Número alterado para {$accountPhone}" . ($accountName ? " ({$accountName})" : ""),
+                'data' => [
+                    'account_id' => $newAccountId,
+                    'phone_number' => $accountPhone,
+                    'name' => $accountName
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
     }
 }
 

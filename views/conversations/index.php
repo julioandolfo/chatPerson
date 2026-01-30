@@ -5381,6 +5381,33 @@ function startApi4ComCall(conversationId) {
         return;
     }
     
+    // Verificar se o WebPhone está conectado (se estiver habilitado)
+    const webphoneReady = window.api4comWebphone && window.api4comWebphone.isReady();
+    const webphoneWidget = document.getElementById('api4com-webphone-widget');
+    const webphoneEnabled = webphoneWidget && webphoneWidget.style.display !== 'none';
+    
+    if (webphoneEnabled && !webphoneReady) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'WebPhone Não Conectado',
+            html: 'O WebPhone não está registrado no servidor SIP.<br><br>' +
+                  'Clique no botão <strong>📞 WebPhone</strong> no canto inferior direito para conectar.<br><br>' +
+                  '<small class="text-muted">Status atual: ' + (window.api4comWebphone?.getStatus() || 'não iniciado') + '</small>',
+            confirmButtonText: 'Tentar Mesmo Assim',
+            showCancelButton: true,
+            cancelButtonText: 'Cancelar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                executeApi4ComCall(conversationId);
+            }
+        });
+        return;
+    }
+    
+    executeApi4ComCall(conversationId);
+}
+
+function executeApi4ComCall(conversationId) {
     // Desabilitar botão durante a requisição
     const btn = document.getElementById('btnApi4ComCall');
     if (btn) {
@@ -5406,13 +5433,18 @@ function startApi4ComCall(conversationId) {
             Swal.fire({
                 icon: 'success',
                 title: 'Chamada Iniciada',
-                text: 'Chamada iniciada com sucesso!',
-                timer: 2000,
+                html: 'Chamada iniciada! Aguarde a conexão...<br><small class="text-muted">O WebPhone irá atender automaticamente</small>',
+                timer: 3000,
                 showConfirmButton: false
             });
             
-            // Atualizar interface se necessário
-            // Você pode adicionar um indicador visual de chamada em andamento aqui
+            // Expandir o painel do WebPhone se existir
+            const webphonePanel = document.getElementById('webphone-panel');
+            const webphoneToggle = document.getElementById('webphone-toggle');
+            if (webphonePanel && webphoneToggle) {
+                webphonePanel.style.display = 'block';
+                webphoneToggle.style.display = 'none';
+            }
         } else {
             Swal.fire({
                 icon: 'error',

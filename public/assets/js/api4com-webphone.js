@@ -84,7 +84,8 @@ class Api4ComWebPhone {
      */
     loadLibrary() {
         return new Promise((resolve, reject) => {
-            if (window.libwebphone) {
+            // Verificar se já está carregada (pode estar em diferentes lugares)
+            if (window.libwebphone || window.Location || window.lwp) {
                 this.libLoaded = true;
                 resolve();
                 return;
@@ -95,9 +96,17 @@ class Api4ComWebPhone {
             script.async = true;
             
             script.onload = () => {
-                this.libLoaded = true;
-                console.log('[API4Com WebPhone] Biblioteca carregada');
-                resolve();
+                // Aguardar um pouco para a biblioteca inicializar
+                setTimeout(() => {
+                    this.libLoaded = true;
+                    console.log('[API4Com WebPhone] Biblioteca carregada');
+                    console.log('[API4Com WebPhone] Objetos disponíveis:', {
+                        libwebphone: typeof window.libwebphone,
+                        lwp: typeof window.lwp,
+                        Locations: typeof window.Locations
+                    });
+                    resolve();
+                }, 100);
             };
             
             script.onerror = (error) => {
@@ -120,8 +129,43 @@ class Api4ComWebPhone {
         
         const { domain, port, extension, password, realm } = this.credentials;
         
+        // Encontrar o construtor correto da biblioteca
+        let LibWebPhone = window.libwebphone || window.lwp || window.LibWebPhone || window.Locations;
+        
+        // Se ainda não encontrou, procurar em outros lugares
+        if (!LibWebPhone && typeof libwebphone !== 'undefined') {
+            LibWebPhone = libwebphone;
+        }
+        
+        if (!LibWebPhone) {
+            console.error('[API4Com WebPhone] Biblioteca libwebphone não encontrada no escopo global');
+            console.log('[API4Com WebPhone] Objetos window disponíveis:', Object.keys(window).filter(k => k.toLowerCase().includes('lib') || k.toLowerCase().includes('phone') || k.toLowerCase().includes('sip')));
+            this.updateStatus('error', 'Biblioteca não carregada');
+            return;
+        }
+        
+        console.log('[API4Com WebPhone] Tipo do construtor:', typeof LibWebPhone);
+        
+        // Verificar se é uma função/construtor
+        if (typeof LibWebPhone !== 'function') {
+            console.error('[API4Com WebPhone] libwebphone não é um construtor válido. Tipo:', typeof LibWebPhone);
+            console.log('[API4Com WebPhone] Conteúdo:', LibWebPhone);
+            
+            // Tentar usar como objeto se tiver método create ou init
+            if (LibWebPhone && typeof LibWebPhone.create === 'function') {
+                console.log('[API4Com WebPhone] Tentando usar LibWebPhone.create()');
+                LibWebPhone = LibWebPhone.create;
+            } else if (LibWebPhone && typeof LibWebPhone.init === 'function') {
+                console.log('[API4Com WebPhone] Tentando usar LibWebPhone.init()');
+                LibWebPhone = LibWebPhone.init;
+            } else {
+                this.updateStatus('error', 'Biblioteca incompatível');
+                return;
+            }
+        }
+        
         try {
-            this.webphone = new libwebphone({
+            const config = {
                 dialpad: {
                     renderTargets: [this.options.renderTarget + '-dialpad'],
                 },
@@ -154,7 +198,11 @@ class Api4ComWebPhone {
                         user_agent: 'Chat-WebPhone-libwebphone',
                     },
                 },
-            });
+            };
+            
+            console.log('[API4Com WebPhone] Configuração:', { domain, port, extension, realm: realm || domain });
+            
+            this.webphone = new LibWebPhone(config);
             
             // Configurar eventos
             this.setupEvents();

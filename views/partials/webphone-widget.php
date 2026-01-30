@@ -71,7 +71,7 @@ if (!$webphoneEnabled) {
 .webphone-widget {
     position: fixed;
     bottom: 20px;
-    right: 20px;
+    left: 20px;
     z-index: 1050;
     font-family: inherit;
 }
@@ -109,7 +109,7 @@ if (!$webphoneEnabled) {
 .webphone-panel {
     position: absolute;
     bottom: 70px;
-    right: 0;
+    left: 0;
     width: 320px;
     background: var(--bs-body-bg, #1e1e2d);
     border-radius: 12px;

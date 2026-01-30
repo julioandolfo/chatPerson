@@ -127,5 +127,13 @@ class Logger
     {
         self::log("[WARNING] {$message}", $file);
     }
+
+    /**
+     * Log específico para API4Com (telefonia)
+     */
+    public static function api4com(string $message, string $level = 'INFO'): void
+    {
+        self::log("[{$level}] {$message}", 'api4com.log');
+    }
 }
 

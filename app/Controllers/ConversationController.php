@@ -3754,7 +3754,8 @@ class ConversationController
      */
     public function changeAccount(int $id): void
     {
-        Permission::abortIfCannot('conversations.edit');
+        // Verificar se tem permissão de visualizar conversas (mínimo necessário)
+        Permission::abortIfCannot('conversations.view');
         
         try {
             $data = Request::json();
@@ -3767,6 +3768,16 @@ class ConversationController
             $conversation = Conversation::find($id);
             if (!$conversation) {
                 throw new \Exception('Conversa não encontrada');
+            }
+            
+            // Verificar permissão: pode editar se for admin OU se estiver atribuído à conversa
+            $currentUserId = \App\Helpers\Auth::id();
+            $isAdmin = Permission::isAdmin() || Permission::isSuperAdmin();
+            $isAssigned = ($conversation['agent_id'] == $currentUserId);
+            $canEdit = Permission::can('conversations.edit') || Permission::can('conversations.edit.all');
+            
+            if (!$isAdmin && !$isAssigned && !$canEdit) {
+                throw new \Exception('Você não tem permissão para alterar o número desta conversa. Apenas o agente atribuído ou administradores podem fazer isso.');
             }
             
             // Verificar se a conta existe

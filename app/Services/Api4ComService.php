@@ -103,7 +103,7 @@ class Api4ComService
                     ))
                 ]);
 
-                Logger::info("Api4ComService::createCall - Chamada iniciada: Call ID {$callId}, Api4Com ID: " . ($api4comResponse['call_id'] ?? 'N/A'));
+                Logger::api4com("createCall - Chamada iniciada: Call ID {$callId}, Api4Com ID: " . ($api4comResponse['call_id'] ?? 'N/A'));
 
                 return Api4ComCall::find($callId);
             } else {
@@ -114,7 +114,7 @@ class Api4ComService
                 throw new \Exception('Erro ao iniciar chamada: ' . ($api4comResponse['error'] ?? 'Erro desconhecido'));
             }
         } catch (\Exception $e) {
-            Logger::error("Api4ComService::createCall - Erro: " . $e->getMessage());
+            Logger::api4com("createCall - Erro: " . $e->getMessage(), 'ERROR');
             Api4ComCall::updateStatus($callId, 'failed', [
                 'error_message' => $e->getMessage()
             ]);
@@ -156,7 +156,7 @@ class Api4ComService
         
         // Validar que temos um valor para o ramal
         if (empty($extensionValue)) {
-            Logger::error("Api4ComService::initiateApi4ComCall - Ramal sem extension_number ou extension_id. Extension: " . json_encode($extension));
+            Logger::api4com("initiateApi4ComCall - Ramal sem extension_number ou extension_id. Extension: " . json_encode($extension), 'ERROR');
             return [
                 'success' => false,
                 'error' => 'Ramal não possui número ou ID configurado. Verifique a configuração do ramal em Integrações → Api4Com → Ramais'
@@ -181,7 +181,7 @@ class Api4ComService
             $payload = array_merge($payload, $config['extra_fields']);
         }
         
-        Logger::info("Api4ComService::initiateApi4ComCall - URL: {$url}, Extension: {$extensionValue}, Phone: {$toNumber}, Payload: " . json_encode($payload));
+        Logger::api4com("initiateApi4ComCall - URL: {$url}, Extension: {$extensionValue}, Phone: {$toNumber}, Payload: " . json_encode($payload));
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [
@@ -202,7 +202,7 @@ class Api4ComService
         curl_close($ch);
 
         if ($error) {
-            Logger::error("Api4ComService::initiateApi4ComCall - Curl error: {$error}");
+            Logger::api4com("initiateApi4ComCall - Curl error: {$error}", 'ERROR');
             return [
                 'success' => false,
                 'error' => 'Erro de conexão: ' . $error
@@ -211,9 +211,9 @@ class Api4ComService
 
         $data = json_decode($response, true);
         
-        Logger::info("Api4ComService::initiateApi4ComCall - HTTP {$httpCode}, Response: " . substr($response, 0, 500));
+        Logger::api4com("initiateApi4ComCall - HTTP {$httpCode}, Response: " . substr($response, 0, 500));
         if ($httpCode >= 500) {
-            Logger::error("Api4ComService::initiateApi4ComCall - HTTP {$httpCode}, URL: {$url}, Payload: " . json_encode($payload) . ", Info: " . json_encode($curlInfo));
+            Logger::api4com("initiateApi4ComCall - HTTP {$httpCode}, URL: {$url}, Payload: " . json_encode($payload) . ", Info: " . json_encode($curlInfo), 'ERROR');
         }
 
         if ($httpCode >= 200 && $httpCode < 300) {
@@ -254,7 +254,7 @@ class Api4ComService
      */
     public static function processWebhook(array $webhookData): bool
     {
-        Logger::info("Api4ComService::processWebhook - Webhook recebido: " . json_encode($webhookData));
+        Logger::api4com("processWebhook - Webhook recebido: " . json_encode($webhookData));
 
         // Identificar chamada por api4com_call_id
         $call = null;
@@ -265,7 +265,7 @@ class Api4ComService
         }
 
         if (!$call) {
-            Logger::warning("Api4ComService::processWebhook - Chamada não encontrada para webhook");
+            Logger::api4com("processWebhook - Chamada não encontrada para webhook", 'WARNING');
             return false;
         }
 
@@ -326,7 +326,7 @@ class Api4ComService
 
         Api4ComCall::update($call['id'], $updateData);
 
-        Logger::info("Api4ComService::processWebhook - Chamada {$call['id']} atualizada para status: {$status}");
+        Logger::api4com("processWebhook - Chamada {$call['id']} atualizada para status: {$status}");
 
         // Notificar via WebSocket se necessário
         if ($call['conversation_id']) {
@@ -389,7 +389,7 @@ class Api4ComService
             try {
                 self::endApi4ComCall($account, $call['api4com_call_id']);
             } catch (\Exception $e) {
-                Logger::error("Api4ComService::endCall - Erro ao encerrar via API: " . $e->getMessage());
+                Logger::api4com("endCall - Erro ao encerrar via API: " . $e->getMessage(), 'ERROR');
             }
         }
 
@@ -625,15 +625,15 @@ class Api4ComService
         curl_close($ch);
 
         if ($error) {
-            Logger::error("Api4ComService::fetchExtensionsFromApi - Erro: " . $error);
+            Logger::api4com("fetchExtensionsFromApi - Erro: " . $error, 'ERROR');
             throw new \Exception('Erro de conexão: ' . $error);
         }
 
         $data = json_decode($response, true);
 
-        Logger::info("Api4ComService::fetchExtensionsFromApi - HTTP {$httpCode}, Response: " . substr($response, 0, 500));
+        Logger::api4com("fetchExtensionsFromApi - HTTP {$httpCode}, Response: " . substr($response, 0, 500));
         if ($httpCode >= 500) {
-            Logger::error("Api4ComService::fetchExtensionsFromApi - HTTP {$httpCode}, URL: {$url}, Info: " . json_encode($curlInfo));
+            Logger::api4com("fetchExtensionsFromApi - HTTP {$httpCode}, URL: {$url}, Info: " . json_encode($curlInfo), 'ERROR');
         }
 
         if ($httpCode >= 200 && $httpCode < 300) {
@@ -643,7 +643,7 @@ class Api4ComService
             // Se não é array indexado, pode ser que a resposta veio em outro formato
             if (!is_array($extensions) || (is_array($extensions) && !isset($extensions[0]) && !empty($extensions))) {
                 // Pode ser um objeto único ou formato diferente
-                Logger::info("Api4ComService::fetchExtensionsFromApi - Formato diferente, tentando normalizar");
+                Logger::api4com("fetchExtensionsFromApi - Formato diferente, tentando normalizar");
                 if (isset($extensions['extensions'])) {
                     $extensions = $extensions['extensions'];
                 } elseif (isset($extensions['items'])) {
@@ -658,7 +658,7 @@ class Api4ComService
                 $extensions = [];
             }
             
-            Logger::info("Api4ComService::fetchExtensionsFromApi - Encontrados " . count($extensions) . " ramais");
+            Logger::api4com("fetchExtensionsFromApi - Encontrados " . count($extensions) . " ramais");
             
             return $extensions;
         } else {
@@ -678,7 +678,7 @@ class Api4ComService
                 $errorMsg = "HTTP {$httpCode}: " . substr($response, 0, 200);
             }
             
-            Logger::error("Api4ComService::fetchExtensionsFromApi - Erro API: " . $errorMsg);
+            Logger::api4com("fetchExtensionsFromApi - Erro API: " . $errorMsg, 'ERROR');
             throw new \Exception('Erro na API: ' . $errorMsg);
         }
     }

@@ -24,6 +24,7 @@ try {
 
 // Lista de arquivos de log para verificar
 $logFiles = [
+    'API4Com (Telefonia/WebPhone)' => __DIR__ . '/../logs/api4com.log',
     'Campanhas (Disparo em Massa)' => __DIR__ . '/../logs/campaigns.log',
     'External Sources (Google Maps/WooCommerce)' => __DIR__ . '/../logs/external_sources.log',
     'Dashboard' => __DIR__ . '/../logs/dash.log',
@@ -129,6 +130,7 @@ $logFiles = [
     
     <div class="controls">
         <button onclick="location.reload()">🔄 Atualizar</button>
+        <button class="nav-btn" onclick="document.getElementById('api4com-telefonia/webphone-log').scrollIntoView({behavior: 'smooth'})" style="background: #00bcd4; color: #fff">📞 API4Com</button>
         <button class="nav-btn" onclick="document.getElementById('sync-logs-db').scrollIntoView({behavior: 'smooth'})" style="background: #e91e63; color: #fff">📊 Sync DB</button>
         <button class="nav-btn" onclick="document.getElementById('metas-e-ote-goals-log').scrollIntoView({behavior: 'smooth'})" style="background: #ffd700; color: #000">🎯 Metas/OTE</button>
         <button class="nav-btn" onclick="document.getElementById('coaching-em-tempo-real-log').scrollIntoView({behavior: 'smooth'})" style="background: #4ec9b0">⚡ Coaching</button>

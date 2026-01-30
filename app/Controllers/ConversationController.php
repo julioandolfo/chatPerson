@@ -795,7 +795,7 @@ class ConversationController
                 }
                 
                 // Criar sem executar automações (manual)
-                $conversation = \App\Services\ConversationService::create($conversationData, false)
+                $conversation = \App\Services\ConversationService::create($conversationData, false);
                 
                 $conversationId = $conversation['id'];
             }

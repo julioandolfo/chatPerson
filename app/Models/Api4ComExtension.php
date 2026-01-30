@@ -11,7 +11,8 @@ class Api4ComExtension extends Model
     protected string $primaryKey = 'id';
     protected array $fillable = [
         'user_id', 'api4com_account_id', 'extension_id', 'extension_number',
-        'sip_username', 'sip_password', 'status', 'metadata'
+        'sip_username', 'sip_password', 'sip_password_encrypted', 'webphone_enabled',
+        'status', 'metadata'
     ];
     protected bool $timestamps = true;
 

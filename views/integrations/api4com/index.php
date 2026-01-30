@@ -226,8 +226,8 @@ ob_start();
                         <input type="url" name="api_url" id="edit_api_url" class="form-control form-control-solid" required />
                     </div>
                     <div class="fv-row mb-7">
-                        <label class="required fw-semibold fs-6 mb-2">Token de Autenticação</label>
-                        <input type="text" name="api_token" id="edit_api_token" class="form-control form-control-solid" required />
+                        <label class="fw-semibold fs-6 mb-2">Token de Autenticação</label>
+                        <input type="text" name="api_token" id="edit_api_token" class="form-control form-control-solid" />
                         <div class="form-text">Deixe em branco para manter o token atual</div>
                     </div>
                     <div class="fv-row mb-7">
@@ -294,6 +294,49 @@ ob_start();
                         </div>
                     </div>
                     <!--end::Configurações Avançadas-->
+                    
+                    <!--begin::Configurações WebPhone SIP-->
+                    <div class="separator separator-dashed my-5"></div>
+                    <div class="mb-3">
+                        <a class="fw-bold text-success" data-bs-toggle="collapse" href="#editWebphoneSettings" role="button" aria-expanded="false">
+                            <i class="ki-duotone ki-phone fs-5 me-1"><span class="path1"></span><span class="path2"></span></i>
+                            Configurações WebPhone Integrado (SIP)
+                        </a>
+                    </div>
+                    <div class="collapse" id="editWebphoneSettings">
+                        <div class="card card-flush bg-light-success">
+                            <div class="card-body py-4">
+                                <div class="text-success fs-7 mb-4">
+                                    <i class="ki-duotone ki-information-5 fs-5 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                    Configure para habilitar o WebPhone integrado no chat (sem precisar de extensão externa).
+                                </div>
+                                <div class="row g-4">
+                                    <div class="col-md-6">
+                                        <label class="fw-semibold fs-7 mb-2">Domínio SIP</label>
+                                        <input type="text" name="sip_domain" id="edit_sip_domain" 
+                                               class="form-control form-control-sm" placeholder="seudominio.api4com.com" />
+                                        <div class="form-text fs-8">O mesmo domínio da sua conta Api4Com</div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="fw-semibold fs-7 mb-2">Porta WebSocket</label>
+                                        <input type="number" name="sip_port" id="edit_sip_port" 
+                                               class="form-control form-control-sm" value="6443" placeholder="6443" />
+                                        <div class="form-text fs-8">Padrão: 6443</div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="fw-semibold fs-7 mb-2">WebPhone</label>
+                                        <div class="form-check form-switch form-check-custom form-check-solid mt-2">
+                                            <input class="form-check-input" type="checkbox" name="webphone_enabled" id="edit_webphone_enabled" value="1" />
+                                            <label class="form-check-label" for="edit_webphone_enabled">
+                                                <span class="fw-semibold">Habilitar</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!--end::Configurações WebPhone SIP-->
                 </div>
                 <div class="modal-footer flex-center">
                     <button type="reset" data-bs-dismiss="modal" class="btn btn-light me-3">Cancelar</button>
@@ -534,6 +577,11 @@ function editAccount(id) {
             document.getElementById("edit_config_phone_field").value = config.phone_field || "";
             document.getElementById("edit_config_extension_value_field").value = config.extension_value_field || "";
             
+            // Configurações WebPhone SIP
+            document.getElementById("edit_sip_domain").value = account.sip_domain || account.domain || "";
+            document.getElementById("edit_sip_port").value = account.sip_port || 6443;
+            document.getElementById("edit_webphone_enabled").checked = account.webphone_enabled == 1;
+            
             const modal = new bootstrap.Modal(document.getElementById("kt_modal_edit_api4com"));
             modal.show();
         } else {
@@ -688,7 +736,7 @@ function renderExtensions(extensions, accountId) {
     }
     
     let html = \'<table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">\';
-    html += \'<thead><tr class="fw-bold text-muted"><th>Ramal</th><th>ID API</th><th>Usuário Associado</th><th class="text-center">Status</th><th class="text-end">Ações</th></tr></thead>\';
+    html += \'<thead><tr class="fw-bold text-muted"><th>Ramal</th><th>ID API</th><th>Usuário Associado</th><th>Senha SIP (WebPhone)</th><th class="text-center">Status</th><th class="text-end">Ações</th></tr></thead>\';
     html += \'<tbody>\';
     
     extensions.forEach(function(ext) {
@@ -699,6 +747,10 @@ function renderExtensions(extensions, accountId) {
         const name = metadata.name || ext.extension_number || "Ramal";
         const statusClass = ext.status === "active" ? "success" : "warning";
         const statusText = ext.status === "active" ? "Ativo" : "Inativo";
+        const hasSipPassword = ext.sip_password_encrypted ? true : false;
+        const sipBadge = hasSipPassword 
+            ? \'<span class="badge badge-light-success">Configurada</span>\' 
+            : \'<span class="badge badge-light-warning">Não configurada</span>\';
         
         html += \'<tr>\';
         html += \'<td><span class="fw-bold">\' + name + \'</span><br><small class="text-muted">\' + (ext.extension_number || "-") + \'</small></td>\';
@@ -717,6 +769,14 @@ function renderExtensions(extensions, accountId) {
             html += \'<small class="text-muted d-block">Atual: \' + ext.user_name + \'</small>\';
         }
         html += \'</td>\';
+        // Coluna de senha SIP
+        html += \'<td>\';
+        html += \'<div class="d-flex align-items-center gap-2">\';
+        html += \'<input type="password" class="form-control form-control-sm" id="sip_pwd_\' + ext.id + \'" placeholder="Senha SIP" style="width: 120px;" />\';
+        html += \'<button type="button" class="btn btn-sm btn-icon btn-light-primary" onclick="saveSipPassword(\' + accountId + \', \' + ext.id + \')" title="Salvar senha SIP"><i class="ki-duotone ki-check fs-4"><span class="path1"></span><span class="path2"></span></i></button>\';
+        html += \'</div>\';
+        html += \'<small class="d-block mt-1">\' + sipBadge + \'</small>\';
+        html += \'</td>\';
         html += \'<td class="text-center"><span class="badge badge-light-\' + statusClass + \'">\' + statusText + \'</span></td>\';
         html += \'<td class="text-end"><button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="deleteExtension(\' + accountId + \', \' + ext.id + \')" title="Deletar ramal"><i class="ki-duotone ki-trash fs-5"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i></button></td>\';
         html += \'</tr>\';
@@ -724,6 +784,39 @@ function renderExtensions(extensions, accountId) {
     
     html += \'</tbody></table>\';
     listDiv.innerHTML = html;
+}
+
+// Salvar senha SIP do ramal
+function saveSipPassword(accountId, extensionId) {
+    const passwordInput = document.getElementById("sip_pwd_" + extensionId);
+    const password = passwordInput.value.trim();
+    
+    if (!password) {
+        alert("Digite a senha SIP");
+        return;
+    }
+    
+    fetch("' . \App\Helpers\Url::to('/integrations/api4com') . '/" + accountId + "/extensions/" + extensionId + "/sip", {
+        method: "POST",
+        headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ sip_password: password })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            passwordInput.value = "";
+            alert("Senha SIP salva com sucesso!");
+            loadExtensions(accountId);
+        } else {
+            alert("Erro: " + (data.message || "Erro ao salvar senha SIP"));
+        }
+    })
+    .catch(error => {
+        alert("Erro ao salvar senha SIP");
+    });
 }
 
 function assignExtension(accountId, extensionId, userId) {

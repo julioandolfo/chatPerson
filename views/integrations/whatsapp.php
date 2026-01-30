@@ -657,21 +657,21 @@ function loadFunnelStages(funnelId, targetSelectId, callback) {
 // Abrir modal de edição da conta (campos principais)
 function editAccount(account) {
     document.getElementById("kt_edit_whatsapp_id").value = account.id;
-    document.getElementById("kt_edit_whatsapp_name").value = account.name || '';
-    document.getElementById("kt_edit_whatsapp_phone").value = account.phone_number || '';
-    document.getElementById("kt_edit_whatsapp_api_url").value = account.api_url || '';
-    document.getElementById("kt_edit_whatsapp_user").value = account.quepasa_user || '';
-    document.getElementById("kt_edit_whatsapp_trackid").value = account.quepasa_trackid || '';
-    document.getElementById("kt_edit_whatsapp_api_key").value = ''; // Não exibir token por segurança
+    document.getElementById("kt_edit_whatsapp_name").value = account.name || "";
+    document.getElementById("kt_edit_whatsapp_phone").value = account.phone_number || "";
+    document.getElementById("kt_edit_whatsapp_api_url").value = account.api_url || "";
+    document.getElementById("kt_edit_whatsapp_user").value = account.quepasa_user || "";
+    document.getElementById("kt_edit_whatsapp_trackid").value = account.quepasa_trackid || "";
+    document.getElementById("kt_edit_whatsapp_api_key").value = ""; // Não exibir token por segurança
     
     // Exibir status atual
     const statusDisplay = document.getElementById("kt_edit_whatsapp_status_display");
     const statusLabels = {
-        'active': '✅ Conectado',
-        'inactive': '⚪ Inativo',
-        'disconnected': '❌ Desconectado'
+        "active": "✅ Conectado",
+        "inactive": "⚪ Inativo",
+        "disconnected": "❌ Desconectado"
     };
-    statusDisplay.textContent = statusLabels[account.status] || account.status || 'Desconhecido';
+    statusDisplay.textContent = statusLabels[account.status] || account.status || "Desconhecido";
     
     // Abrir modal
     const modal = new bootstrap.Modal(document.getElementById("kt_modal_edit_whatsapp"));
@@ -844,7 +844,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const accountId = document.getElementById("kt_edit_whatsapp_id").value;
             const formData = new FormData(editWhatsappForm);
             
-            fetch("<?= \App\Helpers\Url::to('/integrations/whatsapp') ?>/" + accountId, {
+            fetch("' . \App\Helpers\Url::to('/integrations/whatsapp') . '/" + accountId, {
                 method: "POST",
                 headers: {
                     "X-Requested-With": "XMLHttpRequest"
@@ -862,18 +862,18 @@ document.addEventListener("DOMContentLoaded", function() {
                     
                     // Mostrar mensagem de sucesso
                     Swal.fire({
-                        icon: 'success',
-                        title: 'Conta Atualizada!',
-                        text: data.message || 'As configurações foram salvas. Se você alterou a URL da API, escaneie o QR Code novamente.',
-                        confirmButtonText: 'OK'
+                        icon: "success",
+                        title: "Conta Atualizada!",
+                        text: data.message || "As configurações foram salvas. Se você alterou a URL da API, escaneie o QR Code novamente.",
+                        confirmButtonText: "OK"
                     }).then(() => {
                         location.reload();
                     });
                 } else {
                     Swal.fire({
-                        icon: 'error',
-                        title: 'Erro',
-                        text: data.message || 'Erro ao atualizar conta'
+                        icon: "error",
+                        title: "Erro",
+                        text: data.message || "Erro ao atualizar conta"
                     });
                 }
             })
@@ -881,9 +881,9 @@ document.addEventListener("DOMContentLoaded", function() {
                 submitBtn.removeAttribute("data-kt-indicator");
                 submitBtn.disabled = false;
                 Swal.fire({
-                    icon: 'error',
-                    title: 'Erro',
-                    text: 'Erro ao atualizar conta: ' + error.message
+                    icon: "error",
+                    title: "Erro",
+                    text: "Erro ao atualizar conta: " + error.message
                 });
             });
         });

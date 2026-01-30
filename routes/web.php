@@ -323,8 +323,11 @@ Router::get('/integrations/api4com/{id}/extensions', [Api4ComController::class, 
 Router::post('/integrations/api4com/{accountId}/extensions/{extensionId}/assign', [Api4ComController::class, 'assignExtension'], ['Authentication']);
 Router::post('/integrations/api4com/{accountId}/extensions', [Api4ComController::class, 'createExtension'], ['Authentication']);
 Router::delete('/integrations/api4com/{accountId}/extensions/{extensionId}', [Api4ComController::class, 'deleteExtension'], ['Authentication']);
+Router::post('/integrations/api4com/{accountId}/extensions/{extensionId}/sip', [Api4ComController::class, 'updateExtensionSip'], ['Authentication']);
 Router::get('/integrations/api4com/{id}/show', [Api4ComController::class, 'show'], ['Authentication']);
 Router::post('/integrations/api4com/{id}/test', [Api4ComController::class, 'testConnection'], ['Authentication']);
+Router::post('/integrations/api4com/{id}/webphone-settings', [Api4ComController::class, 'updateWebphoneSettings'], ['Authentication']);
+Router::get('/api4com/webphone-credentials', [Api4ComController::class, 'getWebphoneCredentials'], ['Authentication']);
 
 // Rotas de Integrações WooCommerce
 Router::get('/integrations/woocommerce', [WooCommerceController::class, 'index'], ['Authentication']);

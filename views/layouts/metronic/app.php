@@ -1251,6 +1251,10 @@
     
     <?= $scripts ?? '' ?>
     <!--end::Javascript-->
+    
+    <!--begin::API4Com WebPhone Widget-->
+    <?php include __DIR__ . '/../../partials/webphone-widget.php'; ?>
+    <!--end::API4Com WebPhone Widget-->
 </body>
 </html>
 

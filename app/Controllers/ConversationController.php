@@ -742,6 +742,28 @@ class ConversationController
                 
                 // Se está atribuída ao usuário atual ou é IA, usar a conversa existente
                 $conversationId = $existingOpenConversation['id'];
+                
+                // ✅ IMPORTANTE: Atualizar a conta de integração se o usuário selecionou uma diferente
+                if ($channel === 'whatsapp' && $whatsappAccountId) {
+                    $currentAccountId = $existingOpenConversation['whatsapp_account_id'] ?? $existingOpenConversation['integration_account_id'] ?? null;
+                    
+                    if ($currentAccountId != $whatsappAccountId) {
+                        \App\Helpers\Logger::info("newConversation - Atualizando conta de integração: {$currentAccountId} -> {$whatsappAccountId}");
+                        
+                        // Verificar se é integration_accounts ou whatsapp_accounts
+                        $integrationAccount = \App\Models\IntegrationAccount::find($whatsappAccountId);
+                        if ($integrationAccount) {
+                            \App\Models\Conversation::update($conversationId, [
+                                'integration_account_id' => $whatsappAccountId,
+                                'whatsapp_account_id' => $whatsappAccountId // Manter sincronizado
+                            ]);
+                        } else {
+                            \App\Models\Conversation::update($conversationId, [
+                                'whatsapp_account_id' => $whatsappAccountId
+                            ]);
+                        }
+                    }
+                }
             } else {
                 // ✅ NOVO: Não existe conversa ABERTA - permitir criar nova
                 // (mesmo que existam conversas fechadas)
@@ -759,13 +781,21 @@ class ConversationController
                     $conversationData['stage_id'] = $stageId;
                 }
                 
-                // Adicionar whatsapp_account_id apenas se canal for WhatsApp
+                // Adicionar whatsapp_account_id e integration_account_id se canal for WhatsApp
                 if ($channel === 'whatsapp' && $whatsappAccountId) {
-                    $conversationData['whatsapp_account_id'] = $whatsappAccountId;
+                    // Verificar se é integration_accounts ou whatsapp_accounts
+                    $integrationAccount = \App\Models\IntegrationAccount::find($whatsappAccountId);
+                    if ($integrationAccount) {
+                        $conversationData['integration_account_id'] = $whatsappAccountId;
+                        $conversationData['whatsapp_account_id'] = $whatsappAccountId; // Manter sincronizado
+                    } else {
+                        $conversationData['whatsapp_account_id'] = $whatsappAccountId;
+                    }
+                    \App\Helpers\Logger::info("newConversation - Criando conversa com conta: integration_id=" . ($conversationData['integration_account_id'] ?? 'NULL') . ", wa_id=" . ($conversationData['whatsapp_account_id'] ?? 'NULL'));
                 }
                 
                 // Criar sem executar automações (manual)
-                $conversation = \App\Services\ConversationService::create($conversationData, false);
+                $conversation = \App\Services\ConversationService::create($conversationData, false)
                 
                 $conversationId = $conversation['id'];
             }

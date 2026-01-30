@@ -11,7 +11,7 @@ class Api4ComAccount extends Model
     protected string $primaryKey = 'id';
     protected array $fillable = [
         'name', 'api_url', 'api_token', 'domain', 'enabled', 
-        'webhook_url', 'config'
+        'webhook_url', 'config', 'sip_domain', 'sip_port', 'webphone_enabled'
     ];
     protected bool $timestamps = true;
 

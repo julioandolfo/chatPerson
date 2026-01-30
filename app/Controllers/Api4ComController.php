@@ -9,6 +9,7 @@ namespace App\Controllers;
 use App\Helpers\Response;
 use App\Helpers\Request;
 use App\Helpers\Permission;
+use App\Helpers\Encryption;
 use App\Models\Api4ComAccount;
 use App\Helpers\Validator;
 
@@ -110,6 +111,11 @@ class Api4ComController
             if (isset($data['domain'])) $updateData['domain'] = $data['domain'];
             if (isset($data['enabled'])) $updateData['enabled'] = (int)$data['enabled'];
             if (isset($data['webhook_url'])) $updateData['webhook_url'] = $data['webhook_url'];
+            
+            // Campos WebPhone SIP
+            if (isset($data['sip_domain'])) $updateData['sip_domain'] = $data['sip_domain'];
+            if (isset($data['sip_port'])) $updateData['sip_port'] = (int)$data['sip_port'];
+            if (isset($data['webphone_enabled'])) $updateData['webphone_enabled'] = (int)$data['webphone_enabled'];
             
             // Processar configurações avançadas
             $config = [];
@@ -454,6 +460,178 @@ class Api4ComController
             Response::json([
                 'success' => false,
                 'message' => 'Erro ao deletar ramal: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Atualizar configurações SIP de um ramal (para WebPhone)
+     */
+    public function updateExtensionSip(int $accountId, int $extensionId): void
+    {
+        Permission::abortIfCannot('api4com.edit');
+        
+        try {
+            $extension = \App\Models\Api4ComExtension::find($extensionId);
+            if (!$extension || $extension['api4com_account_id'] != $accountId) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Ramal não encontrado'
+                ], 404);
+                return;
+            }
+
+            $data = Request::post();
+            $updateData = [];
+            
+            // Atualizar senha SIP (criptografada)
+            if (!empty($data['sip_password'])) {
+                $updateData['sip_password_encrypted'] = Encryption::encrypt($data['sip_password']);
+            }
+            
+            // Atualizar se WebPhone está habilitado
+            if (isset($data['webphone_enabled'])) {
+                $updateData['webphone_enabled'] = (int)$data['webphone_enabled'];
+            }
+            
+            if (!empty($updateData)) {
+                \App\Models\Api4ComExtension::update($extensionId, $updateData);
+            }
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Configurações SIP atualizadas com sucesso!'
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao atualizar configurações SIP: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Obter credenciais SIP para WebPhone do usuário logado
+     */
+    public function getWebphoneCredentials(): void
+    {
+        try {
+            $userId = \App\Helpers\Auth::id();
+            
+            // Buscar conta Api4Com habilitada
+            $account = Api4ComAccount::getFirstEnabled();
+            if (!$account) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Nenhuma conta Api4Com configurada'
+                ], 400);
+                return;
+            }
+            
+            // Buscar ramal do usuário
+            $extension = \App\Models\Api4ComExtension::findByUserAndAccount($userId, $account['id']);
+            if (!$extension) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Nenhum ramal associado ao seu usuário'
+                ], 400);
+                return;
+            }
+            
+            // Verificar se tem senha SIP configurada
+            if (empty($extension['sip_password_encrypted'])) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Senha SIP não configurada para este ramal. Configure em Integrações → Api4Com → Ramais'
+                ], 400);
+                return;
+            }
+            
+            // Descriptografar senha
+            $sipPassword = Encryption::decrypt($extension['sip_password_encrypted']);
+            if (!$sipPassword) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Erro ao recuperar senha SIP'
+                ], 500);
+                return;
+            }
+            
+            // Determinar domínio SIP
+            $sipDomain = $account['sip_domain'] ?? $account['domain'] ?? null;
+            if (empty($sipDomain)) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Domínio SIP não configurado. Configure em Integrações → Api4Com'
+                ], 400);
+                return;
+            }
+            
+            // Porta WebSocket
+            $sipPort = $account['sip_port'] ?? 6443;
+            
+            Response::json([
+                'success' => true,
+                'credentials' => [
+                    'domain' => $sipDomain,
+                    'port' => $sipPort,
+                    'websocket_url' => "wss://{$sipDomain}:{$sipPort}",
+                    'extension' => $extension['extension_number'],
+                    'username' => $extension['extension_number'],
+                    'password' => $sipPassword,
+                    'realm' => $sipDomain
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao obter credenciais: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Atualizar configurações WebPhone da conta
+     */
+    public function updateWebphoneSettings(int $id): void
+    {
+        Permission::abortIfCannot('api4com.edit');
+        
+        try {
+            $account = Api4ComAccount::find($id);
+            if (!$account) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Conta não encontrada'
+                ], 404);
+                return;
+            }
+
+            $data = Request::post();
+            $updateData = [];
+            
+            if (isset($data['sip_domain'])) {
+                $updateData['sip_domain'] = $data['sip_domain'];
+            }
+            if (isset($data['sip_port'])) {
+                $updateData['sip_port'] = (int)$data['sip_port'];
+            }
+            if (isset($data['webphone_enabled'])) {
+                $updateData['webphone_enabled'] = (int)$data['webphone_enabled'];
+            }
+            
+            if (!empty($updateData)) {
+                Api4ComAccount::update($id, $updateData);
+            }
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Configurações WebPhone atualizadas!'
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao atualizar configurações: ' . $e->getMessage()
             ], 500);
         }
     }

@@ -122,6 +122,10 @@ class Api4ComController
             if (!empty($data['config_phone_field'])) {
                 $config['phone_field'] = $data['config_phone_field'];
             }
+            // Novo: qual campo do ramal usar (extension_number ou extension_id)
+            if (!empty($data['config_extension_value_field'])) {
+                $config['extension_value_field'] = $data['config_extension_value_field'];
+            }
             if (!empty($config)) {
                 $updateData['config'] = json_encode($config);
             } elseif (isset($data['config'])) {

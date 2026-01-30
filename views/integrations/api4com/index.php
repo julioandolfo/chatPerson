@@ -263,21 +263,31 @@ ob_start();
                                     Altere somente se a API retornar erro. Consulte a documentação da Api4Com.
                                 </div>
                                 <div class="row g-4">
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <label class="fw-semibold fs-7 mb-2">Endpoint do Discador</label>
                                         <input type="text" name="config_dialer_endpoint" id="edit_config_dialer_endpoint" 
                                                class="form-control form-control-sm" placeholder="/api/v1/dialer" />
                                         <div class="form-text fs-8">Padrão: /api/v1/dialer</div>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-md-2">
                                         <label class="fw-semibold fs-7 mb-2">Campo Ramal</label>
                                         <input type="text" name="config_extension_field" id="edit_config_extension_field" 
                                                class="form-control form-control-sm" placeholder="extension" />
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-md-2">
                                         <label class="fw-semibold fs-7 mb-2">Campo Telefone</label>
                                         <input type="text" name="config_phone_field" id="edit_config_phone_field" 
                                                class="form-control form-control-sm" placeholder="phone" />
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="fw-semibold fs-7 mb-2">Usar valor de</label>
+                                        <select name="config_extension_value_field" id="edit_config_extension_value_field" 
+                                                class="form-select form-select-sm">
+                                            <option value="">Automático (prioriza número)</option>
+                                            <option value="extension_number">Número do Ramal (ex: 1001)</option>
+                                            <option value="extension_id">ID do Ramal (ex: 123)</option>
+                                        </select>
+                                        <div class="form-text fs-8">Se der erro "extension not found", tente trocar</div>
                                     </div>
                                 </div>
                             </div>
@@ -522,6 +532,7 @@ function editAccount(id) {
             document.getElementById("edit_config_dialer_endpoint").value = config.dialer_endpoint || "";
             document.getElementById("edit_config_extension_field").value = config.extension_field || "";
             document.getElementById("edit_config_phone_field").value = config.phone_field || "";
+            document.getElementById("edit_config_extension_value_field").value = config.extension_value_field || "";
             
             const modal = new bootstrap.Modal(document.getElementById("kt_modal_edit_api4com"));
             modal.show();

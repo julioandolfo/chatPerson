@@ -135,10 +135,33 @@ class Api4ComService
         $apiUrl = rtrim($account['api_url'], '/');
         $token = $account['api_token'];
         $authHeader = self::formatAuthHeader($token);
-        $extensionId = $extension['extension_id'] ?? $extension['extension_number'];
         
         // Configurações da conta (podem customizar endpoint e campos)
         $config = !empty($account['config']) ? json_decode($account['config'], true) : [];
+        
+        // Determinar qual valor usar para o ramal:
+        // 1. Se configurado extension_value_field, usa esse campo específico
+        // 2. Senão, prioriza extension_number (padrão em APIs de telefonia)
+        // 3. Fallback para extension_id
+        $extensionValueField = $config['extension_value_field'] ?? null;
+        if ($extensionValueField && !empty($extension[$extensionValueField])) {
+            $extensionValue = $extension[$extensionValueField];
+        } else {
+            // Priorizar extension_number (número do ramal como "1001")
+            // Se não existir, usar extension_id (ID interno como "123")
+            $extensionValue = !empty($extension['extension_number']) 
+                ? $extension['extension_number'] 
+                : ($extension['extension_id'] ?? null);
+        }
+        
+        // Validar que temos um valor para o ramal
+        if (empty($extensionValue)) {
+            Logger::error("Api4ComService::initiateApi4ComCall - Ramal sem extension_number ou extension_id. Extension: " . json_encode($extension));
+            return [
+                'success' => false,
+                'error' => 'Ramal não possui número ou ID configurado. Verifique a configuração do ramal em Integrações → Api4Com → Ramais'
+            ];
+        }
         
         // Endpoint configurável (padrão: /api/v1/dialer conforme documentação Api4Com)
         $dialerEndpoint = $config['dialer_endpoint'] ?? '/api/v1/dialer';
@@ -149,7 +172,7 @@ class Api4ComService
         $phoneField = $config['phone_field'] ?? 'phone';
         
         $payload = [
-            $extensionField => $extensionId,
+            $extensionField => $extensionValue,
             $phoneField => $toNumber
         ];
         
@@ -158,7 +181,7 @@ class Api4ComService
             $payload = array_merge($payload, $config['extra_fields']);
         }
         
-        Logger::info("Api4ComService::initiateApi4ComCall - URL: {$url}, Extension: {$extensionId}, Phone: {$toNumber}, Payload: " . json_encode($payload));
+        Logger::info("Api4ComService::initiateApi4ComCall - URL: {$url}, Extension: {$extensionValue}, Phone: {$toNumber}, Payload: " . json_encode($payload));
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [

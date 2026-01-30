@@ -440,7 +440,7 @@ class GoalBonusCondition extends Model
      */
     private static function getValidWooCommerceStatuses(): array
     {
-        return ['processing', 'completed', 'producao', 'designer', 'pedido-enviado', 'pedido-entregue'];
+        return ['processing', 'completed', 'producao', 'designer', 'pedido-enviado', 'pedido-entregue', 'etiqueta-gerada'];
     }
     
     /**

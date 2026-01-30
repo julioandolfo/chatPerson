@@ -48,8 +48,8 @@ class AgentConversionService
         $orders = self::getOrdersFromCache($sellerId, $dateFrom, $dateTo);
         
         // 4. Filtrar apenas pedidos válidos para conversão
-        // Valem: processing, completed, producao, designer, pedido-enviado, pedido-entregue
-        $validStatuses = ['processing', 'completed', 'producao', 'designer', 'pedido-enviado', 'pedido-entregue'];
+        // Valem: processing, completed, producao, designer, pedido-enviado, pedido-entregue, etiqueta-gerada
+        $validStatuses = ['processing', 'completed', 'producao', 'designer', 'pedido-enviado', 'pedido-entregue', 'etiqueta-gerada'];
         $validOrders = array_filter($orders, function($order) use ($validStatuses) {
             $status = $order['order_status'] ?? 'pending';
             return in_array($status, $validStatuses);
@@ -302,7 +302,7 @@ class AgentConversionService
         $cachedOrders = self::getOrdersFromCache($sellerId, $dateFrom, $dateTo);
         
         // Status válidos para conversão
-        $validStatuses = ['processing', 'completed', 'producao', 'designer', 'pedido-enviado', 'pedido-entregue'];
+        $validStatuses = ['processing', 'completed', 'producao', 'designer', 'pedido-enviado', 'pedido-entregue', 'etiqueta-gerada'];
         
         // Processar cada pedido do cache
         $processedOrders = [];

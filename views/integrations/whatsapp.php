@@ -172,6 +172,14 @@ ob_start();
                                             <span class="path3"></span>
                                         </i>
                                     </button>
+                                    <button type="button" class="btn btn-light-warning btn-sm" 
+                                            onclick="editAccount(<?= htmlspecialchars(json_encode($account), ENT_QUOTES) ?>)"
+                                            title="Editar Conta">
+                                        <i class="ki-duotone ki-pencil fs-4">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                    </button>
                                     <button type="button" class="btn btn-light-success btn-sm" 
                                             onclick="editAccountSettings(<?= $account['id'] ?>, <?= htmlspecialchars(json_encode($account['name']), ENT_QUOTES) ?>, <?= $account['default_funnel_id'] ?? 'null' ?>, <?= $account['default_stage_id'] ?? 'null' ?>)"
                                             title="Configurar Funil/Etapa">
@@ -442,6 +450,96 @@ ob_start();
 <?php endif; ?>
 <!--end::Modal - Editar Configurações da Conta-->
 
+<!--begin::Modal - Editar Conta WhatsApp-->
+<?php if (\App\Helpers\Permission::can('whatsapp.edit')): ?>
+<div class="modal fade" id="kt_modal_edit_whatsapp" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-650px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Editar Conta WhatsApp</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <form id="kt_modal_edit_whatsapp_form" class="form">
+                <input type="hidden" name="account_id" id="kt_edit_whatsapp_id">
+                <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                    <div class="fv-row mb-7">
+                        <label class="required fw-semibold fs-6 mb-2">Nome da Conta</label>
+                        <input type="text" name="name" id="kt_edit_whatsapp_name" class="form-control form-control-solid" 
+                               placeholder="Ex: WhatsApp Principal" required />
+                    </div>
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Número do WhatsApp</label>
+                        <input type="text" name="phone_number" id="kt_edit_whatsapp_phone" class="form-control form-control-solid" 
+                               placeholder="5511999999999" readonly />
+                        <div class="form-text text-warning">O número não pode ser alterado após a criação</div>
+                    </div>
+                    <div class="fv-row mb-7">
+                        <label class="required fw-semibold fs-6 mb-2">URL da API</label>
+                        <input type="url" name="api_url" id="kt_edit_whatsapp_api_url" class="form-control form-control-solid" 
+                               placeholder="https://whats.seudominio.com" required />
+                        <div class="form-text">URL base da sua instalação Quepasa (ex: https://whats.seudominio.com)</div>
+                    </div>
+                    <div class="fv-row mb-7">
+                        <label class="required fw-semibold fs-6 mb-2">Quepasa User</label>
+                        <input type="text" name="quepasa_user" id="kt_edit_whatsapp_user" class="form-control form-control-solid" 
+                               placeholder="julio" required />
+                        <div class="form-text">Identificador do usuário (X-QUEPASA-USER). Ex: julio, personizi, etc.</div>
+                    </div>
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Quepasa TrackId</label>
+                        <input type="text" name="quepasa_trackid" id="kt_edit_whatsapp_trackid" class="form-control form-control-solid" 
+                               placeholder="nome_da_conta" />
+                        <div class="form-text">Identificador único para rastreamento (X-QUEPASA-TRACKID). Deixe vazio para usar o nome da conta.</div>
+                    </div>
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Token da API (opcional)</label>
+                        <input type="text" name="api_key" id="kt_edit_whatsapp_api_key" class="form-control form-control-solid" 
+                               placeholder="Token será gerado automaticamente se vazio" />
+                        <div class="form-text">Se deixar vazio, um token será gerado automaticamente ao escanear o QR Code</div>
+                    </div>
+                    
+                    <div class="separator separator-dashed my-5"></div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Status Atual</label>
+                        <div id="kt_edit_whatsapp_status_display" class="form-control form-control-solid bg-light-secondary"></div>
+                    </div>
+                    
+                    <div class="notice d-flex bg-light-info rounded border-info border border-dashed p-4">
+                        <i class="ki-duotone ki-information-5 fs-2tx text-info me-4">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div class="d-flex flex-stack flex-grow-1">
+                            <div class="fw-semibold">
+                                <div class="fs-6 text-gray-700">
+                                    Após alterar a URL da API, você precisará escanear o QR Code novamente para reconectar.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer flex-center">
+                    <button type="reset" data-bs-dismiss="modal" class="btn btn-light me-3">Cancelar</button>
+                    <button type="submit" id="kt_modal_edit_whatsapp_submit" class="btn btn-primary">
+                        <span class="indicator-label">Salvar Alterações</span>
+                        <span class="indicator-progress">Aguarde...
+                        <span class="spinner-border spinner-border-sm align-middle ms-2"></span></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+<!--end::Modal - Editar Conta WhatsApp-->
+
 <!--begin::Modal - Configurar WavoIP-->
 <?php if (\App\Helpers\Permission::can('whatsapp.edit')): ?>
 <div class="modal fade" id="kt_modal_wavoip" tabindex="-1" aria-hidden="true">
@@ -556,7 +654,31 @@ function loadFunnelStages(funnelId, targetSelectId, callback) {
     });
 }
 
-// Abrir modal de edição de configurações
+// Abrir modal de edição da conta (campos principais)
+function editAccount(account) {
+    document.getElementById("kt_edit_whatsapp_id").value = account.id;
+    document.getElementById("kt_edit_whatsapp_name").value = account.name || '';
+    document.getElementById("kt_edit_whatsapp_phone").value = account.phone_number || '';
+    document.getElementById("kt_edit_whatsapp_api_url").value = account.api_url || '';
+    document.getElementById("kt_edit_whatsapp_user").value = account.quepasa_user || '';
+    document.getElementById("kt_edit_whatsapp_trackid").value = account.quepasa_trackid || '';
+    document.getElementById("kt_edit_whatsapp_api_key").value = ''; // Não exibir token por segurança
+    
+    // Exibir status atual
+    const statusDisplay = document.getElementById("kt_edit_whatsapp_status_display");
+    const statusLabels = {
+        'active': '✅ Conectado',
+        'inactive': '⚪ Inativo',
+        'disconnected': '❌ Desconectado'
+    };
+    statusDisplay.textContent = statusLabels[account.status] || account.status || 'Desconhecido';
+    
+    // Abrir modal
+    const modal = new bootstrap.Modal(document.getElementById("kt_modal_edit_whatsapp"));
+    modal.show();
+}
+
+// Abrir modal de edição de configurações (funil/etapa)
 function editAccountSettings(accountId, accountName, funnelId, stageId) {
     document.getElementById("kt_edit_account_id").value = accountId;
     document.getElementById("kt_edit_account_name").textContent = accountName;
@@ -705,6 +827,64 @@ document.addEventListener("DOMContentLoaded", function() {
                 submitBtn.removeAttribute("data-kt-indicator");
                 submitBtn.disabled = false;
                 alert("Erro ao atualizar configurações");
+            });
+        });
+    }
+    
+    // Handler do formulário de edição da conta WhatsApp
+    const editWhatsappForm = document.getElementById("kt_modal_edit_whatsapp_form");
+    if (editWhatsappForm) {
+        editWhatsappForm.addEventListener("submit", function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById("kt_modal_edit_whatsapp_submit");
+            submitBtn.setAttribute("data-kt-indicator", "on");
+            submitBtn.disabled = true;
+            
+            const accountId = document.getElementById("kt_edit_whatsapp_id").value;
+            const formData = new FormData(editWhatsappForm);
+            
+            fetch("<?= \App\Helpers\Url::to('/integrations/whatsapp') ?>/" + accountId, {
+                method: "POST",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                submitBtn.removeAttribute("data-kt-indicator");
+                submitBtn.disabled = false;
+                
+                if (data.success) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_edit_whatsapp"));
+                    modal.hide();
+                    
+                    // Mostrar mensagem de sucesso
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Conta Atualizada!',
+                        text: data.message || 'As configurações foram salvas. Se você alterou a URL da API, escaneie o QR Code novamente.',
+                        confirmButtonText: 'OK'
+                    }).then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro',
+                        text: data.message || 'Erro ao atualizar conta'
+                    });
+                }
+            })
+            .catch(error => {
+                submitBtn.removeAttribute("data-kt-indicator");
+                submitBtn.disabled = false;
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erro',
+                    text: 'Erro ao atualizar conta: ' + error.message
+                });
             });
         });
     }

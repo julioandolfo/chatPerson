@@ -517,6 +517,7 @@ class Api4ComController
     {
         try {
             $userId = \App\Helpers\Auth::id();
+            \App\Helpers\Logger::api4com("getWebphoneCredentials - Iniciando para user_id: {$userId}");
             
             // Buscar conta Api4Com habilitada
             $account = Api4ComAccount::getFirstEnabled();
@@ -583,6 +584,7 @@ class Api4ComController
                 ]
             ]);
         } catch (\Exception $e) {
+            \App\Helpers\Logger::api4com("getWebphoneCredentials - Erro: " . $e->getMessage() . " | Trace: " . $e->getTraceAsString(), 'ERROR');
             Response::json([
                 'success' => false,
                 'message' => 'Erro ao obter credenciais: ' . $e->getMessage()

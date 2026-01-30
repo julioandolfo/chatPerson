@@ -3754,9 +3754,6 @@ class ConversationController
      */
     public function changeAccount(int $id): void
     {
-        // Verificar se tem permissão de visualizar conversas (mínimo necessário)
-        Permission::abortIfCannot('conversations.view');
-        
         try {
             $data = Request::json();
             $newAccountId = $data['account_id'] ?? null;
@@ -3770,14 +3767,36 @@ class ConversationController
                 throw new \Exception('Conversa não encontrada');
             }
             
-            // Verificar permissão: pode editar se for admin OU se estiver atribuído à conversa
+            // Verificar permissão: pode editar se for admin OU se estiver atribuído/participante à conversa
             $currentUserId = \App\Helpers\Auth::id();
             $isAdmin = Permission::isAdmin() || Permission::isSuperAdmin();
-            $isAssigned = ($conversation['agent_id'] == $currentUserId);
-            $canEdit = Permission::can('conversations.edit') || Permission::can('conversations.edit.all');
+            $isAssigned = !empty($conversation['agent_id']) && ((int)$conversation['agent_id'] === (int)$currentUserId);
             
-            if (!$isAdmin && !$isAssigned && !$canEdit) {
-                throw new \Exception('Você não tem permissão para alterar o número desta conversa. Apenas o agente atribuído ou administradores podem fazer isso.');
+            // Verificar se é participante da conversa
+            $isParticipant = false;
+            try {
+                $participants = \App\Models\ConversationParticipant::getByConversation($id);
+                foreach ($participants as $p) {
+                    if ((int)$p['user_id'] === (int)$currentUserId) {
+                        $isParticipant = true;
+                        break;
+                    }
+                }
+            } catch (\Exception $e) {
+                // Ignorar erro
+            }
+            
+            $canEdit = Permission::can('conversations.edit') || Permission::can('conversations.edit.all');
+            $canEditOwn = Permission::can('conversations.edit.own') && $isAssigned;
+            
+            \App\Helpers\Logger::info("changeAccount - userId={$currentUserId}, agent_id={$conversation['agent_id']}, isAdmin=" . ($isAdmin ? 'Y' : 'N') . ", isAssigned=" . ($isAssigned ? 'Y' : 'N') . ", isParticipant=" . ($isParticipant ? 'Y' : 'N') . ", canEdit=" . ($canEdit ? 'Y' : 'N'));
+            
+            if (!$isAdmin && !$isAssigned && !$isParticipant && !$canEdit && !$canEditOwn) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Você não tem permissão para alterar o número desta conversa. Apenas o agente atribuído, participantes ou administradores podem fazer isso.'
+                ], 403);
+                return;
             }
             
             // Verificar se a conta existe

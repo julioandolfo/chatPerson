@@ -623,7 +623,18 @@ class ConversationService
         // ✅ VERIFICAÇÃO: Só registrar no histórico se o agente mudou de fato
         $agentChanged = ($oldAgentId != $agentId);
         
-        Conversation::update($conversationId, ['agent_id' => $agentId]);
+        // Preparar dados de atualização
+        $updateData = ['agent_id' => $agentId];
+        
+        // ✅ Se o agente mudou, marcar como não lida e atualizar timestamp para aparecer no topo
+        if ($agentChanged && $oldAgentId !== null) {
+            $updateData['unread_count'] = ($conversation['unread_count'] ?? 0) + 1; // Incrementar não lidas
+            $updateData['last_message_at'] = date('Y-m-d H:i:s'); // Atualizar para "agora"
+            $updateData['updated_at'] = date('Y-m-d H:i:s');
+            Logger::info("ConversationService::assignToAgent - Conversa marcada como não lida para novo agente {$agentId} e movida para topo da lista");
+        }
+        
+        Conversation::update($conversationId, $updateData);
         
         // Registrar no histórico de atribuições APENAS se houve mudança
         if ($agentChanged) {

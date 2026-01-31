@@ -252,14 +252,24 @@ class DashboardController
                 error_log("Erro ao carregar métricas de atendimento: " . $e->getMessage());
             }
             
-            // Estatísticas de ligações API4Com
+            // Estatísticas de ligações API4Com (sem filtro de agente para ver todas)
             $callStats = [];
             $recentCalls = [];
+            $callAnalysisStats = [];
+            $recentCallAnalyses = [];
             try {
                 if (class_exists('\App\Models\Api4ComCall')) {
-                    $callStats = \App\Models\Api4ComCall::getStats($dateFrom, str_replace(' 23:59:59', '', $dateTo), $agentIds);
-                    $recentCalls = \App\Models\Api4ComCall::getRecent(10, $agentIds);
+                    // Não filtrar por agente - mostrar todas as chamadas do período
+                    $callStats = \App\Models\Api4ComCall::getStats($dateFrom, str_replace(' 23:59:59', '', $dateTo), null);
+                    $recentCalls = \App\Models\Api4ComCall::getRecent(10, null);
                     self::logDash("callStats=" . json_encode($callStats));
+                }
+                
+                // Estatísticas de análise de chamadas
+                if (class_exists('\App\Models\Api4ComCallAnalysis')) {
+                    $callAnalysisStats = \App\Models\Api4ComCallAnalysis::getStats($dateFrom, str_replace(' 23:59:59', '', $dateTo));
+                    $recentCallAnalyses = \App\Models\Api4ComCallAnalysis::getRecent(5);
+                    self::logDash("callAnalysisStats=" . json_encode($callAnalysisStats));
                 }
             } catch (\Exception $e) {
                 error_log("Erro ao carregar estatísticas de ligações: " . $e->getMessage());
@@ -286,7 +296,9 @@ class DashboardController
                 'goalsOverview' => $goalsOverview,
                 'agentAttendanceMetrics' => $agentAttendanceMetrics,
                 'callStats' => $callStats,
-                'recentCalls' => $recentCalls
+                'recentCalls' => $recentCalls,
+                'callAnalysisStats' => $callAnalysisStats,
+                'recentCallAnalyses' => $recentCallAnalyses
             ]);
         } catch (\Exception $e) {
             self::logDash("ERRO CRÍTICO: " . $e->getMessage());

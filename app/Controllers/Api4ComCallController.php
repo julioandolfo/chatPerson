@@ -352,5 +352,85 @@ class Api4ComCallController
             'calls' => $calls
         ]);
     }
+
+    /**
+     * Obter análise de uma chamada
+     */
+    public function getAnalysis(int $id): void
+    {
+        try {
+            $analysis = \App\Models\Api4ComCallAnalysis::find($id);
+            
+            if (!$analysis) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Análise não encontrada'
+                ], 404);
+                return;
+            }
+            
+            Response::json([
+                'success' => true,
+                'analysis' => $analysis
+            ]);
+            
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao buscar análise: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Analisar uma chamada manualmente
+     */
+    public function analyzeCall(int $id): void
+    {
+        Permission::abortIfCannot('api4com_calls.view');
+        
+        try {
+            $call = Api4ComCall::find($id);
+            
+            if (!$call) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Chamada não encontrada'
+                ], 404);
+                return;
+            }
+            
+            if (empty($call['recording_url'])) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Chamada não possui gravação'
+                ], 400);
+                return;
+            }
+            
+            // Iniciar análise
+            $result = \App\Services\CallPerformanceAnalysisService::analyzeCall($id);
+            
+            if ($result['success']) {
+                Response::json([
+                    'success' => true,
+                    'message' => 'Análise iniciada com sucesso!',
+                    'analysis_id' => $result['analysis_id'],
+                    'overall_score' => $result['overall_score'] ?? null
+                ]);
+            } else {
+                Response::json([
+                    'success' => false,
+                    'message' => $result['error'] ?? 'Erro ao analisar chamada'
+                ], 500);
+            }
+            
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao analisar chamada: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
 

@@ -291,6 +291,182 @@ ob_start();
 <?php endif; ?>
 <!--end::Row - Estatísticas de Ligações API4Com-->
 
+<!--begin::Row - Análise de Performance de Chamadas-->
+<?php if (!empty($callAnalysisStats) && $callAnalysisStats['total_analyzed'] > 0): ?>
+<div class="row g-5 mb-5">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-3 mb-1">
+                        <i class="ki-duotone ki-chart-line-star text-primary me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        Análise de Performance em Chamadas
+                    </span>
+                    <span class="text-muted mt-1 fw-semibold fs-7"><?= $callAnalysisStats['total_analyzed'] ?> chamadas analisadas</span>
+                </h3>
+                <div class="card-toolbar">
+                    <span class="badge badge-light-<?= \App\Models\Api4ComCallAnalysis::getScoreColor($callAnalysisStats['avg_overall_score']) ?> fs-6">
+                        Score Médio: <?= number_format($callAnalysisStats['avg_overall_score'], 1) ?>/5.0
+                    </span>
+                </div>
+            </div>
+            <div class="card-body pt-0">
+                <div class="row g-4 mb-5">
+                    <!-- Resultados das Chamadas -->
+                    <div class="col-xl-3 col-md-6">
+                        <div class="d-flex align-items-center bg-light-success rounded p-3">
+                            <span class="bullet bullet-vertical h-40px bg-success me-3"></span>
+                            <div>
+                                <div class="text-gray-900 fw-bold fs-3"><?= $callAnalysisStats['outcomes']['positive'] ?></div>
+                                <div class="text-muted fw-semibold">Positivas</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="d-flex align-items-center bg-light-danger rounded p-3">
+                            <span class="bullet bullet-vertical h-40px bg-danger me-3"></span>
+                            <div>
+                                <div class="text-gray-900 fw-bold fs-3"><?= $callAnalysisStats['outcomes']['negative'] ?></div>
+                                <div class="text-muted fw-semibold">Negativas</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="d-flex align-items-center bg-light-warning rounded p-3">
+                            <span class="bullet bullet-vertical h-40px bg-warning me-3"></span>
+                            <div>
+                                <div class="text-gray-900 fw-bold fs-3"><?= $callAnalysisStats['outcomes']['followup_needed'] ?></div>
+                                <div class="text-muted fw-semibold">Requer Follow-up</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="d-flex align-items-center bg-light-secondary rounded p-3">
+                            <span class="bullet bullet-vertical h-40px bg-secondary me-3"></span>
+                            <div>
+                                <div class="text-gray-900 fw-bold fs-3"><?= $callAnalysisStats['outcomes']['neutral'] ?></div>
+                                <div class="text-muted fw-semibold">Neutras</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Dimensões de Avaliação -->
+                <h6 class="text-gray-800 fw-bold mb-3">
+                    <i class="ki-duotone ki-chart-simple-2 me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                        <span class="path4"></span>
+                    </i>
+                    Médias por Dimensão
+                </h6>
+                <div class="row g-3">
+                    <?php 
+                    $dimensionLabels = \App\Models\Api4ComCallAnalysis::getDimensionLabels();
+                    foreach ($callAnalysisStats['dimensions'] as $key => $score): 
+                        $color = \App\Models\Api4ComCallAnalysis::getScoreColor($score);
+                    ?>
+                    <div class="col-xl-2 col-md-4 col-6">
+                        <div class="border rounded p-2 text-center">
+                            <div class="fs-4 fw-bold text-<?= $color ?>"><?= number_format($score, 1) ?></div>
+                            <div class="text-muted fs-8"><?= $dimensionLabels[$key] ?? ucfirst($key) ?></div>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Análises Recentes -->
+<?php if (!empty($recentCallAnalyses)): ?>
+<div class="card mb-5">
+    <div class="card-header border-0 pt-5">
+        <h3 class="card-title align-items-start flex-column">
+            <span class="card-label fw-bold fs-3 mb-1">
+                <i class="ki-duotone ki-document text-primary me-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                Análises Recentes de Chamadas
+            </span>
+        </h3>
+    </div>
+    <div class="card-body py-3">
+        <div class="table-responsive">
+            <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
+                <thead>
+                    <tr class="fw-bold text-muted">
+                        <th class="min-w-120px">Agente</th>
+                        <th class="min-w-100px">Número</th>
+                        <th class="min-w-80px">Score</th>
+                        <th class="min-w-100px">Resultado</th>
+                        <th class="min-w-150px">Resumo</th>
+                        <th class="min-w-80px">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($recentCallAnalyses as $analysis): ?>
+                    <tr>
+                        <td>
+                            <span class="text-gray-800 fw-bold"><?= htmlspecialchars($analysis['agent_name'] ?? 'N/A') ?></span>
+                        </td>
+                        <td>
+                            <span class="text-gray-600 fs-7"><?= htmlspecialchars($analysis['to_number'] ?? '') ?></span>
+                        </td>
+                        <td>
+                            <span class="badge badge-light-<?= \App\Models\Api4ComCallAnalysis::getScoreColor((float)$analysis['overall_score']) ?> fs-6">
+                                <?= number_format((float)$analysis['overall_score'], 1) ?>
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge badge-light-<?= \App\Models\Api4ComCallAnalysis::getOutcomeColor($analysis['call_outcome'] ?? 'neutral') ?>">
+                                <?= \App\Models\Api4ComCallAnalysis::getOutcomeLabel($analysis['call_outcome'] ?? 'neutral') ?>
+                            </span>
+                        </td>
+                        <td>
+                            <span class="text-gray-600 fs-7">
+                                <?= htmlspecialchars(substr($analysis['summary'] ?? '', 0, 80)) ?>...
+                            </span>
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-icon btn-light-info" 
+                                    onclick="showCallAnalysis(<?= $analysis['id'] ?>)" 
+                                    title="Ver análise completa">
+                                <i class="ki-duotone ki-eye fs-4">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                            </button>
+                            <?php if (!empty($analysis['recording_url'])): ?>
+                            <button type="button" class="btn btn-sm btn-icon btn-light-primary" 
+                                    onclick="playRecording('<?= htmlspecialchars($analysis['recording_url']) ?>')" 
+                                    title="Ouvir gravação">
+                                <i class="ki-duotone ki-headphones fs-4">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                            </button>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+<?php endif; ?>
+<!--end::Row - Análise de Performance de Chamadas-->
+
 <!--begin::Row - Metas-->
 <?php if (!empty($goalsSummary) && $goalsSummary['total_goals'] > 0): ?>
 <div class="card mb-5">
@@ -3706,6 +3882,136 @@ function playRecording(url) {
     
     // Auto-play
     audio.play().catch(() => {});
+}
+
+// Mostrar análise completa de chamada
+function showCallAnalysis(analysisId) {
+    // Buscar dados da análise via AJAX
+    fetch(`<?= \App\Helpers\Url::to('/api4com-calls/analysis/') ?>${analysisId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                Swal.fire('Erro', data.message || 'Erro ao carregar análise', 'error');
+                return;
+            }
+            
+            const analysis = data.analysis;
+            const dimensionLabels = {
+                'opening': 'Abertura',
+                'tone': 'Tom de Voz',
+                'listening': 'Escuta Ativa',
+                'objection_handling': 'Quebra de Objeções',
+                'value_proposition': 'Proposta de Valor',
+                'closing': 'Fechamento',
+                'qualification': 'Qualificação',
+                'control': 'Controle',
+                'professionalism': 'Profissionalismo',
+                'empathy': 'Empatia'
+            };
+            
+            const outcomeLabels = {
+                'positive': 'Positivo',
+                'negative': 'Negativo',
+                'neutral': 'Neutro',
+                'followup_needed': 'Requer Follow-up'
+            };
+            
+            const outcomeColors = {
+                'positive': 'success',
+                'negative': 'danger',
+                'neutral': 'secondary',
+                'followup_needed': 'warning'
+            };
+            
+            // Construir HTML das dimensões
+            let dimensionsHtml = '<div class="row g-2">';
+            const dimensions = ['opening', 'tone', 'listening', 'objection_handling', 'value_proposition', 
+                               'closing', 'qualification', 'control', 'professionalism', 'empathy'];
+            dimensions.forEach(dim => {
+                const score = parseFloat(analysis['score_' + dim] || 0);
+                const color = score >= 4.5 ? 'success' : (score >= 3.5 ? 'primary' : (score >= 2.5 ? 'warning' : 'danger'));
+                dimensionsHtml += `
+                    <div class="col-6 col-md-4">
+                        <div class="border rounded p-2 text-center">
+                            <div class="fs-5 fw-bold text-${color}">${score.toFixed(1)}</div>
+                            <div class="text-muted fs-8">${dimensionLabels[dim]}</div>
+                        </div>
+                    </div>`;
+            });
+            dimensionsHtml += '</div>';
+            
+            // Parse arrays JSON
+            const strengths = JSON.parse(analysis.strengths || '[]');
+            const weaknesses = JSON.parse(analysis.weaknesses || '[]');
+            const suggestions = JSON.parse(analysis.suggestions || '[]');
+            
+            // Construir listas
+            const strengthsHtml = strengths.length > 0 
+                ? strengths.map(s => `<li class="text-success">${escapeHtml(s)}</li>`).join('')
+                : '<li class="text-muted">Nenhum ponto forte identificado</li>';
+            
+            const weaknessesHtml = weaknesses.length > 0 
+                ? weaknesses.map(w => `<li class="text-danger">${escapeHtml(w)}</li>`).join('')
+                : '<li class="text-muted">Nenhum ponto fraco identificado</li>';
+            
+            const suggestionsHtml = suggestions.length > 0 
+                ? suggestions.map(s => `<li class="text-primary">${escapeHtml(s)}</li>`).join('')
+                : '<li class="text-muted">Nenhuma sugestão</li>';
+            
+            const outcome = analysis.call_outcome || 'neutral';
+            
+            Swal.fire({
+                title: `<i class="ki-duotone ki-chart-line-star me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i> Análise da Chamada`,
+                html: `
+                    <div class="text-start">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <div>
+                                <span class="badge badge-light-${outcomeColors[outcome]} fs-6">${outcomeLabels[outcome]}</span>
+                            </div>
+                            <div class="text-end">
+                                <span class="fs-1 fw-bold text-primary">${parseFloat(analysis.overall_score || 0).toFixed(1)}</span>
+                                <span class="text-muted">/5.0</span>
+                            </div>
+                        </div>
+                        
+                        <h6 class="fw-bold mb-2">📊 Scores por Dimensão</h6>
+                        ${dimensionsHtml}
+                        
+                        <h6 class="fw-bold mt-4 mb-2">📝 Resumo</h6>
+                        <p class="text-gray-600">${escapeHtml(analysis.summary || 'Sem resumo')}</p>
+                        
+                        <div class="row mt-4">
+                            <div class="col-md-4">
+                                <h6 class="fw-bold text-success mb-2">✅ Pontos Fortes</h6>
+                                <ul class="ps-3 fs-7">${strengthsHtml}</ul>
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="fw-bold text-danger mb-2">❌ Pontos Fracos</h6>
+                                <ul class="ps-3 fs-7">${weaknessesHtml}</ul>
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="fw-bold text-primary mb-2">💡 Sugestões</h6>
+                                <ul class="ps-3 fs-7">${suggestionsHtml}</ul>
+                            </div>
+                        </div>
+                        
+                        ${analysis.transcription ? `
+                            <h6 class="fw-bold mt-4 mb-2">🎙️ Transcrição</h6>
+                            <div class="bg-light rounded p-3 fs-7" style="max-height: 200px; overflow-y: auto;">
+                                ${escapeHtml(analysis.transcription)}
+                            </div>
+                        ` : ''}
+                    </div>
+                `,
+                width: '800px',
+                showCloseButton: true,
+                showConfirmButton: false
+            });
+        })
+        .catch(error => {
+            console.error('Erro ao carregar análise:', error);
+            Swal.fire('Erro', 'Erro ao carregar análise', 'error');
+        });
 }
 </script>
 SCRIPT;

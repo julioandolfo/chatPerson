@@ -261,10 +261,26 @@ class Api4ComWebPhone {
             
             // Eventos
             this.simpleUser.delegate = {
-                onCallReceived: () => {
+                onCallReceived: async () => {
                     console.log('[API4Com WebPhone] Chamada recebida');
-                    this.updateStatus('ringing', 'Chamada recebida');
-                    this.showIncomingCall();
+                    
+                    // Auto-atender chamadas (Click-to-Call)
+                    if (this.options.autoAnswer) {
+                        console.log('[API4Com WebPhone] Auto-atendendo chamada...');
+                        this.updateStatus('connecting', 'Conectando...');
+                        try {
+                            await this.simpleUser.answer();
+                            console.log('[API4Com WebPhone] Chamada atendida automaticamente');
+                        } catch (e) {
+                            console.error('[API4Com WebPhone] Erro ao auto-atender:', e);
+                            this.updateStatus('ringing', 'Chamada recebida');
+                            this.showIncomingCall();
+                        }
+                    } else {
+                        this.updateStatus('ringing', 'Chamada recebida');
+                        this.showIncomingCall();
+                    }
+                    
                     if (this.options.onCallStart) {
                         this.options.onCallStart(this.simpleUser);
                     }

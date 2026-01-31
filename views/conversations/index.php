@@ -5408,6 +5408,14 @@ function startApi4ComCall(conversationId) {
 }
 
 function executeApi4ComCall(conversationId) {
+    // Expandir o painel do WebPhone ANTES de iniciar a chamada
+    const webphonePanel = document.getElementById('webphone-panel');
+    const webphoneToggle = document.getElementById('webphone-toggle');
+    if (webphonePanel && webphoneToggle) {
+        webphonePanel.style.display = 'block';
+        webphoneToggle.style.display = 'none';
+    }
+    
     // Desabilitar botão durante a requisição
     const btn = document.getElementById('btnApi4ComCall');
     if (btn) {
@@ -12977,6 +12985,19 @@ function addMessageToChat(message) {
         // Notas internas ficam alinhadas á direita como mensagens enviadas
         messageDiv.className = 'chat-message note outgoing';
         const senderName = message.sender_name || 'Sistema';
+        
+        // Verificar se o conteúdo é HTML (notas de sistema como ligações)
+        const isHtmlContent = message.content && (
+            message.content.includes('<strong>') || 
+            message.content.includes('<br>') || 
+            message.content.includes('📞') ||
+            message.content.includes('✅') ||
+            message.content.includes('📴') ||
+            message.content.includes('❌')
+        );
+        
+        const noteContent = isHtmlContent ? message.content : nl2br(escapeHtml(message.content));
+        
         messageDiv.innerHTML = `
             <div class="message-content">
                 <div class="message-bubble">
@@ -12987,7 +13008,7 @@ function addMessageToChat(message) {
                         </i>
                         Nota Interna • ${escapeHtml(senderName)}
                     </div>
-                    ${nl2br(escapeHtml(message.content))}
+                    ${noteContent}
                 </div>
                 <div class="message-time">${formatTime(message.created_at)}</div>
             </div>

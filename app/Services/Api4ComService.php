@@ -420,9 +420,18 @@ class Api4ComService
     public static function createCallNote(array $call, string $event = 'started'): void
     {
         try {
-            if (empty($call['conversation_id']) || empty($call['agent_id'])) {
+            Logger::api4com("createCallNote - Iniciando para evento: {$event}, call_id: " . ($call['id'] ?? 'N/A'));
+            
+            if (empty($call['conversation_id'])) {
+                Logger::api4com("createCallNote - Sem conversation_id, abortando");
                 return;
             }
+            if (empty($call['agent_id'])) {
+                Logger::api4com("createCallNote - Sem agent_id, abortando");
+                return;
+            }
+            
+            Logger::api4com("createCallNote - conversation_id: {$call['conversation_id']}, agent_id: {$call['agent_id']}");
             
             $agentName = 'Agente';
             if (!empty($call['agent_id'])) {
@@ -526,11 +535,14 @@ class Api4ComService
      */
     private static function normalizePhoneNumber(string $phone): string
     {
+        $original = $phone;
+        
         // Remover caracteres especiais exceto +
         $phone = preg_replace('/[^0-9+]/', '', $phone);
         
         // Se já começa com +, manter
         if (strpos($phone, '+') === 0) {
+            Logger::api4com("normalizePhoneNumber - Original: {$original} → Normalizado: {$phone} (já tinha +)");
             return $phone;
         }
         
@@ -546,6 +558,7 @@ class Api4ComService
             $phone = '+' . $phone;
         }
         
+        Logger::api4com("normalizePhoneNumber - Original: {$original} → Normalizado: {$phone}");
         return $phone;
     }
 

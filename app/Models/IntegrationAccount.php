@@ -16,7 +16,12 @@ class IntegrationAccount extends Model
         'config', 'webhook_url', 'webhook_secret', 
         'default_funnel_id', 'default_stage_id', 
         'last_sync_at', 'error_message',
-        'whatsapp_id' // ID correspondente em whatsapp_accounts
+        'whatsapp_id', // ID correspondente em whatsapp_accounts
+        // Campos de limite de novas conversas (rate limit)
+        'new_conv_limit_enabled',
+        'new_conv_limit_count',
+        'new_conv_limit_period',
+        'new_conv_limit_period_value'
     ];
     protected bool $timestamps = true;
 

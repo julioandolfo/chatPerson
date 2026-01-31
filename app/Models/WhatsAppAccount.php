@@ -30,7 +30,12 @@ class WhatsAppAccount extends Model
         'last_connection_check',
         'last_connection_result',
         'last_connection_message',
-        'consecutive_failures'
+        'consecutive_failures',
+        // Campos de limite de novas conversas (rate limit)
+        'new_conv_limit_enabled',
+        'new_conv_limit_count',
+        'new_conv_limit_period',
+        'new_conv_limit_period_value'
     ];
     protected bool $timestamps = true;
 

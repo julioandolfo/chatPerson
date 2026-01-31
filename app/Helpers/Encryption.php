@@ -62,23 +62,40 @@ class Encryption
         }
         
         try {
-            $key = self::getKey();
-            $data = base64_decode($encryptedData);
+            // Verificar se parece ser base64 válido (dados criptografados)
+            $data = base64_decode($encryptedData, true);
             
+            // Se não é base64 válido, provavelmente é texto puro (legado)
             if ($data === false) {
-                return null;
+                Logger::api4com("Encryption::decrypt - Dados não são base64, retornando como texto puro (legado)");
+                return $encryptedData;
             }
             
             $ivLength = openssl_cipher_iv_length(self::$cipher);
+            
+            // Se o tamanho não é suficiente para IV + dados, provavelmente é texto puro
+            if (strlen($data) <= $ivLength) {
+                Logger::api4com("Encryption::decrypt - Dados muito curtos para criptografia, retornando como texto puro (legado)");
+                return $encryptedData;
+            }
+            
             $iv = substr($data, 0, $ivLength);
             $encrypted = substr($data, $ivLength);
             
+            $key = self::getKey();
             $decrypted = openssl_decrypt($encrypted, self::$cipher, $key, OPENSSL_RAW_DATA, $iv);
             
-            return $decrypted !== false ? $decrypted : null;
+            // Se descriptografia falhar, pode ser texto puro que por acaso é base64 válido
+            if ($decrypted === false) {
+                Logger::api4com("Encryption::decrypt - Falha na descriptografia, retornando como texto puro (legado)");
+                return $encryptedData;
+            }
+            
+            return $decrypted;
         } catch (\Exception $e) {
             Logger::error("Encryption::decrypt - Erro: " . $e->getMessage());
-            return null;
+            // Em caso de qualquer erro, retornar dados originais (pode ser texto puro)
+            return $encryptedData;
         }
     }
     

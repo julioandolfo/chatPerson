@@ -302,30 +302,45 @@ class IntegrationController
             }
             
             // Processar campos de limite de novas conversas
+            $rateLimitFields = [];
             if (isset($data['new_conv_limit_enabled'])) {
-                $data['new_conv_limit_enabled'] = ($data['new_conv_limit_enabled'] === '1' || $data['new_conv_limit_enabled'] === 'on' || $data['new_conv_limit_enabled'] === true) ? 1 : 0;
+                $rateLimitFields['new_conv_limit_enabled'] = ($data['new_conv_limit_enabled'] === '1' || $data['new_conv_limit_enabled'] === 'on' || $data['new_conv_limit_enabled'] === true) ? 1 : 0;
+                unset($data['new_conv_limit_enabled']);
             }
             if (isset($data['new_conv_limit_count'])) {
-                $data['new_conv_limit_count'] = (int)$data['new_conv_limit_count'];
+                $rateLimitFields['new_conv_limit_count'] = (int)$data['new_conv_limit_count'];
+                unset($data['new_conv_limit_count']);
+            }
+            if (isset($data['new_conv_limit_period'])) {
+                $rateLimitFields['new_conv_limit_period'] = $data['new_conv_limit_period'];
+                unset($data['new_conv_limit_period']);
             }
             if (isset($data['new_conv_limit_period_value'])) {
-                $data['new_conv_limit_period_value'] = (int)$data['new_conv_limit_period_value'];
+                $rateLimitFields['new_conv_limit_period_value'] = (int)$data['new_conv_limit_period_value'];
+                unset($data['new_conv_limit_period_value']);
+            }
+            
+            // Tentar atualizar campos de rate limit separadamente (podem não existir ainda)
+            if (!empty($rateLimitFields)) {
+                try {
+                    WhatsAppAccount::update($id, $rateLimitFields);
+                } catch (\Exception $e) {
+                    // Ignorar se as colunas não existem ainda
+                    \App\Helpers\Logger::warning("Rate limit columns may not exist yet: " . $e->getMessage());
+                }
             }
 
             if (WhatsAppAccount::update($id, $data)) {
                 // Também atualizar em integration_accounts se existir
-                try {
-                    $integrationAccount = \App\Models\IntegrationAccount::where('whatsapp_id', $id);
-                    if ($integrationAccount) {
-                        \App\Models\IntegrationAccount::update($integrationAccount['id'], [
-                            'new_conv_limit_enabled' => $data['new_conv_limit_enabled'] ?? 0,
-                            'new_conv_limit_count' => $data['new_conv_limit_count'] ?? 10,
-                            'new_conv_limit_period' => $data['new_conv_limit_period'] ?? 'hours',
-                            'new_conv_limit_period_value' => $data['new_conv_limit_period_value'] ?? 1
-                        ]);
+                if (!empty($rateLimitFields)) {
+                    try {
+                        $integrationAccount = \App\Models\IntegrationAccount::where('whatsapp_id', $id);
+                        if ($integrationAccount) {
+                            \App\Models\IntegrationAccount::update($integrationAccount['id'], $rateLimitFields);
+                        }
+                    } catch (\Exception $e) {
+                        // Ignorar erro de sincronização
                     }
-                } catch (\Exception $e) {
-                    // Ignorar erro de sincronização
                 }
                 
                 Response::json([

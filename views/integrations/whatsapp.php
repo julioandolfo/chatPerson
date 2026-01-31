@@ -916,6 +916,12 @@ document.addEventListener("DOMContentLoaded", function() {
             const accountId = document.getElementById("kt_edit_whatsapp_id").value;
             const formData = new FormData(editWhatsappForm);
             
+            // Garantir que o checkbox de limite seja enviado (0 se não marcado)
+            const limitCheckbox = document.getElementById("kt_edit_whatsapp_limit_enabled");
+            if (limitCheckbox) {
+                formData.set("new_conv_limit_enabled", limitCheckbox.checked ? "1" : "0");
+            }
+            
             fetch("' . \App\Helpers\Url::to('/integrations/whatsapp') . '/" + accountId, {
                 method: "POST",
                 headers: {

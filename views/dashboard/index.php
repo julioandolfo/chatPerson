@@ -267,13 +267,10 @@ ob_start();
                         </td>
                         <td>
                             <?php if (!empty($call['recording_url'])): ?>
-                                <button type="button" class="btn btn-sm btn-icon btn-light-primary" 
+                                <button type="button" class="btn btn-sm btn-light-primary px-3" 
                                         onclick="playRecording('<?= htmlspecialchars($call['recording_url']) ?>')" 
                                         title="Ouvir gravação">
-                                    <i class="ki-duotone ki-headphones fs-4">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
+                                    <i class="fas fa-play me-1"></i> Ouvir
                                 </button>
                             <?php else: ?>
                                 <span class="text-muted fs-8">-</span>
@@ -446,13 +443,10 @@ ob_start();
                                 </i>
                             </button>
                             <?php if (!empty($analysis['recording_url'])): ?>
-                            <button type="button" class="btn btn-sm btn-icon btn-light-primary" 
+                            <button type="button" class="btn btn-sm btn-light-primary px-2" 
                                     onclick="playRecording('<?= htmlspecialchars($analysis['recording_url']) ?>')" 
                                     title="Ouvir gravação">
-                                <i class="ki-duotone ki-headphones fs-4">
-                                    <span class="path1"></span>
-                                    <span class="path2"></span>
-                                </i>
+                                <i class="fas fa-play"></i>
                             </button>
                             <?php endif; ?>
                         </td>

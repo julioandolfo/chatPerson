@@ -3887,7 +3887,7 @@ function playRecording(url) {
 // Mostrar análise completa de chamada
 function showCallAnalysis(analysisId) {
     // Buscar dados da análise via AJAX
-    fetch(`<?= \App\Helpers\Url::to('/api4com-calls/analysis/') ?>${analysisId}`)
+    fetch('<?= \App\Helpers\Url::to('/api4com-calls/analysis/') ?>' + analysisId)
         .then(response => response.json())
         .then(data => {
             if (!data.success) {
@@ -3927,16 +3927,10 @@ function showCallAnalysis(analysisId) {
             let dimensionsHtml = '<div class="row g-2">';
             const dimensions = ['opening', 'tone', 'listening', 'objection_handling', 'value_proposition', 
                                'closing', 'qualification', 'control', 'professionalism', 'empathy'];
-            dimensions.forEach(dim => {
+            dimensions.forEach(function(dim) {
                 const score = parseFloat(analysis['score_' + dim] || 0);
                 const color = score >= 4.5 ? 'success' : (score >= 3.5 ? 'primary' : (score >= 2.5 ? 'warning' : 'danger'));
-                dimensionsHtml += `
-                    <div class="col-6 col-md-4">
-                        <div class="border rounded p-2 text-center">
-                            <div class="fs-5 fw-bold text-${color}">${score.toFixed(1)}</div>
-                            <div class="text-muted fs-8">${dimensionLabels[dim]}</div>
-                        </div>
-                    </div>`;
+                dimensionsHtml += '<div class="col-6 col-md-4"><div class="border rounded p-2 text-center"><div class="fs-5 fw-bold text-' + color + '">' + score.toFixed(1) + '</div><div class="text-muted fs-8">' + dimensionLabels[dim] + '</div></div></div>';
             });
             dimensionsHtml += '</div>';
             
@@ -3946,69 +3940,60 @@ function showCallAnalysis(analysisId) {
             const suggestions = JSON.parse(analysis.suggestions || '[]');
             
             // Construir listas
-            const strengthsHtml = strengths.length > 0 
-                ? strengths.map(s => `<li class="text-success">${escapeHtml(s)}</li>`).join('')
-                : '<li class="text-muted">Nenhum ponto forte identificado</li>';
+            let strengthsHtml = '';
+            if (strengths.length > 0) {
+                strengths.forEach(function(s) { strengthsHtml += '<li class="text-success">' + escapeHtml(s) + '</li>'; });
+            } else {
+                strengthsHtml = '<li class="text-muted">Nenhum ponto forte identificado</li>';
+            }
             
-            const weaknessesHtml = weaknesses.length > 0 
-                ? weaknesses.map(w => `<li class="text-danger">${escapeHtml(w)}</li>`).join('')
-                : '<li class="text-muted">Nenhum ponto fraco identificado</li>';
+            let weaknessesHtml = '';
+            if (weaknesses.length > 0) {
+                weaknesses.forEach(function(w) { weaknessesHtml += '<li class="text-danger">' + escapeHtml(w) + '</li>'; });
+            } else {
+                weaknessesHtml = '<li class="text-muted">Nenhum ponto fraco identificado</li>';
+            }
             
-            const suggestionsHtml = suggestions.length > 0 
-                ? suggestions.map(s => `<li class="text-primary">${escapeHtml(s)}</li>`).join('')
-                : '<li class="text-muted">Nenhuma sugestão</li>';
+            let suggestionsHtml = '';
+            if (suggestions.length > 0) {
+                suggestions.forEach(function(s) { suggestionsHtml += '<li class="text-primary">' + escapeHtml(s) + '</li>'; });
+            } else {
+                suggestionsHtml = '<li class="text-muted">Nenhuma sugestão</li>';
+            }
             
             const outcome = analysis.call_outcome || 'neutral';
+            const overallScore = parseFloat(analysis.overall_score || 0).toFixed(1);
+            
+            let modalHtml = '<div class="text-start">' +
+                '<div class="d-flex justify-content-between align-items-center mb-4">' +
+                    '<div><span class="badge badge-light-' + outcomeColors[outcome] + ' fs-6">' + outcomeLabels[outcome] + '</span></div>' +
+                    '<div class="text-end"><span class="fs-1 fw-bold text-primary">' + overallScore + '</span><span class="text-muted">/5.0</span></div>' +
+                '</div>' +
+                '<h6 class="fw-bold mb-2">📊 Scores por Dimensão</h6>' + dimensionsHtml +
+                '<h6 class="fw-bold mt-4 mb-2">📝 Resumo</h6>' +
+                '<p class="text-gray-600">' + escapeHtml(analysis.summary || 'Sem resumo') + '</p>' +
+                '<div class="row mt-4">' +
+                    '<div class="col-md-4"><h6 class="fw-bold text-success mb-2">✅ Pontos Fortes</h6><ul class="ps-3 fs-7">' + strengthsHtml + '</ul></div>' +
+                    '<div class="col-md-4"><h6 class="fw-bold text-danger mb-2">❌ Pontos Fracos</h6><ul class="ps-3 fs-7">' + weaknessesHtml + '</ul></div>' +
+                    '<div class="col-md-4"><h6 class="fw-bold text-primary mb-2">💡 Sugestões</h6><ul class="ps-3 fs-7">' + suggestionsHtml + '</ul></div>' +
+                '</div>';
+            
+            if (analysis.transcription) {
+                modalHtml += '<h6 class="fw-bold mt-4 mb-2">🎙️ Transcrição</h6>' +
+                    '<div class="bg-light rounded p-3 fs-7" style="max-height: 200px; overflow-y: auto;">' + escapeHtml(analysis.transcription) + '</div>';
+            }
+            
+            modalHtml += '</div>';
             
             Swal.fire({
-                title: `<i class="ki-duotone ki-chart-line-star me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i> Análise da Chamada`,
-                html: `
-                    <div class="text-start">
-                        <div class="d-flex justify-content-between align-items-center mb-4">
-                            <div>
-                                <span class="badge badge-light-${outcomeColors[outcome]} fs-6">${outcomeLabels[outcome]}</span>
-                            </div>
-                            <div class="text-end">
-                                <span class="fs-1 fw-bold text-primary">${parseFloat(analysis.overall_score || 0).toFixed(1)}</span>
-                                <span class="text-muted">/5.0</span>
-                            </div>
-                        </div>
-                        
-                        <h6 class="fw-bold mb-2">📊 Scores por Dimensão</h6>
-                        ${dimensionsHtml}
-                        
-                        <h6 class="fw-bold mt-4 mb-2">📝 Resumo</h6>
-                        <p class="text-gray-600">${escapeHtml(analysis.summary || 'Sem resumo')}</p>
-                        
-                        <div class="row mt-4">
-                            <div class="col-md-4">
-                                <h6 class="fw-bold text-success mb-2">✅ Pontos Fortes</h6>
-                                <ul class="ps-3 fs-7">${strengthsHtml}</ul>
-                            </div>
-                            <div class="col-md-4">
-                                <h6 class="fw-bold text-danger mb-2">❌ Pontos Fracos</h6>
-                                <ul class="ps-3 fs-7">${weaknessesHtml}</ul>
-                            </div>
-                            <div class="col-md-4">
-                                <h6 class="fw-bold text-primary mb-2">💡 Sugestões</h6>
-                                <ul class="ps-3 fs-7">${suggestionsHtml}</ul>
-                            </div>
-                        </div>
-                        
-                        ${analysis.transcription ? `
-                            <h6 class="fw-bold mt-4 mb-2">🎙️ Transcrição</h6>
-                            <div class="bg-light rounded p-3 fs-7" style="max-height: 200px; overflow-y: auto;">
-                                ${escapeHtml(analysis.transcription)}
-                            </div>
-                        ` : ''}
-                    </div>
-                `,
+                title: '<i class="ki-duotone ki-chart-line-star me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i> Análise da Chamada',
+                html: modalHtml,
                 width: '800px',
                 showCloseButton: true,
                 showConfirmButton: false
             });
         })
-        .catch(error => {
+        .catch(function(error) {
             console.error('Erro ao carregar análise:', error);
             Swal.fire('Erro', 'Erro ao carregar análise', 'error');
         });

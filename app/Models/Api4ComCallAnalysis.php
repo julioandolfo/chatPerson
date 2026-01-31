@@ -10,8 +10,8 @@ use App\Helpers\Database;
 
 class Api4ComCallAnalysis extends Model
 {
-    protected static string $table = 'api4com_call_analysis';
-    protected static array $fillable = [
+    protected string $table = 'api4com_call_analysis';
+    protected array $fillable = [
         'call_id', 'agent_id', 'conversation_id',
         'transcription', 'transcription_language', 'transcription_duration', 'transcription_cost',
         'summary', 'call_outcome', 'call_type',

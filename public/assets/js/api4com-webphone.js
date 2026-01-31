@@ -117,6 +117,9 @@ class Api4ComWebPhone {
                         if (window.SIP) {
                             this.libLoaded = true;
                             console.log('[API4Com WebPhone] SIP.js carregada com sucesso de:', cdnUrls[currentIndex]);
+                            console.log('[API4Com WebPhone] SIP object keys:', Object.keys(window.SIP));
+                            console.log('[API4Com WebPhone] SIP.UA:', typeof window.SIP.UA);
+                            console.log('[API4Com WebPhone] SIP.Web:', typeof window.SIP.Web);
                             resolve();
                         } else {
                             console.warn('[API4Com WebPhone] SIP.js não encontrada após carregar de:', cdnUrls[currentIndex]);
@@ -158,7 +161,24 @@ class Api4ComWebPhone {
             console.log('[API4Com WebPhone] Conectando a:', `wss://${domain}:${port}`);
             this.updateStatus('connecting', 'Conectando...');
             
-            // Configuração do SIP.js 0.16.x
+            // Detectar versão do SIP.js e usar construtor apropriado
+            let UAConstructor = null;
+            
+            if (typeof SIP.UA === 'function') {
+                // SIP.js 0.15.x e anteriores
+                UAConstructor = SIP.UA;
+                console.log('[API4Com WebPhone] Usando SIP.UA (versão antiga)');
+            } else if (typeof SIP.Web !== 'undefined' && typeof SIP.Web.SimpleUser === 'function') {
+                // SIP.js 0.17+ com SimpleUser
+                return this.initSimpleUser(domain, port, extension, password);
+            } else if (typeof SIP.UserAgent === 'function') {
+                // SIP.js 0.16+ com UserAgent
+                return this.initUserAgentNew(domain, port, extension, password);
+            } else {
+                throw new Error('Versão do SIP.js não suportada. Keys: ' + Object.keys(SIP).join(', '));
+            }
+            
+            // Configuração do SIP.js 0.15.x e anteriores
             const configuration = {
                 uri: `sip:${extension}@${domain}`,
                 transportOptions: {
@@ -190,7 +210,7 @@ class Api4ComWebPhone {
                 }
             };
             
-            this.userAgent = new SIP.UA(configuration);
+            this.userAgent = new UAConstructor(configuration);
             
             // Configurar eventos
             this.setupEvents();
@@ -207,7 +227,141 @@ class Api4ComWebPhone {
     }
     
     /**
-     * Configurar eventos do User Agent (SIP.js 0.16)
+     * Inicializar usando SimpleUser (SIP.js 0.17+)
+     */
+    async initSimpleUser(domain, port, extension, password) {
+        try {
+            const server = `wss://${domain}:${port}`;
+            const aor = `sip:${extension}@${domain}`;
+            
+            const options = {
+                aor: aor,
+                media: {
+                    constraints: { audio: true, video: false },
+                    remote: { audio: this.audioElement }
+                },
+                userAgentOptions: {
+                    authorizationPassword: password,
+                    authorizationUsername: extension,
+                    displayName: `Ramal ${extension}`,
+                }
+            };
+            
+            this.simpleUser = new SIP.Web.SimpleUser(server, options);
+            
+            // Eventos
+            this.simpleUser.delegate = {
+                onCallReceived: () => {
+                    console.log('[API4Com WebPhone] Chamada recebida');
+                    this.updateStatus('ringing', 'Chamada recebida');
+                    this.showIncomingCall();
+                    if (this.options.onCallStart) {
+                        this.options.onCallStart(this.simpleUser);
+                    }
+                },
+                onCallAnswered: () => {
+                    console.log('[API4Com WebPhone] Chamada atendida');
+                    this.updateStatus('in_call', 'Em chamada');
+                    this.hideIncomingCall();
+                },
+                onCallHangup: () => {
+                    console.log('[API4Com WebPhone] Chamada encerrada');
+                    this.updateStatus('registered', 'Conectado');
+                    this.hideIncomingCall();
+                    if (this.options.onCallEnd) {
+                        this.options.onCallEnd(this.simpleUser);
+                    }
+                },
+                onRegistered: () => {
+                    console.log('[API4Com WebPhone] Registrado');
+                    this.isRegistered = true;
+                    this.updateStatus('registered', 'Conectado');
+                },
+                onUnregistered: () => {
+                    console.log('[API4Com WebPhone] Desregistrado');
+                    this.isRegistered = false;
+                    this.updateStatus('unregistered', 'Desconectado');
+                },
+                onServerConnect: () => {
+                    console.log('[API4Com WebPhone] Conectado ao servidor');
+                },
+                onServerDisconnect: () => {
+                    console.log('[API4Com WebPhone] Desconectado do servidor');
+                    this.isRegistered = false;
+                    this.updateStatus('disconnected', 'Desconectado');
+                }
+            };
+            
+            await this.simpleUser.connect();
+            await this.simpleUser.register();
+            
+            console.log('[API4Com WebPhone] SimpleUser inicializado');
+            
+        } catch (error) {
+            console.error('[API4Com WebPhone] Erro ao inicializar SimpleUser:', error);
+            this.updateStatus('error', 'Erro de conexão');
+            this.handleError(error);
+        }
+    }
+    
+    /**
+     * Inicializar usando UserAgent (SIP.js 0.16+)
+     */
+    async initUserAgentNew(domain, port, extension, password) {
+        try {
+            const uri = SIP.UserAgent.makeURI(`sip:${extension}@${domain}`);
+            if (!uri) {
+                throw new Error('URI SIP inválida');
+            }
+            
+            const transportOptions = {
+                server: `wss://${domain}:${port}`
+            };
+            
+            const userAgentOptions = {
+                uri: uri,
+                transportOptions: transportOptions,
+                authorizationUsername: extension,
+                authorizationPassword: password,
+                displayName: `Ramal ${extension}`,
+                sessionDescriptionHandlerFactoryOptions: {
+                    constraints: { audio: true, video: false }
+                },
+                delegate: {
+                    onInvite: (invitation) => this.handleIncomingCall(invitation)
+                }
+            };
+            
+            this.userAgent = new SIP.UserAgent(userAgentOptions);
+            
+            // Iniciar
+            await this.userAgent.start();
+            
+            // Registrar
+            const registerer = new SIP.Registerer(this.userAgent);
+            registerer.stateChange.addListener((state) => {
+                console.log('[API4Com WebPhone] Estado registro:', state);
+                if (state === SIP.RegistererState.Registered) {
+                    this.isRegistered = true;
+                    this.updateStatus('registered', 'Conectado');
+                } else if (state === SIP.RegistererState.Unregistered) {
+                    this.isRegistered = false;
+                    this.updateStatus('unregistered', 'Desconectado');
+                }
+            });
+            await registerer.register();
+            
+            console.log('[API4Com WebPhone] UserAgent (novo) inicializado');
+            
+        } catch (error) {
+            console.error('[API4Com WebPhone] Erro ao inicializar UserAgent novo:', error);
+            this.updateStatus('error', 'Erro de conexão');
+            this.handleError(error);
+        }
+    }
+
+    /**
+     * Configurar eventos do User Agent (SIP.js 0.15 e anteriores)
      */
     setupEvents() {
         if (!this.userAgent) return;
@@ -372,39 +526,54 @@ class Api4ComWebPhone {
     }
     
     /**
-     * Fazer chamada para um número (SIP.js 0.16)
+     * Fazer chamada para um número
      */
-    call(number) {
-        if (!this.userAgent || !this.isRegistered) {
+    async call(number) {
+        if (!this.isRegistered) {
             console.error('[API4Com WebPhone] Não registrado');
             return false;
         }
         
         try {
-            const target = `sip:${number}@${this.credentials.domain}`;
-            
-            const options = {
-                sessionDescriptionHandlerOptions: {
-                    constraints: {
-                        audio: true,
-                        video: false
-                    }
+            // SimpleUser API
+            if (this.simpleUser) {
+                const target = `sip:${number}@${this.credentials.domain}`;
+                await this.simpleUser.call(target);
+                console.log('[API4Com WebPhone] Chamada iniciada para:', number);
+                this.updateStatus('calling', `Ligando para ${number}...`);
+                if (this.options.onCallStart) {
+                    this.options.onCallStart(this.simpleUser);
                 }
-            };
-            
-            const session = this.userAgent.invite(target, options);
-            
-            this.currentSession = session;
-            this.setupSessionEvents(session);
-            
-            console.log('[API4Com WebPhone] Chamada iniciada para:', number);
-            this.updateStatus('calling', `Ligando para ${number}...`);
-            
-            if (this.options.onCallStart) {
-                this.options.onCallStart(session);
+                return true;
             }
             
-            return true;
+            // User Agent API (0.15 e anteriores)
+            if (this.userAgent && typeof this.userAgent.invite === 'function') {
+                const target = `sip:${number}@${this.credentials.domain}`;
+                
+                const options = {
+                    sessionDescriptionHandlerOptions: {
+                        constraints: { audio: true, video: false }
+                    }
+                };
+                
+                const session = this.userAgent.invite(target, options);
+                
+                this.currentSession = session;
+                this.setupSessionEvents(session);
+                
+                console.log('[API4Com WebPhone] Chamada iniciada para:', number);
+                this.updateStatus('calling', `Ligando para ${number}...`);
+                
+                if (this.options.onCallStart) {
+                    this.options.onCallStart(session);
+                }
+                
+                return true;
+            }
+            
+            console.error('[API4Com WebPhone] Nenhum método de chamada disponível');
+            return false;
             
         } catch (error) {
             console.error('[API4Com WebPhone] Erro ao fazer chamada:', error);
@@ -414,21 +583,27 @@ class Api4ComWebPhone {
     }
     
     /**
-     * Atender chamada recebida (SIP.js 0.16)
+     * Atender chamada recebida
      */
-    answer() {
-        if (!this.currentSession) {
-            console.warn('[API4Com WebPhone] Nenhuma chamada para atender');
-            return false;
-        }
-        
+    async answer() {
         try {
+            // SimpleUser API
+            if (this.simpleUser) {
+                await this.simpleUser.answer();
+                console.log('[API4Com WebPhone] Chamada atendida');
+                this.hideIncomingCall();
+                return true;
+            }
+            
+            // Session API
+            if (!this.currentSession) {
+                console.warn('[API4Com WebPhone] Nenhuma chamada para atender');
+                return false;
+            }
+            
             const options = {
                 sessionDescriptionHandlerOptions: {
-                    constraints: {
-                        audio: true,
-                        video: false
-                    }
+                    constraints: { audio: true, video: false }
                 }
             };
             
@@ -443,14 +618,23 @@ class Api4ComWebPhone {
     }
     
     /**
-     * Rejeitar chamada recebida (SIP.js 0.16)
+     * Rejeitar chamada recebida
      */
     reject() {
-        if (!this.currentSession) {
-            return false;
-        }
-        
         try {
+            // SimpleUser API
+            if (this.simpleUser) {
+                this.simpleUser.decline();
+                this.hideIncomingCall();
+                console.log('[API4Com WebPhone] Chamada rejeitada');
+                return true;
+            }
+            
+            // Session API
+            if (!this.currentSession) {
+                return false;
+            }
+            
             this.currentSession.reject();
             this.currentSession = null;
             this.hideIncomingCall();
@@ -463,14 +647,22 @@ class Api4ComWebPhone {
     }
     
     /**
-     * Desligar chamada atual (SIP.js 0.16)
+     * Desligar chamada atual
      */
     hangup() {
-        if (!this.currentSession) {
-            return false;
-        }
-        
         try {
+            // SimpleUser API
+            if (this.simpleUser) {
+                this.simpleUser.hangup();
+                console.log('[API4Com WebPhone] Chamada encerrada');
+                return true;
+            }
+            
+            // Session API
+            if (!this.currentSession) {
+                return false;
+            }
+            
             this.currentSession.terminate();
             this.currentSession = null;
             console.log('[API4Com WebPhone] Chamada encerrada');
@@ -500,20 +692,32 @@ class Api4ComWebPhone {
     }
     
     /**
-     * Colocar/tirar do mudo (SIP.js 0.16)
+     * Colocar/tirar do mudo
      */
     toggleMute() {
-        if (!this.currentSession) return false;
-        
         try {
+            // SimpleUser API
+            if (this.simpleUser) {
+                if (this.simpleUser.isHeld()) {
+                    this.simpleUser.unhold();
+                } else {
+                    this.simpleUser.hold();
+                }
+                return true;
+            }
+            
+            // Session API
+            if (!this.currentSession) return false;
+            
             if (this.isMuted()) {
-                this.currentSession.unmute();
+                this.currentSession.unmute?.();
             } else {
-                this.currentSession.mute();
+                this.currentSession.mute?.();
             }
             return true;
         } catch (error) {
             // Fallback para manipulação direta do track
+            if (!this.currentSession) return false;
             const pc = this.currentSession.sessionDescriptionHandler?.peerConnection;
             if (!pc) return false;
             
@@ -527,14 +731,22 @@ class Api4ComWebPhone {
     }
     
     /**
-     * Verificar se está no mudo (SIP.js 0.16)
+     * Verificar se está no mudo
      */
     isMuted() {
-        if (!this.currentSession) return false;
-        
         try {
-            return this.currentSession.isMuted().audio;
-        } catch (error) {
+            // SimpleUser API
+            if (this.simpleUser) {
+                return this.simpleUser.isHeld?.() || false;
+            }
+            
+            // Session API
+            if (!this.currentSession) return false;
+            
+            if (typeof this.currentSession.isMuted === 'function') {
+                return this.currentSession.isMuted().audio;
+            }
+            
             // Fallback
             const pc = this.currentSession.sessionDescriptionHandler?.peerConnection;
             if (!pc) return false;
@@ -546,6 +758,8 @@ class Api4ComWebPhone {
                 }
             });
             return muted;
+        } catch (error) {
+            return false;
         }
     }
     
@@ -642,17 +856,30 @@ class Api4ComWebPhone {
     }
     
     /**
-     * Desconectar (SIP.js 0.16)
+     * Desconectar
      */
-    disconnect() {
+    async disconnect() {
         try {
             if (this.currentSession) {
                 this.hangup();
             }
             
+            // SimpleUser API
+            if (this.simpleUser) {
+                await this.simpleUser.unregister();
+                await this.simpleUser.disconnect();
+                this.simpleUser = null;
+            }
+            
+            // UserAgent API
             if (this.userAgent) {
-                this.userAgent.unregister();
-                this.userAgent.stop();
+                if (typeof this.userAgent.unregister === 'function') {
+                    this.userAgent.unregister();
+                }
+                if (typeof this.userAgent.stop === 'function') {
+                    this.userAgent.stop();
+                }
+                this.userAgent = null;
             }
             
             this.isRegistered = false;
@@ -675,7 +902,7 @@ class Api4ComWebPhone {
      * Verificar se está pronto para fazer chamadas
      */
     isReady() {
-        return this.isRegistered && this.userAgent !== null;
+        return this.isRegistered && (this.userAgent !== null || this.simpleUser !== null);
     }
     
     /**

@@ -369,8 +369,11 @@ class Api4ComService
             }
         }
 
-        if (!empty($webhookData['recording_url']) || !empty($webhookData['record_url'])) {
-            $updateData['recording_url'] = $webhookData['recording_url'] ?? $webhookData['record_url'];
+        // Gravação: verificar diferentes formatos de campo
+        $recordingUrl = $webhookData['recordUrl'] ?? $webhookData['recording_url'] ?? $webhookData['record_url'] ?? null;
+        if (!empty($recordingUrl)) {
+            $updateData['recording_url'] = $recordingUrl;
+            Logger::api4com("processWebhook - Gravação encontrada: {$recordingUrl}");
         }
 
         if (!empty($webhookData['error'])) {
@@ -394,13 +397,18 @@ class Api4ComService
             self::createCallNote($updatedCall, 'ended');
         }
 
-        // Notificar via WebSocket se necessário
+        // Notificar via WebSocket se necessário (silencioso em caso de erro)
         if ($call['conversation_id']) {
-            \App\Helpers\WebSocket::notifyConversationUpdate($call['conversation_id'], [
-                'type' => 'api4com_call_updated',
-                'call_id' => $call['id'],
-                'status' => $status
-            ]);
+            try {
+                \App\Helpers\WebSocket::broadcast('conversation_updated', [
+                    'conversation_id' => $call['conversation_id'],
+                    'type' => 'api4com_call_updated',
+                    'call_id' => $call['id'],
+                    'status' => $status
+                ]);
+            } catch (\Exception $wsError) {
+                // Ignorar erros de WebSocket
+            }
         }
 
         return true;
@@ -538,11 +546,16 @@ class Api4ComService
                 [$call['conversation_id'], $call['agent_id'], $content]
             );
             
-            // Notificar via WebSocket
-            \App\Helpers\WebSocket::notifyConversationUpdate($call['conversation_id'], [
-                'type' => 'new_message',
-                'subtype' => 'call_note'
-            ]);
+            // Notificar via WebSocket (silencioso em caso de erro)
+            try {
+                \App\Helpers\WebSocket::broadcast('conversation_updated', [
+                    'conversation_id' => $call['conversation_id'],
+                    'type' => 'new_message',
+                    'subtype' => 'call_note'
+                ]);
+            } catch (\Exception $wsError) {
+                // Ignorar erros de WebSocket
+            }
             
             Logger::api4com("createCallNote - Nota criada para chamada {$call['id']} ({$event})");
             

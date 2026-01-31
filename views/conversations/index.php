@@ -13009,16 +13009,13 @@ function addMessageToChat(message) {
         const senderName = message.sender_name || 'Sistema';
         
         // Verificar se o conteúdo é HTML (notas de sistema como ligações)
-        const isHtmlContent = message.content && (
-            message.content.includes('<strong>') || 
-            message.content.includes('<br>') || 
-            message.content.includes('📞') ||
-            message.content.includes('✅') ||
-            message.content.includes('📴') ||
-            message.content.includes('❌')
-        );
+        // Notas de ligação começam com emojis específicos
+        const content = message.content || '';
+        const isCallNote = content.startsWith('📞') || content.startsWith('✅') || content.startsWith('📴') || content.startsWith('❌') || content.startsWith('🎙');
+        const hasHtmlTags = content.indexOf('<strong>') !== -1 || content.indexOf('<br') !== -1 || content.indexOf('<a ') !== -1;
+        const isHtmlContent = isCallNote || hasHtmlTags;
         
-        const noteContent = isHtmlContent ? message.content : nl2br(escapeHtml(message.content));
+        const noteContent = isHtmlContent ? content : nl2br(escapeHtml(content));
         
         messageDiv.innerHTML = `
             <div class="message-content">

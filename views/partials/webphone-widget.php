@@ -35,17 +35,74 @@ if (!$webphoneEnabled) {
         </div>
         
         <div class="webphone-body">
-            <!-- Status de registro -->
-            <div id="api4com-webphone-agent" class="mb-3"></div>
+            <!-- Status de conexão -->
+            <div class="d-flex align-items-center mb-3">
+                <div id="webphone-status-indicator" class="rounded-circle me-2" style="width: 12px; height: 12px; background-color: #6c757d;"></div>
+                <span id="webphone-status-text" class="text-muted fs-7">Iniciando...</span>
+            </div>
             
-            <!-- Discador -->
-            <div id="api4com-webphone-dialpad" class="mb-3"></div>
+            <!-- Discador simples -->
+            <div class="mb-3">
+                <div class="input-group input-group-sm mb-2">
+                    <input type="tel" id="webphone-dial-number" class="form-control" placeholder="Digite o número..." />
+                    <button type="button" class="btn btn-success" onclick="dialNumber()" title="Ligar">
+                        <i class="ki-duotone ki-phone fs-4">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                    </button>
+                </div>
+                
+                <!-- Teclado numérico -->
+                <div class="webphone-keypad d-grid gap-1" style="grid-template-columns: repeat(3, 1fr);">
+                    <button type="button" class="btn btn-sm btn-light-primary" onclick="pressKey('1')">1</button>
+                    <button type="button" class="btn btn-sm btn-light-primary" onclick="pressKey('2')">2</button>
+                    <button type="button" class="btn btn-sm btn-light-primary" onclick="pressKey('3')">3</button>
+                    <button type="button" class="btn btn-sm btn-light-primary" onclick="pressKey('4')">4</button>
+                    <button type="button" class="btn btn-sm btn-light-primary" onclick="pressKey('5')">5</button>
+                    <button type="button" class="btn btn-sm btn-light-primary" onclick="pressKey('6')">6</button>
+                    <button type="button" class="btn btn-sm btn-light-primary" onclick="pressKey('7')">7</button>
+                    <button type="button" class="btn btn-sm btn-light-primary" onclick="pressKey('8')">8</button>
+                    <button type="button" class="btn btn-sm btn-light-primary" onclick="pressKey('9')">9</button>
+                    <button type="button" class="btn btn-sm btn-light-primary" onclick="pressKey('*')">*</button>
+                    <button type="button" class="btn btn-sm btn-light-primary" onclick="pressKey('0')">0</button>
+                    <button type="button" class="btn btn-sm btn-light-primary" onclick="pressKey('#')">#</button>
+                </div>
+            </div>
             
-            <!-- Controles de áudio -->
-            <div id="api4com-webphone-audio" class="mb-2"></div>
-            
-            <!-- Dispositivos -->
-            <div id="api4com-webphone-devices" class="webphone-devices"></div>
+            <!-- Controles de chamada -->
+            <div id="webphone-call-controls" class="d-none">
+                <div class="d-flex gap-2 justify-content-center">
+                    <button type="button" class="btn btn-sm btn-light-warning" onclick="toggleMute()" id="btn-mute" title="Mudo">
+                        <i class="ki-duotone ki-speaker fs-4">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-danger" onclick="window.api4comWebphone?.hangup()" title="Desligar">
+                        <i class="ki-duotone ki-phone fs-4">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Desligar
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Indicador de chamada recebida -->
+        <div id="webphone-incoming-call" class="webphone-incoming" style="display: none;">
+            <div class="d-flex align-items-center justify-content-between p-3 bg-warning">
+                <span class="text-dark fw-bold">📞 Chamada recebida</span>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-success" onclick="window.api4comWebphone?.answer()">
+                        Atender
+                    </button>
+                    <button type="button" class="btn btn-sm btn-danger" onclick="window.api4comWebphone?.reject()">
+                        Rejeitar
+                    </button>
+                </div>
+            </div>
         </div>
         
         <!-- Indicador de chamada ativa -->
@@ -222,10 +279,12 @@ function createWebphoneInstance() {
         },
         onCallStart: function(call) {
             showCallIndicator(true);
+            showCallControls(true);
             startCallTimer();
         },
         onCallEnd: function(call) {
             showCallIndicator(false);
+            showCallControls(false);
             stopCallTimer();
         },
         onError: function(error) {
@@ -329,6 +388,64 @@ function makeApi4ComCall(phoneNumber) {
     } else {
         console.warn('[WebPhone] WebPhone não está pronto para fazer chamadas');
         return false;
+    }
+}
+
+// Funções do teclado
+function pressKey(digit) {
+    const input = document.getElementById('webphone-dial-number');
+    if (input) {
+        input.value += digit;
+    }
+    
+    // Se em chamada, enviar DTMF
+    if (window.api4comWebphone && window.api4comWebphone.currentSession) {
+        window.api4comWebphone.sendDTMF(digit);
+    }
+}
+
+function dialNumber() {
+    const input = document.getElementById('webphone-dial-number');
+    const number = input ? input.value.trim() : '';
+    
+    if (!number) {
+        alert('Digite um número para ligar');
+        return;
+    }
+    
+    if (window.api4comWebphone && window.api4comWebphone.isReady()) {
+        window.api4comWebphone.call(number);
+        showCallControls(true);
+    } else {
+        alert('WebPhone não está conectado. Aguarde a conexão.');
+    }
+}
+
+function toggleMute() {
+    if (window.api4comWebphone) {
+        window.api4comWebphone.toggleMute();
+        
+        const btn = document.getElementById('btn-mute');
+        if (btn) {
+            if (window.api4comWebphone.isMuted()) {
+                btn.classList.remove('btn-light-warning');
+                btn.classList.add('btn-warning');
+            } else {
+                btn.classList.remove('btn-warning');
+                btn.classList.add('btn-light-warning');
+            }
+        }
+    }
+}
+
+function showCallControls(show) {
+    const controls = document.getElementById('webphone-call-controls');
+    if (controls) {
+        if (show) {
+            controls.classList.remove('d-none');
+        } else {
+            controls.classList.add('d-none');
+        }
     }
 }
 </script>

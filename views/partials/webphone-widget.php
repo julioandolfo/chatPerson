@@ -284,6 +284,16 @@ function createWebphoneInstance() {
         autoAnswer: true,
         onStatusChange: function(status, message) {
             updateWebphoneUI(status, message);
+            
+            // Se recebeu chamada e autoAnswer está ativo, atender automaticamente
+            if (status === 'ringing' && window.api4comWebphone) {
+                console.log('[WebPhone Widget] Auto-atendendo chamada...');
+                setTimeout(function() {
+                    if (window.api4comWebphone && typeof window.api4comWebphone.answer === 'function') {
+                        window.api4comWebphone.answer();
+                    }
+                }, 500);
+            }
         },
         onCallStart: function(call) {
             showCallIndicator(true);

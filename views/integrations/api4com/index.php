@@ -20,6 +20,34 @@ ob_start();
         </div>
     </div>
     <div class="card-body pt-0">
+        <!-- Info: Webhook URL -->
+        <div class="notice d-flex bg-light-primary rounded border-primary border border-dashed p-4 mb-6">
+            <i class="ki-duotone ki-information-5 fs-2tx text-primary me-4">
+                <span class="path1"></span>
+                <span class="path2"></span>
+                <span class="path3"></span>
+            </i>
+            <div class="d-flex flex-stack flex-grow-1 flex-wrap flex-md-nowrap">
+                <div class="mb-3 mb-md-0 fw-semibold">
+                    <h4 class="text-gray-900 fw-bold">Configure o Webhook na API4Com</h4>
+                    <div class="fs-7 text-gray-700 pe-7">
+                        Para receber atualizações de chamadas (status, duração, gravações), configure esta URL no painel da API4Com:
+                    </div>
+                    <div class="mt-2">
+                        <code class="bg-dark text-white px-3 py-2 rounded d-inline-block" id="webhookUrl">
+                            <?= rtrim(\App\Helpers\Url::base(), '/') ?>/api4com-calls/webhook
+                        </code>
+                        <button type="button" class="btn btn-sm btn-icon btn-light-primary ms-2" onclick="copyWebhookUrl()" title="Copiar URL">
+                            <i class="ki-duotone ki-copy fs-4">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <?php if (empty($accounts)): ?>
             <div class="text-center py-20">
                 <i class="ki-duotone ki-phone fs-3x text-gray-400 mb-5">
@@ -462,6 +490,34 @@ $usersJson = json_encode($users);
 $scripts = '
 <script>
 const api4comUsers = ' . $usersJson . ';
+
+// Copiar URL do webhook
+function copyWebhookUrl() {
+    const url = document.getElementById("webhookUrl").textContent.trim();
+    navigator.clipboard.writeText(url).then(() => {
+        Swal.fire({
+            icon: "success",
+            title: "URL Copiada!",
+            text: "A URL do webhook foi copiada para a área de transferência.",
+            timer: 2000,
+            showConfirmButton: false
+        });
+    }).catch(() => {
+        // Fallback para navegadores antigos
+        const textArea = document.createElement("textarea");
+        textArea.value = url;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+        Swal.fire({
+            icon: "success",
+            title: "URL Copiada!",
+            timer: 2000,
+            showConfirmButton: false
+        });
+    });
+}
 
 document.addEventListener("DOMContentLoaded", function() {
     // Form de criação

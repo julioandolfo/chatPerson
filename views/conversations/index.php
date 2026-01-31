@@ -9803,6 +9803,27 @@ function updateConversationTimeline(conversationId) {
                     const showUserName = event.user_name && event.type !== 'note';
                     const userInfo = showUserName ? `<div class="text-muted fs-8 mt-1">por ${escapeHtml(event.user_name)}</div>` : '';
                     
+                    // Player de gravação de chamada
+                    let recordingPlayer = '';
+                    if (event.recording_url) {
+                        recordingPlayer = `
+                            <div class="mt-2 p-2 bg-light-primary rounded">
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <i class="ki-duotone ki-headphones fs-4 text-primary">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                    <span class="fs-8 fw-semibold text-primary">Gravação da Chamada</span>
+                                </div>
+                                <audio controls class="w-100" style="height: 32px;">
+                                    <source src="${event.recording_url}" type="audio/mpeg">
+                                    <source src="${event.recording_url}" type="audio/wav">
+                                    Seu navegador não suporta áudio.
+                                </audio>
+                            </div>
+                        `;
+                    }
+                    
                     timelineHtml += `
                         <div class="timeline-item">
                             <div class="timeline-line ${lineClass}"></div>
@@ -9822,6 +9843,7 @@ function updateConversationTimeline(conversationId) {
                                 ${event.description ? `<div class="text-muted fs-7 mt-1">${event.description}</div>` : ''}
                                 ${userInfo}
                                 <div class="text-muted fs-7 mt-1">${formatDateTime(event.date)}</div>
+                                ${recordingPlayer}
                             </div>
                         </div>
                     `;

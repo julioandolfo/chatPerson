@@ -127,7 +127,7 @@ ob_start();
 <!--end::Row-->
 
 <!--begin::Row - Estatísticas de Ligações API4Com-->
-<?php if (!empty($callStats) && ($callStats['total_calls'] ?? 0) > 0): ?>
+<?php if (isset($callStats)): ?>
 <div class="row g-5 mb-5">
     <!--begin::Col - Total de Ligações-->
     <div class="col-xl-3">
@@ -227,6 +227,7 @@ ob_start();
                         <th class="min-w-80px">Status</th>
                         <th class="min-w-80px">Duração</th>
                         <th class="min-w-100px">Data/Hora</th>
+                        <th class="min-w-100px">Gravação</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -263,6 +264,20 @@ ob_start();
                         </td>
                         <td>
                             <span class="text-gray-600 fs-7"><?= date('d/m H:i', strtotime($call['created_at'])) ?></span>
+                        </td>
+                        <td>
+                            <?php if (!empty($call['recording_url'])): ?>
+                                <button type="button" class="btn btn-sm btn-icon btn-light-primary" 
+                                        onclick="playRecording('<?= htmlspecialchars($call['recording_url']) ?>')" 
+                                        title="Ouvir gravação">
+                                    <i class="ki-duotone ki-headphones fs-4">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                </button>
+                            <?php else: ?>
+                                <span class="text-muted fs-8">-</span>
+                            <?php endif; ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -3625,6 +3640,72 @@ function escapeHtml(text) {
 
 function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// Player de gravação de chamadas
+function playRecording(url) {
+    // Criar modal se não existir
+    let modal = document.getElementById('recordingPlayerModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'recordingPlayerModal';
+        modal.className = 'modal fade';
+        modal.innerHTML = `
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="ki-duotone ki-headphones fs-2 text-primary me-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Gravação da Chamada
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body text-center">
+                        <audio id="recordingAudioPlayer" controls class="w-100">
+                            Seu navegador não suporta áudio.
+                        </audio>
+                    </div>
+                    <div class="modal-footer">
+                        <a id="downloadRecordingBtn" href="#" download class="btn btn-light-primary btn-sm">
+                            <i class="ki-duotone ki-cloud-download fs-4 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Baixar
+                        </a>
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        // Parar áudio quando modal fechar
+        modal.addEventListener('hidden.bs.modal', function() {
+            const audio = document.getElementById('recordingAudioPlayer');
+            if (audio) {
+                audio.pause();
+                audio.currentTime = 0;
+            }
+        });
+    }
+    
+    // Configurar o player
+    const audio = document.getElementById('recordingAudioPlayer');
+    const downloadBtn = document.getElementById('downloadRecordingBtn');
+    
+    audio.src = url;
+    downloadBtn.href = url;
+    
+    // Abrir modal
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+    
+    // Auto-play
+    audio.play().catch(() => {});
 }
 </script>
 SCRIPT;

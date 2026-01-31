@@ -289,9 +289,21 @@ class Api4ComWebPhone {
                     console.log('[API4Com WebPhone] Chamada atendida');
                     this.updateStatus('in_call', 'Em chamada');
                     this.hideIncomingCall();
+                    this.callStartTime = Date.now();
+                    
+                    // Notificar backend que a chamada foi atendida
+                    this.notifyCallStatus('answered');
                 },
                 onCallHangup: () => {
                     console.log('[API4Com WebPhone] Chamada encerrada');
+                    
+                    // Calcular duração
+                    const duration = this.callStartTime ? Math.floor((Date.now() - this.callStartTime) / 1000) : 0;
+                    this.callStartTime = null;
+                    
+                    // Notificar backend que a chamada terminou
+                    this.notifyCallStatus('ended', duration);
+                    
                     this.updateStatus('registered', 'Conectado');
                     this.hideIncomingCall();
                     if (this.options.onCallEnd) {
@@ -460,24 +472,23 @@ class Api4ComWebPhone {
         
         this.currentSession = session;
         
-        // Verificar se é chamada da API (Click-to-Call)
-        let isApiCall = false;
-        try {
-            const customHeader = session.request.getHeader('X-Api4comintegratedcall');
-            isApiCall = customHeader === 'true';
-        } catch (e) {}
+        // Configurar eventos da sessão ANTES de auto-atender
+        this.setupSessionEvents(session);
         
-        if (this.options.autoAnswer && isApiCall) {
-            console.log('[API4Com WebPhone] Auto-atendendo chamada da API');
-            this.answer();
+        // Auto-atender quando habilitado (Click-to-Call)
+        if (this.options.autoAnswer) {
+            console.log('[API4Com WebPhone] Auto-atendendo chamada...');
+            this.updateStatus('connecting', 'Conectando...');
+            
+            // Dar um pequeno delay para garantir que a sessão esteja pronta
+            setTimeout(() => {
+                this.answer();
+            }, 300);
         } else {
             // Mostrar indicador de chamada recebida
             this.updateStatus('ringing', 'Chamada recebida');
             this.showIncomingCall();
         }
-        
-        // Configurar eventos da sessão
-        this.setupSessionEvents(session);
         
         if (this.options.onCallStart) {
             this.options.onCallStart(session);
@@ -938,6 +949,32 @@ class Api4ComWebPhone {
      */
     isReady() {
         return this.isRegistered && (this.userAgent !== null || this.simpleUser !== null);
+    }
+    
+    /**
+     * Notificar backend sobre status da chamada
+     */
+    notifyCallStatus(status, duration = 0) {
+        // Buscar última chamada ativa do usuário e atualizar status
+        fetch('/api4com-calls/update-status', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                status: status,
+                duration: duration,
+                source: 'webphone'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('[API4Com WebPhone] Status atualizado no backend:', data);
+        })
+        .catch(error => {
+            console.warn('[API4Com WebPhone] Erro ao atualizar status:', error);
+        });
     }
     
     /**

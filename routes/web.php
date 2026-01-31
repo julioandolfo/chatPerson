@@ -344,6 +344,7 @@ Router::get('/api4com-calls/{id}', [Api4ComCallController::class, 'show'], ['Aut
 Router::post('/api4com-calls/{id}/end', [Api4ComCallController::class, 'end'], ['Authentication']);
 Router::get('/api4com-calls/conversation/{conversationId}', [Api4ComCallController::class, 'getByConversation'], ['Authentication']);
 Router::get('/api4com-calls/statistics', [Api4ComCallController::class, 'statistics'], ['Authentication']);
+Router::post('/api4com-calls/update-status', [Api4ComCallController::class, 'updateStatus'], ['Authentication']);
 // Webhook público para Api4Com (sem autenticação)
 Router::post('/api4com-calls/webhook', [Api4ComCallController::class, 'webhook']);
 

@@ -35,7 +35,7 @@ ob_start();
                     </div>
                     <div class="mt-2">
                         <code class="bg-dark text-white px-3 py-2 rounded d-inline-block" id="webhookUrl">
-                            <?= rtrim(\App\Helpers\Url::base(), '/') ?>/api4com-calls/webhook
+                            <?= \App\Helpers\Url::fullUrl('/api4com-calls/webhook') ?>
                         </code>
                         <button type="button" class="btn btn-sm btn-icon btn-light-primary ms-2" onclick="copyWebhookUrl()" title="Copiar URL">
                             <i class="ki-duotone ki-copy fs-4">

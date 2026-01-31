@@ -9,22 +9,77 @@ namespace App\Helpers;
 class Encryption
 {
     private static string $cipher = 'AES-256-CBC';
+    private static ?string $cachedKey = null;
     
     /**
      * Obter chave de criptografia
-     * Usa APP_KEY do ambiente ou gera uma baseada em configurações do sistema
+     * Usa chave do banco de dados (persistente) ou APP_KEY do ambiente
      */
     private static function getKey(): string
     {
+        // Usar cache para evitar consultas repetidas ao banco
+        if (self::$cachedKey !== null) {
+            return self::$cachedKey;
+        }
+        
+        // Primeiro tentar APP_KEY do ambiente (se definido explicitamente)
         $key = $_ENV['APP_KEY'] ?? getenv('APP_KEY');
         
         if (empty($key)) {
-            // Fallback: usar combinação de configurações do sistema
-            $key = md5(__DIR__ . php_uname() . 'api4com_sip_key');
+            // Buscar ou criar chave persistente no banco de dados
+            $key = self::getOrCreateDatabaseKey();
         }
         
         // Garantir que a chave tenha 32 bytes para AES-256
-        return hash('sha256', $key, true);
+        self::$cachedKey = hash('sha256', $key, true);
+        return self::$cachedKey;
+    }
+    
+    /**
+     * Obter ou criar chave de criptografia no banco de dados
+     * Garante que a chave seja persistente entre deploys
+     */
+    private static function getOrCreateDatabaseKey(): string
+    {
+        try {
+            // Tentar buscar chave existente
+            $result = Database::fetch(
+                "SELECT `value` FROM settings WHERE `key` = 'encryption_key' LIMIT 1"
+            );
+            
+            if (!empty($result['value'])) {
+                return $result['value'];
+            }
+            
+            // Gerar nova chave aleatória
+            $newKey = bin2hex(random_bytes(32));
+            
+            // Salvar no banco
+            Database::query(
+                "INSERT INTO settings (`key`, `value`, `type`, `group`, `label`, `description`, created_at, updated_at) 
+                 VALUES ('encryption_key', ?, 'string', 'security', 'Chave de Criptografia', 'Chave usada para criptografar dados sensíveis (SIP passwords, etc)', NOW(), NOW())
+                 ON DUPLICATE KEY UPDATE `value` = `value`",
+                [$newKey]
+            );
+            
+            Logger::info("Encryption - Nova chave de criptografia gerada e salva no banco");
+            
+            return $newKey;
+            
+        } catch (\Exception $e) {
+            // Se falhar (tabela não existe, etc), usar fallback determinístico
+            Logger::warning("Encryption - Erro ao acessar banco para chave: " . $e->getMessage());
+            
+            // Fallback: usar configuração do banco de dados como base (mais estável)
+            $dbConfig = require __DIR__ . '/../../config/database.php';
+            $fallbackKey = md5(
+                ($dbConfig['host'] ?? 'localhost') . 
+                ($dbConfig['database'] ?? 'chat') . 
+                'api4com_encryption_key_v2'
+            );
+            
+            return $fallbackKey;
+        }
     }
     
     /**

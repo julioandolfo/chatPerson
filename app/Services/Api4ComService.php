@@ -269,34 +269,39 @@ class Api4ComService
             $call = Api4ComCall::findByApi4ComId($callId);
         }
 
-        // Se não encontrou, tentar busca alternativa por ramal + número chamado
+        // Se não encontrou, tentar busca alternativa por número chamado
         if (!$call) {
             $caller = $webhookData['caller'] ?? null;
             $called = $webhookData['called'] ?? null;
             
-            if ($caller && $called) {
+            if ($called) {
                 // Extrair apenas os dígitos do número chamado
                 $calledDigits = preg_replace('/[^0-9]/', '', $called);
                 // Remover 0 inicial se houver (formato 0XX)
-                $calledDigits = preg_replace('/^0/', '', $calledDigits);
+                $calledDigits = ltrim($calledDigits, '0');
                 
-                // Pegar últimos 8-9 dígitos (número local sem DDD)
-                $localNumber = substr($calledDigits, -9);
-                // Pegar DDD (2 dígitos antes do número local)
-                $ddd = strlen($calledDigits) >= 10 ? substr($calledDigits, -11, 2) : '';
+                // Pegar últimos 8 dígitos (número sem DDD)
+                $lastDigits = substr($calledDigits, -8);
                 
-                Logger::api4com("processWebhook - Busca alternativa: caller={$caller}, called={$called}, digits={$calledDigits}, local={$localNumber}, ddd={$ddd}");
+                Logger::api4com("processWebhook - Busca alternativa: called={$called}, digits={$calledDigits}, last8={$lastDigits}");
                 
-                // Buscar chamada recente (últimos 5 minutos) pelo número local
+                // Buscar chamada recente (últimos 10 minutos) pelo número - busca mais ampla
                 $sql = "SELECT * FROM api4com_calls 
                         WHERE status IN ('initiated', 'ringing', 'answered') 
-                        AND created_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
-                        AND to_number LIKE ?
+                        AND created_at >= DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+                        AND (
+                            to_number LIKE ? OR
+                            to_number LIKE ? OR
+                            REPLACE(REPLACE(REPLACE(to_number, '+', ''), '-', ''), ' ', '') LIKE ?
+                        )
                         ORDER BY created_at DESC 
                         LIMIT 1";
                 
-                // Buscar pelo número local (últimos 9 dígitos)
-                $call = \App\Helpers\Database::fetch($sql, ['%' . $localNumber]);
+                $call = \App\Helpers\Database::fetch($sql, [
+                    '%' . $lastDigits,
+                    '%' . $calledDigits,
+                    '%' . $calledDigits
+                ]);
                 
                 if ($call) {
                     Logger::api4com("processWebhook - Chamada encontrada via busca alternativa: ID {$call['id']}");
@@ -304,6 +309,21 @@ class Api4ComService
                     // Atualizar o api4com_call_id para futuras referências
                     if (!empty($webhookData['id'])) {
                         Api4ComCall::update($call['id'], ['api4com_call_id' => $webhookData['id']]);
+                    }
+                } else {
+                    // Última tentativa: buscar qualquer chamada pendente recente
+                    $sql2 = "SELECT * FROM api4com_calls 
+                             WHERE status IN ('initiated', 'ringing') 
+                             AND created_at >= DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+                             ORDER BY created_at DESC 
+                             LIMIT 1";
+                    $call = \App\Helpers\Database::fetch($sql2);
+                    
+                    if ($call) {
+                        Logger::api4com("processWebhook - Chamada encontrada via busca genérica: ID {$call['id']}");
+                        if (!empty($webhookData['id'])) {
+                            Api4ComCall::update($call['id'], ['api4com_call_id' => $webhookData['id']]);
+                        }
                     }
                 }
             }

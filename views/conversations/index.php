@@ -3143,6 +3143,22 @@ function getChannelInfo(channel) {
                         
                         <?php elseif ($msgType === 'note'): ?>
                             <!-- Nota interna - Alinhada á direita como mensagens enviadas -->
+                            <?php
+                            // Verificar se é nota de sistema (ligação) - não escapar HTML
+                            $isSystemNote = (
+                                strpos($msgContent, '📞') === 0 || 
+                                strpos($msgContent, '✅') === 0 || 
+                                strpos($msgContent, '📴') === 0 || 
+                                strpos($msgContent, '❌') === 0 || 
+                                strpos($msgContent, '🎙') === 0 ||
+                                strpos($msgContent, '<strong>') !== false ||
+                                strpos($msgContent, '<br') !== false ||
+                                strpos($msgContent, '<a ') !== false
+                            );
+                            $noteDisplayContent = $isSystemNote 
+                                ? $msgContent 
+                                : str_replace("\n", "<br>", htmlspecialchars($msgContent));
+                            ?>
                             <div class="chat-message note outgoing" data-message-id="<?= $msg['id'] ?? '' ?>" data-timestamp="<?= strtotime($msgCreatedAt) * 1000 ?>">
                                 <div class="message-content">
                                     <div class="message-bubble">
@@ -3153,7 +3169,7 @@ function getChannelInfo(channel) {
                                             </i>
                                             Nota Interna • <?= htmlspecialchars($msgSenderName) ?>
                                         </div>
-                                        <?= str_replace("\n", "<br>", htmlspecialchars($msgContent)) ?>
+                                        <?= $noteDisplayContent ?>
                                     </div>
                                     <div class="message-time"><?= date('H:i', strtotime($msgCreatedAt)) ?></div>
                                 </div>

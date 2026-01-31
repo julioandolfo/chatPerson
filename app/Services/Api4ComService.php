@@ -265,7 +265,49 @@ class Api4ComService
         
         if (!empty($webhookData['call_id']) || !empty($webhookData['id'])) {
             $callId = $webhookData['call_id'] ?? $webhookData['id'];
+            Logger::api4com("processWebhook - Buscando por api4com_call_id: {$callId}");
             $call = Api4ComCall::findByApi4ComId($callId);
+        }
+
+        // Se não encontrou, tentar busca alternativa por ramal + número chamado
+        if (!$call) {
+            $caller = $webhookData['caller'] ?? null;
+            $called = $webhookData['called'] ?? null;
+            
+            if ($caller && $called) {
+                // Normalizar número chamado (remover 0 inicial do DDD)
+                $normalizedCalled = preg_replace('/^0/', '', $called);
+                $normalizedCalled = preg_replace('/[^0-9]/', '', $normalizedCalled);
+                
+                Logger::api4com("processWebhook - Busca alternativa: caller={$caller}, called={$called} (normalized: {$normalizedCalled})");
+                
+                // Buscar chamada recente (últimos 5 minutos) do mesmo ramal para o mesmo número
+                $sql = "SELECT * FROM api4com_calls 
+                        WHERE status IN ('initiated', 'ringing', 'answered') 
+                        AND created_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+                        AND (
+                            to_number LIKE ? 
+                            OR to_number LIKE ?
+                            OR to_number LIKE ?
+                        )
+                        ORDER BY created_at DESC 
+                        LIMIT 1";
+                
+                $call = \App\Helpers\Database::fetch($sql, [
+                    '%' . $normalizedCalled,
+                    '+55' . $normalizedCalled,
+                    $normalizedCalled
+                ]);
+                
+                if ($call) {
+                    Logger::api4com("processWebhook - Chamada encontrada via busca alternativa: ID {$call['id']}");
+                    
+                    // Atualizar o api4com_call_id para futuras referências
+                    if (!empty($webhookData['id'])) {
+                        Api4ComCall::update($call['id'], ['api4com_call_id' => $webhookData['id']]);
+                    }
+                }
+            }
         }
 
         if (!$call) {
@@ -274,24 +316,33 @@ class Api4ComService
         }
 
         // Mapear evento/status do Api4Com para nosso sistema
-        $event = $webhookData['event'] ?? $webhookData['status'] ?? 'unknown';
+        // v1.4 usa 'eventType', versões anteriores usam 'event' ou 'status'
+        $event = $webhookData['eventType'] ?? $webhookData['event'] ?? $webhookData['status'] ?? 'unknown';
         $status = self::mapApi4ComStatus($event);
+        
+        Logger::api4com("processWebhook - Evento: {$event} -> Status: {$status}");
         
         $updateData = [
             'status' => $status
         ];
 
         // Atualizar timestamps baseado no evento
-        if (in_array($event, ['call.answered', 'call.ringing']) || $status === 'answered') {
-            if (!empty($webhookData['answered_at'])) {
+        $answerEvents = ['call.answered', 'call.ringing', 'channel-answer', 'channel-ringing'];
+        if (in_array($event, $answerEvents) || $status === 'answered') {
+            if (!empty($webhookData['answeredAt'])) {
+                $updateData['answered_at'] = $webhookData['answeredAt'];
+            } elseif (!empty($webhookData['answered_at'])) {
                 $updateData['answered_at'] = $webhookData['answered_at'];
             } elseif ($status === 'answered') {
                 $updateData['answered_at'] = date('Y-m-d H:i:s');
             }
         }
         
-        if (in_array($event, ['call.ended', 'call.failed', 'call.cancelled']) || in_array($status, ['ended', 'failed', 'cancelled'])) {
-            if (!empty($webhookData['ended_at'])) {
+        $endEvents = ['call.ended', 'call.failed', 'call.cancelled', 'channel-hangup'];
+        if (in_array($event, $endEvents) || in_array($status, ['ended', 'failed', 'cancelled'])) {
+            if (!empty($webhookData['endedAt'])) {
+                $updateData['ended_at'] = $webhookData['endedAt'];
+            } elseif (!empty($webhookData['ended_at'])) {
                 $updateData['ended_at'] = $webhookData['ended_at'];
             } else {
                 $updateData['ended_at'] = date('Y-m-d H:i:s');
@@ -307,8 +358,11 @@ class Api4ComService
             }
         }
 
-        if ($event === 'call.ringing' || $status === 'ringing') {
-            if (!empty($webhookData['started_at'])) {
+        $ringingEvents = ['call.ringing', 'channel-ringing', 'channel-create'];
+        if (in_array($event, $ringingEvents) || $status === 'ringing') {
+            if (!empty($webhookData['startedAt'])) {
+                $updateData['started_at'] = $webhookData['startedAt'];
+            } elseif (!empty($webhookData['started_at'])) {
                 $updateData['started_at'] = $webhookData['started_at'];
             } elseif (!$call['started_at']) {
                 $updateData['started_at'] = date('Y-m-d H:i:s');
@@ -358,6 +412,12 @@ class Api4ComService
     private static function mapApi4ComStatus(string $event): string
     {
         $statusMap = [
+            // Eventos v1.4 (channel-*)
+            'channel-create' => 'initiated',
+            'channel-ringing' => 'ringing',
+            'channel-answer' => 'answered',
+            'channel-hangup' => 'ended',
+            // Eventos antigos (call.*)
             'call.initiated' => 'initiated',
             'call.ringing' => 'ringing',
             'call.answered' => 'answered',
@@ -366,6 +426,7 @@ class Api4ComService
             'call.cancelled' => 'cancelled',
             'call.busy' => 'failed',
             'call.no-answer' => 'failed',
+            // Status simples
             'initiated' => 'initiated',
             'ringing' => 'ringing',
             'answered' => 'answered',
@@ -472,8 +533,8 @@ class Api4ComService
             
             // Criar mensagem do tipo 'note' no chat
             \App\Helpers\Database::query(
-                "INSERT INTO messages (conversation_id, sender_type, sender_id, content, message_type, created_at, updated_at) 
-                 VALUES (?, 'agent', ?, ?, 'note', NOW(), NOW())",
+                "INSERT INTO messages (conversation_id, sender_type, sender_id, content, message_type, created_at) 
+                 VALUES (?, 'agent', ?, ?, 'note', NOW())",
                 [$call['conversation_id'], $call['agent_id'], $content]
             );
             

@@ -33,10 +33,12 @@ ob_start();
                     <div class="fs-7 text-gray-700 pe-7">
                         Para receber atualizações de chamadas (status, duração, gravações), configure esta URL no painel da API4Com:
                     </div>
-                    <div class="mt-2">
-                        <code class="bg-dark text-white px-3 py-2 rounded d-inline-block" id="webhookUrl">
-                            <?= \App\Helpers\Url::fullUrl('/api4com-calls/webhook') ?>
-                        </code>
+                    <div class="mt-2 d-flex align-items-center">
+                        <input type="text" class="form-control form-control-sm bg-gray-200 text-gray-800 border-0" 
+                               id="webhookUrl" 
+                               value="<?= \App\Helpers\Url::fullUrl('/api4com-calls/webhook') ?>" 
+                               readonly 
+                               style="max-width: 400px; font-family: monospace;">
                         <button type="button" class="btn btn-sm btn-icon btn-light-primary ms-2" onclick="copyWebhookUrl()" title="Copiar URL">
                             <i class="ki-duotone ki-copy fs-4">
                                 <span class="path1"></span>
@@ -493,7 +495,7 @@ const api4comUsers = ' . $usersJson . ';
 
 // Copiar URL do webhook
 function copyWebhookUrl() {
-    const url = document.getElementById("webhookUrl").textContent.trim();
+    const url = document.getElementById("webhookUrl").value.trim();
     navigator.clipboard.writeText(url).then(() => {
         Swal.fire({
             icon: "success",

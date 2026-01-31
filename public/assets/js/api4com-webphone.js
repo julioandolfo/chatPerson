@@ -234,6 +234,15 @@ class Api4ComWebPhone {
             const server = `wss://${domain}:${port}`;
             const aor = `sip:${extension}@${domain}`;
             
+            // Log de debug (sem mostrar senha completa)
+            const passPreview = password ? password.substring(0, 3) + '***' : '(vazia)';
+            console.log('[API4Com WebPhone] Configuração SimpleUser:', {
+                server: server,
+                aor: aor,
+                extension: extension,
+                password: passPreview
+            });
+            
             const options = {
                 aor: aor,
                 media: {
@@ -244,6 +253,7 @@ class Api4ComWebPhone {
                     authorizationPassword: password,
                     authorizationUsername: extension,
                     displayName: `Ramal ${extension}`,
+                    logLevel: 'warn'
                 }
             };
             
@@ -273,27 +283,36 @@ class Api4ComWebPhone {
                     }
                 },
                 onRegistered: () => {
-                    console.log('[API4Com WebPhone] Registrado');
+                    console.log('[API4Com WebPhone] ✅ Registrado com sucesso!');
                     this.isRegistered = true;
                     this.updateStatus('registered', 'Conectado');
                 },
                 onUnregistered: () => {
-                    console.log('[API4Com WebPhone] Desregistrado');
+                    console.log('[API4Com WebPhone] ❌ Desregistrado - verifique usuário/senha SIP');
                     this.isRegistered = false;
-                    this.updateStatus('unregistered', 'Desconectado');
+                    this.updateStatus('unregistered', 'Falha no registro');
                 },
                 onServerConnect: () => {
-                    console.log('[API4Com WebPhone] Conectado ao servidor');
+                    console.log('[API4Com WebPhone] Conectado ao servidor WebSocket');
                 },
-                onServerDisconnect: () => {
-                    console.log('[API4Com WebPhone] Desconectado do servidor');
+                onServerDisconnect: (error) => {
+                    console.log('[API4Com WebPhone] Desconectado do servidor:', error);
                     this.isRegistered = false;
                     this.updateStatus('disconnected', 'Desconectado');
                 }
             };
             
+            console.log('[API4Com WebPhone] Conectando...');
             await this.simpleUser.connect();
-            await this.simpleUser.register();
+            console.log('[API4Com WebPhone] Conexão estabelecida, registrando...');
+            
+            try {
+                await this.simpleUser.register();
+                console.log('[API4Com WebPhone] Registro enviado');
+            } catch (regError) {
+                console.error('[API4Com WebPhone] Erro no registro:', regError);
+                this.updateStatus('error', 'Falha na autenticação');
+            }
             
             console.log('[API4Com WebPhone] SimpleUser inicializado');
             

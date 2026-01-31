@@ -522,45 +522,57 @@ class Api4ComController
             // Buscar conta Api4Com habilitada
             $account = Api4ComAccount::getFirstEnabled();
             if (!$account) {
+                \App\Helpers\Logger::api4com("getWebphoneCredentials - Nenhuma conta habilitada encontrada", 'WARNING');
                 Response::json([
                     'success' => false,
                     'message' => 'Nenhuma conta Api4Com configurada'
                 ], 400);
                 return;
             }
+            \App\Helpers\Logger::api4com("getWebphoneCredentials - Conta encontrada: {$account['id']} - {$account['name']}");
             
             // Buscar ramal do usuário
             $extension = \App\Models\Api4ComExtension::findByUserAndAccount($userId, $account['id']);
             if (!$extension) {
+                \App\Helpers\Logger::api4com("getWebphoneCredentials - Nenhum ramal para user_id {$userId} na conta {$account['id']}", 'WARNING');
                 Response::json([
                     'success' => false,
                     'message' => 'Nenhum ramal associado ao seu usuário'
                 ], 400);
                 return;
             }
+            \App\Helpers\Logger::api4com("getWebphoneCredentials - Ramal encontrado: {$extension['extension_number']} (ID: {$extension['id']})");
             
             // Verificar se tem senha SIP configurada
             if (empty($extension['sip_password_encrypted'])) {
+                \App\Helpers\Logger::api4com("getWebphoneCredentials - Senha SIP não configurada para ramal {$extension['id']}", 'WARNING');
                 Response::json([
                     'success' => false,
                     'message' => 'Senha SIP não configurada para este ramal. Configure em Integrações → Api4Com → Ramais'
                 ], 400);
                 return;
             }
+            \App\Helpers\Logger::api4com("getWebphoneCredentials - Senha SIP encontrada (encrypted)");
             
             // Descriptografar senha
             $sipPassword = Encryption::decrypt($extension['sip_password_encrypted']);
             if (!$sipPassword) {
+                \App\Helpers\Logger::api4com("getWebphoneCredentials - Falha ao descriptografar senha SIP", 'ERROR');
                 Response::json([
                     'success' => false,
                     'message' => 'Erro ao recuperar senha SIP'
                 ], 500);
                 return;
             }
+            \App\Helpers\Logger::api4com("getWebphoneCredentials - Senha SIP descriptografada com sucesso");
             
             // Determinar domínio SIP
             $sipDomain = $account['sip_domain'] ?? $account['domain'] ?? null;
+            $logSipDomain = $account['sip_domain'] ?? '(null)';
+            $logDomain = $account['domain'] ?? '(null)';
+            \App\Helpers\Logger::api4com("getWebphoneCredentials - Domínio: sip_domain={$logSipDomain}, domain={$logDomain}, final=" . ($sipDomain ?? '(null)'));
             if (empty($sipDomain)) {
+                \App\Helpers\Logger::api4com("getWebphoneCredentials - Domínio SIP não configurado", 'WARNING');
                 Response::json([
                     'success' => false,
                     'message' => 'Domínio SIP não configurado. Configure em Integrações → Api4Com'
@@ -570,6 +582,8 @@ class Api4ComController
             
             // Porta WebSocket
             $sipPort = $account['sip_port'] ?? 6443;
+            
+            \App\Helpers\Logger::api4com("getWebphoneCredentials - Sucesso! Retornando credenciais para ramal {$extension['extension_number']} @ {$sipDomain}:{$sipPort}");
             
             Response::json([
                 'success' => true,

@@ -615,7 +615,29 @@ class ConversationController
                 // Verificar se a conta WhatsApp existe e está ativa
                 $whatsappAccount = \App\Models\WhatsAppAccount::find($whatsappAccountId);
                 if (!$whatsappAccount || ($whatsappAccount['status'] ?? '') !== 'active') {
-                    Response::json(['success' => false, 'message' => 'Integração WhatsApp inválida ou inativa'], 400);
+                    // Tentar em integration_accounts
+                    $whatsappAccount = \App\Models\IntegrationAccount::find($whatsappAccountId);
+                    if (!$whatsappAccount || ($whatsappAccount['status'] ?? '') !== 'active') {
+                        Response::json(['success' => false, 'message' => 'Integração WhatsApp inválida ou inativa'], 400);
+                        return;
+                    }
+                    $accountType = 'integration';
+                } else {
+                    $accountType = 'whatsapp';
+                }
+                
+                // ✅ VERIFICAR LIMITE DE NOVAS CONVERSAS (Anti-Spam)
+                $rateLimitCheck = \App\Services\NewConversationRateLimitService::canCreateNewConversation($whatsappAccountId, $accountType);
+                if (!$rateLimitCheck['allowed']) {
+                    Response::json([
+                        'success' => false, 
+                        'message' => $rateLimitCheck['message'],
+                        'code' => 'rate_limit_exceeded',
+                        'remaining' => $rateLimitCheck['remaining'],
+                        'reset_in' => $rateLimitCheck['reset_in'],
+                        'limit' => $rateLimitCheck['limit'] ?? null,
+                        'current' => $rateLimitCheck['current'] ?? null
+                    ], 429);
                     return;
                 }
             }
@@ -798,6 +820,18 @@ class ConversationController
                 $conversation = \App\Services\ConversationService::create($conversationData, false);
                 
                 $conversationId = $conversation['id'];
+                
+                // ✅ REGISTRAR no log de rate limit (apenas para conversas NOVAS)
+                if ($channel === 'whatsapp' && $whatsappAccountId && isset($contact['id'])) {
+                    $accountType = isset($accountType) ? $accountType : 'whatsapp';
+                    \App\Services\NewConversationRateLimitService::logNewConversation(
+                        $whatsappAccountId,
+                        $accountType,
+                        $contact['id'],
+                        $conversationId,
+                        $currentUserId
+                    );
+                }
             }
             
             // Enviar mensagem
@@ -1946,6 +1980,38 @@ class ConversationController
                             ];
                             break;
                     }
+                }
+            }
+            
+            // Buscar chamadas API4Com
+            if (class_exists('\App\Models\Api4ComCall')) {
+                $calls = \App\Models\Api4ComCall::getByConversationWithAgent($conversationId);
+                foreach ($calls as $call) {
+                    $statusLabel = \App\Models\Api4ComCall::getStatusLabel($call['status'] ?? 'unknown');
+                    $statusColor = \App\Models\Api4ComCall::getStatusColor($call['status'] ?? 'unknown');
+                    $duration = \App\Models\Api4ComCall::formatDuration((int)($call['duration'] ?? 0));
+                    
+                    $description = "Para: {$call['to_number']}";
+                    if (($call['duration'] ?? 0) > 0) {
+                        $description .= " • Duração: {$duration}";
+                    }
+                    if (!empty($call['error_message'])) {
+                        $description .= " • Erro: {$call['error_message']}";
+                    }
+                    
+                    $events[] = [
+                        'type' => 'phone_call',
+                        'date' => $call['created_at'],
+                        'icon' => 'ki-phone',
+                        'color' => $statusColor,
+                        'title' => "Ligação: {$statusLabel}",
+                        'description' => $description,
+                        'user_name' => $call['agent_name'] ?? null,
+                        'call_id' => $call['id'],
+                        'call_status' => $call['status'],
+                        'call_duration' => (int)($call['duration'] ?? 0),
+                        'recording_url' => $call['recording_url'] ?? null
+                    ];
                 }
             }
             

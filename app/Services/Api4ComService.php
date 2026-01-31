@@ -105,7 +105,11 @@ class Api4ComService
 
                 Logger::api4com("createCall - Chamada iniciada: Call ID {$callId}, Api4Com ID: " . ($api4comResponse['call_id'] ?? 'N/A'));
 
-                return Api4ComCall::find($callId);
+                // Criar nota interna no chat
+                $updatedCall = Api4ComCall::find($callId);
+                self::createCallNote($updatedCall, 'started');
+
+                return $updatedCall;
             } else {
                 // Falha na API Api4Com
                 Api4ComCall::updateStatus($callId, 'failed', [
@@ -328,6 +332,14 @@ class Api4ComService
 
         Logger::api4com("processWebhook - Chamada {$call['id']} atualizada para status: {$status}");
 
+        // Criar nota interna para eventos importantes
+        $updatedCall = Api4ComCall::find($call['id']);
+        if ($status === 'answered') {
+            self::createCallNote($updatedCall, 'answered');
+        } elseif (in_array($status, ['ended', 'failed', 'cancelled'])) {
+            self::createCallNote($updatedCall, 'ended');
+        }
+
         // Notificar via WebSocket se necessário
         if ($call['conversation_id']) {
             \App\Helpers\WebSocket::notifyConversationUpdate($call['conversation_id'], [
@@ -400,6 +412,73 @@ class Api4ComService
         ]);
 
         return true;
+    }
+
+    /**
+     * Criar nota interna no chat sobre a ligação
+     */
+    public static function createCallNote(array $call, string $event = 'started'): void
+    {
+        try {
+            if (empty($call['conversation_id']) || empty($call['agent_id'])) {
+                return;
+            }
+            
+            $agentName = 'Agente';
+            if (!empty($call['agent_id'])) {
+                $user = \App\Helpers\Database::fetch("SELECT name FROM users WHERE id = ?", [$call['agent_id']]);
+                $agentName = $user['name'] ?? 'Agente';
+            }
+            
+            $toNumber = $call['to_number'] ?? 'desconhecido';
+            $dateTime = date('d/m/Y H:i');
+            
+            if ($event === 'started') {
+                $emoji = '📞';
+                $statusText = 'iniciou uma ligação';
+                $content = "{$emoji} <strong>{$agentName}</strong> {$statusText} para <strong>{$toNumber}</strong> em {$dateTime}";
+            } elseif ($event === 'answered') {
+                $emoji = '✅';
+                $statusText = 'A ligação foi atendida';
+                $content = "{$emoji} {$statusText}";
+            } else {
+                // ended/failed
+                $statusLabel = Api4ComCall::getStatusLabel($call['status'] ?? 'ended');
+                $duration = (int)($call['duration'] ?? 0);
+                $durationText = Api4ComCall::formatDuration($duration);
+                
+                $emoji = in_array($call['status'], ['failed', 'no_answer', 'busy', 'cancelled']) ? '❌' : '📴';
+                
+                $content = "{$emoji} <strong>Ligação {$statusLabel}</strong>";
+                if ($duration > 0) {
+                    $content .= " • Duração: <strong>{$durationText}</strong>";
+                }
+                if (!empty($call['error_message'])) {
+                    $content .= " • Erro: {$call['error_message']}";
+                }
+                if (!empty($call['recording_url'])) {
+                    $content .= "<br>🎙️ <a href=\"{$call['recording_url']}\" target=\"_blank\">Ouvir gravação</a>";
+                }
+            }
+            
+            // Criar mensagem do tipo 'note' no chat
+            \App\Helpers\Database::query(
+                "INSERT INTO messages (conversation_id, sender_type, sender_id, content, message_type, created_at, updated_at) 
+                 VALUES (?, 'agent', ?, ?, 'note', NOW(), NOW())",
+                [$call['conversation_id'], $call['agent_id'], $content]
+            );
+            
+            // Notificar via WebSocket
+            \App\Helpers\WebSocket::notifyConversationUpdate($call['conversation_id'], [
+                'type' => 'new_message',
+                'subtype' => 'call_note'
+            ]);
+            
+            Logger::api4com("createCallNote - Nota criada para chamada {$call['id']} ({$event})");
+            
+        } catch (\Exception $e) {
+            Logger::api4com("createCallNote - Erro: " . $e->getMessage(), 'ERROR');
+        }
     }
 
     /**

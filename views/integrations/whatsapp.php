@@ -505,6 +505,55 @@ ob_start();
                     
                     <div class="separator separator-dashed my-5"></div>
                     
+                    <!--begin::Limite de Novas Conversas-->
+                    <div class="mb-7">
+                        <h5 class="fw-bold mb-3">
+                            <i class="ki-duotone ki-shield-tick fs-4 text-warning me-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Limite de Novas Conversas (Anti-Spam)
+                        </h5>
+                        
+                        <div class="form-check form-switch form-check-custom form-check-solid mb-4">
+                            <input class="form-check-input" type="checkbox" name="new_conv_limit_enabled" 
+                                   id="kt_edit_whatsapp_limit_enabled" value="1" />
+                            <label class="form-check-label fw-semibold text-gray-700" for="kt_edit_whatsapp_limit_enabled">
+                                Habilitar limite de novas conversas manuais
+                            </label>
+                        </div>
+                        
+                        <div id="kt_edit_whatsapp_limit_fields" style="display: none;">
+                            <div class="row g-4">
+                                <div class="col-md-4">
+                                    <label class="fw-semibold fs-7 mb-2">Máximo de conversas</label>
+                                    <input type="number" name="new_conv_limit_count" id="kt_edit_whatsapp_limit_count" 
+                                           class="form-control form-control-solid" value="10" min="1" max="1000" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="fw-semibold fs-7 mb-2">A cada</label>
+                                    <input type="number" name="new_conv_limit_period_value" id="kt_edit_whatsapp_limit_period_value" 
+                                           class="form-control form-control-solid" value="1" min="1" max="999" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="fw-semibold fs-7 mb-2">Período</label>
+                                    <select name="new_conv_limit_period" id="kt_edit_whatsapp_limit_period" class="form-select form-select-solid">
+                                        <option value="minutes">Minuto(s)</option>
+                                        <option value="hours" selected>Hora(s)</option>
+                                        <option value="days">Dia(s)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-text mt-2">
+                                <i class="ki-duotone ki-information fs-7 text-muted me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                Exemplo: 10 conversas a cada 1 hora. Isso limita apenas a criação manual de novas conversas, não afeta conversas recebidas.
+                            </div>
+                        </div>
+                    </div>
+                    <!--end::Limite de Novas Conversas-->
+                    
+                    <div class="separator separator-dashed my-5"></div>
+                    
                     <div class="fv-row mb-7">
                         <label class="fw-semibold fs-6 mb-2">Status Atual</label>
                         <div id="kt_edit_whatsapp_status_display" class="form-control form-control-solid bg-light-secondary"></div>
@@ -673,10 +722,33 @@ function editAccount(account) {
     };
     statusDisplay.textContent = statusLabels[account.status] || account.status || "Desconhecido";
     
+    // Preencher campos de limite de novas conversas
+    const limitEnabled = account.new_conv_limit_enabled == 1 || account.new_conv_limit_enabled === true;
+    const limitCheckbox = document.getElementById("kt_edit_whatsapp_limit_enabled");
+    const limitFields = document.getElementById("kt_edit_whatsapp_limit_fields");
+    
+    limitCheckbox.checked = limitEnabled;
+    limitFields.style.display = limitEnabled ? "block" : "none";
+    
+    document.getElementById("kt_edit_whatsapp_limit_count").value = account.new_conv_limit_count || 10;
+    document.getElementById("kt_edit_whatsapp_limit_period_value").value = account.new_conv_limit_period_value || 1;
+    document.getElementById("kt_edit_whatsapp_limit_period").value = account.new_conv_limit_period || "hours";
+    
     // Abrir modal
     const modal = new bootstrap.Modal(document.getElementById("kt_modal_edit_whatsapp"));
     modal.show();
 }
+
+// Toggle para mostrar/ocultar campos de limite
+document.addEventListener("DOMContentLoaded", function() {
+    const limitCheckbox = document.getElementById("kt_edit_whatsapp_limit_enabled");
+    if (limitCheckbox) {
+        limitCheckbox.addEventListener("change", function() {
+            const limitFields = document.getElementById("kt_edit_whatsapp_limit_fields");
+            limitFields.style.display = this.checked ? "block" : "none";
+        });
+    }
+});
 
 // Abrir modal de edição de configurações (funil/etapa)
 function editAccountSettings(accountId, accountName, funnelId, stageId) {

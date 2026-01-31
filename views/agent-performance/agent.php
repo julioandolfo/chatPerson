@@ -601,6 +601,119 @@ function formatTimeDisplay($seconds, $showUnit = true) {
 </div>
 <?php endif; ?>
 
+<!-- Estatísticas de Ligações API4Com -->
+<?php if (!empty($callStats) && ($callStats['total_calls'] ?? 0) > 0): ?>
+<div class="row g-5 mb-7">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold text-gray-900">
+                        <i class="ki-duotone ki-phone text-primary me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Estatísticas de Ligações
+                    </span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">Chamadas realizadas no período</span>
+                </h3>
+                <div class="card-toolbar">
+                    <span class="badge badge-light-<?= ($callStats['success_rate'] ?? 0) >= 70 ? 'success' : (($callStats['success_rate'] ?? 0) >= 50 ? 'warning' : 'danger') ?> fs-5">
+                        <?= number_format($callStats['success_rate'] ?? 0, 1) ?>% de sucesso
+                    </span>
+                </div>
+            </div>
+            <div class="card-body py-3">
+                <!-- Cards de Estatísticas -->
+                <div class="row g-5 mb-5">
+                    <div class="col-md-3">
+                        <div class="border border-gray-300 border-dashed rounded p-4 text-center">
+                            <div class="fs-2x fw-bold text-gray-800"><?= $callStats['total_calls'] ?? 0 ?></div>
+                            <div class="fw-semibold text-muted">Total de Ligações</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border border-gray-300 border-dashed rounded p-4 text-center">
+                            <div class="fs-2x fw-bold text-success"><?= $callStats['answered_calls'] ?? 0 ?></div>
+                            <div class="fw-semibold text-muted">Atendidas</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border border-gray-300 border-dashed rounded p-4 text-center">
+                            <div class="fs-2x fw-bold text-danger"><?= $callStats['failed_calls'] ?? 0 ?></div>
+                            <div class="fw-semibold text-muted">Falharam</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border border-gray-300 border-dashed rounded p-4 text-center">
+                            <div class="fs-2x fw-bold text-info">
+                                <?= \App\Models\Api4ComCall::formatDuration($callStats['avg_duration'] ?? 0) ?>
+                            </div>
+                            <div class="fw-semibold text-muted">Duração Média</div>
+                            <div class="fs-8 text-muted mt-1">
+                                Total: <?= \App\Models\Api4ComCall::formatDuration($callStats['total_duration'] ?? 0) ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Histórico de Ligações -->
+                <?php if (!empty($callHistory)): ?>
+                <h4 class="fw-bold text-gray-800 mb-3">Histórico Recente</h4>
+                <div class="table-responsive">
+                    <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-3">
+                        <thead>
+                            <tr class="fw-bold text-muted bg-light">
+                                <th class="min-w-150px ps-4 rounded-start">Contato</th>
+                                <th class="min-w-80px">Status</th>
+                                <th class="min-w-80px">Duração</th>
+                                <th class="min-w-120px pe-4 rounded-end">Data/Hora</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach (array_slice($callHistory, 0, 10) as $call): ?>
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="d-flex align-items-center">
+                                        <div class="symbol symbol-30px me-3">
+                                            <span class="symbol-label bg-light-primary text-primary">
+                                                <i class="ki-duotone ki-profile-user fs-5">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-800 fw-bold d-block fs-7"><?= htmlspecialchars($call['contact_name'] ?? 'Desconhecido') ?></span>
+                                            <span class="text-muted fs-8"><?= htmlspecialchars($call['to_number'] ?? $call['contact_phone'] ?? '') ?></span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <?php 
+                                    $statusColor = \App\Models\Api4ComCall::getStatusColor($call['status'] ?? 'unknown');
+                                    $statusLabel = \App\Models\Api4ComCall::getStatusLabel($call['status'] ?? 'unknown');
+                                    ?>
+                                    <span class="badge badge-light-<?= $statusColor ?> fs-8"><?= $statusLabel ?></span>
+                                </td>
+                                <td>
+                                    <span class="text-gray-600 fs-7"><?= \App\Models\Api4ComCall::formatDuration((int)($call['duration'] ?? 0)) ?></span>
+                                </td>
+                                <td class="pe-4">
+                                    <span class="text-gray-600 fs-8"><?= date('d/m/Y H:i', strtotime($call['created_at'])) ?></span>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- Dimensões de Coaching (Notas de Performance) -->
 <?php if (!empty($report['averages'])): ?>
 <div class="row g-5 mb-7">

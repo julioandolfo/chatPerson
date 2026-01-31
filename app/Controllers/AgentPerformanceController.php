@@ -146,6 +146,18 @@ class AgentPerformanceController
             // Sistema de metas pode não estar configurado
         }
         
+        // Estatísticas de ligações API4Com do agente
+        $callStats = [];
+        $callHistory = [];
+        try {
+            if (class_exists('\App\Models\Api4ComCall')) {
+                $callStats = \App\Models\Api4ComCall::getStatsByAgent($agentId, $dateFrom, $dateTo);
+                $callHistory = \App\Models\Api4ComCall::getHistoryByAgent($agentId, 20);
+            }
+        } catch (\Exception $e) {
+            // API4Com pode não estar configurado
+        }
+        
         Response::view('agent-performance/agent', [
             'report' => $report,
             'badges' => $badges,
@@ -162,7 +174,9 @@ class AgentPerformanceController
             'slaSettings' => $slaSettings,
             'analyzedConversations' => $analyzedConversations,
             'goalsSummary' => $goalsSummary,
-            'goalAlerts' => $goalAlerts
+            'goalAlerts' => $goalAlerts,
+            'callStats' => $callStats,
+            'callHistory' => $callHistory
         ]);
     }
     

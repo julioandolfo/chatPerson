@@ -126,6 +126,156 @@ ob_start();
 </div>
 <!--end::Row-->
 
+<!--begin::Row - Estatísticas de Ligações API4Com-->
+<?php if (!empty($callStats) && ($callStats['total_calls'] ?? 0) > 0): ?>
+<div class="row g-5 mb-5">
+    <!--begin::Col - Total de Ligações-->
+    <div class="col-xl-3">
+        <div class="card bg-light-primary h-100">
+            <div class="card-body">
+                <i class="ki-duotone ki-phone fs-2x text-primary mb-3">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                <div class="text-gray-900 fw-bold fs-2 mb-2"><?= number_format($callStats['total_calls'] ?? 0) ?></div>
+                <div class="fw-semibold text-gray-500">Total de Ligações</div>
+                <div class="text-muted fs-7 mt-1">Período selecionado</div>
+            </div>
+        </div>
+    </div>
+    <!--end::Col-->
+    
+    <!--begin::Col - Ligações Atendidas-->
+    <div class="col-xl-3">
+        <div class="card bg-light-success h-100">
+            <div class="card-body">
+                <i class="ki-duotone ki-check-circle fs-2x text-success mb-3">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                <div class="text-gray-900 fw-bold fs-2 mb-2"><?= number_format($callStats['answered_calls'] ?? 0) ?></div>
+                <div class="fw-semibold text-gray-500">Ligações Atendidas</div>
+                <div class="text-muted fs-7 mt-1"><?= number_format($callStats['success_rate'] ?? 0, 1) ?>% de sucesso</div>
+            </div>
+        </div>
+    </div>
+    <!--end::Col-->
+    
+    <!--begin::Col - Ligações Falharam-->
+    <div class="col-xl-3">
+        <div class="card bg-light-danger h-100">
+            <div class="card-body">
+                <i class="ki-duotone ki-cross-circle fs-2x text-danger mb-3">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                <div class="text-gray-900 fw-bold fs-2 mb-2"><?= number_format($callStats['failed_calls'] ?? 0) ?></div>
+                <div class="fw-semibold text-gray-500">Ligações Falharam</div>
+                <div class="text-muted fs-7 mt-1">Não atendidas/erro</div>
+            </div>
+        </div>
+    </div>
+    <!--end::Col-->
+    
+    <!--begin::Col - Duração Média-->
+    <div class="col-xl-3">
+        <div class="card bg-light-info h-100">
+            <div class="card-body">
+                <i class="ki-duotone ki-time fs-2x text-info mb-3">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                <div class="text-gray-900 fw-bold fs-2 mb-2">
+                    <?= \App\Models\Api4ComCall::formatDuration($callStats['avg_duration'] ?? 0) ?>
+                </div>
+                <div class="fw-semibold text-gray-500">Duração Média</div>
+                <div class="text-muted fs-7 mt-1">
+                    Total: <?= \App\Models\Api4ComCall::formatDuration($callStats['total_duration'] ?? 0) ?>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!--end::Col-->
+</div>
+
+<!--begin::Card - Ligações Recentes-->
+<?php if (!empty($recentCalls)): ?>
+<div class="card mb-5">
+    <div class="card-header border-0 pt-5">
+        <h3 class="card-title align-items-start flex-column">
+            <span class="card-label fw-bold fs-3 mb-1">
+                <i class="ki-duotone ki-phone text-primary me-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>Ligações Recentes
+            </span>
+            <span class="text-muted mt-1 fw-semibold fs-7"><?= $callStats['unique_contacts'] ?? 0 ?> contatos diferentes</span>
+        </h3>
+        <div class="card-toolbar">
+            <a href="<?= \App\Helpers\Url::to('/api4com-calls') ?>" class="btn btn-sm btn-light-primary">
+                Ver Todas
+            </a>
+        </div>
+    </div>
+    <div class="card-body py-3">
+        <div class="table-responsive">
+            <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
+                <thead>
+                    <tr class="fw-bold text-muted">
+                        <th class="min-w-150px">Contato</th>
+                        <th class="min-w-100px">Agente</th>
+                        <th class="min-w-80px">Status</th>
+                        <th class="min-w-80px">Duração</th>
+                        <th class="min-w-100px">Data/Hora</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($recentCalls as $call): ?>
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="symbol symbol-35px me-3">
+                                    <span class="symbol-label bg-light-primary text-primary">
+                                        <i class="ki-duotone ki-profile-user">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                    </span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-800 fw-bold d-block"><?= htmlspecialchars($call['contact_name'] ?? 'Desconhecido') ?></span>
+                                    <span class="text-muted fs-7"><?= htmlspecialchars($call['to_number'] ?? $call['contact_phone'] ?? '') ?></span>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="text-gray-800"><?= htmlspecialchars($call['agent_name'] ?? '-') ?></span>
+                        </td>
+                        <td>
+                            <?php 
+                            $statusColor = \App\Models\Api4ComCall::getStatusColor($call['status'] ?? 'unknown');
+                            $statusLabel = \App\Models\Api4ComCall::getStatusLabel($call['status'] ?? 'unknown');
+                            ?>
+                            <span class="badge badge-light-<?= $statusColor ?>"><?= $statusLabel ?></span>
+                        </td>
+                        <td>
+                            <span class="text-gray-600"><?= \App\Models\Api4ComCall::formatDuration((int)($call['duration'] ?? 0)) ?></span>
+                        </td>
+                        <td>
+                            <span class="text-gray-600 fs-7"><?= date('d/m H:i', strtotime($call['created_at'])) ?></span>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+<!--end::Card - Ligações Recentes-->
+<?php endif; ?>
+<!--end::Row - Estatísticas de Ligações API4Com-->
+
 <!--begin::Row - Metas-->
 <?php if (!empty($goalsSummary) && $goalsSummary['total_goals'] > 0): ?>
 <div class="card mb-5">

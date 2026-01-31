@@ -285,7 +285,12 @@ class IntegrationController
                 'quepasa_trackid' => 'nullable|string|max:255',
                 'api_key' => 'nullable|string|max:255',
                 'instance_id' => 'nullable|string|max:255',
-                'status' => 'nullable|string|in:active,inactive,disconnected'
+                'status' => 'nullable|string|in:active,inactive,disconnected',
+                // Campos de limite de novas conversas
+                'new_conv_limit_enabled' => 'nullable',
+                'new_conv_limit_count' => 'nullable|integer|min:1|max:1000',
+                'new_conv_limit_period' => 'nullable|string|in:minutes,hours,days',
+                'new_conv_limit_period_value' => 'nullable|integer|min:1|max:999'
             ]);
 
             if (!empty($errors)) {
@@ -295,8 +300,34 @@ class IntegrationController
             if (isset($data['config']) && is_array($data['config'])) {
                 $data['config'] = json_encode($data['config']);
             }
+            
+            // Processar campos de limite de novas conversas
+            if (isset($data['new_conv_limit_enabled'])) {
+                $data['new_conv_limit_enabled'] = ($data['new_conv_limit_enabled'] === '1' || $data['new_conv_limit_enabled'] === 'on' || $data['new_conv_limit_enabled'] === true) ? 1 : 0;
+            }
+            if (isset($data['new_conv_limit_count'])) {
+                $data['new_conv_limit_count'] = (int)$data['new_conv_limit_count'];
+            }
+            if (isset($data['new_conv_limit_period_value'])) {
+                $data['new_conv_limit_period_value'] = (int)$data['new_conv_limit_period_value'];
+            }
 
             if (WhatsAppAccount::update($id, $data)) {
+                // Também atualizar em integration_accounts se existir
+                try {
+                    $integrationAccount = \App\Models\IntegrationAccount::where('whatsapp_id', $id);
+                    if ($integrationAccount) {
+                        \App\Models\IntegrationAccount::update($integrationAccount['id'], [
+                            'new_conv_limit_enabled' => $data['new_conv_limit_enabled'] ?? 0,
+                            'new_conv_limit_count' => $data['new_conv_limit_count'] ?? 10,
+                            'new_conv_limit_period' => $data['new_conv_limit_period'] ?? 'hours',
+                            'new_conv_limit_period_value' => $data['new_conv_limit_period_value'] ?? 1
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    // Ignorar erro de sincronização
+                }
+                
                 Response::json([
                     'success' => true,
                     'message' => 'Conta atualizada com sucesso!'

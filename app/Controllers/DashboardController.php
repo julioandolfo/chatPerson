@@ -252,6 +252,19 @@ class DashboardController
                 error_log("Erro ao carregar métricas de atendimento: " . $e->getMessage());
             }
             
+            // Estatísticas de ligações API4Com
+            $callStats = [];
+            $recentCalls = [];
+            try {
+                if (class_exists('\App\Models\Api4ComCall')) {
+                    $callStats = \App\Models\Api4ComCall::getStats($dateFrom, str_replace(' 23:59:59', '', $dateTo), $agentIds);
+                    $recentCalls = \App\Models\Api4ComCall::getRecent(10, $agentIds);
+                    self::logDash("callStats=" . json_encode($callStats));
+                }
+            } catch (\Exception $e) {
+                error_log("Erro ao carregar estatísticas de ligações: " . $e->getMessage());
+            }
+            
             self::logDash("Passando dados para view");
             Response::view('dashboard/index', [
                 'stats' => $generalStats,
@@ -271,7 +284,9 @@ class DashboardController
                 'dateTo' => $dateTo,
                 'goalsSummary' => $goalsSummary,
                 'goalsOverview' => $goalsOverview,
-                'agentAttendanceMetrics' => $agentAttendanceMetrics
+                'agentAttendanceMetrics' => $agentAttendanceMetrics,
+                'callStats' => $callStats,
+                'recentCalls' => $recentCalls
             ]);
         } catch (\Exception $e) {
             self::logDash("ERRO CRÍTICO: " . $e->getMessage());
@@ -312,7 +327,9 @@ class DashboardController
                     'goals_by_level' => []
                 ],
                 'goalsOverview' => [],
-                'agentAttendanceMetrics' => ['agents' => [], 'totals' => []]
+                'agentAttendanceMetrics' => ['agents' => [], 'totals' => []],
+                'callStats' => [],
+                'recentCalls' => []
             ]);
         }
     }

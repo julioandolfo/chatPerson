@@ -36,9 +36,17 @@ if (!$webphoneEnabled) {
         
         <div class="webphone-body">
             <!-- Status de conexão -->
-            <div class="d-flex align-items-center mb-3">
-                <div id="webphone-status-indicator" class="rounded-circle me-2" style="width: 12px; height: 12px; background-color: #6c757d;"></div>
-                <span id="webphone-status-text" class="text-muted fs-7">Iniciando...</span>
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <div class="d-flex align-items-center">
+                    <div id="webphone-status-indicator" class="rounded-circle me-2" style="width: 12px; height: 12px; background-color: #6c757d;"></div>
+                    <span id="webphone-status-text" class="text-muted fs-7">Iniciando...</span>
+                </div>
+                <button type="button" id="btn-reconnect" class="btn btn-sm btn-light-primary d-none" onclick="reconnectWebphone()" title="Reconectar">
+                    <i class="ki-duotone ki-arrows-circle fs-4">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </button>
             </div>
             
             <!-- Discador simples -->
@@ -317,6 +325,7 @@ function updateWebphoneUI(status, message) {
         'connected': 'badge-info',
         'connecting': 'badge-warning',
         'disconnected': 'badge-secondary',
+        'unregistered': 'badge-danger',
         'error': 'badge-danger',
         'not_configured': 'badge-secondary'
     };
@@ -333,11 +342,15 @@ function updateWebphoneUI(status, message) {
     toggle.classList.remove('registered', 'error', 'connecting', 'in-call');
     if (status === 'registered') {
         toggle.classList.add('registered');
-    } else if (status === 'error') {
+    } else if (status === 'error' || status === 'unregistered') {
         toggle.classList.add('error');
     } else if (status === 'connecting') {
         toggle.classList.add('connecting');
     }
+    
+    // Mostrar botão de reconectar quando desconectado/erro
+    const showReconnect = ['error', 'unregistered', 'disconnected', 'not_configured'].includes(status);
+    showReconnectButton(showReconnect);
 }
 
 function showCallIndicator(show) {
@@ -445,6 +458,40 @@ function showCallControls(show) {
             controls.classList.remove('d-none');
         } else {
             controls.classList.add('d-none');
+        }
+    }
+}
+
+function showReconnectButton(show) {
+    const btn = document.getElementById('btn-reconnect');
+    if (btn) {
+        if (show) {
+            btn.classList.remove('d-none');
+        } else {
+            btn.classList.add('d-none');
+        }
+    }
+}
+
+async function reconnectWebphone() {
+    const btn = document.getElementById('btn-reconnect');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    }
+    
+    try {
+        if (window.api4comWebphone) {
+            await window.api4comWebphone.reconnect();
+        } else {
+            createWebphoneInstance();
+        }
+    } catch (error) {
+        console.error('[WebPhone] Erro ao reconectar:', error);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="ki-duotone ki-arrows-circle fs-4"><span class="path1"></span><span class="path2"></span></i>';
         }
     }
 }

@@ -275,29 +275,28 @@ class Api4ComService
             $called = $webhookData['called'] ?? null;
             
             if ($caller && $called) {
-                // Normalizar número chamado (remover 0 inicial do DDD)
-                $normalizedCalled = preg_replace('/^0/', '', $called);
-                $normalizedCalled = preg_replace('/[^0-9]/', '', $normalizedCalled);
+                // Extrair apenas os dígitos do número chamado
+                $calledDigits = preg_replace('/[^0-9]/', '', $called);
+                // Remover 0 inicial se houver (formato 0XX)
+                $calledDigits = preg_replace('/^0/', '', $calledDigits);
                 
-                Logger::api4com("processWebhook - Busca alternativa: caller={$caller}, called={$called} (normalized: {$normalizedCalled})");
+                // Pegar últimos 8-9 dígitos (número local sem DDD)
+                $localNumber = substr($calledDigits, -9);
+                // Pegar DDD (2 dígitos antes do número local)
+                $ddd = strlen($calledDigits) >= 10 ? substr($calledDigits, -11, 2) : '';
                 
-                // Buscar chamada recente (últimos 5 minutos) do mesmo ramal para o mesmo número
+                Logger::api4com("processWebhook - Busca alternativa: caller={$caller}, called={$called}, digits={$calledDigits}, local={$localNumber}, ddd={$ddd}");
+                
+                // Buscar chamada recente (últimos 5 minutos) pelo número local
                 $sql = "SELECT * FROM api4com_calls 
                         WHERE status IN ('initiated', 'ringing', 'answered') 
                         AND created_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
-                        AND (
-                            to_number LIKE ? 
-                            OR to_number LIKE ?
-                            OR to_number LIKE ?
-                        )
+                        AND to_number LIKE ?
                         ORDER BY created_at DESC 
                         LIMIT 1";
                 
-                $call = \App\Helpers\Database::fetch($sql, [
-                    '%' . $normalizedCalled,
-                    '+55' . $normalizedCalled,
-                    $normalizedCalled
-                ]);
+                // Buscar pelo número local (últimos 9 dígitos)
+                $call = \App\Helpers\Database::fetch($sql, ['%' . $localNumber]);
                 
                 if ($call) {
                     Logger::api4com("processWebhook - Chamada encontrada via busca alternativa: ID {$call['id']}");

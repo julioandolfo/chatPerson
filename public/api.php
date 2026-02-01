@@ -655,10 +655,10 @@ try {
             if (!$conversation) {
                 apiLog('INFO', '📝 Criando nova conversa...');
                 $stmt = $db->prepare("
-                    INSERT INTO conversations (contact_id, channel, status, contact_name, contact_phone, whatsapp_account_id, created_at, updated_at)
-                    VALUES (?, 'whatsapp', 'open', ?, ?, ?, NOW(), NOW())
+                    INSERT INTO conversations (contact_id, channel, status, whatsapp_account_id, created_at, updated_at)
+                    VALUES (?, 'whatsapp', 'open', ?, NOW(), NOW())
                 ");
-                $stmt->execute([$contactId, $contactName ?: $to, $to, $account['id']]);
+                $stmt->execute([$contactId, $account['id']]);
                 $conversationId = $db->lastInsertId();
                 apiLog('INFO', "✅ Conversa criada (ID: {$conversationId})");
             } else {
@@ -805,7 +805,7 @@ try {
             }
             
             $stmt = $db->prepare("
-                INSERT INTO conversations (contact_id, channel, status, agent_id, department_id, funnel_id, stage_id, created_at, updated_at)
+                INSERT INTO conversations (contact_id, channel, status, agent_id, department_id, funnel_id, funnel_stage_id, created_at, updated_at)
                 VALUES (?, ?, 'open', ?, ?, ?, ?, NOW(), NOW())
             ");
             $stmt->execute([
@@ -814,7 +814,7 @@ try {
                 $input['agent_id'] ?? null,
                 $input['department_id'] ?? null,
                 $input['funnel_id'] ?? null,
-                $input['stage_id'] ?? null
+                $input['stage_id'] ?? $input['funnel_stage_id'] ?? null
             ]);
             
             $id = $db->lastInsertId();
@@ -839,10 +839,15 @@ try {
         case 'conversationsUpdate':
             $input = getJsonBody();
             
+            // Compatibilidade: aceitar stage_id e converter para funnel_stage_id
+            if (isset($input['stage_id']) && !isset($input['funnel_stage_id'])) {
+                $input['funnel_stage_id'] = $input['stage_id'];
+            }
+            
             $fields = [];
             $values = [];
             
-            foreach (['status', 'agent_id', 'department_id', 'funnel_id', 'stage_id'] as $field) {
+            foreach (['status', 'agent_id', 'department_id', 'funnel_id', 'funnel_stage_id'] as $field) {
                 if (isset($input[$field])) {
                     $fields[] = "{$field} = ?";
                     $values[] = $input[$field];
@@ -899,8 +904,11 @@ try {
         case 'conversationsMoveStage':
             $input = getJsonBody();
             
-            $stmt = $db->prepare("UPDATE conversations SET funnel_id = ?, stage_id = ?, updated_at = NOW() WHERE id = ?");
-            $stmt->execute([$input['funnel_id'] ?? null, $input['stage_id'] ?? null, $params['id']]);
+            // Compatibilidade: aceitar stage_id ou funnel_stage_id
+            $stageId = $input['stage_id'] ?? $input['funnel_stage_id'] ?? null;
+            
+            $stmt = $db->prepare("UPDATE conversations SET funnel_id = ?, funnel_stage_id = ?, updated_at = NOW() WHERE id = ?");
+            $stmt->execute([$input['funnel_id'] ?? null, $stageId, $params['id']]);
             
             successResponse(['conversation_id' => $params['id']], 'Conversa movida');
             break;

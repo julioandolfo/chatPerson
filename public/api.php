@@ -627,13 +627,13 @@ try {
             
             // Buscar ou criar contato
             apiLog('INFO', '🔍 Buscando contato...');
-            $stmt = $db->prepare("SELECT id FROM contacts WHERE phone_number = ? LIMIT 1");
+            $stmt = $db->prepare("SELECT id FROM contacts WHERE phone = ? LIMIT 1");
             $stmt->execute([$to]);
             $contact = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if (!$contact) {
                 apiLog('INFO', '📝 Criando novo contato...');
-                $stmt = $db->prepare("INSERT INTO contacts (phone_number, name, channel, created_at, updated_at) VALUES (?, ?, 'whatsapp', NOW(), NOW())");
+                $stmt = $db->prepare("INSERT INTO contacts (phone, name, created_at, updated_at) VALUES (?, ?, NOW(), NOW())");
                 $stmt->execute([$to, $contactName ?: $to]);
                 $contactId = $db->lastInsertId();
                 apiLog('INFO', "✅ Contato criado (ID: {$contactId})");
@@ -916,7 +916,7 @@ try {
             $queryParams = [];
             
             if ($search) {
-                $where[] = '(name LIKE ? OR phone_number LIKE ? OR email LIKE ?)';
+                $where[] = '(name LIKE ? OR phone LIKE ? OR email LIKE ?)';
                 $queryParams[] = "%{$search}%";
                 $queryParams[] = "%{$search}%";
                 $queryParams[] = "%{$search}%";
@@ -943,14 +943,13 @@ try {
             $input = getJsonBody();
             
             $stmt = $db->prepare("
-                INSERT INTO contacts (name, phone_number, email, channel, created_at, updated_at)
-                VALUES (?, ?, ?, ?, NOW(), NOW())
+                INSERT INTO contacts (name, phone, email, created_at, updated_at)
+                VALUES (?, ?, ?, NOW(), NOW())
             ");
             $stmt->execute([
                 $input['name'] ?? null,
-                $input['phone_number'] ?? null,
-                $input['email'] ?? null,
-                $input['channel'] ?? 'whatsapp'
+                $input['phone'] ?? $input['phone_number'] ?? null, // Aceita ambos
+                $input['email'] ?? null
             ]);
             
             $id = $db->lastInsertId();
@@ -978,7 +977,12 @@ try {
             $fields = [];
             $values = [];
             
-            foreach (['name', 'phone_number', 'email'] as $field) {
+            // Aceitar tanto 'phone' quanto 'phone_number' (compatibilidade)
+            if (isset($input['phone_number']) && !isset($input['phone'])) {
+                $input['phone'] = $input['phone_number'];
+            }
+            
+            foreach (['name', 'phone', 'email'] as $field) {
                 if (isset($input[$field])) {
                     $fields[] = "{$field} = ?";
                     $values[] = $input[$field];

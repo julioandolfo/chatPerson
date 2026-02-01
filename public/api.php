@@ -153,14 +153,34 @@ function getAuthorizationHeader() {
  * Validar token de autenticação
  */
 function validateToken() {
+    $logFile = __DIR__ . '/../storage/logs/api.log';
+    $logDir = dirname($logFile);
+    if (!is_dir($logDir)) {
+        @mkdir($logDir, 0755, true);
+    }
+    
+    $log = function($level, $message) use ($logFile) {
+        $timestamp = date('Y-m-d H:i:s');
+        $line = "[{$timestamp}] [{$level}] {$message}\n";
+        @file_put_contents($logFile, $line, FILE_APPEND);
+    };
+    
+    $log('INFO', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    $log('INFO', '🔐 INICIANDO VALIDAÇÃO DE TOKEN');
+    
     $authHeader = getAuthorizationHeader();
     
+    $log('DEBUG', 'Authorization Header: ' . ($authHeader ? substr($authHeader, 0, 50) . '...' : 'VAZIO'));
+    
     if (empty($authHeader)) {
+        $log('ERROR', '❌ Header Authorization não encontrado');
+        
         // Debug: mostrar quais headers estão disponíveis
         $availableHeaders = [];
         foreach ($_SERVER as $key => $value) {
             if (strpos($key, 'HTTP_') === 0) {
                 $availableHeaders[$key] = substr($value, 0, 50);
+                $log('DEBUG', "Header disponível: {$key} = {$value}");
             }
         }
         
@@ -174,53 +194,112 @@ function validateToken() {
     $token = null;
     if (preg_match('/^Bearer\s+(.+)$/i', $authHeader, $matches)) {
         $token = $matches[1];
+        $log('DEBUG', 'Token extraído via Bearer (length: ' . strlen($token) . ')');
     } elseif (preg_match('/^Token\s+(.+)$/i', $authHeader, $matches)) {
         $token = $matches[1];
+        $log('DEBUG', 'Token extraído via Token (length: ' . strlen($token) . ')');
     } else {
         $token = $authHeader;
+        $log('DEBUG', 'Token extraído direto (length: ' . strlen($token) . ')');
     }
     
     if (empty($token)) {
+        $log('ERROR', '❌ Token vazio após extração');
         errorResponse('Token inválido', 'UNAUTHORIZED', 401);
     }
     
+    $log('DEBUG', 'Token: ' . substr($token, 0, 20) . '...' . substr($token, -10));
+    
     try {
+        $log('INFO', '🔍 Conectando ao banco de dados...');
         $db = Database::getInstance();
+        $log('INFO', '✅ Conexão com banco OK');
+        
+        $tokenHash = hash('sha256', $token);
+        $log('DEBUG', 'Token SHA256: ' . substr($tokenHash, 0, 20) . '...' . substr($tokenHash, -10));
         
         // Verificar na tabela api_tokens (com hash)
+        $log('INFO', '🔍 Buscando token no banco (COM hash SHA256)...');
         $stmt = $db->prepare("
-            SELECT id, user_id, name, permissions, rate_limit, expires_at
+            SELECT id, user_id, name, permissions, rate_limit, expires_at, revoked_at
             FROM api_tokens 
             WHERE token = ? AND revoked_at IS NULL
             LIMIT 1
         ");
-        $stmt->execute([hash('sha256', $token)]);
+        $stmt->execute([$tokenHash]);
         $apiToken = $stmt->fetch(\PDO::FETCH_ASSOC);
         
-        if (!$apiToken) {
+        if ($apiToken) {
+            $log('INFO', '✅ Token encontrado COM hash (ID: ' . $apiToken['id'] . ', Name: ' . $apiToken['name'] . ')');
+        } else {
+            $log('WARNING', '⚠️ Token NÃO encontrado com hash, tentando SEM hash...');
+            
             // Tentar token sem hash (compatibilidade)
             $stmt->execute([$token]);
             $apiToken = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($apiToken) {
+                $log('INFO', '✅ Token encontrado SEM hash (ID: ' . $apiToken['id'] . ', Name: ' . $apiToken['name'] . ')');
+            }
         }
         
         if (!$apiToken) {
+            $log('ERROR', '❌ Token NÃO encontrado no banco de dados');
+            
+            // Listar tokens disponíveis (primeiros 5)
+            $stmt = $db->prepare("SELECT id, name, LEFT(token, 20) as token_preview FROM api_tokens ORDER BY created_at DESC LIMIT 5");
+            $stmt->execute();
+            $availableTokens = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            $log('DEBUG', 'Tokens disponíveis no banco: ' . count($availableTokens));
+            foreach ($availableTokens as $t) {
+                $log('DEBUG', "  - ID {$t['id']}: {$t['name']} (preview: {$t['token_preview']}...)");
+            }
+            
             errorResponse('Token inválido ou expirado', 'UNAUTHORIZED', 401);
+        }
+        
+        // Verificar se está revogado
+        if ($apiToken['revoked_at']) {
+            $log('ERROR', '❌ Token foi REVOGADO em: ' . $apiToken['revoked_at']);
+            errorResponse('Token foi revogado', 'UNAUTHORIZED', 401);
         }
         
         // Verificar expiração
         if ($apiToken['expires_at'] && strtotime($apiToken['expires_at']) < time()) {
+            $log('ERROR', '❌ Token EXPIROU em: ' . $apiToken['expires_at']);
             errorResponse('Token expirado', 'UNAUTHORIZED', 401);
         }
+        
+        $log('INFO', '✅ Token válido e ativo');
+        $log('INFO', 'User ID: ' . $apiToken['user_id']);
+        $log('INFO', 'Token Name: ' . $apiToken['name']);
         
         // Atualizar last_used_at
         $stmt = $db->prepare("UPDATE api_tokens SET last_used_at = NOW() WHERE id = ?");
         $stmt->execute([$apiToken['id']]);
+        $log('DEBUG', 'last_used_at atualizado');
+        
+        $log('INFO', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         
         return $apiToken;
         
     } catch (\Exception $e) {
+        $log('ERROR', '❌ EXCEÇÃO: ' . $e->getMessage());
+        $log('ERROR', 'Arquivo: ' . $e->getFile());
+        $log('ERROR', 'Linha: ' . $e->getLine());
+        $log('DEBUG', 'Stack trace: ' . $e->getTraceAsString());
+        
         error_log("Erro ao validar token: " . $e->getMessage());
-        errorResponse('Erro ao validar token', 'SERVER_ERROR', 500);
+        error_log("Stack trace: " . $e->getTraceAsString());
+        
+        errorResponse('Erro ao validar token', 'SERVER_ERROR', 500, [
+            'error_message' => $e->getMessage(),
+            'error_file' => $e->getFile(),
+            'error_line' => $e->getLine(),
+            'debug_url' => 'Use /debug-token.php?token=SEU_TOKEN para diagnosticar',
+            'view_logs' => 'Use /view-all-logs.php para ver logs completos'
+        ]);
     }
 }
 

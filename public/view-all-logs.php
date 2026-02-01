@@ -1,271 +1,507 @@
 <?php
 /**
- * Visualizador de TODOS os Logs
+ * Visualizador Completo de Logs da API
+ * Acesse: https://chat.personizi.com.br/view-all-logs.php
  */
 
-require_once __DIR__ . '/../app/Helpers/autoload.php';
+// Definir timezone
+date_default_timezone_set('America/Sao_Paulo');
 
-// Buscar logs de sincronização de fontes externas do banco de dados
-$syncLogs = [];
-try {
-    $syncLogs = \App\Helpers\Database::fetchAll("
-        SELECT 
-            sl.*,
-            eds.name as source_name,
-            eds.type as source_type
-        FROM external_data_sync_logs sl
-        LEFT JOIN external_data_sources eds ON sl.source_id = eds.id
-        ORDER BY sl.started_at DESC
-        LIMIT 50
-    ", []);
-} catch (\Exception $e) {
-    // Silenciar erro se tabela não existir
+// Configurações
+$logFile = __DIR__ . '/../storage/logs/api.log';
+$maxLines = isset($_GET['lines']) ? (int)$_GET['lines'] : 500;
+$filter = isset($_GET['filter']) ? $_GET['filter'] : '';
+$level = isset($_GET['level']) ? $_GET['level'] : '';
+
+// Ler logs
+$logs = [];
+if (file_exists($logFile)) {
+    $allLines = file($logFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    $logs = array_slice(array_reverse($allLines), 0, $maxLines);
+} else {
+    $logs = ['Arquivo de log não encontrado: ' . $logFile];
 }
 
-// Lista de arquivos de log para verificar
-$logFiles = [
-    'API4Com (Telefonia/WebPhone)' => __DIR__ . '/../logs/api4com.log',
-    'Campanhas (Disparo em Massa)' => __DIR__ . '/../logs/campaigns.log',
-    'External Sources (Google Maps/WooCommerce)' => __DIR__ . '/../logs/external_sources.log',
-    'Dashboard' => __DIR__ . '/../logs/dash.log',
-    'Metas e OTE (Goals)' => __DIR__ . '/../logs/goals.log',
-    'Coaching em Tempo Real' => __DIR__ . '/../logs/coaching.log',
-    'Jobs Agendados (Cron)' => __DIR__ . '/../storage/logs/jobs.log',
-    'Webhook WooCommerce' => __DIR__ . '/../logs/webhook.log',
-    'Aplicação' => __DIR__ . '/../logs/app.log',
-    'Conversas' => __DIR__ . '/../logs/conversas.log',
-    'Quepasa' => __DIR__ . '/../logs/quepasa.log',
-    'Automação' => __DIR__ . '/../logs/automacao.log',
-    'AI Agent' => __DIR__ . '/../logs/ai_agent.log',
-    'AI Tools' => __DIR__ . '/../logs/ai_tools.log',
-    'Kanban Agents' => __DIR__ . '/../logs/kanban_agents.log',
-    'Kanban Agents Cron' => __DIR__ . '/../storage/logs/kanban-agents-cron.log',
-    'Erros PHP' => __DIR__ . '/../logs/error.log',
+// Aplicar filtros
+if (!empty($filter) || !empty($level)) {
+    $logs = array_filter($logs, function($line) use ($filter, $level) {
+        $matchFilter = empty($filter) || stripos($line, $filter) !== false;
+        $matchLevel = empty($level) || stripos($line, "[$level]") !== false;
+        return $matchFilter && $matchLevel;
+    });
+}
+
+// Estatísticas
+$stats = [
+    'total' => count($logs),
+    'errors' => 0,
+    'warnings' => 0,
+    'info' => 0,
+    'debug' => 0
 ];
+
+foreach ($logs as $log) {
+    if (stripos($log, '[ERROR]') !== false) $stats['errors']++;
+    if (stripos($log, '[WARNING]') !== false) $stats['warnings']++;
+    if (stripos($log, '[INFO]') !== false) $stats['info']++;
+    if (stripos($log, '[DEBUG]') !== false) $stats['debug']++;
+}
+
+// Função para colorir logs
+function colorizeLog($log) {
+    $log = htmlspecialchars($log);
+    
+    // Níveis
+    $log = preg_replace('/\[ERROR\]/', '<span class="badge-error">[ERROR]</span>', $log);
+    $log = preg_replace('/\[WARNING\]/', '<span class="badge-warning">[WARNING]</span>', $log);
+    $log = preg_replace('/\[INFO\]/', '<span class="badge-info">[INFO]</span>', $log);
+    $log = preg_replace('/\[DEBUG\]/', '<span class="badge-debug">[DEBUG]</span>', $log);
+    
+    // URLs
+    $log = preg_replace('/(https?:\/\/[^\s]+)/', '<span class="url">$1</span>', $log);
+    
+    // Números
+    $log = preg_replace('/\b(\d+)\b/', '<span class="number">$1</span>', $log);
+    
+    // Timestamps
+    $log = preg_replace('/(\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\])/', '<span class="timestamp">$1</span>', $log);
+    
+    // JSON
+    if (preg_match('/(\{.*\}|\[.*\])/', $log)) {
+        $log = preg_replace_callback('/(\{.*\}|\[.*\])/', function($matches) {
+            $json = $matches[1];
+            $decoded = json_decode($json, true);
+            if ($decoded !== null) {
+                return '<span class="json">' . json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . '</span>';
+            }
+            return $json;
+        }, $log);
+    }
+    
+    // Separadores
+    $log = preg_replace('/(━+)/', '<span class="separator">$1</span>', $log);
+    
+    // Emojis/Símbolos
+    $log = preg_replace('/(✅|❌|⚠️|🔧|📥|📤|🔍|💡|⏱️|🚀)/', '<span class="emoji">$1</span>', $log);
+    
+    return $log;
+}
 
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Todos os Logs</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logs da API - Chat Personizi</title>
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body {
-            font-family: monospace;
-            padding: 20px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             background: #1e1e1e;
             color: #d4d4d4;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: #252526;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #007acc;
+        }
+        
+        h1 {
+            color: #ffffff;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+        
+        .stat {
+            background: #2d2d30;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        .stat-label {
+            color: #858585;
             font-size: 12px;
         }
-        h1 {
-            color: #4ec9b0;
+        
+        .stat-value {
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: bold;
         }
-        h2 {
-            color: #569cd6;
-            border-bottom: 2px solid #569cd6;
-            padding-bottom: 5px;
-            margin-top: 30px;
-        }
-        .log-entry {
-            padding: 8px;
-            margin: 4px 0;
-            border-left: 3px solid #007acc;
+        
+        .stat.errors .stat-value { color: #f48771; }
+        .stat.warnings .stat-value { color: #dcdcaa; }
+        .stat.info .stat-value { color: #4ec9b0; }
+        .stat.debug .stat-value { color: #9cdcfe; }
+        
+        .filters {
             background: #252526;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .filter-row {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        label {
+            color: #858585;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        
+        input, select, button {
+            background: #3c3c3c;
+            border: 1px solid #555;
+            color: #d4d4d4;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 14px;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+        
+        button {
+            background: #007acc;
+            border: none;
+            color: #ffffff;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        
+        button:hover {
+            background: #005a9e;
+        }
+        
+        button.secondary {
+            background: #3c3c3c;
+            border: 1px solid #555;
+        }
+        
+        button.secondary:hover {
+            background: #505050;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-left: auto;
+        }
+        
+        .logs-container {
+            background: #1e1e1e;
+            border: 1px solid #3c3c3c;
+            border-radius: 8px;
+            padding: 20px;
+            overflow-x: auto;
+        }
+        
+        .log-line {
+            padding: 8px 10px;
+            margin-bottom: 2px;
+            border-left: 3px solid transparent;
             white-space: pre-wrap;
-            word-break: break-all;
+            word-wrap: break-word;
+            font-size: 13px;
+            line-height: 1.5;
         }
-        .error {
+        
+        .log-line:hover {
+            background: #2d2d30;
+        }
+        
+        .log-line.error {
             border-left-color: #f48771;
-            background: #3c1f1e;
+            background: rgba(244, 135, 113, 0.05);
         }
-        .success {
+        
+        .log-line.warning {
+            border-left-color: #dcdcaa;
+            background: rgba(220, 220, 170, 0.05);
+        }
+        
+        .log-line.info {
             border-left-color: #4ec9b0;
         }
-        .warning {
-            border-left-color: #dcdcaa;
-            background: #3c3c1e;
+        
+        .log-line.debug {
+            border-left-color: #9cdcfe;
+            opacity: 0.8;
         }
-        .timestamp {
-            color: #608b4e;
-        }
-        .controls {
-            margin-bottom: 20px;
-            position: sticky;
-            top: 0;
-            background: #1e1e1e;
-            padding: 10px 0;
-            z-index: 100;
-        }
-        button {
-            padding: 8px 16px;
-            background: #0e639c;
-            color: white;
-            border: none;
-            cursor: pointer;
-            margin-right: 8px;
-        }
-        button:hover {
-            background: #1177bb;
-        }
-        .clear-btn {
+        
+        .badge-error {
             background: #f48771;
+            color: #1e1e1e;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 11px;
         }
-        .clear-btn:hover {
-            background: #ff6b6b;
+        
+        .badge-warning {
+            background: #dcdcaa;
+            color: #1e1e1e;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 11px;
         }
-        .nav-btn {
-            background: #569cd6;
+        
+        .badge-info {
+            background: #4ec9b0;
+            color: #1e1e1e;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 11px;
         }
-        .nav-btn:hover {
-            background: #6aacd6;
+        
+        .badge-debug {
+            background: #9cdcfe;
+            color: #1e1e1e;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 11px;
         }
-        .file-not-found {
-            color: #f48771;
-            font-style: italic;
+        
+        .timestamp {
+            color: #858585;
+        }
+        
+        .url {
+            color: #4ec9b0;
+            text-decoration: underline;
+        }
+        
+        .number {
+            color: #b5cea8;
+        }
+        
+        .json {
+            display: block;
+            background: #2d2d30;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            color: #ce9178;
+            font-size: 12px;
+        }
+        
+        .separator {
+            color: #555;
+        }
+        
+        .emoji {
+            font-size: 16px;
+        }
+        
+        .no-logs {
+            text-align: center;
+            padding: 40px;
+            color: #858585;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #858585;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+        
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .auto-refresh input[type="checkbox"] {
+            width: auto;
+        }
+        
+        @media (max-width: 768px) {
+            .filter-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .actions {
+                margin-left: 0;
+                width: 100%;
+            }
         }
     </style>
 </head>
 <body>
-    <h1>📋 Todos os Logs do Sistema</h1>
-    
-    <div class="controls">
-        <button onclick="location.reload()">🔄 Atualizar</button>
-        <button class="nav-btn" onclick="document.getElementById('api4com-telefonia/webphone-log').scrollIntoView({behavior: 'smooth'})" style="background: #00bcd4; color: #fff">📞 API4Com</button>
-        <button class="nav-btn" onclick="document.getElementById('sync-logs-db').scrollIntoView({behavior: 'smooth'})" style="background: #e91e63; color: #fff">📊 Sync DB</button>
-        <button class="nav-btn" onclick="document.getElementById('metas-e-ote-goals-log').scrollIntoView({behavior: 'smooth'})" style="background: #ffd700; color: #000">🎯 Metas/OTE</button>
-        <button class="nav-btn" onclick="document.getElementById('coaching-em-tempo-real-log').scrollIntoView({behavior: 'smooth'})" style="background: #4ec9b0">⚡ Coaching</button>
-        <button class="nav-btn" onclick="document.getElementById('jobs-agendados-cron-log').scrollIntoView({behavior: 'smooth'})" style="background: #dcdcaa">⏰ Jobs Cron</button>
-        <button class="nav-btn" onclick="document.getElementById('webhook-woocommerce-log').scrollIntoView({behavior: 'smooth'})" style="background: #4caf50">🔗 Webhook</button>
-        <button class="nav-btn" onclick="document.getElementById('aplicacao-log').scrollIntoView({behavior: 'smooth'})">Aplicação</button>
-        <button class="nav-btn" onclick="document.getElementById('conversas-log').scrollIntoView({behavior: 'smooth'})">Conversas</button>
-        <button class="nav-btn" onclick="document.getElementById('quepasa-log').scrollIntoView({behavior: 'smooth'})">Quepasa</button>
-        <button class="nav-btn" onclick="document.getElementById('automacao-log').scrollIntoView({behavior: 'smooth'})">Automação</button>
-        <button class="nav-btn" onclick="document.getElementById('ai-agent-log').scrollIntoView({behavior: 'smooth'})">AI Agent</button>
-        <button class="nav-btn" onclick="document.getElementById('ai-tools-log').scrollIntoView({behavior: 'smooth'})">AI Tools</button>
-        <button class="nav-btn" onclick="document.getElementById('kanban-agents-log').scrollIntoView({behavior: 'smooth'})">Kanban Agents</button>
-        <button class="nav-btn" onclick="document.getElementById('kanban-agents-cron-log').scrollIntoView({behavior: 'smooth'})">Kanban Cron</button>
-        <button onclick="window.history.back()">← Voltar</button>
-    </div>
-    
-    <!-- Logs de Sincronização de Fontes Externas (do Banco de Dados) -->
-    <h2 id="sync-logs-db" style="color: #e91e63;">📊 Logs de Sincronização (Fontes Externas - BD)</h2>
-    <div>
-        <?php if (empty($syncLogs)): ?>
-            <div class='warning' style='padding: 20px; text-align: center;'>
-                📋 Nenhum log de sincronização encontrado no banco de dados<br>
-                <small style='color: #888;'>Execute uma sincronização para gerar logs</small>
+    <div class="container">
+        <header>
+            <h1>📋 Visualizador de Logs - API Chat</h1>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-label">Total</div>
+                    <div class="stat-value"><?= $stats['total'] ?></div>
+                </div>
+                <div class="stat errors">
+                    <div class="stat-label">Erros</div>
+                    <div class="stat-value"><?= $stats['errors'] ?></div>
+                </div>
+                <div class="stat warnings">
+                    <div class="stat-label">Avisos</div>
+                    <div class="stat-value"><?= $stats['warnings'] ?></div>
+                </div>
+                <div class="stat info">
+                    <div class="stat-label">Info</div>
+                    <div class="stat-value"><?= $stats['info'] ?></div>
+                </div>
+                <div class="stat debug">
+                    <div class="stat-label">Debug</div>
+                    <div class="stat-value"><?= $stats['debug'] ?></div>
+                </div>
             </div>
-        <?php else: ?>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-                <thead>
-                    <tr style="background: #333; color: #fff;">
-                        <th style="padding: 8px; text-align: left; border: 1px solid #555;">Data/Hora</th>
-                        <th style="padding: 8px; text-align: left; border: 1px solid #555;">Fonte</th>
-                        <th style="padding: 8px; text-align: left; border: 1px solid #555;">Tipo</th>
-                        <th style="padding: 8px; text-align: center; border: 1px solid #555;">Status</th>
-                        <th style="padding: 8px; text-align: center; border: 1px solid #555;">Buscados</th>
-                        <th style="padding: 8px; text-align: center; border: 1px solid #555;">Criados</th>
-                        <th style="padding: 8px; text-align: center; border: 1px solid #555;">Atualiz.</th>
-                        <th style="padding: 8px; text-align: center; border: 1px solid #555;">Falhas</th>
-                        <th style="padding: 8px; text-align: center; border: 1px solid #555;">Tempo</th>
-                        <th style="padding: 8px; text-align: left; border: 1px solid #555;">Mensagem</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($syncLogs as $log): ?>
-                    <?php
-                        $statusColor = match($log['status'] ?? '') {
-                            'success' => '#4ec9b0',
-                            'error' => '#f48771',
-                            'syncing' => '#dcdcaa',
-                            default => '#888'
-                        };
-                        $rowBg = ($log['status'] ?? '') === 'error' ? '#3c1f1e' : '#252526';
-                    ?>
-                    <tr style="background: <?= $rowBg ?>;">
-                        <td style="padding: 6px 8px; border: 1px solid #444;">
-                            <span class="timestamp"><?= date('d/m/Y H:i:s', strtotime($log['started_at'])) ?></span>
-                        </td>
-                        <td style="padding: 6px 8px; border: 1px solid #444;">
-                            <?= htmlspecialchars($log['source_name'] ?? 'ID: ' . $log['source_id']) ?>
-                        </td>
-                        <td style="padding: 6px 8px; border: 1px solid #444;">
-                            <span style="background: #569cd6; color: #fff; padding: 2px 6px; border-radius: 3px; font-size: 10px;">
-                                <?= strtoupper($log['source_type'] ?? '-') ?>
-                            </span>
-                        </td>
-                        <td style="padding: 6px 8px; border: 1px solid #444; text-align: center;">
-                            <span style="background: <?= $statusColor ?>; color: #000; padding: 2px 8px; border-radius: 3px; font-size: 11px;">
-                                <?= ucfirst($log['status'] ?? 'unknown') ?>
-                            </span>
-                        </td>
-                        <td style="padding: 6px 8px; border: 1px solid #444; text-align: center;"><?= $log['records_fetched'] ?? 0 ?></td>
-                        <td style="padding: 6px 8px; border: 1px solid #444; text-align: center; color: #4ec9b0; font-weight: bold;"><?= $log['records_created'] ?? 0 ?></td>
-                        <td style="padding: 6px 8px; border: 1px solid #444; text-align: center; color: #569cd6;"><?= $log['records_updated'] ?? 0 ?></td>
-                        <td style="padding: 6px 8px; border: 1px solid #444; text-align: center; color: #f48771;"><?= $log['records_failed'] ?? 0 ?></td>
-                        <td style="padding: 6px 8px; border: 1px solid #444; text-align: center;">
-                            <?php 
-                            $ms = $log['execution_time_ms'] ?? 0;
-                            echo $ms > 1000 ? round($ms/1000, 1) . 's' : $ms . 'ms';
-                            ?>
-                        </td>
-                        <td style="padding: 6px 8px; border: 1px solid #444; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="<?= htmlspecialchars($log['error_message'] ?? '') ?>">
-                            <?php if (!empty($log['error_message'])): ?>
-                                <span style="color: #f48771;"><?= htmlspecialchars(substr($log['error_message'], 0, 60)) ?><?= strlen($log['error_message']) > 60 ? '...' : '' ?></span>
-                            <?php else: ?>
-                                <span style="color: #666;">-</span>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
+        </header>
+        
+        <div class="filters">
+            <form method="GET" class="filter-row">
+                <div class="filter-group">
+                    <label>Buscar</label>
+                    <input type="text" name="filter" placeholder="Token, URL, erro..." value="<?= htmlspecialchars($filter) ?>" style="min-width: 300px;">
+                </div>
+                
+                <div class="filter-group">
+                    <label>Nível</label>
+                    <select name="level">
+                        <option value="">Todos</option>
+                        <option value="ERROR" <?= $level === 'ERROR' ? 'selected' : '' ?>>Erros</option>
+                        <option value="WARNING" <?= $level === 'WARNING' ? 'selected' : '' ?>>Avisos</option>
+                        <option value="INFO" <?= $level === 'INFO' ? 'selected' : '' ?>>Info</option>
+                        <option value="DEBUG" <?= $level === 'DEBUG' ? 'selected' : '' ?>>Debug</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label>Linhas</label>
+                    <select name="lines">
+                        <option value="100" <?= $maxLines === 100 ? 'selected' : '' ?>>100</option>
+                        <option value="500" <?= $maxLines === 500 ? 'selected' : '' ?>>500</option>
+                        <option value="1000" <?= $maxLines === 1000 ? 'selected' : '' ?>>1000</option>
+                        <option value="5000" <?= $maxLines === 5000 ? 'selected' : '' ?>>5000</option>
+                        <option value="10000" <?= $maxLines === 10000 ? 'selected' : '' ?>>Todos</option>
+                    </select>
+                </div>
+                
+                <div class="actions">
+                    <button type="submit">🔍 Filtrar</button>
+                    <button type="button" class="secondary" onclick="window.location.href='?'">🔄 Limpar</button>
+                    <button type="button" class="secondary" onclick="window.location.reload()">♻️ Atualizar</button>
+                </div>
+            </form>
+            
+            <div class="filter-row" style="margin-top: 15px;">
+                <div class="auto-refresh">
+                    <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh(this)">
+                    <label for="autoRefresh" style="text-transform: none;">Auto-atualizar a cada 5 segundos</label>
+                </div>
+                <div style="margin-left: auto;">
+                    <button class="secondary" onclick="downloadLogs()">💾 Baixar Logs</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="logs-container">
+            <?php if (empty($logs)): ?>
+                <div class="no-logs">
+                    <h2>Nenhum log encontrado</h2>
+                    <p>Tente ajustar os filtros ou aguarde novas requisições</p>
+                </div>
+            <?php else: ?>
+                <?php foreach ($logs as $log): 
+                    $class = '';
+                    if (stripos($log, '[ERROR]') !== false) $class = 'error';
+                    elseif (stripos($log, '[WARNING]') !== false) $class = 'warning';
+                    elseif (stripos($log, '[INFO]') !== false) $class = 'info';
+                    elseif (stripos($log, '[DEBUG]') !== false) $class = 'debug';
+                ?>
+                    <div class="log-line <?= $class ?>"><?= colorizeLog($log) ?></div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+        
+        <div class="footer">
+            <p>Arquivo: <?= $logFile ?></p>
+            <p>Última atualização: <?= date('d/m/Y H:i:s') ?></p>
+            <p>
+                <a href="/debug-token.php" style="color: #4ec9b0;">Debug Token</a> | 
+                <a href="/test-headers.php" style="color: #4ec9b0;">Test Headers</a> | 
+                <a href="/api-test.php" style="color: #4ec9b0;">Test API</a>
+            </p>
+        </div>
     </div>
     
-    <?php foreach ($logFiles as $name => $logFile): ?>
-        <h2 id="<?= strtolower(str_replace(' ', '-', $name)) ?>-log"><?= $name ?></h2>
-        <div>
-            <?php
-            if (file_exists($logFile)) {
-                $content = file_get_contents($logFile);
-                if (trim($content) === '') {
-                    echo "<div class='warning' style='padding: 20px; text-align: center;'>";
-                    echo "📋 Log vazio - Nenhuma atividade registrada ainda<br>";
-                    echo "<small style='color: #888;'>O log será preenchido automaticamente quando houver atividade</small>";
-                    echo "</div>";
-                } else {
-                    $lines = file($logFile);
-                    $lines = array_reverse(array_slice($lines, -100)); // Últimas 100 linhas, mais recentes primeiro
-                    
-                    foreach ($lines as $line) {
-                        $line = htmlspecialchars($line);
-                        $cssClass = 'log-entry';
-                        
-                        if (stripos($line, 'erro') !== false || stripos($line, 'error') !== false || stripos($line, 'exception') !== false) {
-                            $cssClass .= ' error';
-                        } elseif (stripos($line, 'sucesso') !== false || stripos($line, 'success') !== false || stripos($line, '✅') !== false) {
-                            $cssClass .= ' success';
-                        } elseif (stripos($line, 'warning') !== false || stripos($line, '⚠️') !== false) {
-                            $cssClass .= ' warning';
-                        }
-                        
-                        // Destacar timestamp
-                        $line = preg_replace('/\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]/', '<span class="timestamp">[$1]</span>', $line);
-                        
-                        echo "<div class='{$cssClass}'>{$line}</div>";
-                    }
-                }
+    <script>
+        let autoRefreshInterval = null;
+        
+        function toggleAutoRefresh(checkbox) {
+            if (checkbox.checked) {
+                autoRefreshInterval = setInterval(() => {
+                    window.location.reload();
+                }, 5000);
             } else {
-                echo "<div class='file-not-found'>";
-                echo "❌ Arquivo não encontrado: {$logFile}<br>";
-                echo "<small>Crie o arquivo executando: touch {$logFile}</small>";
-                echo "</div>";
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                    autoRefreshInterval = null;
+                }
             }
-            ?>
-        </div>
-    <?php endforeach; ?>
-    
+        }
+        
+        function downloadLogs() {
+            const content = document.querySelector('.logs-container').innerText;
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'api-logs-' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        // Scroll automático para o topo
+        window.scrollTo(0, 0);
+    </script>
 </body>
 </html>
-

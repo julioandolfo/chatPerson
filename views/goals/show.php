@@ -28,7 +28,7 @@ ob_start();
                             <span class="badge badge-light-info"><?= \App\Models\Goal::TARGET_TYPES[$goal['target_type']] ?? $goal['target_type'] ?></span>
                             <span class="badge badge-light-secondary"><?= \App\Models\Goal::PERIODS[$goal['period_type']] ?? $goal['period_type'] ?></span>
                             <?php if ($goal['is_stretch']): ?>
-                                <span class="badge badge-light-warning">🎯 Stretch Goal</span>
+                                <span class="badge badge-light-warning">🎯 Meta Desafiadora</span>
                             <?php endif; ?>
                             <span class="badge badge-light-<?= ['low' => 'secondary', 'medium' => 'primary', 'high' => 'warning', 'critical' => 'danger'][$goal['priority']] ?? 'secondary' ?>">
                                 Prioridade: <?= ucfirst($goal['priority']) ?>
@@ -54,9 +54,9 @@ ob_start();
         <!--begin::Progress Card-->
         <?php if ($progress): 
             $percentage = (float)$progress['percentage'];
-            $flagStatus = $progress['flag_status'] ?? 'good';
+            $flagStatus = $progress['flag_status'] ?? 'bom';
             $flagColor = \App\Models\Goal::getFlagColor($flagStatus);
-            $flagIcon = ['critical' => '🔴', 'warning' => '🟡', 'good' => '🟢', 'excellent' => '🔵'][$flagStatus] ?? '⚪';
+            $flagIcon = ['critico' => '🔴', 'atencao' => '🟡', 'bom' => '🟢', 'excelente' => '🔵'][$flagStatus] ?? '⚪';
             $targetCount = (int)($goal['target_count'] ?? 0);
             $isMulti = ($goal['target_type'] ?? '') === 'multi_agent';
             $targetTotal = $isMulti && $targetCount > 0

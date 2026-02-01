@@ -31,7 +31,7 @@ ob_start();
             <div class="card-body d-flex flex-column justify-content-between">
                 <div class="d-flex flex-column mb-7">
                     <span class="text-gray-600 fw-bold fs-6">Atingidas</span>
-                    <span class="text-success fw-bolder fs-2x"><?= $summary['achieved'] ?></span>
+                    <span class="text-success fw-bolder fs-2x"><?= $summary['atingidas'] ?? 0 ?></span>
                 </div>
                 <div class="m-0">
                     <i class="bi bi-trophy-fill text-success fs-3x"></i>
@@ -45,7 +45,7 @@ ob_start();
             <div class="card-body d-flex flex-column justify-content-between">
                 <div class="d-flex flex-column mb-7">
                     <span class="text-gray-600 fw-bold fs-6">Em Progresso</span>
-                    <span class="text-primary fw-bolder fs-2x"><?= $summary['in_progress'] ?></span>
+                    <span class="text-primary fw-bolder fs-2x"><?= $summary['em_andamento'] ?? 0 ?></span>
                 </div>
                 <div class="m-0">
                     <i class="bi bi-graph-up-arrow text-primary fs-3x"></i>

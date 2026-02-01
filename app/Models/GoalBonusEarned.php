@@ -54,7 +54,7 @@ class GoalBonusEarned extends Model
             Database::execute(
                 "UPDATE goal_bonus_earned 
                  SET tier_id = ?, bonus_amount = ?, percentage_achieved = ?, 
-                     earned_at = NOW(), status = 'pending'
+                     earned_at = NOW(), status = 'pendente'
                  WHERE id = ?",
                 [$tierId, $bonusAmount, $percentage, $existing['id']]
             );
@@ -70,7 +70,7 @@ class GoalBonusEarned extends Model
                 'earned_at' => date('Y-m-d H:i:s'),
                 'period_start' => $goal['start_date'],
                 'period_end' => $goal['end_date'],
-                'status' => 'pending'
+                'status' => 'pendente'
             ]);
         }
     }
@@ -140,7 +140,7 @@ class GoalBonusEarned extends Model
                 FROM goal_bonus_earned gbe
                 INNER JOIN goals g ON gbe.goal_id = g.id
                 INNER JOIN users u ON gbe.user_id = u.id
-                WHERE gbe.status = 'pending'
+                WHERE gbe.status = 'pendente'
                 ORDER BY gbe.earned_at DESC";
         
         if ($limit) {
@@ -187,7 +187,7 @@ class GoalBonusEarned extends Model
         
         $sql = "SELECT 
                     COUNT(*) as total_bonuses,
-                    SUM(CASE WHEN status = 'pending' THEN bonus_amount ELSE 0 END) as pending_amount,
+                    SUM(CASE WHEN status = 'pendente' THEN bonus_amount ELSE 0 END) as pendente_amount,
                     SUM(CASE WHEN status = 'approved' THEN bonus_amount ELSE 0 END) as approved_amount,
                     SUM(CASE WHEN status = 'paid' THEN bonus_amount ELSE 0 END) as paid_amount,
                     SUM(bonus_amount) as total_amount
@@ -197,7 +197,7 @@ class GoalBonusEarned extends Model
         
         return Database::fetch($sql, [$userId, $startDate, $endDate]) ?: [
             'total_bonuses' => 0,
-            'pending_amount' => 0,
+            'pendente_amount' => 0,
             'approved_amount' => 0,
             'paid_amount' => 0,
             'total_amount' => 0

@@ -306,15 +306,15 @@ class Goal extends Model
         $good = $this->data['flag_good_threshold'] ?? 95.0;
         
         if ($percentage >= 100) {
-            return 'excellent'; // Atingiu ou superou
+            return 'excelente'; // Atingiu ou superou
         } elseif ($percentage >= $good) {
-            return 'good'; // Verde - Bom ritmo
+            return 'bom'; // Verde - Bom ritmo
         } elseif ($percentage >= $warning) {
-            return 'warning'; // Amarelo - Atenção
+            return 'atencao'; // Amarelo - Atenção
         } elseif ($percentage >= $critical) {
-            return 'warning'; // Amarelo ainda
+            return 'atencao'; // Amarelo ainda
         } else {
-            return 'critical'; // Vermelho - Crítico
+            return 'critico'; // Vermelho - Crítico
         }
     }
     
@@ -324,10 +324,10 @@ class Goal extends Model
     public static function getFlagColor(string $flag): string
     {
         return [
-            'critical' => 'danger',
-            'warning' => 'warning',
-            'good' => 'success',
-            'excellent' => 'primary'
+            'critico' => 'danger',
+            'atencao' => 'warning',
+            'bom' => 'success',
+            'excelente' => 'primary'
         ][$flag] ?? 'secondary';
     }
     
@@ -337,10 +337,10 @@ class Goal extends Model
     public static function getFlagLabel(string $flag): string
     {
         return [
-            'critical' => 'Crítico',
-            'warning' => 'Atenção',
-            'good' => 'No Caminho',
-            'excellent' => 'Atingida'
+            'critico' => 'Crítico',
+            'atencao' => 'Atenção',
+            'bom' => 'No Caminho',
+            'excelente' => 'Atingida'
         ][$flag] ?? 'Desconhecido';
     }
     

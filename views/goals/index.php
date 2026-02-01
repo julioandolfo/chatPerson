@@ -93,7 +93,7 @@ ob_start();
                                     $progress = $goal['progress'] ?? null;
                                     $percentage = $progress ? (float)$progress['percentage'] : 0;
                                     $currentValue = $progress ? (float)$progress['current_value'] : 0;
-                                    $status = $progress ? $progress['status'] : 'not_started';
+                                    $status = $progress ? $progress['status'] : 'nao_iniciada';
                                     
                                     // Cor do progresso
                                     if ($percentage >= 100) {
@@ -108,11 +108,11 @@ ob_start();
                                     
                                     // Badge de status
                                     $statusBadges = [
-                                        'not_started' => '<span class="badge badge-light">Não Iniciada</span>',
-                                        'in_progress' => '<span class="badge badge-primary">Em Progresso</span>',
-                                        'achieved' => '<span class="badge badge-success">Atingida</span>',
-                                        'exceeded' => '<span class="badge badge-success">Superada</span>',
-                                        'failed' => '<span class="badge badge-danger">Falhou</span>'
+                                        'nao_iniciada' => '<span class="badge badge-light">Não Iniciada</span>',
+                                        'em_andamento' => '<span class="badge badge-primary">Em Andamento</span>',
+                                        'atingida' => '<span class="badge badge-success">Atingida</span>',
+                                        'superada' => '<span class="badge badge-success">Superada</span>',
+                                        'falhada' => '<span class="badge badge-danger">Falhada</span>'
                                     ];
                                 ?>
                                     <tr>

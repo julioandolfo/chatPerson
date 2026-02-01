@@ -232,18 +232,18 @@ class GoalService
         $good = $goal['flag_good_threshold'] ?? 95.0;
 
         if ($percentage >= 100) {
-            return 'excellent';
+            return 'excelente';
         }
         if ($percentage >= $good) {
-            return 'good';
+            return 'bom';
         }
         if ($percentage >= $warning) {
-            return 'warning';
+            return 'atencao';
         }
         if ($percentage >= $critical) {
-            return 'warning';
+            return 'atencao';
         }
-        return 'critical';
+        return 'critico';
     }
     
     /**
@@ -330,8 +330,8 @@ class GoalService
             $daysRemaining = $projection ? $projection['days_remaining'] : '?';
             GoalAlert::createAlert(
                 $goal['id'],
-                'critical',
-                'critical',
+                'critico',
+                'critico',
                 "Meta em situação crítica! Apenas {$percentage}% atingido. {$daysRemaining} dias restantes.",
                 ['percentage' => $percentage, 'threshold' => $criticalThreshold]
             );
@@ -342,8 +342,8 @@ class GoalService
             $deviation = abs($projection['deviation']);
             GoalAlert::createAlert(
                 $goal['id'],
-                'off_track',
-                'warning',
+                'fora_do_ritmo',
+                'atencao',
                 "Fora do ritmo esperado! Desvio de {$deviation}%. Esperado: {$projection['expected_percentage']}%, Atual: {$percentage}%.",
                 $projection
             );
@@ -353,8 +353,8 @@ class GoalService
         if ($projection && $projection['projected_percentage'] < 100 && $percentage < 90) {
             GoalAlert::createAlert(
                 $goal['id'],
-                'at_risk',
-                'warning',
+                'em_risco',
+                'atencao',
                 "Risco de não atingir meta! Projeção atual: {$projection['projected_percentage']}%.",
                 $projection
             );
@@ -849,22 +849,22 @@ class GoalService
         $ended = $now > $goal['end_date'];
         
         if (!$started) {
-            return 'not_started';
+            return 'nao_iniciada';
         }
         
         if ($percentage >= 100) {
-            return 'exceeded';
+            return 'superada';
         }
         
         if ($percentage >= 100) {
-            return 'achieved';
+            return 'atingida';
         }
         
         if ($ended && $percentage < 100) {
-            return 'failed';
+            return 'falhada';
         }
         
-        return 'in_progress';
+        return 'em_andamento';
     }
     
     /**
@@ -997,9 +997,9 @@ class GoalService
         $goals = Goal::getAgentGoals($userId);
         $summary = [
             'total_goals' => 0,
-            'achieved' => 0,
-            'in_progress' => 0,
-            'at_risk' => 0,
+            'atingidas' => 0,
+            'em_andamento' => 0,
+            'em_risco' => 0,
             'goals_by_level' => [
                 'individual' => [],
                 'team' => [],
@@ -1018,12 +1018,12 @@ class GoalService
                 if ($progress) {
                     $goal['progress'] = $progress;
                     
-                    if ($progress['status'] === 'achieved' || $progress['status'] === 'exceeded') {
-                        $summary['achieved']++;
+                    if ($progress['status'] === 'atingida' || $progress['status'] === 'superada') {
+                        $summary['atingidas']++;
                     } elseif ($progress['percentage'] < 50 && strtotime($goal['end_date']) < strtotime('+7 days')) {
-                        $summary['at_risk']++;
+                        $summary['em_risco']++;
                     } else {
-                        $summary['in_progress']++;
+                        $summary['em_andamento']++;
                     }
                 }
                 

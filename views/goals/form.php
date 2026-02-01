@@ -266,7 +266,7 @@ ob_start();
                                 <div class="d-flex flex-wrap gap-3" id="badge-selector">
                                     <?php 
                                     $badges = [
-                                        ['value' => 'trophy', 'icon' => '🏆', 'name' => 'Troféu'],
+                                        ['value' => 'trofeu', 'icon' => '🏆', 'name' => 'Troféu'],
                                         ['value' => 'medal_gold', 'icon' => '🥇', 'name' => 'Medalha Ouro'],
                                         ['value' => 'medal_silver', 'icon' => '🥈', 'name' => 'Medalha Prata'],
                                         ['value' => 'medal_bronze', 'icon' => '🥉', 'name' => 'Medalha Bronze'],

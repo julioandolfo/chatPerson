@@ -9,6 +9,7 @@ $pageTitle = 'Documentação da API';
 $baseUrl = Url::fullUrl('/api/v1');
 // Remover /api/v1 do final para usar como base
 $baseUrl = substr($baseUrl, 0, -7);
+$standaloneUrl = Url::fullUrl('/api.php');
 ob_start();
 ?>
 
@@ -16,8 +17,8 @@ ob_start();
     <!-- Header -->
     <div class="d-flex align-items-center justify-content-between mb-5">
         <div>
-            <h1 class="fw-bold mb-1">Documentação da API REST</h1>
-            <p class="text-muted mb-0">Guia completo para integração</p>
+            <h1 class="fw-bold mb-1">Documentacao da API REST</h1>
+            <p class="text-muted mb-0">Guia completo para integracao</p>
         </div>
         <a href="<?= Url::to('/settings/api-tokens') ?>" class="btn btn-light-primary">
             <i class="ki-duotone ki-arrow-left fs-2"></i>
@@ -25,19 +26,38 @@ ob_start();
         </a>
     </div>
     
-    <!-- Menu Lateral + Conteúdo -->
+    <!-- Aviso Importante -->
+    <div class="alert alert-success d-flex align-items-center mb-5">
+        <i class="ki-duotone ki-shield-tick fs-2x text-success me-3"><span class="path1"></span><span class="path2"></span></i>
+        <div>
+            <strong>Nova API Standalone Disponivel!</strong><br>
+            Agora a API possui um gateway standalone que funciona sem depender de configuracoes de servidor. 
+            Use <code><?= $standaloneUrl ?></code> para maior compatibilidade.
+        </div>
+    </div>
+    
+    <!-- Menu Lateral + Conteudo -->
     <div class="row g-5">
-        <!-- Sidebar de Navegação -->
+        <!-- Sidebar de Navegacao -->
         <div class="col-lg-3">
             <div class="card card-flush sticky-top" style="top: 80px;">
                 <div class="card-body p-5">
-                    <h4 class="fw-bold mb-5">Navegação</h4>
+                    <h4 class="fw-bold mb-5">Navegacao</h4>
                     <ul class="nav nav-pills flex-column" id="docs-nav">
                         <li class="nav-item mb-2">
-                            <a class="nav-link active" href="#inicio">Início Rápido</a>
+                            <a class="nav-link active" href="#inicio">Inicio Rapido</a>
                         </li>
                         <li class="nav-item mb-2">
-                            <a class="nav-link" href="#autenticacao">Autenticação</a>
+                            <a class="nav-link" href="#urls">URLs da API</a>
+                        </li>
+                        <li class="nav-item mb-2">
+                            <a class="nav-link" href="#autenticacao">Autenticacao</a>
+                        </li>
+                        <li class="nav-item mb-2">
+                            <a class="nav-link" href="#whatsapp-accounts">WhatsApp Accounts</a>
+                        </li>
+                        <li class="nav-item mb-2">
+                            <a class="nav-link" href="#envio-direto">Envio Direto (WhatsApp)</a>
                         </li>
                         <li class="nav-item mb-2">
                             <a class="nav-link" href="#conversas">Conversas</a>
@@ -46,19 +66,13 @@ ob_start();
                             <a class="nav-link" href="#mensagens">Mensagens</a>
                         </li>
                         <li class="nav-item mb-2">
-                            <a class="nav-link" href="#envio-direto">📤 Envio Direto (WhatsApp)</a>
-                        </li>
-                        <li class="nav-item mb-2">
                             <a class="nav-link" href="#contatos">Contatos</a>
-                        </li>
-                        <li class="nav-item mb-2">
-                            <a class="nav-link" href="#participantes">Participantes</a>
                         </li>
                         <li class="nav-item mb-2">
                             <a class="nav-link" href="#auxiliares">Recursos Auxiliares</a>
                         </li>
                         <li class="nav-item mb-2">
-                            <a class="nav-link" href="#paginacao">Paginação</a>
+                            <a class="nav-link" href="#paginacao">Paginacao</a>
                         </li>
                         <li class="nav-item mb-2">
                             <a class="nav-link" href="#erros">Erros</a>
@@ -71,22 +85,22 @@ ob_start();
             </div>
         </div>
         
-        <!-- Conteúdo da Documentação -->
+        <!-- Conteudo da Documentacao -->
         <div class="col-lg-9">
             
-            <!-- Início Rápido -->
+            <!-- Inicio Rapido -->
             <div class="card mb-5" id="inicio">
                 <div class="card-header">
-                    <h3 class="card-title">🚀 Início Rápido</h3>
+                    <h3 class="card-title">Inicio Rapido</h3>
                 </div>
                 <div class="card-body">
                     <h4 class="fw-bold mb-3">1. Gerar Token</h4>
-                    <p>Acesse <a href="<?= Url::to('/settings/api-tokens') ?>">Configurações → API & Tokens</a> e gere um novo token.</p>
+                    <p>Acesse <a href="<?= Url::to('/settings/api-tokens') ?>">Configuracoes - API & Tokens</a> e gere um novo token.</p>
                     
-                    <h4 class="fw-bold mb-3 mt-5">2. Fazer Primeira Requisição</h4>
+                    <h4 class="fw-bold mb-3 mt-5">2. Fazer Primeira Requisicao</h4>
                     <div class="bg-light rounded p-4">
                         <code class="text-dark">
-                            curl -X GET "<?= $baseUrl ?>/api/v1/conversations" \<br>
+                            curl -X GET "<?= $standaloneUrl ?>/whatsapp-accounts" \<br>
                             &nbsp;&nbsp;-H "Authorization: Bearer SEU_TOKEN_AQUI"
                         </code>
                     </div>
@@ -94,24 +108,93 @@ ob_start();
                     <div class="alert alert-info d-flex align-items-center mt-5">
                         <i class="ki-duotone ki-information-5 fs-2x text-info me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
                         <div>
-                            <strong>Base URL:</strong> <code><?= $baseUrl ?>/api/v1</code><br>
+                            <strong>URL Recomendada (Standalone):</strong> <code><?= $standaloneUrl ?></code><br>
+                            <strong>URL Alternativa:</strong> <code><?= $baseUrl ?>/api/v1</code><br>
                             <strong>Formato:</strong> JSON<br>
-                            <strong>Rate Limit:</strong> 100 requisições/minuto (padrão)
+                            <strong>Rate Limit:</strong> 100 requisicoes/minuto (padrao)
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Autenticação -->
-            <div class="card mb-5" id="autenticacao">
-                <div class="card-header">
-                    <h3 class="card-title">🔐 Autenticação</h3>
+            <!-- URLs da API -->
+            <div class="card mb-5" id="urls">
+                <div class="card-header bg-primary">
+                    <h3 class="card-title text-white">URLs da API</h3>
                 </div>
                 <div class="card-body">
-                    <h4 class="fw-bold mb-3">Opção 1: JWT (Login Temporário)</h4>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="border border-success rounded p-4 h-100">
+                                <h5 class="text-success fw-bold mb-3">
+                                    <i class="ki-duotone ki-check-circle text-success fs-2 me-2"><span class="path1"></span><span class="path2"></span></i>
+                                    API Standalone (RECOMENDADO)
+                                </h5>
+                                <code class="fs-6"><?= $standaloneUrl ?></code>
+                                <ul class="mt-3 mb-0">
+                                    <li>Funciona em qualquer servidor</li>
+                                    <li>Nao depende de .htaccess</li>
+                                    <li>Maior compatibilidade</li>
+                                    <li>Ideal para integracoes externas</li>
+                                </ul>
+                                
+                                <div class="mt-4">
+                                    <strong>Exemplo:</strong><br>
+                                    <code><?= $standaloneUrl ?>/whatsapp-accounts</code><br>
+                                    <code><?= $standaloneUrl ?>/messages/send</code><br>
+                                    <code><?= $standaloneUrl ?>/conversations</code>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="border border-secondary rounded p-4 h-100">
+                                <h5 class="text-secondary fw-bold mb-3">
+                                    <i class="ki-duotone ki-information text-secondary fs-2 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                    API Tradicional
+                                </h5>
+                                <code class="fs-6"><?= $baseUrl ?>/api/v1</code>
+                                <ul class="mt-3 mb-0">
+                                    <li>Requer .htaccess configurado</li>
+                                    <li>Formato RESTful classico</li>
+                                    <li>Pode ter problemas em alguns hosts</li>
+                                </ul>
+                                
+                                <div class="mt-4">
+                                    <strong>Exemplo:</strong><br>
+                                    <code><?= $baseUrl ?>/api/v1/whatsapp-accounts</code><br>
+                                    <code><?= $baseUrl ?>/api/v1/messages/send</code><br>
+                                    <code><?= $baseUrl ?>/api/v1/conversations</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-warning mt-5 mb-0">
+                        <strong>Dica:</strong> Se voce esta tendo erros 404 com a API tradicional, use a API Standalone.
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Autenticacao -->
+            <div class="card mb-5" id="autenticacao">
+                <div class="card-header">
+                    <h3 class="card-title">Autenticacao</h3>
+                </div>
+                <div class="card-body">
+                    <h4 class="fw-bold mb-3">Opcao 1: API Token (Recomendado)</h4>
+                    <p>Gere um token permanente no painel e use em todas as requisicoes:</p>
+                    <div class="bg-light rounded p-4">
+                        <code class="text-dark">
+                            Authorization: Bearer SEU_TOKEN_AQUI<br>
+                            # ou<br>
+                            X-API-Key: SEU_TOKEN_AQUI
+                        </code>
+                    </div>
+                    
+                    <h4 class="fw-bold mb-3 mt-5">Opcao 2: Login (Token Temporario)</h4>
                     <div class="mb-5">
                         <div class="badge badge-light-primary mb-2">POST</div>
-                        <code class="ms-2">/api/v1/auth/login</code>
+                        <code class="ms-2"><?= $standaloneUrl ?>/auth/login</code>
                         <div class="bg-light rounded p-4 mt-3">
                             <strong>Request:</strong>
                             <pre class="mb-0"><code>{
@@ -124,323 +207,109 @@ ob_start();
                             <pre class="mb-0"><code>{
   "success": true,
   "data": {
-    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "refresh_token": "...",
+    "user": {
+      "id": 1,
+      "name": "Usuario",
+      "email": "usuario@empresa.com"
+    },
+    "access_token": "abc123...",
     "token_type": "Bearer",
-    "expires_in": 3600
+    "expires_in": 86400
   }
 }</code></pre>
                         </div>
-                    </div>
-                    
-                    <h4 class="fw-bold mb-3">Opção 2: API Token (Permanente)</h4>
-                    <p>Gere um token permanente no painel e use em todas as requisições:</p>
-                    <div class="bg-light rounded p-4">
-                        <code class="text-dark">
-                            Authorization: Bearer SEU_TOKEN_AQUI<br>
-                            # ou<br>
-                            X-API-Key: SEU_TOKEN_AQUI
-                        </code>
                     </div>
                     
                     <h4 class="fw-bold mb-3 mt-5">Outros Endpoints de Auth</h4>
                     <table class="table table-row-bordered">
                         <thead>
                             <tr>
-                                <th>Método</th>
+                                <th>Metodo</th>
                                 <th>Endpoint</th>
-                                <th>Descrição</th>
+                                <th>Descricao</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td><span class="badge badge-light-success">POST</span></td>
-                                <td><code>/api/v1/auth/refresh</code></td>
-                                <td>Renovar JWT</td>
-                            </tr>
-                            <tr>
-                                <td><span class="badge badge-light-success">POST</span></td>
-                                <td><code>/api/v1/auth/logout</code></td>
-                                <td>Logout</td>
-                            </tr>
-                            <tr>
                                 <td><span class="badge badge-light-primary">GET</span></td>
-                                <td><code>/api/v1/auth/me</code></td>
-                                <td>Dados do usuário autenticado</td>
+                                <td><code>/auth/me</code></td>
+                                <td>Dados do usuario autenticado</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
             
-            <!-- Conversas -->
-            <div class="card mb-5" id="conversas">
-                <div class="card-header">
-                    <h3 class="card-title">💬 Conversas</h3>
+            <!-- WhatsApp Accounts -->
+            <div class="card mb-5" id="whatsapp-accounts">
+                <div class="card-header bg-success">
+                    <h3 class="card-title text-white">WhatsApp Accounts</h3>
                 </div>
                 <div class="card-body">
-                    <h4 class="fw-bold mb-3">Endpoints Disponíveis</h4>
+                    <div class="alert alert-success mb-5">
+                        <strong>Importante para Integracoes!</strong><br>
+                        Use este endpoint para listar as contas WhatsApp disponiveis antes de enviar mensagens.
+                    </div>
+                    
                     <table class="table table-row-bordered">
                         <thead>
                             <tr>
-                                <th>Método</th>
+                                <th>Metodo</th>
                                 <th>Endpoint</th>
-                                <th>Descrição</th>
+                                <th>Descricao</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
                                 <td><span class="badge badge-light-primary">GET</span></td>
-                                <td><code>/api/v1/conversations</code></td>
-                                <td>Listar conversas</td>
-                            </tr>
-                            <tr>
-                                <td><span class="badge badge-light-success">POST</span></td>
-                                <td><code>/api/v1/conversations</code></td>
-                                <td>Criar conversa</td>
+                                <td><code>/whatsapp-accounts</code></td>
+                                <td>Listar todas as contas WhatsApp</td>
                             </tr>
                             <tr>
                                 <td><span class="badge badge-light-primary">GET</span></td>
-                                <td><code>/api/v1/conversations/:id</code></td>
-                                <td>Obter conversa</td>
-                            </tr>
-                            <tr>
-                                <td><span class="badge badge-light-warning">PUT</span></td>
-                                <td><code>/api/v1/conversations/:id</code></td>
-                                <td>Atualizar conversa</td>
-                            </tr>
-                            <tr>
-                                <td><span class="badge badge-light-danger">DELETE</span></td>
-                                <td><code>/api/v1/conversations/:id</code></td>
-                                <td>Deletar conversa</td>
-                            </tr>
-                            <tr>
-                                <td><span class="badge badge-light-success">POST</span></td>
-                                <td><code>/api/v1/conversations/:id/assign</code></td>
-                                <td>Atribuir conversa</td>
-                            </tr>
-                            <tr>
-                                <td><span class="badge badge-light-success">POST</span></td>
-                                <td><code>/api/v1/conversations/:id/close</code></td>
-                                <td>Encerrar conversa</td>
-                            </tr>
-                            <tr>
-                                <td><span class="badge badge-light-success">POST</span></td>
-                                <td><code>/api/v1/conversations/:id/reopen</code></td>
-                                <td>Reabrir conversa</td>
-                            </tr>
-                            <tr>
-                                <td><span class="badge badge-light-success">POST</span></td>
-                                <td><code>/api/v1/conversations/:id/move-stage</code></td>
-                                <td>Mover no funil</td>
-                            </tr>
-                            <tr>
-                                <td><span class="badge badge-light-warning">PUT</span></td>
-                                <td><code>/api/v1/conversations/:id/department</code></td>
-                                <td>Mudar setor</td>
-                            </tr>
-                            <tr>
-                                <td><span class="badge badge-light-success">POST</span></td>
-                                <td><code>/api/v1/conversations/:id/tags</code></td>
-                                <td>Adicionar tag</td>
-                            </tr>
-                            <tr>
-                                <td><span class="badge badge-light-danger">DELETE</span></td>
-                                <td><code>/api/v1/conversations/:id/tags/:tagId</code></td>
-                                <td>Remover tag</td>
+                                <td><code>/whatsapp-accounts/:id</code></td>
+                                <td>Obter detalhes de uma conta</td>
                             </tr>
                         </tbody>
                     </table>
                     
-                    <h4 class="fw-bold mb-3 mt-5">Exemplo: Criar Conversa</h4>
-                    <div class="bg-light rounded p-4">
-                        <code class="text-dark">
-                            curl -X POST "<?= $baseUrl ?>/api/v1/conversations" \<br>
-                            &nbsp;&nbsp;-H "Authorization: Bearer TOKEN" \<br>
-                            &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
-                            &nbsp;&nbsp;-d '{<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;"contact_id": 123,<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;"channel": "whatsapp",<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;"agent_id": 5,<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;"department_id": 2,<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;"funnel_id": 1,<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;"stage_id": 3<br>
-                            &nbsp;&nbsp;}'
-                        </code>
-                    </div>
-                    
-                    <h4 class="fw-bold mb-3 mt-5">Exemplo: Listar com Filtros</h4>
-                    <div class="bg-light rounded p-4">
-                        <code class="text-dark">
-                            GET /api/v1/conversations?status=open&agent_id=5&page=1&per_page=20
-                        </code>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Mensagens -->
-            <div class="card mb-5" id="mensagens">
-                <div class="card-header">
-                    <h3 class="card-title">✉️ Mensagens</h3>
-                </div>
-                <div class="card-body">
+                    <h4 class="fw-bold mb-3 mt-5">Filtros Disponiveis</h4>
                     <table class="table table-row-bordered">
                         <thead>
                             <tr>
-                                <th>Método</th>
-                                <th>Endpoint</th>
-                                <th>Descrição</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><span class="badge badge-light-primary">GET</span></td>
-                                <td><code>/api/v1/conversations/:id/messages</code></td>
-                                <td>Listar mensagens</td>
-                            </tr>
-                            <tr>
-                                <td><span class="badge badge-light-success">POST</span></td>
-                                <td><code>/api/v1/conversations/:id/messages</code></td>
-                                <td>Enviar mensagem</td>
-                            </tr>
-                            <tr>
-                                <td><span class="badge badge-light-primary">GET</span></td>
-                                <td><code>/api/v1/messages/:id</code></td>
-                                <td>Obter mensagem</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    
-                    <h4 class="fw-bold mb-3 mt-5">Exemplo: Enviar Mensagem</h4>
-                    <div class="bg-light rounded p-4">
-                        <code class="text-dark">
-                            curl -X POST "<?= $baseUrl ?>/api/v1/conversations/456/messages" \<br>
-                            &nbsp;&nbsp;-H "Authorization: Bearer TOKEN" \<br>
-                            &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
-                            &nbsp;&nbsp;-d '{<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;"body": "Olá! Como posso ajudar?",<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;"type": "text"<br>
-                            &nbsp;&nbsp;}'
-                        </code>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Envio Direto de Mensagens -->
-            <div class="card mb-5" id="envio-direto">
-                <div class="card-header">
-                    <h3 class="card-title">📤 Envio Direto de Mensagens (WhatsApp)</h3>
-                </div>
-                <div class="card-body">
-                    <div class="alert alert-success d-flex align-items-center mb-5">
-                        <i class="ki-duotone ki-check-circle fs-2x text-success me-3"><span class="path1"></span><span class="path2"></span></i>
-                        <div>
-                            <strong>Endpoint Simplificado!</strong><br>
-                            Envie mensagens diretamente para qualquer número, mesmo sem contato ou conversa pré-existente.
-                            O sistema criará automaticamente o contato e a conversa se necessário.
-                        </div>
-                    </div>
-                    
-                    <table class="table table-row-bordered">
-                        <thead>
-                            <tr>
-                                <th>Método</th>
-                                <th>Endpoint</th>
-                                <th>Descrição</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><span class="badge badge-light-success">POST</span></td>
-                                <td><code>/api/v1/messages/send</code></td>
-                                <td>Enviar mensagem via WhatsApp</td>
-                            </tr>
-                            <tr>
-                                <td><span class="badge badge-light-primary">GET</span></td>
-                                <td><code>/api/v1/whatsapp/accounts</code></td>
-                                <td>Listar integrações WhatsApp disponíveis</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    
-                    <h4 class="fw-bold mb-3 mt-5">Parâmetros do Envio</h4>
-                    <table class="table table-row-bordered">
-                        <thead>
-                            <tr>
-                                <th>Campo</th>
+                                <th>Parametro</th>
                                 <th>Tipo</th>
-                                <th>Obrigatório</th>
-                                <th>Descrição</th>
+                                <th>Descricao</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td><code>to</code></td>
+                                <td><code>status</code></td>
                                 <td>string</td>
-                                <td><span class="badge badge-light-danger">Sim</span></td>
-                                <td>Número do destinatário (ex: <code>5535991970289</code>)</td>
+                                <td><code>active</code>, <code>inactive</code>, <code>disconnected</code></td>
                             </tr>
                             <tr>
-                                <td><code>from</code></td>
-                                <td>string</td>
-                                <td><span class="badge badge-light-danger">Sim</span></td>
-                                <td>Número da integração WhatsApp (ex: <code>5535991970289</code>)</td>
+                                <td><code>page</code></td>
+                                <td>integer</td>
+                                <td>Numero da pagina (padrao: 1)</td>
                             </tr>
                             <tr>
-                                <td><code>message</code></td>
-                                <td>string</td>
-                                <td><span class="badge badge-light-danger">Sim</span></td>
-                                <td>Texto da mensagem (máx. 4096 caracteres)</td>
-                            </tr>
-                            <tr>
-                                <td><code>contact_name</code></td>
-                                <td>string</td>
-                                <td><span class="badge badge-light-secondary">Não</span></td>
-                                <td>Nome do contato (usado se for um novo contato)</td>
+                                <td><code>per_page</code></td>
+                                <td>integer</td>
+                                <td>Itens por pagina (padrao: 20, max: 100)</td>
                             </tr>
                         </tbody>
                     </table>
                     
-                    <h4 class="fw-bold mb-3 mt-5">Exemplo: Enviar Mensagem Direta</h4>
+                    <h4 class="fw-bold mb-3 mt-5">Exemplo: Listar Contas Ativas</h4>
                     <div class="bg-light rounded p-4">
                         <code class="text-dark">
-                            curl -X POST "<?= $baseUrl ?>/api/v1/messages/send" \<br>
-                            &nbsp;&nbsp;-H "Authorization: Bearer SEU_TOKEN" \<br>
-                            &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
-                            &nbsp;&nbsp;-d '{<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;"to": "5511999998888",<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;"from": "5535991970289",<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;"message": "Olá! Esta é uma mensagem de teste via API.",<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;"contact_name": "João Silva"<br>
-                            &nbsp;&nbsp;}'
-                        </code>
-                    </div>
-                    
-                    <h5 class="fw-bold mb-3 mt-5">Resposta de Sucesso</h5>
-                    <div class="bg-light rounded p-4">
-                        <pre class="mb-0"><code>{
-  "success": true,
-  "data": {
-    "message_id": 12345,
-    "external_id": "3EB0123ABC456DEF",
-    "status": "sent",
-    "conversation_id": 789,
-    "contact_id": 456,
-    "is_new_contact": false,
-    "is_new_conversation": false
-  }
-}</code></pre>
-                    </div>
-                    
-                    <h4 class="fw-bold mb-3 mt-5">Exemplo: Listar Integrações WhatsApp</h4>
-                    <div class="bg-light rounded p-4">
-                        <code class="text-dark">
-                            curl -X GET "<?= $baseUrl ?>/api/v1/whatsapp/accounts" \<br>
+                            curl -X GET "<?= $standaloneUrl ?>/whatsapp-accounts?status=active" \<br>
                             &nbsp;&nbsp;-H "Authorization: Bearer SEU_TOKEN"
                         </code>
                     </div>
                     
-                    <h5 class="fw-bold mb-3 mt-3">Resposta</h5>
+                    <h5 class="fw-bold mb-3 mt-4">Resposta</h5>
                     <div class="bg-light rounded p-4">
                         <pre class="mb-0"><code>{
   "success": true,
@@ -450,11 +319,120 @@ ob_start();
         "id": 1,
         "name": "Atendimento Geral",
         "phone_number": "5535991970289",
+        "provider": "quepasa",
         "status": "active",
-        "provider": "quepasa"
+        "default_funnel_id": 1,
+        "default_stage_id": 3,
+        "created_at": "2024-01-15 10:30:00"
       }
     ],
-    "total": 1
+    "pagination": {
+      "total": 1,
+      "page": 1,
+      "per_page": 20,
+      "total_pages": 1
+    }
+  }
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Envio Direto de Mensagens -->
+            <div class="card mb-5" id="envio-direto">
+                <div class="card-header bg-success">
+                    <h3 class="card-title text-white">Envio Direto de Mensagens (WhatsApp)</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-success d-flex align-items-center mb-5">
+                        <i class="ki-duotone ki-check-circle fs-2x text-success me-3"><span class="path1"></span><span class="path2"></span></i>
+                        <div>
+                            <strong>Endpoint Simplificado!</strong><br>
+                            Envie mensagens diretamente para qualquer numero, mesmo sem contato ou conversa pre-existente.
+                            O sistema criara automaticamente o contato e a conversa se necessario.
+                        </div>
+                    </div>
+                    
+                    <table class="table table-row-bordered">
+                        <thead>
+                            <tr>
+                                <th>Metodo</th>
+                                <th>Endpoint</th>
+                                <th>Descricao</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="badge badge-light-success">POST</span></td>
+                                <td><code>/messages/send</code></td>
+                                <td>Enviar mensagem via WhatsApp</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <h4 class="fw-bold mb-3 mt-5">Parametros do Envio</h4>
+                    <table class="table table-row-bordered">
+                        <thead>
+                            <tr>
+                                <th>Campo</th>
+                                <th>Tipo</th>
+                                <th>Obrigatorio</th>
+                                <th>Descricao</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>to</code></td>
+                                <td>string</td>
+                                <td><span class="badge badge-light-danger">Sim</span></td>
+                                <td>Numero do destinatario (ex: <code>5511999998888</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>from</code></td>
+                                <td>string</td>
+                                <td><span class="badge badge-light-danger">Sim</span></td>
+                                <td>Numero da integracao WhatsApp (ex: <code>5535991970289</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>message</code></td>
+                                <td>string</td>
+                                <td><span class="badge badge-light-danger">Sim</span></td>
+                                <td>Texto da mensagem (max. 4096 caracteres)</td>
+                            </tr>
+                            <tr>
+                                <td><code>contact_name</code></td>
+                                <td>string</td>
+                                <td><span class="badge badge-light-secondary">Nao</span></td>
+                                <td>Nome do contato (usado se for um novo contato)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <h4 class="fw-bold mb-3 mt-5">Exemplo: Enviar Mensagem Direta</h4>
+                    <div class="bg-light rounded p-4">
+                        <code class="text-dark">
+                            curl -X POST "<?= $standaloneUrl ?>/messages/send" \<br>
+                            &nbsp;&nbsp;-H "Authorization: Bearer SEU_TOKEN" \<br>
+                            &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
+                            &nbsp;&nbsp;-d '{<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"to": "5511999998888",<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"from": "5535991970289",<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"message": "Ola! Esta e uma mensagem de teste via API.",<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"contact_name": "Joao Silva"<br>
+                            &nbsp;&nbsp;}'
+                        </code>
+                    </div>
+                    
+                    <h5 class="fw-bold mb-3 mt-5">Resposta de Sucesso</h5>
+                    <div class="bg-light rounded p-4">
+                        <pre class="mb-0"><code>{
+  "success": true,
+  "message": "Mensagem enviada",
+  "data": {
+    "message_id": "12345",
+    "conversation_id": "789",
+    "contact_id": "456",
+    "status": "sent"
   }
 }</code></pre>
                     </div>
@@ -463,9 +441,164 @@ ob_start();
                         <i class="ki-duotone ki-information-5 fs-2x text-warning me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
                         <div>
                             <strong>Importante:</strong><br>
-                            O número <code>from</code> deve corresponder a uma integração WhatsApp ativa no sistema.
-                            Use o endpoint <code>/api/v1/whatsapp/accounts</code> para listar os números disponíveis.
+                            O numero <code>from</code> deve corresponder a uma integracao WhatsApp ativa no sistema.
+                            Use o endpoint <code>/whatsapp-accounts</code> para listar os numeros disponiveis.
                         </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Conversas -->
+            <div class="card mb-5" id="conversas">
+                <div class="card-header">
+                    <h3 class="card-title">Conversas</h3>
+                </div>
+                <div class="card-body">
+                    <h4 class="fw-bold mb-3">Endpoints Disponiveis</h4>
+                    <table class="table table-row-bordered">
+                        <thead>
+                            <tr>
+                                <th>Metodo</th>
+                                <th>Endpoint</th>
+                                <th>Descricao</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="badge badge-light-primary">GET</span></td>
+                                <td><code>/conversations</code></td>
+                                <td>Listar conversas</td>
+                            </tr>
+                            <tr>
+                                <td><span class="badge badge-light-success">POST</span></td>
+                                <td><code>/conversations</code></td>
+                                <td>Criar conversa</td>
+                            </tr>
+                            <tr>
+                                <td><span class="badge badge-light-primary">GET</span></td>
+                                <td><code>/conversations/:id</code></td>
+                                <td>Obter conversa</td>
+                            </tr>
+                            <tr>
+                                <td><span class="badge badge-light-warning">PUT</span></td>
+                                <td><code>/conversations/:id</code></td>
+                                <td>Atualizar conversa</td>
+                            </tr>
+                            <tr>
+                                <td><span class="badge badge-light-danger">DELETE</span></td>
+                                <td><code>/conversations/:id</code></td>
+                                <td>Deletar conversa</td>
+                            </tr>
+                            <tr>
+                                <td><span class="badge badge-light-success">POST</span></td>
+                                <td><code>/conversations/:id/assign</code></td>
+                                <td>Atribuir a agente</td>
+                            </tr>
+                            <tr>
+                                <td><span class="badge badge-light-success">POST</span></td>
+                                <td><code>/conversations/:id/close</code></td>
+                                <td>Encerrar conversa</td>
+                            </tr>
+                            <tr>
+                                <td><span class="badge badge-light-success">POST</span></td>
+                                <td><code>/conversations/:id/reopen</code></td>
+                                <td>Reabrir conversa</td>
+                            </tr>
+                            <tr>
+                                <td><span class="badge badge-light-success">POST</span></td>
+                                <td><code>/conversations/:id/move-stage</code></td>
+                                <td>Mover no funil</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <h4 class="fw-bold mb-3 mt-5">Filtros de Listagem</h4>
+                    <table class="table table-row-bordered">
+                        <thead>
+                            <tr>
+                                <th>Parametro</th>
+                                <th>Tipo</th>
+                                <th>Descricao</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>status</code></td>
+                                <td>string</td>
+                                <td><code>open</code>, <code>pending</code>, <code>closed</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>agent_id</code></td>
+                                <td>integer</td>
+                                <td>Filtrar por agente</td>
+                            </tr>
+                            <tr>
+                                <td><code>page</code></td>
+                                <td>integer</td>
+                                <td>Numero da pagina</td>
+                            </tr>
+                            <tr>
+                                <td><code>per_page</code></td>
+                                <td>integer</td>
+                                <td>Itens por pagina (max: 100)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <h4 class="fw-bold mb-3 mt-5">Exemplo: Listar Conversas Abertas</h4>
+                    <div class="bg-light rounded p-4">
+                        <code class="text-dark">
+                            curl -X GET "<?= $standaloneUrl ?>/conversations?status=open&page=1" \<br>
+                            &nbsp;&nbsp;-H "Authorization: Bearer TOKEN"
+                        </code>
+                    </div>
+                    
+                    <h4 class="fw-bold mb-3 mt-5">Exemplo: Criar Conversa</h4>
+                    <div class="bg-light rounded p-4">
+                        <code class="text-dark">
+                            curl -X POST "<?= $standaloneUrl ?>/conversations" \<br>
+                            &nbsp;&nbsp;-H "Authorization: Bearer TOKEN" \<br>
+                            &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
+                            &nbsp;&nbsp;-d '{<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"contact_id": 123,<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"channel": "whatsapp",<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"agent_id": 5,<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"department_id": 2<br>
+                            &nbsp;&nbsp;}'
+                        </code>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Mensagens -->
+            <div class="card mb-5" id="mensagens">
+                <div class="card-header">
+                    <h3 class="card-title">Mensagens</h3>
+                </div>
+                <div class="card-body">
+                    <table class="table table-row-bordered">
+                        <thead>
+                            <tr>
+                                <th>Metodo</th>
+                                <th>Endpoint</th>
+                                <th>Descricao</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="badge badge-light-primary">GET</span></td>
+                                <td><code>/conversations/:id/messages</code></td>
+                                <td>Listar mensagens de uma conversa</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <h4 class="fw-bold mb-3 mt-5">Exemplo: Listar Mensagens</h4>
+                    <div class="bg-light rounded p-4">
+                        <code class="text-dark">
+                            curl -X GET "<?= $standaloneUrl ?>/conversations/456/messages" \<br>
+                            &nbsp;&nbsp;-H "Authorization: Bearer TOKEN"
+                        </code>
                     </div>
                 </div>
             </div>
@@ -473,109 +606,69 @@ ob_start();
             <!-- Contatos -->
             <div class="card mb-5" id="contatos">
                 <div class="card-header">
-                    <h3 class="card-title">👥 Contatos</h3>
+                    <h3 class="card-title">Contatos</h3>
                 </div>
                 <div class="card-body">
                     <table class="table table-row-bordered">
                         <thead>
                             <tr>
-                                <th>Método</th>
+                                <th>Metodo</th>
                                 <th>Endpoint</th>
-                                <th>Descrição</th>
+                                <th>Descricao</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
                                 <td><span class="badge badge-light-primary">GET</span></td>
-                                <td><code>/api/v1/contacts</code></td>
+                                <td><code>/contacts</code></td>
                                 <td>Listar contatos</td>
                             </tr>
                             <tr>
                                 <td><span class="badge badge-light-success">POST</span></td>
-                                <td><code>/api/v1/contacts</code></td>
+                                <td><code>/contacts</code></td>
                                 <td>Criar contato</td>
                             </tr>
                             <tr>
                                 <td><span class="badge badge-light-primary">GET</span></td>
-                                <td><code>/api/v1/contacts/:id</code></td>
+                                <td><code>/contacts/:id</code></td>
                                 <td>Obter contato</td>
                             </tr>
                             <tr>
                                 <td><span class="badge badge-light-warning">PUT</span></td>
-                                <td><code>/api/v1/contacts/:id</code></td>
+                                <td><code>/contacts/:id</code></td>
                                 <td>Atualizar contato</td>
                             </tr>
                             <tr>
                                 <td><span class="badge badge-light-danger">DELETE</span></td>
-                                <td><code>/api/v1/contacts/:id</code></td>
+                                <td><code>/contacts/:id</code></td>
                                 <td>Deletar contato</td>
                             </tr>
                             <tr>
                                 <td><span class="badge badge-light-primary">GET</span></td>
-                                <td><code>/api/v1/contacts/:id/conversations</code></td>
+                                <td><code>/contacts/:id/conversations</code></td>
                                 <td>Conversas do contato</td>
                             </tr>
                         </tbody>
                     </table>
                     
+                    <h4 class="fw-bold mb-3 mt-5">Busca de Contatos</h4>
+                    <div class="bg-light rounded p-4">
+                        <code class="text-dark">
+                            GET /contacts?search=joao
+                        </code>
+                    </div>
+                    <p class="mt-2 text-muted">Busca por nome, telefone ou email.</p>
+                    
                     <h4 class="fw-bold mb-3 mt-5">Exemplo: Criar Contato</h4>
                     <div class="bg-light rounded p-4">
                         <code class="text-dark">
-                            curl -X POST "<?= $baseUrl ?>/api/v1/contacts" \<br>
+                            curl -X POST "<?= $standaloneUrl ?>/contacts" \<br>
                             &nbsp;&nbsp;-H "Authorization: Bearer TOKEN" \<br>
                             &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
                             &nbsp;&nbsp;-d '{<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;"name": "João Silva",<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;"phone": "5511999998888",<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"name": "Joao Silva",<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"phone_number": "5511999998888",<br>
                             &nbsp;&nbsp;&nbsp;&nbsp;"email": "joao@email.com"<br>
-                            &nbsp;&nbsp;}'
-                        </code>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Participantes -->
-            <div class="card mb-5" id="participantes">
-                <div class="card-header">
-                    <h3 class="card-title">👨‍💼 Participantes</h3>
-                </div>
-                <div class="card-body">
-                    <table class="table table-row-bordered">
-                        <thead>
-                            <tr>
-                                <th>Método</th>
-                                <th>Endpoint</th>
-                                <th>Descrição</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><span class="badge badge-light-primary">GET</span></td>
-                                <td><code>/api/v1/conversations/:id/participants</code></td>
-                                <td>Listar participantes</td>
-                            </tr>
-                            <tr>
-                                <td><span class="badge badge-light-success">POST</span></td>
-                                <td><code>/api/v1/conversations/:id/participants</code></td>
-                                <td>Adicionar participante</td>
-                            </tr>
-                            <tr>
-                                <td><span class="badge badge-light-danger">DELETE</span></td>
-                                <td><code>/api/v1/conversations/:id/participants/:userId</code></td>
-                                <td>Remover participante</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    
-                    <h4 class="fw-bold mb-3 mt-5">Exemplo: Adicionar Participante</h4>
-                    <div class="bg-light rounded p-4">
-                        <code class="text-dark">
-                            curl -X POST "<?= $baseUrl ?>/api/v1/conversations/456/participants" \<br>
-                            &nbsp;&nbsp;-H "Authorization: Bearer TOKEN" \<br>
-                            &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
-                            &nbsp;&nbsp;-d '{<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;"user_id": 10,<br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;"role": "observer"<br>
                             &nbsp;&nbsp;}'
                         </code>
                     </div>
@@ -585,58 +678,58 @@ ob_start();
             <!-- Recursos Auxiliares -->
             <div class="card mb-5" id="auxiliares">
                 <div class="card-header">
-                    <h3 class="card-title">🔧 Recursos Auxiliares</h3>
+                    <h3 class="card-title">Recursos Auxiliares</h3>
                 </div>
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6">
                             <h5 class="fw-bold mb-3">Agentes</h5>
                             <ul class="list-unstyled">
-                                <li class="mb-2"><code>GET /api/v1/agents</code></li>
-                                <li class="mb-2"><code>GET /api/v1/agents/:id</code></li>
-                                <li class="mb-2"><code>GET /api/v1/agents/:id/stats</code></li>
+                                <li class="mb-2"><code>GET /agents</code> - Listar agentes</li>
+                                <li class="mb-2"><code>GET /agents/:id</code> - Obter agente</li>
+                                <li class="mb-2"><code>GET /agents/:id/stats</code> - Estatisticas</li>
                             </ul>
                         </div>
                         <div class="col-md-6">
-                            <h5 class="fw-bold mb-3">Setores</h5>
+                            <h5 class="fw-bold mb-3">Setores (Departments)</h5>
                             <ul class="list-unstyled">
-                                <li class="mb-2"><code>GET /api/v1/departments</code></li>
-                                <li class="mb-2"><code>GET /api/v1/departments/:id</code></li>
+                                <li class="mb-2"><code>GET /departments</code> - Listar setores</li>
+                                <li class="mb-2"><code>GET /departments/:id</code> - Obter setor</li>
                             </ul>
                         </div>
                         <div class="col-md-6 mt-5">
-                            <h5 class="fw-bold mb-3">Funis</h5>
+                            <h5 class="fw-bold mb-3">Funis (Funnels)</h5>
                             <ul class="list-unstyled">
-                                <li class="mb-2"><code>GET /api/v1/funnels</code></li>
-                                <li class="mb-2"><code>GET /api/v1/funnels/:id</code></li>
-                                <li class="mb-2"><code>GET /api/v1/funnels/:id/stages</code></li>
-                                <li class="mb-2"><code>GET /api/v1/funnels/:id/conversations</code></li>
+                                <li class="mb-2"><code>GET /funnels</code> - Listar funis</li>
+                                <li class="mb-2"><code>GET /funnels/:id</code> - Obter funil</li>
+                                <li class="mb-2"><code>GET /funnels/:id/stages</code> - Etapas</li>
+                                <li class="mb-2"><code>GET /funnels/:id/conversations</code> - Conversas</li>
                             </ul>
                         </div>
                         <div class="col-md-6 mt-5">
                             <h5 class="fw-bold mb-3">Tags</h5>
                             <ul class="list-unstyled">
-                                <li class="mb-2"><code>GET /api/v1/tags</code></li>
-                                <li class="mb-2"><code>POST /api/v1/tags</code></li>
-                                <li class="mb-2"><code>GET /api/v1/tags/:id</code></li>
-                                <li class="mb-2"><code>PUT /api/v1/tags/:id</code></li>
-                                <li class="mb-2"><code>DELETE /api/v1/tags/:id</code></li>
+                                <li class="mb-2"><code>GET /tags</code> - Listar tags</li>
+                                <li class="mb-2"><code>POST /tags</code> - Criar tag</li>
+                                <li class="mb-2"><code>GET /tags/:id</code> - Obter tag</li>
+                                <li class="mb-2"><code>PUT /tags/:id</code> - Atualizar tag</li>
+                                <li class="mb-2"><code>DELETE /tags/:id</code> - Deletar tag</li>
                             </ul>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Paginação -->
+            <!-- Paginacao -->
             <div class="card mb-5" id="paginacao">
                 <div class="card-header">
-                    <h3 class="card-title">📄 Paginação</h3>
+                    <h3 class="card-title">Paginacao</h3>
                 </div>
                 <div class="card-body">
-                    <p>Endpoints de listagem suportam paginação via query string:</p>
+                    <p>Endpoints de listagem suportam paginacao via query string:</p>
                     <div class="bg-light rounded p-4 mb-3">
                         <code class="text-dark">
-                            GET /api/v1/conversations?page=2&per_page=50
+                            GET /conversations?page=2&per_page=50
                         </code>
                     </div>
                     
@@ -663,10 +756,10 @@ ob_start();
             <!-- Erros -->
             <div class="card mb-5" id="erros">
                 <div class="card-header">
-                    <h3 class="card-title">❌ Tratamento de Erros</h3>
+                    <h3 class="card-title">Tratamento de Erros</h3>
                 </div>
                 <div class="card-body">
-                    <h5 class="fw-bold mb-3">Códigos HTTP</h5>
+                    <h5 class="fw-bold mb-3">Codigos HTTP</h5>
                     <table class="table table-row-bordered">
                         <tbody>
                             <tr>
@@ -679,23 +772,23 @@ ob_start();
                             </tr>
                             <tr>
                                 <td><span class="badge badge-light-warning">400</span></td>
-                                <td>Bad Request - Requisição inválida</td>
+                                <td>Bad Request - Requisicao invalida</td>
                             </tr>
                             <tr>
                                 <td><span class="badge badge-light-danger">401</span></td>
-                                <td>Unauthorized - Não autenticado</td>
+                                <td>Unauthorized - Nao autenticado</td>
                             </tr>
                             <tr>
                                 <td><span class="badge badge-light-danger">403</span></td>
-                                <td>Forbidden - Sem permissão</td>
+                                <td>Forbidden - Sem permissao</td>
                             </tr>
                             <tr>
                                 <td><span class="badge badge-light-warning">404</span></td>
-                                <td>Not Found - Recurso não encontrado</td>
+                                <td>Not Found - Recurso nao encontrado</td>
                             </tr>
                             <tr>
                                 <td><span class="badge badge-light-warning">422</span></td>
-                                <td>Validation Error - Erro de validação</td>
+                                <td>Validation Error - Erro de validacao</td>
                             </tr>
                             <tr>
                                 <td><span class="badge badge-light-danger">429</span></td>
@@ -714,9 +807,9 @@ ob_start();
   "success": false,
   "error": {
     "code": "VALIDATION_ERROR",
-    "message": "Dados inválidos",
+    "message": "Dados invalidos",
     "details": {
-      "contact_id": ["Campo obrigatório"],
+      "contact_id": ["Campo obrigatorio"],
       "channel": ["Deve ser um dos: whatsapp, email, ..."]
     }
   }
@@ -728,14 +821,14 @@ ob_start();
             <!-- Rate Limiting -->
             <div class="card mb-5" id="rate-limit">
                 <div class="card-header">
-                    <h3 class="card-title">⏱️ Rate Limiting</h3>
+                    <h3 class="card-title">Rate Limiting</h3>
                 </div>
                 <div class="card-body">
                     <div class="alert alert-info d-flex align-items-center">
                         <i class="ki-duotone ki-information-5 fs-2x text-info me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
                         <div>
-                            <strong>Limite Padrão:</strong> 100 requisições por minuto<br>
-                            <strong>Configurável:</strong> Por token no painel de gerenciamento
+                            <strong>Limite Padrao:</strong> 100 requisicoes por minuto<br>
+                            <strong>Configuravel:</strong> Por token no painel de gerenciamento
                         </div>
                     </div>
                     
@@ -757,14 +850,73 @@ Retry-After: 45
   "success": false,
   "error": {
     "code": "TOO_MANY_REQUESTS",
-    "message": "Limite de 100 requisições por minuto excedido"
+    "message": "Limite de 100 requisicoes por minuto excedido"
   }
 }</code></pre>
                     </div>
                 </div>
             </div>
             
-            <!-- Botão Voltar -->
+            <!-- Exemplo PHP -->
+            <div class="card mb-5" id="exemplo-php">
+                <div class="card-header bg-dark">
+                    <h3 class="card-title text-white">Exemplo de Codigo PHP</h3>
+                </div>
+                <div class="card-body">
+                    <p>Exemplo completo de integracao usando PHP:</p>
+                    <div class="bg-light rounded p-4">
+                        <pre class="mb-0"><code>&lt;?php
+// Configuracao
+$apiUrl = '<?= $standaloneUrl ?>';
+$token = 'SEU_TOKEN_AQUI';
+
+// Funcao para fazer requisicoes
+function apiRequest($endpoint, $method = 'GET', $data = null) {
+    global $apiUrl, $token;
+    
+    $ch = curl_init($apiUrl . $endpoint);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => [
+            'Authorization: Bearer ' . $token,
+            'Content-Type: application/json',
+            'Accept: application/json'
+        ]
+    ]);
+    
+    if ($method === 'POST') {
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+    }
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    return [
+        'code' => $httpCode,
+        'data' => json_decode($response, true)
+    ];
+}
+
+// Exemplo 1: Listar contas WhatsApp
+$accounts = apiRequest('/whatsapp-accounts');
+print_r($accounts);
+
+// Exemplo 2: Enviar mensagem
+$result = apiRequest('/messages/send', 'POST', [
+    'to' => '5511999998888',
+    'from' => '5535991970289',
+    'message' => 'Ola! Mensagem de teste.',
+    'contact_name' => 'Cliente Teste'
+]);
+print_r($result);
+?&gt;</code></pre>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Botao Voltar -->
             <div class="text-center">
                 <a href="<?= Url::to('/settings/api-tokens') ?>" class="btn btn-light-primary btn-lg">
                     <i class="ki-duotone ki-arrow-left fs-2"></i>
@@ -788,7 +940,7 @@ html {
     color: white !important;
 }
 
-/* Código mais legível */
+/* Codigo mais legivel */
 code {
     font-size: 0.9rem;
 }
@@ -799,7 +951,7 @@ pre code {
 </style>
 
 <script>
-// Scroll spy - destacar seção atual
+// Scroll spy - destacar secao atual
 document.addEventListener('DOMContentLoaded', function() {
     const sections = document.querySelectorAll('.card[id]');
     const navLinks = document.querySelectorAll('#docs-nav .nav-link');

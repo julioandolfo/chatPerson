@@ -2259,6 +2259,9 @@ class WhatsAppService
                         'email' => null
                     ]);
                     $contact = \App\Models\Contact::find($contactId);
+                    Logger::quepasa("processWebhook - ✅ Contato criado (ID: {$contact['id']})");
+                } else {
+                    Logger::quepasa("processWebhook - ✅ Contato existente encontrado (ID: {$contact['id']}, Nome: {$contact['name']})");
                 }
                 
                 // Buscar conversa existente com esse contato
@@ -2362,7 +2365,24 @@ class WhatsAppService
                     $userId = $defaultUser['id'] ?? null;
                 }
                 
-                Logger::quepasa("processWebhook - Criando mensagem OUTGOING: conversation_id={$conversation['id']}, sender_type=agent, sender_id={$userId}");
+                // ✅ VERIFICAR DUPLICATA: Não criar mensagem se já existe (enviada pela API)
+                Logger::quepasa("processWebhook - 🔍 Verificando se mensagem já existe (evitar duplicata)...");
+                $existingMessage = \App\Helpers\Database::fetch(
+                    "SELECT id FROM messages 
+                     WHERE conversation_id = ? 
+                     AND sender_type = 'agent' 
+                     AND content = ? 
+                     AND created_at >= DATE_SUB(NOW(), INTERVAL 60 SECOND)
+                     LIMIT 1",
+                    [$conversation['id'], $message ?: '']
+                );
+                
+                if ($existingMessage) {
+                    Logger::quepasa("processWebhook - ⚠️ Mensagem duplicada detectada! Já existe mensagem ID={$existingMessage['id']} com mesmo conteúdo nos últimos 60s. Ignorando webhook.");
+                    return; // Não criar mensagem duplicada
+                }
+                
+                Logger::quepasa("processWebhook - ✅ Mensagem não duplicada. Criando mensagem OUTGOING: conversation_id={$conversation['id']}, sender_type=agent, sender_id={$userId}");
                 
                 try {
                     $messageId = \App\Services\ConversationService::sendMessage(

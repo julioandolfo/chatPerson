@@ -627,19 +627,22 @@ try {
             
             // Buscar ou criar contato
             apiLog('INFO', '🔍 Buscando contato...');
-            $stmt = $db->prepare("SELECT id FROM contacts WHERE phone = ? LIMIT 1");
+            $stmt = $db->prepare("SELECT id, name FROM contacts WHERE phone = ? LIMIT 1");
             $stmt->execute([$to]);
             $contact = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if (!$contact) {
-                apiLog('INFO', '📝 Criando novo contato...');
+                apiLog('INFO', '📝 Contato não encontrado, criando novo...');
+                $newContactName = $contactName ?: $to;
                 $stmt = $db->prepare("INSERT INTO contacts (phone, name, created_at, updated_at) VALUES (?, ?, NOW(), NOW())");
-                $stmt->execute([$to, $contactName ?: $to]);
+                $stmt->execute([$to, $newContactName]);
                 $contactId = $db->lastInsertId();
-                apiLog('INFO', "✅ Contato criado (ID: {$contactId})");
+                $contactName = $newContactName;
+                apiLog('INFO', "✅ Contato criado: {$contactName} (ID: {$contactId})");
             } else {
                 $contactId = $contact['id'];
-                apiLog('INFO', "✅ Contato encontrado (ID: {$contactId})");
+                $contactName = $contact['name']; // Usar nome do contato existente (prioritário)
+                apiLog('INFO', "✅ Contato encontrado: {$contactName} (ID: {$contactId})");
             }
             
             // Buscar ou criar conversa
@@ -668,13 +671,17 @@ try {
             
             // Inserir mensagem
             apiLog('INFO', '📝 Inserindo mensagem no banco...');
+            
+            // Gerar ID externo único para evitar duplicatas do webhook
+            $externalId = 'api_' . time() . '_' . uniqid();
+            
             $stmt = $db->prepare("
-                INSERT INTO messages (conversation_id, sender_type, content, message_type, status, created_at)
-                VALUES (?, 'agent', ?, 'text', 'sent', NOW())
+                INSERT INTO messages (conversation_id, sender_type, content, message_type, status, external_id, created_at)
+                VALUES (?, 'agent', ?, 'text', 'sent', ?, NOW())
             ");
-            $stmt->execute([$conversationId, $message]);
+            $stmt->execute([$conversationId, $message, $externalId]);
             $messageId = $db->lastInsertId();
-            apiLog('INFO', "✅ Mensagem inserida (ID: {$messageId})");
+            apiLog('INFO', "✅ Mensagem inserida (ID: {$messageId}, External ID: {$externalId})");
             
             // Atualizar conversa
             apiLog('DEBUG', 'Atualizando timestamp da conversa...');

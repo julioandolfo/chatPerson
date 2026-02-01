@@ -159,6 +159,24 @@ curl -X GET "https://seudominio.com/api/v1/conversations" \
 | PUT | `/api/v1/tags/:id` | Atualizar tag |
 | DELETE | `/api/v1/tags/:id` | Deletar tag |
 
+### Contas WhatsApp
+
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| GET | `/api/v1/whatsapp-accounts` | Listar contas WhatsApp |
+| GET | `/api/v1/whatsapp-accounts/:id` | Obter conta WhatsApp específica |
+
+**Filtros disponíveis (GET /whatsapp-accounts):**
+- `status`: Filtrar por status (`active`, `inactive`, `disconnected`)
+- `page`: Número da página (padrão: 1)
+- `per_page`: Itens por página (padrão: 20, máximo: 100)
+
+**Exemplo:**
+```bash
+curl -X GET "https://seudominio.com/api/v1/whatsapp-accounts?status=active&page=1&per_page=20" \
+  -H "Authorization: Bearer SEU_TOKEN"
+```
+
 ---
 
 ## 📖 Exemplos de Uso

@@ -79,6 +79,10 @@ $routes = [
     'GET /tags/:id' => ['Api\V1\Controllers\TagsController', 'show', true],
     'PUT /tags/:id' => ['Api\V1\Controllers\TagsController', 'update', true],
     'DELETE /tags/:id' => ['Api\V1\Controllers\TagsController', 'destroy', true],
+    
+    // WhatsApp Accounts
+    'GET /whatsapp-accounts' => ['Api\V1\Controllers\WhatsAppAccountsController', 'index', true],
+    'GET /whatsapp-accounts/:id' => ['Api\V1\Controllers\WhatsAppAccountsController', 'show', true],
 ];
 
 // Encontrar rota correspondente

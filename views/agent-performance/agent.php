@@ -71,12 +71,23 @@ function formatTimeDisplay($seconds, $showUnit = true) {
             </div>
         </div>
     </div>
-    <div class="d-flex gap-2">
-        <form method="GET" class="d-flex gap-2 align-items-center">
+    <div class="d-flex flex-column flex-md-row gap-2">
+        <!-- Filtros Rápidos -->
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-sm btn-light-primary" onclick="setQuickPeriodAgent('today')">Hoje</button>
+            <button type="button" class="btn btn-sm btn-light-primary" onclick="setQuickPeriodAgent('yesterday')">Ontem</button>
+            <button type="button" class="btn btn-sm btn-light-primary" onclick="setQuickPeriodAgent('this_week')">Esta Sem.</button>
+            <button type="button" class="btn btn-sm btn-light-primary" onclick="setQuickPeriodAgent('last_week')">Sem. Pass.</button>
+            <button type="button" class="btn btn-sm btn-light-primary" onclick="setQuickPeriodAgent('this_month')">Este Mês</button>
+            <button type="button" class="btn btn-sm btn-light-primary" onclick="setQuickPeriodAgent('last_month')">Mês Pass.</button>
+        </div>
+        
+        <!-- Filtro Personalizado -->
+        <form method="GET" id="dateFilterFormAgent" class="d-flex gap-2 align-items-center">
             <input type="hidden" name="id" value="<?= $agent['id'] ?? '' ?>">
-            <input type="date" name="date_from" class="form-control form-control-sm" value="<?= htmlspecialchars($dateFrom) ?>">
+            <input type="date" name="date_from" id="date_from_agent" class="form-control form-control-sm" value="<?= htmlspecialchars($dateFrom) ?>">
             <span class="text-muted">até</span>
-            <input type="date" name="date_to" class="form-control form-control-sm" value="<?= htmlspecialchars($dateTo) ?>">
+            <input type="date" name="date_to" id="date_to_agent" class="form-control form-control-sm" value="<?= htmlspecialchars($dateTo) ?>">
             <button type="submit" class="btn btn-sm btn-primary">
                 <i class="ki-duotone ki-filter fs-4"></i> Filtrar
             </button>
@@ -2204,6 +2215,74 @@ loadSLABreachedConversations();
 loadSLAOngoingBreachedConversations();
 </script>
 <?php endif; ?>
+
+<script>
+function setQuickPeriodAgent(period) {
+    const today = new Date();
+    let dateFrom, dateTo;
+    
+    switch(period) {
+        case 'today':
+            dateFrom = dateTo = today;
+            break;
+            
+        case 'yesterday':
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            dateFrom = dateTo = yesterday;
+            break;
+            
+        case 'this_week':
+            // Segunda-feira da semana atual
+            const startOfWeek = new Date(today);
+            const dayOfWeek = startOfWeek.getDay();
+            const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Se domingo, volta 6 dias
+            startOfWeek.setDate(startOfWeek.getDate() + diff);
+            dateFrom = startOfWeek;
+            dateTo = today;
+            break;
+            
+        case 'last_week':
+            // Segunda a domingo da semana passada
+            const lastWeekEnd = new Date(today);
+            const currentDay = lastWeekEnd.getDay();
+            const daysToLastSunday = currentDay === 0 ? 0 : currentDay;
+            lastWeekEnd.setDate(lastWeekEnd.getDate() - daysToLastSunday);
+            
+            const lastWeekStart = new Date(lastWeekEnd);
+            lastWeekStart.setDate(lastWeekStart.getDate() - 6);
+            
+            dateFrom = lastWeekStart;
+            dateTo = lastWeekEnd;
+            break;
+            
+        case 'this_month':
+            dateFrom = new Date(today.getFullYear(), today.getMonth(), 1);
+            dateTo = today;
+            break;
+            
+        case 'last_month':
+            const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const lastDayOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+            dateFrom = lastMonth;
+            dateTo = lastDayOfLastMonth;
+            break;
+    }
+    
+    // Formatar datas para YYYY-MM-DD
+    const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+    
+    // Atualizar campos e submeter form
+    document.getElementById('date_from_agent').value = formatDate(dateFrom);
+    document.getElementById('date_to_agent').value = formatDate(dateTo);
+    document.getElementById('dateFilterFormAgent').submit();
+}
+</script>
 
 <?php
 $content = ob_get_clean();

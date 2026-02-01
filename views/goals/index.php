@@ -50,6 +50,11 @@ ob_start();
                         <?php endforeach; ?>
                     </select>
                     
+                    <select class="form-select form-select-sm w-150px" id="filter-active-only" onchange="filterGoals()">
+                        <option value="0" <?= !($filters['active_period'] ?? false) ? 'selected' : '' ?>>Todas as Metas</option>
+                        <option value="1" <?= ($filters['active_period'] ?? false) ? 'selected' : '' ?>>Apenas Ativas</option>
+                    </select>
+                    
                     <a href="<?= Url::to('/goals/create') ?>" class="btn btn-sm btn-primary">
                         <i class="bi bi-plus-lg fs-4"></i> Nova Meta
                     </a>
@@ -206,11 +211,13 @@ function filterGoals() {
     const targetType = document.getElementById('filter-target-type').value;
     const type = document.getElementById('filter-type').value;
     const period = document.getElementById('filter-period').value;
+    const activeOnly = document.getElementById('filter-active-only').value;
     
     const params = new URLSearchParams();
     if (targetType) params.set('target_type', targetType);
     if (type) params.set('type', type);
     if (period) params.set('period_type', period);
+    if (activeOnly) params.set('active_only', activeOnly);
     
     window.location.href = '<?= Url::to('/goals') ?>' + (params.toString() ? '?' + params.toString() : '');
 }

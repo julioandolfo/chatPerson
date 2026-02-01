@@ -164,14 +164,17 @@ class Goal extends Model
     
     /**
      * Obter metas de um agente específico
+     * @param int $agentId ID do agente
+     * @param bool $activePeriodOnly Se true, retorna apenas metas do período atual (padrão: true)
      */
-    public static function getAgentGoals(int $agentId): array
+    public static function getAgentGoals(int $agentId, bool $activePeriodOnly = true): array
     {
+        $periodFilter = $activePeriodOnly ? " AND start_date <= CURDATE() AND end_date >= CURDATE()" : "";
+        
         // Buscar metas individuais do agente
         $individualGoals = Database::fetchAll(
-            "SELECT * FROM goals WHERE target_type = 'individual' AND target_id = ? AND is_active = 1 
-             AND start_date <= CURDATE() AND end_date >= CURDATE()
-             ORDER BY priority DESC",
+            "SELECT * FROM goals WHERE target_type = 'individual' AND target_id = ? AND is_active = 1{$periodFilter}
+             ORDER BY priority DESC, end_date DESC",
             [$agentId]
         );
         
@@ -187,8 +190,8 @@ class Goal extends Model
             $placeholders = str_repeat('?,', count($teamIds) - 1) . '?';
             $teamGoals = Database::fetchAll(
                 "SELECT * FROM goals WHERE target_type = 'team' AND target_id IN ($placeholders) 
-                 AND is_active = 1 AND start_date <= CURDATE() AND end_date >= CURDATE()
-                 ORDER BY priority DESC",
+                 AND is_active = 1{$periodFilter}
+                 ORDER BY priority DESC, end_date DESC",
                 $teamIds
             );
         }
@@ -205,17 +208,16 @@ class Goal extends Model
             $placeholders = str_repeat('?,', count($departmentIds) - 1) . '?';
             $departmentGoals = Database::fetchAll(
                 "SELECT * FROM goals WHERE target_type = 'department' AND target_id IN ($placeholders)
-                 AND is_active = 1 AND start_date <= CURDATE() AND end_date >= CURDATE()
-                 ORDER BY priority DESC",
+                 AND is_active = 1{$periodFilter}
+                 ORDER BY priority DESC, end_date DESC",
                 $departmentIds
             );
         }
         
         // Metas globais
         $globalGoals = Database::fetchAll(
-            "SELECT * FROM goals WHERE target_type = 'global' AND is_active = 1 
-             AND start_date <= CURDATE() AND end_date >= CURDATE()
-             ORDER BY priority DESC"
+            "SELECT * FROM goals WHERE target_type = 'global' AND is_active = 1{$periodFilter}
+             ORDER BY priority DESC, end_date DESC"
         );
 
         // Metas multi-agente
@@ -223,8 +225,8 @@ class Goal extends Model
             "SELECT g.* FROM goals g
              INNER JOIN goal_agent_targets gat ON g.id = gat.goal_id
              WHERE g.target_type = 'multi_agent' AND gat.agent_id = ?
-             AND g.is_active = 1 AND g.start_date <= CURDATE() AND g.end_date >= CURDATE()
-             ORDER BY g.priority DESC",
+             AND g.is_active = 1{$periodFilter}
+             ORDER BY g.priority DESC, g.end_date DESC",
             [$agentId]
         );
         
@@ -239,13 +241,16 @@ class Goal extends Model
     
     /**
      * Obter metas de um time
+     * @param int $teamId ID do time
+     * @param bool $activePeriodOnly Se true, retorna apenas metas do período atual (padrão: true)
      */
-    public static function getTeamGoals(int $teamId): array
+    public static function getTeamGoals(int $teamId, bool $activePeriodOnly = true): array
     {
+        $periodFilter = $activePeriodOnly ? " AND start_date <= CURDATE() AND end_date >= CURDATE()" : "";
+        
         return Database::fetchAll(
-            "SELECT * FROM goals WHERE target_type = 'team' AND target_id = ? AND is_active = 1 
-             AND start_date <= CURDATE() AND end_date >= CURDATE()
-             ORDER BY priority DESC",
+            "SELECT * FROM goals WHERE target_type = 'team' AND target_id = ? AND is_active = 1{$periodFilter}
+             ORDER BY priority DESC, end_date DESC",
             [$teamId]
         );
     }

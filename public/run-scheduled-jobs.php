@@ -16,6 +16,7 @@ use App\Jobs\AICostMonitoringJob;
 use App\Jobs\AutomationDelayJob;
 use App\Jobs\AIFallbackMonitoringJob;
 use App\Jobs\WooCommerceSyncJob;
+use App\Jobs\ChatbotTimeoutJob;
 
 // ✅ Garantir que diretório de cache existe
 $cacheDir = $rootDir . '/storage/cache';
@@ -56,6 +57,13 @@ try {
     AutomationDelayJob::run();
     $duration = round(microtime(true) - $startTime, 2);
     echo "[" . date('Y-m-d H:i:s') . "] AutomationDelayJob concluído em {$duration}s\n";
+    
+    // ✅ Verificar timeouts de chatbot (CRÍTICO - executar sempre)
+    echo "[" . date('Y-m-d H:i:s') . "] Executando ChatbotTimeoutJob...\n";
+    $startTime = microtime(true);
+    ChatbotTimeoutJob::run();
+    $duration = round(microtime(true) - $startTime, 2);
+    echo "[" . date('Y-m-d H:i:s') . "] ChatbotTimeoutJob concluído em {$duration}s\n";
     
     // ========== JOBS IMPORTANTES (a cada 2-3 minutos) ==========
     

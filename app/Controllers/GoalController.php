@@ -34,7 +34,7 @@ class GoalController
             'target_type' => Request::get('target_type'),
             'type' => Request::get('type'),
             'period' => Request::get('period_type'),
-            'active_period' => Request::get('active_only', '1') === '1'
+            'active_period' => Request::get('active_only', '0') === '1'
         ];
         
         $goals = Goal::getActive($filters);

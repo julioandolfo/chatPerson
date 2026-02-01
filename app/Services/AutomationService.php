@@ -2067,6 +2067,7 @@ class AutomationService
             $currentMetadata['chatbot_max_attempts'] = (int)($nodeData['chatbot_max_attempts'] ?? 3);
             $currentMetadata['chatbot_invalid_feedback'] = $nodeData['chatbot_invalid_feedback'] ?? 'Opção inválida. Por favor, escolha uma das opções disponíveis.';
             $currentMetadata['chatbot_fallback_node_id'] = $nodeData['chatbot_fallback_node_id'] ?? null;
+            $currentMetadata['chatbot_timeout_node_id'] = $nodeData['chatbot_timeout_node_id'] ?? null;
             $currentMetadata['chatbot_invalid_attempts'] = 0; // Resetar contador
             
             \App\Helpers\Logger::automation("    Salvando estado do chatbot no metadata...");

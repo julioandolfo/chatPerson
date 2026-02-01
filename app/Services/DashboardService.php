@@ -495,11 +495,22 @@ class DashboardService
 
     private static function getOnlineAgents(): int
     {
+        // Obter configurações de disponibilidade
+        $settings = \App\Services\AvailabilityService::getSettings();
+        $offlineTimeoutMinutes = $settings['offline_timeout_minutes'];
+        
+        // Calcular o timestamp mínimo para considerar online
+        // Um agente é considerado online se:
+        // 1. availability_status = 'online' E
+        // 2. last_seen_at foi atualizado nos últimos X minutos (configurável)
         $sql = "SELECT COUNT(*) as total FROM users 
                 WHERE role IN ('agent', 'admin', 'supervisor') 
                 AND status = 'active' 
-                AND availability_status = 'online'";
-        $result = \App\Helpers\Database::fetch($sql);
+                AND availability_status = 'online'
+                AND last_seen_at IS NOT NULL
+                AND last_seen_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE)";
+        
+        $result = \App\Helpers\Database::fetch($sql, [$offlineTimeoutMinutes]);
         return (int)($result['total'] ?? 0);
     }
 

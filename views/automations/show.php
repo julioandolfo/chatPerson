@@ -2457,12 +2457,22 @@ function openNodeConfig(nodeId) {
                 
                 <div class="fv-row mb-7">
                     <label class="fw-semibold fs-6 mb-2">Ação ao Timeout</label>
-                    <select name="chatbot_timeout_action" class="form-select form-select-solid">
+                    <select name="chatbot_timeout_action" id="kt_chatbot_timeout_action" class="form-select form-select-solid" onchange="toggleTimeoutNodeSelect()">
                         <option value="nothing">Nada</option>
                         <option value="assign_agent">Atribuir a um Agente</option>
                         <option value="send_message">Enviar Mensagem</option>
                         <option value="close">Encerrar Conversa</option>
+                        <option value="go_to_node">Seguir para Nó Específico</option>
                     </select>
+                </div>
+                
+                <div class="fv-row mb-7" id="kt_chatbot_timeout_node_container" style="display: none;">
+                    <label class="fw-semibold fs-6 mb-2">⏭️ Nó de Destino (Timeout)</label>
+                    <select name="chatbot_timeout_node_id" id="kt_chatbot_timeout_node_id" class="form-select form-select-solid">
+                        <option value="">Selecione um nó</option>
+                        <!-- Será preenchido dinamicamente com os nós disponíveis -->
+                    </select>
+                    <div class="form-text">Nó a ser executado quando o tempo de espera expirar</div>
                 </div>
                 
                 <div class="separator my-5"></div>
@@ -2683,9 +2693,12 @@ function openNodeConfig(nodeId) {
         console.log('✅ Node ID corrigido de volta para:', nodeId);
     }
     
-    // Popular select de nó fallback para chatbot
+    // Popular select de nó fallback e timeout para chatbot
     if (node.node_type === 'action_chatbot') {
         const fallbackSelect = document.getElementById('kt_chatbot_fallback_node_id');
+        const timeoutNodeSelect = document.getElementById('kt_chatbot_timeout_node_id');
+        
+        // Popular fallback select
         if (fallbackSelect) {
             // Limpar opções existentes (manter apenas a primeira)
             while (fallbackSelect.options.length > 1) {
@@ -2701,6 +2714,26 @@ function openNodeConfig(nodeId) {
                     option.value = String(n.id);
                     option.textContent = `${nodeLabel} (ID: ${n.id})`;
                     fallbackSelect.appendChild(option);
+                }
+            });
+        }
+        
+        // Popular timeout node select
+        if (timeoutNodeSelect) {
+            // Limpar opções existentes (manter apenas a primeira)
+            while (timeoutNodeSelect.options.length > 1) {
+                timeoutNodeSelect.remove(1);
+            }
+            
+            // Adicionar todos os nós disponíveis (exceto o atual)
+            nodes.forEach(n => {
+                if (String(n.id) !== String(nodeId)) {
+                    const nodeConfig = nodeTypes[n.node_type] || {};
+                    const nodeLabel = n.node_data?.label || nodeConfig.label || n.node_type;
+                    const option = document.createElement('option');
+                    option.value = String(n.id);
+                    option.textContent = `${nodeLabel} (ID: ${n.id})`;
+                    timeoutNodeSelect.appendChild(option);
                 }
             });
         }
@@ -2732,6 +2765,11 @@ function openNodeConfig(nodeId) {
             
             // Mostrar/ocultar containers baseado no tipo
             updateChatbotFields(chatbotType);
+            
+            // Mostrar/ocultar campo de nó de timeout se necessário
+            if (typeof toggleTimeoutNodeSelect === 'function') {
+                toggleTimeoutNodeSelect();
+            }
             
             // Preencher opções do menu (se existirem)
             if (chatbotType === 'menu' && node.node_data.chatbot_options) {
@@ -4272,6 +4310,21 @@ window.updateChatbotFields = function updateChatbotFields(type) {
         }
     } else if (type === 'conditional') {
         if (conditionalContainer) conditionalContainer.style.display = 'block';
+    }
+};
+
+window.toggleTimeoutNodeSelect = function toggleTimeoutNodeSelect() {
+    const timeoutActionSelect = document.getElementById('kt_chatbot_timeout_action');
+    const timeoutNodeContainer = document.getElementById('kt_chatbot_timeout_node_container');
+    
+    if (!timeoutActionSelect || !timeoutNodeContainer) return;
+    
+    const selectedAction = timeoutActionSelect.value;
+    
+    if (selectedAction === 'go_to_node') {
+        timeoutNodeContainer.style.display = 'block';
+    } else {
+        timeoutNodeContainer.style.display = 'none';
     }
 };
 

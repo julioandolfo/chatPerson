@@ -46,13 +46,25 @@ ob_start();
                     
                     <div class="col-lg-4">
                         <label class="form-label">Período</label>
+                        
+                        <!-- Filtros Rápidos -->
+                        <div class="btn-group w-100 mb-2" role="group">
+                            <button type="button" class="btn btn-sm btn-light-primary" onclick="setQuickPeriodCompare('today')">Hoje</button>
+                            <button type="button" class="btn btn-sm btn-light-primary" onclick="setQuickPeriodCompare('yesterday')">Ontem</button>
+                            <button type="button" class="btn btn-sm btn-light-primary" onclick="setQuickPeriodCompare('this_week')">Sem.</button>
+                            <button type="button" class="btn btn-sm btn-light-primary" onclick="setQuickPeriodCompare('this_month')">Mês</button>
+                            <button type="button" class="btn btn-sm btn-light-primary" onclick="setQuickPeriodCompare('last_month')">Mês Pass.</button>
+                        </div>
+                        
+                        <!-- Filtro Personalizado -->
                         <div class="input-group mb-2">
-                            <input type="date" name="date_from" class="form-control" 
+                            <input type="date" name="date_from" id="date_from_compare" class="form-control" 
                                    value="<?= $dateFrom ?>" required>
                             <span class="input-group-text">até</span>
-                            <input type="date" name="date_to" class="form-control" 
+                            <input type="date" name="date_to" id="date_to_compare" class="form-control" 
                                    value="<?= $dateTo ?>" required>
                         </div>
+                        
                         <button type="submit" class="btn btn-primary w-100">
                             <i class="ki-duotone ki-search-list fs-2">
                                 <span class="path1"></span>
@@ -256,6 +268,71 @@ $(document).ready(function() {
         });
     }
 });
+
+function setQuickPeriodCompare(period) {
+    const today = new Date();
+    let dateFrom, dateTo;
+    
+    switch(period) {
+        case 'today':
+            dateFrom = dateTo = today;
+            break;
+            
+        case 'yesterday':
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            dateFrom = dateTo = yesterday;
+            break;
+            
+        case 'this_week':
+            // Segunda-feira da semana atual
+            const startOfWeek = new Date(today);
+            const dayOfWeek = startOfWeek.getDay();
+            const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Se domingo, volta 6 dias
+            startOfWeek.setDate(startOfWeek.getDate() + diff);
+            dateFrom = startOfWeek;
+            dateTo = today;
+            break;
+            
+        case 'last_week':
+            // Segunda a domingo da semana passada
+            const lastWeekEnd = new Date(today);
+            const currentDay = lastWeekEnd.getDay();
+            const daysToLastSunday = currentDay === 0 ? 0 : currentDay;
+            lastWeekEnd.setDate(lastWeekEnd.getDate() - daysToLastSunday);
+            
+            const lastWeekStart = new Date(lastWeekEnd);
+            lastWeekStart.setDate(lastWeekStart.getDate() - 6);
+            
+            dateFrom = lastWeekStart;
+            dateTo = lastWeekEnd;
+            break;
+            
+        case 'this_month':
+            dateFrom = new Date(today.getFullYear(), today.getMonth(), 1);
+            dateTo = today;
+            break;
+            
+        case 'last_month':
+            const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const lastDayOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+            dateFrom = lastMonth;
+            dateTo = lastDayOfLastMonth;
+            break;
+    }
+    
+    // Formatar datas para YYYY-MM-DD
+    const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+    
+    // Atualizar campos
+    document.getElementById('date_from_compare').value = formatDate(dateFrom);
+    document.getElementById('date_to_compare').value = formatDate(dateTo);
+}
 </script>
 
 <?php

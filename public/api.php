@@ -669,7 +669,7 @@ try {
             // Inserir mensagem
             apiLog('INFO', '📝 Inserindo mensagem no banco...');
             $stmt = $db->prepare("
-                INSERT INTO messages (conversation_id, sender_type, content, type, status, created_at)
+                INSERT INTO messages (conversation_id, sender_type, content, message_type, status, created_at)
                 VALUES (?, 'agent', ?, 'text', 'sent', NOW())
             ");
             $stmt->execute([$conversationId, $message]);

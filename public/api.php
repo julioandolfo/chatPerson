@@ -329,6 +329,44 @@ function getJsonBody() {
     return $input ?: [];
 }
 
+/**
+ * Normalizar número de telefone brasileiro (adicionar 9º dígito se necessário)
+ */
+function normalizePhoneBR(string $phone): string {
+    if (empty($phone)) {
+        return '';
+    }
+    
+    // Remover caracteres especiais
+    $phone = preg_replace('/[^0-9]/', '', $phone);
+    
+    // ✅ NORMALIZAR 9º DÍGITO PARA NÚMEROS BRASILEIROS
+    // Formato: 55 (país) + DD (2 dígitos DDD) + 9XXXXXXXX (9 dígitos com 9º adicional)
+    if (strlen($phone) == 12 && substr($phone, 0, 2) === '55') {
+        // Já tem 12 dígitos (formato correto com 9º dígito)
+        // Exemplo: 5535991970289
+        return $phone;
+    } elseif (strlen($phone) == 13 && substr($phone, 0, 2) === '55') {
+        // 13 dígitos? Pode ter 0 extra no DDD antigo, remover
+        // Exemplo: 55035991970289 -> 5535991970289
+        return '55' . ltrim(substr($phone, 2), '0');
+    } elseif (strlen($phone) == 11 && substr($phone, 0, 2) === '55') {
+        // 11 dígitos: falta o 9º dígito adicional
+        // Exemplo: 553591970289 -> 5535991970289
+        $ddd = substr($phone, 2, 2);
+        $numero = substr($phone, 4);
+        
+        // Adicionar 9º dígito se o número começar com 6-9 (celular)
+        if (strlen($numero) === 8 && in_array($numero[0], ['6', '7', '8', '9'])) {
+            return '55' . $ddd . '9' . $numero;
+        }
+        
+        return $phone; // Número fixo ou já normalizado
+    }
+    
+    return $phone;
+}
+
 // =====================================================
 // ROTEAMENTO
 // =====================================================
@@ -597,19 +635,19 @@ try {
                 errorResponse('Dados inválidos', 'VALIDATION_ERROR', 422, $errors);
             }
             
-            $to = preg_replace('/[^0-9]/', '', $input['to']);
-            $from = preg_replace('/[^0-9]/', '', $input['from']);
+            $to = normalizePhoneBR($input['to']);
+            $from = normalizePhoneBR($input['from']);
             $message = $input['message'];
             $contactName = $input['contact_name'] ?? '';
             
-            apiLog('INFO', "Para: {$to}");
-            apiLog('INFO', "De: {$from}");
+            apiLog('INFO', "Para (normalizado): {$to}");
+            apiLog('INFO', "De (normalizado): {$from}");
             apiLog('INFO', "Mensagem: " . substr($message, 0, 50) . '...');
             
             // Buscar conta WhatsApp
             apiLog('INFO', '🔍 Buscando conta WhatsApp...');
             $stmt = $db->prepare("
-                SELECT id, name, api_url, provider, quepasa_token, quepasa_user
+                SELECT id, name, api_url, provider, quepasa_token, quepasa_user, inbox_id
                 FROM whatsapp_accounts 
                 WHERE phone_number = ? AND status = 'active'
                 LIMIT 1
@@ -623,7 +661,25 @@ try {
                     ['from' => ["Nenhuma conta ativa para: {$from}"]]);
             }
             
-            apiLog('INFO', "✅ Conta encontrada: {$account['name']} (ID: {$account['id']})");
+            apiLog('INFO', "✅ Conta encontrada: {$account['name']} (ID: {$account['id']}, Inbox: {$account['inbox_id']})");
+            
+            // Buscar configurações da Integration Account (funil e etapa padrão da integração)
+            $integration = null;
+            apiLog('INFO', '🔍 Buscando Integration Account...');
+            $stmt = $db->prepare("
+                SELECT id, default_funnel_id, default_stage_id, inbox_id, default_department_id
+                FROM integration_accounts 
+                WHERE phone_number = ? AND channel = 'whatsapp'
+                LIMIT 1
+            ");
+            $stmt->execute([$from]);
+            $integration = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($integration) {
+                apiLog('INFO', "✅ Integration Account encontrada (ID: {$integration['id']}, Funil: {$integration['default_funnel_id']}, Etapa: {$integration['default_stage_id']}, Inbox: {$integration['inbox_id']}, Depto: {$integration['default_department_id']})");
+            } else {
+                apiLog('WARNING', "⚠️ Integration Account não encontrada. Usando configurações padrão do sistema.");
+            }
             
             // Buscar ou criar contato
             apiLog('INFO', '🔍 Buscando contato...');
@@ -657,11 +713,33 @@ try {
             
             if (!$conversation) {
                 apiLog('INFO', '📝 Criando nova conversa...');
+                
+                // Preparar valores para funil/etapa/departamento da integração
+                $integrationAccountId = $integration['id'] ?? null;
+                $inboxId = $integration['inbox_id'] ?? $account['inbox_id'] ?? null;
+                $departmentId = $integration['default_department_id'] ?? null;
+                $funnelId = $integration['default_funnel_id'] ?? null;
+                $stageId = $integration['default_stage_id'] ?? null;
+                
+                apiLog('INFO', "📊 Configurações da conversa: Integration={$integrationAccountId}, Inbox={$inboxId}, Depto={$departmentId}, Funil={$funnelId}, Etapa={$stageId}");
+                
                 $stmt = $db->prepare("
-                    INSERT INTO conversations (contact_id, channel, status, whatsapp_account_id, created_at, updated_at)
-                    VALUES (?, 'whatsapp', 'open', ?, NOW(), NOW())
+                    INSERT INTO conversations (
+                        contact_id, channel, status, whatsapp_account_id, integration_account_id,
+                        inbox_id, department_id, funnel_id, funnel_stage_id,
+                        created_at, updated_at
+                    )
+                    VALUES (?, 'whatsapp', 'open', ?, ?, ?, ?, ?, ?, NOW(), NOW())
                 ");
-                $stmt->execute([$contactId, $account['id']]);
+                $stmt->execute([
+                    $contactId, 
+                    $account['id'],
+                    $integrationAccountId,
+                    $inboxId,
+                    $departmentId,
+                    $funnelId,
+                    $stageId
+                ]);
                 $conversationId = $db->lastInsertId();
                 apiLog('INFO', "✅ Conversa criada (ID: {$conversationId})");
             } else {
@@ -957,13 +1035,19 @@ try {
         case 'contactsCreate':
             $input = getJsonBody();
             
+            // Normalizar telefone
+            $phone = $input['phone'] ?? $input['phone_number'] ?? null;
+            if ($phone) {
+                $phone = normalizePhoneBR($phone);
+            }
+            
             $stmt = $db->prepare("
                 INSERT INTO contacts (name, phone, email, created_at, updated_at)
                 VALUES (?, ?, ?, NOW(), NOW())
             ");
             $stmt->execute([
                 $input['name'] ?? null,
-                $input['phone'] ?? $input['phone_number'] ?? null, // Aceita ambos
+                $phone,
                 $input['email'] ?? null
             ]);
             
@@ -995,6 +1079,11 @@ try {
             // Aceitar tanto 'phone' quanto 'phone_number' (compatibilidade)
             if (isset($input['phone_number']) && !isset($input['phone'])) {
                 $input['phone'] = $input['phone_number'];
+            }
+            
+            // Normalizar telefone se fornecido
+            if (isset($input['phone'])) {
+                $input['phone'] = normalizePhoneBR($input['phone']);
             }
             
             foreach (['name', 'phone', 'email'] as $field) {

@@ -166,6 +166,30 @@ class Contact extends Model
         // Remover + se ainda estiver presente
         $phone = ltrim($phone, '+');
         
+        // ✅ NORMALIZAR 9º DÍGITO PARA NÚMEROS BRASILEIROS
+        // Formato: 55 (país) + DD (2 dígitos DDD) + 9XXXXXXXX (9 dígitos com 9º adicional)
+        if (strlen($phone) == 12 && substr($phone, 0, 2) === '55') {
+            // Já tem 12 dígitos (formato correto com 9º dígito)
+            // Exemplo: 5535991970289
+            return $phone;
+        } elseif (strlen($phone) == 13 && substr($phone, 0, 2) === '55') {
+            // 13 dígitos? Pode ter 0 extra no DDD antigo, remover
+            // Exemplo: 55035991970289 -> 5535991970289
+            return '55' . ltrim(substr($phone, 2), '0');
+        } elseif (strlen($phone) == 11 && substr($phone, 0, 2) === '55') {
+            // 11 dígitos: falta o 9º dígito adicional
+            // Exemplo: 553591970289 -> 5535991970289
+            $ddd = substr($phone, 2, 2);
+            $numero = substr($phone, 4);
+            
+            // Adicionar 9º dígito se o número começar com 6-9 (celular)
+            if (strlen($numero) === 8 && in_array($numero[0], ['6', '7', '8', '9'])) {
+                return '55' . $ddd . '9' . $numero;
+            }
+            
+            return $phone; // Número fixo ou já normalizado
+        }
+        
         return $phone;
     }
 

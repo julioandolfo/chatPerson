@@ -7,10 +7,17 @@ php_value memory_limit 256M
 
 RewriteEngine On
 
+# Repassar header Authorization para PHP (necessário para API)
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+# Permitir acesso direto a arquivos existentes
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]
 
+# Permitir acesso direto a diretórios existentes
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
+# Redirecionar tudo para index.php
 RewriteRule ^ index.php [L]

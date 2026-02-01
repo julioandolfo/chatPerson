@@ -1,0 +1,425 @@
+================================================================================
+  GUIA DE INTEGRACAO - API CHAT PERSONIZI
+  Atualizado: 2026-02-01
+================================================================================
+
+URL BASE: https://chat.personizi.com.br/api.php
+
+================================================================================
+1. PROBLEMA ATUAL - HEADER AUTHORIZATION NAO RECONHECIDO
+================================================================================
+
+SINTOMA:
+- Requisicao retorna: "Token de autenticacao nao fornecido"
+- Mesmo enviando o header: Authorization: Bearer TOKEN
+
+CAUSA:
+- Alguns servidores Apache nao repassam o header Authorization para o PHP
+
+SOLUCAO APLICADA:
+- Atualizado o .htaccess do servidor
+- Adicionados multiplos metodos de captura do token na API
+
+================================================================================
+2. TESTE DE DIAGNOSTICO
+================================================================================
+
+PASSO 1: Testar se o servidor recebe o header Authorization
+---------------------------------------------------------
+curl -H "Authorization: Bearer teste123" https://chat.personizi.com.br/test-headers.php
+
+RESULTADO ESPERADO:
+{
+  "authorization_header_working": true,
+  "authorization_checks": {
+    "$_SERVER[HTTP_AUTHORIZATION]": "Bearer teste123"
+  }
+}
+
+SE NAO FUNCIONAR:
+- O servidor precisa ser configurado (veja secao 5)
+
+
+PASSO 2: Testar a API com token real
+---------------------------------------------------------
+curl -X GET "https://chat.personizi.com.br/api.php/whatsapp-accounts" \
+  -H "Authorization: Bearer SEU_TOKEN_AQUI"
+
+RESULTADO ESPERADO (200 OK):
+{
+  "success": true,
+  "data": {
+    "accounts": [...]
+  }
+}
+
+================================================================================
+3. INTEGRACAO NO PERSONIZI (WordPress)
+================================================================================
+
+CODIGO COMPLETO:
+---------------------------------------------------------
+<?php
+class ChatPersoniziAPI {
+    
+    private $apiUrl = 'https://chat.personizi.com.br/api.php';
+    private $token;
+    
+    public function __construct($token) {
+        $this->token = $token;
+    }
+    
+    /**
+     * Fazer requisicao para a API
+     */
+    private function request($endpoint, $method = 'GET', $data = null) {
+        $url = $this->apiUrl . $endpoint;
+        
+        $args = [
+            'method' => $method,
+            'timeout' => 30,
+            'headers' => [
+                'Authorization' => 'Bearer ' . $this->token,
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json',
+                // ALTERNATIVA: Se Authorization nao funcionar, use:
+                // 'X-API-Key' => $this->token
+            ],
+            'sslverify' => true
+        ];
+        
+        if ($data && in_array($method, ['POST', 'PUT'])) {
+            $args['body'] = json_encode($data);
+        }
+        
+        // Debug (remover em producao)
+        error_log("API Request: {$method} {$url}");
+        error_log("API Headers: " . json_encode($args['headers']));
+        
+        $response = wp_remote_request($url, $args);
+        
+        if (is_wp_error($response)) {
+            error_log("API Error: " . $response->get_error_message());
+            return [
+                'success' => false,
+                'error' => $response->get_error_message(),
+                'code' => 0
+            ];
+        }
+        
+        $body = wp_remote_retrieve_body($response);
+        $code = wp_remote_retrieve_response_code($response);
+        
+        // Debug (remover em producao)
+        error_log("API Response Code: {$code}");
+        error_log("API Response Body: {$body}");
+        
+        $data = json_decode($body, true);
+        
+        return [
+            'success' => ($code >= 200 && $code < 300),
+            'code' => $code,
+            'data' => $data
+        ];
+    }
+    
+    /**
+     * Listar contas WhatsApp ativas
+     */
+    public function getWhatsAppAccounts($status = 'active') {
+        $endpoint = '/whatsapp-accounts';
+        if ($status) {
+            $endpoint .= '?status=' . urlencode($status);
+        }
+        
+        $result = $this->request($endpoint);
+        
+        if ($result['success'] && isset($result['data']['data']['accounts'])) {
+            return [
+                'success' => true,
+                'accounts' => $result['data']['data']['accounts']
+            ];
+        }
+        
+        return [
+            'success' => false,
+            'error' => $result['data']['error']['message'] ?? 'Erro desconhecido',
+            'code' => $result['code']
+        ];
+    }
+    
+    /**
+     * Enviar mensagem WhatsApp
+     */
+    public function sendMessage($to, $from, $message, $contactName = '') {
+        // Limpar numeros (apenas digitos)
+        $to = preg_replace('/[^0-9]/', '', $to);
+        $from = preg_replace('/[^0-9]/', '', $from);
+        
+        $data = [
+            'to' => $to,
+            'from' => $from,
+            'message' => $message
+        ];
+        
+        if (!empty($contactName)) {
+            $data['contact_name'] = $contactName;
+        }
+        
+        $result = $this->request('/messages/send', 'POST', $data);
+        
+        if ($result['success']) {
+            return [
+                'success' => true,
+                'message_id' => $result['data']['data']['message_id'] ?? null,
+                'conversation_id' => $result['data']['data']['conversation_id'] ?? null,
+                'status' => $result['data']['data']['status'] ?? 'sent'
+            ];
+        }
+        
+        return [
+            'success' => false,
+            'error' => $result['data']['error']['message'] ?? 'Erro desconhecido',
+            'details' => $result['data']['error']['details'] ?? null,
+            'code' => $result['code']
+        ];
+    }
+    
+    /**
+     * Testar conexao
+     */
+    public function testConnection() {
+        $result = $this->request('/whatsapp-accounts?per_page=1');
+        return [
+            'success' => $result['success'],
+            'code' => $result['code'],
+            'message' => $result['success'] 
+                ? 'Conexao OK' 
+                : ($result['data']['error']['message'] ?? 'Erro de conexao')
+        ];
+    }
+}
+
+// =====================================================
+// EXEMPLO DE USO NO PERSONIZI
+// =====================================================
+
+// 1. Inicializar a API
+$token = get_option('personizi_chat_api_token'); // ou onde voce armazena o token
+$api = new ChatPersoniziAPI($token);
+
+// 2. Testar conexao
+$test = $api->testConnection();
+if (!$test['success']) {
+    error_log("Erro na API do Chat: " . $test['message']);
+    // Mostrar aviso no admin
+    return;
+}
+
+// 3. Buscar contas WhatsApp disponiveis
+$accountsResult = $api->getWhatsAppAccounts('active');
+if ($accountsResult['success']) {
+    $accounts = $accountsResult['accounts'];
+    
+    // Usar a primeira conta ativa
+    if (!empty($accounts)) {
+        $whatsappNumber = $accounts[0]['phone_number'];
+        
+        // 4. Enviar mensagem
+        $sendResult = $api->sendMessage(
+            '5511999998888',              // Numero do cliente
+            $whatsappNumber,              // Numero do WhatsApp do sistema
+            'Ola! Sua compra foi confirmada.',
+            'Joao Silva'                  // Nome do cliente (opcional)
+        );
+        
+        if ($sendResult['success']) {
+            error_log("Mensagem enviada! ID: " . $sendResult['message_id']);
+        } else {
+            error_log("Erro ao enviar: " . $sendResult['error']);
+        }
+    }
+} else {
+    error_log("Erro ao buscar contas: " . $accountsResult['error']);
+}
+
+?>
+
+================================================================================
+4. ALTERNATIVA - SE O HEADER AUTHORIZATION NAO FUNCIONAR
+================================================================================
+
+Se mesmo apos a configuracao o header Authorization nao funcionar,
+use o header alternativo X-API-Key:
+
+CODIGO ALTERNATIVO:
+---------------------------------------------------------
+$args = [
+    'method' => $method,
+    'timeout' => 30,
+    'headers' => [
+        'X-API-Key' => $this->token,  // <-- Use este em vez de Authorization
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json'
+    ]
+];
+
+
+TESTE COM CURL:
+---------------------------------------------------------
+curl -X GET "https://chat.personizi.com.br/api.php/whatsapp-accounts" \
+  -H "X-API-Key: SEU_TOKEN_AQUI"
+
+================================================================================
+5. CONFIGURACAO DO SERVIDOR (Caso necessario)
+================================================================================
+
+Se o teste test-headers.php mostrar que Authorization nao funciona:
+
+OPCAO 1: Adicionar no .htaccess (JA APLICADO)
+---------------------------------------------------------
+RewriteEngine On
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+
+OPCAO 2: Configuracao do Apache
+---------------------------------------------------------
+No arquivo de configuracao do site Apache, adicionar:
+
+<Directory /var/www/html>
+    SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+</Directory>
+
+
+OPCAO 3: Configuracao do PHP-FPM
+---------------------------------------------------------
+No arquivo de configuracao do pool PHP-FPM, adicionar:
+
+env[HTTP_AUTHORIZATION] = $HTTP_AUTHORIZATION
+
+================================================================================
+6. TRATAMENTO DE ERROS
+================================================================================
+
+ERRO 401 - Token invalido ou nao fornecido
+---------------------------------------------------------
+{
+  "success": false,
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Token de autenticacao nao fornecido"
+  }
+}
+
+SOLUCOES:
+1. Verificar se o token esta correto
+2. Testar com test-headers.php
+3. Usar X-API-Key em vez de Authorization
+
+
+ERRO 422 - Campos obrigatorios
+---------------------------------------------------------
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Dados invalidos",
+    "details": {
+      "to": ["Campo obrigatorio"],
+      "from": ["Campo obrigatorio"]
+    }
+  }
+}
+
+SOLUCOES:
+- Verificar se todos os campos obrigatorios foram enviados
+- Campos para /messages/send: to, from, message
+
+
+ERRO 404 - Conta WhatsApp nao encontrada
+---------------------------------------------------------
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "details": {
+      "from": ["Nenhuma conta ativa para: 5535991970289"]
+    }
+  }
+}
+
+SOLUCOES:
+1. Listar contas disponiveis com: GET /whatsapp-accounts
+2. Usar o phone_number de uma conta com status "active"
+
+
+ERRO 500 - Erro no servidor
+---------------------------------------------------------
+{
+  "success": false,
+  "error": {
+    "code": "SERVER_ERROR",
+    "message": "Erro interno"
+  }
+}
+
+SOLUCOES:
+- Verificar logs do servidor
+- Verificar se o banco de dados esta acessivel
+- Verificar se as credenciais do Quepasa estao corretas
+
+================================================================================
+7. ENDPOINTS DISPONIVEIS
+================================================================================
+
+GET  /whatsapp-accounts          Listar contas WhatsApp
+GET  /whatsapp-accounts/:id      Obter uma conta especifica
+POST /messages/send              Enviar mensagem WhatsApp
+GET  /conversations              Listar conversas
+POST /conversations              Criar conversa
+GET  /conversations/:id          Obter conversa
+PUT  /conversations/:id          Atualizar conversa
+POST /conversations/:id/assign   Atribuir agente
+POST /conversations/:id/close    Encerrar conversa
+GET  /contacts                   Listar contatos
+POST /contacts                   Criar contato
+GET  /agents                     Listar agentes
+GET  /departments                Listar setores
+GET  /funnels                    Listar funis
+GET  /tags                       Listar tags
+
+================================================================================
+8. LINKS UTEIS
+================================================================================
+
+Teste de Headers:    https://chat.personizi.com.br/test-headers.php
+Teste da API:        https://chat.personizi.com.br/api-test.php
+Documentacao:        https://chat.personizi.com.br/settings/api-tokens/docs
+Gerar Token:         https://chat.personizi.com.br/settings/api-tokens
+
+================================================================================
+9. CHECKLIST DE INTEGRACAO
+================================================================================
+
+[ ] 1. Gerar token no painel do Chat
+[ ] 2. Testar conectividade com test-headers.php
+[ ] 3. Verificar se Authorization funciona ou usar X-API-Key
+[ ] 4. Implementar classe ChatPersoniziAPI no Personizi
+[ ] 5. Testar listagem de contas: getWhatsAppAccounts()
+[ ] 6. Testar envio de mensagem: sendMessage()
+[ ] 7. Ativar logs (WP_DEBUG) para debug
+[ ] 8. Implementar tratamento de erros
+[ ] 9. Testar em producao com numero real
+[ ] 10. Desativar logs de debug apos confirmar funcionamento
+
+================================================================================
+10. SUPORTE
+================================================================================
+
+Em caso de duvidas:
+1. Verifique os logs do WordPress (wp-content/debug.log)
+2. Teste a conectividade com test-headers.php
+3. Verifique a documentacao em /settings/api-tokens/docs
+
+================================================================================

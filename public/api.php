@@ -105,21 +105,69 @@ function paginatedResponse($items, $total, $page, $perPage) {
 }
 
 /**
- * Validar token de autenticação
+ * Obter header de autorização (compatível com vários servidores)
  */
-function validateToken() {
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+function getAuthorizationHeader() {
+    $authHeader = null;
     
-    // Também verificar X-API-Key
-    if (empty($authHeader)) {
-        $authHeader = $_SERVER['HTTP_X_API_KEY'] ?? '';
-        if (!empty($authHeader)) {
-            $authHeader = 'Token ' . $authHeader;
+    // Método 1: $_SERVER['HTTP_AUTHORIZATION']
+    if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
+    }
+    // Método 2: $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] (quando há redirect)
+    elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+        $authHeader = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+    }
+    // Método 3: apache_request_headers()
+    elseif (function_exists('apache_request_headers')) {
+        $headers = apache_request_headers();
+        if (isset($headers['Authorization'])) {
+            $authHeader = $headers['Authorization'];
+        } elseif (isset($headers['authorization'])) {
+            $authHeader = $headers['authorization'];
+        }
+    }
+    // Método 4: getallheaders()
+    elseif (function_exists('getallheaders')) {
+        $headers = getallheaders();
+        if (isset($headers['Authorization'])) {
+            $authHeader = $headers['Authorization'];
+        } elseif (isset($headers['authorization'])) {
+            $authHeader = $headers['authorization'];
         }
     }
     
+    // Método 5: X-API-Key como fallback
     if (empty($authHeader)) {
-        errorResponse('Token de autenticação não fornecido', 'UNAUTHORIZED', 401);
+        if (isset($_SERVER['HTTP_X_API_KEY'])) {
+            $authHeader = 'Bearer ' . $_SERVER['HTTP_X_API_KEY'];
+        } elseif (isset($_SERVER['REDIRECT_HTTP_X_API_KEY'])) {
+            $authHeader = 'Bearer ' . $_SERVER['REDIRECT_HTTP_X_API_KEY'];
+        }
+    }
+    
+    return $authHeader;
+}
+
+/**
+ * Validar token de autenticação
+ */
+function validateToken() {
+    $authHeader = getAuthorizationHeader();
+    
+    if (empty($authHeader)) {
+        // Debug: mostrar quais headers estão disponíveis
+        $availableHeaders = [];
+        foreach ($_SERVER as $key => $value) {
+            if (strpos($key, 'HTTP_') === 0) {
+                $availableHeaders[$key] = substr($value, 0, 50);
+            }
+        }
+        
+        errorResponse('Token de autenticação não fornecido', 'UNAUTHORIZED', 401, [
+            'available_headers' => $availableHeaders,
+            'tip' => 'Verifique se o servidor está configurado para repassar o header Authorization'
+        ]);
     }
     
     // Extrair token

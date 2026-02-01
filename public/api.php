@@ -46,6 +46,20 @@ use App\Helpers\Database;
 // =====================================================
 
 /**
+ * Logger global da API
+ */
+function apiLog($level, $message) {
+    $logFile = __DIR__ . '/../storage/logs/api.log';
+    $logDir = dirname($logFile);
+    if (!is_dir($logDir)) {
+        @mkdir($logDir, 0755, true);
+    }
+    $timestamp = date('Y-m-d H:i:s');
+    $line = "[{$timestamp}] [{$level}] {$message}\n";
+    @file_put_contents($logFile, $line, FILE_APPEND);
+}
+
+/**
  * Responder JSON
  */
 function jsonResponse($data, $statusCode = 200) {
@@ -567,7 +581,11 @@ try {
         
         // ============== MESSAGES ==============
         case 'messagesSend':
+            apiLog('INFO', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            apiLog('INFO', '📤 ENVIANDO MENSAGEM WHATSAPP');
+            
             $input = getJsonBody();
+            apiLog('DEBUG', 'Body recebido: ' . json_encode($input));
             
             $errors = [];
             if (empty($input['to'])) $errors['to'] = ['Campo obrigatório'];
@@ -575,6 +593,7 @@ try {
             if (empty($input['message'])) $errors['message'] = ['Campo obrigatório'];
             
             if (!empty($errors)) {
+                apiLog('ERROR', '❌ Validação falhou: ' . json_encode($errors));
                 errorResponse('Dados inválidos', 'VALIDATION_ERROR', 422, $errors);
             }
             
@@ -583,7 +602,12 @@ try {
             $message = $input['message'];
             $contactName = $input['contact_name'] ?? '';
             
+            apiLog('INFO', "Para: {$to}");
+            apiLog('INFO', "De: {$from}");
+            apiLog('INFO', "Mensagem: " . substr($message, 0, 50) . '...');
+            
             // Buscar conta WhatsApp
+            apiLog('INFO', '🔍 Buscando conta WhatsApp...');
             $stmt = $db->prepare("
                 SELECT id, name, api_url, provider, quepasa_token, quepasa_user
                 FROM whatsapp_accounts 
@@ -594,24 +618,32 @@ try {
             $account = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if (!$account) {
+                apiLog('ERROR', "❌ Conta WhatsApp não encontrada para: {$from}");
                 errorResponse('Conta WhatsApp não encontrada', 'VALIDATION_ERROR', 422, 
                     ['from' => ["Nenhuma conta ativa para: {$from}"]]);
             }
             
+            apiLog('INFO', "✅ Conta encontrada: {$account['name']} (ID: {$account['id']})");
+            
             // Buscar ou criar contato
+            apiLog('INFO', '🔍 Buscando contato...');
             $stmt = $db->prepare("SELECT id FROM contacts WHERE phone_number = ? LIMIT 1");
             $stmt->execute([$to]);
             $contact = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if (!$contact) {
+                apiLog('INFO', '📝 Criando novo contato...');
                 $stmt = $db->prepare("INSERT INTO contacts (phone_number, name, channel, created_at, updated_at) VALUES (?, ?, 'whatsapp', NOW(), NOW())");
                 $stmt->execute([$to, $contactName ?: $to]);
                 $contactId = $db->lastInsertId();
+                apiLog('INFO', "✅ Contato criado (ID: {$contactId})");
             } else {
                 $contactId = $contact['id'];
+                apiLog('INFO', "✅ Contato encontrado (ID: {$contactId})");
             }
             
             // Buscar ou criar conversa
+            apiLog('INFO', '🔍 Buscando conversa aberta...');
             $stmt = $db->prepare("
                 SELECT id FROM conversations 
                 WHERE contact_id = ? AND channel = 'whatsapp' AND status IN ('open', 'pending')
@@ -621,36 +653,48 @@ try {
             $conversation = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if (!$conversation) {
+                apiLog('INFO', '📝 Criando nova conversa...');
                 $stmt = $db->prepare("
                     INSERT INTO conversations (contact_id, channel, status, contact_name, contact_phone, whatsapp_account_id, created_at, updated_at)
                     VALUES (?, 'whatsapp', 'open', ?, ?, ?, NOW(), NOW())
                 ");
                 $stmt->execute([$contactId, $contactName ?: $to, $to, $account['id']]);
                 $conversationId = $db->lastInsertId();
+                apiLog('INFO', "✅ Conversa criada (ID: {$conversationId})");
             } else {
                 $conversationId = $conversation['id'];
+                apiLog('INFO', "✅ Conversa encontrada (ID: {$conversationId})");
             }
             
             // Inserir mensagem
+            apiLog('INFO', '📝 Inserindo mensagem no banco...');
             $stmt = $db->prepare("
                 INSERT INTO messages (conversation_id, sender_type, content, type, status, created_at)
                 VALUES (?, 'agent', ?, 'text', 'sent', NOW())
             ");
             $stmt->execute([$conversationId, $message]);
             $messageId = $db->lastInsertId();
+            apiLog('INFO', "✅ Mensagem inserida (ID: {$messageId})");
             
             // Atualizar conversa
+            apiLog('DEBUG', 'Atualizando timestamp da conversa...');
             $stmt = $db->prepare("UPDATE conversations SET updated_at = NOW() WHERE id = ?");
             $stmt->execute([$conversationId]);
             
             // Enviar via Quepasa
             $messageSent = false;
             if ($account['provider'] === 'quepasa' && !empty($account['api_url'])) {
+                apiLog('INFO', '📡 Enviando via Quepasa...');
+                apiLog('DEBUG', "Quepasa URL: {$account['api_url']}/send");
+                
+                $quepasaPayload = ['chatid' => $to . '@s.whatsapp.net', 'text' => $message];
+                apiLog('DEBUG', 'Quepasa Payload: ' . json_encode($quepasaPayload));
+                
                 $ch = curl_init(rtrim($account['api_url'], '/') . '/send');
                 curl_setopt_array($ch, [
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_POST => true,
-                    CURLOPT_POSTFIELDS => json_encode(['chatid' => $to . '@s.whatsapp.net', 'text' => $message]),
+                    CURLOPT_POSTFIELDS => json_encode($quepasaPayload),
                     CURLOPT_HTTPHEADER => [
                         'Content-Type: application/json',
                         'X-QUEPASA-TOKEN: ' . ($account['quepasa_token'] ?? ''),
@@ -663,12 +707,28 @@ try {
                 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 curl_close($ch);
                 $messageSent = ($httpCode >= 200 && $httpCode < 300);
+                
+                apiLog('INFO', "📡 Quepasa respondeu: HTTP {$httpCode}");
+                apiLog('DEBUG', "Quepasa Response: " . substr($response, 0, 200));
+                
+                if ($messageSent) {
+                    apiLog('INFO', '✅ Mensagem enviada via Quepasa');
+                } else {
+                    apiLog('WARNING', "⚠️ Quepasa falhou (HTTP {$httpCode})");
+                }
+            } else {
+                apiLog('WARNING', '⚠️ Quepasa não configurado ou provider diferente');
             }
             
             if ($messageSent) {
                 $stmt = $db->prepare("UPDATE messages SET status = 'delivered' WHERE id = ?");
                 $stmt->execute([$messageId]);
+                apiLog('DEBUG', 'Status atualizado para delivered');
             }
+            
+            apiLog('INFO', '✅ MENSAGEM PROCESSADA COM SUCESSO');
+            apiLog('INFO', "Message ID: {$messageId}, Conversation ID: {$conversationId}, Contact ID: {$contactId}");
+            apiLog('INFO', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
             
             successResponse([
                 'message_id' => (string) $messageId,
@@ -1112,9 +1172,37 @@ try {
     }
     
 } catch (\PDOException $e) {
+    $logFile = __DIR__ . '/../storage/logs/api.log';
+    $timestamp = date('Y-m-d H:i:s');
+    @file_put_contents($logFile, "[{$timestamp}] [ERROR] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n", FILE_APPEND);
+    @file_put_contents($logFile, "[{$timestamp}] [ERROR] ❌ EXCEÇÃO PDO (BANCO DE DADOS)\n", FILE_APPEND);
+    @file_put_contents($logFile, "[{$timestamp}] [ERROR] Mensagem: " . $e->getMessage() . "\n", FILE_APPEND);
+    @file_put_contents($logFile, "[{$timestamp}] [ERROR] Arquivo: " . $e->getFile() . "\n", FILE_APPEND);
+    @file_put_contents($logFile, "[{$timestamp}] [ERROR] Linha: " . $e->getLine() . "\n", FILE_APPEND);
+    @file_put_contents($logFile, "[{$timestamp}] [DEBUG] Stack trace: " . $e->getTraceAsString() . "\n", FILE_APPEND);
+    @file_put_contents($logFile, "[{$timestamp}] [ERROR] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n", FILE_APPEND);
+    
     error_log("API Database Error: " . $e->getMessage());
-    errorResponse('Erro no banco de dados', 'SERVER_ERROR', 500);
+    errorResponse('Erro no banco de dados', 'SERVER_ERROR', 500, [
+        'error' => $e->getMessage(),
+        'file' => $e->getFile(),
+        'line' => $e->getLine()
+    ]);
 } catch (\Exception $e) {
+    $logFile = __DIR__ . '/../storage/logs/api.log';
+    $timestamp = date('Y-m-d H:i:s');
+    @file_put_contents($logFile, "[{$timestamp}] [ERROR] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n", FILE_APPEND);
+    @file_put_contents($logFile, "[{$timestamp}] [ERROR] ❌ EXCEÇÃO GENÉRICA\n", FILE_APPEND);
+    @file_put_contents($logFile, "[{$timestamp}] [ERROR] Mensagem: " . $e->getMessage() . "\n", FILE_APPEND);
+    @file_put_contents($logFile, "[{$timestamp}] [ERROR] Arquivo: " . $e->getFile() . "\n", FILE_APPEND);
+    @file_put_contents($logFile, "[{$timestamp}] [ERROR] Linha: " . $e->getLine() . "\n", FILE_APPEND);
+    @file_put_contents($logFile, "[{$timestamp}] [DEBUG] Stack trace: " . $e->getTraceAsString() . "\n", FILE_APPEND);
+    @file_put_contents($logFile, "[{$timestamp}] [ERROR] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n", FILE_APPEND);
+    
     error_log("API Error: " . $e->getMessage());
-    errorResponse('Erro interno', 'SERVER_ERROR', 500);
+    errorResponse('Erro interno', 'SERVER_ERROR', 500, [
+        'error' => $e->getMessage(),
+        'file' => $e->getFile(),
+        'line' => $e->getLine()
+    ]);
 }

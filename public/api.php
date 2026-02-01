@@ -221,9 +221,9 @@ function validateToken() {
         // Verificar na tabela api_tokens (com hash)
         $log('INFO', '🔍 Buscando token no banco (COM hash SHA256)...');
         $stmt = $db->prepare("
-            SELECT id, user_id, name, permissions, rate_limit, expires_at, revoked_at
+            SELECT id, user_id, name, permissions, rate_limit, expires_at, is_active
             FROM api_tokens 
-            WHERE token = ? AND revoked_at IS NULL
+            WHERE token = ? AND is_active = 1
             LIMIT 1
         ");
         $stmt->execute([$tokenHash]);
@@ -244,25 +244,26 @@ function validateToken() {
         }
         
         if (!$apiToken) {
-            $log('ERROR', '❌ Token NÃO encontrado no banco de dados');
+            $log('ERROR', '❌ Token NÃO encontrado no banco de dados ou está inativo');
             
             // Listar tokens disponíveis (primeiros 5)
-            $stmt = $db->prepare("SELECT id, name, LEFT(token, 20) as token_preview FROM api_tokens ORDER BY created_at DESC LIMIT 5");
+            $stmt = $db->prepare("SELECT id, name, is_active, LEFT(token, 20) as token_preview FROM api_tokens ORDER BY created_at DESC LIMIT 5");
             $stmt->execute();
             $availableTokens = $stmt->fetchAll(\PDO::FETCH_ASSOC);
             
-            $log('DEBUG', 'Tokens disponíveis no banco: ' . count($availableTokens));
+            $log('DEBUG', 'Tokens no banco: ' . count($availableTokens));
             foreach ($availableTokens as $t) {
-                $log('DEBUG', "  - ID {$t['id']}: {$t['name']} (preview: {$t['token_preview']}...)");
+                $status = $t['is_active'] ? 'ATIVO' : 'INATIVO';
+                $log('DEBUG', "  - ID {$t['id']}: {$t['name']} [{$status}] (preview: {$t['token_preview']}...)");
             }
             
-            errorResponse('Token inválido ou expirado', 'UNAUTHORIZED', 401);
+            errorResponse('Token inválido, expirado ou inativo', 'UNAUTHORIZED', 401);
         }
         
-        // Verificar se está revogado
-        if ($apiToken['revoked_at']) {
-            $log('ERROR', '❌ Token foi REVOGADO em: ' . $apiToken['revoked_at']);
-            errorResponse('Token foi revogado', 'UNAUTHORIZED', 401);
+        // Verificar se está ativo
+        if (!$apiToken['is_active']) {
+            $log('ERROR', '❌ Token está INATIVO (is_active = 0)');
+            errorResponse('Token foi desativado', 'UNAUTHORIZED', 401);
         }
         
         // Verificar expiração

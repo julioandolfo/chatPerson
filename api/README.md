@@ -2,6 +2,34 @@
 
 API REST completa para integração com o sistema de multiatendimento.
 
+---
+
+## 🆕 Novidades (01/02/2025)
+
+### ⭐ Novo Endpoint: Envio Direto de Mensagens WhatsApp
+
+Criado endpoint `POST /api/v1/messages/send` para envio direto de mensagens via WhatsApp, ideal para integrações externas.
+
+**Benefícios:**
+- ✅ Não precisa criar conversa antes
+- ✅ Cria contato automaticamente
+- ✅ Cria conversa automaticamente
+- ✅ Retorna IDs de mensagem e conversa
+- ✅ Integração simplificada para WordPress/Personizi
+
+**Endpoints atualizados:**
+- ✅ `GET /api/v1/whatsapp-accounts` - Lista contas WhatsApp
+- ✅ `GET /api/v1/whatsapp-accounts/:id` - Obter conta específica
+- ⭐ `POST /api/v1/messages/send` - **NOVO** - Envio direto de mensagens
+
+**Documentação específica para Personizi:**
+- 📘 `/DOCUMENTACAO_PERSONIZI_CORRIGIDA.md` - Documentação técnica completa
+- 🚨 `/CORRECOES_PERSONIZI_URGENTE.md` - Correções em 7 minutos
+- 📖 `/INTEGRACAO_PERSONIZI.md` - Guia de integração passo a passo
+- 🔍 `/diagnostico-personizi.php` - Ferramenta de diagnóstico visual
+
+---
+
 ## 🚀 Início Rápido
 
 ### 1. Executar Migrations
@@ -103,8 +131,52 @@ curl -X GET "https://seudominio.com/api/v1/conversations" \
 | Método | Endpoint | Descrição |
 |--------|----------|-----------|
 | GET | `/api/v1/conversations/:id/messages` | Listar mensagens |
-| POST | `/api/v1/conversations/:id/messages` | Enviar mensagem |
+| POST | `/api/v1/conversations/:id/messages` | Enviar mensagem em conversa existente |
 | GET | `/api/v1/messages/:id` | Obter mensagem |
+| POST | `/api/v1/messages/send` | **Enviar mensagem WhatsApp direta** ⭐ |
+
+#### Enviar Mensagem WhatsApp Direta (Novo) ⭐
+
+Endpoint especial para envio direto de mensagens via WhatsApp, ideal para integrações externas como Personizi, WordPress, etc.
+
+**POST** `/api/v1/messages/send`
+
+**Body JSON:**
+```json
+{
+  "to": "5511999999999",
+  "from": "5511916127354",
+  "message": "Texto da mensagem",
+  "contact_name": "Nome do Contato" (opcional)
+}
+```
+
+**Campos:**
+- `to` (obrigatório): Número do destinatário com código do país (apenas dígitos)
+- `from` (obrigatório): Número da conta WhatsApp remetente
+- `message` (obrigatório): Texto da mensagem (máx 4096 caracteres)
+- `contact_name` (opcional): Nome do contato
+
+**Resposta de Sucesso (201):**
+```json
+{
+  "success": true,
+  "data": {
+    "message_id": "12345",
+    "conversation_id": "789",
+    "status": "sent",
+    "external_message_id": "msg_xyz123"
+  },
+  "message": "Mensagem enviada com sucesso"
+}
+```
+
+**Comportamento:**
+- Busca ou cria o contato automaticamente
+- Busca ou cria a conversa automaticamente
+- Salva mensagem no banco de dados
+- Envia via provedor (Quepasa, etc)
+- Retorna IDs da mensagem e conversa criadas
 
 ### Participantes
 
@@ -181,7 +253,35 @@ curl -X GET "https://seudominio.com/api/v1/whatsapp-accounts?status=active&page=
 
 ## 📖 Exemplos de Uso
 
-### Criar Conversa e Enviar Mensagem
+### Enviar Mensagem WhatsApp Diretamente (Novo) ⭐
+
+**Recomendado para integrações externas** - Não precisa criar conversa antes!
+
+```bash
+curl -X POST "https://seudominio.com/api/v1/messages/send" \
+  -H "Authorization: Bearer SEU_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "5511999999999",
+    "from": "5511916127354",
+    "message": "Olá! Esta é uma mensagem via API",
+    "contact_name": "João Silva"
+  }'
+
+# Resposta:
+{
+  "success": true,
+  "data": {
+    "message_id": "12345",
+    "conversation_id": "789",
+    "status": "sent",
+    "external_message_id": "msg_xyz"
+  },
+  "message": "Mensagem enviada com sucesso"
+}
+```
+
+### Criar Conversa e Enviar Mensagem (Método Tradicional)
 
 ```bash
 # 1. Criar conversa
@@ -425,7 +525,62 @@ Para dúvidas ou problemas:
 
 - **Documentação completa**: `/api/docs/openapi.yaml`
 - **Logs da API**: Configurações > API & Tokens > Logs
+- **Integração Personizi**: `/DOCUMENTACAO_PERSONIZI_CORRIGIDA.md`
+- **Diagnóstico Personizi**: `/diagnostico-personizi.php`
 - **Suporte**: contato@seudominio.com
+
+### Documentação Adicional
+
+- 📚 **Índice Personizi**: `/INDICE_PERSONIZI.md` - Índice de todos os recursos
+- 🚨 **Correções Urgentes**: `/CORRECOES_PERSONIZI_URGENTE.md` - Correções rápidas
+- 📖 **Guia de Integração**: `/INTEGRACAO_PERSONIZI.md` - Passo a passo completo
+
+---
+
+## 🔗 Integrações Especiais
+
+### Personizi (WordPress)
+
+A API possui endpoints específicos otimizados para integração com o plugin Personizi:
+
+**Endpoints disponíveis:**
+- `POST /api/v1/messages/send` - Envio direto de mensagens
+- `GET /api/v1/whatsapp-accounts` - Listar contas WhatsApp
+- `GET /api/v1/whatsapp-accounts/:id` - Obter conta específica
+
+**Documentação específica:**
+- 📘 **Guia completo:** `/DOCUMENTACAO_PERSONIZI_CORRIGIDA.md`
+- 🚨 **Correções urgentes:** `/CORRECOES_PERSONIZI_URGENTE.md`
+- 📖 **Integração passo a passo:** `/INTEGRACAO_PERSONIZI.md`
+- 🔍 **Diagnóstico visual:** `https://seudominio.com/diagnostico-personizi.php`
+
+**Exemplo PHP (WordPress):**
+```php
+<?php
+$api_url = 'https://chat.personizi.com.br/api/v1';
+$token = 'seu_token_aqui';
+
+// Enviar mensagem
+$response = wp_remote_post($api_url . '/messages/send', [
+    'headers' => [
+        'Authorization' => 'Bearer ' . $token,
+        'Content-Type' => 'application/json'
+    ],
+    'body' => json_encode([
+        'to' => '5511999999999',
+        'from' => '5511916127354',
+        'message' => 'Olá do WordPress!',
+        'contact_name' => 'Cliente'
+    ])
+]);
+
+// Listar contas
+$response = wp_remote_get($api_url . '/whatsapp-accounts?status=active', [
+    'headers' => [
+        'Authorization' => 'Bearer ' . $token
+    ]
+]);
+```
 
 ---
 
@@ -438,3 +593,7 @@ Sua API REST está configurada e pronta para uso!
 2. Teste endpoints básicos
 3. Integre com sua aplicação
 4. Monitore logs e uso
+
+**Para integrações Personizi:**
+- Consulte a documentação específica em `/DOCUMENTACAO_PERSONIZI_CORRIGIDA.md`
+- Use a ferramenta de diagnóstico em `/diagnostico-personizi.php`

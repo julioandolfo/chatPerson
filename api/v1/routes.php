@@ -83,6 +83,9 @@ $routes = [
     // WhatsApp Accounts
     'GET /whatsapp-accounts' => ['Api\V1\Controllers\WhatsAppAccountsController', 'index', true],
     'GET /whatsapp-accounts/:id' => ['Api\V1\Controllers\WhatsAppAccountsController', 'show', true],
+    
+    // Messages (Enviar mensagem via WhatsApp)
+    'POST /messages/send' => ['Api\V1\Controllers\MessagesController', 'send', true],
 ];
 
 // Encontrar rota correspondente

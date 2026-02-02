@@ -626,6 +626,18 @@ class ConversationController
                     $accountType = 'whatsapp';
                 }
                 
+                // ✅ CORRIGIDO: Se usuário não selecionou funil/etapa, usar defaults da conta WhatsApp
+                if (!$funnelId && !$stageId) {
+                    if (!empty($whatsappAccount['default_funnel_id'])) {
+                        $funnelId = (int)$whatsappAccount['default_funnel_id'];
+                        \App\Helpers\Logger::info("newConversation - Usando funil padrão da conta: {$funnelId}");
+                    }
+                    if (!empty($whatsappAccount['default_stage_id'])) {
+                        $stageId = (int)$whatsappAccount['default_stage_id'];
+                        \App\Helpers\Logger::info("newConversation - Usando etapa padrão da conta: {$stageId}");
+                    }
+                }
+                
                 // ✅ VERIFICAR LIMITE DE NOVAS CONVERSAS (Anti-Spam)
                 $rateLimitCheck = \App\Services\NewConversationRateLimitService::canCreateNewConversation($whatsappAccountId, $accountType);
                 if (!$rateLimitCheck['allowed']) {

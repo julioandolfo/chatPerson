@@ -647,7 +647,7 @@ try {
             // Buscar conta WhatsApp
             apiLog('INFO', '🔍 Buscando conta WhatsApp...');
             $stmt = $db->prepare("
-                SELECT id, name, api_url, provider, quepasa_token, quepasa_user, inbox_id
+                SELECT id, name, api_url, provider, quepasa_token, quepasa_user
                 FROM whatsapp_accounts 
                 WHERE phone_number = ? AND status = 'active'
                 LIMIT 1
@@ -661,7 +661,7 @@ try {
                     ['from' => ["Nenhuma conta ativa para: {$from}"]]);
             }
             
-            apiLog('INFO', "✅ Conta encontrada: {$account['name']} (ID: {$account['id']}, Inbox: {$account['inbox_id']})");
+            apiLog('INFO', "✅ Conta encontrada: {$account['name']} (ID: {$account['id']})");
             
             // Buscar configurações da Integration Account (funil e etapa padrão da integração)
             $integration = null;
@@ -716,7 +716,7 @@ try {
                 
                 // Preparar valores para funil/etapa/departamento da integração
                 $integrationAccountId = $integration['id'] ?? null;
-                $inboxId = $account['inbox_id'] ?? null; // inbox_id vem da whatsapp_accounts
+                $inboxId = null; // inbox_id não disponível via API
                 $departmentId = $integration['default_department_id'] ?? null;
                 $funnelId = $integration['default_funnel_id'] ?? null;
                 $stageId = $integration['default_stage_id'] ?? null;

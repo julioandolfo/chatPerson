@@ -74,14 +74,11 @@ class ConversationService
         
         // ✅ LOG: Valores recebidos do usuário
         Logger::debug("ConversationService::create - Valores recebidos: funnel_id=" . ($funnelId ?? 'NULL') . ", stage_id=" . ($stageId ?? 'NULL'), 'conversas.log');
+        Logger::debug("ConversationService::create - IDs de conta: integration_account_id=" . ($data['integration_account_id'] ?? 'NULL') . ", whatsapp_account_id=" . ($data['whatsapp_account_id'] ?? 'NULL'), 'conversas.log');
 
-        // ✅ Se usuário já escolheu funil OU etapa, preservar a escolha
-        if ($funnelId || $stageId) {
-            Logger::debug("ConversationService::create - ✅ PRESERVANDO escolha do usuário (Funil: " . ($funnelId ?? 'NULL') . ", Etapa: " . ($stageId ?? 'NULL') . ")", 'conversas.log');
-        }
-
-        // 1) Defaults da conta de integração, APENAS se usuário não selecionou AMBOS
-        if (!$funnelId && !$stageId && !empty($data['integration_account_id'])) {
+        // 1) Defaults da conta de integração, se usuário não selecionou
+        if ((!$funnelId || !$stageId) && !empty($data['integration_account_id'])) {
+            Logger::debug("ConversationService::create - Buscando defaults da IntegrationAccount ID: " . $data['integration_account_id'], 'conversas.log');
             try {
                 $account = \App\Models\IntegrationAccount::find((int)$data['integration_account_id']);
                 if ($account && !empty($account['default_funnel_id'])) {
@@ -116,10 +113,17 @@ class ConversationService
             }
         }
         
-        // 1.1) Defaults da conta WhatsApp (legacy), APENAS se usuário não selecionou AMBOS
-        if (!$funnelId && !$stageId && !empty($data['whatsapp_account_id'])) {
+        // 1.1) Defaults da conta WhatsApp (legacy), se usuário não selecionou
+        Logger::debug("ConversationService::create - Verificando WhatsApp (legacy): funnelId=" . ($funnelId ?? 'NULL') . ", stageId=" . ($stageId ?? 'NULL') . ", whatsapp_account_id=" . ($data['whatsapp_account_id'] ?? 'NULL'), 'conversas.log');
+        if ((!$funnelId || !$stageId) && !empty($data['whatsapp_account_id'])) {
+            Logger::debug("ConversationService::create - ✅ Buscando defaults da WhatsAppAccount ID: " . $data['whatsapp_account_id'], 'conversas.log');
             try {
                 $account = WhatsAppAccount::find((int)$data['whatsapp_account_id']);
+                if ($account) {
+                    Logger::debug("ConversationService::create - ✅ WhatsAppAccount encontrada: ID=" . $account['id'] . ", name=" . ($account['name'] ?? 'NULL') . ", default_funnel_id=" . ($account['default_funnel_id'] ?? 'NULL') . ", default_stage_id=" . ($account['default_stage_id'] ?? 'NULL'), 'conversas.log');
+                } else {
+                    Logger::debug("ConversationService::create - ❌ WhatsAppAccount NÃO encontrada para ID: " . $data['whatsapp_account_id'], 'conversas.log');
+                }
                 if ($account && !empty($account['default_funnel_id'])) {
                     $funnelId = $funnelId ?: (int)$account['default_funnel_id'];
                     

@@ -20034,7 +20034,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const funnelId = document.getElementById('new_conversation_funnel')?.value.trim() || '';
             const stageId = document.getElementById('new_conversation_stage')?.value.trim() || '';
             
-            console.log('👔 Dados do formulírio:', { channel, whatsappAccountId, name, phone, message });
+            console.log('👔 Dados do formulírio:', { channel, whatsappAccountId, name, phone, message, funnelId, stageId });
             
             if (!channel || !name || !phone || !message) {
                 alert('Preencha todos os campos obrigatórios');

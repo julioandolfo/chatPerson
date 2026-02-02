@@ -315,17 +315,25 @@ class FunnelService
         // Verificar permissões (apenas se não for bypass - usado em automações)
         if (!$bypassPermissions) {
             \App\Helpers\Logger::automation("  Verificando permissões...");
-            if (!\App\Services\PermissionService::canEditConversation($userId, $conversation)) {
-                \App\Helpers\Logger::automation("  ❌ Sem permissão para editar conversa!");
-                throw new \Exception('Você não tem permissão para editar esta conversa');
-            }
-
+            
+            // ✅ CORREÇÃO: Para movimentação no kanban, verificar permissões específicas
             // Verificar se usuário pode mover para este estágio
             if (!\App\Models\AgentFunnelPermission::canMoveToStage($userId, $stageId)) {
                 \App\Helpers\Logger::automation("  ❌ Sem permissão para mover para este estágio!");
                 throw new \Exception('Você não tem permissão para mover conversas para este estágio');
             }
-            \App\Helpers\Logger::automation("  ✅ Permissões OK");
+            \App\Helpers\Logger::automation("  ✅ Permissão de movimentação OK");
+            
+            // Verificar se pode visualizar/acessar a conversa (mais permissivo que editar)
+            // Se tem permissão de mover para o estágio, e pode ver a conversa, pode movê-la
+            if (!\App\Services\PermissionService::canViewConversation($userId, $conversation) 
+                && !\App\Services\PermissionService::canEditConversation($userId, $conversation)) {
+                \App\Helpers\Logger::automation("  ❌ Sem permissão para acessar esta conversa!");
+                throw new \Exception('Você não tem permissão para acessar esta conversa');
+            }
+            \App\Helpers\Logger::automation("  ✅ Permissão de acesso à conversa OK");
+            
+            \App\Helpers\Logger::automation("  ✅ Todas as permissões OK");
         } else {
             \App\Helpers\Logger::automation("  ⚠️  Bypass de permissões ativado (automação)");
         }
@@ -455,13 +463,16 @@ class FunnelService
             return ['allowed' => false, 'message' => 'Estágio não encontrado'];
         }
 
-        // Verificar permissões básicas
-        if (!\App\Services\PermissionService::canEditConversation($userId, $conversation)) {
-            return ['allowed' => false, 'message' => 'Você não tem permissão para editar esta conversa'];
-        }
-
+        // ✅ CORREÇÃO: Verificar permissões básicas de forma mais permissiva para kanban
+        // Primeiro verificar se pode mover para este estágio
         if (!\App\Models\AgentFunnelPermission::canMoveToStage($userId, $stageId)) {
             return ['allowed' => false, 'message' => 'Você não tem permissão para mover conversas para este estágio'];
+        }
+
+        // Verificar se pode acessar a conversa (view ou edit)
+        if (!\App\Services\PermissionService::canViewConversation($userId, $conversation) 
+            && !\App\Services\PermissionService::canEditConversation($userId, $conversation)) {
+            return ['allowed' => false, 'message' => 'Você não tem permissão para acessar esta conversa'];
         }
 
         $oldStageId = $conversation['funnel_stage_id'] ?? null;

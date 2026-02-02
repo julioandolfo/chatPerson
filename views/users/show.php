@@ -211,10 +211,29 @@ ob_start();
                 </h3>
                 <?php if (\App\Helpers\Permission::can('users.edit')): ?>
                 <div class="card-toolbar">
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#kt_modal_assign_funnel_permission">
-                        <i class="ki-duotone ki-plus fs-2"></i>
-                        Adicionar Permissão
-                    </button>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#kt_modal_assign_funnel_permission">
+                            <i class="ki-duotone ki-plus fs-2"></i>
+                            Adicionar
+                        </button>
+                        <button type="button" class="btn btn-light-warning" id="btn_bulk_edit_permissions" onclick="openBulkEditPermissions()" style="display: none;">
+                            <i class="ki-duotone ki-notepad-edit fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Editar (<span id="count_selected_permissions">0</span>)
+                        </button>
+                        <button type="button" class="btn btn-light-danger" id="btn_bulk_remove_permissions" onclick="bulkRemovePermissions()" style="display: none;">
+                            <i class="ki-duotone ki-trash fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                                <span class="path3"></span>
+                                <span class="path4"></span>
+                                <span class="path5"></span>
+                            </i>
+                            Remover (<span id="count_selected_permissions_remove">0</span>)
+                        </button>
+                    </div>
                 </div>
                 <?php endif; ?>
             </div>
@@ -230,9 +249,16 @@ ob_start();
                     </div>
                 <?php else: ?>
                     <div class="table-responsive">
-                        <table class="table align-middle table-row-dashed fs-6 gy-5">
+                        <table class="table align-middle table-row-dashed fs-6 gy-5" id="table_funnel_permissions">
                             <thead>
                                 <tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">
+                                    <?php if (\App\Helpers\Permission::can('users.edit')): ?>
+                                    <th class="w-25px">
+                                        <div class="form-check form-check-sm form-check-custom form-check-solid">
+                                            <input class="form-check-input" type="checkbox" id="select_all_permissions" onchange="toggleAllPermissions(this)" />
+                                        </div>
+                                    </th>
+                                    <?php endif; ?>
                                     <th class="min-w-150px">Funil</th>
                                     <th class="min-w-150px">Estágio</th>
                                     <th class="min-w-100px">Tipo</th>
@@ -242,6 +268,19 @@ ob_start();
                             <tbody class="text-gray-600 fw-semibold">
                                 <?php foreach ($funnelPermissions as $perm): ?>
                                     <tr>
+                                        <?php if (\App\Helpers\Permission::can('users.edit')): ?>
+                                        <td>
+                                            <div class="form-check form-check-sm form-check-custom form-check-solid">
+                                                <input class="form-check-input permission-checkbox" 
+                                                       type="checkbox" 
+                                                       data-permission-id="<?= $perm['id'] ?>"
+                                                       data-funnel-id="<?= $perm['funnel_id'] ?? '' ?>"
+                                                       data-stage-id="<?= $perm['stage_id'] ?? '' ?>"
+                                                       data-permission-type="<?= $perm['permission_type'] ?>"
+                                                       onchange="updateBulkButtons()" />
+                                            </div>
+                                        </td>
+                                        <?php endif; ?>
                                         <td>
                                             <?= htmlspecialchars($perm['funnel_name'] ?? 'Todos os Funis') ?>
                                         </td>
@@ -1214,6 +1253,211 @@ function removeFunnelPermission(userId, funnelId, stageId, permissionType) {
             location.reload();
         } else {
             alert("Erro: " + (data.message || "Erro ao remover permissão"));
+        }
+    });
+}
+
+// Selecionar/desselecionar todos os checkboxes de permissões
+function toggleAllPermissions(checkbox) {
+    const checkboxes = document.querySelectorAll(".permission-checkbox");
+    checkboxes.forEach(cb => {
+        cb.checked = checkbox.checked;
+    });
+    updateBulkButtons();
+}
+
+// Atualizar visibilidade e contadores dos botões de ações em massa
+function updateBulkButtons() {
+    const selected = document.querySelectorAll(".permission-checkbox:checked");
+    const count = selected.length;
+    
+    const btnEdit = document.getElementById("btn_bulk_edit_permissions");
+    const btnRemove = document.getElementById("btn_bulk_remove_permissions");
+    const countEdit = document.getElementById("count_selected_permissions");
+    const countRemove = document.getElementById("count_selected_permissions_remove");
+    
+    if (count > 0) {
+        btnEdit.style.display = "";
+        btnRemove.style.display = "";
+        countEdit.textContent = count;
+        countRemove.textContent = count;
+    } else {
+        btnEdit.style.display = "none";
+        btnRemove.style.display = "none";
+    }
+    
+    // Atualizar checkbox "selecionar todos"
+    const selectAll = document.getElementById("select_all_permissions");
+    const allCheckboxes = document.querySelectorAll(".permission-checkbox");
+    if (selectAll && allCheckboxes.length > 0) {
+        selectAll.checked = (count === allCheckboxes.length);
+    }
+}
+
+// Abrir modal de edição em massa
+function openBulkEditPermissions() {
+    const selected = document.querySelectorAll(".permission-checkbox:checked");
+    if (selected.length === 0) {
+        alert("Selecione pelo menos uma permissão para editar.");
+        return;
+    }
+    
+    // Criar modal dinâmico
+    Swal.fire({
+        title: "Editar Permissões em Massa",
+        html: `
+            <div class="text-start mb-5">
+                <p class="text-muted"><strong>${selected.length}</strong> permissão(ões) selecionada(s)</p>
+            </div>
+            <div class="fv-row">
+                <label class="fw-semibold fs-6 mb-2">Novo Tipo de Permissão</label>
+                <select id="swal_bulk_permission_type" class="form-select form-select-solid">
+                    <option value="view">Visualizar</option>
+                    <option value="edit">Editar</option>
+                    <option value="move">Mover Conversas</option>
+                </select>
+            </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: "Atualizar",
+        cancelButtonText: "Cancelar",
+        customClass: {
+            confirmButton: "btn btn-primary",
+            cancelButton: "btn btn-secondary"
+        },
+        preConfirm: () => {
+            const newType = document.getElementById("swal_bulk_permission_type").value;
+            if (!newType) {
+                Swal.showValidationMessage("Selecione um tipo de permissão");
+                return false;
+            }
+            return newType;
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            bulkUpdatePermissions(result.value);
+        }
+    });
+}
+
+// Atualizar permissões em massa
+function bulkUpdatePermissions(newPermissionType) {
+    const selected = document.querySelectorAll(".permission-checkbox:checked");
+    const permissions = [];
+    
+    selected.forEach(cb => {
+        permissions.push({
+            id: cb.dataset.permissionId,
+            funnel_id: cb.dataset.funnelId || null,
+            stage_id: cb.dataset.stageId || null,
+            permission_type: newPermissionType
+        });
+    });
+    
+    fetch("' . \App\Helpers\Url::to('/users/' . $user['id'] . '/funnel-permissions/bulk-update') . '", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest"
+        },
+        body: JSON.stringify({ permissions: permissions })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            Swal.fire({
+                icon: "success",
+                title: "Sucesso!",
+                text: data.message,
+                timer: 2000
+            }).then(() => {
+                location.reload();
+            });
+        } else {
+            Swal.fire({
+                icon: "error",
+                title: "Erro",
+                text: data.message || "Erro ao atualizar permissões"
+            });
+        }
+    })
+    .catch(error => {
+        console.error(error);
+        Swal.fire({
+            icon: "error",
+            title: "Erro",
+            text: "Erro ao atualizar permissões"
+        });
+    });
+}
+
+// Remover permissões em massa
+function bulkRemovePermissions() {
+    const selected = document.querySelectorAll(".permission-checkbox:checked");
+    if (selected.length === 0) {
+        alert("Selecione pelo menos uma permissão para remover.");
+        return;
+    }
+    
+    Swal.fire({
+        title: "Remover Permissões?",
+        html: `<p class="mb-0">Tem certeza que deseja remover <strong>${selected.length}</strong> permissão(ões)?</p>`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sim, remover",
+        cancelButtonText: "Cancelar",
+        confirmButtonColor: "#f1416c",
+        customClass: {
+            confirmButton: "btn btn-danger",
+            cancelButton: "btn btn-secondary"
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const permissions = [];
+            selected.forEach(cb => {
+                permissions.push({
+                    id: cb.dataset.permissionId,
+                    funnel_id: cb.dataset.funnelId || null,
+                    stage_id: cb.dataset.stageId || null,
+                    permission_type: cb.dataset.permissionType
+                });
+            });
+            
+            fetch("' . \App\Helpers\Url::to('/users/' . $user['id'] . '/funnel-permissions/bulk-remove') . '", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: JSON.stringify({ permissions: permissions })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        icon: "success",
+                        title: "Sucesso!",
+                        text: data.message,
+                        timer: 2000
+                    }).then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire({
+                        icon: "error",
+                        title: "Erro",
+                        text: data.message || "Erro ao remover permissões"
+                    });
+                }
+            })
+            .catch(error => {
+                console.error(error);
+                Swal.fire({
+                    icon: "error",
+                    title: "Erro",
+                    text: "Erro ao remover permissões"
+                });
+            });
         }
     });
 }

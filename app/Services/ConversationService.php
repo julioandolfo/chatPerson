@@ -67,35 +67,39 @@ class ConversationService
         }
 
         // ------------------------------------------------------------------
-        // Resolver funil/etapa padrão (Integração -> WhatsApp (legacy) -> sistema)
+        // Resolver funil/etapa: PRIORIDADE do usuário -> Integração -> WhatsApp (legacy) -> sistema
         // ------------------------------------------------------------------
-        $funnelId = $data['funnel_id'] ?? null;
-        $stageId = $data['stage_id'] ?? null;
+        $funnelId = !empty($data['funnel_id']) ? (int)$data['funnel_id'] : null;
+        $stageId = !empty($data['stage_id']) ? (int)$data['stage_id'] : null;
+        
+        // ✅ LOG: Valores recebidos do usuário
+        Logger::debug("ConversationService::create - Valores recebidos: funnel_id=" . ($funnelId ?? 'NULL') . ", stage_id=" . ($stageId ?? 'NULL'), 'conversas.log');
 
-        // 1) Defaults da conta de integração, se aplicável (prioridade da integração)
-        if (!empty($data['integration_account_id'])) {
+        // 1) Defaults da conta de integração, APENAS se usuário não selecionou
+        if ((!$funnelId || !$stageId) && !empty($data['integration_account_id'])) {
             try {
                 $account = \App\Models\IntegrationAccount::find((int)$data['integration_account_id']);
                 if ($account && !empty($account['default_funnel_id'])) {
-                    $funnelId = (int)$account['default_funnel_id'];
+                    // Só usar padrão da integração se usuário NÃO escolheu
+                    $funnelId = $funnelId ?: (int)$account['default_funnel_id'];
                     
-                    // Se tem etapa específica configurada, usar ela
-                    if (!empty($account['default_stage_id'])) {
+                    // Se tem etapa específica configurada, usar ela (se usuário não escolheu)
+                    if (!$stageId && !empty($account['default_stage_id'])) {
                         $stageId = (int)$account['default_stage_id'];
-                        Logger::debug("ConversationService::create - Integração: Funil ID {$funnelId}, Etapa específica ID {$stageId}", 'conversas.log');
-                    } else {
+                        Logger::debug("ConversationService::create - Integração (fallback): Funil ID {$funnelId}, Etapa específica ID {$stageId}", 'conversas.log');
+                    } elseif (!$stageId) {
                         // Se não tem etapa específica, buscar etapa "Entrada" do funil (sistema obrigatório)
-                        Logger::debug("ConversationService::create - Integração: Funil ID {$funnelId}, sem etapa específica. Buscando 'Entrada'...", 'conversas.log');
+                        Logger::debug("ConversationService::create - Integração (fallback): Funil ID {$funnelId}, sem etapa específica. Buscando 'Entrada'...", 'conversas.log');
                         $entradaStage = \App\Models\FunnelStage::getSystemStage($funnelId, 'entrada');
                         if ($entradaStage) {
                             $stageId = (int)$entradaStage['id'];
-                            Logger::debug("ConversationService::create - Integração: Usando etapa 'Entrada' ID {$stageId}", 'conversas.log');
+                            Logger::debug("ConversationService::create - Integração (fallback): Usando etapa 'Entrada' ID {$stageId}", 'conversas.log');
                         } else {
                             // Fallback: primeira etapa do funil
                             $stages = Funnel::getStages($funnelId);
                             if (!empty($stages)) {
                                 $stageId = (int)$stages[0]['id'];
-                                Logger::debug("ConversationService::create - Integração: 'Entrada' não encontrada, usando primeira etapa ID {$stageId}", 'conversas.log');
+                                Logger::debug("ConversationService::create - Integração (fallback): 'Entrada' não encontrada, usando primeira etapa ID {$stageId}", 'conversas.log');
                             }
                         }
                     }
@@ -107,30 +111,30 @@ class ConversationService
             }
         }
         
-        // 1.1) Defaults da conta WhatsApp (legacy), se aplicável (compatibilidade)
+        // 1.1) Defaults da conta WhatsApp (legacy), APENAS se usuário não selecionou
         if ((!$funnelId || !$stageId) && !empty($data['whatsapp_account_id'])) {
             try {
                 $account = WhatsAppAccount::find((int)$data['whatsapp_account_id']);
                 if ($account && !empty($account['default_funnel_id'])) {
                     $funnelId = $funnelId ?: (int)$account['default_funnel_id'];
                     
-                    // Se tem etapa específica configurada, usar ela
-                    if (!empty($account['default_stage_id'])) {
-                        $stageId = $stageId ?: (int)$account['default_stage_id'];
-                        Logger::debug("ConversationService::create - WhatsApp (legacy): Funil ID {$funnelId}, Etapa específica ID {$stageId}", 'conversas.log');
-                    } else {
-                        // Se não tem etapa específica, buscar etapa "Entrada" do funil (sistema obrigatório)
-                        Logger::debug("ConversationService::create - WhatsApp (legacy): Funil ID {$funnelId}, sem etapa específica. Buscando 'Entrada'...", 'conversas.log');
+                    // Se tem etapa específica configurada, usar ela (se usuário não escolheu)
+                    if (!$stageId && !empty($account['default_stage_id'])) {
+                        $stageId = (int)$account['default_stage_id'];
+                        Logger::debug("ConversationService::create - WhatsApp (legacy, fallback): Funil ID {$funnelId}, Etapa específica ID {$stageId}", 'conversas.log');
+                    } elseif (!$stageId) {
+                        // Se não tem etapa específica, buscar etapa "Entrada" do funil
+                        Logger::debug("ConversationService::create - WhatsApp (legacy, fallback): Funil ID {$funnelId}, sem etapa específica. Buscando 'Entrada'...", 'conversas.log');
                         $entradaStage = \App\Models\FunnelStage::getSystemStage($funnelId, 'entrada');
                         if ($entradaStage) {
-                            $stageId = $stageId ?: (int)$entradaStage['id'];
-                            Logger::debug("ConversationService::create - WhatsApp (legacy): Usando etapa 'Entrada' ID {$stageId}", 'conversas.log');
+                            $stageId = (int)$entradaStage['id'];
+                            Logger::debug("ConversationService::create - WhatsApp (legacy, fallback): Usando etapa 'Entrada' ID {$stageId}", 'conversas.log');
                         } else {
                             // Fallback: primeira etapa do funil
                             $stages = Funnel::getStages($funnelId);
                             if (!empty($stages)) {
-                                $stageId = $stageId ?: (int)$stages[0]['id'];
-                                Logger::debug("ConversationService::create - WhatsApp (legacy): 'Entrada' não encontrada, usando primeira etapa ID {$stageId}", 'conversas.log');
+                                $stageId = (int)$stages[0]['id'];
+                                Logger::debug("ConversationService::create - WhatsApp (legacy, fallback): 'Entrada' não encontrada, usando primeira etapa ID {$stageId}", 'conversas.log');
                             }
                         }
                     }

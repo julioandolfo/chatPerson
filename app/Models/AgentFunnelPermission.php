@@ -116,7 +116,7 @@ class AgentFunnelPermission extends Model
             return true;
         }
         
-        // Verificar permissão de edição geral
+        // Verificar permissão de edição geral (drag & drop all)
         if (\App\Services\PermissionService::hasPermission($userId, 'kanban.drag_drop.all')) {
             return true;
         }
@@ -127,13 +127,31 @@ class AgentFunnelPermission extends Model
             return false;
         }
         
-        // Verificar permissão específica no estágio
+        // ✅ CORREÇÃO: Verificar permissão específica no estágio
+        // Se tem permissão de 'move' ou 'edit', pode mover diretamente
         $sql = "SELECT COUNT(*) as count FROM agent_funnel_permissions 
                 WHERE user_id = ? AND permission_type IN ('move', 'edit') 
                 AND (stage_id = ? OR stage_id IS NULL) 
                 AND (funnel_id = ? OR funnel_id IS NULL)";
         $result = Database::fetch($sql, [$userId, $stageId, $stage['funnel_id']]);
-        return ($result['count'] ?? 0) > 0;
+        if (($result['count'] ?? 0) > 0) {
+            return true;
+        }
+        
+        // ✅ NOVO: Se tem permissão 'view' + permissão geral de drag & drop own, também pode mover
+        if (\App\Services\PermissionService::hasPermission($userId, 'kanban.drag_drop.own')) {
+            // Verificar se tem pelo menos permissão 'view' no estágio/funil
+            $sqlView = "SELECT COUNT(*) as count FROM agent_funnel_permissions 
+                        WHERE user_id = ? AND permission_type = 'view' 
+                        AND (stage_id = ? OR stage_id IS NULL) 
+                        AND (funnel_id = ? OR funnel_id IS NULL)";
+            $resultView = Database::fetch($sqlView, [$userId, $stageId, $stage['funnel_id']]);
+            if (($resultView['count'] ?? 0) > 0) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     /**

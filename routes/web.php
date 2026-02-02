@@ -254,6 +254,8 @@ Router::post('/users/{id}/departments', [UserController::class, 'assignDepartmen
 Router::post('/users/{id}/departments/remove', [UserController::class, 'removeDepartment'], ['Authentication']);
 Router::post('/users/{id}/funnel-permissions', [UserController::class, 'assignFunnelPermission'], ['Authentication']);
 Router::post('/users/{id}/funnel-permissions/bulk', [UserController::class, 'assignFunnelPermissionsBulk'], ['Authentication']);
+Router::post('/users/{id}/funnel-permissions/bulk-update', [UserController::class, 'bulkUpdateFunnelPermissions'], ['Authentication']);
+Router::post('/users/{id}/funnel-permissions/bulk-remove', [UserController::class, 'bulkRemoveFunnelPermissions'], ['Authentication']);
 Router::post('/users/{id}/funnel-permissions/remove', [UserController::class, 'removeFunnelPermission'], ['Authentication']);
 Router::get('/users/{id}/performance', [UserController::class, 'getPerformanceStats'], ['Authentication']);
 Router::post('/users/update-availability', [UserController::class, 'updateAvailability'], ['Authentication']);

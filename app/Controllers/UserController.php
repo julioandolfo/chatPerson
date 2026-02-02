@@ -490,6 +490,134 @@ class UserController
             ], 400);
         }
     }
+
+    /**
+     * Atualizar múltiplas permissões de funil/estágio em massa
+     */
+    public function bulkUpdateFunnelPermissions(int $id): void
+    {
+        Permission::abortIfCannot('users.edit');
+        
+        try {
+            // Ler JSON do body
+            $json = file_get_contents('php://input');
+            $data = json_decode($json, true);
+            
+            if (empty($data['permissions']) || !is_array($data['permissions'])) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Nenhuma permissão enviada.'
+                ], 400);
+                return;
+            }
+            
+            $updated = 0;
+            $errors = [];
+            
+            foreach ($data['permissions'] as $perm) {
+                $funnelId = !empty($perm['funnel_id']) ? (int)$perm['funnel_id'] : null;
+                $stageId = !empty($perm['stage_id']) ? (int)$perm['stage_id'] : null;
+                $newPermissionType = $perm['permission_type'] ?? 'view';
+                
+                try {
+                    // Primeiro, buscar a permissão existente pelo ID
+                    if (!empty($perm['id'])) {
+                        // Atualizar pelo ID
+                        $sql = "UPDATE agent_funnel_permissions 
+                                SET permission_type = ? 
+                                WHERE id = ? AND user_id = ?";
+                        \App\Helpers\Database::execute($sql, [$newPermissionType, $perm['id'], $id]);
+                        $updated++;
+                    } else {
+                        // Fallback: atualizar por funnel_id, stage_id
+                        $sql = "UPDATE agent_funnel_permissions 
+                                SET permission_type = ? 
+                                WHERE user_id = ? 
+                                AND funnel_id <=> ? 
+                                AND stage_id <=> ?";
+                        \App\Helpers\Database::execute($sql, [$newPermissionType, $id, $funnelId, $stageId]);
+                        $updated++;
+                    }
+                } catch (\Exception $e) {
+                    $errors[] = "Erro ao atualizar permissão: " . $e->getMessage();
+                }
+            }
+            
+            Response::json([
+                'success' => true,
+                'message' => "{$updated} permissão(ões) atualizada(s) com sucesso!",
+                'updated' => $updated,
+                'errors' => $errors
+            ]);
+            
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Remover múltiplas permissões de funil/estágio em massa
+     */
+    public function bulkRemoveFunnelPermissions(int $id): void
+    {
+        Permission::abortIfCannot('users.edit');
+        
+        try {
+            // Ler JSON do body
+            $json = file_get_contents('php://input');
+            $data = json_decode($json, true);
+            
+            if (empty($data['permissions']) || !is_array($data['permissions'])) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Nenhuma permissão enviada.'
+                ], 400);
+                return;
+            }
+            
+            $removed = 0;
+            $errors = [];
+            
+            foreach ($data['permissions'] as $perm) {
+                try {
+                    // Remover pelo ID se disponível
+                    if (!empty($perm['id'])) {
+                        $sql = "DELETE FROM agent_funnel_permissions 
+                                WHERE id = ? AND user_id = ?";
+                        \App\Helpers\Database::execute($sql, [$perm['id'], $id]);
+                        $removed++;
+                    } else {
+                        // Fallback: remover por funnel_id, stage_id, permission_type
+                        $funnelId = !empty($perm['funnel_id']) ? (int)$perm['funnel_id'] : null;
+                        $stageId = !empty($perm['stage_id']) ? (int)$perm['stage_id'] : null;
+                        $permissionType = $perm['permission_type'] ?? 'view';
+                        
+                        if (AgentFunnelPermission::removePermission($id, $funnelId, $stageId, $permissionType)) {
+                            $removed++;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    $errors[] = "Erro ao remover permissão: " . $e->getMessage();
+                }
+            }
+            
+            Response::json([
+                'success' => true,
+                'message' => "{$removed} permissão(ões) removida(s) com sucesso!",
+                'removed' => $removed,
+                'errors' => $errors
+            ]);
+            
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
     
     /**
      * Obter estatísticas de performance (JSON)

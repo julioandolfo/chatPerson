@@ -667,7 +667,7 @@ try {
             $integration = null;
             apiLog('INFO', '🔍 Buscando Integration Account...');
             $stmt = $db->prepare("
-                SELECT id, default_funnel_id, default_stage_id, inbox_id, default_department_id
+                SELECT id, default_funnel_id, default_stage_id, default_department_id
                 FROM integration_accounts 
                 WHERE phone_number = ? AND channel = 'whatsapp'
                 LIMIT 1
@@ -676,7 +676,7 @@ try {
             $integration = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if ($integration) {
-                apiLog('INFO', "✅ Integration Account encontrada (ID: {$integration['id']}, Funil: {$integration['default_funnel_id']}, Etapa: {$integration['default_stage_id']}, Inbox: {$integration['inbox_id']}, Depto: {$integration['default_department_id']})");
+                apiLog('INFO', "✅ Integration Account encontrada (ID: {$integration['id']}, Funil: {$integration['default_funnel_id']}, Etapa: {$integration['default_stage_id']}, Depto: {$integration['default_department_id']})");
             } else {
                 apiLog('WARNING', "⚠️ Integration Account não encontrada. Usando configurações padrão do sistema.");
             }
@@ -716,7 +716,7 @@ try {
                 
                 // Preparar valores para funil/etapa/departamento da integração
                 $integrationAccountId = $integration['id'] ?? null;
-                $inboxId = $integration['inbox_id'] ?? $account['inbox_id'] ?? null;
+                $inboxId = $account['inbox_id'] ?? null; // inbox_id vem da whatsapp_accounts
                 $departmentId = $integration['default_department_id'] ?? null;
                 $funnelId = $integration['default_funnel_id'] ?? null;
                 $stageId = $integration['default_stage_id'] ?? null;

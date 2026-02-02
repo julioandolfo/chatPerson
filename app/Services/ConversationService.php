@@ -75,8 +75,13 @@ class ConversationService
         // ✅ LOG: Valores recebidos do usuário
         Logger::debug("ConversationService::create - Valores recebidos: funnel_id=" . ($funnelId ?? 'NULL') . ", stage_id=" . ($stageId ?? 'NULL'), 'conversas.log');
 
-        // 1) Defaults da conta de integração, APENAS se usuário não selecionou
-        if ((!$funnelId || !$stageId) && !empty($data['integration_account_id'])) {
+        // ✅ Se usuário já escolheu funil OU etapa, preservar a escolha
+        if ($funnelId || $stageId) {
+            Logger::debug("ConversationService::create - ✅ PRESERVANDO escolha do usuário (Funil: " . ($funnelId ?? 'NULL') . ", Etapa: " . ($stageId ?? 'NULL') . ")", 'conversas.log');
+        }
+
+        // 1) Defaults da conta de integração, APENAS se usuário não selecionou AMBOS
+        if (!$funnelId && !$stageId && !empty($data['integration_account_id'])) {
             try {
                 $account = \App\Models\IntegrationAccount::find((int)$data['integration_account_id']);
                 if ($account && !empty($account['default_funnel_id'])) {
@@ -111,8 +116,8 @@ class ConversationService
             }
         }
         
-        // 1.1) Defaults da conta WhatsApp (legacy), APENAS se usuário não selecionou
-        if ((!$funnelId || !$stageId) && !empty($data['whatsapp_account_id'])) {
+        // 1.1) Defaults da conta WhatsApp (legacy), APENAS se usuário não selecionou AMBOS
+        if (!$funnelId && !$stageId && !empty($data['whatsapp_account_id'])) {
             try {
                 $account = WhatsAppAccount::find((int)$data['whatsapp_account_id']);
                 if ($account && !empty($account['default_funnel_id'])) {
@@ -144,12 +149,13 @@ class ConversationService
             }
         }
 
-        // 2) Fallback: padrão do sistema
+        // 2) Fallback: padrão do sistema (APENAS para valores ainda não definidos)
         if (!$funnelId || !$stageId) {
             Logger::debug("ConversationService::create - Aplicando fallback do sistema. Funil atual: " . ($funnelId ?? 'NULL') . ", Etapa atual: " . ($stageId ?? 'NULL'), 'conversas.log');
             try {
                 $defaultConfig = Setting::get('system_default_funnel_stage');
                 if (is_array($defaultConfig)) {
+                    // ✅ CORRIGIDO: Usar operador ?: para preservar valores escolhidos pelo usuário
                     $funnelId = $funnelId ?: ($defaultConfig['funnel_id'] ?? null);
                     $stageId = $stageId ?: ($defaultConfig['stage_id'] ?? null);
                     Logger::debug("ConversationService::create - Após fallback sistema: Funil ID " . ($funnelId ?? 'NULL') . ", Etapa ID " . ($stageId ?? 'NULL'), 'conversas.log');
@@ -158,7 +164,7 @@ class ConversationService
                 error_log("Conversas: erro ao obter padrão do sistema: " . $e->getMessage());
             }
         } else {
-            Logger::debug("ConversationService::create - Funil e etapa já definidos (integração ou outro). Funil ID {$funnelId}, Etapa ID {$stageId}", 'conversas.log');
+            Logger::debug("ConversationService::create - Funil e etapa já definidos pelo usuário. Funil ID {$funnelId}, Etapa ID {$stageId}", 'conversas.log');
         }
 
         // 3) Se tem funil mas não etapa, pegar etapa "Entrada" do funil (sistema obrigatório)

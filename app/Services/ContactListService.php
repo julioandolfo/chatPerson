@@ -172,9 +172,12 @@ class ContactListService
                 // Buscar ou criar contato
                 $contact = Contact::findByEmailOrPhone($email, $phone);
                 if (!$contact) {
+                    // ✅ Normalizar telefone antes de salvar
+                    $normalizedPhone = Contact::normalizePhoneNumber($phone);
+                    
                     $contactData = [
                         'name' => $name,
-                        'phone' => $phone,
+                        'phone' => $normalizedPhone,
                         'email' => $email
                     ];
                     $contactId = Contact::create($contactData);

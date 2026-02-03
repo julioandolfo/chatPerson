@@ -399,11 +399,8 @@ class WooCommerceProspectService
             return null;
         }
         
-        // Buscar pelo telefone normalizado
-        return Database::fetch(
-            "SELECT * FROM contacts WHERE phone = ? OR phone LIKE ? LIMIT 1",
-            [$phone, '%' . substr($phone, -10)]
-        );
+        // ✅ CORRIGIDO: Usar findByPhoneNormalized para busca robusta (considera variantes)
+        return Contact::findByPhoneNormalized($phone);
     }
     
     /**

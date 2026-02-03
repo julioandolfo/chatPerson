@@ -268,10 +268,17 @@ class WebhookController
         $contact = null;
         if ($email) {
             $contact = Contact::findByEmail($email);
+            if ($contact) {
+                self::log("✓ Contato encontrado por email: ID={$contact['id']}");
+            }
         }
         if (!$contact && $phone) {
+            // ✅ CORRIGIDO: Usar findByPhoneNormalized para busca robusta (considera variantes)
             $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
-            $contact = Contact::findByPhone($cleanPhone);
+            $contact = Contact::findByPhoneNormalized($cleanPhone);
+            if ($contact) {
+                self::log("✓ Contato encontrado por telefone: ID={$contact['id']}, Phone={$contact['phone']}");
+            }
         }
         
         if (!$contact) {
@@ -280,18 +287,21 @@ class WebhookController
             $lastName = $orderData['billing']['last_name'] ?? '';
             $fullName = trim("{$firstName} {$lastName}");
             
+            // ✅ Normalizar telefone antes de salvar
+            $normalizedPhone = $phone ? Contact::normalizePhoneNumber(preg_replace('/[^0-9]/', '', $phone)) : null;
+            
             $contactData = [
                 'name' => $fullName ?: 'Cliente WooCommerce',
                 'email' => $email,
-                'phone' => $phone,
+                'phone' => $normalizedPhone,
                 'source' => 'woocommerce'
             ];
             
             $contactId = Contact::create($contactData);
-            self::log("✓ Novo contato criado: ID={$contactId}, Nome={$contactData['name']}");
+            self::log("✓ Novo contato criado: ID={$contactId}, Nome={$contactData['name']}, Phone={$normalizedPhone}");
         } else {
             $contactId = $contact['id'];
-            self::log("✓ Contato existente: ID={$contactId}");
+            self::log("✓ Contato existente: ID={$contactId}, Nome={$contact['name']}");
         }
         
         // 5. Cachear ou atualizar pedido

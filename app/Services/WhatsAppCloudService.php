@@ -436,11 +436,20 @@ class WhatsAppCloudService extends MetaIntegrationService
         $contactInfo = $contactsMap[$from] ?? [];
         $contactName = $contactInfo['profile']['name'] ?? "WhatsApp {$from}";
         
+        // ✅ CORRIGIDO: Buscar por identifier OU por telefone normalizado
         $contact = Contact::findByIdentifier($from);
         if (!$contact) {
+            // Tentar buscar por telefone normalizado (evita duplicatas)
+            $contact = Contact::findByPhoneNormalized($from);
+        }
+        
+        if (!$contact) {
+            // Normalizar telefone antes de salvar
+            $normalizedPhone = Contact::normalizePhoneNumber($from);
+            
             $contactData = [
                 'name' => $contactName,
-                'phone' => "+{$from}",
+                'phone' => $normalizedPhone,
                 'identifier' => $from,
                 'whatsapp_wa_id' => $from,
                 'channel' => 'whatsapp',

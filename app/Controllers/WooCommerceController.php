@@ -371,10 +371,14 @@ class WooCommerceController
                             if (!$contact) {
                                 $contactName = trim(($order['billing']['first_name'] ?? '') . ' ' . ($order['billing']['last_name'] ?? ''));
                                 $contactName = !empty($contactName) ? $contactName : 'Cliente WooCommerce';
+                                
+                                // ✅ Normalizar telefone antes de salvar
+                                $normalizedPhone = $customerPhone ? \App\Models\Contact::normalizePhoneNumber($customerPhone) : null;
+                                
                                 $contactId = \App\Models\Contact::create([
                                     'name' => $contactName,
                                     'email' => $customerEmail,
-                                    'phone' => $customerPhone,
+                                    'phone' => $normalizedPhone,
                                     'status' => 'active',
                                     'source' => 'woocommerce_manual_sync'
                                 ]);

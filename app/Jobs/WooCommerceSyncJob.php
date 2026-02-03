@@ -139,15 +139,19 @@ class WooCommerceSyncJob
                     $contact = Contact::findByEmail($email);
                 }
                 if (!$contact && $phone) {
-                    $contact = Contact::findByPhone(self::cleanPhone($phone));
+                    // ✅ CORRIGIDO: Usar findByPhoneNormalized para busca robusta
+                    $contact = Contact::findByPhoneNormalized(self::cleanPhone($phone));
                 }
                 
                 if (!$contact) {
                     // Criar contato se não existir
+                    // ✅ Normalizar telefone antes de salvar
+                    $normalizedPhone = $phone ? Contact::normalizePhoneNumber(self::cleanPhone($phone)) : null;
+                    
                     $contactData = [
                         'name' => trim(($order['billing']['first_name'] ?? '') . ' ' . ($order['billing']['last_name'] ?? '')),
                         'email' => $email,
-                        'phone' => $phone,
+                        'phone' => $normalizedPhone,
                         'source' => 'woocommerce'
                     ];
                     

@@ -102,24 +102,35 @@ class ApiMessageController
             }
             
             // 2. Buscar ou criar contato
+            \App\Helpers\Logger::info("[ApiMessageController] Buscando contato por telefone: '{$to}'");
             $contact = Contact::findByPhoneNormalized($to);
             
             if (!$contact) {
+                \App\Helpers\Logger::info("[ApiMessageController] Contato NÃO encontrado, criando novo...");
+                
+                // Normalizar telefone antes de salvar
+                $normalizedPhone = Contact::normalizePhoneNumber($to);
+                \App\Helpers\Logger::info("[ApiMessageController] Telefone normalizado: '{$to}' -> '{$normalizedPhone}'");
+                
                 // Criar novo contato
                 $contactData = [
-                    'name' => !empty($contactName) ? $contactName : $to,
-                    'phone' => $to
+                    'name' => !empty($contactName) ? $contactName : $normalizedPhone,
+                    'phone' => $normalizedPhone
                 ];
                 
                 $contactId = Contact::create($contactData);
                 $contact = Contact::find($contactId);
                 
+                \App\Helpers\Logger::info("[ApiMessageController] Contato criado: ID={$contactId}");
                 $isNewContact = true;
             } else {
+                \App\Helpers\Logger::info("[ApiMessageController] Contato ENCONTRADO: ID={$contact['id']}, Nome={$contact['name']}, Phone={$contact['phone']}");
                 $isNewContact = false;
                 
-                // Atualizar nome se fornecido e contato não tinha nome definido
+                // ✅ NÃO atualizar nome se contato já existe com nome definido
+                // Apenas atualizar se o contato não tinha nome ou nome era o telefone
                 if (!empty($contactName) && (empty($contact['name']) || $contact['name'] === $contact['phone'])) {
+                    \App\Helpers\Logger::info("[ApiMessageController] Atualizando nome do contato: '{$contact['name']}' -> '{$contactName}'");
                     Contact::update($contact['id'], ['name' => $contactName]);
                     $contact['name'] = $contactName;
                 }

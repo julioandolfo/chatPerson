@@ -125,7 +125,34 @@ if ($existing) {
 echo "</pre>";
 
 echo "<h2>Verificar logs em:</h2>";
-echo "<p>Os logs do sistema são gravados em <code>storage/logs/</code> ou configurado no Logger.</p>";
+
+// Testar se o Logger está funcionando
+$logDir = dirname(__DIR__) . '/logs';
+echo "<p>Diretório de logs: <code>{$logDir}</code></p>";
+echo "<p>Existe? " . (is_dir($logDir) ? '<span style="color:green">SIM</span>' : '<span style="color:red">NÃO</span>') . "</p>";
+echo "<p>Gravável? " . (is_writable($logDir) ? '<span style="color:green">SIM</span>' : '<span style="color:red">NÃO</span>') . "</p>";
+
+// Tentar gravar um log de teste
+$testLogFile = $logDir . '/test-debug.log';
+$testContent = "[" . date('Y-m-d H:i:s') . "] Teste de gravação de log\n";
+$writeResult = @file_put_contents($testLogFile, $testContent, FILE_APPEND);
+echo "<p>Teste de gravação: " . ($writeResult ? '<span style="color:green">SUCESSO (' . $writeResult . ' bytes)</span>' : '<span style="color:red">FALHA</span>') . "</p>";
+
+// Listar arquivos de log existentes
+echo "<p>Arquivos de log existentes:</p>";
+$files = @scandir($logDir);
+echo "<pre>";
+if ($files) {
+    foreach ($files as $f) {
+        if ($f !== '.' && $f !== '..') {
+            $size = @filesize($logDir . '/' . $f);
+            echo "  {$f} ({$size} bytes)\n";
+        }
+    }
+} else {
+    echo "  (não foi possível listar)\n";
+}
+echo "</pre>";
 
 // Verificar se o problema está na ordem do ID
 echo "<h2>Verificar ordem dos contatos:</h2>";

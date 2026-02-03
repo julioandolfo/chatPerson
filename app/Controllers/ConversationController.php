@@ -586,12 +586,13 @@ class ConversationController
             }
             
             // Normalizar telefone
-            $phone = preg_replace('/^\+?55/', '', $phone);
             $phone = preg_replace('/\D/', '', $phone);
-            $fullPhone = '55' . $phone;
+            if (!str_starts_with($phone, '55') && strlen($phone) >= 10 && strlen($phone) <= 11) {
+                $phone = '55' . $phone;
+            }
             
-            // Buscar contato
-            $contact = \App\Services\ContactService::findByPhone($fullPhone);
+            // Buscar contato usando busca normalizada (considera variantes com/sem 9º dígito)
+            $contact = \App\Models\Contact::findByPhoneNormalized($phone);
             
             if (!$contact) {
                 Response::json(['success' => true, 'has_conversations' => false]);

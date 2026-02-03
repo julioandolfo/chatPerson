@@ -56,6 +56,8 @@ class Contact extends Model
             return null;
         }
         
+        \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] Buscando telefone: original={$phone}, normalizado={$normalized}");
+        
         // Gerar variantes de número (com e sem 9º dígito de celular)
         $variants = [];
 
@@ -81,6 +83,8 @@ class Contact extends Model
 
         // Unificar e remover duplicatas
         $variants = array_values(array_unique($variants));
+        
+        \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] Variantes geradas: " . json_encode($variants));
 
         // Para cada variante, buscar variações comuns (sufixos WhatsApp e +)
         foreach ($variants as $variant) {
@@ -95,6 +99,7 @@ class Contact extends Model
             foreach ($candidates as $candidate) {
                 $contact = self::whereFirst('phone', '=', $candidate);
                 if ($contact) {
+                    \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] ✅ Encontrado por match exato: {$candidate}");
                     return $contact;
                 }
             }
@@ -109,10 +114,26 @@ class Contact extends Model
             ]);
             
             if ($contact) {
+                \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] ✅ Encontrado por LIKE: {$variant}");
                 return $contact;
             }
         }
         
+        // ✅ NOVO: Buscar pelos últimos 8 dígitos (núcleo do número sem 9º dígito)
+        // Isso pega casos onde o número foi cadastrado com formato diferente
+        $coreDigits = preg_replace('/\D/', '', $phone);
+        if (strlen($coreDigits) >= 8) {
+            $last8 = substr($coreDigits, -8);
+            $sql = "SELECT * FROM contacts WHERE REPLACE(REPLACE(phone, '+', ''), '@s.whatsapp.net', '') LIKE ? ORDER BY id ASC LIMIT 1";
+            $contact = \App\Helpers\Database::fetch($sql, ['%' . $last8]);
+            
+            if ($contact) {
+                \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] ✅ Encontrado pelos últimos 8 dígitos: {$last8}");
+                return $contact;
+            }
+        }
+        
+        \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] ❌ Nenhum contato encontrado");
         return null;
     }
 

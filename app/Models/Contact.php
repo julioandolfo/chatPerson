@@ -56,7 +56,13 @@ class Contact extends Model
             return null;
         }
         
-        \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] Buscando telefone: original={$phone}, normalizado={$normalized}");
+        \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] ========== INÍCIO BUSCA ==========");
+        \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] Telefone original: '{$phone}'");
+        \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] Telefone normalizado: '{$normalized}'");
+        
+        // Debug: mostrar alguns contatos existentes
+        $debugContacts = \App\Helpers\Database::fetchAll("SELECT id, name, phone FROM contacts ORDER BY id DESC LIMIT 5");
+        \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] Últimos 5 contatos: " . json_encode($debugContacts, JSON_UNESCAPED_UNICODE));
         
         // Gerar variantes de número (com e sem 9º dígito de celular)
         $variants = [];
@@ -97,9 +103,17 @@ class Contact extends Model
             ];
 
             foreach ($candidates as $candidate) {
+                // Buscar por phone
                 $contact = self::whereFirst('phone', '=', $candidate);
                 if ($contact) {
-                    \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] ✅ Encontrado por match exato: {$candidate}");
+                    \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] ✅ Encontrado por match exato phone: {$candidate}");
+                    return $contact;
+                }
+                
+                // Buscar por whatsapp_id também
+                $contact = self::whereFirst('whatsapp_id', '=', $candidate);
+                if ($contact) {
+                    \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] ✅ Encontrado por match exato whatsapp_id: {$candidate}");
                     return $contact;
                 }
             }
@@ -107,14 +121,22 @@ class Contact extends Model
         
         // Buscar usando LIKE para números que contenham alguma variante
         foreach ($variants as $variant) {
-            $sql = "SELECT * FROM contacts WHERE phone LIKE ? OR phone LIKE ? LIMIT 1";
+            // Busca mais abrangente: prefixo, sufixo e contém em phone e whatsapp_id
+            $sql = "SELECT * FROM contacts 
+                    WHERE phone LIKE ? OR phone LIKE ? OR phone LIKE ?
+                       OR whatsapp_id LIKE ? OR whatsapp_id LIKE ? OR whatsapp_id LIKE ?
+                    ORDER BY id ASC LIMIT 1";
             $contact = \App\Helpers\Database::fetch($sql, [
-                $variant . '%',
-                '%' . $variant
+                $variant . '%',      // phone começa com
+                '%' . $variant,      // phone termina com
+                '%' . $variant . '%', // phone contém
+                $variant . '%',      // whatsapp_id começa com
+                '%' . $variant,      // whatsapp_id termina com
+                '%' . $variant . '%' // whatsapp_id contém
             ]);
             
             if ($contact) {
-                \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] ✅ Encontrado por LIKE: {$variant}");
+                \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] ✅ Encontrado por LIKE variante: {$variant}, contato: {$contact['name']} (ID: {$contact['id']})");
                 return $contact;
             }
         }
@@ -122,18 +144,37 @@ class Contact extends Model
         // ✅ NOVO: Buscar pelos últimos 8 dígitos (núcleo do número sem 9º dígito)
         // Isso pega casos onde o número foi cadastrado com formato diferente
         $coreDigits = preg_replace('/\D/', '', $phone);
+        \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] Core digits: {$coreDigits}");
+        
         if (strlen($coreDigits) >= 8) {
             $last8 = substr($coreDigits, -8);
-            $sql = "SELECT * FROM contacts WHERE REPLACE(REPLACE(phone, '+', ''), '@s.whatsapp.net', '') LIKE ? ORDER BY id ASC LIMIT 1";
-            $contact = \App\Helpers\Database::fetch($sql, ['%' . $last8]);
+            \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] Buscando pelos últimos 8 dígitos: {$last8}");
+            
+            // Busca simples por LIKE no campo phone (mais compatível)
+            $sql = "SELECT * FROM contacts WHERE phone LIKE ? ORDER BY id ASC LIMIT 1";
+            $contact = \App\Helpers\Database::fetch($sql, ['%' . $last8 . '%']);
             
             if ($contact) {
-                \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] ✅ Encontrado pelos últimos 8 dígitos: {$last8}");
+                \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] ✅ Encontrado por LIKE: {$last8}, contato ID: {$contact['id']}, nome: {$contact['name']}");
                 return $contact;
+            }
+            
+            // Tentar também com últimos 9 dígitos (inclui o 9º dígito de celular)
+            if (strlen($coreDigits) >= 9) {
+                $last9 = substr($coreDigits, -9);
+                \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] Tentando com últimos 9 dígitos: {$last9}");
+                
+                $sql = "SELECT * FROM contacts WHERE phone LIKE ? ORDER BY id ASC LIMIT 1";
+                $contact = \App\Helpers\Database::fetch($sql, ['%' . $last9 . '%']);
+                
+                if ($contact) {
+                    \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] ✅ Encontrado por LIKE (9 dígitos): {$last9}, contato ID: {$contact['id']}, nome: {$contact['name']}");
+                    return $contact;
+                }
             }
         }
         
-        \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] ❌ Nenhum contato encontrado");
+        \App\Helpers\Logger::info("[Contact::findByPhoneNormalized] ❌ Nenhum contato encontrado para: {$phone}");
         return null;
     }
 

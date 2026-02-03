@@ -59,7 +59,54 @@ foreach ($testPhones as $phone) {
     echo "</p>";
 }
 
-echo "<h2>Testando fluxo completo de criação (simulação):</h2>";
+echo "<h2>Simulando fluxo do WEBHOOK (exatamente como o WhatsAppService faz):</h2>";
+
+// Simular dados que viriam do webhook
+$webhookFrom = '5535991970289@s.whatsapp.net'; // Como viria do WhatsApp
+echo "<p><strong>Payload webhook: from='{$webhookFrom}'</strong></p>";
+
+// Normalização do WhatsAppService
+function simulateWhatsAppNormalize($phone) {
+    if (empty($phone)) return '';
+    $phone = str_replace('@s.whatsapp.net', '', $phone);
+    $phone = str_replace('@lid', '', $phone);
+    $phone = str_replace('@c.us', '', $phone);
+    $phone = str_replace('@g.us', '', $phone);
+    $phone = str_replace(['+', '-', ' ', '(', ')', '.', '_'], '', $phone);
+    if (strpos($phone, ':') !== false) {
+        $phone = explode(':', $phone)[0];
+    }
+    $phone = ltrim($phone, '+');
+    return $phone;
+}
+
+$fromPhone = simulateWhatsAppNormalize($webhookFrom);
+echo "<p>1. WhatsAppService::normalizePhoneNumber: '{$webhookFrom}' → '{$fromPhone}'</p>";
+
+// Busca como o webhook faz
+echo "<p>2. Contact::findByPhoneNormalized('{$fromPhone}')... ";
+$contact = \App\Models\Contact::findByPhoneNormalized($fromPhone);
+if ($contact) {
+    echo "<strong style='color: green;'>ENCONTRADO: ID {$contact['id']} - {$contact['name']} (phone: {$contact['phone']})</strong>";
+} else {
+    echo "<strong style='color: red;'>NÃO ENCONTRADO - O webhook CRIARIA um novo contato!</strong>";
+}
+echo "</p>";
+
+// Testar com o telefone EXATO que está no banco (553591970289 - SEM o 9º dígito)
+echo "<h3>Teste com telefone do banco (sem 9º dígito):</h3>";
+$dbPhone = '553591970289';
+echo "<p>Contact::findByPhoneNormalized('{$dbPhone}')... ";
+$contact2 = \App\Models\Contact::findByPhoneNormalized($dbPhone);
+if ($contact2) {
+    echo "<strong style='color: green;'>ENCONTRADO: ID {$contact2['id']} - {$contact2['name']}</strong>";
+} else {
+    echo "<strong style='color: red;'>NÃO ENCONTRADO</strong>";
+}
+echo "</p>";
+
+echo "<hr>";
+echo "<h2>Testando fluxo completo de criação via MODAL (simulação):</h2>";
 
 // Simular exatamente o que o newConversation faz
 $testPhone = '35991970289'; // Como seria digitado no formulário
@@ -165,6 +212,21 @@ foreach ($allWithPhone as $c) {
 echo "</pre>";
 
 // Teste direto da query LIKE
+echo "<h2>Comparação de formatos de telefone:</h2>";
+echo "<pre>";
+$dbPhone = '553591970289';
+$webhookPhone = '5535991970289';
+echo "Telefone no banco (12 dígitos, SEM 9º): {$dbPhone}\n";
+echo "Telefone do webhook (13 dígitos, COM 9º): {$webhookPhone}\n";
+echo "\n";
+echo "Comparação:\n";
+echo "  DB:      553591970289\n";
+echo "  Webhook: 5535991970289\n";
+echo "           ^^^ diferença (9 adicional)\n";
+echo "\n";
+echo "findByPhoneNormalized deve gerar variantes e encontrar mesmo assim.\n";
+echo "</pre>";
+
 echo "<h2>Teste direto da query LIKE:</h2>";
 $testQueries = [
     "SELECT * FROM contacts WHERE phone LIKE '%553591970289%' ORDER BY id ASC LIMIT 1",

@@ -31,10 +31,12 @@ class ConversationMergeService
                        ia.phone_number as account_phone,
                        wa.name as wa_account_name,
                        wa.phone_number as wa_account_phone,
+                       u.name as agent_name,
                        (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id) as message_count
                 FROM conversations c
                 LEFT JOIN integration_accounts ia ON c.integration_account_id = ia.id
                 LEFT JOIN whatsapp_accounts wa ON c.whatsapp_account_id = wa.id
+                LEFT JOIN users u ON c.agent_id = u.id
                 WHERE c.contact_id = ? 
                   AND c.status = 'open'
                   AND c.id != ?
@@ -66,6 +68,8 @@ class ConversationMergeService
                     'id' => $conv['id'],
                     'account_name' => $conv['account_name'] ?? $conv['wa_account_name'] ?? 'Desconhecido',
                     'account_phone' => $conv['account_phone'] ?? $conv['wa_account_phone'] ?? '',
+                    'agent_name' => $conv['agent_name'] ?? 'Sem agente',
+                    'status' => $conv['status'] ?? 'open',
                     'message_count' => $conv['message_count'],
                     'updated_at' => $conv['updated_at']
                 ];

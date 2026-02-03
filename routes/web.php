@@ -77,6 +77,7 @@ Router::get('/conversations/metrics/current-agent', [ConversationController::cla
 Router::get('/conversations/sla-details', [ConversationController::class, 'getConversationSLA'], ['Authentication']);
 Router::post('/conversations', [ConversationController::class, 'store'], ['Authentication']);
 // Rotas específicas DEVEM vir ANTES das rotas com parâmetros dinâmicos
+Router::post('/conversations/check-existing', [ConversationController::class, 'checkExistingConversationsBeforeCreate'], ['Authentication']);
 Router::post('/conversations/new', [ConversationController::class, 'newConversation'], ['Authentication']);
 Router::get('/conversations/for-forwarding', [ConversationController::class, 'listForForwarding'], ['Authentication']);
 // Rotas com parâmetros dinâmicos {id}
@@ -730,6 +731,16 @@ Router::post('/api/campaigns/preview-ai-message', [CampaignController::class, 'p
 Router::get('/api/contact-lists', [ContactListController::class, 'listAPI'], ['Authentication']);
 Router::get('/api/contact-lists/{id}/contacts', [ContactListController::class, 'contacts'], ['Authentication']);
 Router::get('/api/contacts/search', [ContactListController::class, 'searchContacts'], ['Authentication']);
+
+// API para listar contas WhatsApp (usado em contatos)
+Router::get('/api/whatsapp/accounts', function() {
+    // Buscar contas WhatsApp ativas
+    $accounts = \App\Models\WhatsAppAccount::getActive();
+    \App\Helpers\Response::json([
+        'success' => true,
+        'accounts' => $accounts
+    ]);
+}, ['Authentication']);
 
 // API para listar contas de integração WhatsApp
 Router::get('/api/integration-accounts/whatsapp', function() {

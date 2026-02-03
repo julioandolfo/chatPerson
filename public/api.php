@@ -367,6 +367,26 @@ function normalizePhoneBR(string $phone): string {
     return $phone;
 }
 
+/**
+ * Gerar versão alternativa do número (com/sem 9º dígito) para busca
+ */
+function getAlternativePhone(string $phone): ?string {
+    if (strlen($phone) == 12 && substr($phone, 0, 2) === '55') {
+        // Tem 9º dígito (5535991970289) -> remover (553591970289)
+        $ddd = substr($phone, 2, 2);
+        $numero = substr($phone, 5); // Pular o 9
+        return '55' . $ddd . $numero;
+    } elseif (strlen($phone) == 11 && substr($phone, 0, 2) === '55') {
+        // Não tem 9º dígito (553591970289) -> adicionar (5535991970289)
+        $ddd = substr($phone, 2, 2);
+        $numero = substr($phone, 4);
+        if (strlen($numero) === 8 && in_array($numero[0], ['6', '7', '8', '9'])) {
+            return '55' . $ddd . '9' . $numero;
+        }
+    }
+    return null;
+}
+
 // =====================================================
 // ROTEAMENTO
 // =====================================================
@@ -684,11 +704,33 @@ try {
                 apiLog('WARNING', "⚠️ Integration Account não encontrada. Usando configurações padrão do sistema.");
             }
             
-            // Buscar ou criar contato
+            // Buscar ou criar contato (com fallback para versão alternativa do número)
             apiLog('INFO', '🔍 Buscando contato...');
-            $stmt = $db->prepare("SELECT id, name FROM contacts WHERE phone = ? LIMIT 1");
+            apiLog('DEBUG', "Buscando por: {$to}");
+            
+            // Buscar pela versão normalizada
+            $stmt = $db->prepare("SELECT id, name, phone FROM contacts WHERE phone = ? LIMIT 1");
             $stmt->execute([$to]);
             $contact = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            // Se não encontrou, buscar pela versão alternativa (com/sem 9º dígito)
+            if (!$contact) {
+                $alternativePhone = getAlternativePhone($to);
+                if ($alternativePhone) {
+                    apiLog('DEBUG', "Não encontrado. Tentando versão alternativa: {$alternativePhone}");
+                    $stmt = $db->prepare("SELECT id, name, phone FROM contacts WHERE phone = ? LIMIT 1");
+                    $stmt->execute([$alternativePhone]);
+                    $contact = $stmt->fetch(\PDO::FETCH_ASSOC);
+                    
+                    if ($contact) {
+                        // ✅ Encontrou! Atualizar telefone para versão normalizada
+                        apiLog('INFO', "✅ Contato encontrado na versão alternativa! Atualizando telefone...");
+                        $stmt = $db->prepare("UPDATE contacts SET phone = ?, updated_at = NOW() WHERE id = ?");
+                        $stmt->execute([$to, $contact['id']]);
+                        $contact['phone'] = $to; // Atualizar no array
+                    }
+                }
+            }
             
             if (!$contact) {
                 apiLog('INFO', '📝 Contato não encontrado, criando novo...');
@@ -701,7 +743,7 @@ try {
             } else {
                 $contactId = $contact['id'];
                 $contactName = $contact['name']; // Usar nome do contato existente (prioritário)
-                apiLog('INFO', "✅ Contato encontrado: {$contactName} (ID: {$contactId})");
+                apiLog('INFO', "✅ Contato encontrado: {$contactName} (ID: {$contactId}, Phone: {$contact['phone']})");
             }
             
             // Buscar ou criar conversa

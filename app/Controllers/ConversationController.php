@@ -572,6 +572,73 @@ class ConversationController
     }
 
     /**
+     * Verificar conversas existentes antes de criar nova
+     */
+    public function checkExistingConversationsBeforeCreate(): void
+    {
+        try {
+            $data = \App\Helpers\Request::post();
+            $phone = trim($data['phone'] ?? '');
+            
+            if (empty($phone)) {
+                Response::json(['success' => false, 'has_conversations' => false]);
+                return;
+            }
+            
+            // Normalizar telefone
+            $phone = preg_replace('/^\+?55/', '', $phone);
+            $phone = preg_replace('/\D/', '', $phone);
+            $fullPhone = '55' . $phone;
+            
+            // Buscar contato
+            $contact = \App\Services\ContactService::findByPhone($fullPhone);
+            
+            if (!$contact) {
+                Response::json(['success' => true, 'has_conversations' => false]);
+                return;
+            }
+            
+            // Buscar conversas abertas do contato
+            $sql = "SELECT c.*, 
+                           COALESCE(ia.name, wa.name) as account_name,
+                           COALESCE(ia.phone_number, wa.phone_number) as account_phone,
+                           u.name as agent_name
+                    FROM conversations c
+                    LEFT JOIN integration_accounts ia ON c.integration_account_id = ia.id
+                    LEFT JOIN whatsapp_accounts wa ON c.whatsapp_account_id = wa.id
+                    LEFT JOIN users u ON c.agent_id = u.id
+                    WHERE c.contact_id = ? AND c.status = 'open'
+                    ORDER BY c.updated_at DESC";
+            
+            $conversations = \App\Helpers\Database::fetchAll($sql, [$contact['id']]);
+            
+            if (empty($conversations)) {
+                Response::json(['success' => true, 'has_conversations' => false]);
+                return;
+            }
+            
+            $convInfo = array_map(function($conv) {
+                return [
+                    'id' => $conv['id'],
+                    'account_name' => $conv['account_name'] ?? 'Desconhecido',
+                    'account_phone' => $conv['account_phone'] ?? '',
+                    'agent_name' => $conv['agent_name'] ?? 'Sem agente',
+                    'status' => $conv['status'],
+                    'updated_at' => $conv['updated_at']
+                ];
+            }, $conversations);
+            
+            Response::json([
+                'success' => true,
+                'has_conversations' => true,
+                'conversations' => $convInfo
+            ]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+    
+    /**
      * Criar nova conversa com contato e mensagem
      * Qualquer agente autenticado pode criar conversas
      */

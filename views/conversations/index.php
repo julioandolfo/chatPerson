@@ -9318,17 +9318,21 @@ async function checkOtherOpenConversations(conversationId) {
             // Guardar IDs para mesclagem
             window.otherConversationsToMerge = convs.map(c => c.id);
             
-            // Montar texto informativo
-            const numbers = convs.map(c => c.account_phone || c.account_name).join(', ');
-            const infoText = `${count} conversa${count > 1 ? 's' : ''} em: ${numbers}`;
+            // Montar texto informativo com agente
+            const details = convs.map(c => {
+                const phone = c.account_phone || c.account_name || 'Sem número';
+                const agent = c.agent_name || 'Sem agente';
+                return `${phone} (${agent})`;
+            }).join(', ');
+            const infoText = `${count} conversa${count > 1 ? 's' : ''} em: ${details}`;
             
-            // Atualizar sidebar
+            // Atualizar sidebar - ✅ SEMPRE MOSTRAR (não depende de permissão)
             if (alertEl && infoEl) {
                 infoEl.innerHTML = infoText;
                 alertEl.style.display = 'block';
             }
             
-            // Atualizar banner do chat (se não foi dispensado)
+            // Atualizar banner do chat - ✅ SEMPRE MOSTRAR (não depende de permissão)
             if (chatMergeAlert && chatMergeInfo && !wasDismissed) {
                 chatMergeInfo.textContent = infoText;
                 chatMergeAlert.style.display = 'block';
@@ -9531,7 +9535,7 @@ async function openChangeAccountModal() {
         const accounts = accountsData.data || accountsData.accounts || accountsData || [];
         
         // Mostrar conta atual
-        const currentAccountId = conversation.integration_account_id || conversation.whatsapp_account_id;
+        const currentAccountId = conversation.whatsapp_account_id || conversation.integration_account_id;
         const currentPhone = conversation.whatsapp_account_phone || conversation.account_phone || 'Não definido';
         const currentName = conversation.whatsapp_account_name || conversation.account_name || '';
         currentEl.innerHTML = `<strong>${escapeHtml(currentPhone)}</strong> ${currentName ? '(' + escapeHtml(currentName) + ')' : ''}`;
@@ -9544,8 +9548,14 @@ async function openChangeAccountModal() {
         
         window.selectedNewAccountId = null;
         
+        // ✅ CORRIGIDO: Comparar por telefone (único) ao invés de ID (pode conflitar entre tabelas)
+        const normalizePhone = (phone) => (phone || '').replace(/\D/g, '');
+        const currentPhoneNormalized = normalizePhone(currentPhone);
+        
         listEl.innerHTML = accounts.map(acc => {
-            const isCurrentAccount = (acc.id == currentAccountId);
+            // Comparar por telefone normalizado para evitar conflito de IDs entre tabelas
+            const accPhoneNormalized = normalizePhone(acc.phone_number);
+            const isCurrentAccount = currentPhoneNormalized && accPhoneNormalized && currentPhoneNormalized === accPhoneNormalized;
             const statusBadge = acc.status === 'active' 
                 ? '<span class="badge badge-success ms-2">Conectado</span>' 
                 : '<span class="badge badge-danger ms-2">Desconectado</span>';
@@ -20075,9 +20085,63 @@ document.addEventListener('DOMContentLoaded', function() {
             progress.style.display = 'inline-block';
             submitBtn.disabled = true;
             
-            console.log('⏳ Enviando requisição para criar nova conversa...');
+            console.log('⏳ Verificando conversas existentes...');
             
             try {
+                // ✅ VERIFICAR SE JÁ EXISTE CONVERSA COM O CONTATO
+                const checkResponse = await fetch('<?= \App\Helpers\Url::to("/conversations/check-existing") ?>', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ phone: fullPhone })
+                });
+                
+                const checkData = await checkResponse.json();
+                
+                if (checkData.has_conversations && checkData.conversations && checkData.conversations.length > 0) {
+                    // Resetar botão
+                    submitBtn.removeAttribute('data-kt-indicator');
+                    indicator.style.display = 'inline-block';
+                    progress.style.display = 'none';
+                    submitBtn.disabled = false;
+                    
+                    // Mostrar aviso com SweetAlert
+                    const convList = checkData.conversations.map(c => 
+                        `<li><strong>${c.account_phone || c.account_name}</strong> - Agente: <strong>${c.agent_name}</strong> - Status: <span class="badge badge-${c.status === 'open' ? 'success' : 'secondary'}">${c.status === 'open' ? 'Aberta' : 'Fechada'}</span></li>`
+                    ).join('');
+                    
+                    const result = await Swal.fire({
+                        icon: 'warning',
+                        title: 'Já existe conversa com este contato!',
+                        html: `
+                            <div class="text-start">
+                                <p><strong>Conversas encontradas:</strong></p>
+                                <ul>${convList}</ul>
+                                <p class="mt-3"><strong>Deseja continuar e criar uma nova conversa mesmo assim?</strong></p>
+                            </div>
+                        `,
+                        showCancelButton: true,
+                        confirmButtonText: 'Sim, criar nova conversa',
+                        cancelButtonText: 'Cancelar',
+                        confirmButtonColor: '#f1416c'
+                    });
+                    
+                    if (!result.isConfirmed) {
+                        return;
+                    }
+                    
+                    // Reativar loading
+                    submitBtn.setAttribute('data-kt-indicator', 'on');
+                    indicator.style.display = 'none';
+                    progress.style.display = 'inline-block';
+                    submitBtn.disabled = true;
+                }
+                
+                console.log('⏳ Enviando requisição para criar nova conversa...');
+                
                 const requestData = {
                     channel: channel,
                     name: name,

@@ -3412,11 +3412,8 @@ function getChannelInfo(channel) {
                             <span class="path2"></span>
                         </i>
                     </button>
-                    <button class="btn btn-sm btn-icon btn-light-primary" title="Emoji" onclick="toggleEmoji()">
-                        <i class="ki-duotone ki-emoji-happy fs-3">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                        </i>
+                    <button class="btn btn-sm btn-icon btn-light-primary" title="Emoji" onclick="toggleEmoji()" style="font-size: 20px;">
+                        😊
                     </button>
                     <button class="btn btn-sm btn-icon btn-light-primary" id="aiAssistantBtn" title="Assistente IA" onclick="showAIAssistantModal()">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
@@ -17579,20 +17576,234 @@ function renderAttachmentHtml(attachment) {
     return html;
 }
 
-// Emoji picker (placeholder melhorado)
+// Emoji picker completo com busca e categorias
 function toggleEmoji() {
-    // TODO: Implementar emoji picker completo
-    const emojis = ['😀', '😁', '😂', '😃', '😄', '😅', '😆', '😉', '😊', '😋', '😌', '😊', '😍', '😎', '😏', '😐', '😑', '😒', '😓', '😔', '😕', '😖', '😗', '😘', '😙', '😚', '😛', '😜', '😝', '😞', '😟', '😠', '😡', '😢', '😣', '😤', '😥', '😦', '😧', '😨', '😩', '😪', '😫', '😬', '😭', '😮', '😯', '😰', '😱', '😲', '😳', '😴', '😵', '👨‍👩‍👦', '😶', '👨‍💻', '😷', '😸', '😹', '😺', '😻', '😼', '😽', '😾', '😿', '🙀', '❤️', '🙁', '🙂', '🙃', '🙄', '🙅', '🙆', '🙇', '🙈', '🙉', '🙊', '🙋', '🙌', '🙍', '🙎', '🙏', '🤐', '🤑', '🤒', '🤓', '🤔', '🤕', '🤖', '🤗', '🤘', '🤙', '🤚', '🤛', '❤️', '🤜', '🤝', '🤞', '🤟', '🤠', '🤡', '🤢', '🤖', '🤣', '🤤', '🤥', '🤦', '🤧', '🤨', '🤩', '🤪', '🤫'];
+    const emojiCategories = {
+        'Rostos e Emoções': {
+            keywords: ['feliz', 'triste', 'rosto', 'emoção', 'alegre', 'sorriso', 'chorar', 'raiva', 'amor', 'coração'],
+            emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '😵', '🤯', '🤠', '🥳', '😎', '🤓', '🧐', '😕', '😟', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '😈', '👿', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾', '🤖']
+        },
+        'Gestos e Mãos': {
+            keywords: ['mão', 'ok', 'polegar', 'dedo', 'palmas', 'oração', 'gesto', 'apontar'],
+            emojis: ['👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦿', '🦵', '🦶', '👂', '🦻', '👃', '🧠', '🫀', '🫁', '🦷', '🦴', '👀', '👁️', '👅', '👄', '💋']
+        },
+        'Pessoas': {
+            keywords: ['pessoa', 'homem', 'mulher', 'família', 'bebê', 'criança', 'adulto'],
+            emojis: ['👶', '🧒', '👦', '👧', '🧑', '👨', '👩', '🧔', '👨‍🦰', '👨‍🦱', '👨‍🦳', '👨‍🦲', '👩‍🦰', '🧑‍🦰', '👩‍🦱', '🧑‍🦱', '👩‍🦳', '🧑‍🦳', '👩‍🦲', '🧑‍🦲', '👱', '👱‍♂️', '👱‍♀️', '🧓', '👴', '👵', '🙍', '🙍‍♂️', '🙍‍♀️', '🙎', '🙎‍♂️', '🙎‍♀️', '🙅', '🙅‍♂️', '🙅‍♀️', '🙆', '🙆‍♂️', '🙆‍♀️', '💁', '💁‍♂️', '💁‍♀️', '🙋', '🙋‍♂️', '🙋‍♀️', '🧏', '🧏‍♂️', '🧏‍♀️', '🙇', '🙇‍♂️', '🙇‍♀️', '🤦', '🤦‍♂️', '🤦‍♀️', '🤷', '🤷‍♂️', '🤷‍♀️', '👨‍⚕️', '👩‍⚕️', '👨‍🎓', '👩‍🎓', '👨‍🏫', '👩‍🏫', '👨‍⚖️', '👩‍⚖️', '👨‍🌾', '👩‍🌾', '👨‍🍳', '👩‍🍳', '👨‍🔧', '👩‍🔧', '👨‍🏭', '👩‍🏭', '👨‍💼', '👩‍💼', '👨‍🔬', '👩‍🔬', '👨‍💻', '👩‍💻', '👨‍🎤', '👩‍🎤', '👨‍🎨', '👩‍🎨', '👨‍✈️', '👩‍✈️', '👨‍🚀', '👩‍🚀', '👨‍🚒', '👩‍🚒', '👮', '👮‍♂️', '👮‍♀️', '🕵️', '🕵️‍♂️', '🕵️‍♀️', '💂', '💂‍♂️', '💂‍♀️']
+        },
+        'Animais e Natureza': {
+            keywords: ['animal', 'cachorro', 'gato', 'natureza', 'planta', 'flor', 'árvore', 'bicho'],
+            emojis: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐽', '🐸', '🐵', '🙈', '🙉', '🙊', '🐒', '🐔', '🐧', '🐦', '🐤', '🐣', '🐥', '🦆', '🦅', '🦉', '🦇', '🐺', '🐗', '🐴', '🦄', '🐝', '🐛', '🦋', '🐌', '🐞', '🐜', '🦟', '🦗', '🕷️', '🕸️', '🦂', '🐢', '🐍', '🦎', '🦖', '🦕', '🐙', '🦑', '🦐', '🦞', '🦀', '🐡', '🐠', '🐟', '🐬', '🐳', '🐋', '🦈', '🐊', '🐅', '🐆', '🦓', '🦍', '🦧', '🐘', '🦛', '🦏', '🐪', '🐫', '🦒', '🦘', '🐃', '🐂', '🐄', '🐎', '🐖', '🐏', '🐑', '🦙', '🐐', '🦌', '🐕', '🐩', '🦮', '🐕‍🦺', '🐈', '🐓', '🦃', '🦚', '🦜', '🦢', '🦩', '🕊️', '🐇', '🦝', '🦨', '🦡', '🦦', '🦥', '🐁', '🐀', '🐿️', '🦔', '🌵', '🎄', '🌲', '🌳', '🌴', '🌱', '🌿', '☘️', '🍀', '🎍', '🎋', '🍃', '🍂', '🍁', '🍄', '🌾', '💐', '🌷', '🌹', '🥀', '🌺', '🌸', '🌼', '🌻', '🌞', '🌝', '🌛', '🌜', '🌚', '🌕', '🌖', '🌗', '🌘', '🌑', '🌒', '🌓', '🌔', '🌙', '🌎', '🌍', '🌏', '🪐', '💫', '⭐', '🌟', '✨', '⚡', '☄️', '💥', '🔥', '🌪️', '🌈', '☀️', '🌤️', '⛅', '🌥️', '☁️', '🌦️', '🌧️', '⛈️', '🌩️', '🌨️', '❄️', '☃️', '⛄', '🌬️', '💨', '💧', '💦', '☔', '☂️', '🌊', '🌫️']
+        },
+        'Comida e Bebida': {
+            keywords: ['comida', 'bebida', 'fruta', 'legume', 'carne', 'doce', 'bolo', 'café', 'pizza'],
+            emojis: ['🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶️', '🫑', '🌽', '🥕', '🫒', '🧄', '🧅', '🥔', '🍠', '🥐', '🥯', '🍞', '🥖', '🥨', '🧀', '🥚', '🍳', '🧈', '🥞', '🧇', '🥓', '🥩', '🍗', '🍖', '🦴', '🌭', '🍔', '🍟', '🍕', '🫓', '🥪', '🥙', '🧆', '🌮', '🌯', '🫔', '🥗', '🥘', '🫕', '🥫', '🍝', '🍜', '🍲', '🍛', '🍣', '🍱', '🥟', '🦪', '🍤', '🍙', '🍚', '🍘', '🍥', '🥠', '🥮', '🍢', '🍡', '🍧', '🍨', '🍦', '🥧', '🧁', '🍰', '🎂', '🍮', '🍭', '🍬', '🍫', '🍿', '🍩', '🍪', '🌰', '🥜', '🍯', '🥛', '🍼', '🫖', '☕', '🍵', '🧃', '🥤', '🧋', '🍶', '🍺', '🍻', '🥂', '🍷', '🥃', '🍸', '🍹', '🧉', '🍾', '🧊', '🥄', '🍴', '🍽️', '🥣', '🥡', '🥢', '🧂']
+        },
+        'Atividades e Esportes': {
+            keywords: ['esporte', 'futebol', 'basquete', 'jogo', 'música', 'arte', 'celebração'],
+            emojis: ['⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱', '🪀', '🏓', '🏸', '🏒', '🏑', '🥍', '🏏', '🪃', '🥅', '⛳', '🪁', '🏹', '🎣', '🤿', '🥊', '🥋', '🎽', '🛹', '🛼', '🛷', '⛸️', '🥌', '🎿', '⛷️', '🏂', '🪂', '🏋️', '🤼', '🤸', '🤺', '⛹️', '🤾', '🏌️', '🏇', '🧘', '🏊', '🤽', '🚣', '🧗', '🚵', '🚴', '🏆', '🥇', '🥈', '🥉', '🏅', '🎖️', '🏵️', '🎗️', '🎫', '🎟️', '🎪', '🤹', '🎭', '🩰', '🎨', '🎬', '🎤', '🎧', '🎼', '🎹', '🥁', '🪘', '🎷', '🎺', '🎸', '🪕', '🎻', '🎲', '♟️', '🎯', '🎳', '🎮', '🎰', '🧩']
+        },
+        'Viagem e Lugares': {
+            keywords: ['carro', 'avião', 'viagem', 'transporte', 'cidade', 'casa', 'prédio', 'hotel'],
+            emojis: ['🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐', '🛻', '🚚', '🚛', '🚜', '🦯', '🦽', '🦼', '🛴', '🚲', '🛵', '🏍️', '🛺', '🚨', '🚔', '🚍', '🚘', '🚖', '🚡', '🚠', '🚟', '🚃', '🚋', '🚞', '🚝', '🚄', '🚅', '🚈', '🚂', '🚆', '🚇', '🚊', '🚉', '✈️', '🛫', '🛬', '🛩️', '💺', '🛰️', '🚀', '🛸', '🚁', '🛶', '⛵', '🚤', '🛥️', '🛳️', '⛴️', '🚢', '⚓', '⛽', '🚧', '🚦', '🚥', '🚏', '🗺️', '🗿', '🗽', '🗼', '🏰', '🏯', '🏟️', '🎡', '🎢', '🎠', '⛲', '⛱️', '🏖️', '🏝️', '🏜️', '🌋', '⛰️', '🏔️', '🗻', '🏕️', '⛺', '🛖', '🏠', '🏡', '🏘️', '🏚️', '🏗️', '🏭', '🏢', '🏬', '🏣', '🏤', '🏥', '🏦', '🏨', '🏪', '🏫', '🏩', '💒', '🏛️', '⛪', '🕌', '🕍', '🛕', '🕋', '⛩️', '🛤️', '🛣️', '🗾', '🎑', '🏞️', '🌅', '🌄', '🌠', '🎇', '🎆', '🌇', '🌆', '🏙️', '🌃', '🌌', '🌉', '🌁']
+        },
+        'Objetos': {
+            keywords: ['relógio', 'telefone', 'computador', 'livro', 'lápis', 'ferramenta', 'dinheiro'],
+            emojis: ['⌚', '📱', '📲', '💻', '⌨️', '🖥️', '🖨️', '🖱️', '🖲️', '🕹️', '🗜️', '💽', '💾', '💿', '📀', '📼', '📷', '📸', '📹', '🎥', '📽️', '🎞️', '📞', '☎️', '📟', '📠', '📺', '📻', '🎙️', '🎚️', '🎛️', '🧭', '⏱️', '⏲️', '⏰', '🕰️', '⌛', '⏳', '📡', '🔋', '🔌', '💡', '🔦', '🕯️', '🪔', '🧯', '🛢️', '💸', '💵', '💴', '💶', '💷', '💰', '💳', '💎', '⚖️', '🪜', '🧰', '🪛', '🔧', '🔨', '⚒️', '🛠️', '⛏️', '🪚', '🔩', '⚙️', '🪤', '🧱', '⛓️', '🧲', '🔫', '💣', '🧨', '🪓', '🔪', '🗡️', '⚔️', '🛡️', '🚬', '⚰️', '🪦', '⚱️', '🏺', '🔮', '📿', '🧿', '💈', '⚗️', '🔭', '🔬', '🕳️', '🩹', '🩺', '💊', '💉', '🩸', '🧬', '🦠', '🧫', '🧪', '🌡️', '🧹', '🪠', '🧺', '🧻', '🚽', '🚰', '🚿', '🛁', '🛀', '🧼', '🪒', '🧽', '🪣', '🧴', '🛎️', '🔑', '🗝️', '🚪', '🪑', '🛋️', '🛏️', '🛌', '🧸', '🪆', '🖼️', '🪞', '🪟', '🛍️', '🛒', '🎁', '🎈', '🎏', '🎀', '🪄', '🪅', '🎊', '🎉', '🎎', '🏮', '🎐', '🧧', '✉️', '📩', '📨', '📧', '💌', '📥', '📤', '📦', '🏷️', '🪧', '📪', '📫', '📬', '📭', '📮', '📯', '📜', '📃', '📄', '📑', '🧾', '📊', '📈', '📉', '🗒️', '🗓️', '📆', '📅', '🗑️', '📇', '🗃️', '🗳️', '🗄️', '📋', '📁', '📂', '🗂️', '🗞️', '📰', '📓', '📔', '📒', '📕', '📗', '📘', '📙', '📚', '📖', '🔖', '🧷', '🔗', '📎', '🖇️', '📐', '📏', '🧮', '📌', '📍', '✂️', '🖊️', '🖋️', '✒️', '🖌️', '🖍️', '📝', '✏️', '🔍', '🔎', '🔏', '🔐', '🔒', '🔓']
+        },
+        'Símbolos': {
+            keywords: ['coração', 'estrela', 'símbolo', 'seta', 'check', 'x', 'aviso', 'proibido'],
+            emojis: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '☮️', '✝️', '☪️', '🕉️', '☸️', '✡️', '🔯', '🕎', '☯️', '☦️', '🛐', '⛎', '♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓', '🆔', '⚛️', '🉑', '☢️', '☣️', '📴', '📳', '🈶', '🈚', '🈸', '🈺', '🈷️', '✴️', '🆚', '💮', '🉐', '㊙️', '㊗️', '🈴', '🈵', '🈹', '🈲', '🅰️', '🅱️', '🆎', '🆑', '🅾️', '🆘', '❌', '⭕', '🛑', '⛔', '📛', '🚫', '💯', '💢', '♨️', '🚷', '🚯', '🚳', '🚱', '🔞', '📵', '🚭', '❗', '❕', '❓', '❔', '‼️', '⁉️', '🔅', '🔆', '〽️', '⚠️', '🚸', '🔱', '⚜️', '🔰', '♻️', '✅', '🈯', '💹', '❇️', '✳️', '❎', '🌐', '💠', 'Ⓜ️', '🌀', '💤', '🏧', '🚾', '♿', '🅿️', '🛗', '🈳', '🈂️', '🛂', '🛃', '🛄', '🛅', '🚹', '🚺', '🚼', '⚧️', '🚻', '🚮', '🎦', '📶', '🈁', '🔣', 'ℹ️', '🔤', '🔡', '🔠', '🆖', '🆗', '🆙', '🆒', '🆕', '🆓', '0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟', '🔢', '#️⃣', '*️⃣', '⏏️', '▶️', '⏸️', '⏯️', '⏹️', '⏺️', '⏭️', '⏮️', '⏩', '⏪', '⏫', '⏬', '◀️', '🔼', '🔽', '➡️', '⬅️', '⬆️', '⬇️', '↗️', '↘️', '↙️', '↖️', '↕️', '↔️', '↪️', '↩️', '⤴️', '⤵️', '🔀', '🔁', '🔂', '🔄', '🔃', '🎵', '🎶', '➕', '➖', '➗', '✖️', '♾️', '💲', '💱', '™️', '©️', '®️', '〰️', '➰', '➿', '🔚', '🔙', '🔛', '🔝', '🔜', '✔️', '☑️', '🔘', '🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚫', '⚪', '🟤', '🔺', '🔻', '🔸', '🔹', '🔶', '🔷', '🔳', '🔲', '▪️', '▫️', '◾', '◽', '◼️', '◻️', '🟥', '🟧', '🟨', '🟩', '🟦', '🟪', '⬛', '⬜', '🟫', '🔈', '🔇', '🔉', '🔊', '🔔', '🔕', '📣', '📢', '👁️‍🗨️', '💬', '💭', '🗯️', '♠️', '♣️', '♥️', '♦️', '🃏', '🎴', '🀄', '🕐', '🕑', '🕒', '🕓', '🕔', '🕕', '🕖', '🕗', '🕘', '🕙', '🕚', '🕛', '🕜', '🕝', '🕞', '🕟', '🕠', '🕡', '🕢', '🕣', '🕤', '🕥', '🕦', '🕧']
+        },
+        'Bandeiras': {
+            keywords: ['bandeira', 'país', 'brasil', 'eua', 'portugal', 'flag'],
+            emojis: ['🏳️', '🏴', '🏴‍☠️', '🏁', '🚩', '🏳️‍🌈', '🏳️‍⚧️', '🇧🇷', '🇺🇸', '🇵🇹', '🇦🇷', '🇨🇱', '🇨🇴', '🇲🇽', '🇪🇸', '🇫🇷', '🇬🇧', '🇮🇹', '🇩🇪', '🇯🇵', '🇨🇳', '🇰🇷', '🇷🇺', '🇮🇳', '🇨🇦', '🇦🇺', '🇿🇦', '🇪🇬', '🇳🇬', '🇰🇪', '🇦🇪', '🇸🇦', '🇮🇱', '🇹🇷', '🇬🇷', '🇳🇱', '🇧🇪', '🇨🇭', '🇸🇪', '🇳🇴', '🇩🇰', '🇫🇮', '🇵🇱', '🇦🇹', '🇨🇿', '🇭🇺', '🇷🇴', '🇧🇬', '🇷🇸', '🇭🇷', '🇸🇮', '🇸🇰', '🇱🇹', '🇱🇻', '🇪🇪', '🇮🇸', '🇮🇪', '🇵🇹', '🇱🇺', '🇲🇹', '🇨🇾', '🇳🇿', '🇵🇭', '🇹🇭', '🇻🇳', '🇮🇩', '🇲🇾', '🇸🇬', '🇵🇰', '🇧🇩', '🇱🇰', '🇳🇵', '🇦🇫', '🇮🇷', '🇮🇶', '🇸🇾', '🇱🇧', '🇯🇴', '🇵🇸', '🇰🇼', '🇶🇦', '🇧🇭', '🇴🇲', '🇾🇪', '🇲🇦', '🇹🇳', '🇩🇿', '🇱🇾', '🇸🇩', '🇪🇹', '🇸🇴', '🇩🇯', '🇪🇷', '🇹🇿', '🇺🇬', '🇷🇼', '🇧🇮', '🇲🇼', '🇿🇲', '🇿🇼', '🇧🇼', '🇳🇦', '🇦🇴', '🇲🇿', '🇲🇬', '🇲🇺', '🇸🇨', '🇰🇲', '🇲🇱', '🇸🇳', '🇬🇲', '🇬🇳', '🇬🇼', '🇸🇱', '🇱🇷', '🇨🇮', '🇬🇭', '🇧🇫', '🇧🇯', '🇹🇬', '🇳🇪', '🇨🇲', '🇬🇶', '🇬🇦', '🇨🇬', '🇨🇩', '🇨🇫', '🇹🇩', '🇸🇹', '🇦🇴']
+        }
+    };
     
-    // Criar modal simples de emoji
-    const emojiHtml = emojis.map(emoji => `<span class="btn btn-sm btn-icon btn-light m-1" onclick="insertEmoji('${emoji}')" style="font-size: 24px; cursor: pointer;">${emoji}</span>`).join('');
+    // Carregar últimos emojis usados do localStorage
+    const recentEmojis = JSON.parse(localStorage.getItem('recentEmojis') || '[]');
+    
+    // Criar HTML do seletor com busca
+    let html = `
+        <div class="emoji-picker-container">
+            <div class="mb-4">
+                <div class="position-relative">
+                    <i class="ki-duotone ki-magnifier fs-3 position-absolute top-50 translate-middle-y ms-4 text-gray-500">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    <input type="text" 
+                           id="emojiSearch" 
+                           class="form-control form-control-solid ps-12" 
+                           placeholder="Buscar emoji... (ex: feliz, coração, Brasil)" 
+                           style="font-size: 14px;" />
+                    <button class="btn btn-sm btn-icon btn-light position-absolute top-50 translate-middle-y end-0 me-2" 
+                            id="clearSearch" 
+                            style="display: none;"
+                            title="Limpar busca">
+                        <i class="ki-duotone ki-cross fs-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                    </button>
+                </div>
+            </div>
+            <div id="emojiCategories" style="max-height: 400px; overflow-y: auto;">
+    `;
+    
+    // Adicionar seção de últimos utilizados (se houver)
+    if (recentEmojis.length > 0) {
+        html += `
+            <div class="emoji-category mb-4" data-category="recent">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="text-primary fw-bold mb-0">
+                        <i class="ki-duotone ki-time fs-5 me-1">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        Últimos Utilizados
+                        <span class="badge badge-light-primary badge-sm ms-2">${recentEmojis.length}</span>
+                    </h6>
+                    <button class="btn btn-sm btn-icon btn-light-danger" onclick="clearRecentEmojis()" title="Limpar histórico">
+                        <i class="ki-duotone ki-trash fs-6">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                            <span class="path4"></span>
+                            <span class="path5"></span>
+                        </i>
+                    </button>
+                </div>
+                <div class="d-flex flex-wrap gap-1">
+                    ${recentEmojis.map(emoji => 
+                        `<span class="btn btn-sm btn-icon btn-light-primary emoji-item" 
+                               onclick="insertEmoji('${emoji}')" 
+                               data-emoji="${emoji}"
+                               style="font-size: 22px; cursor: pointer; width: 40px; height: 40px; padding: 0;" 
+                               title="${emoji}">${emoji}</span>`
+                    ).join('')}
+                </div>
+                <div class="separator separator-dashed my-4"></div>
+            </div>
+        `;
+    }
+    
+    // Adicionar categorias
+    for (const [category, data] of Object.entries(emojiCategories)) {
+        html += `
+            <div class="emoji-category mb-4" data-keywords="${data.keywords.join(',').toLowerCase()}">
+                <h6 class="text-gray-700 fw-bold mb-3">${category}</h6>
+                <div class="d-flex flex-wrap gap-1">
+                    ${data.emojis.map(emoji => 
+                        `<span class="btn btn-sm btn-icon btn-light emoji-item" 
+                               onclick="insertEmoji('${emoji}')" 
+                               data-emoji="${emoji}"
+                               style="font-size: 22px; cursor: pointer; width: 40px; height: 40px; padding: 0;" 
+                               title="${emoji}">${emoji}</span>`
+                    ).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    html += `
+            </div>
+        </div>
+        <style>
+            .emoji-item:hover {
+                transform: scale(1.2);
+                background-color: #f1f1f2 !important;
+                transition: all 0.2s;
+            }
+            .emoji-category.hidden {
+                display: none !important;
+            }
+            .emoji-category[data-category="recent"] {
+                background-color: #f8f9fa;
+                padding: 15px;
+                border-radius: 8px;
+                border: 1px dashed #e1e3ea;
+            }
+            .emoji-category[data-category="recent"] .emoji-item {
+                background-color: #fff !important;
+            }
+            .emoji-category[data-category="recent"] .emoji-item:hover {
+                background-color: #e8f4ff !important;
+            }
+        </style>
+    `;
     
     Swal.fire({
         title: 'Selecione um emoji',
-        html: `<div style="max-height: 400px; overflow-y: auto; text-align: center; padding: 20px;">${emojiHtml}</div>`,
-        width: '600px',
+        html: html,
+        width: '700px',
         showConfirmButton: false,
-        showCloseButton: true
+        showCloseButton: true,
+        didOpen: () => {
+            // Implementar busca de emoji
+            const searchInput = document.getElementById('emojiSearch');
+            const clearSearchBtn = document.getElementById('clearSearch');
+            const categories = document.querySelectorAll('.emoji-category');
+            
+            // Função de filtro
+            function filterEmojis() {
+                const searchTerm = searchInput.value.toLowerCase().trim();
+                
+                // Mostrar/esconder botão de limpar
+                clearSearchBtn.style.display = searchTerm ? 'block' : 'none';
+                
+                if (!searchTerm) {
+                    // Mostrar todas as categorias e emojis
+                    categories.forEach(cat => {
+                        cat.classList.remove('hidden');
+                        cat.querySelectorAll('.emoji-item').forEach(emoji => {
+                            emoji.style.display = '';
+                        });
+                    });
+                    return;
+                }
+                
+                // Filtrar categorias e emojis
+                categories.forEach(cat => {
+                    const categoryType = cat.getAttribute('data-category');
+                    const keywords = cat.getAttribute('data-keywords') || '';
+                    const emojis = cat.querySelectorAll('.emoji-item');
+                    
+                    // Para categoria "Últimos Utilizados", sempre mostrar mas filtrar os emojis
+                    if (categoryType === 'recent') {
+                        emojis.forEach(emoji => {
+                            emoji.style.display = ''; // Sempre mostrar na busca
+                        });
+                        cat.classList.remove('hidden');
+                    } else {
+                        // Para outras categorias, verificar keywords
+                        if (keywords.includes(searchTerm)) {
+                            cat.classList.remove('hidden');
+                            emojis.forEach(emoji => {
+                                emoji.style.display = '';
+                            });
+                        } else {
+                            // Esconder categoria se não houver correspondência
+                            cat.classList.add('hidden');
+                        }
+                    }
+                });
+            }
+            
+            // Listener de busca
+            searchInput.addEventListener('input', filterEmojis);
+            
+            // Botão de limpar busca
+            clearSearchBtn.addEventListener('click', function() {
+                searchInput.value = '';
+                filterEmojis();
+                searchInput.focus();
+            });
+            
+            // Focus no campo de busca
+            searchInput.focus();
+        }
     });
 }
 
@@ -17610,7 +17821,58 @@ function insertEmoji(emoji) {
     input.style.height = 'auto';
     input.style.height = Math.min(input.scrollHeight, 150) + 'px';
     
+    // Salvar emoji nos recentes (localStorage)
+    saveRecentEmoji(emoji);
+    
     Swal.close();
+}
+
+// Função para salvar emoji recente
+function saveRecentEmoji(emoji) {
+    // Carregar lista atual de emojis recentes
+    let recentEmojis = JSON.parse(localStorage.getItem('recentEmojis') || '[]');
+    
+    // Remover emoji se já existir (para evitar duplicatas)
+    recentEmojis = recentEmojis.filter(e => e !== emoji);
+    
+    // Adicionar emoji no início da lista
+    recentEmojis.unshift(emoji);
+    
+    // Limitar a 30 emojis recentes
+    if (recentEmojis.length > 30) {
+        recentEmojis = recentEmojis.slice(0, 30);
+    }
+    
+    // Salvar de volta no localStorage
+    localStorage.setItem('recentEmojis', JSON.stringify(recentEmojis));
+}
+
+// Função para limpar emojis recentes
+function clearRecentEmojis() {
+    Swal.fire({
+        title: 'Limpar histórico?',
+        text: 'Deseja remover todos os emojis recentes?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, limpar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#f1416c',
+        cancelButtonColor: '#gray-400'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            localStorage.removeItem('recentEmojis');
+            Swal.fire({
+                icon: 'success',
+                title: 'Histórico limpo!',
+                text: 'Os emojis recentes foram removidos.',
+                timer: 2000,
+                showConfirmButton: false
+            }).then(() => {
+                // Reabrir o seletor de emoji sem os recentes
+                toggleEmoji();
+            });
+        }
+    });
 }
 
 // ============================================================================

@@ -733,29 +733,31 @@ Router::get('/api/contacts/search', [ContactListController::class, 'searchContac
 
 // API para listar contas de integração WhatsApp
 Router::get('/api/integration-accounts/whatsapp', function() {
-    // Buscar contas de integração ativas (WhatsApp)
-    $integrationAccounts = \App\Models\IntegrationAccount::getActive('whatsapp');
-    
-    // Também buscar contas legacy WhatsApp
+    // ✅ CORRIGIDO: Priorizar whatsapp_accounts (tabela principal usada no modal de nova conversa)
     $legacyAccounts = \App\Models\WhatsAppAccount::getActive();
     
-    // Combinar as duas listas, removendo duplicatas por phone_number
+    // Também buscar contas de integração ativas (WhatsApp)
+    $integrationAccounts = \App\Models\IntegrationAccount::getActive('whatsapp');
+    
+    // Combinar as duas listas, priorizando whatsapp_accounts
     $allAccounts = [];
     $seenPhones = [];
     
-    foreach ($integrationAccounts as $acc) {
+    // PRIMEIRO: Adicionar contas de whatsapp_accounts (prioridade)
+    foreach ($legacyAccounts as $acc) {
         $phone = $acc['phone_number'] ?? '';
         if ($phone && !in_array($phone, $seenPhones)) {
+            $acc['source'] = 'whatsapp_accounts';
             $allAccounts[] = $acc;
             $seenPhones[] = $phone;
         }
     }
     
-    foreach ($legacyAccounts as $acc) {
+    // SEGUNDO: Adicionar contas de integration_accounts (se não existir o mesmo telefone)
+    foreach ($integrationAccounts as $acc) {
         $phone = $acc['phone_number'] ?? '';
         if ($phone && !in_array($phone, $seenPhones)) {
-            // Marcar como conta legacy
-            $acc['is_legacy'] = true;
+            $acc['source'] = 'integration_accounts';
             $allAccounts[] = $acc;
             $seenPhones[] = $phone;
         }

@@ -667,7 +667,7 @@ try {
             $integration = null;
             apiLog('INFO', '🔍 Buscando Integration Account...');
             $stmt = $db->prepare("
-                SELECT id, default_funnel_id, default_stage_id, default_department_id
+                SELECT *
                 FROM integration_accounts 
                 WHERE phone_number = ? AND channel = 'whatsapp'
                 LIMIT 1
@@ -676,7 +676,10 @@ try {
             $integration = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if ($integration) {
-                apiLog('INFO', "✅ Integration Account encontrada (ID: {$integration['id']}, Funil: {$integration['default_funnel_id']}, Etapa: {$integration['default_stage_id']}, Depto: {$integration['default_department_id']})");
+                $funnelLog = $integration['default_funnel_id'] ?? $integration['funnel_id'] ?? 'NULL';
+                $stageLog = $integration['default_stage_id'] ?? $integration['funnel_stage_id'] ?? $integration['stage_id'] ?? 'NULL';
+                $deptoLog = $integration['default_department_id'] ?? $integration['department_id'] ?? 'NULL';
+                apiLog('INFO', "✅ Integration Account encontrada (ID: {$integration['id']}, Funil: {$funnelLog}, Etapa: {$stageLog}, Depto: {$deptoLog})");
             } else {
                 apiLog('WARNING', "⚠️ Integration Account não encontrada. Usando configurações padrão do sistema.");
             }
@@ -715,11 +718,12 @@ try {
                 apiLog('INFO', '📝 Criando nova conversa...');
                 
                 // Preparar valores para funil/etapa/departamento da integração
+                // Aceitar tanto default_* quanto os nomes sem default_ (compatibilidade)
                 $integrationAccountId = $integration['id'] ?? null;
-                $inboxId = null; // inbox_id não disponível via API
-                $departmentId = $integration['default_department_id'] ?? null;
-                $funnelId = $integration['default_funnel_id'] ?? null;
-                $stageId = $integration['default_stage_id'] ?? null;
+                $inboxId = $integration['inbox_id'] ?? null;
+                $departmentId = $integration['default_department_id'] ?? $integration['department_id'] ?? null;
+                $funnelId = $integration['default_funnel_id'] ?? $integration['funnel_id'] ?? null;
+                $stageId = $integration['default_stage_id'] ?? $integration['funnel_stage_id'] ?? $integration['stage_id'] ?? null;
                 
                 apiLog('INFO', "📊 Configurações da conversa: Integration={$integrationAccountId}, Inbox={$inboxId}, Depto={$departmentId}, Funil={$funnelId}, Etapa={$stageId}");
                 

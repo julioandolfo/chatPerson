@@ -704,46 +704,30 @@ try {
                 apiLog('WARNING', "⚠️ Integration Account não encontrada. Usando configurações padrão do sistema.");
             }
             
-            // Buscar ou criar contato (com fallback para versão alternativa do número)
+            // Buscar ou criar contato (usando busca normalizada robusta)
             apiLog('INFO', '🔍 Buscando contato...');
             apiLog('DEBUG', "Buscando por: {$to}");
             
-            // Buscar pela versão normalizada
-            $stmt = $db->prepare("SELECT id, name, phone FROM contacts WHERE phone = ? LIMIT 1");
-            $stmt->execute([$to]);
-            $contact = $stmt->fetch(\PDO::FETCH_ASSOC);
-            
-            // Se não encontrou, buscar pela versão alternativa (com/sem 9º dígito)
-            if (!$contact) {
-                $alternativePhone = getAlternativePhone($to);
-                if ($alternativePhone) {
-                    apiLog('DEBUG', "Não encontrado. Tentando versão alternativa: {$alternativePhone}");
-                    $stmt = $db->prepare("SELECT id, name, phone FROM contacts WHERE phone = ? LIMIT 1");
-                    $stmt->execute([$alternativePhone]);
-                    $contact = $stmt->fetch(\PDO::FETCH_ASSOC);
-                    
-                    if ($contact) {
-                        // ✅ Encontrou! Atualizar telefone para versão normalizada
-                        apiLog('INFO', "✅ Contato encontrado na versão alternativa! Atualizando telefone...");
-                        $stmt = $db->prepare("UPDATE contacts SET phone = ?, updated_at = NOW() WHERE id = ?");
-                        $stmt->execute([$to, $contact['id']]);
-                        $contact['phone'] = $to; // Atualizar no array
-                    }
-                }
-            }
+            // ✅ CORRIGIDO: Usar findByPhoneNormalized para busca robusta (considera variantes com/sem 9º dígito)
+            $contact = \App\Models\Contact::findByPhoneNormalized($to);
             
             if (!$contact) {
                 apiLog('INFO', '📝 Contato não encontrado, criando novo...');
-                $newContactName = $contactName ?: $to;
+                
+                // Normalizar telefone antes de salvar
+                $normalizedPhone = \App\Models\Contact::normalizePhoneNumber($to);
+                $newContactName = $contactName ?: $normalizedPhone;
+                
                 $stmt = $db->prepare("INSERT INTO contacts (phone, name, created_at, updated_at) VALUES (?, ?, NOW(), NOW())");
-                $stmt->execute([$to, $newContactName]);
+                $stmt->execute([$normalizedPhone, $newContactName]);
                 $contactId = $db->lastInsertId();
                 $contactName = $newContactName;
-                apiLog('INFO', "✅ Contato criado: {$contactName} (ID: {$contactId})");
+                apiLog('INFO', "✅ Contato criado: {$contactName} (ID: {$contactId}, Phone: {$normalizedPhone})");
             } else {
                 $contactId = $contact['id'];
-                $contactName = $contact['name']; // Usar nome do contato existente (prioritário)
-                apiLog('INFO', "✅ Contato encontrado: {$contactName} (ID: {$contactId}, Phone: {$contact['phone']})");
+                // ✅ IMPORTANTE: Usar nome do contato existente, ignorar nome do payload
+                $contactName = $contact['name'];
+                apiLog('INFO', "✅ Contato EXISTENTE encontrado: {$contactName} (ID: {$contactId}, Phone: {$contact['phone']})");
             }
             
             // Buscar ou criar conversa

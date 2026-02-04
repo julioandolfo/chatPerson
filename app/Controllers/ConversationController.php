@@ -8,8 +8,10 @@ namespace App\Controllers;
 use App\Helpers\Response;
 use App\Helpers\Permission;
 use App\Helpers\Request;
+use App\Helpers\Auth;
 use App\Services\ConversationService;
 use App\Services\Api4ComService;
+use App\Services\PermissionService;
 use App\Models\User;
 use App\Models\Conversation;
 use App\Models\Funnel;
@@ -3849,7 +3851,18 @@ class ConversationController
      */
     public function mergeConversations(int $id): void
     {
-        Permission::abortIfCannot('conversations.edit');
+        // Verificar se usuário pode editar a conversa de destino
+        $conversation = Conversation::find($id);
+        if (!$conversation) {
+            Response::json(['success' => false, 'message' => 'Conversa não encontrada'], 404);
+            return;
+        }
+        
+        $userId = Auth::id();
+        if (!PermissionService::canEditConversation($userId, $conversation)) {
+            Response::forbidden('Acesso negado - você não tem permissão para editar esta conversa');
+            return;
+        }
         
         try {
             $data = Request::json();

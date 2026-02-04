@@ -3002,7 +3002,7 @@ function getChannelInfo(channel) {
                     <strong>Existem outras conversas deste contato!</strong>
                     <span id="chat-merge-alert-info"></span>
                 </div>
-                <?php if (\App\Helpers\Permission::can('conversations.edit')): ?>
+                <?php if (\App\Helpers\Permission::canAny(['conversations.edit.own', 'conversations.edit.department', 'conversations.edit.all'])): ?>
                 <button type="button" class="btn btn-sm btn-warning" onclick="openMergeModal()">
                     <i class="ki-duotone ki-arrows-loop fs-5 me-1">
                         <span class="path1"></span>

@@ -1083,10 +1083,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <div class="fs-8 text-muted" id="sidebar-other-conversations-info"></div>
                             </div>
                         </div>
+                        <?php if (\App\Helpers\Permission::canAny(['conversations.edit.own', 'conversations.edit.department', 'conversations.edit.all'])): ?>
                         <button type="button" class="btn btn-sm btn-warning mt-2 w-100" onclick="openMergeModal()">
                             <i class="ki-duotone ki-arrows-loop fs-5 me-1"></i>
                             Mesclar Conversas
                         </button>
+                        <?php endif; ?>
                     </div>
                     
                     <div class="sidebar-info-item" id="sidebar-department-item" style="display: none;">

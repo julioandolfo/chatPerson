@@ -3826,7 +3826,8 @@ class ConversationController
      */
     public function checkOtherConversations(int $id): void
     {
-        Permission::abortIfCannot('conversations.view');
+        // ✅ Não requer permissão especial, apenas autenticação (já verificada pelo middleware)
+        // Todos os agentes autenticados podem ver se há outras conversas
         
         try {
             $result = \App\Services\ConversationMergeService::checkMultipleConversations($id);

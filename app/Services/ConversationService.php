@@ -1350,6 +1350,17 @@ class ConversationService
         if (!$conversation) {
             throw new \Exception('Conversa não encontrada');
         }
+        
+        // ✅ REABRIR CONVERSA AUTOMATICAMENTE se:
+        // - Conversa está fechada
+        // - Mensagem é de agente humano (não IA)
+        // - Usuário está logado via interface web (sessão ativa, NÃO via API)
+        $hasActiveWebSession = session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION['user_id']);
+        if ($conversation['status'] === 'closed' && $senderType === 'agent' && $aiAgentId === null && $hasActiveWebSession) {
+            \App\Helpers\Logger::info("ConversationService::sendMessage - Reabrindo conversa fechada via interface web (conv={$conversationId}, sender={$senderId})");
+            Conversation::reopen($conversationId);
+            $conversation['status'] = 'open'; // Atualizar localmente
+        }
 
         // Processar anexos se houver
         $attachmentsData = [];

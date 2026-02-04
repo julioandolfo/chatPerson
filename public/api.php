@@ -656,32 +656,111 @@ try {
             }
             
             $to = normalizePhoneBR($input['to']);
-            $from = normalizePhoneBR($input['from']);
+            $fromOriginal = normalizePhoneBR($input['from']);
             $message = $input['message'];
             $contactName = $input['contact_name'] ?? '';
             
             apiLog('INFO', "Para (normalizado): {$to}");
-            apiLog('INFO', "De (normalizado): {$from}");
+            apiLog('INFO', "De (original da API): {$fromOriginal}");
             apiLog('INFO', "Mensagem: " . substr($message, 0, 50) . '...');
             
-            // Buscar conta WhatsApp
-            apiLog('INFO', '🔍 Buscando conta WhatsApp...');
-            $stmt = $db->prepare("
-                SELECT id, name, api_url, provider, quepasa_token, quepasa_user
-                FROM whatsapp_accounts 
-                WHERE phone_number = ? AND status = 'active'
-                LIMIT 1
-            ");
-            $stmt->execute([$from]);
-            $account = $stmt->fetch(\PDO::FETCH_ASSOC);
+            // ============================================================
+            // 🔄 ROTEAMENTO INTELIGENTE: Usar número da conversa existente
+            // ============================================================
+            // Verifica se já existe conversa aberta com o contato
+            // Se sim, usa o número WhatsApp dessa conversa (continuidade)
+            // Se não, usa o número que veio na API
+            // ============================================================
             
-            if (!$account) {
-                apiLog('ERROR', "❌ Conta WhatsApp não encontrada para: {$from}");
-                errorResponse('Conta WhatsApp não encontrada', 'VALIDATION_ERROR', 422, 
-                    ['from' => ["Nenhuma conta ativa para: {$from}"]]);
+            apiLog('INFO', '🔄 Verificando roteamento inteligente...');
+            
+            // 1. Primeiro buscar o contato para ter o contact_id
+            $contactForRouting = null;
+            $stmt = $db->prepare("SELECT id, name, phone FROM contacts WHERE phone = ? LIMIT 1");
+            $stmt->execute([$to]);
+            $contactForRouting = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            // Se não encontrou, tentar versão alternativa do número
+            if (!$contactForRouting) {
+                $alternativePhone = getAlternativePhone($to);
+                if ($alternativePhone) {
+                    $stmt = $db->prepare("SELECT id, name, phone FROM contacts WHERE phone = ? LIMIT 1");
+                    $stmt->execute([$alternativePhone]);
+                    $contactForRouting = $stmt->fetch(\PDO::FETCH_ASSOC);
+                }
             }
             
-            apiLog('INFO', "✅ Conta encontrada: {$account['name']} (ID: {$account['id']})");
+            $from = $fromOriginal; // Padrão: usar número da API
+            $usedExistingConversation = false;
+            
+            if ($contactForRouting) {
+                apiLog('DEBUG', "Contato encontrado para roteamento: ID={$contactForRouting['id']}, Nome={$contactForRouting['name']}");
+                
+                // 2. Buscar conversa ABERTA com esse contato
+                $stmt = $db->prepare("
+                    SELECT c.id as conversation_id, c.whatsapp_account_id, wa.phone_number, wa.name as account_name,
+                           wa.api_url, wa.provider, wa.quepasa_token, wa.quepasa_user
+                    FROM conversations c
+                    INNER JOIN whatsapp_accounts wa ON wa.id = c.whatsapp_account_id
+                    WHERE c.contact_id = ? 
+                      AND c.channel = 'whatsapp' 
+                      AND c.status IN ('open', 'pending')
+                      AND wa.status = 'active'
+                    ORDER BY c.updated_at DESC
+                    LIMIT 1
+                ");
+                $stmt->execute([$contactForRouting['id']]);
+                $existingConversation = $stmt->fetch(\PDO::FETCH_ASSOC);
+                
+                if ($existingConversation) {
+                    // ✅ Encontrou conversa aberta! Usar o número dessa conversa
+                    $from = $existingConversation['phone_number'];
+                    $usedExistingConversation = true;
+                    apiLog('INFO', "🔄 ROTEAMENTO: Conversa aberta encontrada!");
+                    apiLog('INFO', "   → Número original da API: {$fromOriginal}");
+                    apiLog('INFO', "   → Número da conversa existente: {$from}");
+                    apiLog('INFO', "   → Conta: {$existingConversation['account_name']} (ID: {$existingConversation['whatsapp_account_id']})");
+                    apiLog('INFO', "   → Conversa ID: {$existingConversation['conversation_id']}");
+                } else {
+                    apiLog('INFO', "🔄 ROTEAMENTO: Nenhuma conversa aberta. Usando número da API: {$from}");
+                }
+            } else {
+                apiLog('INFO', "🔄 ROTEAMENTO: Contato novo. Usando número da API: {$from}");
+            }
+            
+            // Buscar conta WhatsApp (pode ser diferente do original se teve roteamento)
+            apiLog('INFO', '🔍 Buscando conta WhatsApp...');
+            
+            // Se usou conversa existente, já temos os dados da conta
+            if ($usedExistingConversation && isset($existingConversation)) {
+                $account = [
+                    'id' => $existingConversation['whatsapp_account_id'],
+                    'name' => $existingConversation['account_name'],
+                    'api_url' => $existingConversation['api_url'],
+                    'provider' => $existingConversation['provider'],
+                    'quepasa_token' => $existingConversation['quepasa_token'],
+                    'quepasa_user' => $existingConversation['quepasa_user']
+                ];
+                apiLog('INFO', "✅ Usando conta da conversa existente: {$account['name']} (ID: {$account['id']})");
+            } else {
+                // Buscar conta pelo número
+                $stmt = $db->prepare("
+                    SELECT id, name, api_url, provider, quepasa_token, quepasa_user
+                    FROM whatsapp_accounts 
+                    WHERE phone_number = ? AND status = 'active'
+                    LIMIT 1
+                ");
+                $stmt->execute([$from]);
+                $account = $stmt->fetch(\PDO::FETCH_ASSOC);
+                
+                if (!$account) {
+                    apiLog('ERROR', "❌ Conta WhatsApp não encontrada para: {$from}");
+                    errorResponse('Conta WhatsApp não encontrada', 'VALIDATION_ERROR', 422, 
+                        ['from' => ["Nenhuma conta ativa para: {$from}"]]);
+                }
+                
+                apiLog('INFO', "✅ Conta encontrada: {$account['name']} (ID: {$account['id']})");
+            }
             
             // Buscar configurações da Integration Account (funil e etapa padrão da integração)
             $integration = null;
@@ -731,50 +810,58 @@ try {
             }
             
             // Buscar ou criar conversa
-            apiLog('INFO', '🔍 Buscando conversa aberta...');
-            $stmt = $db->prepare("
-                SELECT id FROM conversations 
-                WHERE contact_id = ? AND channel = 'whatsapp' AND status IN ('open', 'pending')
-                ORDER BY updated_at DESC LIMIT 1
-            ");
-            $stmt->execute([$contactId]);
-            $conversation = $stmt->fetch(\PDO::FETCH_ASSOC);
+            // Se já encontramos conversa durante o roteamento, usar essa
+            $conversationId = null;
             
-            if (!$conversation) {
-                apiLog('INFO', '📝 Criando nova conversa...');
-                
-                // Preparar valores para funil/etapa/departamento da integração
-                // Aceitar tanto default_* quanto os nomes sem default_ (compatibilidade)
-                $integrationAccountId = $integration['id'] ?? null;
-                $inboxId = $integration['inbox_id'] ?? null;
-                $departmentId = $integration['default_department_id'] ?? $integration['department_id'] ?? null;
-                $funnelId = $integration['default_funnel_id'] ?? $integration['funnel_id'] ?? null;
-                $stageId = $integration['default_stage_id'] ?? $integration['funnel_stage_id'] ?? $integration['stage_id'] ?? null;
-                
-                apiLog('INFO', "📊 Configurações da conversa: Integration={$integrationAccountId}, Inbox={$inboxId}, Depto={$departmentId}, Funil={$funnelId}, Etapa={$stageId}");
-                
-                $stmt = $db->prepare("
-                    INSERT INTO conversations (
-                        contact_id, channel, status, whatsapp_account_id, integration_account_id,
-                        inbox_id, department_id, funnel_id, funnel_stage_id,
-                        created_at, updated_at
-                    )
-                    VALUES (?, 'whatsapp', 'open', ?, ?, ?, ?, ?, ?, NOW(), NOW())
-                ");
-                $stmt->execute([
-                    $contactId, 
-                    $account['id'],
-                    $integrationAccountId,
-                    $inboxId,
-                    $departmentId,
-                    $funnelId,
-                    $stageId
-                ]);
-                $conversationId = $db->lastInsertId();
-                apiLog('INFO', "✅ Conversa criada (ID: {$conversationId})");
+            if ($usedExistingConversation && isset($existingConversation['conversation_id'])) {
+                $conversationId = $existingConversation['conversation_id'];
+                apiLog('INFO', "✅ Usando conversa do roteamento (ID: {$conversationId})");
             } else {
-                $conversationId = $conversation['id'];
-                apiLog('INFO', "✅ Conversa encontrada (ID: {$conversationId})");
+                apiLog('INFO', '🔍 Buscando conversa aberta...');
+                $stmt = $db->prepare("
+                    SELECT id FROM conversations 
+                    WHERE contact_id = ? AND channel = 'whatsapp' AND status IN ('open', 'pending')
+                    ORDER BY updated_at DESC LIMIT 1
+                ");
+                $stmt->execute([$contactId]);
+                $conversation = $stmt->fetch(\PDO::FETCH_ASSOC);
+                
+                if (!$conversation) {
+                    apiLog('INFO', '📝 Criando nova conversa...');
+                    
+                    // Preparar valores para funil/etapa/departamento da integração
+                    // Aceitar tanto default_* quanto os nomes sem default_ (compatibilidade)
+                    $integrationAccountId = $integration['id'] ?? null;
+                    $inboxId = $integration['inbox_id'] ?? null;
+                    $departmentId = $integration['default_department_id'] ?? $integration['department_id'] ?? null;
+                    $funnelId = $integration['default_funnel_id'] ?? $integration['funnel_id'] ?? null;
+                    $stageId = $integration['default_stage_id'] ?? $integration['funnel_stage_id'] ?? $integration['stage_id'] ?? null;
+                    
+                    apiLog('INFO', "📊 Configurações da conversa: Integration={$integrationAccountId}, Inbox={$inboxId}, Depto={$departmentId}, Funil={$funnelId}, Etapa={$stageId}");
+                    
+                    $stmt = $db->prepare("
+                        INSERT INTO conversations (
+                            contact_id, channel, status, whatsapp_account_id, integration_account_id,
+                            inbox_id, department_id, funnel_id, funnel_stage_id,
+                            created_at, updated_at
+                        )
+                        VALUES (?, 'whatsapp', 'open', ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                    ");
+                    $stmt->execute([
+                        $contactId, 
+                        $account['id'],
+                        $integrationAccountId,
+                        $inboxId,
+                        $departmentId,
+                        $funnelId,
+                        $stageId
+                    ]);
+                    $conversationId = $db->lastInsertId();
+                    apiLog('INFO', "✅ Conversa criada (ID: {$conversationId})");
+                } else {
+                    $conversationId = $conversation['id'];
+                    apiLog('INFO', "✅ Conversa encontrada (ID: {$conversationId})");
+                }
             }
             
             // Inserir mensagem
@@ -843,13 +930,20 @@ try {
             
             apiLog('INFO', '✅ MENSAGEM PROCESSADA COM SUCESSO');
             apiLog('INFO', "Message ID: {$messageId}, Conversation ID: {$conversationId}, Contact ID: {$contactId}");
+            apiLog('INFO', "Roteamento: " . ($usedExistingConversation ? "Usou conversa existente ({$from})" : "Usou número da API ({$from})"));
             apiLog('INFO', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
             
             successResponse([
                 'message_id' => (string) $messageId,
                 'conversation_id' => (string) $conversationId,
                 'contact_id' => (string) $contactId,
-                'status' => $messageSent ? 'sent' : 'queued'
+                'contact_name' => $contactName,
+                'status' => $messageSent ? 'sent' : 'queued',
+                'routing' => [
+                    'original_from' => $fromOriginal,
+                    'actual_from' => $from,
+                    'used_existing_conversation' => $usedExistingConversation
+                ]
             ], 'Mensagem enviada', 201);
             break;
             

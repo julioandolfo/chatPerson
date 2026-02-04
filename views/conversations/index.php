@@ -2988,7 +2988,7 @@ function getChannelInfo(channel) {
             </div>
         </div>
         
-        <!-- Banner de Outras Conversas (Mesclar) -->
+        <!-- Banner de Outras Conversas (Mesclar) - Sempre aparece para todos -->
         <div id="chat-merge-alert" class="chat-merge-alert" style="display: none;">
             <div class="chat-merge-alert-content">
                 <div class="chat-merge-alert-icon">
@@ -3002,6 +3002,7 @@ function getChannelInfo(channel) {
                     <strong>Existem outras conversas deste contato!</strong>
                     <span id="chat-merge-alert-info"></span>
                 </div>
+                <?php if (\App\Helpers\Permission::can('conversations.edit')): ?>
                 <button type="button" class="btn btn-sm btn-warning" onclick="openMergeModal()">
                     <i class="ki-duotone ki-arrows-loop fs-5 me-1">
                         <span class="path1"></span>
@@ -3009,6 +3010,7 @@ function getChannelInfo(channel) {
                     </i>
                     Mesclar
                 </button>
+                <?php endif; ?>
                 <button type="button" class="btn btn-sm btn-icon btn-light" onclick="dismissMergeAlert()" title="Dispensar">
                     <i class="ki-duotone ki-cross fs-4">
                         <span class="path1"></span>
@@ -3412,8 +3414,8 @@ function getChannelInfo(channel) {
                             <span class="path2"></span>
                         </i>
                     </button>
-                    <button class="btn btn-sm btn-icon btn-light-primary" title="Emoji" onclick="toggleEmoji()" style="font-size: 20px;">
-                        😊
+                    <button class="btn btn-sm btn-icon btn-light-primary" title="Emoji" onclick="toggleEmoji()">
+                        <span class="fs-3" style="line-height: 1;">😊</span>
                     </button>
                     <button class="btn btn-sm btn-icon btn-light-primary" id="aiAssistantBtn" title="Assistente IA" onclick="showAIAssistantModal()">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
@@ -17649,14 +17651,14 @@ function toggleEmoji() {
                     </button>
                 </div>
             </div>
-            <div id="emojiCategories" style="max-height: 400px; overflow-y: auto;">
+            <div id="emojiCategories" style="max-height: 650px; overflow-y: auto; padding: 10px;">
     `;
     
     // Adicionar seção de últimos utilizados (se houver)
     if (recentEmojis.length > 0) {
         html += `
-            <div class="emoji-category mb-4" data-category="recent">
-                <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="emoji-category mb-5 pb-3" data-category="recent">
+                <div class="d-flex justify-content-between align-items-center mb-4">
                     <h6 class="text-primary fw-bold mb-0">
                         <i class="ki-duotone ki-time fs-5 me-1">
                             <span class="path1"></span>
@@ -17675,16 +17677,16 @@ function toggleEmoji() {
                         </i>
                     </button>
                 </div>
-                <div class="d-flex flex-wrap gap-1">
+                <div class="d-flex flex-wrap gap-2">
                     ${recentEmojis.map(emoji => 
                         `<span class="btn btn-sm btn-icon btn-light-primary emoji-item" 
                                onclick="insertEmoji('${emoji}')" 
                                data-emoji="${emoji}"
-                               style="font-size: 22px; cursor: pointer; width: 40px; height: 40px; padding: 0;" 
+                               style="font-size: 26px; cursor: pointer; width: 48px; height: 48px; padding: 0; display: inline-flex; align-items: center; justify-content: center;" 
                                title="${emoji}">${emoji}</span>`
                     ).join('')}
                 </div>
-                <div class="separator separator-dashed my-4"></div>
+                <div class="separator separator-dashed my-5"></div>
             </div>
         `;
     }
@@ -17692,14 +17694,14 @@ function toggleEmoji() {
     // Adicionar categorias
     for (const [category, data] of Object.entries(emojiCategories)) {
         html += `
-            <div class="emoji-category mb-4" data-keywords="${data.keywords.join(',').toLowerCase()}">
-                <h6 class="text-gray-700 fw-bold mb-3">${category}</h6>
-                <div class="d-flex flex-wrap gap-1">
+            <div class="emoji-category mb-5 pb-3" data-keywords="${data.keywords.join(',').toLowerCase()}">
+                <h6 class="text-gray-700 fw-bold mb-4">${category}</h6>
+                <div class="d-flex flex-wrap gap-2">
                     ${data.emojis.map(emoji => 
                         `<span class="btn btn-sm btn-icon btn-light emoji-item" 
                                onclick="insertEmoji('${emoji}')" 
                                data-emoji="${emoji}"
-                               style="font-size: 22px; cursor: pointer; width: 40px; height: 40px; padding: 0;" 
+                               style="font-size: 26px; cursor: pointer; width: 48px; height: 48px; padding: 0; display: inline-flex; align-items: center; justify-content: center;" 
                                title="${emoji}">${emoji}</span>`
                     ).join('')}
                 </div>
@@ -17711,17 +17713,37 @@ function toggleEmoji() {
             </div>
         </div>
         <style>
-            .emoji-item:hover {
-                transform: scale(1.2);
-                background-color: #f1f1f2 !important;
+            .emoji-picker-modal {
+                min-height: 800px !important;
+                max-height: 90vh !important;
+                height: auto !important;
+                padding: 20px !important;
+            }
+            .emoji-picker-content {
+                max-height: calc(90vh - 180px) !important;
+                overflow-y: visible !important;
+                padding: 0 !important;
+            }
+            .emoji-picker-container {
+                padding: 0;
+            }
+            .emoji-item {
                 transition: all 0.2s;
+                margin: 2px;
+            }
+            .emoji-item:hover {
+                transform: scale(1.35);
+                background-color: #f1f1f2 !important;
+                z-index: 10;
+                position: relative;
+                box-shadow: 0 0 8px rgba(0,0,0,0.1);
             }
             .emoji-category.hidden {
                 display: none !important;
             }
             .emoji-category[data-category="recent"] {
                 background-color: #f8f9fa;
-                padding: 15px;
+                padding: 18px;
                 border-radius: 8px;
                 border: 1px dashed #e1e3ea;
             }
@@ -17730,6 +17752,33 @@ function toggleEmoji() {
             }
             .emoji-category[data-category="recent"] .emoji-item:hover {
                 background-color: #e8f4ff !important;
+            }
+            .emoji-category h6 {
+                position: sticky;
+                top: -10px;
+                background: white;
+                z-index: 5;
+                padding: 10px 0;
+                margin-top: 0;
+                font-size: 14px;
+            }
+            #emojiCategories {
+                scrollbar-width: thin;
+                scrollbar-color: #cbd5e0 #f1f1f2;
+            }
+            #emojiCategories::-webkit-scrollbar {
+                width: 8px;
+            }
+            #emojiCategories::-webkit-scrollbar-track {
+                background: #f1f1f2;
+                border-radius: 4px;
+            }
+            #emojiCategories::-webkit-scrollbar-thumb {
+                background: #cbd5e0;
+                border-radius: 4px;
+            }
+            #emojiCategories::-webkit-scrollbar-thumb:hover {
+                background: #a0aec0;
             }
         </style>
     `;
@@ -17740,6 +17789,10 @@ function toggleEmoji() {
         width: '700px',
         showConfirmButton: false,
         showCloseButton: true,
+        customClass: {
+            popup: 'emoji-picker-modal',
+            htmlContainer: 'emoji-picker-content'
+        },
         didOpen: () => {
             // Implementar busca de emoji
             const searchInput = document.getElementById('emojiSearch');

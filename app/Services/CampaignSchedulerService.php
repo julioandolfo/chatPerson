@@ -425,13 +425,11 @@ class CampaignSchedulerService
                     // Verificar o que precisa atualizar na conversa
                     $updateData = [];
                     
-                    // ✅ CORREÇÃO: NÃO sobrescrever integration_account_id de conversas existentes
-                    // Cada conversa deve manter seu número original para garantir que respostas
-                    // sejam enviadas pelo mesmo número que o cliente está conversando
-                    // Em vez disso, registrar por qual número a mensagem da campanha foi enviada
+                    // IMPORTANTE: Atualizar o número WhatsApp (integration_account_id) para o da campanha
+                    // Isso garante que a conversa reflita o número pelo qual foi feito o último contato
                     if ($existingConversation['integration_account_id'] != $integrationAccountId) {
-                        Logger::campaign("Campanha {$campaignId}: [CONVERSA] ⚠️ Conta de integração diferente - conversa: {$existingConversation['integration_account_id']}, campanha: {$integrationAccountId}. Mantendo conta original da conversa.");
-                        // Não atualiza mais: $updateData['integration_account_id'] = $integrationAccountId;
+                        $updateData['integration_account_id'] = $integrationAccountId;
+                        Logger::campaign("Campanha {$campaignId}: [CONVERSA] Atualizando conta de integração: {$existingConversation['integration_account_id']} -> {$integrationAccountId}");
                     }
                     
                     // Se a campanha tem funil/etapa específicos e a conversa está em outro, mover

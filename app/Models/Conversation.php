@@ -684,75 +684,70 @@ class Conversation extends Model
      */
     public static function findByContactAndChannel(int $contactId, string $channel, ?int $whatsappAccountId = null, ?int $integrationAccountId = null): ?array
     {
-        // ✅ CORREÇÃO: Buscar a conversa EXATA para a conta específica
-        // Priorizar busca com integrationAccountId (novo sistema) se fornecido
+        $sql = "SELECT * FROM conversations 
+                WHERE contact_id = ? AND channel = ?";
+        $params = [$contactId, $channel];
         
-        // PRIMEIRO: Buscar pela conta de integração específica
-        if ($integrationAccountId) {
-            $sql = "SELECT * FROM conversations 
-                    WHERE contact_id = ? AND channel = ? AND integration_account_id = ?
-                    ORDER BY created_at DESC LIMIT 1";
-            $result = Database::fetch($sql, [$contactId, $channel, $integrationAccountId]);
-            if ($result) {
-                return $result;
+        // ✅ CORREÇÃO: Buscar pelos IDs corretos de cada tabela
+        // NÃO misturar whatsapp_account_id com integration_account_id (são tabelas diferentes!)
+        if ($whatsappAccountId || $integrationAccountId) {
+            $conditions = [];
+            
+            if ($whatsappAccountId) {
+                $conditions[] = "whatsapp_account_id = ?";
+                $params[] = $whatsappAccountId;
+            }
+            
+            if ($integrationAccountId) {
+                $conditions[] = "integration_account_id = ?";
+                $params[] = $integrationAccountId;
+            }
+            
+            if (!empty($conditions)) {
+                $sql .= " AND (" . implode(" OR ", $conditions) . ")";
             }
         }
         
-        // SEGUNDO: Buscar pela conta WhatsApp específica (legacy)
-        if ($whatsappAccountId) {
-            $sql = "SELECT * FROM conversations 
-                    WHERE contact_id = ? AND channel = ? AND whatsapp_account_id = ?
-                    ORDER BY created_at DESC LIMIT 1";
-            $result = Database::fetch($sql, [$contactId, $channel, $whatsappAccountId]);
-            if ($result) {
-                return $result;
-            }
-        }
+        $sql .= " ORDER BY created_at DESC LIMIT 1";
         
-        // TERCEIRO: Se nenhum ID específico encontrou, retornar NULL
-        // Isso garante que conversas de diferentes contas não sejam misturadas
-        return null;
+        return Database::fetch($sql, $params);
     }
     
     /**
      * Buscar conversa ABERTA por contato e canal
      * Retorna apenas conversas com status 'open'
-     * ✅ CORREÇÃO: Busca a conversa EXATA para a conta específica (não usa mais OR)
+     * ✅ ATUALIZADO: Busca por whatsapp_account_id OU integration_account_id
      */
     public static function findOpenByContactAndChannel(int $contactId, string $channel, ?int $whatsappAccountId = null, ?int $integrationAccountId = null): ?array
     {
-        // ✅ CORREÇÃO: Buscar a conversa EXATA para a conta específica
-        // Priorizar busca com integrationAccountId (novo sistema) se fornecido
+        $sql = "SELECT c.*, u.name as agent_name 
+                FROM conversations c
+                LEFT JOIN users u ON c.agent_id = u.id
+                WHERE c.contact_id = ? AND c.channel = ? AND c.status = 'open'";
+        $params = [$contactId, $channel];
         
-        // PRIMEIRO: Buscar pela conta de integração específica
-        if ($integrationAccountId) {
-            $sql = "SELECT c.*, u.name as agent_name 
-                    FROM conversations c
-                    LEFT JOIN users u ON c.agent_id = u.id
-                    WHERE c.contact_id = ? AND c.channel = ? AND c.status = 'open' AND c.integration_account_id = ?
-                    ORDER BY c.created_at DESC LIMIT 1";
-            $result = Database::fetch($sql, [$contactId, $channel, $integrationAccountId]);
-            if ($result) {
-                return $result;
+        // ✅ CORREÇÃO: Buscar pelos IDs corretos de cada tabela
+        if ($whatsappAccountId || $integrationAccountId) {
+            $conditions = [];
+            
+            if ($whatsappAccountId) {
+                $conditions[] = "c.whatsapp_account_id = ?";
+                $params[] = $whatsappAccountId;
+            }
+            
+            if ($integrationAccountId) {
+                $conditions[] = "c.integration_account_id = ?";
+                $params[] = $integrationAccountId;
+            }
+            
+            if (!empty($conditions)) {
+                $sql .= " AND (" . implode(" OR ", $conditions) . ")";
             }
         }
         
-        // SEGUNDO: Buscar pela conta WhatsApp específica (legacy)
-        if ($whatsappAccountId) {
-            $sql = "SELECT c.*, u.name as agent_name 
-                    FROM conversations c
-                    LEFT JOIN users u ON c.agent_id = u.id
-                    WHERE c.contact_id = ? AND c.channel = ? AND c.status = 'open' AND c.whatsapp_account_id = ?
-                    ORDER BY c.created_at DESC LIMIT 1";
-            $result = Database::fetch($sql, [$contactId, $channel, $whatsappAccountId]);
-            if ($result) {
-                return $result;
-            }
-        }
+        $sql .= " ORDER BY c.created_at DESC LIMIT 1";
         
-        // TERCEIRO: Se nenhum ID específico encontrou, retornar NULL
-        // Isso garante que conversas de diferentes contas não sejam misturadas
-        return null;
+        return Database::fetch($sql, $params);
     }
     
     /**

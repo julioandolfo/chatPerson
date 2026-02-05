@@ -1545,6 +1545,9 @@ class ConversationService
         $integrationAccountId = $conversation['integration_account_id'] ?? null;
         $whatsappAccountId = $conversation['whatsapp_account_id'] ?? null; // Legacy
         
+        // ✅ LOG DETALHADO: Para diagnosticar problemas de número de envio incorreto
+        \App\Helpers\Logger::info("ConversationService::sendMessage - 📞 CONTA DE ENVIO: conv_id={$conversationId}, integration_account_id=" . ($integrationAccountId ?? 'NULL') . ", whatsapp_account_id=" . ($whatsappAccountId ?? 'NULL') . ", is_merged=" . ($conversation['is_merged'] ?? 'NULL') . ", last_customer_account_id=" . ($conversation['last_customer_account_id'] ?? 'NULL'));
+        
         if (!empty($conversation['is_merged']) && !empty($conversation['last_customer_account_id'])) {
             $lastAccountId = (int)$conversation['last_customer_account_id'];
             \App\Helpers\Logger::info("ConversationService::sendMessage - Conversa MESCLADA, usando último número do cliente: account_id={$lastAccountId}");

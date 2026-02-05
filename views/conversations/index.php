@@ -9481,11 +9481,32 @@ async function executeMerge() {
                 refreshConversationList();
             }, 500);
         } else {
-            toastr.error(data.message || 'Erro ao mesclar conversas');
+            // Fechar modal de merge primeiro
+            const mergeModal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_merge_conversations'));
+            if (mergeModal) mergeModal.hide();
+            
+            // Mostrar modal de alerta com a mensagem de erro
+            Swal.fire({
+                icon: 'warning',
+                title: 'Não é possível mesclar',
+                html: `<div class="fs-5">${data.message || 'Erro ao mesclar conversas'}</div>`,
+                confirmButtonText: 'Entendi',
+                confirmButtonColor: '#f6c000',
+                customClass: {
+                    popup: 'swal2-popup-custom',
+                    title: 'fw-bold'
+                }
+            });
         }
     } catch (error) {
         console.error('Erro ao mesclar:', error);
-        toastr.error('Erro de conexão ao mesclar conversas');
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro de conexão',
+            text: 'Não foi possível conectar ao servidor. Tente novamente.',
+            confirmButtonText: 'Ok',
+            confirmButtonColor: '#f1416c'
+        });
     }
 }
 

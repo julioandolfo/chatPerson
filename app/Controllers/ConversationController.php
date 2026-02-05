@@ -3851,7 +3851,9 @@ class ConversationController
      */
     public function mergeConversations(int $id): void
     {
-        // Verificar se usuário pode editar a conversa de destino
+        // Verificar se usuário pode visualizar a conversa de destino
+        // Usamos canViewConversation porque mesclar é consolidar conversas do mesmo contato
+        // Se o agente pode ver, significa que está atendendo esse contato
         $conversation = Conversation::find($id);
         if (!$conversation) {
             Response::json(['success' => false, 'message' => 'Conversa não encontrada'], 404);
@@ -3859,8 +3861,17 @@ class ConversationController
         }
         
         $userId = Auth::id();
-        if (!PermissionService::canEditConversation($userId, $conversation)) {
-            Response::forbidden('Acesso negado - você não tem permissão para editar esta conversa');
+        
+        // Verificar se tem alguma permissão de edição de conversas
+        $canEdit = Permission::canAny(['conversations.edit.own', 'conversations.edit.department', 'conversations.edit.all']);
+        if (!$canEdit) {
+            Response::forbidden('Acesso negado - você não tem permissão para mesclar conversas');
+            return;
+        }
+        
+        // Verificar se pode visualizar a conversa de destino
+        if (!PermissionService::canViewConversation($userId, $conversation)) {
+            Response::forbidden('Acesso negado - você não tem acesso a esta conversa');
             return;
         }
         
@@ -3870,6 +3881,31 @@ class ConversationController
             
             if (empty($sourceIds)) {
                 throw new \Exception('Nenhuma conversa para mesclar');
+            }
+            
+            // Verificar se pode visualizar todas as conversas de origem
+            // E se não estão atribuídas a outro agente
+            foreach ($sourceIds as $sourceId) {
+                $sourceConv = Conversation::find($sourceId);
+                if (!$sourceConv) {
+                    continue;
+                }
+                
+                if (!PermissionService::canViewConversation($userId, $sourceConv)) {
+                    throw new \Exception('Você não tem acesso a uma das conversas selecionadas');
+                }
+                
+                // Verificar se a conversa de origem está atribuída a outro agente
+                $sourceAgentId = $sourceConv['agent_id'] ?? null;
+                if ($sourceAgentId && $sourceAgentId != $userId) {
+                    // Buscar nome do agente para mensagem mais clara
+                    $agentName = 'outro agente';
+                    $agent = User::find($sourceAgentId);
+                    if ($agent) {
+                        $agentName = $agent['name'];
+                    }
+                    throw new \Exception("Não é possível mesclar: a conversa está atribuída a {$agentName}. Peça para ele transferir ou finalize a conversa primeiro.");
+                }
             }
             
             $result = \App\Services\ConversationMergeService::merge($id, $sourceIds);

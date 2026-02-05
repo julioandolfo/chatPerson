@@ -1100,7 +1100,7 @@ ob_start();
                                                                 </i>
                                                                 Ver Detalhes
                                                             </a></li>
-                                                            <li><a class="dropdown-item" href="<?= \App\Helpers\Url::to('/conversations?id=' . $conv['id']) ?>">
+                                                            <li><a class="dropdown-item" href="<?= \App\Helpers\Url::to('/conversations?id=' . $conv['id']) ?>" target="_blank">
                                                                 <i class="ki-duotone ki-messages fs-4 me-2">
                                                                     <span class="path1"></span>
                                                                     <span class="path2"></span>

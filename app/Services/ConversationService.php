@@ -1345,12 +1345,8 @@ class ConversationService
             throw new \Exception('Mensagem não pode estar vazia');
         }
         
-        // ✅ CORREÇÃO: Usar findWithRelations para obter resolved_integration_account_id
-        // Isso garante que o ID correto da integration_account é resolvido via JOINs:
-        // 1) Direto pelo integration_account_id da conversa
-        // 2) Via whatsapp_id em integration_accounts (fallback)
-        // 3) Via whatsapp_accounts (último fallback)
-        $conversation = Conversation::findWithRelations($conversationId);
+        // Verificar se conversa existe
+        $conversation = Conversation::find($conversationId);
         if (!$conversation) {
             throw new \Exception('Conversa não encontrada');
         }
@@ -1545,55 +1541,88 @@ class ConversationService
         }
 
         // **ENVIAR PARA INTEGRAÇÃO** se a mensagem for do agente (MAS NÃO SE FOR NOTA INTERNA)
-        // ✅ CORREÇÃO DEFINITIVA: Usar resolved_integration_account_id do findWithRelations
-        // O findWithRelations resolve o ID correto via 3 níveis de JOIN:
-        // 1) c.integration_account_id direto
-        // 2) integration_accounts.whatsapp_id = c.whatsapp_account_id (fallback)
-        // 3) whatsapp_accounts como último recurso
+        // ✅ CORREÇÃO: Resolver integration_account_id em PHP puro
+        // Garante que usamos a conta correta sem depender de colunas SQL especiais
         
-        $integrationAccountId = $conversation['resolved_integration_account_id'] ?? $conversation['integration_account_id'] ?? null;
+        $integrationAccountId = $conversation['integration_account_id'] ?? null;
         $whatsappAccountId = $conversation['whatsapp_account_id'] ?? null;
         
         // ✅ LOG: IDs da conversa para diagnóstico
         \App\Helpers\Logger::info("ConversationService::sendMessage - 📞 IDs da conversa {$conversationId}: " .
-            "integration_account_id=" . ($conversation['integration_account_id'] ?? 'NULL') . 
-            ", resolved_integration_account_id=" . ($conversation['resolved_integration_account_id'] ?? 'NULL') . 
+            "integration_account_id=" . ($integrationAccountId ?? 'NULL') . 
             ", whatsapp_account_id=" . ($whatsappAccountId ?? 'NULL') . 
-            ", whatsapp_account_phone=" . ($conversation['whatsapp_account_phone'] ?? 'NULL') .
             ", channel=" . ($conversation['channel'] ?? 'NULL'));
         
-        // ✅ Se resolveu integration_account_id e a conversa não tinha, atualizar para futuro
-        if ($integrationAccountId && empty($conversation['integration_account_id'])) {
-            Conversation::update($conversationId, ['integration_account_id' => $integrationAccountId]);
-            \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Atualizado integration_account_id={$integrationAccountId} na conversa {$conversationId}");
+        // ✅ CORREÇÃO: Se tem whatsapp_account_id, buscar o número de telefone real
+        // e garantir que o integration_account_id corresponde ao mesmo número
+        $waPhoneNumber = null;
+        if ($whatsappAccountId && $conversation['channel'] === 'whatsapp') {
+            $waAccount = \App\Models\WhatsAppAccount::find($whatsappAccountId);
+            if ($waAccount) {
+                $waPhoneNumber = $waAccount['phone_number'] ?? null;
+                \App\Helpers\Logger::info("ConversationService::sendMessage - WhatsApp account {$whatsappAccountId}: phone={$waPhoneNumber}");
+            }
         }
         
-        // ✅ VALIDAÇÃO: Se tem integration_account_id, verificar se corresponde ao número da sidebar
-        if ($integrationAccountId && !empty($conversation['whatsapp_account_phone'])) {
+        // ✅ VALIDAÇÃO: Se tem integration_account_id, verificar se bate com o número do whatsapp_account
+        if ($integrationAccountId && $waPhoneNumber) {
             $iaAccount = \App\Models\IntegrationAccount::find($integrationAccountId);
             if ($iaAccount && !empty($iaAccount['phone_number'])) {
-                // Normalizar números para comparação (remover +, espaços, etc.)
-                $sidebarPhone = preg_replace('/[^0-9]/', '', $conversation['whatsapp_account_phone']);
-                $accountPhone = preg_replace('/[^0-9]/', '', $iaAccount['phone_number']);
+                $normalizedWa = preg_replace('/[^0-9]/', '', $waPhoneNumber);
+                $normalizedIa = preg_replace('/[^0-9]/', '', $iaAccount['phone_number']);
                 
-                if ($sidebarPhone !== $accountPhone) {
-                    \App\Helpers\Logger::warning("ConversationService::sendMessage - ⚠️ DIVERGÊNCIA! Sidebar mostra {$sidebarPhone} mas integration_account {$integrationAccountId} tem {$accountPhone}");
+                if ($normalizedWa !== $normalizedIa) {
+                    \App\Helpers\Logger::warning("ConversationService::sendMessage - ⚠️ DIVERGÊNCIA! whatsapp_account phone={$normalizedWa} mas integration_account {$integrationAccountId} phone={$normalizedIa}. Buscando conta correta...");
                     
-                    // Buscar integration_account correta pelo número da sidebar
+                    // integration_account_id aponta para o número ERRADO, corrigir
                     $correctAccount = \App\Helpers\Database::fetch(
-                        "SELECT id FROM integration_accounts WHERE REPLACE(REPLACE(REPLACE(phone_number, '+', ''), ' ', ''), '-', '') = ? AND channel = 'whatsapp' LIMIT 1",
-                        [$sidebarPhone]
+                        "SELECT id FROM integration_accounts WHERE phone_number = ? AND channel = 'whatsapp' LIMIT 1",
+                        [$waPhoneNumber]
                     );
+                    
+                    if (!$correctAccount) {
+                        // Tentar com número normalizado
+                        $correctAccount = \App\Helpers\Database::fetch(
+                            "SELECT id FROM integration_accounts WHERE REPLACE(REPLACE(REPLACE(phone_number, '+', ''), ' ', ''), '-', '') = ? AND channel = 'whatsapp' LIMIT 1",
+                            [$normalizedWa]
+                        );
+                    }
                     
                     if ($correctAccount) {
                         $integrationAccountId = $correctAccount['id'];
-                        \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Corrigido para integration_account_id={$integrationAccountId} (número correto: {$sidebarPhone})");
+                        \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Corrigido para integration_account_id={$integrationAccountId} (phone={$waPhoneNumber})");
                         Conversation::update($conversationId, ['integration_account_id' => $integrationAccountId]);
                     } else {
-                        \App\Helpers\Logger::warning("ConversationService::sendMessage - ⚠️ Nenhuma integration_account encontrada para phone={$sidebarPhone}. Tentando whatsapp_account_id...");
-                        // Fallback: usar whatsapp_account_id direto
+                        \App\Helpers\Logger::warning("ConversationService::sendMessage - ⚠️ Nenhuma integration_account para phone={$waPhoneNumber}. Usando WhatsAppService como fallback.");
                         $integrationAccountId = null;
                     }
+                }
+            }
+        }
+        
+        // ✅ Se não tem integration_account_id mas tem whatsapp_account_id, buscar correspondente
+        if (!$integrationAccountId && $whatsappAccountId && $conversation['channel'] === 'whatsapp') {
+            if ($waPhoneNumber) {
+                // Buscar por phone_number
+                $integrationAccount = \App\Helpers\Database::fetch(
+                    "SELECT id FROM integration_accounts WHERE phone_number = ? AND channel = 'whatsapp' LIMIT 1",
+                    [$waPhoneNumber]
+                );
+                
+                if (!$integrationAccount) {
+                    $normalizedWa = preg_replace('/[^0-9]/', '', $waPhoneNumber);
+                    $integrationAccount = \App\Helpers\Database::fetch(
+                        "SELECT id FROM integration_accounts WHERE REPLACE(REPLACE(REPLACE(phone_number, '+', ''), ' ', ''), '-', '') = ? AND channel = 'whatsapp' LIMIT 1",
+                        [$normalizedWa]
+                    );
+                }
+                
+                if ($integrationAccount) {
+                    $integrationAccountId = $integrationAccount['id'];
+                    \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Encontrado integration_account_id={$integrationAccountId} via phone={$waPhoneNumber}");
+                    Conversation::update($conversationId, ['integration_account_id' => $integrationAccountId]);
+                } else {
+                    \App\Helpers\Logger::warning("ConversationService::sendMessage - ⚠️ Nenhum integration_account para phone={$waPhoneNumber}. Usando WhatsAppService como fallback.");
                 }
             }
         }
@@ -1610,18 +1639,23 @@ class ConversationService
                 $whatsappAccountId = null;
                 \App\Helpers\Logger::info("ConversationService::sendMessage - Conta é integração: integration_id={$lastAccountId}");
             } else {
-                // Verificar se é um whatsapp_account_id e buscar correspondente em integration_accounts
-                $integrationAccount = \App\Helpers\Database::fetch(
-                    "SELECT id FROM integration_accounts WHERE whatsapp_id = ? LIMIT 1",
-                    [$lastAccountId]
-                );
-                
-                if ($integrationAccount) {
-                    $integrationAccountId = $integrationAccount['id'];
-                    $whatsappAccountId = null;
-                    \App\Helpers\Logger::info("ConversationService::sendMessage - Convertido whatsapp_id={$lastAccountId} para integration_id={$integrationAccountId}");
+                // Buscar whatsapp_account para pegar o phone e encontrar integration_account
+                $lastWa = \App\Models\WhatsAppAccount::find($lastAccountId);
+                if ($lastWa && !empty($lastWa['phone_number'])) {
+                    $iaByPhone = \App\Helpers\Database::fetch(
+                        "SELECT id FROM integration_accounts WHERE phone_number = ? AND channel = 'whatsapp' LIMIT 1",
+                        [$lastWa['phone_number']]
+                    );
+                    if ($iaByPhone) {
+                        $integrationAccountId = $iaByPhone['id'];
+                        $whatsappAccountId = null;
+                        \App\Helpers\Logger::info("ConversationService::sendMessage - Convertido wa_id={$lastAccountId} para integration_id={$integrationAccountId} via phone");
+                    } else {
+                        $whatsappAccountId = $lastAccountId;
+                        $integrationAccountId = null;
+                        \App\Helpers\Logger::info("ConversationService::sendMessage - Usando whatsapp_account_id={$lastAccountId} como fallback");
+                    }
                 } else {
-                    // Último fallback: usar whatsapp_account_id diretamente
                     $whatsappAccountId = $lastAccountId;
                     $integrationAccountId = null;
                     \App\Helpers\Logger::info("ConversationService::sendMessage - Usando whatsapp_account_id={$lastAccountId} como fallback");

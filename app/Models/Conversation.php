@@ -639,14 +639,6 @@ class Conversation extends Model
                        u.email as agent_email, u.avatar as agent_avatar,
                        COALESCE(ia.name, wa.name) as whatsapp_account_name,
                        COALESCE(ia.phone_number, wa.phone_number) as whatsapp_account_phone,
-                       -- ✅ Resolver integration_account_id: direto -> via subquery whatsapp_id
-                       COALESCE(
-                           c.integration_account_id,
-                           (SELECT ia2.id FROM integration_accounts ia2 
-                            WHERE ia2.whatsapp_id = c.whatsapp_account_id 
-                            AND c.integration_account_id IS NULL 
-                            LIMIT 1)
-                       ) as resolved_integration_account_id,
                        f.name as funnel_name,
                        fs.name as stage_name,
                        (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact' AND m.read_at IS NULL) as unread_count

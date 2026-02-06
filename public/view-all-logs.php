@@ -1,13 +1,158 @@
 <?php
 /**
- * Visualizador Completo de Logs da API
+ * Visualizador Completo de Logs da API + Diagnóstico de Unificação de Contas
  * Acesse: https://chat.personizi.com.br/view-all-logs.php
+ * 
+ * Tabs:
+ *   - Logs: Visualizador de logs padrão
+ *   - Unificação: Diagnóstico do mapeamento whatsapp_accounts <-> integration_accounts
  */
 
 // Definir timezone
 date_default_timezone_set('America/Sao_Paulo');
 
-// Configurações
+// Tab ativa
+$activeTab = isset($_GET['tab']) ? $_GET['tab'] : 'logs';
+
+// ── Diagnóstico de Unificação ──
+$unification = null;
+if ($activeTab === 'unificacao') {
+    try {
+        require_once __DIR__ . '/../config/bootstrap.php';
+        $db = \App\Helpers\Database::getInstance();
+        
+        // 1. Todas as whatsapp_accounts e seus correspondentes em integration_accounts
+        $waAccounts = $db->query("
+            SELECT wa.id as wa_id, wa.name as wa_name, wa.phone_number as wa_phone, wa.status as wa_status,
+                   wa.quepasa_token,
+                   ia.id as ia_id, ia.name as ia_name, ia.phone_number as ia_phone, ia.provider as ia_provider,
+                   ia.channel as ia_channel, ia.status as ia_status
+            FROM whatsapp_accounts wa
+            LEFT JOIN integration_accounts ia ON ia.phone_number = wa.phone_number AND ia.channel = 'whatsapp'
+            ORDER BY wa.id
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+        
+        // 2. integration_accounts SEM whatsapp_accounts correspondente
+        $iaOrphans = $db->query("
+            SELECT ia.id as ia_id, ia.name as ia_name, ia.phone_number as ia_phone, 
+                   ia.provider as ia_provider, ia.channel as ia_channel, ia.status as ia_status
+            FROM integration_accounts ia
+            LEFT JOIN whatsapp_accounts wa ON wa.phone_number = ia.phone_number
+            WHERE ia.channel = 'whatsapp' AND wa.id IS NULL
+            ORDER BY ia.id
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+        
+        // 3. Conversas com whatsapp_account_id mas SEM integration_account_id
+        $convsSemIntegration = $db->query("
+            SELECT c.id as conv_id, c.contact_id, c.channel, c.status,
+                   c.whatsapp_account_id, c.integration_account_id,
+                   ct.name as contact_name, ct.phone as contact_phone,
+                   wa.name as wa_name, wa.phone_number as wa_phone,
+                   c.created_at
+            FROM conversations c
+            LEFT JOIN contacts ct ON ct.id = c.contact_id
+            LEFT JOIN whatsapp_accounts wa ON wa.id = c.whatsapp_account_id
+            WHERE c.whatsapp_account_id IS NOT NULL AND c.integration_account_id IS NULL
+            ORDER BY c.created_at DESC
+            LIMIT 100
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+        
+        // 4. Conversas com DIVERGÊNCIA (integration_account aponta para número diferente do whatsapp_account)
+        $convsDivergentes = $db->query("
+            SELECT c.id as conv_id, c.contact_id, c.channel, c.status,
+                   c.whatsapp_account_id, c.integration_account_id,
+                   ct.name as contact_name,
+                   wa.phone_number as wa_phone, wa.name as wa_name,
+                   ia.phone_number as ia_phone, ia.name as ia_name,
+                   c.created_at
+            FROM conversations c
+            LEFT JOIN contacts ct ON ct.id = c.contact_id
+            LEFT JOIN whatsapp_accounts wa ON wa.id = c.whatsapp_account_id
+            LEFT JOIN integration_accounts ia ON ia.id = c.integration_account_id
+            WHERE c.whatsapp_account_id IS NOT NULL 
+              AND c.integration_account_id IS NOT NULL
+              AND wa.phone_number IS NOT NULL
+              AND ia.phone_number IS NOT NULL
+              AND REPLACE(REPLACE(REPLACE(wa.phone_number, '+', ''), ' ', ''), '-', '') 
+                  != REPLACE(REPLACE(REPLACE(ia.phone_number, '+', ''), ' ', ''), '-', '')
+            ORDER BY c.created_at DESC
+            LIMIT 100
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+        
+        // 5. Totais
+        $totalWa = $db->query("SELECT COUNT(*) as c FROM whatsapp_accounts")->fetch(\PDO::FETCH_ASSOC)['c'];
+        $totalIa = $db->query("SELECT COUNT(*) as c FROM integration_accounts WHERE channel = 'whatsapp'")->fetch(\PDO::FETCH_ASSOC)['c'];
+        $totalIaAll = $db->query("SELECT COUNT(*) as c FROM integration_accounts")->fetch(\PDO::FETCH_ASSOC)['c'];
+        $totalConvs = $db->query("SELECT COUNT(*) as c FROM conversations WHERE channel = 'whatsapp'")->fetch(\PDO::FETCH_ASSOC)['c'];
+        $totalConvsSemIa = $db->query("SELECT COUNT(*) as c FROM conversations WHERE whatsapp_account_id IS NOT NULL AND integration_account_id IS NULL")->fetch(\PDO::FETCH_ASSOC)['c'];
+        $totalConvsComAmbos = $db->query("SELECT COUNT(*) as c FROM conversations WHERE whatsapp_account_id IS NOT NULL AND integration_account_id IS NOT NULL")->fetch(\PDO::FETCH_ASSOC)['c'];
+        $totalConvsSoIa = $db->query("SELECT COUNT(*) as c FROM conversations WHERE whatsapp_account_id IS NULL AND integration_account_id IS NOT NULL AND channel = 'whatsapp'")->fetch(\PDO::FETCH_ASSOC)['c'];
+        
+        $unification = [
+            'waAccounts' => $waAccounts,
+            'iaOrphans' => $iaOrphans,
+            'convsSemIntegration' => $convsSemIntegration,
+            'convsDivergentes' => $convsDivergentes,
+            'totalWa' => $totalWa,
+            'totalIa' => $totalIa,
+            'totalIaAll' => $totalIaAll,
+            'totalConvs' => $totalConvs,
+            'totalConvsSemIa' => $totalConvsSemIa,
+            'totalConvsComAmbos' => $totalConvsComAmbos,
+            'totalConvsSoIa' => $totalConvsSoIa,
+        ];
+    } catch (\Exception $e) {
+        $unification = ['error' => $e->getMessage()];
+    }
+}
+
+// ── Ação: Corrigir conversas ──
+$fixResult = null;
+if (isset($_GET['action']) && $_GET['action'] === 'fix_conversations') {
+    try {
+        require_once __DIR__ . '/../config/bootstrap.php';
+        $db = \App\Helpers\Database::getInstance();
+        
+        // Atualizar integration_account_id de conversas baseado no phone_number
+        $stmt = $db->query("
+            UPDATE conversations c
+            INNER JOIN whatsapp_accounts wa ON wa.id = c.whatsapp_account_id
+            INNER JOIN integration_accounts ia ON ia.phone_number = wa.phone_number AND ia.channel = 'whatsapp'
+            SET c.integration_account_id = ia.id
+            WHERE c.whatsapp_account_id IS NOT NULL AND c.integration_account_id IS NULL
+        ");
+        $fixResult = ['success' => true, 'affected' => $stmt->rowCount()];
+    } catch (\Exception $e) {
+        $fixResult = ['success' => false, 'error' => $e->getMessage()];
+    }
+}
+
+// ── Ação: Corrigir divergências ──
+$fixDivResult = null;
+if (isset($_GET['action']) && $_GET['action'] === 'fix_divergencias') {
+    try {
+        require_once __DIR__ . '/../config/bootstrap.php';
+        $db = \App\Helpers\Database::getInstance();
+        
+        // Corrigir integration_account_id para apontar para o mesmo número do whatsapp_account
+        $stmt = $db->query("
+            UPDATE conversations c
+            INNER JOIN whatsapp_accounts wa ON wa.id = c.whatsapp_account_id
+            INNER JOIN integration_accounts ia_correct ON ia_correct.phone_number = wa.phone_number AND ia_correct.channel = 'whatsapp'
+            INNER JOIN integration_accounts ia_wrong ON ia_wrong.id = c.integration_account_id
+            SET c.integration_account_id = ia_correct.id
+            WHERE c.whatsapp_account_id IS NOT NULL 
+              AND c.integration_account_id IS NOT NULL
+              AND REPLACE(REPLACE(REPLACE(wa.phone_number, '+', ''), ' ', ''), '-', '') 
+                  != REPLACE(REPLACE(REPLACE(ia_wrong.phone_number, '+', ''), ' ', ''), '-', '')
+        ");
+        $fixDivResult = ['success' => true, 'affected' => $stmt->rowCount()];
+    } catch (\Exception $e) {
+        $fixDivResult = ['success' => false, 'error' => $e->getMessage()];
+    }
+}
+
+// ── Logs ──
 $logFile = __DIR__ . '/../storage/logs/api.log';
 $maxLines = isset($_GET['lines']) ? (int)$_GET['lines'] : 500;
 $filter = isset($_GET['filter']) ? $_GET['filter'] : '';
@@ -355,6 +500,54 @@ function colorizeLog($log) {
             width: auto;
         }
         
+        /* Tabs */
+        .tabs { display: flex; gap: 0; margin-bottom: 20px; }
+        .tab { padding: 12px 24px; background: #2d2d30; color: #858585; cursor: pointer; 
+               border: 1px solid #3c3c3c; border-bottom: none; border-radius: 8px 8px 0 0;
+               text-decoration: none; font-family: inherit; font-size: 14px; font-weight: bold; }
+        .tab:hover { background: #3c3c3c; color: #d4d4d4; }
+        .tab.active { background: #1e1e1e; color: #4ec9b0; border-color: #4ec9b0; border-bottom: 2px solid #1e1e1e; }
+        
+        /* Diagnóstico */
+        .diag-section { background: #252526; border-radius: 8px; padding: 20px; margin-bottom: 20px; border-left: 4px solid #007acc; }
+        .diag-section.warning { border-left-color: #dcdcaa; }
+        .diag-section.danger { border-left-color: #f48771; }
+        .diag-section.success { border-left-color: #4ec9b0; }
+        .diag-section h2 { color: #fff; font-size: 18px; margin-bottom: 15px; }
+        .diag-section h3 { color: #9cdcfe; font-size: 14px; margin-bottom: 10px; }
+        
+        .diag-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .diag-table th { background: #2d2d30; color: #9cdcfe; padding: 8px 12px; text-align: left; 
+                         border-bottom: 2px solid #4ec9b0; white-space: nowrap; }
+        .diag-table td { padding: 6px 12px; border-bottom: 1px solid #3c3c3c; color: #d4d4d4; }
+        .diag-table tr:hover td { background: #2d2d30; }
+        
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+        .badge-ok { background: #4ec9b0; color: #1e1e1e; }
+        .badge-miss { background: #f48771; color: #1e1e1e; }
+        .badge-warn { background: #dcdcaa; color: #1e1e1e; }
+        .badge-na { background: #555; color: #ccc; }
+        
+        .big-number { font-size: 36px; font-weight: bold; margin: 5px 0; }
+        .big-number.green { color: #4ec9b0; }
+        .big-number.red { color: #f48771; }
+        .big-number.yellow { color: #dcdcaa; }
+        .big-number.blue { color: #9cdcfe; }
+        
+        .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .grid-card { background: #2d2d30; border-radius: 8px; padding: 15px; text-align: center; }
+        .grid-card .label { color: #858585; font-size: 12px; text-transform: uppercase; }
+        
+        .fix-btn { background: #4ec9b0; color: #1e1e1e; padding: 8px 16px; border: none; border-radius: 6px;
+                   cursor: pointer; font-weight: bold; font-size: 13px; text-decoration: none; display: inline-block; margin: 5px 0; }
+        .fix-btn:hover { background: #3db89d; }
+        .fix-btn.danger { background: #f48771; }
+        .fix-btn.danger:hover { background: #d3735f; }
+        
+        .alert { padding: 12px 16px; border-radius: 6px; margin-bottom: 15px; font-size: 13px; }
+        .alert-success { background: rgba(78,201,176,0.15); border: 1px solid #4ec9b0; color: #4ec9b0; }
+        .alert-error { background: rgba(244,135,113,0.15); border: 1px solid #f48771; color: #f48771; }
+        
         @media (max-width: 768px) {
             .filter-row {
                 flex-direction: column;
@@ -370,6 +563,261 @@ function colorizeLog($log) {
 </head>
 <body>
     <div class="container">
+        <div class="tabs">
+            <a href="?tab=logs" class="tab <?= $activeTab === 'logs' ? 'active' : '' ?>">📋 Logs</a>
+            <a href="?tab=unificacao" class="tab <?= $activeTab === 'unificacao' ? 'active' : '' ?>">🔗 Unificação Contas</a>
+        </div>
+        
+        <?php if ($activeTab === 'unificacao'): ?>
+        <!-- ═══════════════ ABA UNIFICAÇÃO ═══════════════ -->
+        <?php if ($fixResult): ?>
+            <div class="alert <?= $fixResult['success'] ? 'alert-success' : 'alert-error' ?>">
+                <?php if ($fixResult['success']): ?>
+                    ✅ <?= $fixResult['affected'] ?> conversa(s) corrigida(s) com integration_account_id!
+                <?php else: ?>
+                    ❌ Erro: <?= htmlspecialchars($fixResult['error']) ?>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+        
+        <?php if ($fixDivResult): ?>
+            <div class="alert <?= $fixDivResult['success'] ? 'alert-success' : 'alert-error' ?>">
+                <?php if ($fixDivResult['success']): ?>
+                    ✅ <?= $fixDivResult['affected'] ?> conversa(s) com divergência corrigida(s)!
+                <?php else: ?>
+                    ❌ Erro: <?= htmlspecialchars($fixDivResult['error']) ?>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+        
+        <?php if (isset($unification['error'])): ?>
+            <div class="alert alert-error">❌ Erro ao conectar ao banco: <?= htmlspecialchars($unification['error']) ?></div>
+        <?php elseif ($unification): ?>
+        
+        <header>
+            <h1>🔗 Diagnóstico de Unificação - whatsapp_accounts → integration_accounts</h1>
+            <p style="color: #858585; margin-top: 5px;">Objetivo: migrar tudo para integration_accounts e parar de usar whatsapp_accounts</p>
+        </header>
+        
+        <!-- Resumo Geral -->
+        <div class="grid-4">
+            <div class="grid-card">
+                <div class="label">WhatsApp Accounts</div>
+                <div class="big-number blue"><?= $unification['totalWa'] ?></div>
+                <div class="label">tabela legada</div>
+            </div>
+            <div class="grid-card">
+                <div class="label">Integration Accounts (WA)</div>
+                <div class="big-number green"><?= $unification['totalIa'] ?></div>
+                <div class="label">de <?= $unification['totalIaAll'] ?> total</div>
+            </div>
+            <div class="grid-card">
+                <div class="label">Conversas sem integration_id</div>
+                <div class="big-number <?= $unification['totalConvsSemIa'] > 0 ? 'red' : 'green' ?>"><?= $unification['totalConvsSemIa'] ?></div>
+                <div class="label">precisam correção</div>
+            </div>
+            <div class="grid-card">
+                <div class="label">Conversas divergentes</div>
+                <div class="big-number <?= count($unification['convsDivergentes']) > 0 ? 'red' : 'green' ?>"><?= count($unification['convsDivergentes']) ?></div>
+                <div class="label">wa ≠ ia phone</div>
+            </div>
+            <div class="grid-card">
+                <div class="label">Conversas com ambos IDs</div>
+                <div class="big-number green"><?= $unification['totalConvsComAmbos'] ?></div>
+                <div class="label">OK (prontas)</div>
+            </div>
+            <div class="grid-card">
+                <div class="label">Conversas só integration_id</div>
+                <div class="big-number green"><?= $unification['totalConvsSoIa'] ?></div>
+                <div class="label">já migradas</div>
+            </div>
+        </div>
+        
+        <!-- Barra de progresso -->
+        <?php 
+            $totalMigradas = $unification['totalConvsComAmbos'] + $unification['totalConvsSoIa'];
+            $totalWaConvs = $unification['totalConvsSemIa'] + $unification['totalConvsComAmbos'];
+            $progressPct = $totalWaConvs > 0 ? round(($totalMigradas / ($totalMigradas + $unification['totalConvsSemIa'])) * 100) : 100;
+        ?>
+        <div class="diag-section success">
+            <h2>Progresso da Unificação: <?= $progressPct ?>%</h2>
+            <div style="background: #3c3c3c; border-radius: 8px; height: 24px; overflow: hidden;">
+                <div style="background: #4ec9b0; height: 100%; width: <?= $progressPct ?>%; transition: width 0.3s; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #1e1e1e; font-weight: bold; font-size: 12px;">
+                    <?= $progressPct ?>%
+                </div>
+            </div>
+            <p style="color: #858585; margin-top: 8px; font-size: 12px;">
+                <?= $totalMigradas ?> conversas já com integration_account_id | <?= $unification['totalConvsSemIa'] ?> aguardando
+            </p>
+        </div>
+        
+        <!-- 1. Mapeamento de Contas -->
+        <div class="diag-section">
+            <h2>📱 Mapeamento: whatsapp_accounts → integration_accounts</h2>
+            <table class="diag-table">
+                <thead>
+                    <tr>
+                        <th>WA ID</th>
+                        <th>Nome (WA)</th>
+                        <th>Telefone</th>
+                        <th>Status WA</th>
+                        <th>→</th>
+                        <th>IA ID</th>
+                        <th>Nome (IA)</th>
+                        <th>Provider</th>
+                        <th>Status IA</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($unification['waAccounts'] as $row): ?>
+                    <tr>
+                        <td><strong><?= $row['wa_id'] ?></strong></td>
+                        <td><?= htmlspecialchars($row['wa_name'] ?? '-') ?></td>
+                        <td style="color: #4ec9b0;"><?= htmlspecialchars($row['wa_phone'] ?? '-') ?></td>
+                        <td><?= htmlspecialchars($row['wa_status'] ?? '-') ?></td>
+                        <td style="color: #555;">→</td>
+                        <td><strong><?= $row['ia_id'] ?? '<span style="color:#f48771">NULL</span>' ?></strong></td>
+                        <td><?= htmlspecialchars($row['ia_name'] ?? '-') ?></td>
+                        <td><?= htmlspecialchars($row['ia_provider'] ?? '-') ?></td>
+                        <td><?= htmlspecialchars($row['ia_status'] ?? '-') ?></td>
+                        <td>
+                            <?php if ($row['ia_id']): ?>
+                                <span class="badge badge-ok">VINCULADO</span>
+                            <?php else: ?>
+                                <span class="badge badge-miss">SEM VÍNCULO</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- 2. Integration Accounts órfãs -->
+        <?php if (!empty($unification['iaOrphans'])): ?>
+        <div class="diag-section warning">
+            <h2>⚠️ Integration Accounts SEM whatsapp_account correspondente (<?= count($unification['iaOrphans']) ?>)</h2>
+            <p style="color: #858585; font-size: 12px; margin-bottom: 10px;">Estas contas existem apenas em integration_accounts. Se foram criadas pelo Notificame ou outra integração, está correto.</p>
+            <table class="diag-table">
+                <thead>
+                    <tr><th>IA ID</th><th>Nome</th><th>Telefone</th><th>Provider</th><th>Channel</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($unification['iaOrphans'] as $row): ?>
+                    <tr>
+                        <td><strong><?= $row['ia_id'] ?></strong></td>
+                        <td><?= htmlspecialchars($row['ia_name'] ?? '-') ?></td>
+                        <td style="color: #dcdcaa;"><?= htmlspecialchars($row['ia_phone'] ?? '-') ?></td>
+                        <td><?= htmlspecialchars($row['ia_provider'] ?? '-') ?></td>
+                        <td><?= htmlspecialchars($row['ia_channel'] ?? '-') ?></td>
+                        <td><?= htmlspecialchars($row['ia_status'] ?? '-') ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php endif; ?>
+        
+        <!-- 3. Conversas sem integration_account_id -->
+        <div class="diag-section <?= $unification['totalConvsSemIa'] > 0 ? 'danger' : 'success' ?>">
+            <h2><?= $unification['totalConvsSemIa'] > 0 ? '❌' : '✅' ?> Conversas sem integration_account_id (<?= $unification['totalConvsSemIa'] ?>)</h2>
+            <?php if ($unification['totalConvsSemIa'] > 0): ?>
+                <p style="color: #858585; font-size: 12px; margin-bottom: 10px;">Estas conversas usam apenas whatsapp_account_id. Precisam de integration_account_id para envio correto.</p>
+                <a href="?tab=unificacao&action=fix_conversations" class="fix-btn" 
+                   onclick="return confirm('Isso vai atualizar <?= $unification['totalConvsSemIa'] ?> conversa(s). Continuar?')">
+                    🔧 Corrigir Agora (preencher integration_account_id)
+                </a>
+                <table class="diag-table" style="margin-top: 15px;">
+                    <thead>
+                        <tr><th>Conv ID</th><th>Contato</th><th>Tel Contato</th><th>WA ID</th><th>Número WA</th><th>Status</th><th>Criada em</th></tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach (array_slice($unification['convsSemIntegration'], 0, 30) as $row): ?>
+                        <tr>
+                            <td><strong><?= $row['conv_id'] ?></strong></td>
+                            <td><?= htmlspecialchars($row['contact_name'] ?? '-') ?></td>
+                            <td><?= htmlspecialchars($row['contact_phone'] ?? '-') ?></td>
+                            <td><?= $row['whatsapp_account_id'] ?></td>
+                            <td style="color: #f48771;"><?= htmlspecialchars($row['wa_phone'] ?? '-') ?></td>
+                            <td><?= $row['status'] ?></td>
+                            <td style="color: #858585;"><?= $row['created_at'] ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php if ($unification['totalConvsSemIa'] > 30): ?>
+                        <tr><td colspan="7" style="text-align: center; color: #858585;">... e mais <?= $unification['totalConvsSemIa'] - 30 ?> conversas</td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            <?php else: ?>
+                <p style="color: #4ec9b0;">Todas as conversas já possuem integration_account_id!</p>
+            <?php endif; ?>
+        </div>
+        
+        <!-- 4. Conversas com divergência -->
+        <div class="diag-section <?= count($unification['convsDivergentes']) > 0 ? 'danger' : 'success' ?>">
+            <h2><?= count($unification['convsDivergentes']) > 0 ? '⚠️' : '✅' ?> Conversas com DIVERGÊNCIA de número (<?= count($unification['convsDivergentes']) ?>)</h2>
+            <?php if (!empty($unification['convsDivergentes'])): ?>
+                <p style="color: #858585; font-size: 12px; margin-bottom: 10px;">
+                    O whatsapp_account aponta para um número e o integration_account aponta para OUTRO. 
+                    <strong style="color: #f48771;">Isso causa envio pelo número errado!</strong>
+                </p>
+                <a href="?tab=unificacao&action=fix_divergencias" class="fix-btn danger"
+                   onclick="return confirm('Isso vai corrigir <?= count($unification['convsDivergentes']) ?> conversa(s) divergentes. Continuar?')">
+                    🔧 Corrigir Divergências (alinhar integration_account_id com whatsapp_account)
+                </a>
+                <table class="diag-table" style="margin-top: 15px;">
+                    <thead>
+                        <tr><th>Conv ID</th><th>Contato</th><th>WA ID</th><th>Num WA</th><th>→</th><th>IA ID</th><th>Num IA</th><th>Status</th></tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($unification['convsDivergentes'] as $row): ?>
+                        <tr>
+                            <td><strong><?= $row['conv_id'] ?></strong></td>
+                            <td><?= htmlspecialchars($row['contact_name'] ?? '-') ?></td>
+                            <td><?= $row['whatsapp_account_id'] ?></td>
+                            <td style="color: #4ec9b0;"><?= htmlspecialchars($row['wa_phone'] ?? '-') ?></td>
+                            <td style="color: #f48771; font-weight: bold;">≠</td>
+                            <td><?= $row['integration_account_id'] ?></td>
+                            <td style="color: #f48771;"><?= htmlspecialchars($row['ia_phone'] ?? '-') ?></td>
+                            <td><?= $row['status'] ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php else: ?>
+                <p style="color: #4ec9b0;">Nenhuma divergência encontrada! Todos os números estão alinhados.</p>
+            <?php endif; ?>
+        </div>
+        
+        <!-- SQL de referência -->
+        <div class="diag-section">
+            <h2>📝 SQL Manual (se necessário)</h2>
+            <h3>Preencher integration_account_id faltantes:</h3>
+            <pre style="background: #1e1e1e; padding: 12px; border-radius: 6px; color: #ce9178; font-size: 12px; overflow-x: auto;">UPDATE conversations c
+INNER JOIN whatsapp_accounts wa ON wa.id = c.whatsapp_account_id
+INNER JOIN integration_accounts ia ON ia.phone_number = wa.phone_number AND ia.channel = 'whatsapp'
+SET c.integration_account_id = ia.id
+WHERE c.whatsapp_account_id IS NOT NULL AND c.integration_account_id IS NULL;</pre>
+            
+            <h3 style="margin-top: 15px;">Corrigir divergências:</h3>
+            <pre style="background: #1e1e1e; padding: 12px; border-radius: 6px; color: #ce9178; font-size: 12px; overflow-x: auto;">UPDATE conversations c
+INNER JOIN whatsapp_accounts wa ON wa.id = c.whatsapp_account_id
+INNER JOIN integration_accounts ia_correct ON ia_correct.phone_number = wa.phone_number AND ia_correct.channel = 'whatsapp'
+SET c.integration_account_id = ia_correct.id
+WHERE c.whatsapp_account_id IS NOT NULL 
+  AND c.integration_account_id IS NOT NULL
+  AND c.integration_account_id != ia_correct.id;</pre>
+        </div>
+        
+        <?php endif; // unification ?>
+        
+        <div class="footer">
+            <p>Última atualização: <?= date('d/m/Y H:i:s') ?></p>
+        </div>
+        
+        <?php else: ?>
+        <!-- ═══════════════ ABA LOGS ═══════════════ -->
         <header>
             <h1>📋 Visualizador de Logs - API Chat</h1>
             <div class="stats">
@@ -471,6 +919,7 @@ function colorizeLog($log) {
                 <a href="/api-test.php" style="color: #4ec9b0;">Test API</a>
             </p>
         </div>
+        <?php endif; // activeTab ?>
     </div>
     
     <script>

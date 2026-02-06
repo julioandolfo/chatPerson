@@ -1541,28 +1541,83 @@ class ConversationService
         }
 
         // **ENVIAR PARA INTEGRAÇÃO** se a mensagem for do agente (MAS NÃO SE FOR NOTA INTERNA)
-        // ✅ Para conversas MESCLADAS, usar o último número que o cliente usou (last_customer_account_id)
-        $integrationAccountId = $conversation['integration_account_id'] ?? null;
-        $whatsappAccountId = $conversation['whatsapp_account_id'] ?? null; // Legacy
+        // ✅ UNIFICADO: Usar APENAS integration_account_id para envio
+        // Isso elimina a confusão entre whatsapp_accounts e integration_accounts
         
-        if (!empty($conversation['is_merged']) && !empty($conversation['last_customer_account_id'])) {
-            $lastAccountId = (int)$conversation['last_customer_account_id'];
-            \App\Helpers\Logger::info("ConversationService::sendMessage - Conversa MESCLADA, usando último número do cliente: account_id={$lastAccountId}");
-            $integrationAccountId = $lastAccountId;
-            // Verificar se é uma conta de integração válida
-            $lastAccount = \App\Models\IntegrationAccount::find($lastAccountId);
-            if (!$lastAccount) {
-                // Pode ser ID de whatsapp_accounts, verificar lá
-                $waAccount = \App\Models\WhatsAppAccount::find($lastAccountId);
-                if ($waAccount) {
-                    $whatsappAccountId = $lastAccountId;
-                    $integrationAccountId = null;
-                    \App\Helpers\Logger::info("ConversationService::sendMessage - Conta é WhatsApp legacy: wa_id={$lastAccountId}");
+        $integrationAccountId = $conversation['integration_account_id'] ?? $conversation['resolved_integration_account_id'] ?? null;
+        $whatsappAccountId = $conversation['whatsapp_account_id'] ?? null;
+        
+        // ✅ LOG: IDs originais da conversa para diagnóstico
+        \App\Helpers\Logger::info("ConversationService::sendMessage - 📞 IDs da conversa {$conversationId}: integration_account_id=" . ($integrationAccountId ?? 'NULL') . ", whatsapp_account_id=" . ($whatsappAccountId ?? 'NULL') . ", channel=" . ($conversation['channel'] ?? 'NULL'));
+        
+        // ✅ UNIFICADO: Se não tem integration_account_id mas tem whatsapp_account_id, buscar correspondente
+        if (!$integrationAccountId && $whatsappAccountId && $conversation['channel'] === 'whatsapp') {
+            // Buscar integration_account que corresponde ao whatsapp_account
+            $integrationAccount = \App\Helpers\Database::fetch(
+                "SELECT id FROM integration_accounts WHERE whatsapp_id = ? LIMIT 1",
+                [$whatsappAccountId]
+            );
+            
+            if ($integrationAccount) {
+                $integrationAccountId = $integrationAccount['id'];
+                \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Encontrado integration_account_id={$integrationAccountId} para whatsapp_account_id={$whatsappAccountId}");
+                
+                // Atualizar a conversa para evitar essa busca no futuro
+                Conversation::update($conversationId, ['integration_account_id' => $integrationAccountId]);
+            } else {
+                // Fallback: Buscar por phone_number
+                $waAccount = \App\Models\WhatsAppAccount::find($whatsappAccountId);
+                if ($waAccount && !empty($waAccount['phone_number'])) {
+                    $integrationAccount = \App\Helpers\Database::fetch(
+                        "SELECT id FROM integration_accounts WHERE phone_number = ? AND channel = 'whatsapp' LIMIT 1",
+                        [$waAccount['phone_number']]
+                    );
+                    
+                    if ($integrationAccount) {
+                        $integrationAccountId = $integrationAccount['id'];
+                        \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Encontrado integration_account_id={$integrationAccountId} via phone_number={$waAccount['phone_number']}");
+                        
+                        // Atualizar a conversa para evitar essa busca no futuro
+                        Conversation::update($conversationId, ['integration_account_id' => $integrationAccountId]);
+                    } else {
+                        \App\Helpers\Logger::warning("ConversationService::sendMessage - ⚠️ Nenhum integration_account encontrado para whatsapp_account_id={$whatsappAccountId}. Será usado WhatsAppService como fallback.");
+                    }
                 }
             }
         }
         
-        \App\Helpers\Logger::info("ConversationService::sendMessage - Verificando envio (type={$senderType}, messageType={$messageType}, channel={$conversation['channel']}, integration_id=" . ($integrationAccountId ?? 'NULL') . ", wa_id=" . ($whatsappAccountId ?? 'NULL') . ")");
+        // Para conversas MESCLADAS, usar o último número que o cliente usou
+        if (!empty($conversation['is_merged']) && !empty($conversation['last_customer_account_id'])) {
+            $lastAccountId = (int)$conversation['last_customer_account_id'];
+            \App\Helpers\Logger::info("ConversationService::sendMessage - Conversa MESCLADA, usando último número do cliente: account_id={$lastAccountId}");
+            
+            // Tentar encontrar em integration_accounts primeiro
+            $lastAccount = \App\Models\IntegrationAccount::find($lastAccountId);
+            if ($lastAccount) {
+                $integrationAccountId = $lastAccountId;
+                $whatsappAccountId = null; // Usar apenas integration
+                \App\Helpers\Logger::info("ConversationService::sendMessage - Conta é integração: integration_id={$lastAccountId}");
+            } else {
+                // Verificar se é um whatsapp_account_id e buscar correspondente em integration_accounts
+                $integrationAccount = \App\Helpers\Database::fetch(
+                    "SELECT id FROM integration_accounts WHERE whatsapp_id = ? LIMIT 1",
+                    [$lastAccountId]
+                );
+                
+                if ($integrationAccount) {
+                    $integrationAccountId = $integrationAccount['id'];
+                    $whatsappAccountId = null;
+                    \App\Helpers\Logger::info("ConversationService::sendMessage - Convertido whatsapp_id={$lastAccountId} para integration_id={$integrationAccountId}");
+                } else {
+                    // Último fallback: usar whatsapp_account_id diretamente
+                    $whatsappAccountId = $lastAccountId;
+                    $integrationAccountId = null;
+                    \App\Helpers\Logger::info("ConversationService::sendMessage - Usando whatsapp_account_id={$lastAccountId} como fallback");
+                }
+            }
+        }
+        
+        \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ FINAL: integration_id=" . ($integrationAccountId ?? 'NULL') . ", wa_id=" . ($whatsappAccountId ?? 'NULL') . ", channel=" . ($conversation['channel'] ?? 'NULL'));
         
         // ✅ CORREÇÃO: NÃO enviar notas internas para o cliente via WhatsApp
         if ($messageType === 'note') {

@@ -808,85 +808,63 @@ class WhatsAppService
     {
         Logger::quepasa("sendMessage - Iniciando envio: accountId={$accountId}, to={$to}");
         
-        // ✅ CORRIGIDO: PRIMEIRO verificar em whatsapp_accounts (tabela legada/principal)
-        // Isso evita conflito de IDs entre as tabelas (IDs diferentes podem apontar para contas diferentes)
-        $account = WhatsAppAccount::find($accountId);
+        // ✅ CORREÇÃO DEFINITIVA: Detectar se o ID vem de integration_accounts ou whatsapp_accounts
+        // Verificar PRIMEIRO em integration_accounts (pois IntegrationService passa integration_account_id)
+        // Se não encontrar, tentar whatsapp_accounts
+        // Isso evita o bug onde WA ID 9 ≠ IA ID 9 (tabelas com IDs diferentes)
+        $account = null;
         $usingIntegrationAccount = false;
         
-        if ($account) {
-            Logger::quepasa("sendMessage - ✅ Conta encontrada em whatsapp_accounts: ID={$accountId}, nome={$account['name']}, phone={$account['phone_number']}, quepasa_token=" . (!empty($account['quepasa_token']) ? 'SIM' : 'NÃO'));
-        } else {
-            // SEGUNDO: Tentar buscar em integration_accounts (tabela nova)
-            $account = \App\Models\IntegrationAccount::find($accountId);
+        // PRIMEIRO: Tentar integration_accounts (novo padrão)
+        $iaAccount = \App\Models\IntegrationAccount::find($accountId);
+        if ($iaAccount && $iaAccount['channel'] === 'whatsapp') {
+            $usingIntegrationAccount = true;
+            $account = $iaAccount;
+            Logger::quepasa("sendMessage - ✅ Conta encontrada em integration_accounts: ID={$accountId}, nome={$account['name']}, phone={$account['phone_number']}, api_token=" . (!empty($account['api_token']) ? 'SIM' : 'NÃO') . ", whatsapp_id=" . ($account['whatsapp_id'] ?? 'NULL'));
             
+            // Mapear campos: integration_accounts usa api_token, whatsapp_accounts usa quepasa_token
+            if (empty($account['quepasa_token']) && !empty($account['api_token'])) {
+                $account['quepasa_token'] = $account['api_token'];
+            }
+            
+            // Se ainda sem token, buscar na whatsapp_accounts correspondente
+            if (empty($account['quepasa_token'])) {
+                Logger::quepasa("sendMessage - Token vazio em integration_accounts, buscando em whatsapp_accounts...");
+                $legacyAccount = null;
+                
+                // Buscar pelo phone_number (mais confiável que whatsapp_id)
+                if (!empty($account['phone_number'])) {
+                    $legacyAccount = \App\Helpers\Database::fetch(
+                        "SELECT * FROM whatsapp_accounts WHERE phone_number = ? LIMIT 1",
+                        [$account['phone_number']]
+                    );
+                }
+                
+                // Fallback: buscar pelo whatsapp_id
+                if (!$legacyAccount && !empty($account['whatsapp_id'])) {
+                    $legacyAccount = \App\Helpers\Database::fetch(
+                        "SELECT * FROM whatsapp_accounts WHERE id = ? LIMIT 1",
+                        [$account['whatsapp_id']]
+                    );
+                }
+                
+                if ($legacyAccount && !empty($legacyAccount['quepasa_token'])) {
+                    $account['quepasa_token'] = $legacyAccount['quepasa_token'];
+                    if (empty($account['api_url']) && !empty($legacyAccount['api_url'])) {
+                        $account['api_url'] = $legacyAccount['api_url'];
+                    }
+                    Logger::quepasa("sendMessage - ✅ Token obtido de whatsapp_accounts: {$legacyAccount['name']} (phone={$legacyAccount['phone_number']})");
+                } else {
+                    Logger::quepasa("sendMessage - ⚠️ Nenhum token encontrado para integration_account {$accountId}");
+                }
+            }
+        }
+        
+        // SEGUNDO: Se não encontrou em integration_accounts, tentar whatsapp_accounts
+        if (!$account) {
+            $account = WhatsAppAccount::find($accountId);
             if ($account) {
-                $usingIntegrationAccount = true;
-                Logger::quepasa("sendMessage - Conta encontrada em integration_accounts: ID={$accountId}, nome={$account['name']}, phone={$account['phone_number']}, api_token=" . (!empty($account['api_token']) ? 'SIM' : 'NÃO') . ", whatsapp_id=" . ($account['whatsapp_id'] ?? 'NULL'));
-                
-                // Mapear campos de integration_accounts para formato esperado
-                // integration_accounts usa: api_token, api_url
-                // whatsapp_accounts usa: quepasa_token, api_url
-                if (empty($account['quepasa_token']) && !empty($account['api_token'])) {
-                    $account['quepasa_token'] = $account['api_token'];
-                }
-                
-                // Se ainda não tem token, buscar na whatsapp_accounts
-                if (empty($account['quepasa_token'])) {
-                    Logger::quepasa("sendMessage - Token vazio em integration_accounts, buscando em whatsapp_accounts...");
-                    $legacyAccount = null;
-                    
-                    // PRIMEIRO: Tentar pelo whatsapp_id (ligação direta entre as tabelas)
-                    if (!empty($account['whatsapp_id'])) {
-                        Logger::quepasa("sendMessage - Tentando buscar por whatsapp_id: {$account['whatsapp_id']}");
-                        $legacyAccount = \App\Helpers\Database::fetch(
-                            "SELECT * FROM whatsapp_accounts WHERE id = ? LIMIT 1",
-                            [$account['whatsapp_id']]
-                        );
-                        if ($legacyAccount) {
-                            Logger::quepasa("sendMessage - Encontrado por whatsapp_id: {$legacyAccount['name']}");
-                        }
-                    }
-                    
-                    // SEGUNDO: Tentar pelo phone_number (fallback)
-                    if (!$legacyAccount && !empty($account['phone_number'])) {
-                        Logger::quepasa("sendMessage - Tentando buscar por phone_number: {$account['phone_number']}");
-                        $legacyAccount = \App\Helpers\Database::fetch(
-                            "SELECT * FROM whatsapp_accounts WHERE phone_number = ? LIMIT 1",
-                            [$account['phone_number']]
-                        );
-                        
-                        // Se não encontrou exato, tentar com LIKE (números podem ter formatação diferente)
-                        if (!$legacyAccount) {
-                            $phoneDigits = preg_replace('/[^0-9]/', '', $account['phone_number']);
-                            if (strlen($phoneDigits) >= 10) {
-                                Logger::quepasa("sendMessage - Tentando buscar por phone com LIKE: %{$phoneDigits}");
-                                $legacyAccount = \App\Helpers\Database::fetch(
-                                    "SELECT * FROM whatsapp_accounts WHERE REPLACE(REPLACE(REPLACE(phone_number, '+', ''), '-', ''), ' ', '') LIKE ? LIMIT 1",
-                                    ['%' . $phoneDigits]
-                                );
-                            }
-                        }
-                        
-                        if ($legacyAccount) {
-                            Logger::quepasa("sendMessage - Encontrado por phone_number: {$legacyAccount['name']}");
-                        }
-                    }
-                    
-                    if ($legacyAccount && !empty($legacyAccount['quepasa_token'])) {
-                        $account['quepasa_token'] = $legacyAccount['quepasa_token'];
-                        // Também pegar api_url da conta legada se não tiver
-                        if (empty($account['api_url']) && !empty($legacyAccount['api_url'])) {
-                            $account['api_url'] = $legacyAccount['api_url'];
-                        }
-                        // Pegar provider se não tiver
-                        if (empty($account['provider']) && !empty($legacyAccount['provider'])) {
-                            $account['provider'] = $legacyAccount['provider'];
-                        }
-                        Logger::quepasa("sendMessage - ✅ Token obtido de whatsapp_accounts: {$legacyAccount['name']} (ID={$legacyAccount['id']})");
-                    } else {
-                        Logger::quepasa("sendMessage - ⚠️ Nenhuma conta legada encontrada ou sem token");
-                    }
-                }
+                Logger::quepasa("sendMessage - ✅ Conta encontrada em whatsapp_accounts: ID={$accountId}, nome={$account['name']}, phone={$account['phone_number']}, quepasa_token=" . (!empty($account['quepasa_token']) ? 'SIM' : 'NÃO'));
             }
         }
         

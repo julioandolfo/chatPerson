@@ -790,6 +790,100 @@ function colorizeLog($log) {
             <?php endif; ?>
         </div>
         
+        <!-- 5. Automações e seus trigger_config -->
+        <?php
+            $automations = [];
+            try {
+                $automations = $db->query("
+                    SELECT a.id, a.name, a.trigger_type, a.trigger_config, a.status, a.is_active,
+                           f.name as funnel_name
+                    FROM automations a
+                    LEFT JOIN funnels f ON a.funnel_id = f.id
+                    WHERE a.trigger_config IS NOT NULL 
+                      AND a.trigger_config != ''
+                      AND a.trigger_config != '{}'
+                    ORDER BY a.is_active DESC, a.id
+                ")->fetchAll(\PDO::FETCH_ASSOC);
+            } catch (\Exception $e) {}
+        ?>
+        <div class="diag-section">
+            <h2>⚡ Automações e Contas Configuradas (<?= count($automations) ?>)</h2>
+            <p style="color: #858585; font-size: 12px; margin-bottom: 10px;">
+                Mostra quais integration_account_id e/ou whatsapp_account_id cada automação usa para filtrar.
+                Se o ID estiver errado, a automação não dispara para a conversa certa.
+            </p>
+            <table class="diag-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nome</th>
+                        <th>Trigger</th>
+                        <th>Ativa</th>
+                        <th>integration_account_ids (config)</th>
+                        <th>whatsapp_account_ids (config)</th>
+                        <th>Números Correspondentes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($automations as $auto): 
+                        $config = json_decode($auto['trigger_config'], true) ?? [];
+                        $intIds = $config['integration_account_ids'] ?? (isset($config['integration_account_id']) ? [$config['integration_account_id']] : []);
+                        $waIds = $config['whatsapp_account_ids'] ?? (isset($config['whatsapp_account_id']) ? [$config['whatsapp_account_id']] : []);
+                        $intIds = array_filter($intIds);
+                        $waIds = array_filter($waIds);
+                        
+                        // Buscar números reais
+                        $intPhones = [];
+                        foreach ($intIds as $iid) {
+                            try {
+                                $ia = $db->query("SELECT id, name, phone_number FROM integration_accounts WHERE id = " . intval($iid))->fetch(\PDO::FETCH_ASSOC);
+                                $intPhones[] = $ia ? "{$ia['name']} ({$ia['phone_number']})" : "ID {$iid} NÃO ENCONTRADO";
+                            } catch (\Exception $e) { $intPhones[] = "Erro"; }
+                        }
+                        $waPhones = [];
+                        foreach ($waIds as $wid) {
+                            try {
+                                $wa = $db->query("SELECT id, name, phone_number FROM whatsapp_accounts WHERE id = " . intval($wid))->fetch(\PDO::FETCH_ASSOC);
+                                $waPhones[] = $wa ? "{$wa['name']} ({$wa['phone_number']})" : "ID {$wid} NÃO ENCONTRADO";
+                            } catch (\Exception $e) { $waPhones[] = "Erro"; }
+                        }
+                    ?>
+                    <tr>
+                        <td><strong><?= $auto['id'] ?></strong></td>
+                        <td><?= htmlspecialchars($auto['name']) ?></td>
+                        <td><span class="badge badge-na"><?= $auto['trigger_type'] ?></span></td>
+                        <td><?= $auto['is_active'] ? '<span class="badge badge-ok">SIM</span>' : '<span class="badge badge-miss">NÃO</span>' ?></td>
+                        <td>
+                            <?php if (empty($intIds)): ?>
+                                <span style="color: #858585;">-</span>
+                            <?php else: ?>
+                                <?= implode(', ', array_map('intval', $intIds)) ?>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if (empty($waIds)): ?>
+                                <span style="color: #858585;">-</span>
+                            <?php else: ?>
+                                <?= implode(', ', array_map('intval', $waIds)) ?>
+                            <?php endif; ?>
+                        </td>
+                        <td style="font-size: 11px;">
+                            <?php if (!empty($intPhones)): ?>
+                                <span style="color: #4ec9b0;">IA:</span> <?= htmlspecialchars(implode(' | ', $intPhones)) ?><br>
+                            <?php endif; ?>
+                            <?php if (!empty($waPhones)): ?>
+                                <span style="color: #9cdcfe;">WA:</span> <?= htmlspecialchars(implode(' | ', $waPhones)) ?>
+                            <?php endif; ?>
+                            <?php if (empty($intPhones) && empty($waPhones)): ?>
+                                <span style="color: #858585;">Qualquer conta</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        
         <!-- SQL de referência -->
         <div class="diag-section">
             <h2>📝 SQL Manual (se necessário)</h2>

@@ -817,10 +817,10 @@ try {
                 $conversationId = $existingConversation['conversation_id'];
                 apiLog('INFO', "✅ Usando conversa do roteamento (ID: {$conversationId})");
             } else {
-                apiLog('INFO', '🔍 Buscando conversa aberta...');
+                apiLog('INFO', '🔍 Buscando conversa existente (incluindo fechadas)...');
                 $stmt = $db->prepare("
-                    SELECT id FROM conversations 
-                    WHERE contact_id = ? AND channel = 'whatsapp' AND status IN ('open', 'pending')
+                    SELECT id, status FROM conversations 
+                    WHERE contact_id = ? AND channel = 'whatsapp'
                     ORDER BY updated_at DESC LIMIT 1
                 ");
                 $stmt->execute([$contactId]);
@@ -861,6 +861,13 @@ try {
                 } else {
                     $conversationId = $conversation['id'];
                     apiLog('INFO', "✅ Conversa encontrada (ID: {$conversationId})");
+                    
+                    // Se a conversa estava fechada, reabrir
+                    if ($conversation['status'] === 'closed' || $conversation['status'] === 'resolved') {
+                        $stmt = $db->prepare("UPDATE conversations SET status = 'open', updated_at = NOW() WHERE id = ?");
+                        $stmt->execute([$conversationId]);
+                        apiLog('INFO', "🔄 Conversa reaberta (status anterior: {$conversation['status']})");
+                    }
                 }
             }
             

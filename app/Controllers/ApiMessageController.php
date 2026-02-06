@@ -181,8 +181,8 @@ class ApiMessageController
                 'conversation_id' => $conversation['id'],
                 'sender_type' => 'agent',
                 'sender_id' => $userId,
-                'body' => $message,
-                'type' => 'text',
+                'content' => $message,
+                'message_type' => 'text',
                 'external_id' => $sendResult['message_id'] ?? null,
                 'status' => $sendResult['status'] ?? 'sent'
             ];

@@ -213,11 +213,11 @@ class MessagesController
                 }
             }
             
-            // Buscar conversa existente ou criar nova
+            // Buscar conversa existente (incluindo fechadas) ou criar nova
             $stmt = $db->prepare("
-                SELECT id 
+                SELECT id, status 
                 FROM conversations 
-                WHERE contact_id = ? AND channel = 'whatsapp' AND status IN ('open', 'pending')
+                WHERE contact_id = ? AND channel = 'whatsapp'
                 ORDER BY updated_at DESC
                 LIMIT 1
             ");
@@ -242,6 +242,12 @@ class MessagesController
                 $conversationId = $db->lastInsertId();
             } else {
                 $conversationId = $conversation['id'];
+                
+                // Se a conversa estava fechada, reabrir
+                if ($conversation['status'] === 'closed' || $conversation['status'] === 'resolved') {
+                    $stmt = $db->prepare("UPDATE conversations SET status = 'open', updated_at = NOW() WHERE id = ?");
+                    $stmt->execute([$conversationId]);
+                }
             }
             
             // Inserir mensagem no banco
@@ -250,7 +256,7 @@ class MessagesController
                     conversation_id,
                     sender_type,
                     content,
-                    type,
+                    message_type,
                     status,
                     created_at
                 ) VALUES (?, 'agent', ?, 'text', 'sent', NOW())

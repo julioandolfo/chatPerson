@@ -2282,6 +2282,11 @@ class WhatsAppService
                             'whatsapp_account_id' => $account['id']
                         ];
                         
+                        // ✅ CORREÇÃO: Sempre incluir integration_account_id
+                        if (!empty($account['integration_account_id'])) {
+                            $conversationData['integration_account_id'] = $account['integration_account_id'];
+                        }
+                        
                         // Adicionar funil e estágio padrão da integração, se configurados
                         if (!empty($account['default_funnel_id'])) {
                             $conversationData['funnel_id'] = $account['default_funnel_id'];
@@ -2290,15 +2295,20 @@ class WhatsAppService
                             $conversationData['stage_id'] = $account['default_stage_id'];
                         }
                         
-                        $conversation = \App\Services\ConversationService::create($conversationData);
+                        // ✅ CORREÇÃO: Passar false para NÃO executar automações (é eco de mensagem enviada via API/sistema)
+                        $conversation = \App\Services\ConversationService::create($conversationData, false);
                     } catch (\Exception $e) {
                         Logger::quepasa("Erro ao criar conversa via ConversationService: " . $e->getMessage());
-                        $conversationId = \App\Models\Conversation::create([
+                        $fallbackData = [
                             'contact_id' => $contact['id'],
                             'channel' => 'whatsapp',
                             'whatsapp_account_id' => $account['id'],
                             'status' => 'open'
-                        ]);
+                        ];
+                        if (!empty($account['integration_account_id'])) {
+                            $fallbackData['integration_account_id'] = $account['integration_account_id'];
+                        }
+                        $conversationId = \App\Models\Conversation::create($fallbackData);
                         $conversation = \App\Models\Conversation::find($conversationId);
                     }
                 }
@@ -2385,15 +2395,21 @@ class WhatsAppService
                 Logger::quepasa("processWebhook - ✅ Mensagem não duplicada. Criando mensagem OUTGOING: conversation_id={$conversation['id']}, sender_type=agent, sender_id={$userId}");
                 
                 try {
+                    // ✅ CORREÇÃO: skipAutomations=true para NÃO disparar automações em eco de webhook
                     $messageId = \App\Services\ConversationService::sendMessage(
                         $conversation['id'],
                         $message ?: '',
                         'agent', // sender_type = agent (outgoing)
                         $userId, // sender_id = usuário atual ou padrão
-                        $attachments
+                        $attachments,
+                        null,  // messageType
+                        null,  // quotedMessageId
+                        null,  // aiAgentId
+                        null,  // messageTimestamp
+                        true   // skipAutomations = true (eco de mensagem enviada via API/sistema)
                     );
                     
-                    Logger::quepasa("processWebhook - Mensagem OUTGOING criada com sucesso: messageId={$messageId}");
+                    Logger::quepasa("processWebhook - Mensagem OUTGOING criada com sucesso (automações PULADAS): messageId={$messageId}");
                 } catch (\Exception $e) {
                     Logger::quepasa("Erro ao criar mensagem outgoing via ConversationService: " . $e->getMessage());
                     // Fallback: criar mensagem diretamente
@@ -2850,6 +2866,13 @@ class WhatsAppService
                         'whatsapp_account_id' => $account['id']
                     ];
                     
+                    // ✅ CORREÇÃO: Sempre passar integration_account_id ao criar conversa
+                    // Isso garante que o envio de mensagem usará a conta correta
+                    if (!empty($account['integration_account_id'])) {
+                        $conversationData['integration_account_id'] = $account['integration_account_id'];
+                        Logger::quepasa("processWebhook - ✅ Incluindo integration_account_id={$account['integration_account_id']} na nova conversa");
+                    }
+                    
                     if (!empty($account['default_funnel_id'])) {
                         $conversationData['funnel_id'] = $account['default_funnel_id'];
                         Logger::quepasa("processWebhook - Usando funil padrão da integração: {$account['default_funnel_id']}");
@@ -2861,17 +2884,22 @@ class WhatsAppService
                     
                     $conversation = \App\Services\ConversationService::create($conversationData, false);
                     $isNewConversation = true;
-                    Logger::quepasa("processWebhook - 🆕 CONVERSA CRIADA via ConversationService: ID={$conversation['id']}, isNewConversation=TRUE (automações serão executadas após salvar mensagem)");
+                    Logger::quepasa("processWebhook - 🆕 CONVERSA CRIADA via ConversationService: ID={$conversation['id']}, integration_account_id=" . ($account['integration_account_id'] ?? 'NULL') . ", isNewConversation=TRUE");
                 } catch (\Exception $e) {
                     Logger::quepasa("Erro ao criar conversa via ConversationService: " . $e->getMessage());
                     Logger::quepasa("Stack trace: " . $e->getTraceAsString());
                     try {
-                        $conversationId = \App\Models\Conversation::create([
+                        $fallbackData = [
                             'contact_id' => $contact['id'],
                             'channel' => 'whatsapp',
                             'whatsapp_account_id' => $account['id'],
                             'status' => 'open'
-                        ]);
+                        ];
+                        // ✅ CORREÇÃO: Também incluir integration_account_id no fallback
+                        if (!empty($account['integration_account_id'])) {
+                            $fallbackData['integration_account_id'] = $account['integration_account_id'];
+                        }
+                        $conversationId = \App\Models\Conversation::create($fallbackData);
                         $conversation = \App\Models\Conversation::find($conversationId);
                         $isNewConversation = true;
                         Logger::quepasa("processWebhook - Conversa criada via fallback: ID={$conversationId}");

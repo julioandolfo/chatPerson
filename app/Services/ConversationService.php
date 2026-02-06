@@ -1323,7 +1323,7 @@ class ConversationService
     /**
      * Enviar mensagem na conversa
      */
-    public static function sendMessage(int $conversationId, string $content, string $senderType = 'agent', ?int $senderId = null, array $attachments = [], ?string $messageType = null, ?int $quotedMessageId = null, ?int $aiAgentId = null, ?int $messageTimestamp = null): ?int
+    public static function sendMessage(int $conversationId, string $content, string $senderType = 'agent', ?int $senderId = null, array $attachments = [], ?string $messageType = null, ?int $quotedMessageId = null, ?int $aiAgentId = null, ?int $messageTimestamp = null, bool $skipAutomations = false): ?int
     {
         \App\Helpers\Logger::info("═══ ConversationService::sendMessage INÍCIO ═══ conv={$conversationId}, type={$senderType}, sender={$senderId}, aiAgent={$aiAgentId}, contentLen=" . strlen($content) . ", attachments=" . count($attachments));
         
@@ -1345,8 +1345,12 @@ class ConversationService
             throw new \Exception('Mensagem não pode estar vazia');
         }
         
-        // Verificar se conversa existe
-        $conversation = Conversation::find($conversationId);
+        // ✅ CORREÇÃO: Usar findWithRelations para obter resolved_integration_account_id
+        // Isso garante que o ID correto da integration_account é resolvido via JOINs:
+        // 1) Direto pelo integration_account_id da conversa
+        // 2) Via whatsapp_id em integration_accounts (fallback)
+        // 3) Via whatsapp_accounts (último fallback)
+        $conversation = Conversation::findWithRelations($conversationId);
         if (!$conversation) {
             throw new \Exception('Conversa não encontrada');
         }
@@ -1541,46 +1545,54 @@ class ConversationService
         }
 
         // **ENVIAR PARA INTEGRAÇÃO** se a mensagem for do agente (MAS NÃO SE FOR NOTA INTERNA)
-        // ✅ UNIFICADO: Usar APENAS integration_account_id para envio
-        // Isso elimina a confusão entre whatsapp_accounts e integration_accounts
+        // ✅ CORREÇÃO DEFINITIVA: Usar resolved_integration_account_id do findWithRelations
+        // O findWithRelations resolve o ID correto via 3 níveis de JOIN:
+        // 1) c.integration_account_id direto
+        // 2) integration_accounts.whatsapp_id = c.whatsapp_account_id (fallback)
+        // 3) whatsapp_accounts como último recurso
         
-        $integrationAccountId = $conversation['integration_account_id'] ?? $conversation['resolved_integration_account_id'] ?? null;
+        $integrationAccountId = $conversation['resolved_integration_account_id'] ?? $conversation['integration_account_id'] ?? null;
         $whatsappAccountId = $conversation['whatsapp_account_id'] ?? null;
         
-        // ✅ LOG: IDs originais da conversa para diagnóstico
-        \App\Helpers\Logger::info("ConversationService::sendMessage - 📞 IDs da conversa {$conversationId}: integration_account_id=" . ($integrationAccountId ?? 'NULL') . ", whatsapp_account_id=" . ($whatsappAccountId ?? 'NULL') . ", channel=" . ($conversation['channel'] ?? 'NULL'));
+        // ✅ LOG: IDs da conversa para diagnóstico
+        \App\Helpers\Logger::info("ConversationService::sendMessage - 📞 IDs da conversa {$conversationId}: " .
+            "integration_account_id=" . ($conversation['integration_account_id'] ?? 'NULL') . 
+            ", resolved_integration_account_id=" . ($conversation['resolved_integration_account_id'] ?? 'NULL') . 
+            ", whatsapp_account_id=" . ($whatsappAccountId ?? 'NULL') . 
+            ", whatsapp_account_phone=" . ($conversation['whatsapp_account_phone'] ?? 'NULL') .
+            ", channel=" . ($conversation['channel'] ?? 'NULL'));
         
-        // ✅ UNIFICADO: Se não tem integration_account_id mas tem whatsapp_account_id, buscar correspondente
-        if (!$integrationAccountId && $whatsappAccountId && $conversation['channel'] === 'whatsapp') {
-            // Buscar integration_account que corresponde ao whatsapp_account
-            $integrationAccount = \App\Helpers\Database::fetch(
-                "SELECT id FROM integration_accounts WHERE whatsapp_id = ? LIMIT 1",
-                [$whatsappAccountId]
-            );
-            
-            if ($integrationAccount) {
-                $integrationAccountId = $integrationAccount['id'];
-                \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Encontrado integration_account_id={$integrationAccountId} para whatsapp_account_id={$whatsappAccountId}");
+        // ✅ Se resolveu integration_account_id e a conversa não tinha, atualizar para futuro
+        if ($integrationAccountId && empty($conversation['integration_account_id'])) {
+            Conversation::update($conversationId, ['integration_account_id' => $integrationAccountId]);
+            \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Atualizado integration_account_id={$integrationAccountId} na conversa {$conversationId}");
+        }
+        
+        // ✅ VALIDAÇÃO: Se tem integration_account_id, verificar se corresponde ao número da sidebar
+        if ($integrationAccountId && !empty($conversation['whatsapp_account_phone'])) {
+            $iaAccount = \App\Models\IntegrationAccount::find($integrationAccountId);
+            if ($iaAccount && !empty($iaAccount['phone_number'])) {
+                // Normalizar números para comparação (remover +, espaços, etc.)
+                $sidebarPhone = preg_replace('/[^0-9]/', '', $conversation['whatsapp_account_phone']);
+                $accountPhone = preg_replace('/[^0-9]/', '', $iaAccount['phone_number']);
                 
-                // Atualizar a conversa para evitar essa busca no futuro
-                Conversation::update($conversationId, ['integration_account_id' => $integrationAccountId]);
-            } else {
-                // Fallback: Buscar por phone_number
-                $waAccount = \App\Models\WhatsAppAccount::find($whatsappAccountId);
-                if ($waAccount && !empty($waAccount['phone_number'])) {
-                    $integrationAccount = \App\Helpers\Database::fetch(
-                        "SELECT id FROM integration_accounts WHERE phone_number = ? AND channel = 'whatsapp' LIMIT 1",
-                        [$waAccount['phone_number']]
+                if ($sidebarPhone !== $accountPhone) {
+                    \App\Helpers\Logger::warning("ConversationService::sendMessage - ⚠️ DIVERGÊNCIA! Sidebar mostra {$sidebarPhone} mas integration_account {$integrationAccountId} tem {$accountPhone}");
+                    
+                    // Buscar integration_account correta pelo número da sidebar
+                    $correctAccount = \App\Helpers\Database::fetch(
+                        "SELECT id FROM integration_accounts WHERE REPLACE(REPLACE(REPLACE(phone_number, '+', ''), ' ', ''), '-', '') = ? AND channel = 'whatsapp' LIMIT 1",
+                        [$sidebarPhone]
                     );
                     
-                    if ($integrationAccount) {
-                        $integrationAccountId = $integrationAccount['id'];
-                        \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Encontrado integration_account_id={$integrationAccountId} via phone_number={$waAccount['phone_number']}");
-                        
-                        // Atualizar a conversa para evitar essa busca no futuro
+                    if ($correctAccount) {
+                        $integrationAccountId = $correctAccount['id'];
+                        \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Corrigido para integration_account_id={$integrationAccountId} (número correto: {$sidebarPhone})");
                         Conversation::update($conversationId, ['integration_account_id' => $integrationAccountId]);
                     } else {
-                        \App\Helpers\Logger::warning("ConversationService::sendMessage - ⚠️ Nenhum integration_account encontrado para whatsapp_account_id={$whatsappAccountId}. Será usado WhatsAppService como fallback.");
+                        \App\Helpers\Logger::warning("ConversationService::sendMessage - ⚠️ Nenhuma integration_account encontrada para phone={$sidebarPhone}. Tentando whatsapp_account_id...");
+                        // Fallback: usar whatsapp_account_id direto
+                        $integrationAccountId = null;
                     }
                 }
             }
@@ -1595,7 +1607,7 @@ class ConversationService
             $lastAccount = \App\Models\IntegrationAccount::find($lastAccountId);
             if ($lastAccount) {
                 $integrationAccountId = $lastAccountId;
-                $whatsappAccountId = null; // Usar apenas integration
+                $whatsappAccountId = null;
                 \App\Helpers\Logger::info("ConversationService::sendMessage - Conta é integração: integration_id={$lastAccountId}");
             } else {
                 // Verificar se é um whatsapp_account_id e buscar correspondente em integration_accounts
@@ -2146,39 +2158,44 @@ class ConversationService
             }
         }
         
-        // Executar automações para mensagem recebida (se for do contato)
-        if ($senderType === 'contact') {
-            \App\Helpers\Logger::info("ConversationService::sendMessage - DISPARANDO executeForMessageReceived (messageId={$messageId})");
-            try {
-                \App\Services\AutomationService::executeForMessageReceived($messageId);
-                \App\Helpers\Logger::info("ConversationService::sendMessage - executeForMessageReceived CONCLUÍDO");
-            } catch (\Exception $e) {
-                \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO ao executar automações: " . $e->getMessage());
-                error_log("Erro ao executar automações: " . $e->getMessage());
+        // Executar automações e agentes (APENAS se não foi solicitado pular - ex: webhook echo de API)
+        if ($skipAutomations) {
+            \App\Helpers\Logger::info("ConversationService::sendMessage - skipAutomations=true, PULANDO automações e Kanban Agents (messageId={$messageId})");
+        } else {
+            // Executar automações para mensagem recebida (se for do contato)
+            if ($senderType === 'contact') {
+                \App\Helpers\Logger::info("ConversationService::sendMessage - DISPARANDO executeForMessageReceived (messageId={$messageId})");
+                try {
+                    \App\Services\AutomationService::executeForMessageReceived($messageId);
+                    \App\Helpers\Logger::info("ConversationService::sendMessage - executeForMessageReceived CONCLUÍDO");
+                } catch (\Exception $e) {
+                    \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO ao executar automações: " . $e->getMessage());
+                    error_log("Erro ao executar automações: " . $e->getMessage());
+                }
             }
-        }
-        
-        // Executar automações para mensagem enviada por agente (instantâneo)
-        if ($senderType === 'agent') {
-            \App\Helpers\Logger::info("ConversationService::sendMessage - DISPARANDO executeForAgentMessageSent (messageId={$messageId})");
-            try {
-                \App\Services\AutomationService::executeForAgentMessageSent($messageId);
-                \App\Helpers\Logger::info("ConversationService::sendMessage - executeForAgentMessageSent CONCLUÍDO");
-            } catch (\Exception $e) {
-                \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO ao executar automações de agente: " . $e->getMessage());
-                error_log("Erro ao executar automações de agente: " . $e->getMessage());
+            
+            // Executar automações para mensagem enviada por agente (instantâneo)
+            if ($senderType === 'agent') {
+                \App\Helpers\Logger::info("ConversationService::sendMessage - DISPARANDO executeForAgentMessageSent (messageId={$messageId})");
+                try {
+                    \App\Services\AutomationService::executeForAgentMessageSent($messageId);
+                    \App\Helpers\Logger::info("ConversationService::sendMessage - executeForAgentMessageSent CONCLUÍDO");
+                } catch (\Exception $e) {
+                    \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO ao executar automações de agente: " . $e->getMessage());
+                    error_log("Erro ao executar automações de agente: " . $e->getMessage());
+                }
             }
-        }
-        
-        // Executar Agentes Kanban instantâneos
-        try {
-            $kanbanTriggerType = ($senderType === 'contact') ? 'client_message' : 'agent_message';
-            \App\Helpers\Logger::info("ConversationService::sendMessage - DISPARANDO Kanban Agents instantâneos (trigger: $kanbanTriggerType)");
-            \App\Services\KanbanAgentService::executeInstantAgents($conversationId, $kanbanTriggerType);
-            \App\Helpers\Logger::info("ConversationService::sendMessage - Kanban Agents instantâneos CONCLUÍDO");
-        } catch (\Exception $e) {
-            \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO ao executar Kanban Agents: " . $e->getMessage());
-            error_log("Erro ao executar Kanban Agents: " . $e->getMessage());
+            
+            // Executar Agentes Kanban instantâneos
+            try {
+                $kanbanTriggerType = ($senderType === 'contact') ? 'client_message' : 'agent_message';
+                \App\Helpers\Logger::info("ConversationService::sendMessage - DISPARANDO Kanban Agents instantâneos (trigger: $kanbanTriggerType)");
+                \App\Services\KanbanAgentService::executeInstantAgents($conversationId, $kanbanTriggerType);
+                \App\Helpers\Logger::info("ConversationService::sendMessage - Kanban Agents instantâneos CONCLUÍDO");
+            } catch (\Exception $e) {
+                \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO ao executar Kanban Agents: " . $e->getMessage());
+                error_log("Erro ao executar Kanban Agents: " . $e->getMessage());
+            }
         }
 
         \App\Helpers\Logger::info("═══ ConversationService::sendMessage FIM ═══ messageId={$messageId}, conv={$conversationId}");

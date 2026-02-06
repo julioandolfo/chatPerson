@@ -101,9 +101,9 @@ class Conversation extends Model
                            ELSE COALESCE(u.name, CONCAT('Agente #', c.agent_id)) 
                        END as agent_name,
                        u.email as agent_email,
-                       -- ✅ UNIFICADO: Priorizar integration_accounts para nome e telefone
-                       COALESCE(ia.name, wa.name) as whatsapp_account_name, 
-                       COALESCE(ia.phone_number, wa.phone_number) as whatsapp_account_phone,
+                       -- ✅ UNIFICADO: Priorizar integration_accounts -> fallback via whatsapp_id -> whatsapp_accounts
+                       COALESCE(ia.name, ia_fallback.name, wa.name) as whatsapp_account_name, 
+                       COALESCE(ia.phone_number, ia_fallback.phone_number, wa.phone_number) as whatsapp_account_phone,
                        (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact' AND m.read_at IS NULL) as unread_count,
                        (SELECT content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message,
                        (SELECT created_at FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message_at,
@@ -117,10 +117,15 @@ class Conversation extends Model
                 FROM conversations c
                 LEFT JOIN contacts ct ON c.contact_id = ct.id
                 LEFT JOIN users u ON c.agent_id = u.id
-                -- ✅ UNIFICADO: JOIN com integration_accounts PRIMEIRO
+                -- ✅ JOIN direto: integration_accounts pelo ID armazenado
                 LEFT JOIN integration_accounts ia ON c.integration_account_id = ia.id
-                -- ✅ Fallback: JOIN com whatsapp_accounts para conversas antigas
-                LEFT JOIN whatsapp_accounts wa ON c.whatsapp_account_id = wa.id AND c.integration_account_id IS NULL
+                -- ✅ JOIN fallback: integration_accounts via whatsapp_id
+                LEFT JOIN integration_accounts ia_fallback ON ia_fallback.whatsapp_id = c.whatsapp_account_id 
+                    AND c.integration_account_id IS NULL
+                -- ✅ Último fallback: whatsapp_accounts
+                LEFT JOIN whatsapp_accounts wa ON c.whatsapp_account_id = wa.id 
+                    AND c.integration_account_id IS NULL 
+                    AND ia_fallback.id IS NULL
                 LEFT JOIN conversation_tags ctt ON c.id = ctt.conversation_id
                 LEFT JOIN tags t ON ctt.tag_id = t.id
                 LEFT JOIN conversation_participants cp ON c.id = cp.conversation_id AND cp.removed_at IS NULL
@@ -639,21 +644,26 @@ class Conversation extends Model
                            ELSE COALESCE(u.name, CONCAT('Agente #', c.agent_id)) 
                        END as agent_name,
                        u.email as agent_email, u.avatar as agent_avatar,
-                       -- ✅ UNIFICADO: Priorizar integration_accounts para nome e telefone
-                       COALESCE(ia.name, wa.name) as whatsapp_account_name,
-                       COALESCE(ia.phone_number, wa.phone_number) as whatsapp_account_phone,
-                       -- ✅ Adicionar ID da conta de integração para envio
-                       COALESCE(c.integration_account_id, ia.id) as resolved_integration_account_id,
+                       -- ✅ UNIFICADO: Priorizar integration_accounts, depois fallback via whatsapp_id, depois whatsapp_accounts
+                       COALESCE(ia.name, ia_fallback.name, wa.name) as whatsapp_account_name,
+                       COALESCE(ia.phone_number, ia_fallback.phone_number, wa.phone_number) as whatsapp_account_phone,
+                       -- ✅ Resolver integration_account_id: direto -> via whatsapp_id -> NULL
+                       COALESCE(c.integration_account_id, ia_fallback.id) as resolved_integration_account_id,
                        f.name as funnel_name,
                        fs.name as stage_name,
                        (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact' AND m.read_at IS NULL) as unread_count
                 FROM conversations c
                 LEFT JOIN contacts ct ON c.contact_id = ct.id
                 LEFT JOIN users u ON c.agent_id = u.id
-                -- ✅ UNIFICADO: JOIN com integration_accounts PRIMEIRO
+                -- ✅ JOIN direto: integration_accounts pelo ID armazenado na conversa
                 LEFT JOIN integration_accounts ia ON c.integration_account_id = ia.id
-                -- ✅ Fallback: JOIN com whatsapp_accounts para conversas antigas
-                LEFT JOIN whatsapp_accounts wa ON c.whatsapp_account_id = wa.id AND c.integration_account_id IS NULL
+                -- ✅ JOIN fallback: integration_accounts via whatsapp_id (quando integration_account_id é NULL)
+                LEFT JOIN integration_accounts ia_fallback ON ia_fallback.whatsapp_id = c.whatsapp_account_id 
+                    AND c.integration_account_id IS NULL
+                -- ✅ Último fallback: whatsapp_accounts (quando nenhuma integration_account foi encontrada)
+                LEFT JOIN whatsapp_accounts wa ON c.whatsapp_account_id = wa.id 
+                    AND c.integration_account_id IS NULL 
+                    AND ia_fallback.id IS NULL
                 LEFT JOIN funnels f ON c.funnel_id = f.id
                 LEFT JOIN funnel_stages fs ON c.funnel_stage_id = fs.id
                 WHERE c.id = ?";

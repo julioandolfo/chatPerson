@@ -152,8 +152,106 @@ if (isset($_GET['action']) && $_GET['action'] === 'fix_divergencias') {
     }
 }
 
+// ── Diagnóstico de Automação ──
+$automationData = null;
+if ($activeTab === 'automacao') {
+    try {
+        require_once __DIR__ . '/../config/bootstrap.php';
+        $db = \App\Helpers\Database::getInstance();
+        
+        // 1. Todas as automações com detalhes
+        $automations = $db->query("
+            SELECT a.*, 
+                   f.name as funnel_name, 
+                   fs.name as stage_name,
+                   (SELECT COUNT(*) FROM automation_nodes an WHERE an.automation_id = a.id) as total_nodes
+            FROM automations a
+            LEFT JOIN funnels f ON a.funnel_id = f.id
+            LEFT JOIN funnel_stages fs ON a.stage_id = fs.id
+            ORDER BY a.status ASC, a.is_active DESC, a.updated_at DESC
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+        
+        // 2. Últimas execuções de automação
+        $recentExecutions = $db->query("
+            SELECT ae.*, 
+                   a.name as automation_name, 
+                   a.trigger_type,
+                   c.contact_id,
+                   ct.name as contact_name,
+                   ct.phone as contact_phone,
+                   COALESCE(ia.name, wa.name) as account_name,
+                   COALESCE(ia.phone_number, wa.phone_number) as account_phone
+            FROM automation_executions ae
+            LEFT JOIN automations a ON ae.automation_id = a.id
+            LEFT JOIN conversations c ON ae.conversation_id = c.id
+            LEFT JOIN contacts ct ON c.contact_id = ct.id
+            LEFT JOIN integration_accounts ia ON c.integration_account_id = ia.id
+            LEFT JOIN whatsapp_accounts wa ON c.whatsapp_account_id = wa.id AND c.integration_account_id IS NULL
+            ORDER BY ae.created_at DESC
+            LIMIT 50
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+        
+        // 3. Totais
+        $totalAutomations = count($automations);
+        $totalActive = 0;
+        $totalInactive = 0;
+        foreach ($automations as $a) {
+            if ($a['status'] === 'active' && $a['is_active']) {
+                $totalActive++;
+            } else {
+                $totalInactive++;
+            }
+        }
+        
+        $totalExecutions = $db->query("SELECT COUNT(*) as c FROM automation_executions")->fetch(\PDO::FETCH_ASSOC)['c'];
+        $totalExecutionsToday = $db->query("SELECT COUNT(*) as c FROM automation_executions WHERE DATE(created_at) = CURDATE()")->fetch(\PDO::FETCH_ASSOC)['c'];
+        $totalFailed = $db->query("SELECT COUNT(*) as c FROM automation_executions WHERE status = 'failed'")->fetch(\PDO::FETCH_ASSOC)['c'];
+        $totalFailedToday = $db->query("SELECT COUNT(*) as c FROM automation_executions WHERE status = 'failed' AND DATE(created_at) = CURDATE()")->fetch(\PDO::FETCH_ASSOC)['c'];
+        
+        // 4. Mapeamento de accounts para referência
+        $allIntegrationAccounts = $db->query("
+            SELECT id, name, phone_number, channel, status FROM integration_accounts ORDER BY id
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+        $allWhatsappAccounts = $db->query("
+            SELECT id, name, phone_number, status FROM whatsapp_accounts ORDER BY id
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+        
+        // Indexar por ID para lookup rápido
+        $iaById = [];
+        foreach ($allIntegrationAccounts as $ia) {
+            $iaById[$ia['id']] = $ia;
+        }
+        $waById = [];
+        foreach ($allWhatsappAccounts as $wa) {
+            $waById[$wa['id']] = $wa;
+        }
+        
+        $automationData = [
+            'automations' => $automations,
+            'recentExecutions' => $recentExecutions,
+            'totalAutomations' => $totalAutomations,
+            'totalActive' => $totalActive,
+            'totalInactive' => $totalInactive,
+            'totalExecutions' => $totalExecutions,
+            'totalExecutionsToday' => $totalExecutionsToday,
+            'totalFailed' => $totalFailed,
+            'totalFailedToday' => $totalFailedToday,
+            'iaById' => $iaById,
+            'waById' => $waById,
+        ];
+    } catch (\Exception $e) {
+        $automationData = ['error' => $e->getMessage()];
+    }
+}
+
 // ── Logs ──
-$logFile = __DIR__ . '/../storage/logs/api.log';
+$logFileMap = [
+    'logs' => __DIR__ . '/../storage/logs/api.log',
+    'automacao' => __DIR__ . '/../storage/logs/automacao.log',
+    'quepasa' => __DIR__ . '/../storage/logs/quepasa.log',
+    'conversas' => __DIR__ . '/../storage/logs/conversas.log',
+];
+$logFile = $logFileMap[$activeTab] ?? $logFileMap['logs'];
 $maxLines = isset($_GET['lines']) ? (int)$_GET['lines'] : 500;
 $filter = isset($_GET['filter']) ? $_GET['filter'] : '';
 $level = isset($_GET['level']) ? $_GET['level'] : '';
@@ -564,7 +662,8 @@ function colorizeLog($log) {
 <body>
     <div class="container">
         <div class="tabs">
-            <a href="?tab=logs" class="tab <?= $activeTab === 'logs' ? 'active' : '' ?>">📋 Logs</a>
+            <a href="?tab=logs" class="tab <?= $activeTab === 'logs' ? 'active' : '' ?>">📋 Logs API</a>
+            <a href="?tab=automacao" class="tab <?= $activeTab === 'automacao' ? 'active' : '' ?>">🤖 Automações</a>
             <a href="?tab=unificacao" class="tab <?= $activeTab === 'unificacao' ? 'active' : '' ?>">🔗 Unificação Contas</a>
         </div>
         
@@ -905,6 +1004,358 @@ WHERE c.whatsapp_account_id IS NOT NULL
         </div>
         
         <?php endif; // unification ?>
+        
+        <div class="footer">
+            <p>Última atualização: <?= date('d/m/Y H:i:s') ?></p>
+        </div>
+        
+        <?php elseif ($activeTab === 'automacao'): ?>
+        <!-- ═══════════════ ABA AUTOMAÇÃO ═══════════════ -->
+        
+        <?php if (isset($automationData['error'])): ?>
+            <div class="alert alert-error">❌ Erro ao carregar dados: <?= htmlspecialchars($automationData['error']) ?></div>
+        <?php else: ?>
+        
+        <header>
+            <h1>🤖 Diagnóstico de Automações</h1>
+            <p style="color: #858585; font-size: 13px;">Visualize todas as automações, suas configurações de contas/triggers e execuções recentes.</p>
+        </header>
+        
+        <!-- Resumo -->
+        <div class="grid-4">
+            <div class="grid-card">
+                <div class="label">Total Automações</div>
+                <div class="big-number blue"><?= $automationData['totalAutomations'] ?></div>
+            </div>
+            <div class="grid-card">
+                <div class="label">Ativas</div>
+                <div class="big-number green"><?= $automationData['totalActive'] ?></div>
+            </div>
+            <div class="grid-card">
+                <div class="label">Inativas</div>
+                <div class="big-number yellow"><?= $automationData['totalInactive'] ?></div>
+            </div>
+            <div class="grid-card">
+                <div class="label">Execuções Hoje</div>
+                <div class="big-number green"><?= $automationData['totalExecutionsToday'] ?></div>
+            </div>
+            <div class="grid-card">
+                <div class="label">Execuções Total</div>
+                <div class="big-number blue"><?= $automationData['totalExecutions'] ?></div>
+            </div>
+            <div class="grid-card">
+                <div class="label">Falhas Hoje</div>
+                <div class="big-number <?= $automationData['totalFailedToday'] > 0 ? 'red' : 'green' ?>"><?= $automationData['totalFailedToday'] ?></div>
+            </div>
+            <div class="grid-card">
+                <div class="label">Falhas Total</div>
+                <div class="big-number <?= $automationData['totalFailed'] > 0 ? 'red' : 'green' ?>"><?= $automationData['totalFailed'] ?></div>
+            </div>
+        </div>
+        
+        <!-- Lista de Automações -->
+        <div class="diag-section">
+            <h2>📋 Todas as Automações (<?= $automationData['totalAutomations'] ?>)</h2>
+            <p style="color: #858585; font-size: 12px; margin-bottom: 15px;">
+                Detalhes de cada automação, incluindo trigger_config com IDs de contas configuradas e seus telefones correspondentes.
+            </p>
+            
+            <?php if (empty($automationData['automations'])): ?>
+                <p style="color: #858585;">Nenhuma automação cadastrada.</p>
+            <?php else: ?>
+                <div style="overflow-x: auto;">
+                <table class="diag-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nome</th>
+                            <th>Trigger</th>
+                            <th>Status</th>
+                            <th>Funil / Etapa</th>
+                            <th>Nós</th>
+                            <th>Contas Configuradas (trigger_config)</th>
+                            <th>Atualizado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($automationData['automations'] as $auto): 
+                            $isActive = ($auto['status'] === 'active' && $auto['is_active']);
+                            $config = !empty($auto['trigger_config']) ? json_decode($auto['trigger_config'], true) : [];
+                            
+                            // Resolver IDs de contas configuradas
+                            $configuredAccounts = [];
+                            
+                            // integration_account_ids (array)
+                            if (!empty($config['integration_account_ids']) && is_array($config['integration_account_ids'])) {
+                                foreach ($config['integration_account_ids'] as $iaId) {
+                                    $ia = $automationData['iaById'][$iaId] ?? null;
+                                    $configuredAccounts[] = [
+                                        'type' => 'IA',
+                                        'id' => $iaId,
+                                        'name' => $ia ? $ia['name'] : '???',
+                                        'phone' => $ia ? $ia['phone_number'] : '???',
+                                        'status' => $ia ? $ia['status'] : 'unknown',
+                                    ];
+                                }
+                            }
+                            // integration_account_id (single)
+                            if (!empty($config['integration_account_id'])) {
+                                $iaId = $config['integration_account_id'];
+                                $ia = $automationData['iaById'][$iaId] ?? null;
+                                $configuredAccounts[] = [
+                                    'type' => 'IA',
+                                    'id' => $iaId,
+                                    'name' => $ia ? $ia['name'] : '???',
+                                    'phone' => $ia ? $ia['phone_number'] : '???',
+                                    'status' => $ia ? $ia['status'] : 'unknown',
+                                ];
+                            }
+                            // whatsapp_account_ids (array)
+                            if (!empty($config['whatsapp_account_ids']) && is_array($config['whatsapp_account_ids'])) {
+                                foreach ($config['whatsapp_account_ids'] as $waId) {
+                                    $wa = $automationData['waById'][$waId] ?? null;
+                                    $configuredAccounts[] = [
+                                        'type' => 'WA',
+                                        'id' => $waId,
+                                        'name' => $wa ? $wa['name'] : '???',
+                                        'phone' => $wa ? $wa['phone_number'] : '???',
+                                        'status' => $wa ? $wa['status'] : 'unknown',
+                                    ];
+                                }
+                            }
+                            // whatsapp_account_id (single)
+                            if (!empty($config['whatsapp_account_id'])) {
+                                $waId = $config['whatsapp_account_id'];
+                                $wa = $automationData['waById'][$waId] ?? null;
+                                $configuredAccounts[] = [
+                                    'type' => 'WA',
+                                    'id' => $waId,
+                                    'name' => $wa ? $wa['name'] : '???',
+                                    'phone' => $wa ? $wa['phone_number'] : '???',
+                                    'status' => $wa ? $wa['status'] : 'unknown',
+                                ];
+                            }
+                            
+                            // Outros campos do config
+                            $otherConfig = array_diff_key($config, array_flip([
+                                'integration_account_ids', 'integration_account_id', 
+                                'whatsapp_account_ids', 'whatsapp_account_id'
+                            ]));
+                        ?>
+                        <tr style="<?= !$isActive ? 'opacity: 0.5;' : '' ?>">
+                            <td><?= $auto['id'] ?></td>
+                            <td><strong style="color: #fff;"><?= htmlspecialchars($auto['name']) ?></strong></td>
+                            <td>
+                                <span class="badge" style="background: #007acc; color: #fff;"><?= htmlspecialchars($auto['trigger_type']) ?></span>
+                                <?php if (!empty($config['keyword'])): ?>
+                                    <br><small style="color: #ce9178;">keyword: "<?= htmlspecialchars($config['keyword']) ?>"</small>
+                                <?php endif; ?>
+                                <?php if (!empty($config['channel'])): ?>
+                                    <br><small style="color: #9cdcfe;">channel: <?= htmlspecialchars($config['channel']) ?></small>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if ($isActive): ?>
+                                    <span class="badge badge-ok">ATIVO</span>
+                                <?php else: ?>
+                                    <span class="badge badge-miss">INATIVO</span>
+                                    <br><small style="color: #858585;">status=<?= $auto['status'] ?>, is_active=<?= $auto['is_active'] ? 'true' : 'false' ?></small>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if (!empty($auto['funnel_name'])): ?>
+                                    <?= htmlspecialchars($auto['funnel_name']) ?>
+                                    <?php if (!empty($auto['stage_name'])): ?>
+                                        <br><small style="color: #858585;">→ <?= htmlspecialchars($auto['stage_name']) ?></small>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <span style="color: #555;">Todos</span>
+                                <?php endif; ?>
+                            </td>
+                            <td style="text-align: center;"><?= $auto['total_nodes'] ?></td>
+                            <td>
+                                <?php if (empty($configuredAccounts)): ?>
+                                    <span style="color: #4ec9b0;">🌐 Todas as contas</span>
+                                    <?php if (!empty($otherConfig)): ?>
+                                        <br><small style="color: #858585;">config: <?= htmlspecialchars(json_encode($otherConfig, JSON_UNESCAPED_UNICODE)) ?></small>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <?php foreach ($configuredAccounts as $ca): ?>
+                                        <div style="margin: 2px 0;">
+                                            <span class="badge <?= $ca['type'] === 'IA' ? 'badge-ok' : 'badge-warn' ?>"><?= $ca['type'] ?> #<?= $ca['id'] ?></span>
+                                            <span style="color: #d4d4d4;"><?= htmlspecialchars($ca['name']) ?></span>
+                                            <span style="color: #858585;">(<?= $ca['phone'] ?>)</span>
+                                            <?php if ($ca['status'] !== 'active'): ?>
+                                                <span class="badge badge-miss"><?= $ca['status'] ?></span>
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endforeach; ?>
+                                    <?php if (!empty($otherConfig)): ?>
+                                        <small style="color: #858585;">+ <?= htmlspecialchars(json_encode($otherConfig, JSON_UNESCAPED_UNICODE)) ?></small>
+                                    <?php endif; ?>
+                                <?php endif; ?>
+                            </td>
+                            <td style="color: #858585; font-size: 12px; white-space: nowrap;"><?= $auto['updated_at'] ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                </div>
+            <?php endif; ?>
+        </div>
+        
+        <!-- Últimas Execuções -->
+        <div class="diag-section <?= $automationData['totalFailedToday'] > 0 ? 'danger' : 'success' ?>">
+            <h2>🕐 Últimas 50 Execuções de Automação</h2>
+            <p style="color: #858585; font-size: 12px; margin-bottom: 15px;">
+                Histórico recente de execuções. Verifique se a automação esperada aparece aqui ou não.
+            </p>
+            
+            <?php if (empty($automationData['recentExecutions'])): ?>
+                <p style="color: #858585;">Nenhuma execução registrada.</p>
+            <?php else: ?>
+                <div style="overflow-x: auto;">
+                <table class="diag-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Automação</th>
+                            <th>Trigger</th>
+                            <th>Conversa</th>
+                            <th>Contato</th>
+                            <th>Conta WhatsApp</th>
+                            <th>Status</th>
+                            <th>Erro</th>
+                            <th>Data</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($automationData['recentExecutions'] as $exec): ?>
+                        <tr>
+                            <td><?= $exec['id'] ?></td>
+                            <td>
+                                <strong style="color: #fff;"><?= htmlspecialchars($exec['automation_name'] ?? 'ID ' . $exec['automation_id']) ?></strong>
+                                <br><small style="color: #858585;">auto #<?= $exec['automation_id'] ?></small>
+                            </td>
+                            <td>
+                                <span class="badge" style="background: #007acc; color: #fff;"><?= htmlspecialchars($exec['trigger_type'] ?? '?') ?></span>
+                            </td>
+                            <td style="text-align: center;">#<?= $exec['conversation_id'] ?></td>
+                            <td>
+                                <?= htmlspecialchars($exec['contact_name'] ?? '?') ?>
+                                <?php if (!empty($exec['contact_phone'])): ?>
+                                    <br><small style="color: #858585;"><?= $exec['contact_phone'] ?></small>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?= htmlspecialchars($exec['account_name'] ?? '?') ?>
+                                <?php if (!empty($exec['account_phone'])): ?>
+                                    <br><small style="color: #858585;"><?= $exec['account_phone'] ?></small>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php 
+                                $statusClass = 'badge-ok';
+                                if ($exec['status'] === 'failed') $statusClass = 'badge-miss';
+                                elseif ($exec['status'] === 'running') $statusClass = 'badge-warn';
+                                elseif ($exec['status'] === 'pending') $statusClass = 'badge-na';
+                                ?>
+                                <span class="badge <?= $statusClass ?>"><?= strtoupper($exec['status']) ?></span>
+                            </td>
+                            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                <?php if (!empty($exec['error_message'])): ?>
+                                    <span style="color: #f48771;" title="<?= htmlspecialchars($exec['error_message']) ?>">
+                                        <?= htmlspecialchars(substr($exec['error_message'], 0, 80)) ?>
+                                    </span>
+                                <?php else: ?>
+                                    <span style="color: #555;">—</span>
+                                <?php endif; ?>
+                            </td>
+                            <td style="color: #858585; font-size: 12px; white-space: nowrap;"><?= $exec['created_at'] ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                </div>
+            <?php endif; ?>
+        </div>
+        
+        <!-- Checklist de Debug -->
+        <div class="diag-section warning">
+            <h2>🔍 Checklist: Por que minha automação não executou?</h2>
+            <div style="line-height: 2; font-size: 13px;">
+                <p>Se uma automação não está executando, verifique os seguintes pontos:</p>
+                <ol style="padding-left: 20px; color: #d4d4d4;">
+                    <li><strong style="color: #4ec9b0;">Status ativo?</strong> — A automação precisa ter <code style="color: #ce9178;">status='active'</code> E <code style="color: #ce9178;">is_active=TRUE</code></li>
+                    <li><strong style="color: #4ec9b0;">Trigger type correto?</strong> — 
+                        <code style="color: #ce9178;">new_conversation</code> = nova conversa criada, 
+                        <code style="color: #ce9178;">message_received</code> = mensagem recebida do contato,
+                        <code style="color: #ce9178;">agent_message_sent</code> = mensagem do agente
+                    </li>
+                    <li><strong style="color: #4ec9b0;">Conta WhatsApp configurada?</strong> — Se a automação tem <code style="color: #ce9178;">integration_account_ids</code> ou <code style="color: #ce9178;">whatsapp_account_ids</code> no trigger_config, a conversa precisa estar associada a uma dessas contas</li>
+                    <li><strong style="color: #4ec9b0;">Funil/Etapa corretos?</strong> — Se a automação tem funnel_id ou stage_id definidos, a conversa precisa estar nesse funil/etapa</li>
+                    <li><strong style="color: #4ec9b0;">Canal correto?</strong> — Se o trigger_config tem <code style="color: #ce9178;">channel</code>, a conversa precisa ser desse canal</li>
+                    <li><strong style="color: #4ec9b0;">Keyword definida?</strong> — Para trigger <code style="color: #ce9178;">message_received</code>, se há keyword, a mensagem precisa conter essa palavra</li>
+                    <li><strong style="color: #4ec9b0;">Conversa tem integration_account_id?</strong> — Verifique na aba "Unificação Contas" se a conversa possui o campo preenchido</li>
+                    <li><strong style="color: #4ec9b0;">Chatbot/IA ativo?</strong> — Se a conversa tem chatbot ou IA ativo, <code style="color: #ce9178;">message_received</code> pode ser interceptado pelo chatbot ao invés da automação</li>
+                </ol>
+            </div>
+        </div>
+        
+        <!-- Logs de Automação -->
+        <div class="diag-section">
+            <h2>📄 Logs de Automação (automacao.log)</h2>
+            <p style="color: #858585; font-size: 12px; margin-bottom: 15px;">
+                Últimas <?= $maxLines ?> linhas do arquivo de log de automações. 
+                <a href="?tab=automacao&lines=1000" style="color: #4ec9b0;">Ver 1000</a> | 
+                <a href="?tab=automacao&lines=5000" style="color: #4ec9b0;">Ver 5000</a>
+            </p>
+            
+            <div class="filters" style="margin-bottom: 15px; border-left: none; padding: 10px;">
+                <form method="GET" class="filter-row">
+                    <input type="hidden" name="tab" value="automacao">
+                    <div class="filter-group">
+                        <label>Buscar nos logs</label>
+                        <input type="text" name="filter" placeholder="executeForNew, matchesAccount, REJEITADO..." value="<?= htmlspecialchars($filter) ?>" style="min-width: 300px;">
+                    </div>
+                    <div class="filter-group">
+                        <label>Linhas</label>
+                        <select name="lines">
+                            <option value="100" <?= $maxLines === 100 ? 'selected' : '' ?>>100</option>
+                            <option value="500" <?= $maxLines === 500 ? 'selected' : '' ?>>500</option>
+                            <option value="1000" <?= $maxLines === 1000 ? 'selected' : '' ?>>1000</option>
+                            <option value="5000" <?= $maxLines === 5000 ? 'selected' : '' ?>>5000</option>
+                        </select>
+                    </div>
+                    <div class="actions">
+                        <button type="submit">🔍 Filtrar</button>
+                        <button type="button" class="secondary" onclick="window.location.href='?tab=automacao'">🔄 Limpar</button>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="logs-container" style="max-height: 600px; overflow-y: auto;">
+                <?php if (empty($logs) || (count($logs) === 1 && strpos($logs[0], 'não encontrado') !== false)): ?>
+                    <div class="no-logs">
+                        <h2>Nenhum log de automação encontrado</h2>
+                        <p>Arquivo: <?= htmlspecialchars($logFile) ?></p>
+                        <p>Execute uma ação que dispare automação e os logs aparecerão aqui.</p>
+                    </div>
+                <?php else: ?>
+                    <?php foreach ($logs as $log): 
+                        $class = '';
+                        if (stripos($log, 'REJEITADO') !== false || stripos($log, '❌') !== false || stripos($log, 'ERROR') !== false || stripos($log, 'falhou') !== false) $class = 'error';
+                        elseif (stripos($log, '⚠') !== false || stripos($log, 'WARNING') !== false) $class = 'warning';
+                        elseif (stripos($log, '✅') !== false || stripos($log, 'INÍCIO') !== false || stripos($log, 'FIM') !== false) $class = 'info';
+                        elseif (stripos($log, '🔍') !== false || stripos($log, 'matchesAccount') !== false) $class = 'debug';
+                    ?>
+                        <div class="log-line <?= $class ?>"><?= colorizeLog($log) ?></div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <?php endif; // automationData error ?>
         
         <div class="footer">
             <p>Última atualização: <?= date('d/m/Y H:i:s') ?></p>

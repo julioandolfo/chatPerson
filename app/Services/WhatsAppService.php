@@ -2295,8 +2295,7 @@ class WhatsAppService
                             $conversationData['stage_id'] = $account['default_stage_id'];
                         }
                         
-                        // ✅ CORREÇÃO: Passar false para NÃO executar automações (é eco de mensagem enviada via API/sistema)
-                        $conversation = \App\Services\ConversationService::create($conversationData, false);
+                        $conversation = \App\Services\ConversationService::create($conversationData);
                     } catch (\Exception $e) {
                         Logger::quepasa("Erro ao criar conversa via ConversationService: " . $e->getMessage());
                         $fallbackData = [
@@ -2395,21 +2394,15 @@ class WhatsAppService
                 Logger::quepasa("processWebhook - ✅ Mensagem não duplicada. Criando mensagem OUTGOING: conversation_id={$conversation['id']}, sender_type=agent, sender_id={$userId}");
                 
                 try {
-                    // ✅ CORREÇÃO: skipAutomations=true para NÃO disparar automações em eco de webhook
                     $messageId = \App\Services\ConversationService::sendMessage(
                         $conversation['id'],
                         $message ?: '',
                         'agent', // sender_type = agent (outgoing)
                         $userId, // sender_id = usuário atual ou padrão
-                        $attachments,
-                        null,  // messageType
-                        null,  // quotedMessageId
-                        null,  // aiAgentId
-                        null,  // messageTimestamp
-                        true   // skipAutomations = true (eco de mensagem enviada via API/sistema)
+                        $attachments
                     );
                     
-                    Logger::quepasa("processWebhook - Mensagem OUTGOING criada com sucesso (automações PULADAS): messageId={$messageId}");
+                    Logger::quepasa("processWebhook - Mensagem OUTGOING criada com sucesso: messageId={$messageId}");
                 } catch (\Exception $e) {
                     Logger::quepasa("Erro ao criar mensagem outgoing via ConversationService: " . $e->getMessage());
                     // Fallback: criar mensagem diretamente

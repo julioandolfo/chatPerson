@@ -1323,7 +1323,7 @@ class ConversationService
     /**
      * Enviar mensagem na conversa
      */
-    public static function sendMessage(int $conversationId, string $content, string $senderType = 'agent', ?int $senderId = null, array $attachments = [], ?string $messageType = null, ?int $quotedMessageId = null, ?int $aiAgentId = null, ?int $messageTimestamp = null, bool $skipAutomations = false): ?int
+    public static function sendMessage(int $conversationId, string $content, string $senderType = 'agent', ?int $senderId = null, array $attachments = [], ?string $messageType = null, ?int $quotedMessageId = null, ?int $aiAgentId = null, ?int $messageTimestamp = null): ?int
     {
         \App\Helpers\Logger::info("═══ ConversationService::sendMessage INÍCIO ═══ conv={$conversationId}, type={$senderType}, sender={$senderId}, aiAgent={$aiAgentId}, contentLen=" . strlen($content) . ", attachments=" . count($attachments));
         
@@ -2158,44 +2158,39 @@ class ConversationService
             }
         }
         
-        // Executar automações e agentes (APENAS se não foi solicitado pular - ex: webhook echo de API)
-        if ($skipAutomations) {
-            \App\Helpers\Logger::info("ConversationService::sendMessage - skipAutomations=true, PULANDO automações e Kanban Agents (messageId={$messageId})");
-        } else {
-            // Executar automações para mensagem recebida (se for do contato)
-            if ($senderType === 'contact') {
-                \App\Helpers\Logger::info("ConversationService::sendMessage - DISPARANDO executeForMessageReceived (messageId={$messageId})");
-                try {
-                    \App\Services\AutomationService::executeForMessageReceived($messageId);
-                    \App\Helpers\Logger::info("ConversationService::sendMessage - executeForMessageReceived CONCLUÍDO");
-                } catch (\Exception $e) {
-                    \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO ao executar automações: " . $e->getMessage());
-                    error_log("Erro ao executar automações: " . $e->getMessage());
-                }
-            }
-            
-            // Executar automações para mensagem enviada por agente (instantâneo)
-            if ($senderType === 'agent') {
-                \App\Helpers\Logger::info("ConversationService::sendMessage - DISPARANDO executeForAgentMessageSent (messageId={$messageId})");
-                try {
-                    \App\Services\AutomationService::executeForAgentMessageSent($messageId);
-                    \App\Helpers\Logger::info("ConversationService::sendMessage - executeForAgentMessageSent CONCLUÍDO");
-                } catch (\Exception $e) {
-                    \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO ao executar automações de agente: " . $e->getMessage());
-                    error_log("Erro ao executar automações de agente: " . $e->getMessage());
-                }
-            }
-            
-            // Executar Agentes Kanban instantâneos
+        // Executar automações para mensagem recebida (se for do contato)
+        if ($senderType === 'contact') {
+            \App\Helpers\Logger::info("ConversationService::sendMessage - DISPARANDO executeForMessageReceived (messageId={$messageId})");
             try {
-                $kanbanTriggerType = ($senderType === 'contact') ? 'client_message' : 'agent_message';
-                \App\Helpers\Logger::info("ConversationService::sendMessage - DISPARANDO Kanban Agents instantâneos (trigger: $kanbanTriggerType)");
-                \App\Services\KanbanAgentService::executeInstantAgents($conversationId, $kanbanTriggerType);
-                \App\Helpers\Logger::info("ConversationService::sendMessage - Kanban Agents instantâneos CONCLUÍDO");
+                \App\Services\AutomationService::executeForMessageReceived($messageId);
+                \App\Helpers\Logger::info("ConversationService::sendMessage - executeForMessageReceived CONCLUÍDO");
             } catch (\Exception $e) {
-                \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO ao executar Kanban Agents: " . $e->getMessage());
-                error_log("Erro ao executar Kanban Agents: " . $e->getMessage());
+                \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO ao executar automações: " . $e->getMessage());
+                error_log("Erro ao executar automações: " . $e->getMessage());
             }
+        }
+        
+        // Executar automações para mensagem enviada por agente (instantâneo)
+        if ($senderType === 'agent') {
+            \App\Helpers\Logger::info("ConversationService::sendMessage - DISPARANDO executeForAgentMessageSent (messageId={$messageId})");
+            try {
+                \App\Services\AutomationService::executeForAgentMessageSent($messageId);
+                \App\Helpers\Logger::info("ConversationService::sendMessage - executeForAgentMessageSent CONCLUÍDO");
+            } catch (\Exception $e) {
+                \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO ao executar automações de agente: " . $e->getMessage());
+                error_log("Erro ao executar automações de agente: " . $e->getMessage());
+            }
+        }
+        
+        // Executar Agentes Kanban instantâneos
+        try {
+            $kanbanTriggerType = ($senderType === 'contact') ? 'client_message' : 'agent_message';
+            \App\Helpers\Logger::info("ConversationService::sendMessage - DISPARANDO Kanban Agents instantâneos (trigger: $kanbanTriggerType)");
+            \App\Services\KanbanAgentService::executeInstantAgents($conversationId, $kanbanTriggerType);
+            \App\Helpers\Logger::info("ConversationService::sendMessage - Kanban Agents instantâneos CONCLUÍDO");
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO ao executar Kanban Agents: " . $e->getMessage());
+            error_log("Erro ao executar Kanban Agents: " . $e->getMessage());
         }
 
         \App\Helpers\Logger::info("═══ ConversationService::sendMessage FIM ═══ messageId={$messageId}, conv={$conversationId}");

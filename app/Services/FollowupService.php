@@ -18,27 +18,67 @@ class FollowupService
      */
     public static function runFollowups(): void
     {
+        // ⚠️ DESATIVADO: Todos os followups automáticos estão desativados.
+        // Para ativar, configure um agente de IA do tipo FOLLOWUP nas configurações
+        // e descomente os blocos desejados abaixo.
+        
+        // Verificar se existe algum agente de followup ativo e habilitado
+        $followupAgents = AIAgent::getByType('FOLLOWUP');
+        $hasActiveAgent = false;
+        foreach ($followupAgents as $agent) {
+            if (!empty($agent['enabled'])) {
+                $hasActiveAgent = true;
+                break;
+            }
+        }
+        
+        if (!$hasActiveAgent) {
+            // Sem agente de followup ativo — não processar nada
+            return;
+        }
+        
+        // Verificar configuração de quais tipos estão habilitados
+        $settings = [];
+        if ($hasActiveAgent) {
+            $agentSettings = is_string($followupAgents[0]['settings']) 
+                ? json_decode($followupAgents[0]['settings'], true) 
+                : ($followupAgents[0]['settings'] ?? []);
+            $settings = $agentSettings;
+        }
+        
+        $enabledTypes = $settings['followup_types'] ?? [];
+        
         // 1. Followup de conversas fechadas (geral)
-        $conversations = self::getConversationsNeedingFollowup();
-        foreach ($conversations as $conversation) {
-            try {
-                self::processFollowup($conversation, 'general');
-            } catch (\Exception $e) {
-                error_log("Erro ao processar followup para conversa {$conversation['id']}: " . $e->getMessage());
+        if (in_array('general', $enabledTypes)) {
+            $conversations = self::getConversationsNeedingFollowup();
+            foreach ($conversations as $conversation) {
+                try {
+                    self::processFollowup($conversation, 'general');
+                } catch (\Exception $e) {
+                    error_log("Erro ao processar followup para conversa {$conversation['id']}: " . $e->getMessage());
+                }
             }
         }
         
         // 2. Verificação de satisfação pós-atendimento
-        self::checkPostServiceSatisfaction();
+        if (in_array('satisfaction', $enabledTypes)) {
+            self::checkPostServiceSatisfaction();
+        }
         
         // 3. Reengajamento de contatos inativos
-        self::reengageInactiveContacts();
+        if (in_array('reengagement', $enabledTypes)) {
+            self::reengageInactiveContacts();
+        }
         
         // 4. Followup de leads frios
-        self::followupColdLeads();
+        if (in_array('cold_leads', $enabledTypes)) {
+            self::followupColdLeads();
+        }
         
         // 5. Followup de oportunidades de venda
-        self::followupSalesOpportunities();
+        if (in_array('sales', $enabledTypes)) {
+            self::followupSalesOpportunities();
+        }
     }
 
     /**
@@ -46,12 +86,13 @@ class FollowupService
      */
     private static function getConversationsNeedingFollowup(): array
     {
-        // Buscar conversas fechadas há mais de X dias que precisam de followup
+        // Buscar conversas fechadas entre 3 e 7 dias atrás (janela segura, sem backlog antigo)
         $sql = "SELECT c.*, ct.name as contact_name, ct.phone, ct.email
                 FROM conversations c
                 INNER JOIN contacts ct ON c.contact_id = ct.id
                 WHERE c.status = 'closed'
                 AND c.resolved_at IS NOT NULL
+                AND c.resolved_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
                 AND DATE_ADD(c.resolved_at, INTERVAL 3 DAY) <= NOW()
                 AND c.id NOT IN (
                     SELECT DISTINCT conversation_id 
@@ -62,7 +103,7 @@ class FollowupService
                     AND status = 'active'
                 )
                 ORDER BY c.resolved_at ASC
-                LIMIT 50";
+                LIMIT 5";
         
         return Database::fetchAll($sql);
     }
@@ -243,16 +284,17 @@ class FollowupService
      */
     public static function reengageInactiveContacts(): void
     {
-        // Buscar contatos que não interagem há mais de X dias
+        // Buscar contatos inativos entre 7 e 14 dias (janela segura)
         $sql = "SELECT DISTINCT c.contact_id, ct.name, ct.phone, ct.email,
                        MAX(c.updated_at) as last_interaction
                 FROM conversations c
                 INNER JOIN contacts ct ON c.contact_id = ct.id
                 WHERE c.status IN ('open', 'closed')
                 AND c.updated_at < DATE_SUB(NOW(), INTERVAL 7 DAY)
+                AND c.updated_at >= DATE_SUB(NOW(), INTERVAL 14 DAY)
                 GROUP BY c.contact_id
                 HAVING MAX(c.updated_at) < DATE_SUB(NOW(), INTERVAL 7 DAY)
-                LIMIT 20";
+                LIMIT 3";
         
         $contacts = Database::fetchAll($sql);
         
@@ -287,7 +329,7 @@ class FollowupService
                     )
                     AND JSON_EXTRACT(metadata, '$.satisfaction_check') = TRUE
                 )
-                LIMIT 20";
+                LIMIT 3";
         
         $conversations = Database::fetchAll($sql);
         
@@ -323,6 +365,7 @@ class FollowupService
                 WHERE c.status IN ('open', 'closed')
                 AND (t.name LIKE '%lead%' OR t.name LIKE '%prospect%' OR c.subject LIKE '%lead%')
                 AND c.updated_at < DATE_SUB(NOW(), INTERVAL 14 DAY)
+                AND c.updated_at >= DATE_SUB(NOW(), INTERVAL 21 DAY)
                 GROUP BY c.id
                 HAVING MAX(c.updated_at) < DATE_SUB(NOW(), INTERVAL 14 DAY)
                 AND c.id NOT IN (
@@ -331,7 +374,7 @@ class FollowupService
                     WHERE JSON_EXTRACT(metadata, '$.followup_type') = 'cold_leads'
                     AND status = 'active'
                 )
-                LIMIT 20";
+                LIMIT 3";
         
         $conversations = Database::fetchAll($sql);
         
@@ -362,13 +405,14 @@ class FollowupService
                     t.name LIKE '%proposta%' OR f.name LIKE '%vendas%'
                 )
                 AND c.updated_at < DATE_SUB(NOW(), INTERVAL 3 DAY)
+                AND c.updated_at >= DATE_SUB(NOW(), INTERVAL 10 DAY)
                 AND c.id NOT IN (
                     SELECT DISTINCT conversation_id 
                     FROM ai_conversations 
                     WHERE JSON_EXTRACT(metadata, '$.followup_type') = 'sales'
                     AND status = 'active'
                 )
-                LIMIT 20";
+                LIMIT 3";
         
         $conversations = Database::fetchAll($sql);
         

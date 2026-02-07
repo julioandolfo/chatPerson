@@ -7,6 +7,19 @@ chdir($rootDir);
 // ✅ CRÍTICO: Definir timezone ANTES de qualquer operação com data/hora
 date_default_timezone_set('America/Sao_Paulo');
 
+// ✅ Limite de execução: 90 segundos máximo (evita travar indefinidamente)
+set_time_limit(90);
+
+// ✅ Forçar output imediato (sem buffer) para debug via navegador
+if (php_sapi_name() !== 'cli') {
+    @header('Content-Type: text/plain; charset=utf-8');
+    @header('X-Accel-Buffering: no'); // Nginx
+    @ini_set('output_buffering', '0');
+    @ini_set('zlib.output_compression', '0');
+    if (ob_get_level()) ob_end_flush();
+    ob_implicit_flush(true);
+}
+
 // Carregar bootstrap (que já tem o autoloader e todas as configurações)
 require_once $rootDir . '/config/bootstrap.php';
 
@@ -22,6 +35,17 @@ use App\Jobs\ChatbotTimeoutJob;
 $cacheDir = $rootDir . '/storage/cache';
 if (!is_dir($cacheDir)) {
     @mkdir($cacheDir, 0755, true);
+}
+
+/**
+ * Output com flush imediato
+ */
+function cronEcho(string $msg): void
+{
+    echo "[" . date('Y-m-d H:i:s') . "] {$msg}\n";
+    if (php_sapi_name() !== 'cli') {
+        @flush();
+    }
 }
 
 // ✅ Histórico de execuções do cron
@@ -90,6 +114,37 @@ function cronSaveHistory(): void
     }
 }
 
+/**
+ * Executar um job com proteção de timeout individual
+ */
+function cronRunJob(string $jobName, callable $callback, int $timeoutSeconds = 30): void
+{
+    cronEcho("Executando {$jobName}...");
+    $startTime = microtime(true);
+    
+    try {
+        // Alarme de timeout (apenas Linux/CLI)
+        $hasAlarm = function_exists('pcntl_alarm');
+        if ($hasAlarm) {
+            pcntl_alarm($timeoutSeconds);
+        }
+        
+        $callback();
+        
+        if ($hasAlarm) {
+            pcntl_alarm(0); // Cancelar alarme
+        }
+        
+        $duration = microtime(true) - $startTime;
+        cronLogJob($jobName, $duration);
+        cronEcho("{$jobName} concluído em " . round($duration, 2) . "s");
+    } catch (\Throwable $e) {
+        $duration = microtime(true) - $startTime;
+        cronLogJob($jobName, $duration, 'error', $e->getMessage());
+        cronEcho("❌ {$jobName} ERRO ({$duration}s): " . $e->getMessage());
+    }
+}
+
 try {
     // ✅ Garantir que diretórios de storage existem
     $storageDirs = [
@@ -102,7 +157,7 @@ try {
         }
     }
     
-    echo "[" . date('Y-m-d H:i:s') . "] Iniciando execução dos jobs...\n";
+    cronEcho("Iniciando execução dos jobs...");
     
     // ✅ Arquivo de estado para controlar última execução de cada job
     $stateFile = __DIR__ . '/../storage/cache/jobs_state.json';
@@ -116,60 +171,61 @@ try {
     // ========== JOBS CRÍTICOS (a cada execução) ==========
     
     // ✅ Processar buffers de IA (CRÍTICO - executar sempre)
-    echo "[" . date('Y-m-d H:i:s') . "] Processando buffers de IA...\n";
-    $startTime = microtime(true);
-    try {
-        include __DIR__ . '/process-ai-buffers.php';
-        $duration = microtime(true) - $startTime;
-        cronLogJob('AIBuffers', $duration);
-    } catch (\Throwable $e) {
-        $duration = microtime(true) - $startTime;
-        cronLogJob('AIBuffers', $duration, 'error', $e->getMessage());
-    }
-    echo "[" . date('Y-m-d H:i:s') . "] Buffers de IA processados em " . round($duration, 2) . "s\n";
+    cronRunJob('AIBuffers', function() {
+        $bufferDir = dirname(__DIR__) . '/storage/ai_buffers/';
+        if (!is_dir($bufferDir)) { @mkdir($bufferDir, 0755, true); }
+        $bufferFiles = glob($bufferDir . 'buffer_*.json') ?: [];
+        if (empty($bufferFiles)) { return; }
+        
+        $now = time();
+        foreach ($bufferFiles as $bufferFile) {
+            try {
+                $bufferData = json_decode(@file_get_contents($bufferFile), true);
+                if (!$bufferData) { @unlink($bufferFile); continue; }
+                
+                $conversationId = (int)str_replace(['buffer_', '.json'], '', basename($bufferFile));
+                $agentId = $bufferData['agent_id'] ?? null;
+                $messages = $bufferData['messages'] ?? [];
+                $expiresAt = $bufferData['expires_at'] ?? 0;
+                
+                if (!$conversationId || !$agentId || empty($messages)) { @unlink($bufferFile); continue; }
+                
+                $conversation = \App\Models\Conversation::find($conversationId);
+                if (empty($conversation) || empty($conversation['contact_id'])) { @unlink($bufferFile); continue; }
+                
+                $agentModel = \App\Models\AIAgent::find($agentId);
+                if (empty($agentModel) || empty($agentModel['enabled'])) { @unlink($bufferFile); continue; }
+                
+                if ($expiresAt > $now) { continue; } // Ainda não expirou
+                
+                $groupedMessage = implode("\n\n", array_map(fn($msg) => $msg['content'], $messages));
+                \App\Services\AIAgentService::processMessage($conversationId, $agentId, $groupedMessage);
+                @unlink($bufferFile);
+            } catch (\Throwable $e) {
+                \App\Helpers\Logger::aiTools("[BUFFER ERROR] " . basename($bufferFile) . ": " . $e->getMessage());
+                @unlink($bufferFile);
+            }
+        }
+    }, 30);
     
     // ✅ Executar delays de automações (CRÍTICO - executar sempre)
-    echo "[" . date('Y-m-d H:i:s') . "] Executando AutomationDelayJob...\n";
-    $startTime = microtime(true);
-    try {
+    cronRunJob('AutomationDelayJob', function() {
         AutomationDelayJob::run();
-        $duration = microtime(true) - $startTime;
-        cronLogJob('AutomationDelayJob', $duration);
-    } catch (\Throwable $e) {
-        $duration = microtime(true) - $startTime;
-        cronLogJob('AutomationDelayJob', $duration, 'error', $e->getMessage());
-    }
-    echo "[" . date('Y-m-d H:i:s') . "] AutomationDelayJob concluído em " . round($duration, 2) . "s\n";
+    }, 15);
     
     // ✅ Verificar timeouts de chatbot (CRÍTICO - executar sempre)
-    echo "[" . date('Y-m-d H:i:s') . "] Executando ChatbotTimeoutJob...\n";
-    $startTime = microtime(true);
-    try {
+    cronRunJob('ChatbotTimeoutJob', function() {
         ChatbotTimeoutJob::run();
-        $duration = microtime(true) - $startTime;
-        cronLogJob('ChatbotTimeoutJob', $duration);
-    } catch (\Throwable $e) {
-        $duration = microtime(true) - $startTime;
-        cronLogJob('ChatbotTimeoutJob', $duration, 'error', $e->getMessage());
-    }
-    echo "[" . date('Y-m-d H:i:s') . "] ChatbotTimeoutJob concluído em " . round($duration, 2) . "s\n";
+    }, 15);
     
     // ========== JOBS IMPORTANTES (a cada 2-3 minutos) ==========
     
     // ✅ Monitoramento de SLA (REDUZIDO: a cada 3 minutos)
     $lastSLA = $state['last_sla'] ?? 0;
-    if (($now - $lastSLA) >= 180 || isset($_GET['force_sla'])) { // 3 minutos
-        echo "[" . date('Y-m-d H:i:s') . "] Executando SLAMonitoringJob...\n";
-        $startTime = microtime(true);
-        try {
+    if (($now - $lastSLA) >= 180 || isset($_GET['force_sla'])) {
+        cronRunJob('SLAMonitoringJob', function() {
             SLAMonitoringJob::run();
-            $duration = microtime(true) - $startTime;
-            cronLogJob('SLAMonitoringJob', $duration);
-        } catch (\Throwable $e) {
-            $duration = microtime(true) - $startTime;
-            cronLogJob('SLAMonitoringJob', $duration, 'error', $e->getMessage());
-        }
-        echo "[" . date('Y-m-d H:i:s') . "] SLAMonitoringJob concluído em " . round($duration, 2) . "s\n";
+        }, 15);
         $state['last_sla'] = $now;
     }
     
@@ -177,71 +233,40 @@ try {
     
     // ✅ Monitoramento de fallback de IA (a cada 10 minutos)
     $lastFallback = $state['last_fallback'] ?? 0;
-    if (($now - $lastFallback) >= 600 || isset($_GET['force_fallback'])) { // 10 minutos
-        echo "[" . date('Y-m-d H:i:s') . "] Executando AIFallbackMonitoringJob...\n";
-        $startTime = microtime(true);
-        try {
+    if (($now - $lastFallback) >= 600 || isset($_GET['force_fallback'])) {
+        cronRunJob('AIFallbackMonitoringJob', function() {
             AIFallbackMonitoringJob::run();
-            $duration = microtime(true) - $startTime;
-            cronLogJob('AIFallbackMonitoringJob', $duration);
-        } catch (\Throwable $e) {
-            $duration = microtime(true) - $startTime;
-            cronLogJob('AIFallbackMonitoringJob', $duration, 'error', $e->getMessage());
-        }
-        echo "[" . date('Y-m-d H:i:s') . "] AIFallbackMonitoringJob concluído em " . round($duration, 2) . "s\n";
+        }, 15);
         $state['last_fallback'] = $now;
     }
     
-    // ✅ Followups (a cada 15 minutos)
-    $lastFollowup = $state['last_followup'] ?? 0;
-    if (($now - $lastFollowup) >= 900 || isset($_GET['force_followup'])) { // 15 minutos
-        echo "[" . date('Y-m-d H:i:s') . "] Executando FollowupJob...\n";
-        $startTime = microtime(true);
-        try {
-            FollowupJob::run();
-            $duration = microtime(true) - $startTime;
-            cronLogJob('FollowupJob', $duration);
-        } catch (\Throwable $e) {
-            $duration = microtime(true) - $startTime;
-            cronLogJob('FollowupJob', $duration, 'error', $e->getMessage());
-        }
-        echo "[" . date('Y-m-d H:i:s') . "] FollowupJob concluído em " . round($duration, 2) . "s\n";
-        $state['last_followup'] = $now;
-    }
+    // ❌ Followups DESATIVADOS — não enviar mensagens automáticas
+    // Para reativar, descomente o bloco abaixo:
+    // $lastFollowup = $state['last_followup'] ?? 0;
+    // if (($now - $lastFollowup) >= 900 || isset($_GET['force_followup'])) {
+    //     cronRunJob('FollowupJob', function() {
+    //         FollowupJob::run();
+    //     }, 15);
+    //     $state['last_followup'] = $now;
+    // }
     
     // ========== JOBS LEVES (a cada hora) ==========
     
     // ✅ Monitoramento de custos de IA (a cada hora)
     $lastCost = $state['last_cost'] ?? 0;
-    if (($now - $lastCost) >= 3600 || isset($_GET['force_cost_check'])) { // 1 hora
-        echo "[" . date('Y-m-d H:i:s') . "] Executando AICostMonitoringJob...\n";
-        $startTime = microtime(true);
-        try {
+    if (($now - $lastCost) >= 3600 || isset($_GET['force_cost_check'])) {
+        cronRunJob('AICostMonitoringJob', function() {
             AICostMonitoringJob::run();
-            $duration = microtime(true) - $startTime;
-            cronLogJob('AICostMonitoringJob', $duration);
-        } catch (\Throwable $e) {
-            $duration = microtime(true) - $startTime;
-            cronLogJob('AICostMonitoringJob', $duration, 'error', $e->getMessage());
-        }
-        echo "[" . date('Y-m-d H:i:s') . "] AICostMonitoringJob concluído em " . round($duration, 2) . "s\n";
+        }, 15);
         $state['last_cost'] = $now;
     }
     
     // ✅ Sincronização WooCommerce (a cada hora)
     $lastWC = $state['last_wc'] ?? 0;
-    if (($now - $lastWC) >= 3600 || isset($_GET['force_wc_sync'])) { // 1 hora
-        echo "[" . date('Y-m-d H:i:s') . "] Executando WooCommerceSyncJob...\n";
-        $startTime = microtime(true);
-        try {
+    if (($now - $lastWC) >= 3600 || isset($_GET['force_wc_sync'])) {
+        cronRunJob('WooCommerceSyncJob', function() {
             WooCommerceSyncJob::run();
-            $duration = microtime(true) - $startTime;
-            cronLogJob('WooCommerceSyncJob', $duration);
-        } catch (\Throwable $e) {
-            $duration = microtime(true) - $startTime;
-            cronLogJob('WooCommerceSyncJob', $duration, 'error', $e->getMessage());
-        }
-        echo "[" . date('Y-m-d H:i:s') . "] WooCommerceSyncJob concluído em " . round($duration, 2) . "s\n";
+        }, 15);
         $state['last_wc'] = $now;
     }
     
@@ -252,9 +277,9 @@ try {
     cronSaveHistory();
     
     $totalTime = round(microtime(true) - $cronRunStart, 2);
-    echo "[" . date('Y-m-d H:i:s') . "] ✅ Todos os jobs executados com sucesso em {$totalTime}s\n";
+    cronEcho("✅ Todos os jobs executados com sucesso em {$totalTime}s");
 } catch (\Throwable $e) {
-    echo "[" . date('Y-m-d H:i:s') . "] ❌ ERRO: " . $e->getMessage() . "\n";
+    cronEcho("❌ ERRO FATAL: " . $e->getMessage());
     error_log("Erro ao executar jobs agendados: " . $e->getMessage() . " em " . $e->getFile() . ":" . $e->getLine());
     
     $cronStatus = 'error';

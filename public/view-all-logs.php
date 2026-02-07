@@ -125,6 +125,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'clear_lock') {
     }
 }
 
+// ── Ação: Limpar histórico do cron ──
+if (isset($_GET['action']) && $_GET['action'] === 'clear_cron_history') {
+    $cronHistFile = __DIR__ . '/../storage/cache/cron_history.json';
+    if (file_exists($cronHistFile)) {
+        @unlink($cronHistFile);
+    }
+    $clearLockResult = ['success' => true, 'message' => 'Histórico do cron limpo. Próxima execução registrará novo histórico.'];
+}
+
 // ── Ação: Corrigir conversas ──
 $fixResult = null;
 if (isset($_GET['action']) && $_GET['action'] === 'fix_conversations') {
@@ -1197,25 +1206,42 @@ WHERE c.whatsapp_account_id IS NOT NULL
                 <p style="color: #858585; font-size: 12px; margin-top: 5px;">Verifique: <code style="color: #ce9178;">crontab -l</code> deve conter algo como: <code style="color: #ce9178;">* * * * * php /caminho/public/run-scheduled-jobs.php</code></p>
                 <?php 
                     $lockFiles = ['/tmp/run_scheduled_jobs.lock', __DIR__ . '/../storage/cache/jobs.lock'];
-                    $lockFound = false;
+                    $lockLocked = false;
                     foreach ($lockFiles as $lf) {
-                        if (file_exists($lf)):
-                            $lockAge = time() - filemtime($lf);
-                            $lockFound = true;
+                        if (file_exists($lf)) {
+                            // Verificar se o arquivo está REALMENTE trancado (em uso por outro processo)
+                            $testFp = @fopen($lf, 'r');
+                            $isActuallyLocked = false;
+                            if ($testFp) {
+                                $isActuallyLocked = !@flock($testFp, LOCK_EX | LOCK_NB);
+                                if (!$isActuallyLocked) @flock($testFp, LOCK_UN);
+                                @fclose($testFp);
+                            }
+                            
+                            if ($isActuallyLocked) {
+                                $lockAge = time() - filemtime($lf);
+                                $lockLocked = true;
                 ?>
-                <p style="color: #dcdcaa; font-size: 12px; margin-top: 5px;">📁 Lock file existe em <code style="color: #ce9178;"><?= $lf ?></code> (idade: <?= round($lockAge / 60, 1) ?> min). Se > 5 min, pode estar travado. 
-                    <a href="?tab=automacao&action=clear_lock" style="color: #4ec9b0;" onclick="return confirm('Limpar arquivo de lock? Isso pode causar execuções duplicadas se o cron estiver realmente rodando.')">🔓 Limpar Lock</a>
+                <p style="color: #dcdcaa; font-size: 12px; margin-top: 5px;">🔒 Lock <strong>ATIVO</strong> em <code style="color: #ce9178;"><?= $lf ?></code> (rodando há <?= round($lockAge / 60, 1) ?> min). Se > 5 min, pode estar travado. 
+                    <a href="?tab=automacao&action=clear_lock" style="color: #4ec9b0;" onclick="return confirm('Limpar arquivo de lock? Isso pode causar execuções duplicadas se o cron estiver realmente rodando.')">🔓 Forçar Liberação</a>
                 </p>
-                <?php endif; } ?>
-                <?php if (!$lockFound): ?>
-                <p style="color: #6a9955; font-size: 12px; margin-top: 5px;">✅ Nenhum lock file ativo encontrado.</p>
+                <?php
+                            }
+                        }
+                    }
+                    if (!$lockLocked): ?>
+                <p style="color: #6a9955; font-size: 12px; margin-top: 5px;">✅ Nenhum lock ativo — o cron não está rodando neste momento.</p>
                 <?php endif; ?>
             </div>
             <?php endif; ?>
             
             <!-- Histórico detalhado (últimas 20 execuções) -->
             <details style="margin-top: 10px;">
-                <summary style="cursor: pointer; color: #9cdcfe; font-size: 13px; font-weight: bold;">📜 Histórico de Execuções (últimas <?= min(20, count($cronHistory)) ?> de <?= count($cronHistory) ?>)</summary>
+                <summary style="cursor: pointer; color: #9cdcfe; font-size: 13px; font-weight: bold;">📜 Histórico de Execuções (últimas <?= min(20, count($cronHistory)) ?> de <?= count($cronHistory) ?>)
+                    <?php if (!empty($cronHistory)): ?>
+                        <a href="?tab=automacao&action=clear_cron_history" style="color: #858585; font-size: 11px; margin-left: 10px;" onclick="return confirm('Limpar todo o histórico do cron?')">🗑️ Limpar</a>
+                    <?php endif; ?>
+                </summary>
                 <div style="margin-top: 10px; overflow-x: auto;">
                     <?php if (empty($cronHistory)): ?>
                         <p style="color: #858585; padding: 10px;">Nenhuma execução registrada ainda. O histórico será preenchido após a próxima execução do cron.</p>

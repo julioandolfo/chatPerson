@@ -40,6 +40,9 @@ try {
         $msg = '[process-ai-buffers] Autoload não encontrado. Rode "composer install" ou verifique app/Helpers/autoload.php. Procurei: ' . implode(', ', $autoloadCandidates);
         error_log($msg);
         echo "error: autoload - not found\ncandidates:\n" . implode("\n", $autoloadCandidates) . "\n";
+        if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') !== basename(__FILE__)) {
+            return; // Sendo incluído por outro script
+        }
         http_response_code(500);
         exit(1);
     }
@@ -47,6 +50,9 @@ try {
     $msg = '[process-ai-buffers] Autoload error: ' . $e->getMessage();
     error_log($msg);
     echo "error: autoload - " . $e->getMessage() . "\n";
+    if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') !== basename(__FILE__)) {
+        return; // Sendo incluído por outro script
+    }
     http_response_code(500);
     exit(1);
 }
@@ -70,6 +76,10 @@ $bufferFiles = glob($bufferDir . 'buffer_*.json') ?: [];
 
 if (empty($bufferFiles)) {
     // Sem buffers para processar
+    // Se sendo incluído por outro script, apenas retornar (não matar o processo pai)
+    if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') !== basename(__FILE__)) {
+        return;
+    }
     exit(0);
 }
 
@@ -149,5 +159,9 @@ if ($processed > 0 || $skipped > 0) {
 }
 
 echo "ok\n";
+// Se sendo incluído por outro script, apenas retornar (não matar o processo pai)
+if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') !== basename(__FILE__)) {
+    return;
+}
 exit(0);
 

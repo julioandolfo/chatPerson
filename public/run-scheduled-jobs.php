@@ -80,7 +80,14 @@ function cronSaveHistory(): void
     if (!is_dir($historyDir)) {
         @mkdir($historyDir, 0777, true);
     }
-    @file_put_contents($cronHistoryFile, json_encode($history, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    $written = @file_put_contents($cronHistoryFile, json_encode($history, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    if ($written === false) {
+        echo "[" . date('Y-m-d H:i:s') . "] AVISO: Não foi possível salvar histórico em {$cronHistoryFile}\n";
+        // Tentar corrigir permissões
+        @chmod($historyDir, 0777);
+        @chmod($cronHistoryFile, 0666);
+        @file_put_contents($cronHistoryFile, json_encode($history, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    }
 }
 
 try {

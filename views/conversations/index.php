@@ -4845,7 +4845,7 @@ function getChannelInfo(channel) {
                         <select class="form-select form-select-solid" id="new_conversation_whatsapp_account" name="whatsapp_account_id">
                             <option value="">Selecione uma integração...</option>
                             <?php 
-                            $whatsappAccounts = $whatsappAccounts ?? \App\Models\WhatsAppAccount::getActive();
+                            $whatsappAccounts = $whatsappAccounts ?? \App\Models\IntegrationAccount::getActiveWhatsApp();
                             if (empty($whatsappAccounts)): ?>
                                 <option value="" disabled>Nenhuma integração WhatsApp ativa encontrada</option>
                             <?php else: ?>
@@ -4978,7 +4978,7 @@ function getChannelInfo(channel) {
                         <label class="form-label fw-semibold mb-2">IntegraçÁes WhatsApp:</label>
                         <div class="border rounded p-3" style="max-height: 150px; overflow-y: auto; background: var(--bs-gray-100);">
                             <?php 
-                            $whatsappAccounts = \App\Models\WhatsAppAccount::getActive();
+                            $whatsappAccounts = \App\Models\IntegrationAccount::getActiveWhatsApp();
                             $selectedAccounts = [];
                             if (isset($filters['whatsapp_account_ids']) && is_array($filters['whatsapp_account_ids'])) {
                                 $selectedAccounts = $filters['whatsapp_account_ids'];
@@ -9555,7 +9555,7 @@ async function openChangeAccountModal() {
         const accounts = accountsData.data || accountsData.accounts || accountsData || [];
         
         // Mostrar conta atual
-        const currentAccountId = conversation.whatsapp_account_id || conversation.integration_account_id;
+        const currentAccountId = conversation.integration_account_id || conversation.whatsapp_account_id;
         const currentPhone = conversation.whatsapp_account_phone || conversation.account_phone || 'Não definido';
         const currentName = conversation.whatsapp_account_name || conversation.account_name || '';
         currentEl.innerHTML = `<strong>${escapeHtml(currentPhone)}</strong> ${currentName ? '(' + escapeHtml(currentName) + ')' : ''}`;

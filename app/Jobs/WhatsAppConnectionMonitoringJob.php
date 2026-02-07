@@ -7,7 +7,7 @@
 
 namespace App\Jobs;
 
-use App\Models\WhatsAppAccount;
+use App\Models\IntegrationAccount;
 use App\Models\SystemAlert;
 use App\Services\WhatsAppService;
 use App\Services\NotificationService;
@@ -40,7 +40,7 @@ class WhatsAppConnectionMonitoringJob
             Logger::info("WhatsAppConnectionMonitoringJob - Iniciando verificação");
             
             // Buscar todas as contas (não apenas ativas, para detectar desconexões)
-            $accounts = WhatsAppAccount::all();
+            $accounts = IntegrationAccount::getAllWhatsApp();
             
             foreach ($accounts as $account) {
                 $results['checked']++;
@@ -124,7 +124,7 @@ class WhatsAppConnectionMonitoringJob
                 'last_connection_message' => 'Conexão verificada com sucesso',
                 'consecutive_failures' => 0
             ];
-            WhatsAppAccount::update($account['id'], $updateData);
+            IntegrationAccount::update($account['id'], $updateData);
             
             // Resolver alertas anteriores para esta conta
             $resolved = SystemAlert::resolveByTypeAndResource(
@@ -148,7 +148,7 @@ class WhatsAppConnectionMonitoringJob
                 'last_connection_message' => $connectionResult['message'],
                 'consecutive_failures' => $consecutiveFailures
             ];
-            WhatsAppAccount::update($account['id'], $updateData);
+            IntegrationAccount::update($account['id'], $updateData);
             
             // Criar alerta se atingiu limite de falhas
             if ($consecutiveFailures >= self::FAILURES_FOR_WARNING) {

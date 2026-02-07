@@ -173,11 +173,11 @@ class MessagesController
             
             $db = \App\Helpers\Database::getInstance();
             
-            // Buscar conta WhatsApp pelo número "from"
+            // Buscar conta WhatsApp pelo número "from" (integration_accounts unificado)
             $stmt = $db->prepare("
-                SELECT id, name, api_url, api_key, provider, status, quepasa_token, quepasa_user
-                FROM whatsapp_accounts 
-                WHERE phone_number = ? AND status = 'active'
+                SELECT id, name, api_url, api_token as api_key, provider, status, api_token as quepasa_token, username as quepasa_user
+                FROM integration_accounts 
+                WHERE phone_number = ? AND channel = 'whatsapp' AND status = 'active'
                 LIMIT 1
             ");
             
@@ -233,7 +233,7 @@ class MessagesController
                         status, 
                         contact_name,
                         contact_phone,
-                        whatsapp_account_id,
+                        integration_account_id,
                         created_at, 
                         updated_at
                     ) VALUES (?, 'whatsapp', 'open', ?, ?, ?, NOW(), NOW())

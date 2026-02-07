@@ -16,7 +16,12 @@ class IntegrationAccount extends Model
         'config', 'webhook_url', 'webhook_secret', 
         'default_funnel_id', 'default_stage_id', 
         'last_sync_at', 'error_message',
-        'whatsapp_id', // ID correspondente em whatsapp_accounts
+        'whatsapp_id', // ID correspondente em whatsapp_accounts (legado)
+        // Campos WaVoIP (migrados de whatsapp_accounts)
+        'wavoip_token', 'wavoip_enabled',
+        // Campos de monitoramento de conexão (migrados de whatsapp_accounts)
+        'last_connection_check', 'last_connection_result',
+        'last_connection_message', 'consecutive_failures',
         // Campos de limite de novas conversas (rate limit)
         'new_conv_limit_enabled',
         'new_conv_limit_count',
@@ -127,6 +132,85 @@ class IntegrationAccount extends Model
     }
 
     // ========================================
+    // MÉTODOS DE COMPATIBILIDADE COM WHATSAPP_ACCOUNTS
+    // ========================================
+
+    /**
+     * Obter contas WhatsApp ativas (substitui WhatsAppAccount::getActive())
+     */
+    public static function getActiveWhatsApp(): array
+    {
+        return self::getActive('whatsapp');
+    }
+
+    /**
+     * Buscar conta WhatsApp por telefone (substitui WhatsAppAccount::findByPhone())
+     */
+    public static function findWhatsAppByPhone(string $phoneNumber): ?array
+    {
+        return self::findByPhone($phoneNumber, 'whatsapp');
+    }
+
+    /**
+     * Obter todas as contas WhatsApp (ativas e inativas)
+     */
+    public static function getAllWhatsApp(): array
+    {
+        return self::getByChannel('whatsapp');
+    }
+
+    /**
+     * Retorna o quepasa_token (compatibilidade com código legado)
+     * integration_accounts usa api_token, whatsapp_accounts usava quepasa_token
+     */
+    public static function getQuepasaToken(array $account): ?string
+    {
+        $accountId = $account['id'] ?? '?';
+        $accountName = $account['name'] ?? '?';
+        
+        // Primeiro tenta api_token (integration_accounts)
+        if (!empty($account['api_token'])) {
+            return $account['api_token'];
+        }
+        // Fallback: quepasa_token (se veio de whatsapp_accounts)
+        if (!empty($account['quepasa_token'])) {
+            \App\Helpers\Logger::unificacao("[FALLBACK] getQuepasaToken: Conta IA#{$accountId} ({$accountName}) - usando quepasa_token direto (campo legado presente no array)");
+            return $account['quepasa_token'];
+        }
+        // Último fallback: buscar em whatsapp_accounts pelo telefone
+        if (!empty($account['phone_number'])) {
+            \App\Helpers\Logger::unificacao("[FALLBACK] getQuepasaToken: Conta IA#{$accountId} ({$accountName}) - api_token vazio, buscando em whatsapp_accounts por phone={$account['phone_number']}");
+            $waAccount = \App\Helpers\Database::fetch(
+                "SELECT quepasa_token FROM whatsapp_accounts WHERE phone_number = ? AND quepasa_token IS NOT NULL AND quepasa_token != '' LIMIT 1",
+                [$account['phone_number']]
+            );
+            if ($waAccount && !empty($waAccount['quepasa_token'])) {
+                \App\Helpers\Logger::unificacao("[FALLBACK] getQuepasaToken: ✅ Token encontrado em whatsapp_accounts para phone={$account['phone_number']}");
+                return $waAccount['quepasa_token'];
+            }
+            \App\Helpers\Logger::unificacao("[ERROR] getQuepasaToken: ❌ Nenhum token encontrado para conta IA#{$accountId} ({$accountName}) - nem api_token nem quepasa_token");
+        }
+        return null;
+    }
+
+    /**
+     * Obter dados de config Quepasa a partir do campo config JSON
+     */
+    public static function getQuepasaConfig(array $account): array
+    {
+        $config = is_string($account['config'] ?? null) 
+            ? (json_decode($account['config'], true) ?? []) 
+            : ($account['config'] ?? []);
+        
+        return [
+            'quepasa_user' => $config['quepasa_user'] ?? null,
+            'quepasa_trackid' => $config['quepasa_trackid'] ?? null,
+            'quepasa_chatid' => $config['quepasa_chatid'] ?? null,
+            'instance_id' => $config['instance_id'] ?? ($account['account_id'] ?? null),
+        ];
+    }
+
+    // ========================================
     // MÉTODOS DE TRADUÇÃO WHATSAPP_ACCOUNTS <-> INTEGRATION_ACCOUNTS
     // ========================================
 
@@ -205,6 +289,8 @@ class IntegrationAccount extends Model
      */
     public static function resolveAccountForSending(array $conversation): ?int
     {
+        $convId = $conversation['id'] ?? '?';
+        
         // Prioridade 1: integration_account_id (já é o ID correto)
         if (!empty($conversation['integration_account_id'])) {
             return (int)$conversation['integration_account_id'];
@@ -212,12 +298,16 @@ class IntegrationAccount extends Model
         
         // Prioridade 2: traduzir whatsapp_account_id para integration_account_id
         if (!empty($conversation['whatsapp_account_id'])) {
+            \App\Helpers\Logger::unificacao("[RESOLVE] Conversa #{$convId}: sem integration_account_id, tentando resolver via whatsapp_account_id={$conversation['whatsapp_account_id']}");
             $integrationId = self::getIntegrationIdFromWhatsAppId((int)$conversation['whatsapp_account_id']);
             if ($integrationId) {
+                \App\Helpers\Logger::unificacao("[RESOLVE] Conversa #{$convId}: ✅ Resolvido whatsapp_account_id={$conversation['whatsapp_account_id']} → integration_account_id={$integrationId}");
                 return $integrationId;
             }
+            \App\Helpers\Logger::unificacao("[ERROR] Conversa #{$convId}: ❌ Não foi possível resolver whatsapp_account_id={$conversation['whatsapp_account_id']} para integration_account_id");
         }
         
+        \App\Helpers\Logger::unificacao("[ERROR] Conversa #{$convId}: ❌ Nenhum account_id disponível para envio");
         return null;
     }
 

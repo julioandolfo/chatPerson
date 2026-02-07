@@ -7,7 +7,7 @@
 namespace App\Services;
 
 use App\Models\VoiceCall;
-use App\Models\WhatsAppAccount;
+use App\Models\IntegrationAccount;
 use App\Models\Contact;
 use App\Models\Conversation;
 use App\Helpers\Validator;
@@ -41,8 +41,8 @@ class VoiceCallService
             throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));
         }
 
-        // Verificar conta WhatsApp
-        $account = WhatsAppAccount::find($data['whatsapp_account_id']);
+        // Verificar conta WhatsApp (integration_accounts unificado)
+        $account = IntegrationAccount::find($data['whatsapp_account_id']);
         if (!$account) {
             throw new \InvalidArgumentException('Conta WhatsApp não encontrada');
         }
@@ -300,7 +300,7 @@ class VoiceCallService
             return true; // Já finalizada
         }
 
-        $account = WhatsAppAccount::find($call['whatsapp_account_id']);
+        $account = IntegrationAccount::find($call['whatsapp_account_id']);
         if (!$account || empty($account['wavoip_token'])) {
             throw new \InvalidArgumentException('Conta WhatsApp não encontrada ou WavoIP não configurado');
         }

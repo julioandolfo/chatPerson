@@ -246,11 +246,21 @@ if ($activeTab === 'automacao') {
 
 // ── Logs ──
 $logFileMap = [
-    'logs' => __DIR__ . '/../storage/logs/api.log',
-    'automacao' => __DIR__ . '/../storage/logs/automacao.log',
-    'quepasa' => __DIR__ . '/../storage/logs/quepasa.log',
-    'conversas' => __DIR__ . '/../storage/logs/conversas.log',
+    'logs' => __DIR__ . '/../logs/app.log',
+    'automacao' => __DIR__ . '/../logs/automacao.log',
+    'quepasa' => __DIR__ . '/../logs/quepasa.log',
+    'conversas' => __DIR__ . '/../logs/conversas.log',
+    'unificacao_logs' => __DIR__ . '/../logs/unificacao.log',
 ];
+// Fallback: se não existir em logs/, tentar em storage/logs/
+foreach ($logFileMap as $key => $path) {
+    if (!file_exists($path)) {
+        $fallback = str_replace('/logs/', '/storage/logs/', $path);
+        if (file_exists($fallback)) {
+            $logFileMap[$key] = $fallback;
+        }
+    }
+}
 $logFile = $logFileMap[$activeTab] ?? $logFileMap['logs'];
 $maxLines = isset($_GET['lines']) ? (int)$_GET['lines'] : 500;
 $filter = isset($_GET['filter']) ? $_GET['filter'] : '';
@@ -665,6 +675,8 @@ function colorizeLog($log) {
             <a href="?tab=logs" class="tab <?= $activeTab === 'logs' ? 'active' : '' ?>">📋 Logs API</a>
             <a href="?tab=automacao" class="tab <?= $activeTab === 'automacao' ? 'active' : '' ?>">🤖 Automações</a>
             <a href="?tab=unificacao" class="tab <?= $activeTab === 'unificacao' ? 'active' : '' ?>">🔗 Unificação Contas</a>
+            <a href="?tab=unificacao_logs" class="tab <?= $activeTab === 'unificacao_logs' ? 'active' : '' ?>">📊 Logs Unificação</a>
+            <a href="?tab=quepasa" class="tab <?= $activeTab === 'quepasa' ? 'active' : '' ?>">📱 Logs Quepasa</a>
         </div>
         
         <?php if ($activeTab === 'unificacao'): ?>
@@ -1359,6 +1371,198 @@ WHERE c.whatsapp_account_id IS NOT NULL
         
         <div class="footer">
             <p>Última atualização: <?= date('d/m/Y H:i:s') ?></p>
+        </div>
+        
+        <?php elseif ($activeTab === 'unificacao_logs' || $activeTab === 'quepasa'): ?>
+        <!-- ═══════════════ ABA LOGS UNIFICAÇÃO / QUEPASA ═══════════════ -->
+        <?php
+            $tabTitle = $activeTab === 'unificacao_logs' ? '📊 Logs de Unificação' : '📱 Logs Quepasa';
+            $tabDesc = $activeTab === 'unificacao_logs' 
+                ? 'Rastreamento de todas as operações de unificação: resolução de contas, fallbacks, envios, webhooks, automações e erros.'
+                : 'Logs de comunicação com a API Quepasa: envio/recebimento de mensagens, QR codes, webhooks.';
+            $tabLogFile = $logFileMap[$activeTab] ?? '';
+            
+            // Ler logs específicos
+            $tabLogs = [];
+            if (file_exists($tabLogFile)) {
+                $allTabLines = file($tabLogFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                $tabLogs = array_slice(array_reverse($allTabLines), 0, $maxLines);
+            }
+            
+            // Aplicar filtro
+            if (!empty($filter)) {
+                $tabLogs = array_filter($tabLogs, function($line) use ($filter) {
+                    return stripos($line, $filter) !== false;
+                });
+            }
+            
+            // Filtro por nível/tipo para unificação
+            $tabLevelFilter = $_GET['tipo'] ?? '';
+            if (!empty($tabLevelFilter)) {
+                $tabLogs = array_filter($tabLogs, function($line) use ($tabLevelFilter) {
+                    return stripos($line, "[$tabLevelFilter]") !== false;
+                });
+            }
+            
+            // Stats
+            $tabTotal = count($tabLogs);
+            if ($activeTab === 'unificacao_logs' && !empty($allTabLines)) {
+                $catStats = [
+                    'SEND' => 0, 'RESOLVE' => 0, 'FALLBACK' => 0, 'WEBHOOK' => 0,
+                    'AUTOMACAO' => 0, 'CONVERSA' => 0, 'CRUD' => 0, 'ERROR' => 0, 'WHATSAPP_SEND' => 0
+                ];
+                foreach (array_slice(array_reverse($allTabLines), 0, 5000) as $l) {
+                    foreach ($catStats as $cat => $_) {
+                        if (stripos($l, "[$cat]") !== false) $catStats[$cat]++;
+                    }
+                }
+            }
+        ?>
+        
+        <header>
+            <h1><?= $tabTitle ?></h1>
+            <p style="color: #888; margin-top: 5px; font-size: 13px;"><?= $tabDesc ?></p>
+        </header>
+        
+        <?php if ($activeTab === 'unificacao_logs' && !empty($catStats)): ?>
+        <div class="stats" style="margin-bottom: 15px;">
+            <?php 
+            $catLabels = [
+                'WHATSAPP_SEND' => ['label' => 'Envios WA', 'color' => '#4ec9b0'],
+                'SEND' => ['label' => 'Resolução Envio', 'color' => '#569cd6'],
+                'RESOLVE' => ['label' => 'Resolução ID', 'color' => '#dcdcaa'],
+                'FALLBACK' => ['label' => 'Fallbacks', 'color' => '#ce9178'],
+                'WEBHOOK' => ['label' => 'Webhooks', 'color' => '#c586c0'],
+                'AUTOMACAO' => ['label' => 'Automações', 'color' => '#b5cea8'],
+                'CONVERSA' => ['label' => 'Conversas', 'color' => '#9cdcfe'],
+                'CRUD' => ['label' => 'CRUD Contas', 'color' => '#d4d4d4'],
+                'ERROR' => ['label' => 'Erros', 'color' => '#f44747'],
+            ];
+            foreach ($catLabels as $cat => $info): ?>
+                <div class="stat" style="cursor:pointer;" onclick="window.location.href='?tab=unificacao_logs&tipo=<?= $cat ?>&lines=<?= $maxLines ?>'">
+                    <div class="stat-label"><?= $info['label'] ?></div>
+                    <div class="stat-value" style="color: <?= $info['color'] ?>"><?= $catStats[$cat] ?? 0 ?></div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+        
+        <!-- Filtros -->
+        <div style="background: #252526; padding: 12px; border-radius: 6px; margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <form method="GET" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; width: 100%;">
+                <input type="hidden" name="tab" value="<?= $activeTab ?>">
+                <input type="text" name="filter" value="<?= htmlspecialchars($filter) ?>" placeholder="Buscar nos logs..." 
+                    style="background: #1e1e1e; color: #d4d4d4; border: 1px solid #3c3c3c; padding: 6px 12px; border-radius: 4px; flex: 1; min-width: 200px;">
+                <?php if ($activeTab === 'unificacao_logs'): ?>
+                <select name="tipo" style="background: #1e1e1e; color: #d4d4d4; border: 1px solid #3c3c3c; padding: 6px 12px; border-radius: 4px;">
+                    <option value="">Todos os tipos</option>
+                    <option value="WHATSAPP_SEND" <?= $tabLevelFilter === 'WHATSAPP_SEND' ? 'selected' : '' ?>>Envios WhatsApp</option>
+                    <option value="SEND" <?= $tabLevelFilter === 'SEND' ? 'selected' : '' ?>>Resolução Envio</option>
+                    <option value="RESOLVE" <?= $tabLevelFilter === 'RESOLVE' ? 'selected' : '' ?>>Resolução ID</option>
+                    <option value="FALLBACK" <?= $tabLevelFilter === 'FALLBACK' ? 'selected' : '' ?>>Fallbacks (legado)</option>
+                    <option value="WEBHOOK" <?= $tabLevelFilter === 'WEBHOOK' ? 'selected' : '' ?>>Webhooks</option>
+                    <option value="AUTOMACAO" <?= $tabLevelFilter === 'AUTOMACAO' ? 'selected' : '' ?>>Automações</option>
+                    <option value="CONVERSA" <?= $tabLevelFilter === 'CONVERSA' ? 'selected' : '' ?>>Conversas</option>
+                    <option value="CRUD" <?= $tabLevelFilter === 'CRUD' ? 'selected' : '' ?>>CRUD Contas</option>
+                    <option value="ERROR" <?= $tabLevelFilter === 'ERROR' ? 'selected' : '' ?>>Erros</option>
+                </select>
+                <?php endif; ?>
+                <select name="lines" style="background: #1e1e1e; color: #d4d4d4; border: 1px solid #3c3c3c; padding: 6px 12px; border-radius: 4px;">
+                    <option value="100" <?= $maxLines == 100 ? 'selected' : '' ?>>100 linhas</option>
+                    <option value="500" <?= $maxLines == 500 ? 'selected' : '' ?>>500 linhas</option>
+                    <option value="1000" <?= $maxLines == 1000 ? 'selected' : '' ?>>1000 linhas</option>
+                    <option value="5000" <?= $maxLines == 5000 ? 'selected' : '' ?>>5000 linhas</option>
+                </select>
+                <button type="submit" style="background: #0e639c; color: white; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer;">Filtrar</button>
+                <button type="button" onclick="window.location.href='?tab=<?= $activeTab ?>'" style="background: #3c3c3c; color: #d4d4d4; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer;">Limpar</button>
+            </form>
+        </div>
+        
+        <!-- Legenda de cores para logs de unificação -->
+        <?php if ($activeTab === 'unificacao_logs'): ?>
+        <div style="background: #1e1e1e; padding: 10px 15px; border-radius: 6px; margin-bottom: 15px; display: flex; gap: 15px; flex-wrap: wrap; font-size: 12px;">
+            <span style="color: #888;">Legenda:</span>
+            <span style="color: #4ec9b0;">✅ Sucesso</span>
+            <span style="color: #ce9178;">⚠️ Fallback (legado)</span>
+            <span style="color: #f44747;">❌ Erro</span>
+            <span style="color: #569cd6;">[SEND] Envio</span>
+            <span style="color: #c586c0;">[WEBHOOK] Webhook</span>
+            <span style="color: #b5cea8;">[AUTOMACAO] Automação</span>
+            <span style="color: #9cdcfe;">[CONVERSA] Conversa</span>
+            <span style="color: #dcdcaa;">[RESOLVE] Resolução</span>
+            <span style="color: #d4d4d4;">[CRUD] CRUD</span>
+        </div>
+        <?php endif; ?>
+        
+        <!-- Info do arquivo -->
+        <div style="background: #252526; padding: 8px 15px; border-radius: 6px; margin-bottom: 10px; font-size: 12px; color: #888;">
+            📁 Arquivo: <span style="color: #d4d4d4;"><?= htmlspecialchars($tabLogFile) ?></span> | 
+            <?php if (file_exists($tabLogFile)): ?>
+                Tamanho: <span style="color: #d4d4d4;"><?= number_format(filesize($tabLogFile) / 1024, 1) ?> KB</span> | 
+                Última modificação: <span style="color: #d4d4d4;"><?= date('d/m/Y H:i:s', filemtime($tabLogFile)) ?></span> | 
+            <?php endif; ?>
+            Exibindo: <span style="color: #4ec9b0;"><?= $tabTotal ?></span> linhas
+            <?php if (!empty($tabLevelFilter)): ?>
+                | Filtro tipo: <span style="color: #dcdcaa;">[<?= $tabLevelFilter ?>]</span>
+            <?php endif; ?>
+        </div>
+        
+        <!-- Logs -->
+        <div class="log-container" style="max-height: 70vh; overflow-y: auto; background: #1e1e1e; border-radius: 6px; padding: 10px;">
+            <?php if (empty($tabLogs)): ?>
+                <div style="text-align: center; padding: 40px; color: #888;">
+                    <?php if (!file_exists($tabLogFile)): ?>
+                        <p style="font-size: 18px;">📭 Arquivo de log ainda não existe</p>
+                        <p style="margin-top: 10px;">O arquivo <code style="color: #4ec9b0;"><?= basename($tabLogFile) ?></code> será criado automaticamente quando o primeiro evento for registrado.</p>
+                        <p style="margin-top: 5px; font-size: 12px;">Faça uma operação (enviar mensagem, criar conversa, etc.) para gerar os primeiros logs.</p>
+                    <?php else: ?>
+                        <p style="font-size: 18px;">🔍 Nenhum log encontrado</p>
+                        <p style="margin-top: 10px;">Nenhum registro corresponde aos filtros aplicados.</p>
+                    <?php endif; ?>
+                </div>
+            <?php else: ?>
+                <?php foreach ($tabLogs as $line): ?>
+                    <?php
+                    // Colorir linhas baseado no conteúdo
+                    $lineColor = '#d4d4d4';
+                    $bgColor = 'transparent';
+                    if (strpos($line, '❌') !== false || stripos($line, '[ERROR]') !== false) {
+                        $lineColor = '#f44747';
+                        $bgColor = 'rgba(244, 71, 71, 0.05)';
+                    } elseif (strpos($line, '⚠️') !== false || stripos($line, '[FALLBACK]') !== false) {
+                        $lineColor = '#ce9178';
+                        $bgColor = 'rgba(206, 145, 120, 0.05)';
+                    } elseif (strpos($line, '✅') !== false) {
+                        $lineColor = '#4ec9b0';
+                    } elseif (stripos($line, '[WEBHOOK]') !== false) {
+                        $lineColor = '#c586c0';
+                    } elseif (stripos($line, '[AUTOMACAO]') !== false) {
+                        $lineColor = '#b5cea8';
+                    } elseif (stripos($line, '[CONVERSA]') !== false) {
+                        $lineColor = '#9cdcfe';
+                    } elseif (stripos($line, '[CRUD]') !== false) {
+                        $lineColor = '#d4d4d4';
+                    } elseif (stripos($line, '[WHATSAPP_SEND]') !== false) {
+                        $lineColor = '#4ec9b0';
+                    } elseif (stripos($line, '[SEND]') !== false || stripos($line, '[RESOLVE]') !== false) {
+                        $lineColor = '#569cd6';
+                    }
+                    ?>
+                    <div style="padding: 3px 8px; font-family: 'Consolas', 'Courier New', monospace; font-size: 12px; color: <?= $lineColor ?>; background: <?= $bgColor ?>; border-bottom: 1px solid #2a2a2a; word-break: break-all;">
+                        <?= htmlspecialchars($line) ?>
+                    </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+        
+        <div class="footer" style="margin-top: 15px;">
+            <p>Última atualização: <?= date('d/m/Y H:i:s') ?></p>
+            <p style="margin-top: 5px; font-size: 12px; color: #888;">
+                Auto-refresh: 
+                <a href="javascript:void(0)" onclick="setInterval(()=>location.reload(), 5000)" style="color: #4ec9b0;">5s</a> | 
+                <a href="javascript:void(0)" onclick="setInterval(()=>location.reload(), 15000)" style="color: #4ec9b0;">15s</a> | 
+                <a href="javascript:void(0)" onclick="setInterval(()=>location.reload(), 30000)" style="color: #4ec9b0;">30s</a>
+            </p>
         </div>
         
         <?php else: ?>

@@ -35,7 +35,7 @@ class ConversationMergeService
                        (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id) as message_count
                 FROM conversations c
                 LEFT JOIN integration_accounts ia ON c.integration_account_id = ia.id
-                LEFT JOIN whatsapp_accounts wa ON c.whatsapp_account_id = wa.id
+                LEFT JOIN integration_accounts wa ON c.whatsapp_account_id = wa.id
                 LEFT JOIN users u ON c.agent_id = u.id
                 WHERE c.contact_id = ? 
                   AND c.status = 'open'

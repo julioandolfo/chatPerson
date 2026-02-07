@@ -101,9 +101,9 @@ class Conversation extends Model
                            ELSE COALESCE(u.name, CONCAT('Agente #', c.agent_id)) 
                        END as agent_name,
                        u.email as agent_email,
-                       -- ✅ UNIFICADO: Priorizar integration_accounts, whatsapp_accounts como fallback
-                       COALESCE(ia.name, wa.name) as whatsapp_account_name, 
-                       COALESCE(ia.phone_number, wa.phone_number) as whatsapp_account_phone,
+                       -- ✅ UNIFICADO: Usar apenas integration_accounts
+                       ia.name as whatsapp_account_name, 
+                       ia.phone_number as whatsapp_account_phone,
                        (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact' AND m.read_at IS NULL) as unread_count,
                        (SELECT content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message,
                        (SELECT created_at FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message_at,
@@ -118,7 +118,6 @@ class Conversation extends Model
                 LEFT JOIN contacts ct ON c.contact_id = ct.id
                 LEFT JOIN users u ON c.agent_id = u.id
                 LEFT JOIN integration_accounts ia ON c.integration_account_id = ia.id
-                LEFT JOIN whatsapp_accounts wa ON c.whatsapp_account_id = wa.id AND c.integration_account_id IS NULL
                 LEFT JOIN conversation_tags ctt ON c.id = ctt.conversation_id
                 LEFT JOIN tags t ON ctt.tag_id = t.id
                 LEFT JOIN conversation_participants cp ON c.id = cp.conversation_id AND cp.removed_at IS NULL
@@ -197,16 +196,13 @@ class Conversation extends Model
             $params[] = $filters['tag_id'];
         }
         
-        // Filtro por conta WhatsApp/Integração (suporta array para multi-select)
-        // ✅ UNIFICADO: Busca em integration_account_id OU whatsapp_account_id (para compatibilidade)
+        // Filtro por conta de integração (unificado - usa integration_account_id)
         if (!empty($filters['whatsapp_account_ids']) && is_array($filters['whatsapp_account_ids'])) {
             $placeholders = implode(',', array_fill(0, count($filters['whatsapp_account_ids']), '?'));
-            // Buscar também os integration_account_ids correspondentes
-            $sql .= " AND (c.whatsapp_account_id IN ($placeholders) OR c.integration_account_id IN (SELECT id FROM integration_accounts WHERE whatsapp_id IN ($placeholders)))";
-            $params = array_merge($params, $filters['whatsapp_account_ids'], $filters['whatsapp_account_ids']);
+            $sql .= " AND c.integration_account_id IN ($placeholders)";
+            $params = array_merge($params, $filters['whatsapp_account_ids']);
         } elseif (!empty($filters['whatsapp_account_id'])) {
-            $sql .= " AND (c.whatsapp_account_id = ? OR c.integration_account_id IN (SELECT id FROM integration_accounts WHERE whatsapp_id = ?))";
-            $params[] = $filters['whatsapp_account_id'];
+            $sql .= " AND c.integration_account_id = ?";
             $params[] = $filters['whatsapp_account_id'];
         }
 
@@ -626,7 +622,7 @@ class Conversation extends Model
 
     /**
      * Obter conversa com relacionamentos
-     * ✅ UNIFICADO: Prioriza integration_accounts, usa whatsapp_accounts como fallback
+     * ✅ UNIFICADO: Usa apenas integration_accounts
      */
     public static function findWithRelations(int $id): ?array
     {
@@ -637,8 +633,9 @@ class Conversation extends Model
                            ELSE COALESCE(u.name, CONCAT('Agente #', c.agent_id)) 
                        END as agent_name,
                        u.email as agent_email, u.avatar as agent_avatar,
-                       COALESCE(ia.name, wa.name) as whatsapp_account_name,
-                       COALESCE(ia.phone_number, wa.phone_number) as whatsapp_account_phone,
+                       ia.name as whatsapp_account_name,
+                       ia.phone_number as whatsapp_account_phone,
+                       c.integration_account_id as resolved_integration_account_id,
                        f.name as funnel_name,
                        fs.name as stage_name,
                        (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact' AND m.read_at IS NULL) as unread_count
@@ -646,7 +643,6 @@ class Conversation extends Model
                 LEFT JOIN contacts ct ON c.contact_id = ct.id
                 LEFT JOIN users u ON c.agent_id = u.id
                 LEFT JOIN integration_accounts ia ON c.integration_account_id = ia.id
-                LEFT JOIN whatsapp_accounts wa ON c.whatsapp_account_id = wa.id AND c.integration_account_id IS NULL
                 LEFT JOIN funnels f ON c.funnel_id = f.id
                 LEFT JOIN funnel_stages fs ON c.funnel_stage_id = fs.id
                 WHERE c.id = ?";
@@ -687,9 +683,8 @@ class Conversation extends Model
 
     /**
      * Buscar conversa por contato e canal
-     * ✅ ATUALIZADO: Busca por whatsapp_account_id OU integration_account_id
-     * para garantir que encontre conversas criadas via campanha (integration_account_id)
-     * ou via webhook (whatsapp_account_id)
+     * ✅ UNIFICADO: Busca por integration_account_id
+     * Parâmetro $whatsappAccountId mantido para compatibilidade (tratado como integration_account_id)
      */
     public static function findByContactAndChannel(int $contactId, string $channel, ?int $whatsappAccountId = null, ?int $integrationAccountId = null): ?array
     {
@@ -697,24 +692,11 @@ class Conversation extends Model
                 WHERE contact_id = ? AND channel = ?";
         $params = [$contactId, $channel];
         
-        // ✅ CORREÇÃO: Buscar pelos IDs corretos de cada tabela
-        // NÃO misturar whatsapp_account_id com integration_account_id (são tabelas diferentes!)
-        if ($whatsappAccountId || $integrationAccountId) {
-            $conditions = [];
-            
-            if ($whatsappAccountId) {
-                $conditions[] = "whatsapp_account_id = ?";
-                $params[] = $whatsappAccountId;
-            }
-            
-            if ($integrationAccountId) {
-                $conditions[] = "integration_account_id = ?";
-                $params[] = $integrationAccountId;
-            }
-            
-            if (!empty($conditions)) {
-                $sql .= " AND (" . implode(" OR ", $conditions) . ")";
-            }
+        // Unificado: usar integration_account_id
+        $accountId = $integrationAccountId ?? $whatsappAccountId;
+        if ($accountId) {
+            $sql .= " AND integration_account_id = ?";
+            $params[] = $accountId;
         }
         
         $sql .= " ORDER BY created_at DESC LIMIT 1";
@@ -724,8 +706,7 @@ class Conversation extends Model
     
     /**
      * Buscar conversa ABERTA por contato e canal
-     * Retorna apenas conversas com status 'open'
-     * ✅ ATUALIZADO: Busca por whatsapp_account_id OU integration_account_id
+     * ✅ UNIFICADO: Busca por integration_account_id
      */
     public static function findOpenByContactAndChannel(int $contactId, string $channel, ?int $whatsappAccountId = null, ?int $integrationAccountId = null): ?array
     {
@@ -735,23 +716,11 @@ class Conversation extends Model
                 WHERE c.contact_id = ? AND c.channel = ? AND c.status = 'open'";
         $params = [$contactId, $channel];
         
-        // ✅ CORREÇÃO: Buscar pelos IDs corretos de cada tabela
-        if ($whatsappAccountId || $integrationAccountId) {
-            $conditions = [];
-            
-            if ($whatsappAccountId) {
-                $conditions[] = "c.whatsapp_account_id = ?";
-                $params[] = $whatsappAccountId;
-            }
-            
-            if ($integrationAccountId) {
-                $conditions[] = "c.integration_account_id = ?";
-                $params[] = $integrationAccountId;
-            }
-            
-            if (!empty($conditions)) {
-                $sql .= " AND (" . implode(" OR ", $conditions) . ")";
-            }
+        // Unificado: usar integration_account_id
+        $accountId = $integrationAccountId ?? $whatsappAccountId;
+        if ($accountId) {
+            $sql .= " AND c.integration_account_id = ?";
+            $params[] = $accountId;
         }
         
         $sql .= " ORDER BY c.created_at DESC LIMIT 1";

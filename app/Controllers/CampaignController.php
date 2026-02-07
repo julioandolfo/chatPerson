@@ -562,11 +562,11 @@ class CampaignController
     }
 
     /**
-     * Sincronizar todas as contas do whatsapp_accounts
+     * Sincronizar todas as contas do whatsapp_accounts (legado - mantido para compatibilidade)
      */
     private function syncWhatsAppIntegrationAccounts(): void
     {
-        $legacyAccounts = WhatsAppAccount::all();
+        $legacyAccounts = \App\Helpers\Database::fetchAll("SELECT * FROM whatsapp_accounts", []);
         if (empty($legacyAccounts)) {
             return;
         }

@@ -807,6 +807,7 @@ class WhatsAppService
     public static function sendMessage(int $accountId, string $to, string $message, array $options = []): array
     {
         Logger::quepasa("sendMessage - Iniciando envio: accountId={$accountId}, to={$to}");
+        Logger::unificacao("[WHATSAPP_SEND] sendMessage chamado: accountId={$accountId}, to={$to}");
         
         // ✅ CORREÇÃO DEFINITIVA: Detectar se o ID vem de integration_accounts ou whatsapp_accounts
         // Verificar PRIMEIRO em integration_accounts (pois IntegrationService passa integration_account_id)
@@ -821,6 +822,7 @@ class WhatsAppService
             $usingIntegrationAccount = true;
             $account = $iaAccount;
             Logger::quepasa("sendMessage - ✅ Conta encontrada em integration_accounts: ID={$accountId}, nome={$account['name']}, phone={$account['phone_number']}, api_token=" . (!empty($account['api_token']) ? 'SIM' : 'NÃO') . ", whatsapp_id=" . ($account['whatsapp_id'] ?? 'NULL'));
+            Logger::unificacao("[WHATSAPP_SEND] ✅ Conta via integration_accounts: ID={$accountId}, nome={$account['name']}, phone={$account['phone_number']}");
             
             // Mapear campos: integration_accounts usa api_token, whatsapp_accounts usa quepasa_token
             if (empty($account['quepasa_token']) && !empty($account['api_token'])) {
@@ -854,22 +856,26 @@ class WhatsAppService
                         $account['api_url'] = $legacyAccount['api_url'];
                     }
                     Logger::quepasa("sendMessage - ✅ Token obtido de whatsapp_accounts: {$legacyAccount['name']} (phone={$legacyAccount['phone_number']})");
+                    Logger::unificacao("[WHATSAPP_SEND] ⚠️ FALLBACK TOKEN: Conta IA#{$accountId} precisou buscar token em whatsapp_accounts (phone={$legacyAccount['phone_number']}). Ação: copiar api_token para integration_accounts.");
                 } else {
                     Logger::quepasa("sendMessage - ⚠️ Nenhum token encontrado para integration_account {$accountId}");
+                    Logger::unificacao("[WHATSAPP_SEND] ❌ ERRO TOKEN: Conta IA#{$accountId} sem token em ambas as tabelas!");
                 }
             }
         }
         
-        // SEGUNDO: Se não encontrou em integration_accounts, tentar whatsapp_accounts
+        // SEGUNDO: Se não encontrou em integration_accounts, tentar whatsapp_accounts (LEGADO)
         if (!$account) {
             $account = WhatsAppAccount::find($accountId);
             if ($account) {
                 Logger::quepasa("sendMessage - ✅ Conta encontrada em whatsapp_accounts: ID={$accountId}, nome={$account['name']}, phone={$account['phone_number']}, quepasa_token=" . (!empty($account['quepasa_token']) ? 'SIM' : 'NÃO'));
+                Logger::unificacao("[WHATSAPP_SEND] ⚠️ FALLBACK TABELA: accountId={$accountId} encontrado APENAS em whatsapp_accounts ({$account['name']}, phone={$account['phone_number']}). Isto NÃO deveria mais acontecer! Verifique se a conversa está usando whatsapp_account_id ao invés de integration_account_id.");
             }
         }
         
         if (!$account) {
             Logger::quepasa("sendMessage - ERRO: Conta não encontrada em NENHUMA tabela: {$accountId}");
+            Logger::unificacao("[WHATSAPP_SEND] ❌ ERRO CRÍTICO: accountId={$accountId} NÃO encontrado em NENHUMA tabela! to={$to}");
             throw new \InvalidArgumentException('Conta não encontrada');
         }
 
@@ -2263,6 +2269,9 @@ class WhatsAppService
                         // ✅ CORREÇÃO: Sempre incluir integration_account_id
                         if (!empty($account['integration_account_id'])) {
                             $conversationData['integration_account_id'] = $account['integration_account_id'];
+                            Logger::unificacao("[WEBHOOK] Criando conversa (eco): contato={$contact['id']}, wa_id={$account['id']}, ia_id={$account['integration_account_id']}");
+                        } else {
+                            Logger::unificacao("[WEBHOOK] ⚠️ Criando conversa SEM integration_account_id! wa_id={$account['id']}, phone=" . ($account['phone_number'] ?? '?'));
                         }
                         
                         // Adicionar funil e estágio padrão da integração, se configurados
@@ -2849,6 +2858,9 @@ class WhatsAppService
                     if (!empty($account['integration_account_id'])) {
                         $conversationData['integration_account_id'] = $account['integration_account_id'];
                         Logger::quepasa("processWebhook - ✅ Incluindo integration_account_id={$account['integration_account_id']} na nova conversa");
+                        Logger::unificacao("[WEBHOOK] Criando conversa (incoming): contato={$contact['id']}, wa_id={$account['id']}, ia_id={$account['integration_account_id']}");
+                    } else {
+                        Logger::unificacao("[WEBHOOK] ⚠️ Criando conversa incoming SEM integration_account_id! wa_id={$account['id']}, phone=" . ($account['phone_number'] ?? '?'));
                     }
                     
                     if (!empty($account['default_funnel_id'])) {

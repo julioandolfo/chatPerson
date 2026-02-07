@@ -11,7 +11,7 @@ use App\Helpers\Request;
 use App\Helpers\Permission;
 use App\Services\VoiceCallService;
 use App\Models\VoiceCall;
-use App\Models\WhatsAppAccount;
+use App\Models\IntegrationAccount;
 use App\Models\Contact;
 use App\Models\Conversation;
 
@@ -75,7 +75,7 @@ class VoiceCallController
                 FROM voice_calls vc
                 LEFT JOIN contacts c ON vc.contact_id = c.id
                 LEFT JOIN users u ON vc.agent_id = u.id
-                LEFT JOIN whatsapp_accounts wa ON vc.whatsapp_account_id = wa.id
+                LEFT JOIN integration_accounts wa ON vc.whatsapp_account_id = wa.id
                 LEFT JOIN conversations conv ON vc.conversation_id = conv.id
                 WHERE {$whereClause}
                 ORDER BY vc.created_at DESC
@@ -108,7 +108,7 @@ class VoiceCallController
                 'pages' => ceil($total / $limit)
             ],
             'filters' => $filters,
-            'whatsapp_accounts' => WhatsAppAccount::getActive(),
+            'whatsapp_accounts' => IntegrationAccount::getActiveWhatsApp(),
             'agents' => \App\Models\User::where('role', 'IN', ['agent', 'senior_agent', 'supervisor'])
         ]);
     }
@@ -167,7 +167,7 @@ class VoiceCallController
             $call['agent'] = \App\Models\User::find($call['agent_id']);
         }
         if ($call['whatsapp_account_id']) {
-            $call['whatsapp_account'] = WhatsAppAccount::find($call['whatsapp_account_id']);
+            $call['whatsapp_account'] = IntegrationAccount::find($call['whatsapp_account_id']);
         }
         if ($call['conversation_id']) {
             $call['conversation'] = Conversation::find($call['conversation_id']);

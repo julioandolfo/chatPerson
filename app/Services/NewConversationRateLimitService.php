@@ -113,7 +113,7 @@ class NewConversationRateLimitService
      */
     private static function getAccountWithLimits(int $accountId, string $accountType): ?array
     {
-        $table = $accountType === 'integration' ? 'integration_accounts' : 'whatsapp_accounts';
+        $table = 'integration_accounts'; // Unificado: sempre usar integration_accounts
         
         return Database::fetch(
             "SELECT id, name, new_conv_limit_enabled, new_conv_limit_count, 

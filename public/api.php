@@ -592,15 +592,15 @@ try {
             
             $whereClause = implode(' AND ', $where);
             
-            $stmt = $db->prepare("SELECT COUNT(*) as total FROM whatsapp_accounts WHERE {$whereClause}");
+            $stmt = $db->prepare("SELECT COUNT(*) as total FROM integration_accounts WHERE channel = 'whatsapp' AND {$whereClause}");
             $stmt->execute($params);
             $total = (int) $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
             
             $stmt = $db->prepare("
                 SELECT id, name, phone_number, provider, api_url, status, 
                        default_funnel_id, default_stage_id, created_at, updated_at
-                FROM whatsapp_accounts 
-                WHERE {$whereClause}
+                FROM integration_accounts 
+                WHERE channel = 'whatsapp' AND {$whereClause}
                 ORDER BY created_at DESC
                 LIMIT ? OFFSET ?
             ");
@@ -625,7 +625,7 @@ try {
                 SELECT id, name, phone_number, provider, api_url, status,
                        default_funnel_id, default_stage_id, wavoip_enabled,
                        created_at, updated_at
-                FROM whatsapp_accounts WHERE id = ?
+                FROM integration_accounts WHERE id = ?
             ");
             $stmt->execute([$params['id']]);
             $account = $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -698,10 +698,11 @@ try {
                 
                 // 2. Buscar conversa ABERTA com esse contato
                 $stmt = $db->prepare("
-                    SELECT c.id as conversation_id, c.whatsapp_account_id, wa.phone_number, wa.name as account_name,
-                           wa.api_url, wa.provider, wa.quepasa_token, wa.quepasa_user
+                    SELECT c.id as conversation_id, c.integration_account_id as whatsapp_account_id, 
+                           ia.phone_number, ia.name as account_name,
+                           ia.api_url, ia.provider, ia.api_token as quepasa_token, ia.username as quepasa_user
                     FROM conversations c
-                    INNER JOIN whatsapp_accounts wa ON wa.id = c.whatsapp_account_id
+                    INNER JOIN integration_accounts ia ON ia.id = c.integration_account_id
                     WHERE c.contact_id = ? 
                       AND c.channel = 'whatsapp' 
                       AND c.status IN ('open', 'pending')
@@ -743,11 +744,11 @@ try {
                 ];
                 apiLog('INFO', "✅ Usando conta da conversa existente: {$account['name']} (ID: {$account['id']})");
             } else {
-                // Buscar conta pelo número
+                // Buscar conta pelo número (integration_accounts unificado)
                 $stmt = $db->prepare("
-                    SELECT id, name, api_url, provider, quepasa_token, quepasa_user
-                    FROM whatsapp_accounts 
-                    WHERE phone_number = ? AND status = 'active'
+                    SELECT id, name, api_url, provider, api_token as quepasa_token, username as quepasa_user
+                    FROM integration_accounts 
+                    WHERE phone_number = ? AND channel = 'whatsapp' AND status = 'active'
                     LIMIT 1
                 ");
                 $stmt->execute([$from]);
@@ -841,16 +842,15 @@ try {
                     
                     $stmt = $db->prepare("
                         INSERT INTO conversations (
-                            contact_id, channel, status, whatsapp_account_id, integration_account_id,
+                            contact_id, channel, status, integration_account_id,
                             inbox_id, department_id, funnel_id, funnel_stage_id,
                             created_at, updated_at
                         )
-                        VALUES (?, 'whatsapp', 'open', ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                        VALUES (?, 'whatsapp', 'open', ?, ?, ?, ?, ?, NOW(), NOW())
                     ");
                     $stmt->execute([
                         $contactId, 
-                        $account['id'],
-                        $integrationAccountId,
+                        $integrationAccountId ?? $account['id'],
                         $inboxId,
                         $departmentId,
                         $funnelId,

@@ -61,6 +61,14 @@ class Logger
     }
 
     /**
+     * Log específico para unificação de contas (migration whatsapp_accounts → integration_accounts)
+     */
+    public static function unificacao(string $message): void
+    {
+        self::log($message, 'unificacao.log');
+    }
+
+    /**
      * Log específico para Notificame
      */
     public static function notificame(string $message): void

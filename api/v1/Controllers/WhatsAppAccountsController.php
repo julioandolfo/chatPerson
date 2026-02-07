@@ -44,7 +44,7 @@ class WhatsAppAccountsController
             $whereClause = implode(' AND ', $where);
             
             // Contar total
-            $stmt = $db->prepare("SELECT COUNT(*) as total FROM whatsapp_accounts WHERE {$whereClause}");
+            $stmt = $db->prepare("SELECT COUNT(*) as total FROM integration_accounts WHERE channel = 'whatsapp' AND {$whereClause}");
             $stmt->execute($params);
             $total = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
             
@@ -61,8 +61,8 @@ class WhatsAppAccountsController
                     default_stage_id,
                     created_at,
                     updated_at
-                FROM whatsapp_accounts 
-                WHERE {$whereClause}
+                FROM integration_accounts 
+                WHERE channel = 'whatsapp' AND {$whereClause}
                 ORDER BY created_at DESC
                 LIMIT ? OFFSET ?
             ");
@@ -137,7 +137,7 @@ class WhatsAppAccountsController
                     consecutive_failures,
                     created_at,
                     updated_at
-                FROM whatsapp_accounts 
+                FROM integration_accounts 
                 WHERE id = ?
             ");
             

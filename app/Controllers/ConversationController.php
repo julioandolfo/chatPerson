@@ -177,7 +177,7 @@ class ConversationController
             $agents = User::getActiveAgents();
             $departments = \App\Models\Department::all();
             $tags = \App\Models\Tag::all();
-            $whatsappAccounts = \App\Models\WhatsAppAccount::getActive();
+            $whatsappAccounts = \App\Models\IntegrationAccount::getActiveWhatsApp();
             // Obter funis permitidos para o agente (usado no modal de nova conversa)
             $funnelsForNewConversation = [];
             try {
@@ -601,14 +601,13 @@ class ConversationController
                 return;
             }
             
-            // Buscar conversas abertas do contato
+            // Buscar conversas abertas do contato (integration_accounts unificado)
             $sql = "SELECT c.*, 
-                           COALESCE(ia.name, wa.name) as account_name,
-                           COALESCE(ia.phone_number, wa.phone_number) as account_phone,
+                           ia.name as account_name,
+                           ia.phone_number as account_phone,
                            u.name as agent_name
                     FROM conversations c
                     LEFT JOIN integration_accounts ia ON c.integration_account_id = ia.id
-                    LEFT JOIN whatsapp_accounts wa ON c.whatsapp_account_id = wa.id
                     LEFT JOIN users u ON c.agent_id = u.id
                     WHERE c.contact_id = ? AND c.status = 'open'
                     ORDER BY c.updated_at DESC";
@@ -682,11 +681,11 @@ class ConversationController
                     return;
                 }
                 
-                // Verificar se a conta WhatsApp existe e está ativa
-                $whatsappAccount = \App\Models\WhatsAppAccount::find($whatsappAccountId);
+                // Verificar se a conta WhatsApp existe e está ativa (integration_accounts unificado)
+                $whatsappAccount = \App\Models\IntegrationAccount::find($whatsappAccountId);
                 if (!$whatsappAccount || ($whatsappAccount['status'] ?? '') !== 'active') {
-                    // Tentar em integration_accounts
-                    $whatsappAccount = \App\Models\IntegrationAccount::find($whatsappAccountId);
+                    // Fallback legado: tentar em whatsapp_accounts
+                    $whatsappAccount = \App\Models\WhatsAppAccount::find($whatsappAccountId);
                     if (!$whatsappAccount || ($whatsappAccount['status'] ?? '') !== 'active') {
                         Response::json(['success' => false, 'message' => 'Integração WhatsApp inválida ou inativa'], 400);
                         return;
@@ -849,23 +848,15 @@ class ConversationController
                 
                 // ✅ IMPORTANTE: Atualizar a conta de integração se o usuário selecionou uma diferente
                 if ($channel === 'whatsapp' && $whatsappAccountId) {
-                    $currentAccountId = $existingOpenConversation['whatsapp_account_id'] ?? $existingOpenConversation['integration_account_id'] ?? null;
+                    $currentAccountId = $existingOpenConversation['integration_account_id'] ?? null;
                     
                     if ($currentAccountId != $whatsappAccountId) {
                         \App\Helpers\Logger::info("newConversation - Atualizando conta de integração: {$currentAccountId} -> {$whatsappAccountId}");
+                        \App\Helpers\Logger::unificacao("[CONVERSA] newConversation: Atualizando integration_account_id da conversa #{$conversationId}: {$currentAccountId} → {$whatsappAccountId}");
                         
-                        // Verificar se é integration_accounts ou whatsapp_accounts
-                        $integrationAccount = \App\Models\IntegrationAccount::find($whatsappAccountId);
-                        if ($integrationAccount) {
-                            \App\Models\Conversation::update($conversationId, [
-                                'integration_account_id' => $whatsappAccountId,
-                                'whatsapp_account_id' => $whatsappAccountId // Manter sincronizado
-                            ]);
-                        } else {
-                            \App\Models\Conversation::update($conversationId, [
-                                'whatsapp_account_id' => $whatsappAccountId
-                            ]);
-                        }
+                        \App\Models\Conversation::update($conversationId, [
+                            'integration_account_id' => $whatsappAccountId
+                        ]);
                     }
                 }
             } else {
@@ -885,17 +876,11 @@ class ConversationController
                     $conversationData['stage_id'] = $stageId;
                 }
                 
-                // Adicionar whatsapp_account_id e integration_account_id se canal for WhatsApp
+                // Adicionar integration_account_id se canal for WhatsApp
                 if ($channel === 'whatsapp' && $whatsappAccountId) {
-                    // Verificar se é integration_accounts ou whatsapp_accounts
-                    $integrationAccount = \App\Models\IntegrationAccount::find($whatsappAccountId);
-                    if ($integrationAccount) {
-                        $conversationData['integration_account_id'] = $whatsappAccountId;
-                        $conversationData['whatsapp_account_id'] = $whatsappAccountId; // Manter sincronizado
-                    } else {
-                        $conversationData['whatsapp_account_id'] = $whatsappAccountId;
-                    }
-                    \App\Helpers\Logger::info("newConversation - Criando conversa com conta: integration_id=" . ($conversationData['integration_account_id'] ?? 'NULL') . ", wa_id=" . ($conversationData['whatsapp_account_id'] ?? 'NULL'));
+                    $conversationData['integration_account_id'] = $whatsappAccountId;
+                    \App\Helpers\Logger::info("newConversation - Criando conversa com integration_account_id=" . $whatsappAccountId);
+                    \App\Helpers\Logger::unificacao("[CONVERSA] newConversation: Criando nova conversa com integration_account_id={$whatsappAccountId}, contato={$contact['id']}, canal={$channel}");
                 }
                 
                 // Criar sem executar automações (manual)
@@ -3995,31 +3980,22 @@ class ConversationController
                 return;
             }
             
-            // Verificar se a conta existe
+            // Verificar se a conta existe (integration_accounts unificado)
             $account = \App\Models\IntegrationAccount::find($newAccountId);
             if (!$account) {
-                // Tentar buscar em whatsapp_accounts (legacy)
-                $account = \App\Models\WhatsAppAccount::find($newAccountId);
-                if (!$account) {
-                    throw new \Exception('Conta não encontrada');
-                }
-                // É uma conta legacy
-                Conversation::update($id, [
-                    'whatsapp_account_id' => $newAccountId,
-                    'last_customer_account_id' => $newAccountId
-                ]);
-            } else {
-                // É uma conta de integração
-                Conversation::update($id, [
-                    'integration_account_id' => $newAccountId,
-                    'last_customer_account_id' => $newAccountId
-                ]);
+                throw new \Exception('Conta não encontrada');
             }
+            
+            Conversation::update($id, [
+                'integration_account_id' => $newAccountId,
+                'last_customer_account_id' => $newAccountId
+            ]);
             
             $accountPhone = $account['phone_number'] ?? 'Desconhecido';
             $accountName = $account['name'] ?? '';
             
             \App\Helpers\Logger::info("ConversationController::changeAccount - Conversa {$id} alterada para conta {$newAccountId} ({$accountPhone})");
+            \App\Helpers\Logger::unificacao("[CONVERSA] changeAccount: Conversa #{$id} - integration_account_id alterado para {$newAccountId} ({$accountName}, phone={$accountPhone})");
             
             Response::json([
                 'success' => true,

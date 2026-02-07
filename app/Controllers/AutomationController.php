@@ -57,8 +57,8 @@ class AutomationController
                 return;
             }
             
-            // Buscar contas WhatsApp (legacy)
-            $whatsappAccounts = WhatsAppAccount::getActive();
+            // Buscar contas WhatsApp (integration_accounts unificado)
+            $whatsappAccounts = IntegrationAccount::getActiveWhatsApp();
             
             // Buscar todas as contas de integração (novo sistema unificado)
             $integrationAccounts = IntegrationAccount::all();

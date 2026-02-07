@@ -203,80 +203,60 @@ class Automation extends Model
         \App\Helpers\Logger::automation("    🔍 Config recebido: " . json_encode($config));
         \App\Helpers\Logger::automation("    🔍 Data recebido: " . json_encode($data));
         
-        // Obter contas de integração configuradas (array ou valor único)
-        $configIntegrationIds = [];
+        // ✅ UNIFICADO: Coletar todos os IDs configurados (integration + whatsapp legado)
+        $configAccountIds = [];
+        
+        // integration_account_ids (novo padrão)
         if (!empty($config['integration_account_ids']) && is_array($config['integration_account_ids'])) {
-            $configIntegrationIds = $config['integration_account_ids'];
-            \App\Helpers\Logger::automation("    🔍 Encontrou integration_account_ids (array): " . json_encode($configIntegrationIds));
+            $configAccountIds = array_merge($configAccountIds, $config['integration_account_ids']);
         } elseif (!empty($config['integration_account_id'])) {
-            $configIntegrationIds = [$config['integration_account_id']];
-            \App\Helpers\Logger::automation("    🔍 Encontrou integration_account_id (único): {$config['integration_account_id']}");
+            $configAccountIds[] = $config['integration_account_id'];
         }
         
-        // Obter contas WhatsApp configuradas (array ou valor único)
-        $configWhatsappIds = [];
+        // whatsapp_account_ids (legado - converter para integration IDs)
         if (!empty($config['whatsapp_account_ids']) && is_array($config['whatsapp_account_ids'])) {
-            $configWhatsappIds = $config['whatsapp_account_ids'];
-            \App\Helpers\Logger::automation("    🔍 Encontrou whatsapp_account_ids (array): " . json_encode($configWhatsappIds));
+            \App\Helpers\Logger::unificacao("[AUTOMACAO] matchesAccountConfig: Convertendo whatsapp_account_ids legado: " . json_encode($config['whatsapp_account_ids']));
+            foreach ($config['whatsapp_account_ids'] as $waId) {
+                $iaId = \App\Models\IntegrationAccount::getIntegrationIdFromWhatsAppId((int)$waId);
+                if ($iaId) {
+                    $configAccountIds[] = $iaId;
+                    \App\Helpers\Logger::unificacao("[AUTOMACAO] ✅ whatsapp_account_id={$waId} → integration_account_id={$iaId}");
+                } else {
+                    \App\Helpers\Logger::unificacao("[AUTOMACAO] ❌ whatsapp_account_id={$waId} → NÃO ENCONTRADO em integration_accounts");
+                }
+            }
         } elseif (!empty($config['whatsapp_account_id'])) {
-            $configWhatsappIds = [$config['whatsapp_account_id']];
-            \App\Helpers\Logger::automation("    🔍 Encontrou whatsapp_account_id (único): {$config['whatsapp_account_id']}");
+            \App\Helpers\Logger::unificacao("[AUTOMACAO] matchesAccountConfig: Convertendo whatsapp_account_id legado: {$config['whatsapp_account_id']}");
+            $iaId = \App\Models\IntegrationAccount::getIntegrationIdFromWhatsAppId((int)$config['whatsapp_account_id']);
+            if ($iaId) {
+                $configAccountIds[] = $iaId;
+                \App\Helpers\Logger::unificacao("[AUTOMACAO] ✅ whatsapp_account_id={$config['whatsapp_account_id']} → integration_account_id={$iaId}");
+            } else {
+                \App\Helpers\Logger::unificacao("[AUTOMACAO] ❌ whatsapp_account_id={$config['whatsapp_account_id']} → NÃO ENCONTRADO em integration_accounts");
+            }
         }
         
-        \App\Helpers\Logger::automation("    🔍 Resumo: configIntegrationIds=" . json_encode($configIntegrationIds) . ", configWhatsappIds=" . json_encode($configWhatsappIds));
+        // Remover duplicatas
+        $configAccountIds = array_unique(array_map('strval', $configAccountIds));
+        
+        \App\Helpers\Logger::automation("    🔍 IDs de conta unificados: " . json_encode(array_values($configAccountIds)));
         
         // Se nenhuma conta está configurada, aceitar qualquer conta
-        if (empty($configIntegrationIds) && empty($configWhatsappIds)) {
+        if (empty($configAccountIds)) {
             \App\Helpers\Logger::automation("    ⚠️ NENHUMA conta configurada na automação! Aceitando QUALQUER conta");
             return true;
         }
         
-        // Obter conta da conversa
+        // Obter integration_account_id da conversa
         $dataIntegrationId = $data['integration_account_id'] ?? null;
-        $dataWhatsappId = $data['whatsapp_account_id'] ?? null;
         
-        // Verificar se a conta de integração da conversa está nas contas configuradas
-        if (!empty($configIntegrationIds) && !empty($dataIntegrationId)) {
-            // Converter para strings para comparação consistente
-            $configIntegrationIdsStr = array_map('strval', $configIntegrationIds);
-            $dataIntegrationIdStr = strval($dataIntegrationId);
-            
-            if (in_array($dataIntegrationIdStr, $configIntegrationIdsStr)) {
-                \App\Helpers\Logger::automation("    ✓ Conta de integração {$dataIntegrationId} está na lista configurada: " . json_encode($configIntegrationIds));
-                return true;
-            }
-        }
-        
-        // Verificar se a conta WhatsApp da conversa está nas contas configuradas
-        if (!empty($configWhatsappIds) && !empty($dataWhatsappId)) {
-            // Converter para strings para comparação consistente
-            $configWhatsappIdsStr = array_map('strval', $configWhatsappIds);
-            $dataWhatsappIdStr = strval($dataWhatsappId);
-            
-            if (in_array($dataWhatsappIdStr, $configWhatsappIdsStr)) {
-                \App\Helpers\Logger::automation("    ✓ Conta WhatsApp {$dataWhatsappId} está na lista configurada: " . json_encode($configWhatsappIds));
-                return true;
-            }
-        }
-        
-        // Verificar correspondência cruzada (WhatsApp ID pode estar em integration_account_ids via migração)
-        if (!empty($configIntegrationIds) && !empty($dataWhatsappId)) {
-            // Buscar integration_account correspondente ao whatsapp_account
-            $integrationAccount = \App\Helpers\Database::fetch(
-                "SELECT ia.id FROM integration_accounts ia 
-                 JOIN whatsapp_accounts wa ON ia.phone_number = wa.phone_number 
-                 WHERE wa.id = ?",
-                [$dataWhatsappId]
-            );
-            
-            if ($integrationAccount && in_array(strval($integrationAccount['id']), array_map('strval', $configIntegrationIds))) {
-                \App\Helpers\Logger::automation("    ✓ Conta WhatsApp {$dataWhatsappId} corresponde a integration_account {$integrationAccount['id']} na lista configurada");
-                return true;
-            }
+        if (!empty($dataIntegrationId) && in_array(strval($dataIntegrationId), $configAccountIds)) {
+            \App\Helpers\Logger::automation("    ✓ integration_account_id {$dataIntegrationId} está na lista configurada");
+            return true;
         }
         
         // Nenhuma correspondência encontrada
-        \App\Helpers\Logger::automation("    ✗ Conta não corresponde. Config: integration_ids=" . json_encode($configIntegrationIds) . ", whatsapp_ids=" . json_encode($configWhatsappIds) . " | Data: integration_id={$dataIntegrationId}, whatsapp_id={$dataWhatsappId} - REJEITADO");
+        \App\Helpers\Logger::automation("    ✗ Conta não corresponde. Config IDs=" . json_encode(array_values($configAccountIds)) . " | Data: integration_id={$dataIntegrationId} - REJEITADO");
         return false;
     }
 }

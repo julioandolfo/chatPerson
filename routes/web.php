@@ -732,51 +732,22 @@ Router::get('/api/contact-lists', [ContactListController::class, 'listAPI'], ['A
 Router::get('/api/contact-lists/{id}/contacts', [ContactListController::class, 'contacts'], ['Authentication']);
 Router::get('/api/contacts/search', [ContactListController::class, 'searchContacts'], ['Authentication']);
 
-// API para listar contas WhatsApp (usado em contatos)
+// API para listar contas WhatsApp (unificado - integration_accounts)
 Router::get('/api/whatsapp/accounts', function() {
-    // Buscar contas WhatsApp ativas
-    $accounts = \App\Models\WhatsAppAccount::getActive();
+    $accounts = \App\Models\IntegrationAccount::getActiveWhatsApp();
     \App\Helpers\Response::json([
         'success' => true,
         'accounts' => $accounts
     ]);
 }, ['Authentication']);
 
-// API para listar contas de integração WhatsApp
+// API para listar contas de integração WhatsApp (unificado)
 Router::get('/api/integration-accounts/whatsapp', function() {
-    // ✅ CORRIGIDO: Priorizar whatsapp_accounts (tabela principal usada no modal de nova conversa)
-    $legacyAccounts = \App\Models\WhatsAppAccount::getActive();
-    
-    // Também buscar contas de integração ativas (WhatsApp)
-    $integrationAccounts = \App\Models\IntegrationAccount::getActive('whatsapp');
-    
-    // Combinar as duas listas, priorizando whatsapp_accounts
-    $allAccounts = [];
-    $seenPhones = [];
-    
-    // PRIMEIRO: Adicionar contas de whatsapp_accounts (prioridade)
-    foreach ($legacyAccounts as $acc) {
-        $phone = $acc['phone_number'] ?? '';
-        if ($phone && !in_array($phone, $seenPhones)) {
-            $acc['source'] = 'whatsapp_accounts';
-            $allAccounts[] = $acc;
-            $seenPhones[] = $phone;
-        }
-    }
-    
-    // SEGUNDO: Adicionar contas de integration_accounts (se não existir o mesmo telefone)
-    foreach ($integrationAccounts as $acc) {
-        $phone = $acc['phone_number'] ?? '';
-        if ($phone && !in_array($phone, $seenPhones)) {
-            $acc['source'] = 'integration_accounts';
-            $allAccounts[] = $acc;
-            $seenPhones[] = $phone;
-        }
-    }
+    $accounts = \App\Models\IntegrationAccount::getActive('whatsapp');
     
     \App\Helpers\Response::json([
         'success' => true,
-        'data' => $allAccounts
+        'data' => $accounts
     ]);
 }, ['Authentication']);
 

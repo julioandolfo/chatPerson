@@ -48,8 +48,8 @@ class IntegrationController
         Permission::abortIfCannot('whatsapp.view');
         
         try {
-            // Buscar contas WhatsApp com informações de funil/etapa
-            $accounts = WhatsAppAccount::all();
+            // Buscar contas WhatsApp de integration_accounts (unificado)
+            $accounts = IntegrationAccount::getAllWhatsApp();
             
             // Enriquecer com nomes de funil e etapa
             foreach ($accounts as &$account) {
@@ -247,8 +247,8 @@ class IntegrationController
                 'default_stage_id' => !empty($data['default_stage_id']) ? (int)$data['default_stage_id'] : null
             ];
             
-            // Atualizar
-            WhatsAppAccount::update($id, $updateData);
+            // Atualizar em integration_accounts (unificado)
+            IntegrationAccount::update($id, $updateData);
             
             Response::json([
                 'success' => true,
@@ -320,27 +320,22 @@ class IntegrationController
                 unset($data['new_conv_limit_period_value']);
             }
             
-            // Tentar atualizar campos de rate limit separadamente (podem não existir ainda)
+            // Mesclar campos de rate limit nos dados
             if (!empty($rateLimitFields)) {
-                try {
-                    WhatsAppAccount::update($id, $rateLimitFields);
-                } catch (\Exception $e) {
-                    // Ignorar se as colunas não existem ainda
-                    \App\Helpers\Logger::warning("Rate limit columns may not exist yet: " . $e->getMessage());
-                }
+                $data = array_merge($data, $rateLimitFields);
             }
 
-            if (WhatsAppAccount::update($id, $data)) {
-                // Também atualizar em integration_accounts se existir
-                if (!empty($rateLimitFields)) {
-                    try {
-                        $integrationAccount = \App\Models\IntegrationAccount::where('whatsapp_id', $id);
-                        if ($integrationAccount) {
-                            \App\Models\IntegrationAccount::update($integrationAccount['id'], $rateLimitFields);
-                        }
-                    } catch (\Exception $e) {
-                        // Ignorar erro de sincronização
+            if (IntegrationAccount::update($id, $data)) {
+                \App\Helpers\Logger::unificacao("[CRUD] updateWhatsAppAccount: Conta IA#{$id} atualizada em integration_accounts");
+                // Sincronizar com whatsapp_accounts legado (se existir)
+                try {
+                    $waId = IntegrationAccount::getWhatsAppIdFromIntegrationId($id);
+                    if ($waId) {
+                        WhatsAppAccount::update($waId, $data);
+                        \App\Helpers\Logger::unificacao("[CRUD] updateWhatsAppAccount: ✅ Sincronizado com whatsapp_accounts (WA#{$waId})");
                     }
+                } catch (\Exception $e) {
+                    \App\Helpers\Logger::unificacao("[CRUD] updateWhatsAppAccount: ⚠️ Erro ao sincronizar com whatsapp_accounts: " . $e->getMessage());
                 }
                 
                 Response::json([
@@ -417,7 +412,7 @@ class IntegrationController
                 // Ignorar erro de desconexão
             }
 
-            if (WhatsAppAccount::delete($id)) {
+            if (IntegrationAccount::delete($id)) {
                 Response::json([
                     'success' => true,
                     'message' => 'Conta deletada com sucesso!'
@@ -500,7 +495,7 @@ class IntegrationController
                 throw new \InvalidArgumentException('Nenhum dado para atualizar');
             }
 
-            if (WhatsAppAccount::update($id, $updateData)) {
+            if (IntegrationAccount::update($id, $updateData)) {
                 Response::json([
                     'success' => true,
                     'message' => 'Configuração WavoIP atualizada com sucesso!'

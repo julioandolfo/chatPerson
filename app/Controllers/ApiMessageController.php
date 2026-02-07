@@ -26,7 +26,7 @@ use App\Models\ApiLog;
 use App\Models\Contact;
 use App\Models\Conversation;
 use App\Models\Message;
-use App\Models\WhatsAppAccount;
+use App\Models\IntegrationAccount;
 use App\Services\WhatsAppService;
 
 class ApiMessageController
@@ -66,8 +66,8 @@ class ApiMessageController
             $message = trim($input['message']);
             $contactName = trim($input['contact_name'] ?? '');
             
-            // 1. Buscar conta WhatsApp pelo número "from"
-            $account = WhatsAppAccount::findByPhone($from);
+            // 1. Buscar conta WhatsApp pelo número "from" (integration_accounts unificado)
+            $account = IntegrationAccount::findWhatsAppByPhone($from);
             
             if (!$account) {
                 $this->logRequest($tokenData, $userId, 'messages/send', 404, $input, [
@@ -148,7 +148,7 @@ class ApiMessageController
                 $conversationData = [
                     'contact_id' => $contact['id'],
                     'channel' => 'whatsapp',
-                    'whatsapp_account_id' => $account['id'],
+                    'integration_account_id' => $account['id'],
                     'status' => 'open',
                     'funnel_id' => $account['default_funnel_id'] ?? null,
                     'funnel_stage_id' => $account['default_stage_id'] ?? null
@@ -240,7 +240,7 @@ class ApiMessageController
         $userId = ApiAuth::getUserId();
         
         try {
-            $accounts = WhatsAppAccount::getActive();
+            $accounts = IntegrationAccount::getActiveWhatsApp();
             
             // Retornar apenas dados públicos (sem tokens)
             $safeAccounts = array_map(function($account) {

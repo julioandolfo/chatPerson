@@ -496,14 +496,18 @@ class ContactService
                 return null;
             }
 
-            $account = \App\Models\WhatsAppAccount::find($whatsappAccountId);
-            if (!$account || $account['provider'] !== 'quepasa' || empty($account['quepasa_token'])) {
+            // Buscar conta em integration_accounts (unificado)
+            $account = \App\Models\IntegrationAccount::find($whatsappAccountId);
+            if (!$account) {
+                return null;
+            }
+            $token = \App\Models\IntegrationAccount::getQuepasaToken($account);
+            $quepasaConfig = \App\Models\IntegrationAccount::getQuepasaConfig($account);
+            if ($account['provider'] !== 'quepasa' || empty($token)) {
                 return null;
             }
 
             // Tentar buscar avatar via Quepasa API
-            // Nota: A API do Quepasa pode não ter endpoint direto para avatar
-            // Vamos tentar alguns endpoints comuns
             $apiUrl = rtrim($account['api_url'], '/');
             $endpoints = [
                 "/profile-picture/{$phone}",
@@ -516,8 +520,8 @@ class ContactService
                 $url = $apiUrl . $endpoint;
                 $headers = [
                     'Accept: image/*',
-                    'X-QUEPASA-TOKEN: ' . $account['quepasa_token'],
-                    'X-QUEPASA-TRACKID: ' . ($account['quepasa_trackid'] ?? $account['name'])
+                    'X-QUEPASA-TOKEN: ' . $token,
+                    'X-QUEPASA-TRACKID: ' . ($quepasaConfig['quepasa_trackid'] ?? $account['name'])
                 ];
 
                 $ch = curl_init($url);
@@ -565,8 +569,13 @@ class ContactService
     public static function fetchWhatsAppAvatarByChatId(int $contactId, int $whatsappAccountId, string $chatId): ?string
     {
         try {
-            $account = \App\Models\WhatsAppAccount::find($whatsappAccountId);
-            if (!$account || $account['provider'] !== 'quepasa' || empty($account['quepasa_token'])) {
+            // Buscar conta em integration_accounts (unificado)
+            $account = \App\Models\IntegrationAccount::find($whatsappAccountId);
+            if (!$account) {
+                return null;
+            }
+            $token = \App\Models\IntegrationAccount::getQuepasaToken($account);
+            if ($account['provider'] !== 'quepasa' || empty($token)) {
                 return null;
             }
 
@@ -579,12 +588,13 @@ class ContactService
                 "/picture/{$chatId}"
             ];
 
+            $quepasaConfig = \App\Models\IntegrationAccount::getQuepasaConfig($account);
             foreach ($endpoints as $endpoint) {
                 $url = $apiUrl . $endpoint;
                 $headers = [
                     'Accept: image/*',
-                    'X-QUEPASA-TOKEN: ' . $account['quepasa_token'],
-                    'X-QUEPASA-TRACKID: ' . ($account['quepasa_trackid'] ?? $account['name'])
+                    'X-QUEPASA-TOKEN: ' . $token,
+                    'X-QUEPASA-TRACKID: ' . ($quepasaConfig['quepasa_trackid'] ?? $account['name'])
                 ];
 
                 $ch = curl_init($url);

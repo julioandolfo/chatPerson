@@ -105,48 +105,38 @@
                         <div class="card-body">
                             <h5 class="card-title mb-4">⚙️ Configurações de Aplicação</h5>
 
-                            <!-- Presets -->
+                            <!-- Posicionamento (dropdown) -->
                             <div class="mb-4">
-                                <label class="form-label fw-bold">Preset Rápido</label>
-                                <div class="btn-group w-100" role="group">
-                                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="applyPreset('caneca')">🎁 Caneca</button>
-                                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="applyPreset('camiseta')">👕 Camiseta</button>
-                                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="applyPreset('caderno')">📓 Caderno</button>
-                                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="applyPreset('caneta')">🖊️ Caneta</button>
-                                </div>
+                                <label class="form-label fw-bold">📍 Posicionamento da Logo</label>
+                                <select class="form-select" id="logoPositionSelect" onchange="updateLogoConfig('position', this.value)">
+                                    <option value="center" selected>Centralizado</option>
+                                    <option value="top-center">Centro Superior</option>
+                                    <option value="bottom-center">Centro Inferior</option>
+                                    <option value="center-left">Centro Esquerda</option>
+                                    <option value="center-right">Centro Direita</option>
+                                    <option value="top-left">Superior Esquerdo</option>
+                                    <option value="top-right">Superior Direito</option>
+                                    <option value="bottom-left">Inferior Esquerdo</option>
+                                    <option value="bottom-right">Inferior Direito</option>
+                                </select>
                             </div>
 
-                            <!-- Posicionamento -->
+                            <!-- Tamanho (3 opções simples) -->
                             <div class="mb-4">
-                                <label class="form-label fw-bold">📍 Posicionamento</label>
-                                <div class="d-flex gap-2 justify-content-center">
-                                    <div class="btn-group-vertical" role="group">
-                                        <button type="button" class="btn btn-sm btn-light" onclick="updateLogoConfig('position', 'top-left')">↖️</button>
-                                        <button type="button" class="btn btn-sm btn-light" onclick="updateLogoConfig('position', 'center-left')">⬅️</button>
-                                        <button type="button" class="btn btn-sm btn-light" onclick="updateLogoConfig('position', 'bottom-left')">↙️</button>
+                                <label class="form-label fw-bold">📏 Tamanho da Logo</label>
+                                <div class="d-flex gap-2">
+                                    <div class="form-check form-check-custom form-check-solid flex-fill">
+                                        <input class="form-check-input" type="radio" name="logoSize" value="10" id="logoSizeSmall" onchange="updateLogoConfig('size', 10)">
+                                        <label class="form-check-label w-100 text-center py-2 rounded border" for="logoSizeSmall" style="cursor: pointer;">Pequeno</label>
                                     </div>
-                                    <div class="btn-group-vertical" role="group">
-                                        <button type="button" class="btn btn-sm btn-light" onclick="updateLogoConfig('position', 'top-center')">⬆️</button>
-                                        <button type="button" class="btn btn-sm btn-primary" onclick="updateLogoConfig('position', 'center')">⚫</button>
-                                        <button type="button" class="btn btn-sm btn-light" onclick="updateLogoConfig('position', 'bottom-center')">⬇️</button>
+                                    <div class="form-check form-check-custom form-check-solid flex-fill">
+                                        <input class="form-check-input" type="radio" name="logoSize" value="20" id="logoSizeMedium" checked onchange="updateLogoConfig('size', 20)">
+                                        <label class="form-check-label w-100 text-center py-2 rounded border" for="logoSizeMedium" style="cursor: pointer;">Médio</label>
                                     </div>
-                                    <div class="btn-group-vertical" role="group">
-                                        <button type="button" class="btn btn-sm btn-light" onclick="updateLogoConfig('position', 'top-right')">↗️</button>
-                                        <button type="button" class="btn btn-sm btn-light" onclick="updateLogoConfig('position', 'center-right')">➡️</button>
-                                        <button type="button" class="btn btn-sm btn-light" onclick="updateLogoConfig('position', 'bottom-right')">↘️</button>
+                                    <div class="form-check form-check-custom form-check-solid flex-fill">
+                                        <input class="form-check-input" type="radio" name="logoSize" value="30" id="logoSizeLarge" onchange="updateLogoConfig('size', 30)">
+                                        <label class="form-check-label w-100 text-center py-2 rounded border" for="logoSizeLarge" style="cursor: pointer;">Grande</label>
                                     </div>
-                                </div>
-                            </div>
-
-                            <!-- Tamanho -->
-                            <div class="mb-4">
-                                <label class="form-label fw-bold">📏 Tamanho: <span id="logoSizeValue">20%</span></label>
-                                <input type="range" class="form-range" min="5" max="50" step="5" value="20" 
-                                       oninput="updateLogoConfig('size', this.value); document.getElementById('logoSizeValue').textContent = this.value + '%'">
-                                <div class="d-flex justify-content-between small text-muted">
-                                    <span>Pequeno</span>
-                                    <span>Médio</span>
-                                    <span>Grande</span>
                                 </div>
                             </div>
 
@@ -161,13 +151,6 @@
                                 </select>
                             </div>
 
-                            <!-- Opacidade -->
-                            <div class="mb-4">
-                                <label class="form-label fw-bold">💫 Opacidade: <span id="logoOpacityValue">100%</span></label>
-                                <input type="range" class="form-range" min="20" max="100" step="10" value="100" 
-                                       oninput="updateLogoConfig('opacity', this.value); document.getElementById('logoOpacityValue').textContent = this.value + '%'">
-                            </div>
-
                             <!-- Efeitos -->
                             <div class="mb-4">
                                 <label class="form-label fw-bold">✨ Efeitos Visuais</label>
@@ -179,21 +162,20 @@
                                     <input class="form-check-input" type="checkbox" id="effectBorder" onchange="updateLogoConfig('effects.border', this.checked)">
                                     <label class="form-check-label" for="effectBorder">Adicionar borda branca</label>
                                 </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="effectReflection" onchange="updateLogoConfig('effects.reflection', this.checked)">
-                                    <label class="form-check-label" for="effectReflection">Efeito reflexo</label>
-                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Preview -->
+                    <!-- Canvas Posicional -->
                     <div class="card">
                         <div class="card-header">
-                            <h5 class="card-title mb-0">👁️ Preview ao Vivo</h5>
+                            <h5 class="card-title mb-0">📐 Posicionar Logo no Produto</h5>
                         </div>
-                        <div class="card-body text-center" id="mockupLogoPreview">
-                            <div class="text-muted">Configurando...</div>
+                        <div class="card-body text-center p-0" id="mockupPositionCanvas" style="min-height: 350px; background: #f5f5f5; position: relative; overflow: hidden; border-radius: 0 0 8px 8px;">
+                            <div class="text-muted py-5">Selecione produto e logo para posicionar</div>
+                        </div>
+                        <div class="card-footer text-muted small">
+                            <i class="fas fa-hand-pointer me-1"></i> Arraste a logo para posicioná-la sobre o produto. Esta imagem será enviada como referência para a IA.
                         </div>
                     </div>
                 </div>
@@ -207,27 +189,30 @@
                         <label class="form-label fw-bold">Escolha o modo de geração</label>
                         <div class="row g-3">
                             <div class="col-md-4">
-                                <div class="card generation-mode-card border-primary border-3" onclick="selectGenerationMode('ai')" style="cursor: pointer;">
-                                    <div class="card-body text-center">
-                                        <h5>🤖 IA Automática</h5>
-                                        <p class="small text-muted mb-0">GPT-4o Vision + DALL-E 3 geram mockup profissional</p>
-                                        <span class="badge badge-success mt-2">Recomendado</span>
+                                <div class="card generation-mode-card active" data-mode="ai" onclick="selectGenerationMode('ai', this)" style="cursor: pointer;">
+                                    <div class="card-body text-center py-4">
+                                        <div class="fs-1 mb-2">🤖</div>
+                                        <h5 class="mb-1">IA Automática</h5>
+                                        <p class="small text-muted mb-2">GPT-4o Vision + DALL-E 3 geram mockup profissional</p>
+                                        <span class="badge bg-success">Recomendado</span>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <div class="card generation-mode-card" onclick="selectGenerationMode('manual')" style="cursor: pointer;">
-                                    <div class="card-body text-center">
-                                        <h5>✋ Editor Manual</h5>
-                                        <p class="small text-muted mb-0">Monte seu mockup com controle total</p>
+                                <div class="card generation-mode-card" data-mode="manual" onclick="selectGenerationMode('manual', this)" style="cursor: pointer;">
+                                    <div class="card-body text-center py-4">
+                                        <div class="fs-1 mb-2">✋</div>
+                                        <h5 class="mb-1">Editor Manual</h5>
+                                        <p class="small text-muted mb-2">Monte seu mockup com controle total no editor</p>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <div class="card generation-mode-card" onclick="selectGenerationMode('hybrid')" style="cursor: pointer;">
-                                    <div class="card-body text-center">
-                                        <h5>🔀 Híbrido</h5>
-                                        <p class="small text-muted mb-0">IA gera base + ajustes manuais</p>
+                                <div class="card generation-mode-card" data-mode="hybrid" onclick="selectGenerationMode('hybrid', this)" style="cursor: pointer;">
+                                    <div class="card-body text-center py-4">
+                                        <div class="fs-1 mb-2">🔀</div>
+                                        <h5 class="mb-1">Híbrido</h5>
+                                        <p class="small text-muted mb-2">IA gera base + ajustes manuais no editor</p>
                                     </div>
                                 </div>
                             </div>
@@ -247,22 +232,6 @@
                             <h5 class="card-title mb-3">⚙️ Opções de Geração</h5>
                             
                             <div class="mb-3">
-                                <label class="form-label fw-bold">Tamanho</label>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="mockupSize" value="1024x1024" id="size1" checked>
-                                    <label class="form-check-label" for="size1">Padrão (1024x1024)</label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="mockupSize" value="1024x1792" id="size2">
-                                    <label class="form-check-label" for="size2">Retrato (1024x1792)</label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="mockupSize" value="1792x1024" id="size3">
-                                    <label class="form-check-label" for="size3">Paisagem (1792x1024)</label>
-                                </div>
-                            </div>
-
-                            <div class="mb-3">
                                 <label class="form-label fw-bold">Qualidade</label>
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" name="mockupQuality" value="standard" id="quality1" checked>
@@ -270,7 +239,7 @@
                                 </div>
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" name="mockupQuality" value="hd" id="quality2">
-                                    <label class="form-check-label" for="quality2">HD (mais demorado)</label>
+                                    <label class="form-check-label" for="quality2">HD (mais demorado, melhor qualidade)</label>
                                 </div>
                             </div>
                         </div>
@@ -308,18 +277,15 @@
     transition: all 0.3s;
     position: relative;
 }
-
 .mockup-image-card:hover {
     transform: translateY(-5px);
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
-
 .mockup-image-check {
     position: absolute;
     top: 5px;
     right: 5px;
 }
-
 .mockup-logo-card {
     padding: 10px;
     border: 2px solid #e4e6ef;
@@ -327,52 +293,36 @@
     cursor: pointer;
     transition: all 0.3s;
 }
-
 .mockup-logo-card:hover {
     transform: scale(1.05);
 }
 
+/* CARDS DE MODO DE GERAÇÃO - estado selecionado visível */
 .generation-mode-card {
     transition: all 0.3s;
     cursor: pointer;
+    border: 2px solid #e4e6ef;
 }
-
 .generation-mode-card:hover {
     transform: translateY(-5px);
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
-</style>
-
-<script>
-// Presets de produtos
-function applyPreset(product) {
-    const presets = {
-        'caneca': { position: 'center', size: 20, style: 'original' },
-        'camiseta': { position: 'top-center', size: 15, style: 'original' },
-        'caderno': { position: 'bottom-right', size: 12, style: 'original' },
-        'caneta': { position: 'center', size: 8, style: 'original' }
-    };
-
-    const preset = presets[product];
-    if (preset) {
-        mockupWizard.logoConfig.position = preset.position;
-        mockupWizard.logoConfig.size = preset.size;
-        mockupWizard.logoConfig.style = preset.style;
-
-        // Atualizar UI
-        document.querySelector('input[type="range"][min="5"]').value = preset.size;
-        document.getElementById('logoSizeValue').textContent = preset.size + '%';
-        document.querySelector('select').value = preset.style;
-
-        updateLogoPreview();
-
-        Swal.fire({
-            icon: 'success',
-            title: 'Preset Aplicado!',
-            text: `Configurações de ${product} aplicadas`,
-            timer: 1500,
-            showConfirmButton: false
-        });
-    }
+.generation-mode-card.active {
+    border: 3px solid #009ef7 !important;
+    background: rgba(0, 158, 247, 0.06) !important;
+    box-shadow: 0 0 0 4px rgba(0, 158, 247, 0.15);
 }
-</script>
+.generation-mode-card.active h5 {
+    color: #009ef7;
+}
+
+/* Canvas posicional */
+#mockupPositionCanvas img.position-logo {
+    cursor: grab;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+#mockupPositionCanvas img.position-logo:active {
+    cursor: grabbing;
+}
+</style>

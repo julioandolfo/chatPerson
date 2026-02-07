@@ -25,13 +25,20 @@ class MockupController
         $oldDisplayErrors = ini_get('display_errors');
         $oldErrorReporting = error_reporting();
         ini_set('display_errors', '0');
+        ini_set('html_errors', '0');
         error_reporting(0);
         
+        // Limpar TODOS os buffers de output
         while (ob_get_level() > 0) {
             ob_end_clean();
         }
         
         ob_start();
+        
+        // Garantir headers JSON
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=utf-8');
+        }
         
         return [
             'display_errors' => $oldDisplayErrors,
@@ -44,6 +51,12 @@ class MockupController
      */
     private function restoreAfterJsonResponse(array $config): void
     {
+        // Limpar qualquer output buffered indesejado antes de restaurar
+        $buffered = ob_get_clean();
+        if ($buffered !== false && $buffered !== '') {
+            // Se houve output HTML do PHP (warnings), logar e descartar
+            error_log('[MockupController] Output buffered descartado: ' . substr($buffered, 0, 200));
+        }
         ini_set('display_errors', $config['display_errors']);
         error_reporting($config['error_reporting']);
     }
@@ -63,8 +76,18 @@ class MockupController
                 return;
             }
 
-            // Obter dados do POST
-            $data = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+            // Obter dados do POST (com tratamento de erro robusto)
+            $rawInput = file_get_contents('php://input');
+            $data = json_decode($rawInput, true);
+            
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $data = $_POST;
+            }
+            
+            if (empty($data)) {
+                Response::json(['error' => 'Dados não recebidos'], 400);
+                return;
+            }
 
             // Validações
             if (empty($data['product_image_path'])) {

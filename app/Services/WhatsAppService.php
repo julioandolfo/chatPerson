@@ -12,6 +12,252 @@ use App\Helpers\Logger;
 class WhatsAppService
 {
     /**
+     * Mapa abrangente de MIME types para extensões de arquivo
+     * Cobre formatos comuns que o WhatsApp pode receber
+     */
+    private static function getMimeToExtensionMap(): array
+    {
+        return [
+            // Imagens
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            'image/webp' => 'webp',
+            'image/bmp' => 'bmp',
+            'image/tiff' => 'tiff',
+            'image/svg+xml' => 'svg',
+            'image/x-icon' => 'ico',
+            'image/heic' => 'heic',
+            'image/heif' => 'heif',
+            // Vídeos
+            'video/mp4' => 'mp4',
+            'video/webm' => 'webm',
+            'video/quicktime' => 'mov',
+            'video/x-msvideo' => 'avi',
+            'video/x-ms-wmv' => 'wmv',
+            'video/x-matroska' => 'mkv',
+            'video/3gpp' => '3gp',
+            'video/x-flv' => 'flv',
+            // Áudio
+            'audio/ogg' => 'ogg',
+            'audio/ogg; codecs=opus' => 'ogg',
+            'audio/opus' => 'ogg',
+            'audio/mpeg' => 'mp3',
+            'audio/mp3' => 'mp3',
+            'audio/mp4' => 'm4a',
+            'audio/x-m4a' => 'm4a',
+            'audio/aac' => 'aac',
+            'audio/wav' => 'wav',
+            'audio/x-wav' => 'wav',
+            'audio/webm' => 'webm',
+            'audio/flac' => 'flac',
+            'audio/x-ms-wma' => 'wma',
+            'audio/amr' => 'amr',
+            // Documentos - Office
+            'application/pdf' => 'pdf',
+            'application/msword' => 'doc',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+            'application/vnd.ms-excel' => 'xls',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+            'application/vnd.ms-powerpoint' => 'ppt',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
+            'application/vnd.oasis.opendocument.text' => 'odt',
+            'application/vnd.oasis.opendocument.spreadsheet' => 'ods',
+            'application/vnd.oasis.opendocument.presentation' => 'odp',
+            // Texto
+            'text/plain' => 'txt',
+            'text/csv' => 'csv',
+            'text/html' => 'html',
+            'text/xml' => 'xml',
+            'text/css' => 'css',
+            'text/javascript' => 'js',
+            'application/json' => 'json',
+            'application/xml' => 'xml',
+            // Compactados
+            'application/zip' => 'zip',
+            'application/x-zip-compressed' => 'zip',
+            'application/x-rar-compressed' => 'rar',
+            'application/vnd.rar' => 'rar',
+            'application/x-7z-compressed' => '7z',
+            'application/gzip' => 'gz',
+            'application/x-tar' => 'tar',
+            'application/x-bzip2' => 'bz2',
+            // Design / Gráficos
+            'application/postscript' => 'ai',
+            'application/x-photoshop' => 'psd',
+            'image/vnd.adobe.photoshop' => 'psd',
+            'application/x-coreldraw' => 'cdr',
+            'application/cdr' => 'cdr',
+            'image/x-coreldraw' => 'cdr',
+            'application/x-cdr' => 'cdr',
+            'application/vnd.corel-draw' => 'cdr',
+            'application/illustrator' => 'ai',
+            'image/x-eps' => 'eps',
+            'application/eps' => 'eps',
+            'application/x-eps' => 'eps',
+            'image/vnd.dwg' => 'dwg',
+            'application/dwg' => 'dwg',
+            'application/x-dwg' => 'dwg',
+            'image/vnd.dxf' => 'dxf',
+            'application/dxf' => 'dxf',
+            'application/x-indesign' => 'indd',
+            // CAD
+            'application/acad' => 'dwg',
+            'application/autocad_dwg' => 'dwg',
+            // Outros
+            'application/vnd.ms-outlook' => 'msg',
+            'message/rfc822' => 'eml',
+            'application/x-iso9660-image' => 'iso',
+            'application/x-executable' => 'exe',
+            'application/x-msi' => 'msi',
+            'application/vnd.android.package-archive' => 'apk',
+            'application/x-shockwave-flash' => 'swf',
+            'application/rtf' => 'rtf',
+            'application/vnd.visio' => 'vsd',
+            'application/vnd.ms-project' => 'mpp',
+        ];
+    }
+
+    /**
+     * Extrair dados de vCard do payload do Quepasa
+     * 
+     * O Quepasa envia contatos compartilhados com:
+     * - attachment.mimetype = "text/x-vcard"
+     * - O conteúdo do vCard está no attachment (base64 ou texto)
+     * - text = DisplayName do contato
+     */
+    private static function parseVCardFromPayload(array $quepasaData, array $payload): array
+    {
+        $result = [
+            'display_name' => $quepasaData['text'] ?? $payload['text'] ?? $quepasaData['body'] ?? '',
+            'phones' => [],
+            'emails' => [],
+            'organization' => '',
+            'vcard_raw' => ''
+        ];
+        
+        // Tentar encontrar o vCard em várias posições do payload
+        $vcardContent = null;
+        
+        // 1. Attachment com content (base64 ou texto)
+        $attachment = $quepasaData['attachment'] ?? $payload['attachment'] ?? null;
+        if ($attachment) {
+            if (isset($attachment['content'])) {
+                $content = $attachment['content'];
+                // Pode ser base64
+                if (strpos($content, 'BEGIN:VCARD') === false) {
+                    $decoded = base64_decode($content, true);
+                    if ($decoded && strpos($decoded, 'BEGIN:VCARD') !== false) {
+                        $vcardContent = $decoded;
+                    }
+                } else {
+                    $vcardContent = $content;
+                }
+            }
+        }
+        
+        // 2. Campo 'vcard' direto no payload
+        if (!$vcardContent) {
+            $vcardContent = $quepasaData['vcard'] ?? $payload['vcard'] ?? null;
+        }
+        
+        // 3. Campo 'contact.vcard'
+        if (!$vcardContent && isset($payload['contact']['vcard'])) {
+            $vcardContent = $payload['contact']['vcard'];
+        }
+        
+        // 4. Body pode conter o vCard
+        if (!$vcardContent) {
+            $body = $quepasaData['body'] ?? $payload['text'] ?? '';
+            if (strpos($body, 'BEGIN:VCARD') !== false) {
+                $vcardContent = $body;
+            }
+        }
+        
+        if ($vcardContent) {
+            $result['vcard_raw'] = $vcardContent;
+            
+            // Parse do vCard
+            // Extrair FN (Full Name)
+            if (preg_match('/FN[;:](.+)/i', $vcardContent, $matches)) {
+                $fn = trim($matches[1]);
+                if (!empty($fn)) {
+                    $result['display_name'] = $fn;
+                }
+            }
+            
+            // Extrair N (Name structured)
+            if (empty($result['display_name']) && preg_match('/^N[;:](.+)/mi', $vcardContent, $matches)) {
+                $parts = explode(';', trim($matches[1]));
+                $name = trim(($parts[1] ?? '') . ' ' . ($parts[0] ?? ''));
+                if (!empty(trim($name))) {
+                    $result['display_name'] = trim($name);
+                }
+            }
+            
+            // Extrair telefones - vários formatos possíveis
+            // TEL;type=CELL:+5511999999999
+            // TEL;waid=5511999999999:+55 11 99999-9999
+            // item1.TEL;waid=5511999999999:+5511999999999
+            if (preg_match_all('/(?:item\d+\.)?TEL[^:]*:([^\r\n]+)/i', $vcardContent, $matches)) {
+                foreach ($matches[1] as $phone) {
+                    $phone = trim($phone);
+                    if (!empty($phone)) {
+                        // Extrair waid se existir (número limpo do WhatsApp)
+                        $waid = '';
+                        if (preg_match('/waid=(\d+)/i', $matches[0][array_search($phone, $matches[1])] ?? '', $waidMatch)) {
+                            $waid = $waidMatch[1];
+                        }
+                        $result['phones'][] = [
+                            'number' => $phone,
+                            'waid' => $waid,
+                            'formatted' => self::formatPhoneForDisplay($phone)
+                        ];
+                    }
+                }
+            }
+            
+            // Extrair emails
+            if (preg_match_all('/EMAIL[^:]*:([^\r\n]+)/i', $vcardContent, $matches)) {
+                foreach ($matches[1] as $email) {
+                    $email = trim($email);
+                    if (!empty($email)) {
+                        $result['emails'][] = $email;
+                    }
+                }
+            }
+            
+            // Extrair organização
+            if (preg_match('/ORG[;:](.+)/i', $vcardContent, $matches)) {
+                $result['organization'] = trim($matches[1], "; \t\n\r\0\x0B");
+            }
+        }
+        
+        // Se ainda não tem nome, usar o texto da mensagem
+        if (empty($result['display_name'])) {
+            $result['display_name'] = $quepasaData['text'] ?? $payload['text'] ?? 'Contato';
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Formatar número de telefone para exibição
+     */
+    private static function formatPhoneForDisplay(string $phone): string
+    {
+        // Remover tudo que não é dígito ou +
+        $clean = preg_replace('/[^\d+]/', '', $phone);
+        
+        // Se começa com +55 (Brasil), formatar
+        if (preg_match('/^\+?55(\d{2})(\d{4,5})(\d{4})$/', $clean, $m)) {
+            return "+55 ({$m[1]}) {$m[2]}-{$m[3]}";
+        }
+        
+        return $phone;
+    }
+
+    /**
      * Normalizar número de telefone do WhatsApp
      * Remove sufixos como @s.whatsapp.net, @lid, @c.us, @g.us, etc.
      * Remove caracteres especiais e deixa apenas dígitos
@@ -1848,22 +2094,50 @@ class WhatsAppService
                                     mkdir($tempDir, 0755, true);
                                 }
                                 
-                                // Determinar extensão baseada no mime type
+                                // Determinar extensão: prioridade = extensão do filename original > mime type > fallback
                                 $extension = 'bin';
-                                $attachmentMime = $payload['attachment']['mime'] ?? $mimetype ?? $contentType;
-                                if ($attachmentMime) {
-                                    if (strpos($attachmentMime, 'opus') !== false || strpos($attachmentMime, 'ogg') !== false) $extension = 'ogg';
-                                    elseif (strpos($attachmentMime, 'mpeg') !== false) $extension = 'mp3';
-                                    elseif (strpos($attachmentMime, 'mp4') !== false) $extension = 'mp4';
-                                    elseif (strpos($attachmentMime, 'webm') !== false) $extension = 'webm';
-                                    elseif (strpos($attachmentMime, 'jpeg') !== false || strpos($attachmentMime, 'jpg') !== false) $extension = 'jpg';
-                                    elseif (strpos($attachmentMime, 'png') !== false) $extension = 'png';
-                                    elseif (strpos($attachmentMime, 'gif') !== false) $extension = 'gif';
-                                    elseif (strpos($attachmentMime, 'webp') !== false) $extension = 'webp';
-                                    elseif (strpos($attachmentMime, 'pdf') !== false) $extension = 'pdf';
-                                    elseif (strpos($attachmentMime, 'document') !== false || strpos($attachmentMime, 'msword') !== false) $extension = 'doc';
-                                    elseif (strpos($attachmentMime, 'sheet') !== false || strpos($attachmentMime, 'excel') !== false) $extension = 'xls';
+                                
+                                // 1. Tentar extensão do nome original do arquivo (mais confiável)
+                                $originalFilename = $payload['attachment']['filename'] ?? $filename ?? null;
+                                if ($originalFilename) {
+                                    $origExt = strtolower(pathinfo($originalFilename, PATHINFO_EXTENSION));
+                                    if (!empty($origExt) && $origExt !== 'bin') {
+                                        $extension = $origExt;
+                                    }
                                 }
+                                
+                                // 2. Se ainda é bin, tentar determinar pelo mime type
+                                if ($extension === 'bin') {
+                                    $attachmentMime = $payload['attachment']['mime'] ?? $mimetype ?? $contentType;
+                                    if ($attachmentMime) {
+                                        $mimeExtMap = self::getMimeToExtensionMap();
+                                        // Tentar match exato primeiro
+                                        $cleanMime = strtolower(trim(explode(';', $attachmentMime)[0]));
+                                        if (isset($mimeExtMap[$cleanMime])) {
+                                            $extension = $mimeExtMap[$cleanMime];
+                                        } else {
+                                            // Fallback parcial por substring
+                                            if (strpos($attachmentMime, 'opus') !== false || strpos($attachmentMime, 'ogg') !== false) $extension = 'ogg';
+                                            elseif (strpos($attachmentMime, 'mpeg') !== false && strpos($attachmentMime, 'audio') !== false) $extension = 'mp3';
+                                            elseif (strpos($attachmentMime, 'mp4') !== false) $extension = 'mp4';
+                                            elseif (strpos($attachmentMime, 'webm') !== false) $extension = 'webm';
+                                            elseif (strpos($attachmentMime, 'jpeg') !== false || strpos($attachmentMime, 'jpg') !== false) $extension = 'jpg';
+                                            elseif (strpos($attachmentMime, 'png') !== false) $extension = 'png';
+                                            elseif (strpos($attachmentMime, 'gif') !== false) $extension = 'gif';
+                                            elseif (strpos($attachmentMime, 'webp') !== false) $extension = 'webp';
+                                            elseif (strpos($attachmentMime, 'pdf') !== false) $extension = 'pdf';
+                                            elseif (strpos($attachmentMime, 'document') !== false || strpos($attachmentMime, 'msword') !== false) $extension = 'doc';
+                                            elseif (strpos($attachmentMime, 'sheet') !== false || strpos($attachmentMime, 'excel') !== false) $extension = 'xls';
+                                            elseif (strpos($attachmentMime, 'presentation') !== false || strpos($attachmentMime, 'powerpoint') !== false) $extension = 'ppt';
+                                            elseif (strpos($attachmentMime, 'zip') !== false) $extension = 'zip';
+                                            elseif (strpos($attachmentMime, 'rar') !== false) $extension = 'rar';
+                                            elseif (strpos($attachmentMime, 'text/plain') !== false) $extension = 'txt';
+                                            elseif (strpos($attachmentMime, 'text/csv') !== false) $extension = 'csv';
+                                        }
+                                    }
+                                }
+                                
+                                Logger::quepasa("processWebhook - Extensão determinada: {$extension} (filename original: " . ($originalFilename ?? 'N/A') . ")");
                                 
                                 $tempFile = $tempDir . '/' . $messageType . '_' . $messageIdOnly . '_' . time() . '.' . $extension;
                                 file_put_contents($tempFile, $mediaData);
@@ -2155,9 +2429,20 @@ class WhatsAppService
                                 elseif (strpos($attachmentMimeType, 'video') !== false) $attachmentType = 'video';
                             }
                             
-                            // Extrair extensão do filename
+                            // Extrair extensão do filename (prioridade: nome original > mime type)
                             $attachmentFilename = $downloadedFile['filename'] ?? $filename;
-                            $attachmentExtension = pathinfo($attachmentFilename, PATHINFO_EXTENSION) ?: 'bin';
+                            $attachmentExtension = pathinfo($attachmentFilename, PATHINFO_EXTENSION);
+                            if (empty($attachmentExtension) || $attachmentExtension === 'bin') {
+                                // Tentar pelo mime type
+                                if ($attachmentMimeType) {
+                                    $mimeExtMap = self::getMimeToExtensionMap();
+                                    $cleanMime = strtolower(trim(explode(';', $attachmentMimeType)[0]));
+                                    $attachmentExtension = $mimeExtMap[$cleanMime] ?? $attachmentExtension ?: 'bin';
+                                }
+                                if (empty($attachmentExtension)) {
+                                    $attachmentExtension = 'bin';
+                                }
+                            }
                             
                             // Attachments são arrays que vão no campo JSON da mensagem
                             $attachment = [
@@ -2890,9 +3175,20 @@ class WhatsAppService
                             elseif (strpos($attachmentMimeType, 'video') !== false) $attachmentType = 'video';
                         }
                         
-                        // Extrair extensão do filename
+                        // Extrair extensão do filename (prioridade: nome original > mime type)
                         $attachmentFilename = $downloadedFile['filename'] ?? $filename;
-                        $attachmentExtension = pathinfo($attachmentFilename, PATHINFO_EXTENSION) ?: 'bin';
+                        $attachmentExtension = pathinfo($attachmentFilename, PATHINFO_EXTENSION);
+                        if (empty($attachmentExtension) || $attachmentExtension === 'bin') {
+                            // Tentar pelo mime type
+                            if ($attachmentMimeType) {
+                                $mimeExtMap = self::getMimeToExtensionMap();
+                                $cleanMime = strtolower(trim(explode(';', $attachmentMimeType)[0]));
+                                $attachmentExtension = $mimeExtMap[$cleanMime] ?? $attachmentExtension ?: 'bin';
+                            }
+                            if (empty($attachmentExtension)) {
+                                $attachmentExtension = 'bin';
+                            }
+                        }
                         
                         // Attachments não são salvos em tabela separada, são arrays que vão no campo JSON da mensagem
                         $attachment = [
@@ -2943,6 +3239,117 @@ class WhatsAppService
             if (empty($message) && !empty($attachments)) {
                 $message = "\u{200B}";
                 Logger::quepasa("processWebhook - Sem texto, usando caractere invisível. Attachments: " . count($attachments));
+            }
+
+            // ═══════════════════════════════════════════════════════════════
+            // TRATAMENTO DE REAÇÕES (emoji reactions)
+            // O Quepasa envia reações como type=text com inreaction=true
+            // Em vez de criar nova mensagem, vinculamos à mensagem original
+            // ═══════════════════════════════════════════════════════════════
+            $isReaction = $quepasaData['inreaction'] ?? $payload['inreaction'] ?? false;
+            $reactionTargetId = $quepasaData['inreply'] ?? $payload['inreply'] ?? null;
+            
+            if ($isReaction && $reactionTargetId) {
+                Logger::quepasa("processWebhook - 🎯 REAÇÃO detectada: emoji='{$message}', targetMessageExternalId={$reactionTargetId}, from={$fromPhone}");
+                
+                try {
+                    // Buscar a mensagem original pelo external_id (que é o message ID do WhatsApp)
+                    $targetMessage = \App\Models\Message::findByExternalId($reactionTargetId);
+                    
+                    if ($targetMessage) {
+                        Logger::quepasa("processWebhook - ✅ Mensagem alvo encontrada: ID={$targetMessage['id']}, conv={$targetMessage['conversation_id']}");
+                        
+                        // Decodificar reações existentes
+                        $reactions = [];
+                        if (!empty($targetMessage['reactions'])) {
+                            $reactions = is_string($targetMessage['reactions']) 
+                                ? json_decode($targetMessage['reactions'], true) ?? [] 
+                                : $targetMessage['reactions'];
+                        }
+                        
+                        $emoji = trim($message);
+                        $senderId = $contact['id'] ?? null;
+                        $senderType = 'contact';
+                        
+                        if ($emoji === '') {
+                            // Reação removida - remover a reação deste remetente
+                            $reactions = array_filter($reactions, function($r) use ($senderId, $senderType) {
+                                return !($r['sender_id'] == $senderId && $r['from'] == $senderType);
+                            });
+                            $reactions = array_values($reactions);
+                            Logger::quepasa("processWebhook - 🗑️ Reação removida do remetente {$senderType}:{$senderId}");
+                        } else {
+                            // Remover reação anterior do mesmo remetente (só permite 1 reação por pessoa)
+                            $reactions = array_filter($reactions, function($r) use ($senderId, $senderType) {
+                                return !($r['sender_id'] == $senderId && $r['from'] == $senderType);
+                            });
+                            $reactions = array_values($reactions);
+                            
+                            // Adicionar nova reação
+                            $reactions[] = [
+                                'emoji' => $emoji,
+                                'from' => $senderType,
+                                'sender_id' => $senderId,
+                                'sender_name' => $contact['name'] ?? 'Contato',
+                                'timestamp' => $timestamp
+                            ];
+                            Logger::quepasa("processWebhook - ➕ Reação '{$emoji}' adicionada por {$senderType}:{$senderId}");
+                        }
+                        
+                        // Salvar reações atualizadas na mensagem original
+                        \App\Helpers\Database::execute(
+                            "UPDATE messages SET reactions = ? WHERE id = ?",
+                            [json_encode($reactions, JSON_UNESCAPED_UNICODE), $targetMessage['id']]
+                        );
+                        
+                        Logger::quepasa("processWebhook - ✅ Reações atualizadas na mensagem {$targetMessage['id']}: " . json_encode($reactions, JSON_UNESCAPED_UNICODE));
+                    } else {
+                        Logger::quepasa("processWebhook - ⚠️ Mensagem alvo não encontrada para reação: external_id={$reactionTargetId}");
+                    }
+                } catch (\Exception $e) {
+                    Logger::quepasa("processWebhook - ❌ Erro ao processar reação: " . $e->getMessage());
+                }
+                
+                return; // Reação processada, não criar nova mensagem
+            }
+            
+            // ═══════════════════════════════════════════════════════════════
+            // TRATAMENTO DE CONTATO COMPARTILHADO (vCard)
+            // O Quepasa envia type=contact com attachment contendo vCard
+            // Extraímos nome e telefone do vCard para exibição visual
+            // ═══════════════════════════════════════════════════════════════
+            if ($messageType === 'contact') {
+                Logger::quepasa("processWebhook - 📇 CONTATO COMPARTILHADO detectado: displayName='{$message}'");
+                
+                // Extrair dados do vCard do attachment
+                $vcardData = self::parseVCardFromPayload($quepasaData, $payload);
+                
+                if (!empty($vcardData)) {
+                    // Salvar como attachment do tipo 'contact' com dados estruturados
+                    $contactAttachment = [
+                        'type' => 'contact',
+                        'display_name' => $vcardData['display_name'] ?? $message,
+                        'phones' => $vcardData['phones'] ?? [],
+                        'emails' => $vcardData['emails'] ?? [],
+                        'organization' => $vcardData['organization'] ?? '',
+                        'vcard_raw' => $vcardData['vcard_raw'] ?? ''
+                    ];
+                    
+                    $attachments = [$contactAttachment];
+                    
+                    // Usar o nome do contato como conteúdo da mensagem (para busca)
+                    if (empty($message)) {
+                        $message = $vcardData['display_name'] ?? 'Contato compartilhado';
+                    }
+                    
+                    Logger::quepasa("processWebhook - ✅ vCard parsed: " . json_encode($contactAttachment, JSON_UNESCAPED_UNICODE));
+                } else {
+                    // Fallback: não conseguiu parsear vCard, manter como texto
+                    Logger::quepasa("processWebhook - ⚠️ Não foi possível extrair dados do vCard, mantendo como texto");
+                    if (empty($message)) {
+                        $message = 'Contato compartilhado';
+                    }
+                }
             }
 
             // Extrair external_id do payload antes de criar mensagem

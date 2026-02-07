@@ -88,11 +88,17 @@ class MockupService
                 ];
             }
 
-            // Gerar thumbnail
+            // Gerar thumbnail (não-fatal se falhar)
             $thumbFilename = 'thumb_' . $filename;
             $thumbPath = "assets/media/mockups/{$conversationId}/{$thumbFilename}";
             $thumbFullPath = $_SERVER['DOCUMENT_ROOT'] . '/' . $thumbPath;
-            DALLEService::generateThumbnail($fullPath, $thumbFullPath, 300);
+            try {
+                DALLEService::generateThumbnail($fullPath, $thumbFullPath, 300);
+            } catch (\Error $e) {
+                // GD não disponível - usar imagem original como thumbnail
+                $thumbPath = $savePath;
+                \error_log('[MockupService] Falha ao gerar thumbnail (GD indisponível): ' . $e->getMessage());
+            }
 
             // Obter tamanho do arquivo
             $fileSize = @filesize($fullPath) ?: 0;

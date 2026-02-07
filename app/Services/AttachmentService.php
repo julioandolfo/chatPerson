@@ -224,10 +224,33 @@ class AttachmentService
             mkdir($conversationDir, 0755, true);
         }
 
-        // Determinar extensão
-        $extension = self::getExtensionFromMimeType($contentType);
+        // Determinar extensão: prioridade = nome original > URL path > Content-Type > fallback
+        $extension = null;
+        
+        // 1. Tentar extensão do nome original (mais confiável para .cdr, .psd, etc.)
+        if ($originalName) {
+            $origExt = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+            if (!empty($origExt) && $origExt !== 'bin') {
+                $extension = $origExt;
+            }
+        }
+        
+        // 2. Tentar extensão da URL
         if (!$extension) {
-            $extension = pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'bin';
+            $urlExt = strtolower(pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION));
+            if (!empty($urlExt) && $urlExt !== 'bin') {
+                $extension = $urlExt;
+            }
+        }
+        
+        // 3. Tentar pelo Content-Type
+        if (!$extension && $contentType) {
+            $extension = self::getExtensionFromMimeType($contentType);
+        }
+        
+        // 4. Fallback
+        if (!$extension) {
+            $extension = 'bin';
         }
 
         // Gerar nome único
@@ -258,27 +281,80 @@ class AttachmentService
      */
     private static function getExtensionFromMimeType(string $mimeType): ?string
     {
+        // Limpar MIME type (remover parâmetros como charset, codecs, etc.)
+        $cleanMime = strtolower(trim(explode(';', $mimeType)[0]));
+        
         $mimeMap = [
+            // Imagens
             'image/jpeg' => 'jpg',
             'image/png' => 'png',
             'image/gif' => 'gif',
             'image/webp' => 'webp',
+            'image/bmp' => 'bmp',
+            'image/tiff' => 'tiff',
+            'image/svg+xml' => 'svg',
+            'image/x-icon' => 'ico',
+            'image/heic' => 'heic',
+            'image/heif' => 'heif',
+            // Vídeos
             'video/mp4' => 'mp4',
             'video/webm' => 'webm',
             'video/quicktime' => 'mov',
             'video/x-m4v' => 'm4v',
+            'video/x-msvideo' => 'avi',
+            'video/x-ms-wmv' => 'wmv',
+            'video/x-matroska' => 'mkv',
+            'video/3gpp' => '3gp',
+            // Áudio
             'audio/webm' => 'webm',
             'audio/mpeg' => 'mp3',
+            'audio/mp3' => 'mp3',
+            'audio/mp4' => 'm4a',
+            'audio/x-m4a' => 'm4a',
             'audio/wav' => 'wav',
+            'audio/x-wav' => 'wav',
             'audio/ogg' => 'ogg',
-            'audio/ogg; codecs=opus' => 'ogg',
+            'audio/opus' => 'ogg',
+            'audio/aac' => 'aac',
+            'audio/flac' => 'flac',
+            'audio/amr' => 'amr',
+            // Documentos
             'application/pdf' => 'pdf',
             'application/msword' => 'doc',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
-            'text/plain' => 'txt'
+            'application/vnd.ms-excel' => 'xls',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+            'application/vnd.ms-powerpoint' => 'ppt',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
+            'application/vnd.oasis.opendocument.text' => 'odt',
+            'application/vnd.oasis.opendocument.spreadsheet' => 'ods',
+            'application/rtf' => 'rtf',
+            // Texto
+            'text/plain' => 'txt',
+            'text/csv' => 'csv',
+            'text/html' => 'html',
+            'application/json' => 'json',
+            'application/xml' => 'xml',
+            // Compactados
+            'application/zip' => 'zip',
+            'application/x-zip-compressed' => 'zip',
+            'application/x-rar-compressed' => 'rar',
+            'application/vnd.rar' => 'rar',
+            'application/x-7z-compressed' => '7z',
+            'application/gzip' => 'gz',
+            // Design / Gráficos
+            'application/postscript' => 'ai',
+            'application/x-photoshop' => 'psd',
+            'image/vnd.adobe.photoshop' => 'psd',
+            'application/x-coreldraw' => 'cdr',
+            'application/cdr' => 'cdr',
+            'image/x-coreldraw' => 'cdr',
+            'application/x-cdr' => 'cdr',
+            'image/vnd.dwg' => 'dwg',
+            'application/dwg' => 'dwg',
         ];
         
-        return $mimeMap[$mimeType] ?? null;
+        return $mimeMap[$cleanMime] ?? null;
     }
 
     /**

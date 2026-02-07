@@ -30,12 +30,17 @@ class Message extends Model
         
         $messages = Database::fetchAll($sql, [$conversationId, $limit, $offset]);
         
-        // Processar attachments JSON
+        // Processar attachments e reactions JSON
         foreach ($messages as &$message) {
             if (!empty($message['attachments'])) {
                 $message['attachments'] = json_decode($message['attachments'], true) ?? [];
             } else {
                 $message['attachments'] = [];
+            }
+            if (!empty($message['reactions'])) {
+                $message['reactions'] = json_decode($message['reactions'], true) ?? [];
+            } else {
+                $message['reactions'] = [];
             }
         }
         
@@ -99,12 +104,17 @@ class Message extends Model
         // Reverter ordem para ASC (mais antigas primeiro) já que buscamos DESC para paginação
         $messages = array_reverse($messages);
         
-        // Processar attachments JSON
+        // Processar attachments e reactions JSON
         foreach ($messages as &$message) {
             if (!empty($message['attachments'])) {
                 $message['attachments'] = json_decode($message['attachments'], true) ?? [];
             } else {
                 $message['attachments'] = [];
+            }
+            if (!empty($message['reactions'])) {
+                $message['reactions'] = json_decode($message['reactions'], true) ?? [];
+            } else {
+                $message['reactions'] = [];
             }
         }
         
@@ -314,12 +324,17 @@ class Message extends Model
         
         $messages = Database::fetchAll($sql, $params);
         
-        // Processar attachments JSON
+        // Processar attachments e reactions JSON
         foreach ($messages as &$message) {
             if (!empty($message['attachments'])) {
                 $message['attachments'] = json_decode($message['attachments'], true) ?? [];
             } else {
                 $message['attachments'] = [];
+            }
+            if (!empty($message['reactions'])) {
+                $message['reactions'] = json_decode($message['reactions'], true) ?? [];
+            } else {
+                $message['reactions'] = [];
             }
         }
         
@@ -401,12 +416,17 @@ class Message extends Model
         
         $messages = Database::fetchAll($sql, $params);
         
-        // Processar attachments JSON
+        // Processar attachments e reactions JSON
         foreach ($messages as &$message) {
             if (!empty($message['attachments'])) {
                 $message['attachments'] = json_decode($message['attachments'], true) ?? [];
             } else {
                 $message['attachments'] = [];
+            }
+            if (!empty($message['reactions'])) {
+                $message['reactions'] = json_decode($message['reactions'], true) ?? [];
+            } else {
+                $message['reactions'] = [];
             }
         }
         

@@ -15,6 +15,49 @@ $hideRightSidebar = true; // Esconder sidebar padrão do Metronic (vamos usar no
 function renderAttachment($attachment) {
     $type = $attachment['type'] ?? 'document';
     
+    // Renderizar contato compartilhado (vCard)
+    if ($type === 'contact') {
+        $displayName = htmlspecialchars($attachment['display_name'] ?? 'Contato');
+        $phones = $attachment['phones'] ?? [];
+        $emails = $attachment['emails'] ?? [];
+        $org = htmlspecialchars($attachment['organization'] ?? '');
+        
+        $html = '<div class="attachment-item mb-2">';
+        $html .= '<div class="d-flex align-items-start gap-3 p-3 border rounded" style="background: rgba(255,255,255,0.05); max-width: 300px;">';
+        
+        // Avatar placeholder
+        $html .= '<div style="flex-shrink:0; width:44px; height:44px; border-radius:50%; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); display:flex; align-items:center; justify-content:center;">';
+        $initials = mb_strtoupper(mb_substr($displayName, 0, 1));
+        $html .= '<span style="color:#fff; font-size:18px; font-weight:600;">' . $initials . '</span>';
+        $html .= '</div>';
+        
+        $html .= '<div class="flex-grow-1" style="min-width:0;">';
+        $html .= '<div class="fw-bold" style="font-size:14px;">' . $displayName . '</div>';
+        if ($org) {
+            $html .= '<div class="text-muted fs-8">' . $org . '</div>';
+        }
+        foreach ($phones as $phone) {
+            $phoneNum = htmlspecialchars($phone['formatted'] ?? $phone['number'] ?? '');
+            if ($phoneNum) {
+                $html .= '<div class="d-flex align-items-center gap-1 mt-1">';
+                $html .= '<i class="ki-duotone ki-phone fs-7 text-success"><span class="path1"></span><span class="path2"></span></i>';
+                $html .= '<span class="fs-7 text-gray-700">' . $phoneNum . '</span>';
+                $html .= '</div>';
+            }
+        }
+        foreach ($emails as $email) {
+            $html .= '<div class="d-flex align-items-center gap-1 mt-1">';
+            $html .= '<i class="ki-duotone ki-sms fs-7 text-primary"><span class="path1"></span><span class="path2"></span></i>';
+            $html .= '<span class="fs-7 text-gray-700">' . htmlspecialchars($email) . '</span>';
+            $html .= '</div>';
+        }
+        $html .= '</div>';
+        
+        $html .= '</div>';
+        $html .= '</div>';
+        return $html;
+    }
+    
     // Renderizar localização
     if ($type === 'location' && isset($attachment['latitude']) && isset($attachment['longitude'])) {
         $lat = $attachment['latitude'];
@@ -130,24 +173,64 @@ function renderAttachment($attachment) {
             // Rota de download para arquivos fora de assets/
             $downloadUrl = \App\Helpers\Url::to('/attachments/' . urlencode($attachmentPath) . '/download');
         }
-        $html .= '<a href="' . $downloadUrl . '" target="_blank" class="d-flex align-items-center gap-2 p-2 border rounded" style="text-decoration: none; color: inherit; background: rgba(255,255,255,0.05);">';
-        $html .= '<i class="ki-duotone ki-file fs-2">';
+        
+        // Verificar se é PDF para exibir botão de preview
+        $mimeType = $attachment['mime_type'] ?? $attachment['mimetype'] ?? '';
+        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+        $isPdf = ($ext === 'pdf' || strpos($mimeType, 'pdf') !== false);
+        
+        // URL para visualização inline (sem /download)
+        $viewUrl = '';
+        if ($isPdf) {
+            if (strpos($attachmentPath, 'assets/') === 0) {
+                $viewUrl = \App\Helpers\Url::to('/' . $attachmentPath);
+            } else {
+                $viewUrl = \App\Helpers\Url::to('/attachments/' . urlencode($attachmentPath));
+            }
+        }
+        
+        // Ícone contextual baseado na extensão
+        $iconClass = 'ki-file';
+        if ($isPdf) $iconClass = 'ki-document';
+        elseif (in_array($ext, ['doc', 'docx', 'odt', 'rtf'])) $iconClass = 'ki-notepad';
+        elseif (in_array($ext, ['xls', 'xlsx', 'ods', 'csv'])) $iconClass = 'ki-chart-simple';
+        elseif (in_array($ext, ['ppt', 'pptx', 'odp'])) $iconClass = 'ki-screen';
+        elseif (in_array($ext, ['zip', 'rar', '7z', 'gz', 'tar'])) $iconClass = 'ki-archive';
+        elseif (in_array($ext, ['psd', 'ai', 'cdr', 'eps', 'indd'])) $iconClass = 'ki-design-2';
+        
+        $html .= '<div class="d-flex align-items-center gap-2 p-2 border rounded doc-link" style="background: rgba(255,255,255,0.05);">';
+        $html .= '<i class="ki-duotone ' . $iconClass . ' fs-2" style="flex-shrink:0;">';
         $html .= '<span class="path1"></span>';
         $html .= '<span class="path2"></span>';
         $html .= '</i>';
-        $html .= '<div class="flex-grow-1">';
-        $html .= '<div class="fw-semibold">' . $name . '</div>';
+        $html .= '<div class="flex-grow-1 document-box">';
+        $html .= '<div class="fw-semibold doc-filename" title="' . $name . '">' . $name . '</div>';
         if (isset($attachment['size'])) {
             $size = $attachment['size'];
             $sizeStr = $size < 1024 ? $size . ' Bytes' : ($size < 1048576 ? round($size / 1024, 2) . ' KB' : round($size / 1048576, 2) . ' MB');
             $html .= '<div class="text-muted fs-7">' . $sizeStr . '</div>';
         }
         $html .= '</div>';
+        
+        // Botão de visualização para PDF
+        if ($isPdf && $viewUrl) {
+            $html .= '<a href="' . $viewUrl . '" target="_blank" class="pdf-preview-btn" title="Visualizar PDF" onclick="event.stopPropagation();">';
+            $html .= '<i class="ki-duotone ki-eye fs-4 text-info">';
+            $html .= '<span class="path1"></span>';
+            $html .= '<span class="path2"></span>';
+            $html .= '<span class="path3"></span>';
+            $html .= '</i>';
+            $html .= '</a>';
+        }
+        
+        // Botão de download
+        $html .= '<a href="' . $downloadUrl . '" target="_blank" title="Baixar arquivo" onclick="event.stopPropagation();" style="flex-shrink:0; text-decoration:none;">';
         $html .= '<i class="ki-duotone ki-arrow-down fs-4 text-primary">';
         $html .= '<span class="path1"></span>';
         $html .= '<span class="path2"></span>';
         $html .= '</i>';
         $html .= '</a>';
+        $html .= '</div>';
     }
     
     $html .= '</div>';
@@ -1246,12 +1329,80 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     width: 100%;
 }
 
+/* Fix: Nome de arquivo não sair do box de documento */
+.attachment-item .document-box {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+}
+.attachment-item .document-box .doc-filename {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 200px;
+    display: block;
+}
+.attachment-item .doc-link {
+    max-width: 300px;
+    overflow: hidden;
+}
+/* Botão de preview PDF */
+.attachment-item .pdf-preview-btn {
+    flex-shrink: 0;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+.attachment-item .pdf-preview-btn:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+
 .message-bubble {
     padding: 12px 16px;
     border-radius: 12px;
     font-size: 14px;
     line-height: 1.5;
     word-wrap: break-word;
+}
+
+/* Reações de mensagem */
+.message-reactions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 2px;
+}
+.reaction-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.06);
+    font-size: 16px;
+    line-height: 1.2;
+    cursor: default;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    transition: background 0.2s;
+}
+.reaction-badge:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+.reaction-count {
+    font-size: 11px;
+    color: #666;
+    font-weight: 600;
+}
+[data-theme="dark"] .reaction-badge {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+[data-theme="dark"] .reaction-badge:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+[data-theme="dark"] .reaction-count {
+    color: #aaa;
 }
 
 /* Reduzir padding quando contêm apenas íudio (manter background da bolha) */
@@ -3471,6 +3622,32 @@ function getChannelInfo(channel) {
                                             </div>
                                         <?php endif; ?>
                                     </div>
+                                    <?php 
+                                    // Renderizar reações
+                                    $reactions = $msg['reactions'] ?? [];
+                                    if (is_string($reactions)) {
+                                        $reactions = json_decode($reactions, true) ?? [];
+                                    }
+                                    if (!empty($reactions)): 
+                                        // Agrupar por emoji
+                                        $grouped = [];
+                                        foreach ($reactions as $r) {
+                                            $emoji = $r['emoji'] ?? '';
+                                            if (!isset($grouped[$emoji])) {
+                                                $grouped[$emoji] = ['count' => 0, 'names' => []];
+                                            }
+                                            $grouped[$emoji]['count']++;
+                                            $grouped[$emoji]['names'][] = $r['sender_name'] ?? ($r['from'] === 'agent' ? 'Agente' : 'Contato');
+                                        }
+                                    ?>
+                                    <div class="message-reactions">
+                                        <?php foreach ($grouped as $emoji => $data): ?>
+                                            <span class="reaction-badge" title="<?= htmlspecialchars(implode(', ', $data['names'])) ?>">
+                                                <?= $emoji ?><?php if ($data['count'] > 1): ?> <span class="reaction-count"><?= $data['count'] ?></span><?php endif; ?>
+                                            </span>
+                                        <?php endforeach; ?>
+                                    </div>
+                                    <?php endif; ?>
                                     <div class="message-time">
                                         <?= date('H:i', strtotime($msgCreatedAt)) ?>
                                         <?php if ($msgDirection === 'outgoing'): ?>
@@ -13480,6 +13657,12 @@ function addMessageToChat(message) {
         const isMediaPlaceholder = ['Documento', 'Imagem', 'Vídeo', 'Áudio', 'Mensagem de voz', 'Figurinha', 'Mídia'].includes(trimmedContent);
         const shouldShowContent = actualContent && !isTechnicalFilename && !hasMatchingAttachment && !isMediaPlaceholder;
         
+        // Renderizar reações se existirem
+        let reactionsHtml = '';
+        if (message.reactions && Array.isArray(message.reactions) && message.reactions.length > 0) {
+            reactionsHtml = renderReactionsHtml(message.reactions);
+        }
+        
         messageDiv.innerHTML = `
             ${avatarHtml}
             <div class="message-content">
@@ -13490,6 +13673,7 @@ function addMessageToChat(message) {
                     ${attachmentsHtml}
                     ${shouldShowContent ? '<div class="' + ((attachmentsHtml || quotedHtml) ? 'mt-2' : '') + '">' + nl2br(escapeHtml(actualContent)) + '</div>' : ''}
                 </div>
+                ${reactionsHtml}
                 <div class="message-time">
                     ${formatTime(message.created_at)}${statusHtml}
                 </div>
@@ -17560,6 +17744,38 @@ function formatFileSize(bytes) {
 }
 
 /**
+ * Renderizar reações de uma mensagem
+ */
+function renderReactionsHtml(reactions) {
+    if (!reactions || !Array.isArray(reactions) || reactions.length === 0) return '';
+    
+    // Agrupar reações por emoji
+    const grouped = {};
+    reactions.forEach(r => {
+        const emoji = r.emoji;
+        if (!grouped[emoji]) {
+            grouped[emoji] = { count: 0, names: [] };
+        }
+        grouped[emoji].count++;
+        grouped[emoji].names.push(r.sender_name || (r.from === 'agent' ? 'Agente' : 'Contato'));
+    });
+    
+    let html = '<div class="message-reactions">';
+    for (const emoji in grouped) {
+        const data = grouped[emoji];
+        const tooltip = data.names.join(', ');
+        html += `<span class="reaction-badge" title="${escapeHtml(tooltip)}">`;
+        html += `${emoji}`;
+        if (data.count > 1) {
+            html += ` <span class="reaction-count">${data.count}</span>`;
+        }
+        html += `</span>`;
+    }
+    html += '</div>';
+    return html;
+}
+
+/**
  * Abrir lightbox de imagem
  */
 function openImageLightbox(imageUrl, imageTitle) {
@@ -17596,6 +17812,48 @@ function renderAttachmentHtml(attachment) {
     
     const type = attachment.type || 'document';
     const mimeType = attachment.mime_type || attachment.mimetype || '';
+    
+    // Renderizar contato compartilhado (vCard)
+    if (type === 'contact') {
+        const displayName = escapeHtml(attachment.display_name || 'Contato');
+        const phones = attachment.phones || [];
+        const emails = attachment.emails || [];
+        const org = escapeHtml(attachment.organization || '');
+        const initial = displayName.charAt(0).toUpperCase();
+        
+        let phonesHtml = '';
+        phones.forEach(phone => {
+            const num = escapeHtml(phone.formatted || phone.number || '');
+            if (num) {
+                phonesHtml += `<div class="d-flex align-items-center gap-1 mt-1">
+                    <i class="ki-duotone ki-phone fs-7 text-success"><span class="path1"></span><span class="path2"></span></i>
+                    <span class="fs-7 text-gray-700">${num}</span>
+                </div>`;
+            }
+        });
+        
+        let emailsHtml = '';
+        emails.forEach(email => {
+            emailsHtml += `<div class="d-flex align-items-center gap-1 mt-1">
+                <i class="ki-duotone ki-sms fs-7 text-primary"><span class="path1"></span><span class="path2"></span></i>
+                <span class="fs-7 text-gray-700">${escapeHtml(email)}</span>
+            </div>`;
+        });
+        
+        return `<div class="attachment-item mb-2">
+            <div class="d-flex align-items-start gap-3 p-3 border rounded" style="background: rgba(255,255,255,0.05); max-width: 300px;">
+                <div style="flex-shrink:0; width:44px; height:44px; border-radius:50%; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); display:flex; align-items:center; justify-content:center;">
+                    <span style="color:#fff; font-size:18px; font-weight:600;">${initial}</span>
+                </div>
+                <div class="flex-grow-1" style="min-width:0;">
+                    <div class="fw-bold" style="font-size:14px;">${displayName}</div>
+                    ${org ? `<div class="text-muted fs-8">${org}</div>` : ''}
+                    ${phonesHtml}
+                    ${emailsHtml}
+                </div>
+            </div>
+        </div>`;
+    }
     
     // Renderizar localização
     if (type === 'location' && attachment.latitude && attachment.longitude) {
@@ -17727,27 +17985,55 @@ function renderAttachmentHtml(attachment) {
         // Para documentos, usar URL direta se o arquivo estiver em assets/
         const attachmentPath = attachment.path || '';
         let downloadUrl;
+        let viewUrl = '';
         if (attachmentPath.startsWith('assets/')) {
-            // Caminho direto para arquivo público
             downloadUrl = `<?= \App\Helpers\Url::to('/') ?>${attachmentPath}`;
+            viewUrl = downloadUrl;
         } else {
-            // Rota de download para arquivos fora de assets/
             downloadUrl = `<?= \App\Helpers\Url::to('/attachments') ?>/${encodeURIComponent(attachmentPath)}/download`;
+            viewUrl = `<?= \App\Helpers\Url::to('/attachments') ?>/${encodeURIComponent(attachmentPath)}`;
         }
-        html += `<a href="${downloadUrl}" target="_blank" class="d-flex align-items-center gap-2 p-2 border rounded" style="text-decoration: none; color: inherit; background: rgba(255,255,255,0.05);" onclick="event.stopPropagation();">
-            <i class="ki-duotone ki-file fs-2">
+        
+        // Detectar extensão e se é PDF
+        const fileName = attachment.original_name || attachment.name || attachment.filename || 'Anexo';
+        const ext = (fileName.split('.').pop() || '').toLowerCase();
+        const isPdf = (ext === 'pdf' || (mimeType && mimeType.indexOf('pdf') !== -1));
+        
+        // Ícone contextual
+        let iconClass = 'ki-file';
+        if (isPdf) iconClass = 'ki-document';
+        else if (['doc','docx','odt','rtf'].includes(ext)) iconClass = 'ki-notepad';
+        else if (['xls','xlsx','ods','csv'].includes(ext)) iconClass = 'ki-chart-simple';
+        else if (['ppt','pptx','odp'].includes(ext)) iconClass = 'ki-screen';
+        else if (['zip','rar','7z','gz','tar'].includes(ext)) iconClass = 'ki-archive';
+        else if (['psd','ai','cdr','eps','indd'].includes(ext)) iconClass = 'ki-design-2';
+        
+        // Botão de preview PDF
+        const pdfPreviewBtn = isPdf ? `<a href="${viewUrl}" target="_blank" class="pdf-preview-btn" title="Visualizar PDF" onclick="event.stopPropagation();">
+            <i class="ki-duotone ki-eye fs-4 text-info">
+                <span class="path1"></span>
+                <span class="path2"></span>
+                <span class="path3"></span>
+            </i>
+        </a>` : '';
+        
+        html += `<div class="d-flex align-items-center gap-2 p-2 border rounded doc-link" style="background: rgba(255,255,255,0.05);" onclick="event.stopPropagation();">
+            <i class="ki-duotone ${iconClass} fs-2" style="flex-shrink:0;">
                 <span class="path1"></span>
                 <span class="path2"></span>
             </i>
-            <div class="flex-grow-1">
-                <div class="fw-semibold">${name}</div>
+            <div class="flex-grow-1 document-box">
+                <div class="fw-semibold doc-filename" title="${name}">${name}</div>
                 ${size ? `<div class="text-muted fs-7">${size}</div>` : ''}
             </div>
-            <i class="ki-duotone ki-arrow-down fs-4 text-primary">
-                <span class="path1"></span>
-                <span class="path2"></span>
-            </i>
-        </a>`;
+            ${pdfPreviewBtn}
+            <a href="${downloadUrl}" target="_blank" title="Baixar arquivo" onclick="event.stopPropagation();" style="flex-shrink:0; text-decoration:none;">
+                <i class="ki-duotone ki-arrow-down fs-4 text-primary">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+            </a>
+        </div>`;
     }
     
     html += '</div>';

@@ -207,18 +207,42 @@ exit;
                                                                 </div>
                                                             </div>
                                                         <?php else: ?>
-                                                            <div class="attachment-document d-flex align-items-center gap-3 p-3 bg-light rounded">
-                                                                <i class="ki-duotone ki-file fs-2x text-primary">
+                                                            <?php
+                                                            $docName = htmlspecialchars($attachment['original_name'] ?? 'Documento');
+                                                            $docExt = strtolower(pathinfo($docName, PATHINFO_EXTENSION));
+                                                            $docMime = $attachment['mime_type'] ?? $attachment['mimetype'] ?? '';
+                                                            $docIsPdf = ($docExt === 'pdf' || strpos($docMime, 'pdf') !== false);
+                                                            $docIcon = 'ki-file';
+                                                            if ($docIsPdf) $docIcon = 'ki-document';
+                                                            elseif (in_array($docExt, ['doc','docx','odt','rtf'])) $docIcon = 'ki-notepad';
+                                                            elseif (in_array($docExt, ['xls','xlsx','ods','csv'])) $docIcon = 'ki-chart-simple';
+                                                            elseif (in_array($docExt, ['ppt','pptx','odp'])) $docIcon = 'ki-screen';
+                                                            elseif (in_array($docExt, ['zip','rar','7z','gz','tar'])) $docIcon = 'ki-archive';
+                                                            elseif (in_array($docExt, ['psd','ai','cdr','eps','indd'])) $docIcon = 'ki-design-2';
+                                                            ?>
+                                                            <div class="attachment-document d-flex align-items-center gap-3 p-3 bg-light rounded" style="max-width: 350px;">
+                                                                <i class="ki-duotone <?= $docIcon ?> fs-2x text-primary" style="flex-shrink:0;">
                                                                     <span class="path1"></span>
                                                                     <span class="path2"></span>
                                                                 </i>
-                                                                <div class="flex-grow-1">
-                                                                    <div class="fw-bold"><?= htmlspecialchars($attachment['original_name'] ?? 'Documento') ?></div>
+                                                                <div class="flex-grow-1" style="min-width:0; overflow:hidden;">
+                                                                    <div class="fw-bold" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="<?= $docName ?>"><?= $docName ?></div>
                                                                     <div class="text-muted fs-7"><?= formatFileSize($attachment['size'] ?? 0) ?></div>
                                                                 </div>
+                                                                <?php if ($docIsPdf): ?>
+                                                                <a href="<?= htmlspecialchars($attachment['url']) ?>" 
+                                                                   target="_blank"
+                                                                   class="btn btn-sm btn-light-info" title="Visualizar PDF">
+                                                                    <i class="ki-duotone ki-eye fs-2">
+                                                                        <span class="path1"></span>
+                                                                        <span class="path2"></span>
+                                                                        <span class="path3"></span>
+                                                                    </i>
+                                                                </a>
+                                                                <?php endif; ?>
                                                                 <a href="<?= htmlspecialchars($attachment['url']) ?>" 
                                                                    download="<?= htmlspecialchars($attachment['original_name'] ?? 'arquivo') ?>" 
-                                                                   class="btn btn-sm btn-light-primary">
+                                                                   class="btn btn-sm btn-light-primary" title="Baixar arquivo">
                                                                     <i class="ki-duotone ki-download fs-2">
                                                                         <span class="path1"></span>
                                                                         <span class="path2"></span>

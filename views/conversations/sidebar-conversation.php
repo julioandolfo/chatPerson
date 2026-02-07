@@ -670,6 +670,9 @@ document.addEventListener('DOMContentLoaded', function() {
             <li class="nav-item">
                 <a class="nav-link" data-bs-toggle="tab" href="#kt_tab_orders">Pedidos</a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#kt_tab_mockups" onclick="loadMockupGallery()">Mockups</a>
+            </li>
         </ul>
     </div>
     
@@ -1332,6 +1335,27 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </div>
                 
+            </div>
+            
+            <!-- ABA: MOCKUPS -->
+            <div class="tab-pane fade" id="kt_tab_mockups">
+                <div class="sidebar-section">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="sidebar-section-title">Mockups Gerados</div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-icon btn-light-success" title="Gerar Mockup" onclick="showMockupGeneratorModal()">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                            <button class="btn btn-sm btn-icon btn-light-primary" title="Atualizar" onclick="loadMockupGallery()">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="mockupGalleryContainer">
+                    <div class="text-center py-4 text-muted fs-7">Clique na aba para carregar mockups</div>
+                </div>
             </div>
             
         </div>
@@ -3075,6 +3099,6 @@ console.log('✅ Função loadConversationSLA registrada');
 console.log('🔍 URL do endpoint SLA:', '<?= \App\Helpers\Url::to('/conversations/sla-details') ?>');*/
 </script>
 
-<!-- Galeria de Mockups -->
+<!-- Galeria de Mockups (JS functions) -->
 <?php include __DIR__ . '/mockup-gallery.php'; ?>
 

@@ -501,7 +501,7 @@ CRITICAL RULES:
     public static function generateThumbnail(string $sourcePath, string $thumbPath, int $maxWidth = 300): bool
     {
         try {
-            $info = @getimagesize($sourcePath);
+            $info = @\getimagesize($sourcePath);
             if (!$info) {
                 return false;
             }
@@ -513,22 +513,22 @@ CRITICAL RULES:
                 $newWidth = $maxWidth;
                 $newHeight = intval($height * ($maxWidth / $width));
             } else {
-                return copy($sourcePath, $thumbPath);
+                return \copy($sourcePath, $thumbPath);
             }
 
             // Criar imagem de acordo com o tipo
             switch ($type) {
                 case IMAGETYPE_JPEG:
-                    $source = @imagecreatefromjpeg($sourcePath);
+                    $source = @\imagecreatefromjpeg($sourcePath);
                     break;
                 case IMAGETYPE_PNG:
-                    $source = @imagecreatefrompng($sourcePath);
+                    $source = @\imagecreatefrompng($sourcePath);
                     break;
                 case IMAGETYPE_GIF:
-                    $source = @imagecreatefromgif($sourcePath);
+                    $source = @\imagecreatefromgif($sourcePath);
                     break;
                 case IMAGETYPE_WEBP:
-                    $source = @imagecreatefromwebp($sourcePath);
+                    $source = @\imagecreatefromwebp($sourcePath);
                     break;
                 default:
                     return false;
@@ -539,27 +539,27 @@ CRITICAL RULES:
             }
 
             // Criar thumbnail
-            $thumb = @imagecreatetruecolor($newWidth, $newHeight);
+            $thumb = @\imagecreatetruecolor($newWidth, $newHeight);
             
             // Preservar transparência para PNG
             if ($type === IMAGETYPE_PNG) {
-                @imagealphablending($thumb, false);
-                @imagesavealpha($thumb, true);
+                @\imagealphablending($thumb, false);
+                @\imagesavealpha($thumb, true);
             }
 
-            @imagecopyresampled($thumb, $source, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+            @\imagecopyresampled($thumb, $source, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
 
             // Criar diretório se não existir
-            $dir = dirname($thumbPath);
-            if (!is_dir($dir)) {
-                @mkdir($dir, 0777, true);
+            $dir = \dirname($thumbPath);
+            if (!\is_dir($dir)) {
+                @\mkdir($dir, 0777, true);
             }
 
             // Salvar thumbnail
-            $result = @imagejpeg($thumb, $thumbPath, 85);
+            $result = @\imagejpeg($thumb, $thumbPath, 85);
 
-            @imagedestroy($source);
-            @imagedestroy($thumb);
+            @\imagedestroy($source);
+            @\imagedestroy($thumb);
 
             return $result;
 

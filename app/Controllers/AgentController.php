@@ -171,4 +171,180 @@ class AgentController
             ], 500);
         }
     }
+    
+    /**
+     * Reatribuir conversas de um agente para outros agentes
+     */
+    public function reassignConversations(int $id): void
+    {
+        Permission::abortIfCannot('agents.edit');
+        
+        try {
+            $targetAgentIds = Request::post('target_agent_ids');
+            $alsoDeactivate = Request::post('also_deactivate', false);
+            
+            // Validar dados
+            if (empty($targetAgentIds) || !is_array($targetAgentIds)) {
+                throw new \InvalidArgumentException('Selecione pelo menos um agente para redistribuição');
+            }
+            
+            // Verificar se o agente existe
+            $agent = User::find($id);
+            if (!$agent) {
+                throw new \InvalidArgumentException('Agente não encontrado');
+            }
+            
+            // Converter IDs para inteiros
+            $targetAgentIds = array_map('intval', $targetAgentIds);
+            
+            // Verificar se todos os agentes destino existem e estão ativos
+            foreach ($targetAgentIds as $targetId) {
+                $targetAgent = User::find($targetId);
+                if (!$targetAgent) {
+                    throw new \InvalidArgumentException("Agente destino ID {$targetId} não encontrado");
+                }
+                if ($targetAgent['status'] !== 'active') {
+                    throw new \InvalidArgumentException("Agente {$targetAgent['name']} está inativo");
+                }
+            }
+            
+            // Buscar TODAS as conversas do agente (abertas, pendentes E fechadas)
+            $conversations = \App\Helpers\Database::fetchAll(
+                "SELECT id, contact_id, status FROM conversations 
+                 WHERE agent_id = ?
+                 ORDER BY id ASC",
+                [$id]
+            );
+            
+            if (empty($conversations)) {
+                Response::json([
+                    'success' => true,
+                    'message' => 'Nenhuma conversa encontrada para reatribuir.',
+                    'conversations_reassigned' => 0
+                ]);
+                return;
+            }
+            
+            // Buscar contatos onde o agente é o agente principal
+            $contactAgents = \App\Helpers\Database::fetchAll(
+                "SELECT DISTINCT contact_id FROM contact_agents 
+                 WHERE agent_id = ?",
+                [$id]
+            );
+            
+            $conversationsReassigned = 0;
+            $contactAgentsUpdated = 0;
+            
+            // Distribuir conversas igualmente entre os agentes
+            $numAgents = count($targetAgentIds);
+            $agentIndex = 0;
+            
+            foreach ($conversations as $conversation) {
+                $targetAgentId = $targetAgentIds[$agentIndex];
+                
+                // Reatribuir conversa
+                \App\Models\Conversation::update($conversation['id'], [
+                    'agent_id' => $targetAgentId,
+                    'assigned_at' => date('Y-m-d H:i:s')
+                ]);
+                
+                // Registrar histórico de atribuição
+                if (class_exists('\App\Models\ConversationAssignment')) {
+                    \App\Models\ConversationAssignment::recordAssignment(
+                        $conversation['id'],
+                        $targetAgentId,
+                        \App\Helpers\Auth::id()
+                    );
+                }
+                
+                $conversationsReassigned++;
+                
+                // Próximo agente (distribuição round-robin)
+                $agentIndex = ($agentIndex + 1) % $numAgents;
+            }
+            
+            // Reatribuir agentes de contatos
+            // Para cada contato, adicionar os novos agentes (mantendo a redistribuição round-robin)
+            $agentIndex = 0;
+            foreach ($contactAgents as $contactAgent) {
+                $contactId = $contactAgent['contact_id'];
+                $targetAgentId = $targetAgentIds[$agentIndex];
+                
+                // Verificar se já existe
+                $exists = \App\Helpers\Database::fetch(
+                    "SELECT id FROM contact_agents WHERE contact_id = ? AND agent_id = ?",
+                    [$contactId, $targetAgentId]
+                );
+                
+                if (!$exists) {
+                    // Adicionar novo agente ao contato
+                    \App\Models\ContactAgent::create([
+                        'contact_id' => $contactId,
+                        'agent_id' => $targetAgentId,
+                        'is_primary' => 0,
+                        'priority' => 0,
+                        'auto_assign_on_reopen' => 1
+                    ]);
+                    $contactAgentsUpdated++;
+                }
+                
+                // Se o agente antigo era o principal, definir o novo como principal
+                $wasPrimary = \App\Helpers\Database::fetch(
+                    "SELECT is_primary FROM contact_agents WHERE contact_id = ? AND agent_id = ?",
+                    [$contactId, $id]
+                );
+                
+                if ($wasPrimary && $wasPrimary['is_primary'] == 1) {
+                    \App\Models\ContactAgent::setPrimaryAgent($contactId, $targetAgentId);
+                }
+                
+                // Próximo agente
+                $agentIndex = ($agentIndex + 1) % $numAgents;
+            }
+            
+            // Remover o agente antigo dos contatos
+            \App\Helpers\Database::execute(
+                "DELETE FROM contact_agents WHERE agent_id = ?",
+                [$id]
+            );
+            
+            // Desativar agente se solicitado
+            if ($alsoDeactivate) {
+                User::update($id, [
+                    'status' => 'inactive',
+                    'availability_status' => 'offline'
+                ]);
+            }
+            
+            // Registrar atividade
+            if (class_exists('\App\Services\ActivityService')) {
+                \App\Services\ActivityService::log(
+                    'agent_conversations_reassigned',
+                    "TODAS as conversas ({$conversationsReassigned} total, incluindo histórico) do agente {$agent['name']} foram reatribuídas para " . count($targetAgentIds) . " agente(s)",
+                    null,
+                    $id,
+                    'agent'
+                );
+            }
+            
+            Response::json([
+                'success' => true,
+                'message' => "Reatribuição concluída! {$conversationsReassigned} conversa(s) (incluindo histórico completo) e {$contactAgentsUpdated} registro(s) de agente do contato foram redistribuídos.",
+                'conversations_reassigned' => $conversationsReassigned,
+                'contact_agents_updated' => $contactAgentsUpdated,
+                'agent_deactivated' => $alsoDeactivate
+            ]);
+            
+        } catch (\InvalidArgumentException $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => 'Erro ao reatribuir conversas: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

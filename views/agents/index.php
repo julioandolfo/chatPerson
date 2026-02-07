@@ -84,6 +84,58 @@ window.quickChangeAvailability = function(link) {
     modal.show();
 };
 
+window.reassignConversations = function(element) {
+    const agentId = element.getAttribute("data-agent-id");
+    const agentName = element.getAttribute("data-agent-name") || "";
+    const conversationsCount = element.getAttribute("data-agent-conversations") || "0";
+
+    document.getElementById("reassign_agent_id").value = agentId;
+    document.getElementById("reassign_warning_text").textContent = 
+        `Esta ação irá redistribuir TODAS as conversas do agente "${agentName}" (incluindo ${conversationsCount} ativa(s) + histórico fechado) e atualizar os contatos.`;
+
+    // Desmarcar todas as checkboxes
+    const checkboxes = document.querySelectorAll('.reassign-agent-checkbox');
+    checkboxes.forEach(checkbox => {
+        // Esconder o próprio agente da lista
+        if (checkbox.value === agentId) {
+            checkbox.closest('.form-check').style.display = 'none';
+            checkbox.checked = false;
+        } else {
+            checkbox.closest('.form-check').style.display = 'block';
+            checkbox.checked = false;
+        }
+    });
+
+    const modal = new bootstrap.Modal(document.getElementById("kt_modal_reassign_conversations"));
+    modal.show();
+};
+
+window.reassignConversations = function(element) {
+    const agentId = element.getAttribute("data-agent-id");
+    const agentName = element.getAttribute("data-agent-name") || "";
+    const conversationsCount = element.getAttribute("data-agent-conversations") || "0";
+
+    document.getElementById("reassign_agent_id").value = agentId;
+    document.getElementById("reassign_warning_text").textContent = 
+        `Esta ação irá redistribuir TODAS as conversas do agente "${agentName}" (incluindo ${conversationsCount} ativa(s) + histórico fechado) e atualizar os contatos.`;
+
+    // Desmarcar todas as checkboxes
+    const checkboxes = document.querySelectorAll('.reassign-agent-checkbox');
+    checkboxes.forEach(checkbox => {
+        // Esconder o próprio agente da lista
+        if (checkbox.value === agentId) {
+            checkbox.closest('.form-check').style.display = 'none';
+            checkbox.checked = false;
+        } else {
+            checkbox.closest('.form-check').style.display = 'block';
+            checkbox.checked = false;
+        }
+    });
+
+    const modal = new bootstrap.Modal(document.getElementById("kt_modal_reassign_conversations"));
+    modal.show();
+};
+
 window.deleteAgent = function(agentId, agentName) {
     if (!confirm('Tem certeza que deseja deletar o agente "' + agentName + '"?\n\nEsta ação não pode ser desfeita.')) {
         return;
@@ -366,6 +418,20 @@ window.deleteAgent = function(agentId, agentName) {
                                                             <span class="path2"></span>
                                                         </i>
                                                         Alterar Disponibilidade
+                                                    </a>
+                                                </li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li>
+                                                    <a class="dropdown-item text-warning" href="#" 
+                                                       data-agent-id="<?= $agent['id'] ?>"
+                                                       data-agent-name="<?= htmlspecialchars($agent['name'] ?? '', ENT_QUOTES) ?>"
+                                                       data-agent-conversations="<?= $agent['current_conversations'] ?? 0 ?>"
+                                                       onclick="reassignConversations(this); return false;">
+                                                        <i class="ki-duotone ki-arrow-mix fs-5 me-2">
+                                                            <span class="path1"></span>
+                                                            <span class="path2"></span>
+                                                        </i>
+                                                        Reatribuir Conversas
                                                     </a>
                                                 </li>
                                             </ul>
@@ -743,6 +809,138 @@ window.deleteAgent = function(agentId, agentName) {
 <?php endif; ?>
 <!--end::Modal - Alterar Disponibilidade Rápido-->
 
+<!--begin::Modal - Reatribuir Conversas-->
+<?php if (\App\Helpers\Permission::can('agents.edit')): ?>
+<div class="modal fade" id="kt_modal_reassign_conversations" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-700px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">Reatribuir Conversas</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <form id="kt_modal_reassign_conversations_form" class="form">
+                <input type="hidden" name="agent_id" id="reassign_agent_id" />
+                <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                    <div class="alert alert-warning d-flex align-items-center mb-7">
+                        <i class="ki-duotone ki-information-5 fs-2x text-warning me-4">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div class="d-flex flex-column">
+                            <h5 class="mb-1">Atenção: Reatribuição em Massa</h5>
+                            <span id="reassign_warning_text">Esta ação irá redistribuir TODAS as conversas (incluindo fechadas) e contatos do agente.</span>
+                        </div>
+                    </div>
+                    
+                    <div class="notice d-flex bg-light-primary rounded border-primary border border-dashed p-6 mb-7">
+                        <i class="ki-duotone ki-information fs-2tx text-primary me-4">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div class="d-flex flex-stack flex-grow-1">
+                            <div class="fw-semibold">
+                                <h4 class="text-gray-900 fw-bold">O que será reatribuído?</h4>
+                                <div class="fs-6 text-gray-700">
+                                    <div class="mb-2">
+                                        <i class="ki-duotone ki-check fs-5 text-success me-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        <strong>Todas as Conversas:</strong> Abertas, pendentes e fechadas (histórico completo)
+                                    </div>
+                                    <div class="mb-2">
+                                        <i class="ki-duotone ki-check fs-5 text-success me-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        <strong>Agente do Contato:</strong> Registros de contact_agents serão atualizados
+                                    </div>
+                                    <div>
+                                        <i class="ki-duotone ki-information-4 fs-5 text-info me-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                        </i>
+                                        <strong>Distribuição:</strong> As conversas serão distribuídas igualmente entre os agentes selecionados
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="required fw-semibold fs-6 mb-2">Selecione os Agentes para Redistribuição</label>
+                        <div class="border border-gray-300 rounded p-5" style="max-height: 300px; overflow-y: auto;">
+                            <?php 
+                            $activeAgents = \App\Models\User::getActiveAgents();
+                            foreach ($activeAgents as $activeAgent): 
+                            ?>
+                                <div class="form-check form-check-custom form-check-solid mb-3">
+                                    <input class="form-check-input reassign-agent-checkbox" 
+                                           type="checkbox" 
+                                           name="target_agent_ids[]" 
+                                           value="<?= $activeAgent['id'] ?>" 
+                                           id="target_agent_<?= $activeAgent['id'] ?>" />
+                                    <label class="form-check-label d-flex align-items-center" for="target_agent_<?= $activeAgent['id'] ?>">
+                                        <div class="symbol symbol-30px me-3">
+                                            <?php if (!empty($activeAgent['avatar'])): ?>
+                                                <img src="<?= htmlspecialchars($activeAgent['avatar']) ?>" alt="" />
+                                            <?php else: ?>
+                                                <div class="symbol-label fs-6 fw-semibold text-primary bg-light-primary">
+                                                    <?= mb_substr(htmlspecialchars($activeAgent['name'] ?? 'A'), 0, 1) ?>
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="d-flex flex-column">
+                                            <span class="fw-semibold"><?= htmlspecialchars($activeAgent['name']) ?></span>
+                                            <span class="text-muted fs-7"><?= htmlspecialchars($activeAgent['email']) ?></span>
+                                        </div>
+                                    </label>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <div class="form-text">Selecione um ou mais agentes que receberão as conversas redistribuídas</div>
+                        <div id="reassign_agents_error" class="text-danger fs-7 mt-2" style="display: none;"></div>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <div class="form-check form-switch form-check-custom form-check-solid">
+                            <input class="form-check-input" type="checkbox" name="also_deactivate" value="1" id="reassign_also_deactivate" />
+                            <label class="form-check-label fw-semibold text-gray-700" for="reassign_also_deactivate">
+                                Desativar agente após reatribuição
+                            </label>
+                        </div>
+                        <div class="form-text">Marca o agente como inativo automaticamente após a redistribuição</div>
+                    </div>
+                </div>
+                <div class="modal-footer flex-center">
+                    <button type="reset" data-bs-dismiss="modal" class="btn btn-light me-3">Cancelar</button>
+                    <button type="submit" id="kt_modal_reassign_conversations_submit" class="btn btn-warning">
+                        <span class="indicator-label">
+                            <i class="ki-duotone ki-arrow-mix fs-3 me-1">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Reatribuir Conversas
+                        </span>
+                        <span class="indicator-progress">Aguarde...
+                        <span class="spinner-border spinner-border-sm align-middle ms-2"></span></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+<!--end::Modal - Reatribuir Conversas-->
+
 <?php 
 $content = ob_get_clean(); 
 $scripts = '
@@ -822,10 +1020,37 @@ window.quickChangeAvailability = function(link) {
     const agentId = link.getAttribute("data-agent-id");
     const currentAvailability = link.getAttribute("data-agent-availability") || "offline";
     
-    document.getElementById("quick_avail_user_id").value = agentId;
+    document.getElementById("quick_avail_agent_id").value = agentId;
     document.getElementById("quick_avail_select").value = currentAvailability;
     
     const modal = new bootstrap.Modal(document.getElementById("kt_modal_quick_change_availability"));
+    modal.show();
+};
+
+// Função para reatribuir conversas
+window.reassignConversations = function(element) {
+    const agentId = element.getAttribute("data-agent-id");
+    const agentName = element.getAttribute("data-agent-name") || "";
+    const conversationsCount = element.getAttribute("data-agent-conversations") || "0";
+
+    document.getElementById("reassign_agent_id").value = agentId;
+    document.getElementById("reassign_warning_text").textContent = 
+        \`Esta ação irá redistribuir TODAS as conversas do agente "\${agentName}" (incluindo \${conversationsCount} ativa(s) + histórico fechado) e atualizar os contatos.\`;
+
+    // Desmarcar todas as checkboxes
+    const checkboxes = document.querySelectorAll(".reassign-agent-checkbox");
+    checkboxes.forEach(checkbox => {
+        // Esconder o próprio agente da lista
+        if (checkbox.value === agentId) {
+            checkbox.closest(".form-check").style.display = "none";
+            checkbox.checked = false;
+        } else {
+            checkbox.closest(".form-check").style.display = "block";
+            checkbox.checked = false;
+        }
+    });
+
+    const modal = new bootstrap.Modal(document.getElementById("kt_modal_reassign_conversations"));
     modal.show();
 };
 
@@ -1148,6 +1373,63 @@ document.addEventListener("DOMContentLoaded", function() {
             alert("Erro ao deletar agente");
         });
     };
+    
+    // Form de reatribuição de conversas
+    const reassignForm = document.getElementById("kt_modal_reassign_conversations_form");
+    if (reassignForm) {
+        reassignForm.addEventListener("submit", function(e) {
+            e.preventDefault();
+            
+            // Validar que pelo menos um agente foi selecionado
+            const checkboxes = document.querySelectorAll(".reassign-agent-checkbox:checked");
+            const errorDiv = document.getElementById("reassign_agents_error");
+            
+            if (checkboxes.length === 0) {
+                errorDiv.textContent = "Selecione pelo menos um agente para redistribuição";
+                errorDiv.style.display = "block";
+                return;
+            }
+            
+            errorDiv.style.display = "none";
+            
+            const submitBtn = document.getElementById("kt_modal_reassign_conversations_submit");
+            submitBtn.setAttribute("data-kt-indicator", "on");
+            submitBtn.disabled = true;
+            
+            const agentId = document.getElementById("reassign_agent_id").value;
+            const formData = new FormData(reassignForm);
+            
+            fetch("' . \App\Helpers\Url::to('/agents') . '/" + agentId + "/reassign-conversations", {
+                method: "POST",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                submitBtn.removeAttribute("data-kt-indicator");
+                submitBtn.disabled = false;
+                
+                if (data.success) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_reassign_conversations"));
+                    modal.hide();
+                    
+                    // Mostrar mensagem de sucesso
+                    alert(data.message || "Conversas reatribuídas com sucesso!");
+                    location.reload();
+                } else {
+                    alert("Erro: " + (data.message || "Erro ao reatribuir conversas"));
+                }
+            })
+            .catch(error => {
+                submitBtn.removeAttribute("data-kt-indicator");
+                submitBtn.disabled = false;
+                alert("Erro ao reatribuir conversas");
+                console.error(error);
+            });
+        });
+    }
 });
 </script>';
 ?>

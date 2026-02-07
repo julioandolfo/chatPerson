@@ -242,6 +242,7 @@ Router::get('/automations/{id}/test', [AutomationController::class, 'test'], ['A
 Router::get('/agents', [AgentController::class, 'index'], ['Authentication']);
 Router::get('/agents/{id}', [AgentController::class, 'show'], ['Authentication']);
 Router::post('/agents/{id}/availability', [AgentController::class, 'updateAvailability'], ['Authentication']);
+Router::post('/agents/{id}/reassign-conversations', [AgentController::class, 'reassignConversations'], ['Authentication']);
 
 // Rotas de Usuários
 Router::get('/users', [UserController::class, 'index'], ['Authentication']);

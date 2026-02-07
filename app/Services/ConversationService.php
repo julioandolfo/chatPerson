@@ -360,10 +360,51 @@ class ConversationService
      */
     public static function isFirstMessageContactName(?string $message, ?string $contactName): bool
     {
+        if (empty($message) || empty($contactName)) {
+            return false;
+        }
+        
+        // Camada 1: Comparação com espaços normalizados (múltiplos → 1 espaço)
         $normalizedMessage = mb_strtolower(trim(preg_replace('/\s+/', ' ', (string)$message)));
         $normalizedContactName = mb_strtolower(trim(preg_replace('/\s+/', ' ', (string)$contactName)));
 
-        return $normalizedMessage !== '' && $normalizedMessage === $normalizedContactName;
+        $isMatch = $normalizedMessage !== '' && $normalizedMessage === $normalizedContactName;
+        
+        // Camada 2: Comparação SEM NENHUM espaço (remove todos)
+        // Pega casos como "https://www. facebook.com" vs "https://www.facebook.com"
+        if (!$isMatch) {
+            $messageNoSpaces = str_replace(' ', '', $normalizedMessage);
+            $nameNoSpaces = str_replace(' ', '', $normalizedContactName);
+            $isMatch = $messageNoSpaces !== '' && $messageNoSpaces === $nameNoSpaces;
+            
+            if ($isMatch) {
+                \App\Helpers\Logger::unificacao("[PROTEÇÃO] Primeira mensagem = nome (sem espaços): '{$message}' === '{$contactName}' → IGNORAR");
+            }
+        }
+        
+        // Camada 3: Proteção especial para URLs do Facebook (padrão comum quando contato não tem nome)
+        // Exemplo: "https://www.facebook.com/...", "facebook.com/...", "www.facebook.com/..."
+        if (!$isMatch && (
+            stripos($normalizedContactName, 'facebook.com/') !== false ||
+            stripos($normalizedContactName, 'fb.com/') !== false
+        )) {
+            // Remove protocolo, espaços e www
+            $cleanMessage = str_replace([' ', 'https://', 'http://', 'www.'], '', $normalizedMessage);
+            $cleanName = str_replace([' ', 'https://', 'http://', 'www.'], '', $normalizedContactName);
+            $isMatch = $cleanMessage !== '' && $cleanMessage === $cleanName;
+            
+            if ($isMatch) {
+                \App\Helpers\Logger::unificacao("[PROTEÇÃO] Primeira mensagem = URL Facebook do nome: '{$message}' === '{$contactName}' → IGNORAR");
+            }
+        }
+        
+        if ($isMatch) {
+            \App\Helpers\Logger::unificacao("[PROTEÇÃO] ✅ Primeira mensagem = nome do contato → IGNORAR criação de conversa");
+            \App\Helpers\Logger::unificacao("  - Mensagem: '{$message}'");
+            \App\Helpers\Logger::unificacao("  - Nome: '{$contactName}'");
+        }
+        
+        return $isMatch;
     }
 
     /**

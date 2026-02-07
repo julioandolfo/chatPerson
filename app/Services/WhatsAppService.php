@@ -2663,7 +2663,7 @@ class WhatsAppService
             // Se ainda não existir, criar (usar transação se lock ativo, senão criar direto)
             if (!$conversation) {
                 // Trava: não criar conversa se a primeira mensagem for exatamente o nome do contato (caso sem mídia)
-                Logger::quepasa("🔍 DEBUG: Verificando se deve ignorar mensagem... messageType={$messageType}, mediaUrl=" . ($mediaUrl ? 'EXISTS' : 'NULL') . ", message='" . substr($message, 0, 50) . "', contact_name='" . ($contact['name'] ?? 'NULL') . "'");
+                Logger::quepasa("🔍 DEBUG: Verificando proteção nome... messageType={$messageType}, mediaUrl=" . ($mediaUrl ? 'EXISTS' : 'NULL') . ", message='" . substr($message, 0, 80) . "', contact_name='" . ($contact['name'] ?? 'NULL') . "'");
                 $shouldIgnoreFirstMessage = $messageType === 'text'
                     && empty($mediaUrl)
                     && \App\Services\ConversationService::isFirstMessageContactName((string)$message, $contact['name'] ?? null);
@@ -2672,11 +2672,14 @@ class WhatsAppService
                 
                 if ($shouldIgnoreFirstMessage) {
                     $contactName = trim((string)($contact['name'] ?? ''));
-                    Logger::quepasa("processWebhook - ❌ Ignorando criação de conversa: primeira mensagem igual ao nome do contato ({$contactName})");
+                    Logger::quepasa("processWebhook - ❌ PROTEÇÃO ATIVADA: Ignorando criação - primeira mensagem = nome do contato ({$contactName})");
+                    Logger::unificacao("[PROTEÇÃO] Webhook ignorou criação de conversa: mensagem='{$message}' = nome '{$contactName}'");
                     if ($usedLock && $db->inTransaction()) {
                         $db->rollBack();
                     }
                     return;
+                } else {
+                    Logger::quepasa("✅ Proteção verificada - mensagem NÃO é igual ao nome, prosseguindo com criação");
                 }
 
                 $logMessage = $shouldReopenAsNew 
@@ -2753,7 +2756,8 @@ class WhatsAppService
 
             if ($shouldIgnoreFirstMessage) {
                 $contactName = trim((string)($contact['name'] ?? ''));
-                Logger::quepasa("processWebhook - Ignorando criação de conversa: primeira mensagem igual ao nome do contato ({$contactName})");
+                Logger::quepasa("processWebhook - ❌ PROTEÇÃO ATIVADA (bloco 2): Ignorando criação - primeira mensagem = nome do contato ({$contactName})");
+                Logger::unificacao("[PROTEÇÃO] Webhook (bloco 2) ignorou criação de conversa: mensagem='{$message}' = nome '{$contactName}'");
                 return;
             }
             

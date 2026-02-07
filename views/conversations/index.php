@@ -17822,7 +17822,7 @@ function toggleReactionPicker(event, messageId) {
     const btn = event.currentTarget;
     const actionsDiv = btn.closest('.message-actions');
     
-    const emojis = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+    const emojis = ['👍', '👎', '❤️', '🔥', '😂', '😮', '😢', '😍', '🎉', '🤔', '👏', '🙏', '💯', '✅', '👀'];
     
     const picker = document.createElement('div');
     picker.className = 'reaction-picker';

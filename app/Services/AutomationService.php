@@ -971,6 +971,10 @@ class AutomationService
                 \App\Helpers\Logger::automation("  Executando: condição");
                 self::executeCondition($nodeData, $conversationId, $allNodes, $executionId);
                 return; // Condição já processa os próximos nós
+            case 'condition_business_hours':
+                \App\Helpers\Logger::automation("  Executando: verificação de horário de atendimento");
+                self::executeBusinessHoursCondition($nodeData, $conversationId, $allNodes, $executionId);
+                return; // Já processa os próximos nós internamente
             case 'delay':
                 \App\Helpers\Logger::automation("  Executando: delay");
                 self::executeDelay($nodeData, $conversationId, $allNodes, $executionId);
@@ -2953,6 +2957,205 @@ class AutomationService
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Verificar se está dentro ou fora do horário de atendimento e seguir pelo caminho correspondente
+     */
+    private static function executeBusinessHoursCondition(array $nodeData, int $conversationId, array $allNodes, ?int $executionId = null): void
+    {
+        $mode = $nodeData['business_hours_mode'] ?? 'global';
+        \App\Helpers\Logger::automation("  ⏰ Horário de Atendimento - Modo: {$mode}");
+
+        $isWithin = false;
+
+        if ($mode === 'global') {
+            // Tentar usar a tabela working_hours_config primeiro (fonte primária)
+            $isWithin = self::checkWorkingHoursConfig();
+            if ($isWithin === null) {
+                // Fallback para AvailabilityService (usa settings)
+                $isWithin = AvailabilityService::isBusinessHours();
+            }
+            \App\Helpers\Logger::automation("  ⏰ Usando configuração global. Dentro do horário: " . ($isWithin ? 'SIM' : 'NÃO'));
+        } else {
+            // Usar horários manuais configurados no nó
+            $timezone = $nodeData['business_hours_timezone'] ?? 'America/Sao_Paulo';
+            $checkHolidays = !empty($nodeData['check_holidays']);
+            $manualSchedule = $nodeData['manual_schedule'] ?? [];
+
+            try {
+                $tz = new \DateTimeZone($timezone);
+                $now = new \DateTime('now', $tz);
+                $dayOfWeek = (int)$now->format('w'); // 0 = domingo, 6 = sábado
+                $currentTime = $now->format('H:i');
+
+                \App\Helpers\Logger::automation("  ⏰ Manual - Dia: {$dayOfWeek}, Hora: {$currentTime}, TZ: {$timezone}");
+
+                // Verificar feriados se habilitado
+                if ($checkHolidays) {
+                    $today = $now->format('Y-m-d');
+                    $monthDay = $now->format('m-d');
+                    $db = \App\Helpers\Database::getInstance();
+                    
+                    // Verificar feriados fixos e recorrentes
+                    $holidaySql = "SELECT id FROM holidays WHERE date = ? OR (is_recurring = 1 AND DATE_FORMAT(date, '%m-%d') = ?)";
+                    $holiday = $db->prepare($holidaySql);
+                    $holiday->execute([$today, $monthDay]);
+                    
+                    if ($holiday->fetch()) {
+                        $isWithin = false;
+                        \App\Helpers\Logger::automation("  ⏰ Hoje é feriado - Fora do horário");
+                        
+                        // Seguir para o nó 'outside'
+                        self::followBusinessHoursPath($nodeData, $conversationId, $allNodes, $executionId, $isWithin);
+                        return;
+                    }
+                }
+
+                // Encontrar configuração do dia atual
+                $dayConfig = null;
+                foreach ($manualSchedule as $schedule) {
+                    if ((int)($schedule['day'] ?? -1) === $dayOfWeek) {
+                        $dayConfig = $schedule;
+                        break;
+                    }
+                }
+
+                if (!$dayConfig || empty($dayConfig['active'])) {
+                    // Dia não está ativo
+                    $isWithin = false;
+                    \App\Helpers\Logger::automation("  ⏰ Dia {$dayOfWeek} não está ativo no horário manual");
+                } else {
+                    $start = $dayConfig['start'] ?? '08:00';
+                    $end = $dayConfig['end'] ?? '18:00';
+                    $isWithin = $currentTime >= $start && $currentTime <= $end;
+                    \App\Helpers\Logger::automation("  ⏰ Horário manual: {$start} - {$end}. Atual: {$currentTime}. Dentro: " . ($isWithin ? 'SIM' : 'NÃO'));
+                }
+            } catch (\Throwable $e) {
+                \App\Helpers\Logger::automation("  ❌ Erro ao verificar horário manual: " . $e->getMessage());
+                // Em caso de erro, assume fora do horário para segurança
+                $isWithin = false;
+            }
+        }
+
+        self::followBusinessHoursPath($nodeData, $conversationId, $allNodes, $executionId, $isWithin);
+    }
+
+    /**
+     * Verificar horário de atendimento usando a tabela working_hours_config
+     * Retorna null se a tabela não existir ou estiver vazia
+     */
+    private static function checkWorkingHoursConfig(): ?bool
+    {
+        try {
+            $db = \App\Helpers\Database::getInstance();
+            
+            // Verificar se a tabela existe
+            $tableCheck = $db->query("SHOW TABLES LIKE 'working_hours_config'");
+            if ($tableCheck->rowCount() === 0) {
+                return null;
+            }
+
+            $configs = $db->query("SELECT * FROM working_hours_config ORDER BY day_of_week")->fetchAll(\PDO::FETCH_ASSOC);
+            if (empty($configs)) {
+                return null;
+            }
+
+            // Obter timezone das settings
+            $timezone = 'America/Sao_Paulo';
+            try {
+                $tzSetting = $db->prepare("SELECT value FROM settings WHERE `key` = ?");
+                $tzSetting->execute(['business_hours.timezone']);
+                $tzRow = $tzSetting->fetch(\PDO::FETCH_ASSOC);
+                if ($tzRow && !empty($tzRow['value'])) {
+                    $timezone = $tzRow['value'];
+                }
+            } catch (\Throwable $e) {
+                // Usar timezone padrão
+            }
+
+            $tz = new \DateTimeZone($timezone);
+            $now = new \DateTime('now', $tz);
+            $dayOfWeek = (int)$now->format('w');
+            $currentTime = $now->format('H:i');
+
+            // Verificar feriados
+            try {
+                $today = $now->format('Y-m-d');
+                $monthDay = $now->format('m-d');
+                $holidaySql = "SELECT id FROM holidays WHERE date = ? OR (is_recurring = 1 AND DATE_FORMAT(date, '%m-%d') = ?) LIMIT 1";
+                $stmt = $db->prepare($holidaySql);
+                $stmt->execute([$today, $monthDay]);
+                if ($stmt->fetch()) {
+                    \App\Helpers\Logger::automation("  ⏰ Hoje é feriado - considerado fora do horário");
+                    return false;
+                }
+            } catch (\Throwable $e) {
+                // Tabela holidays pode não existir, ignorar
+            }
+
+            // Encontrar configuração do dia
+            $dayConfig = null;
+            foreach ($configs as $config) {
+                if ((int)$config['day_of_week'] === $dayOfWeek) {
+                    $dayConfig = $config;
+                    break;
+                }
+            }
+
+            if (!$dayConfig || empty($dayConfig['is_working_day'])) {
+                \App\Helpers\Logger::automation("  ⏰ Dia {$dayOfWeek} não é dia útil");
+                return false;
+            }
+
+            $start = substr($dayConfig['start_time'] ?? '08:00:00', 0, 5);
+            $end = substr($dayConfig['end_time'] ?? '18:00:00', 0, 5);
+
+            // Verificar intervalo de almoço
+            if (!empty($dayConfig['lunch_enabled'])) {
+                $lunchStart = substr($dayConfig['lunch_start'] ?? '12:00:00', 0, 5);
+                $lunchEnd = substr($dayConfig['lunch_end'] ?? '13:00:00', 0, 5);
+                
+                if ($currentTime >= $lunchStart && $currentTime <= $lunchEnd) {
+                    \App\Helpers\Logger::automation("  ⏰ Horário de almoço ({$lunchStart}-{$lunchEnd}) - Fora do horário");
+                    return false;
+                }
+            }
+
+            $withinHours = $currentTime >= $start && $currentTime <= $end;
+            \App\Helpers\Logger::automation("  ⏰ Horário: {$start}-{$end}, Atual: {$currentTime}, Dentro: " . ($withinHours ? 'SIM' : 'NÃO'));
+            
+            return $withinHours;
+        } catch (\Throwable $e) {
+            \App\Helpers\Logger::automation("  ⚠️ Erro ao verificar working_hours_config: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Seguir pelo caminho correto baseado no resultado da verificação de horário de atendimento
+     */
+    private static function followBusinessHoursPath(array $nodeData, int $conversationId, array $allNodes, ?int $executionId, bool $isWithin): void
+    {
+        $expectedConnectionType = $isWithin ? 'within' : 'outside';
+        \App\Helpers\Logger::automation("  ⏰ Seguindo caminho: {$expectedConnectionType}");
+
+        if (!empty($nodeData['connections'])) {
+            foreach ($nodeData['connections'] as $connection) {
+                $connType = $connection['connection_type'] ?? null;
+                if ($connType === $expectedConnectionType) {
+                    $nextNode = self::findNodeById($connection['target_node_id'], $allNodes);
+                    if ($nextNode) {
+                        \App\Helpers\Logger::automation("  ⏰ → Seguindo para nó: {$connection['target_node_id']}");
+                        self::executeNode($nextNode, $conversationId, $allNodes, $executionId);
+                    } else {
+                        \App\Helpers\Logger::automation("  ❌ Nó {$connection['target_node_id']} não encontrado!");
+                    }
+                }
+            }
+        } else {
+            \App\Helpers\Logger::automation("  ⚠️ Nenhuma conexão encontrada para '{$expectedConnectionType}'");
         }
     }
 

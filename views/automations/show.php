@@ -1459,6 +1459,33 @@ function renderNode(node) {
             </div>
         `;
         innerHtml += '</div>';
+    } else if (node.node_type === 'condition_business_hours') {
+        // Nó de Horário de Atendimento: mostrar handles DENTRO e FORA
+        const mode = node.node_data?.business_hours_mode || 'global';
+        const modeLabel = mode === 'global' ? '⚙️ Configuração Global' : '✏️ Manual';
+        innerHtml += `<div class="text-muted fs-8 mb-2" style="text-align: center;">${modeLabel}</div>`;
+        innerHtml += '<div class="condition-outputs" style="margin-top: 5px;">';
+        innerHtml += `
+            <div class="condition-output-row" style="position: relative; display: flex; align-items: center; justify-content: flex-end; margin-bottom: 8px; padding-right: 5px;">
+                <span class="condition-output-label" style="font-size: 12px; color: #50cd89; font-weight: 600;">☀️ Dentro do Horário</span>
+                <div class="node-connection-handle output condition-handle" 
+                     data-node-id="${String(node.id || '')}" 
+                     data-handle-type="output" 
+                     data-connection-type="within"
+                     style="position: absolute; right: -11px; top: 50%; transform: translateY(-50%); background: #50cd89 !important;">
+                </div>
+            </div>
+            <div class="condition-output-row" style="position: relative; display: flex; align-items: center; justify-content: flex-end; padding-right: 5px;">
+                <span class="condition-output-label" style="font-size: 12px; color: #f1416c; font-weight: 600;">🌙 Fora do Horário</span>
+                <div class="node-connection-handle output condition-handle" 
+                     data-node-id="${String(node.id || '')}" 
+                     data-handle-type="output" 
+                     data-connection-type="outside"
+                     style="position: absolute; right: -11px; top: 50%; transform: translateY(-50%); background: #f1416c !important;">
+                </div>
+            </div>
+        `;
+        innerHtml += '</div>';
     } else {
         // Handle de saída normal para outros tipos
         innerHtml += `<div class="node-connection-handle output" data-node-id="${String(node.id || '')}" data-handle-type="output"></div>`;
@@ -2693,6 +2720,115 @@ function openNodeConfig(nodeId) {
                 }
             }, 100);
             break;
+        case "condition_business_hours":
+            formContent = `
+                <div class="fv-row mb-7">
+                    <label class="required fw-semibold fs-6 mb-2">Modo de Verificação</label>
+                    <select id="kt_business_hours_mode" name="business_hours_mode" class="form-select form-select-solid" onchange="toggleBusinessHoursMode(this.value)">
+                        <option value="global">Usar Configuração Global (Configurações do sistema)</option>
+                        <option value="manual">Definir Horários Manualmente</option>
+                    </select>
+                    <div class="form-text mt-2">Escolha se deseja usar os horários de atendimento configurados nas Configurações ou definir horários personalizados para este nó.</div>
+                </div>
+
+                <div id="kt_business_hours_manual_container" style="display: none;">
+                    <div class="separator separator-dashed my-5"></div>
+                    <h4 class="fw-bold mb-4">Horários Personalizados</h4>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-row-bordered align-middle gs-3 gy-3">
+                            <thead>
+                                <tr class="fw-bold text-muted">
+                                    <th>Dia</th>
+                                    <th class="text-center">Ativo</th>
+                                    <th class="text-center">Início</th>
+                                    <th class="text-center">Fim</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="fw-semibold">Domingo</td>
+                                    <td class="text-center"><input type="checkbox" class="form-check-input bh-day-toggle" data-day="0" /></td>
+                                    <td class="text-center"><input type="time" class="form-control form-control-sm form-control-solid bh-time-input" data-day="0" data-field="start" value="08:00" disabled /></td>
+                                    <td class="text-center"><input type="time" class="form-control form-control-sm form-control-solid bh-time-input" data-day="0" data-field="end" value="18:00" disabled /></td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-semibold">Segunda-feira</td>
+                                    <td class="text-center"><input type="checkbox" class="form-check-input bh-day-toggle" data-day="1" checked /></td>
+                                    <td class="text-center"><input type="time" class="form-control form-control-sm form-control-solid bh-time-input" data-day="1" data-field="start" value="08:00" /></td>
+                                    <td class="text-center"><input type="time" class="form-control form-control-sm form-control-solid bh-time-input" data-day="1" data-field="end" value="18:00" /></td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-semibold">Terça-feira</td>
+                                    <td class="text-center"><input type="checkbox" class="form-check-input bh-day-toggle" data-day="2" checked /></td>
+                                    <td class="text-center"><input type="time" class="form-control form-control-sm form-control-solid bh-time-input" data-day="2" data-field="start" value="08:00" /></td>
+                                    <td class="text-center"><input type="time" class="form-control form-control-sm form-control-solid bh-time-input" data-day="2" data-field="end" value="18:00" /></td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-semibold">Quarta-feira</td>
+                                    <td class="text-center"><input type="checkbox" class="form-check-input bh-day-toggle" data-day="3" checked /></td>
+                                    <td class="text-center"><input type="time" class="form-control form-control-sm form-control-solid bh-time-input" data-day="3" data-field="start" value="08:00" /></td>
+                                    <td class="text-center"><input type="time" class="form-control form-control-sm form-control-solid bh-time-input" data-day="3" data-field="end" value="18:00" /></td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-semibold">Quinta-feira</td>
+                                    <td class="text-center"><input type="checkbox" class="form-check-input bh-day-toggle" data-day="4" checked /></td>
+                                    <td class="text-center"><input type="time" class="form-control form-control-sm form-control-solid bh-time-input" data-day="4" data-field="start" value="08:00" /></td>
+                                    <td class="text-center"><input type="time" class="form-control form-control-sm form-control-solid bh-time-input" data-day="4" data-field="end" value="18:00" /></td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-semibold">Sexta-feira</td>
+                                    <td class="text-center"><input type="checkbox" class="form-check-input bh-day-toggle" data-day="5" checked /></td>
+                                    <td class="text-center"><input type="time" class="form-control form-control-sm form-control-solid bh-time-input" data-day="5" data-field="start" value="08:00" /></td>
+                                    <td class="text-center"><input type="time" class="form-control form-control-sm form-control-solid bh-time-input" data-day="5" data-field="end" value="17:00" /></td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-semibold">Sábado</td>
+                                    <td class="text-center"><input type="checkbox" class="form-check-input bh-day-toggle" data-day="6" /></td>
+                                    <td class="text-center"><input type="time" class="form-control form-control-sm form-control-solid bh-time-input" data-day="6" data-field="start" value="08:00" disabled /></td>
+                                    <td class="text-center"><input type="time" class="form-control form-control-sm form-control-solid bh-time-input" data-day="6" data-field="end" value="12:00" disabled /></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="fv-row mb-7 mt-5">
+                        <label class="fw-semibold fs-6 mb-2">Fuso Horário</label>
+                        <select id="kt_business_hours_timezone" name="business_hours_timezone" class="form-select form-select-solid">
+                            <option value="America/Sao_Paulo">América/São Paulo (BRT)</option>
+                            <option value="America/Manaus">América/Manaus (AMT)</option>
+                            <option value="America/Belem">América/Belém (BRT)</option>
+                            <option value="America/Cuiaba">América/Cuiabá (AMT)</option>
+                            <option value="America/Fortaleza">América/Fortaleza (BRT)</option>
+                            <option value="America/Recife">América/Recife (BRT)</option>
+                            <option value="America/Rio_Branco">América/Rio Branco (ACT)</option>
+                        </select>
+                    </div>
+
+                    <div class="fv-row mb-3">
+                        <div class="form-check form-switch form-check-custom form-check-solid">
+                            <input type="checkbox" class="form-check-input" id="kt_business_hours_check_holidays" name="check_holidays" />
+                            <label class="form-check-label fw-semibold" for="kt_business_hours_check_holidays">
+                                Considerar feriados cadastrados como fora do horário
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="separator separator-dashed my-5"></div>
+                <div class="alert alert-info d-flex align-items-center p-5 mb-0">
+                    <i class="ki-duotone ki-information fs-2x text-info me-4">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div class="d-flex flex-column">
+                        <h4 class="mb-1 text-dark">Como funciona</h4>
+                        <span>Este nó verifica se o momento atual está dentro ou fora do horário de atendimento e direciona o fluxo pela saída correspondente: <strong class="text-success">☀️ Dentro do Horário</strong> ou <strong class="text-danger">🌙 Fora do Horário</strong>.</span>
+                    </div>
+                </div>
+            `;
+            break;
         case "delay":
             formContent = `
                 <div class="fv-row mb-7">
@@ -2893,6 +3029,13 @@ function openNodeConfig(nodeId) {
                         operatorSelect.value = node.node_data.operator;
                     }
                 }
+            }, 50);
+        }
+
+        // Tratamento especial para Horário de Atendimento
+        if (node.node_type === 'condition_business_hours') {
+            setTimeout(() => {
+                loadBusinessHoursNodeConfig(node.node_data || {});
             }, 50);
         }
     }
@@ -4014,6 +4157,19 @@ document.addEventListener("DOMContentLoaded", function() {
                 }
             }
             
+            // Tratamento específico para Horário de Atendimento
+            if (node.node_type === "condition_business_hours") {
+                const bhData = collectBusinessHoursData();
+                Object.assign(nodeData, bhData);
+                
+                // Checkbox de feriados que não aparece no FormData quando desmarcado
+                if (!formData.has('check_holidays')) {
+                    nodeData.check_holidays = false;
+                }
+                
+                console.log('⏰ Horário de Atendimento - Dados coletados:', bhData);
+            }
+
             console.log('node.node_data ANTES de merge:', node.node_data);
             console.log('nodeData coletado do form:', nodeData);
             
@@ -4422,6 +4578,104 @@ window.toggleTimeoutNodeSelect = function toggleTimeoutNodeSelect() {
 };
 
 // === FUNÇÕES DE RECONEXÃO ===
+
+// ========== Funções do Nó Horário de Atendimento ==========
+window.toggleBusinessHoursMode = function toggleBusinessHoursMode(mode) {
+    const container = document.getElementById('kt_business_hours_manual_container');
+    if (container) {
+        container.style.display = mode === 'manual' ? 'block' : 'none';
+    }
+};
+
+window.initBusinessHoursDayToggles = function initBusinessHoursDayToggles() {
+    document.querySelectorAll('.bh-day-toggle').forEach(function(checkbox) {
+        checkbox.addEventListener('change', function() {
+            const day = this.getAttribute('data-day');
+            const inputs = document.querySelectorAll(`.bh-time-input[data-day="${day}"]`);
+            inputs.forEach(function(input) {
+                input.disabled = !checkbox.checked;
+            });
+        });
+    });
+};
+
+window.loadBusinessHoursNodeConfig = function loadBusinessHoursNodeConfig(nodeData) {
+    const mode = nodeData.business_hours_mode || 'global';
+    const modeSelect = document.getElementById('kt_business_hours_mode');
+    if (modeSelect) {
+        modeSelect.value = mode;
+        toggleBusinessHoursMode(mode);
+    }
+
+    // Carregar fuso horário
+    const tzSelect = document.getElementById('kt_business_hours_timezone');
+    if (tzSelect && nodeData.business_hours_timezone) {
+        tzSelect.value = nodeData.business_hours_timezone;
+    }
+
+    // Carregar check de feriados
+    const holidaysCheck = document.getElementById('kt_business_hours_check_holidays');
+    if (holidaysCheck) {
+        holidaysCheck.checked = !!nodeData.check_holidays;
+    }
+
+    // Carregar horários manuais
+    if (nodeData.manual_schedule && Array.isArray(nodeData.manual_schedule)) {
+        // Primeiro desmarcar todos
+        document.querySelectorAll('.bh-day-toggle').forEach(function(cb) {
+            cb.checked = false;
+            const day = cb.getAttribute('data-day');
+            document.querySelectorAll(`.bh-time-input[data-day="${day}"]`).forEach(function(inp) {
+                inp.disabled = true;
+            });
+        });
+
+        nodeData.manual_schedule.forEach(function(schedule) {
+            const day = String(schedule.day);
+            const cb = document.querySelector(`.bh-day-toggle[data-day="${day}"]`);
+            if (cb && schedule.active) {
+                cb.checked = true;
+                const startInput = document.querySelector(`.bh-time-input[data-day="${day}"][data-field="start"]`);
+                const endInput = document.querySelector(`.bh-time-input[data-day="${day}"][data-field="end"]`);
+                if (startInput) { startInput.value = schedule.start || '08:00'; startInput.disabled = false; }
+                if (endInput) { endInput.value = schedule.end || '18:00'; endInput.disabled = false; }
+            }
+        });
+    }
+
+    initBusinessHoursDayToggles();
+};
+
+window.collectBusinessHoursData = function collectBusinessHoursData() {
+    const data = {};
+    const modeSelect = document.getElementById('kt_business_hours_mode');
+    data.business_hours_mode = modeSelect ? modeSelect.value : 'global';
+
+    if (data.business_hours_mode === 'manual') {
+        const tzSelect = document.getElementById('kt_business_hours_timezone');
+        data.business_hours_timezone = tzSelect ? tzSelect.value : 'America/Sao_Paulo';
+
+        const holidaysCheck = document.getElementById('kt_business_hours_check_holidays');
+        data.check_holidays = holidaysCheck ? holidaysCheck.checked : false;
+
+        const schedule = [];
+        document.querySelectorAll('.bh-day-toggle').forEach(function(cb) {
+            const day = parseInt(cb.getAttribute('data-day'));
+            const active = cb.checked;
+            const startInput = document.querySelector(`.bh-time-input[data-day="${day}"][data-field="start"]`);
+            const endInput = document.querySelector(`.bh-time-input[data-day="${day}"][data-field="end"]`);
+            schedule.push({
+                day: day,
+                active: active,
+                start: startInput ? startInput.value : '08:00',
+                end: endInput ? endInput.value : '18:00'
+            });
+        });
+        data.manual_schedule = schedule;
+    }
+
+    return data;
+};
 
 window.toggleInactivityMode = function toggleInactivityMode() {
     const modeSelect = document.getElementById('kt_chatbot_inactivity_mode');

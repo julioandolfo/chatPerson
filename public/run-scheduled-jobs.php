@@ -82,9 +82,32 @@ function cronSaveHistory(): void
 try {
     // ✅ CRÍTICO: Usar arquivo de controle para evitar múltiplas execuções simultâneas
     $lockFile = __DIR__ . '/../storage/cache/jobs.lock';
-    $lockHandle = fopen($lockFile, 'c+');
-    if (!flock($lockHandle, LOCK_EX | LOCK_NB)) {
+    
+    // Garantir que o diretório existe com permissões adequadas
+    $lockDir = dirname($lockFile);
+    if (!is_dir($lockDir)) {
+        @mkdir($lockDir, 0777, true);
+    }
+    
+    $lockHandle = @fopen($lockFile, 'c+');
+    if ($lockHandle === false) {
+        // Tentar corrigir permissões e recriar
+        @chmod($lockDir, 0777);
+        @unlink($lockFile);
+        $lockHandle = @fopen($lockFile, 'c+');
+        
+        if ($lockHandle === false) {
+            // Se ainda falhar, continuar SEM lock (melhor rodar sem lock do que não rodar)
+            echo "[" . date('Y-m-d H:i:s') . "] AVISO: Não foi possível criar arquivo de lock ({$lockFile}). Executando sem lock.\n";
+            error_log("run-scheduled-jobs: Não foi possível criar lock file: {$lockFile} - Permissão negada");
+            $lockHandle = null;
+        }
+    }
+    
+    if ($lockHandle !== null && !flock($lockHandle, LOCK_EX | LOCK_NB)) {
         echo "[" . date('Y-m-d H:i:s') . "] Jobs já em execução, pulando...\n";
+        fclose($lockHandle);
+        $lockHandle = null;
         $cronStatus = 'skipped';
         $cronError = 'Lock ativo - já em execução';
         cronSaveHistory();
@@ -236,8 +259,10 @@ try {
     file_put_contents($stateFile, json_encode($state, JSON_PRETTY_PRINT));
     
     // ✅ Liberar lock
-    flock($lockHandle, LOCK_UN);
-    fclose($lockHandle);
+    if ($lockHandle !== null && is_resource($lockHandle)) {
+        flock($lockHandle, LOCK_UN);
+        fclose($lockHandle);
+    }
     
     // ✅ Salvar histórico do cron
     cronSaveHistory();
@@ -252,7 +277,7 @@ try {
     cronSaveHistory();
     
     // ✅ Liberar lock em caso de erro
-    if (isset($lockHandle)) {
+    if (isset($lockHandle) && $lockHandle !== null && is_resource($lockHandle)) {
         @flock($lockHandle, LOCK_UN);
         @fclose($lockHandle);
     }

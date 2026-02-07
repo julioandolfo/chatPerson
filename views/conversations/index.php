@@ -11385,20 +11385,47 @@ document.addEventListener('DOMContentLoaded', function() {
         if (panel) panel.classList.remove('d-none');
     }
     
-    // Botão "Carregar mais" e scroll para carregar mais conversas
+    // ✅ CORREÇÃO: Inicializar estado da lista se PHP já renderizou conversas
+    const conversationsListEl = document.querySelector('.conversations-list-items');
+    if (conversationsListEl) {
+        const phpRenderedItems = conversationsListEl.querySelectorAll('.conversation-item');
+        if (phpRenderedItems.length > 0) {
+            // Marcar como carregado para que o spinner não apague as conversas do PHP
+            conversationsListEl.dataset.loaded = '1';
+            
+            // ✅ CORREÇÃO: Definir offset com base na quantidade REAL de conversas já renderizadas pelo PHP
+            // O PHP pode enviar quantidade diferente do conversationPageSize (ex: PHP=70, JS=50)
+            conversationOffset = phpRenderedItems.length;
+            
+            // Mostrar botão "Carregar mais" se houver conversas suficientes (pode haver mais páginas)
+            // Usa conversationPageSize como referência mínima para determinar se há mais
+            const loadMoreBtn = document.getElementById('loadMoreConversationsBtn');
+            if (loadMoreBtn && phpRenderedItems.length >= conversationPageSize) {
+                loadMoreBtn.style.display = '';
+                conversationHasMore = true;
+            } else if (loadMoreBtn && phpRenderedItems.length < conversationPageSize) {
+                // Menos conversas que o page size = não há mais páginas
+                conversationHasMore = false;
+                loadMoreBtn.style.display = 'none';
+            }
+            
+            console.log(`✅ Lista PHP inicializada com ${phpRenderedItems.length} conversas, offset=${conversationOffset}, hasMore=${conversationHasMore}`);
+        }
+        
+        // Scroll infinito
+        conversationsListEl.addEventListener('scroll', () => {
+            if (conversationsListEl.scrollTop + conversationsListEl.clientHeight >= conversationsListEl.scrollHeight - 80) {
+                loadMoreConversations();
+            }
+        });
+    }
+    
+    // Botão "Carregar mais"
     const loadMoreBtn = document.getElementById('loadMoreConversationsBtn');
     if (loadMoreBtn) {
         loadMoreBtn.addEventListener('click', (e) => {
             e.preventDefault();
             loadMoreConversations();
-        });
-    }
-    const conversationsListEl = document.querySelector('.conversations-list-items');
-    if (conversationsListEl) {
-        conversationsListEl.addEventListener('scroll', () => {
-            if (conversationsListEl.scrollTop + conversationsListEl.clientHeight >= conversationsListEl.scrollHeight - 80) {
-                loadMoreConversations();
-            }
         });
     }
 });
@@ -11508,42 +11535,45 @@ function refreshConversationList(params = null, append = false) {
     // Persistir últimos parâmetros para uso no "Carregar mais"
     lastConversationsParams = params instanceof URLSearchParams ? new URLSearchParams(params.toString()) : new URLSearchParams(window.location.search);
     
-    // Evitar flicker: só mostra spinner no primeiro carregamento OU quando hí filtros aplicados E ainda não renderizou
-    const isFirstLoad = conversationsList.dataset.loaded !== '1';
-    
-    // Verificar se hí filtros aplicados (não é apenas polling)
-    const hasFilters = params && params instanceof URLSearchParams && (
-        params.has('search') ||
-        params.has('status') ||
-        params.has('channel') ||
-        params.has('department_id') ||
-        params.has('tag_id') ||
-        params.has('agent_id') ||
-        params.has('unanswered') ||
-        params.has('channels[]') ||
-        params.has('tag_ids[]') ||
-        params.has('whatsapp_account_ids[]') ||
-        params.has('answered') ||
-        params.has('date_from') ||
-        params.has('date_to') ||
-        params.has('pinned') ||
-        params.has('funnel_id') ||
-        params.has('funnel_stage_id')
-    );
-    
-    const shouldShowSpinner = isFirstLoad || (hasFilters && conversationsList.dataset.loaded !== '1');
-    
-    // Mostrar loading apenas no primeiro carregamento OU quando filtros aplicados e ainda não renderizado
-    if (shouldShowSpinner) {
-        conversationsList.innerHTML = `
-            <div class="d-flex align-items-center justify-content-center py-10">
-                <div class="text-center">
-                    <span class="spinner-border spinner-border-sm text-primary mb-3" role="status"></span>
-                    <div class="text-muted fs-7">Carregando conversas...</div>
+    // ✅ CORREÇÃO: NUNCA mostrar spinner quando é append (carregar mais)
+    // O spinner só deve aparecer quando é um carregamento completo (não append)
+    if (!append) {
+        const isFirstLoad = conversationsList.dataset.loaded !== '1';
+        
+        // Verificar se há filtros aplicados (não é apenas polling)
+        const hasFilters = params && params instanceof URLSearchParams && (
+            params.has('search') ||
+            params.has('status') ||
+            params.has('channel') ||
+            params.has('department_id') ||
+            params.has('tag_id') ||
+            params.has('agent_id') ||
+            params.has('unanswered') ||
+            params.has('channels[]') ||
+            params.has('tag_ids[]') ||
+            params.has('whatsapp_account_ids[]') ||
+            params.has('answered') ||
+            params.has('date_from') ||
+            params.has('date_to') ||
+            params.has('pinned') ||
+            params.has('funnel_id') ||
+            params.has('funnel_stage_id')
+        );
+        
+        const shouldShowSpinner = isFirstLoad || (hasFilters && conversationsList.dataset.loaded !== '1');
+        
+        // Mostrar loading apenas no primeiro carregamento OU quando filtros aplicados e ainda não renderizado
+        if (shouldShowSpinner) {
+            conversationsList.innerHTML = `
+                <div class="d-flex align-items-center justify-content-center py-10">
+                    <div class="text-center">
+                        <span class="spinner-border spinner-border-sm text-primary mb-3" role="status"></span>
+                        <div class="text-muted fs-7">Carregando conversas...</div>
+                    </div>
                 </div>
-            </div>
-        `;
-        conversationsList.dataset.rendering = '1';
+            `;
+            conversationsList.dataset.rendering = '1';
+        }
     }
     
     // Construir URL preservando TODOS os filtros
@@ -11617,6 +11647,7 @@ function refreshConversationList(params = null, append = false) {
         console.debug('[TAGS_DEBUG] conversas:', conversations.length, 'primeira tags_data:', conversations[0]?.tags_data);
         
         // Calcular assinatura para evitar re-render quando não houver mudanças
+        // ✅ CORREÇÃO: Não pular re-render quando é append (carregar mais)
         const signature = JSON.stringify(conversations.map(c => [
             c.id,
             c.pinned,
@@ -11626,13 +11657,15 @@ function refreshConversationList(params = null, append = false) {
             c.unread_count,
             c.tags_data ? JSON.stringify(c.tags_data) : null
         ]));
-        if (window.lastConversationListSignature === signature) {
-            // Se a lista já estava renderizada, evita ficar preso no spinner
+        if (!append && window.lastConversationListSignature === signature) {
+            // Se a lista já estava renderizada e não é append, evita ficar preso no spinner
             conversationsList.dataset.rendering = '0';
             conversationsList.dataset.loaded = conversationsList.dataset.loaded || '1';
             return;
         }
-        window.lastConversationListSignature = signature;
+        if (!append) {
+            window.lastConversationListSignature = signature;
+        }
         
         // Obter ID da conversa selecionada da URL atual
         const urlParams = new URLSearchParams(window.location.search);
@@ -11689,6 +11722,15 @@ function refreshConversationList(params = null, append = false) {
         // ✅ CORREÇÃO: Controlar flag de "tem mais conversas" (usa conversationPageSize = 50)
         conversationHasMore = conversations.length >= conversationPageSize;
         isLoadingConversations = false;
+        
+        // ✅ CORREÇÃO: Atualizar offset para a próxima página
+        // Incrementar pelo número de conversas recebidas (não pelo pageSize, que pode diferir)
+        if (append) {
+            conversationOffset += conversations.length;
+        } else {
+            conversationOffset = conversations.length;
+        }
+        console.log(`✅ Offset atualizado para ${conversationOffset}, hasMore=${conversationHasMore}`);
         
         const loadMoreBtn = document.getElementById('loadMoreConversationsBtn');
         if (loadMoreBtn) {
@@ -11755,7 +11797,8 @@ function loadMoreConversations() {
     }
     
     isLoadingConversations = true;
-    conversationOffset += conversationPageSize;  // ✅ Incrementar offset dinamicamente (50 conversas)
+    // ✅ CORREÇÃO: NÃO incrementar offset aqui. O offset já aponta para a próxima página
+    // (definido no init do PHP ou após cada append bem sucedido)
     
     const params = lastConversationsParams ? new URLSearchParams(lastConversationsParams.toString()) : new URLSearchParams(window.location.search);
     
@@ -11769,6 +11812,7 @@ function loadMoreConversations() {
         loadMoreBtn.disabled = true;
     }
     
+    console.log(`📄 Carregando mais conversas: offset=${conversationOffset}, limit=${conversationPageSize}`);
     refreshConversationList(params, true);  // ✅ append=true para não zerar a lista
 }
 

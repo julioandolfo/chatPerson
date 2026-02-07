@@ -75,6 +75,11 @@ class AutomationNode extends Model
                 'icon' => 'ki-bookmark',
                 'color' => '#181c32'
             ],
+            'condition_business_hours' => [
+                'label' => 'Horário de Atendimento',
+                'icon' => 'ki-time',
+                'color' => '#e67e22'
+            ],
             'delay' => [
                 'label' => 'Aguardar',
                 'icon' => 'ki-time',

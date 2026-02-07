@@ -46,6 +46,7 @@ use App\Controllers\AgentConversionController;
 use App\Controllers\CampaignController;
 use App\Controllers\ContactListController;
 use App\Controllers\DripSequenceController;
+use App\Controllers\MockupController;
 
 // Rotas públicas
 Router::get('/', function() {
@@ -172,6 +173,28 @@ Router::delete('/conversations/{id}/scheduled-messages/{messageId}', [Conversati
 Router::post('/conversations/{id}/reminders', [ConversationController::class, 'createReminder'], ['Authentication']);
 Router::get('/conversations/{id}/reminders', [ConversationController::class, 'getReminders'], ['Authentication']);
 Router::post('/reminders/{reminderId}/resolve', [ConversationController::class, 'resolveReminder'], ['Authentication']);
+
+// Rotas de Mockups (Gerador de Mockup com IA)
+Router::post('/api/conversations/{id}/mockups/generate', [MockupController::class, 'generate'], ['Authentication']);
+Router::post('/api/conversations/{id}/mockups/save-canvas', [MockupController::class, 'saveCanvas'], ['Authentication']);
+Router::get('/api/conversations/{id}/mockups', [MockupController::class, 'list'], ['Authentication']);
+Router::get('/api/conversations/{id}/images', [MockupController::class, 'getConversationImages'], ['Authentication']);
+Router::get('/api/mockups/{id}', [MockupController::class, 'get'], ['Authentication']);
+Router::post('/api/mockups/{id}/send-message', [MockupController::class, 'sendAsMessage'], ['Authentication']);
+Router::delete('/api/mockups/{id}', [MockupController::class, 'delete'], ['Authentication']);
+Router::post('/api/mockups/{id}/regenerate', [MockupController::class, 'regenerate'], ['Authentication']);
+// Rotas de Produtos
+Router::get('/api/mockup-products', [MockupController::class, 'listProducts'], ['Authentication']);
+Router::post('/api/mockup-products', [MockupController::class, 'createProduct'], ['Authentication']);
+Router::delete('/api/mockup-products/{id}', [MockupController::class, 'deleteProduct'], ['Authentication']);
+// Rotas de Logos
+Router::post('/api/conversations/{id}/logos/upload', [MockupController::class, 'uploadLogo'], ['Authentication']);
+Router::get('/api/conversations/{id}/logos', [MockupController::class, 'listLogos'], ['Authentication']);
+Router::delete('/api/logos/{id}', [MockupController::class, 'deleteLogo'], ['Authentication']);
+// Rotas de Templates
+Router::get('/api/mockup-templates', [MockupController::class, 'listTemplates'], ['Authentication']);
+Router::post('/api/mockup-templates', [MockupController::class, 'createTemplate'], ['Authentication']);
+Router::delete('/api/mockup-templates/{id}', [MockupController::class, 'deleteTemplate'], ['Authentication']);
 
 // Rotas de Busca Global
 Router::get('/search/global', [SearchController::class, 'global'], ['Authentication']);

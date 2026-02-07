@@ -3075,3 +3075,6 @@ console.log('✅ Função loadConversationSLA registrada');
 console.log('🔍 URL do endpoint SLA:', '<?= \App\Helpers\Url::to('/conversations/sla-details') ?>');*/
 </script>
 
+<!-- Galeria de Mockups -->
+<?php include __DIR__ . '/mockup-gallery.php'; ?>
+

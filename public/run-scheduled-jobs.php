@@ -76,6 +76,10 @@ function cronSaveHistory(): void
     // Manter apenas as últimas 200 execuções
     $history = array_slice($history, 0, 200);
     
+    $historyDir = dirname($cronHistoryFile);
+    if (!is_dir($historyDir)) {
+        @mkdir($historyDir, 0777, true);
+    }
     @file_put_contents($cronHistoryFile, json_encode($history, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 }
 

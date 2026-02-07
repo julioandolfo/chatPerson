@@ -48,9 +48,9 @@ COPY . .
 # Regenerar autoloader após copiar tudo
 RUN composer dump-autoload --optimize --no-dev --classmap-authoritative
 
-# Permissões (se for tipo Laravel, funciona; se não for, ignora com || true)
-RUN chown -R www-data:www-data /var/www/html \
- && (find storage -type d -print0 2>/dev/null | xargs -0 chmod 775 || true) \
- && (find bootstrap/cache -type d -print0 2>/dev/null | xargs -0 chmod 775 || true)
+# Criar diretórios obrigatórios e garantir permissões
+RUN mkdir -p storage/cache storage/logs storage/uploads bootstrap/cache \
+ && chown -R www-data:www-data /var/www/html \
+ && chmod -R 775 storage bootstrap/cache
 
 EXPOSE 80

@@ -7400,13 +7400,43 @@ function subscribeVisibleConversations() {
 /**
  * Atualizar tempos relativos de todas as conversas na lista
  */
+/**
+ * ✅ CORREÇÃO: Atualizar texto de tempo SEM apagar o dropdown de ações.
+ * O dropdown .conversation-item-actions fica DENTRO de .conversation-item-time,
+ * então usar textContent apaga o dropdown inteiro.
+ */
+function setTimeText(timeElement, timeText) {
+    if (!timeElement) return;
+    
+    const actionsDropdown = timeElement.querySelector('.conversation-item-actions');
+    
+    // Encontrar nó de texto existente
+    let timeTextNode = null;
+    for (const node of timeElement.childNodes) {
+        if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+            timeTextNode = node;
+            break;
+        }
+    }
+    
+    if (timeTextNode) {
+        timeTextNode.textContent = timeText;
+    } else if (actionsDropdown) {
+        // Inserir texto ANTES do dropdown
+        timeElement.insertBefore(document.createTextNode(timeText), actionsDropdown);
+    } else {
+        // Nenhum dropdown presente - seguro usar textContent
+        timeElement.textContent = timeText;
+    }
+}
+
 function updateConversationTimes() {
     const conversationItems = document.querySelectorAll('.conversation-item');
     conversationItems.forEach(item => {
         const timeElement = item.querySelector('.conversation-item-time');
         const updatedAt = item.getAttribute('data-updated-at');
         if (timeElement && updatedAt) {
-            timeElement.textContent = formatTime(updatedAt);
+            setTimeText(timeElement, formatTime(updatedAt));
         }
     });
 }
@@ -7687,7 +7717,7 @@ function applyConversationUpdate(conv) {
     if (time && (conv.last_message_at || conv.updated_at)) {
         // Não atualizar o tempo se dropdown estiver aberto (evita fechar)
         if (!wasOpen) {
-            time.textContent = formatTime(conv.last_message_at || conv.updated_at);
+            setTimeText(time, formatTime(conv.last_message_at || conv.updated_at));
         }
     }
 
@@ -7899,7 +7929,7 @@ function updateConversationListPreview(conversationId, lastMessage) {
             // Não atualizar o tempo se dropdown estiver aberto (evita fechar)
             if (!wasOpen) {
                 // Usar formatTime com o timestamp real da mensagem
-                time.textContent = formatTime(lastMessage.created_at);
+                setTimeText(time, formatTime(lastMessage.created_at));
             }
             // Atualizar data-updated-at para ordenação correta (sempre)
             conversationItem.setAttribute('data-updated-at', lastMessage.created_at);
@@ -9437,12 +9467,14 @@ function updateConversationSidebar(conversation, tags) {
         if (chatMergeAlert) chatMergeAlert.style.display = 'none';
     }
     
-    // ✅ Mostrar números vinculados (se conversa mesclada)
+    // ✅ Mostrar números vinculados e "Respondendo via" (se conversa mesclada)
+    const replyViaEl = document.getElementById('sidebar-reply-via');
     if (conversation.is_merged && conversation.linked_account_ids) {
-        loadLinkedAccounts(conversation.id);
+        loadLinkedAccounts(conversation.id, conversation.last_customer_account_id);
     } else {
         const linkedEl = document.getElementById('sidebar-linked-accounts');
         if (linkedEl) linkedEl.style.display = 'none';
+        if (replyViaEl) replyViaEl.style.display = 'none';
     }
 }
 
@@ -9520,9 +9552,11 @@ function dismissMergeAlert() {
 }
 
 // Carregar contas vinculadas (conversa mesclada)
-async function loadLinkedAccounts(conversationId) {
+async function loadLinkedAccounts(conversationId, lastCustomerAccountId = null) {
     const linkedEl = document.getElementById('sidebar-linked-accounts');
     const valueEl = linkedEl?.querySelector('[data-field="linked_accounts"]');
+    const replyViaEl = document.getElementById('sidebar-reply-via');
+    const replyPhoneEl = replyViaEl?.querySelector('[data-field="reply_via_phone"]');
     
     if (!linkedEl || !valueEl) return;
     
@@ -9536,17 +9570,37 @@ async function loadLinkedAccounts(conversationId) {
         
         const data = await response.json();
         
-        if (data.success && data.data && data.data.length > 1) {
-            // Pular o primeiro (é o principal)
-            const others = data.data.slice(1);
-            valueEl.textContent = others.map(a => a.phone_number).join(', ');
-            linkedEl.style.display = 'flex';
+        if (data.success && data.data && data.data.length > 0) {
+            const accounts = data.data;
+            
+            // Mostrar todos os números vinculados
+            if (accounts.length > 1) {
+                valueEl.textContent = accounts.map(a => a.phone_number || a.name).join(', ');
+                linkedEl.style.display = 'flex';
+            } else {
+                linkedEl.style.display = 'none';
+            }
+            
+            // Mostrar por qual número a resposta será enviada
+            if (replyViaEl && replyPhoneEl) {
+                let replyAccount = null;
+                if (lastCustomerAccountId) {
+                    replyAccount = accounts.find(a => a.id == lastCustomerAccountId);
+                }
+                if (!replyAccount) {
+                    replyAccount = accounts[0]; // Primeiro = principal
+                }
+                replyPhoneEl.textContent = replyAccount?.phone_number || replyAccount?.name || '-';
+                replyViaEl.style.display = accounts.length > 1 ? 'flex' : 'none';
+            }
         } else {
             linkedEl.style.display = 'none';
+            if (replyViaEl) replyViaEl.style.display = 'none';
         }
     } catch (error) {
         console.error('Erro ao carregar contas vinculadas:', error);
         linkedEl.style.display = 'none';
+        if (replyViaEl) replyViaEl.style.display = 'none';
     }
 }
 
@@ -14294,7 +14348,7 @@ function updateConversationInList(conversationId, lastMessage) {
         if (time) {
             // Usar formatTime para tempo relativo (Agora, 1min, etc)
             const timestamp = new Date().toISOString();
-            time.textContent = formatTime(timestamp);
+            setTimeText(time, formatTime(timestamp));
             // Atualizar data-updated-at
             conversationItem.setAttribute('data-updated-at', timestamp);
             // Atualizar dataset para SLA (mensagem do agente)
@@ -18260,7 +18314,7 @@ if (typeof window.wsClient !== 'undefined') {
             }
             if (time) {
                 const ts = data.message.created_at || new Date().toISOString();
-                time.textContent = formatTime(ts);
+                setTimeText(time, formatTime(ts));
                 conversationItem.setAttribute('data-updated-at', ts);
             }
             

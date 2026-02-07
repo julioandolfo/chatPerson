@@ -1064,6 +1064,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         </span>
                     </div>
                     
+                    <!-- Número de resposta (quando mesclado, mostra por qual número a resposta será enviada) -->
+                    <div class="sidebar-info-item" id="sidebar-reply-via" style="display: none;">
+                        <span class="sidebar-info-label">Respondendo via:</span>
+                        <span class="sidebar-info-value text-success fw-bold" data-field="reply_via_phone">-</span>
+                    </div>
+                    
                     <!-- Números vinculados (quando mesclado) -->
                     <div class="sidebar-info-item" id="sidebar-linked-accounts" style="display: none;">
                         <span class="sidebar-info-label">Outros Números:</span>

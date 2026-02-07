@@ -317,6 +317,28 @@ Router::post('/integrations/meta/whatsapp/add', [MetaIntegrationController::clas
 Router::post('/integrations/meta/test-message', [MetaIntegrationController::class, 'testMessage'], ['Authentication', 'Permission:integrations.manage']);
 Router::get('/integrations/meta/logs', [MetaIntegrationController::class, 'logs'], ['Authentication', 'Permission:integrations.view']);
 
+// ==================== ROTAS WHATSAPP CoEx ====================
+use App\Controllers\WhatsAppCoexController;
+
+// Página principal CoEx
+Router::get('/integrations/whatsapp-coex', [WhatsAppCoexController::class, 'index'], ['Authentication', 'Permission:integrations.view']);
+Router::get('/integrations/whatsapp-coex/templates', [WhatsAppCoexController::class, 'templates'], ['Authentication', 'Permission:integrations.view']);
+
+// Embedded Signup CoEx
+Router::post('/integrations/whatsapp-coex/embedded-signup', [WhatsAppCoexController::class, 'embeddedSignupCallback'], ['Authentication', 'Permission:integrations.manage']);
+
+// Status CoEx
+Router::get('/integrations/whatsapp-coex/status', [WhatsAppCoexController::class, 'getCoexStatus'], ['Authentication', 'Permission:integrations.view']);
+
+// Templates CRUD
+Router::post('/integrations/whatsapp-coex/templates/create', [WhatsAppCoexController::class, 'createTemplate'], ['Authentication', 'Permission:integrations.manage']);
+Router::post('/integrations/whatsapp-coex/templates/update', [WhatsAppCoexController::class, 'updateTemplate'], ['Authentication', 'Permission:integrations.manage']);
+Router::post('/integrations/whatsapp-coex/templates/submit', [WhatsAppCoexController::class, 'submitTemplate'], ['Authentication', 'Permission:integrations.manage']);
+Router::post('/integrations/whatsapp-coex/templates/check-status', [WhatsAppCoexController::class, 'checkTemplateStatus'], ['Authentication', 'Permission:integrations.view']);
+Router::post('/integrations/whatsapp-coex/templates/sync', [WhatsAppCoexController::class, 'syncTemplates'], ['Authentication', 'Permission:integrations.manage']);
+Router::post('/integrations/whatsapp-coex/templates/delete', [WhatsAppCoexController::class, 'deleteTemplate'], ['Authentication', 'Permission:integrations.manage']);
+Router::get('/integrations/whatsapp-coex/templates/get', [WhatsAppCoexController::class, 'getTemplate'], ['Authentication', 'Permission:integrations.view']);
+
 // Rotas de Integrações Api4Com
 Router::get('/integrations/api4com', [Api4ComController::class, 'index'], ['Authentication']);
 Router::post('/integrations/api4com', [Api4ComController::class, 'create'], ['Authentication']);

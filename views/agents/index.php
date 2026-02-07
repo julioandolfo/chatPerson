@@ -85,55 +85,133 @@ window.quickChangeAvailability = function(link) {
 };
 
 window.reassignConversations = function(element) {
-    const agentId = element.getAttribute("data-agent-id");
-    const agentName = element.getAttribute("data-agent-name") || "";
-    const conversationsCount = element.getAttribute("data-agent-conversations") || "0";
+    console.log("[Reassign] Abrindo modal de reatribuição");
+    var agentId = element.getAttribute("data-agent-id");
+    var agentName = element.getAttribute("data-agent-name") || "";
+    var conversationsCount = element.getAttribute("data-agent-conversations") || "0";
 
     document.getElementById("reassign_agent_id").value = agentId;
     document.getElementById("reassign_warning_text").textContent = 
-        `Esta ação irá redistribuir TODAS as conversas do agente "${agentName}" (incluindo ${conversationsCount} ativa(s) + histórico fechado) e atualizar os contatos.`;
+        "Esta ação irá redistribuir TODAS as conversas do agente \"" + agentName + "\" (incluindo " + conversationsCount + " ativa(s) + histórico fechado) e atualizar os contatos.";
 
     // Desmarcar todas as checkboxes
-    const checkboxes = document.querySelectorAll('.reassign-agent-checkbox');
-    checkboxes.forEach(checkbox => {
-        // Esconder o próprio agente da lista
+    var checkboxes = document.querySelectorAll(".reassign-agent-checkbox");
+    for (var i = 0; i < checkboxes.length; i++) {
+        var checkbox = checkboxes[i];
         if (checkbox.value === agentId) {
-            checkbox.closest('.form-check').style.display = 'none';
+            checkbox.closest(".form-check").style.display = "none";
             checkbox.checked = false;
         } else {
-            checkbox.closest('.form-check').style.display = 'block';
+            checkbox.closest(".form-check").style.display = "block";
             checkbox.checked = false;
         }
-    });
+    }
 
-    const modal = new bootstrap.Modal(document.getElementById("kt_modal_reassign_conversations"));
+    var modal = new bootstrap.Modal(document.getElementById("kt_modal_reassign_conversations"));
     modal.show();
 };
 
-window.reassignConversations = function(element) {
-    const agentId = element.getAttribute("data-agent-id");
-    const agentName = element.getAttribute("data-agent-name") || "";
-    const conversationsCount = element.getAttribute("data-agent-conversations") || "0";
-
-    document.getElementById("reassign_agent_id").value = agentId;
-    document.getElementById("reassign_warning_text").textContent = 
-        `Esta ação irá redistribuir TODAS as conversas do agente "${agentName}" (incluindo ${conversationsCount} ativa(s) + histórico fechado) e atualizar os contatos.`;
-
-    // Desmarcar todas as checkboxes
-    const checkboxes = document.querySelectorAll('.reassign-agent-checkbox');
-    checkboxes.forEach(checkbox => {
-        // Esconder o próprio agente da lista
-        if (checkbox.value === agentId) {
-            checkbox.closest('.form-check').style.display = 'none';
-            checkbox.checked = false;
-        } else {
-            checkbox.closest('.form-check').style.display = 'block';
-            checkbox.checked = false;
-        }
-    });
-
-    const modal = new bootstrap.Modal(document.getElementById("kt_modal_reassign_conversations"));
-    modal.show();
+window.handleReassignSubmit = function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("[Reassign] Submit interceptado!");
+    
+    var reassignForm = document.getElementById("kt_modal_reassign_conversations_form");
+    
+    // Validar que pelo menos um agente foi selecionado
+    var checked = document.querySelectorAll(".reassign-agent-checkbox:checked");
+    var errorDiv = document.getElementById("reassign_agents_error");
+    
+    console.log("[Reassign] Agentes selecionados:", checked.length);
+    
+    if (checked.length === 0) {
+        errorDiv.textContent = "Selecione pelo menos um agente para redistribuição";
+        errorDiv.style.display = "block";
+        return false;
+    }
+    
+    errorDiv.style.display = "none";
+    
+    var agentId = document.getElementById("reassign_agent_id").value;
+    var formData = new FormData(reassignForm);
+    var numTargetAgents = checked.length;
+    
+    console.log("[Reassign] Agent ID de origem:", agentId);
+    console.log("[Reassign] Agentes destino:", numTargetAgents);
+    
+    // 1. Fechar modal de configuração
+    var configModalElement = document.getElementById("kt_modal_reassign_conversations");
+    var configModal = bootstrap.Modal.getInstance(configModalElement);
+    if (configModal) {
+        configModal.hide();
+        console.log("[Reassign] Modal de configuração fechado");
+    }
+    
+    // 2. Mostrar modal de processamento
+    setTimeout(function() {
+        console.log("[Reassign] Abrindo modal de processamento...");
+        var processingModalElement = document.getElementById("kt_modal_reassign_processing");
+        var processingModal = new bootstrap.Modal(processingModalElement);
+        processingModal.show();
+        
+        document.getElementById("reassign_progress_text").textContent = "Redistribuindo conversas e contatos...";
+        
+        var url = "<?= \App\Helpers\Url::to('/agents') ?>/" + agentId + "/reassign-conversations";
+        console.log("[Reassign] Fazendo POST para:", url);
+        
+        // 3. Fazer requisição
+        fetch(url, {
+            method: "POST",
+            headers: {
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: formData
+        })
+        .then(function(response) {
+            console.log("[Reassign] Resposta recebida, status:", response.status);
+            return response.json();
+        })
+        .then(function(data) {
+            console.log("[Reassign] Dados:", data);
+            
+            // 4. Fechar modal de processamento
+            processingModal.hide();
+            
+            setTimeout(function() {
+                if (data.success) {
+                    console.log("[Reassign] Sucesso! Abrindo modal de resultados...");
+                    
+                    // 5. Preencher dados do resultado
+                    document.getElementById("reassign_result_message").innerHTML = data.message || "Operação concluída com sucesso!";
+                    document.getElementById("reassign_conversations_count").textContent = data.conversations_reassigned || 0;
+                    document.getElementById("reassign_contacts_count").textContent = data.contact_agents_updated || 0;
+                    document.getElementById("reassign_agents_count").textContent = numTargetAgents;
+                    
+                    // Mostrar aviso se agente foi desativado
+                    var deactivatedNotice = document.getElementById("reassign_agent_deactivated_notice");
+                    if (data.agent_deactivated) {
+                        deactivatedNotice.style.cssText = "display: flex !important;";
+                    } else {
+                        deactivatedNotice.style.cssText = "display: none !important;";
+                    }
+                    
+                    // 6. Mostrar modal de resultados
+                    var resultModal = new bootstrap.Modal(document.getElementById("kt_modal_reassign_result"));
+                    resultModal.show();
+                } else {
+                    console.error("[Reassign] Erro do servidor:", data.message);
+                    alert("Erro: " + (data.message || "Erro ao reatribuir conversas"));
+                }
+            }, 300);
+        })
+        .catch(function(error) {
+            console.error("[Reassign] Erro na requisição:", error);
+            processingModal.hide();
+            alert("Erro ao reatribuir conversas. Por favor, tente novamente.");
+        });
+    }, 400);
+    
+    return false;
 };
 
 window.deleteAgent = function(agentId, agentName) {
@@ -1156,142 +1234,7 @@ window.quickChangeAvailability = function(link) {
     modal.show();
 };
 
-// Função para reatribuir conversas
-window.reassignConversations = function(element) {
-    const agentId = element.getAttribute("data-agent-id");
-    const agentName = element.getAttribute("data-agent-name") || "";
-    const conversationsCount = element.getAttribute("data-agent-conversations") || "0";
-
-    document.getElementById("reassign_agent_id").value = agentId;
-    document.getElementById("reassign_warning_text").textContent = 
-        \`Esta ação irá redistribuir TODAS as conversas do agente "\${agentName}" (incluindo \${conversationsCount} ativa(s) + histórico fechado) e atualizar os contatos.\`;
-
-    // Desmarcar todas as checkboxes
-    const checkboxes = document.querySelectorAll(".reassign-agent-checkbox");
-    checkboxes.forEach(checkbox => {
-        // Esconder o próprio agente da lista
-        if (checkbox.value === agentId) {
-            checkbox.closest(".form-check").style.display = "none";
-            checkbox.checked = false;
-        } else {
-            checkbox.closest(".form-check").style.display = "block";
-            checkbox.checked = false;
-        }
-    });
-
-    const modal = new bootstrap.Modal(document.getElementById("kt_modal_reassign_conversations"));
-    modal.show();
-};
-
-window.deleteAgent = function(agentId, agentName) {
-    if (!confirm("Tem certeza que deseja deletar o agente \\"" + agentName + "\\"?\\n\\nEsta ação não pode ser desfeita.")) {
-        return;
-    }
-    
-    fetch("' . \App\Helpers\Url::to('/users') . '/" + agentId, {
-        method: "DELETE",
-        headers: {
-            "X-Requested-With": "XMLHttpRequest"
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            location.reload();
-        } else {
-            alert("Erro: " + (data.message || "Erro ao deletar agente"));
-        }
-    })
-    .catch(error => {
-        alert("Erro ao deletar agente");
-    });
-};
-
-// Função global para submit de reatribuição de conversas
-window.handleReassignSubmit = function(e) {
-    e.preventDefault();
-    
-    var reassignForm = document.getElementById("kt_modal_reassign_conversations_form");
-    
-    // Validar que pelo menos um agente foi selecionado
-    var checkboxes = document.querySelectorAll(".reassign-agent-checkbox:checked");
-    var errorDiv = document.getElementById("reassign_agents_error");
-    
-    if (checkboxes.length === 0) {
-        errorDiv.textContent = "Selecione pelo menos um agente para redistribuição";
-        errorDiv.style.display = "block";
-        return false;
-    }
-    
-    errorDiv.style.display = "none";
-    
-    var agentId = document.getElementById("reassign_agent_id").value;
-    var formData = new FormData(reassignForm);
-    var numTargetAgents = checkboxes.length;
-    
-    // 1. Fechar modal de configuração
-    var configModalElement = document.getElementById("kt_modal_reassign_conversations");
-    var configModal = bootstrap.Modal.getInstance(configModalElement);
-    if (configModal) {
-        configModal.hide();
-    }
-    
-    // 2. Aguardar fechamento e mostrar modal de processamento
-    setTimeout(function() {
-        var processingModalElement = document.getElementById("kt_modal_reassign_processing");
-        var processingModal = new bootstrap.Modal(processingModalElement);
-        processingModal.show();
-        
-        document.getElementById("reassign_progress_text").textContent = "Redistribuindo conversas e contatos...";
-        
-        // 3. Fazer requisição
-        fetch("' . \App\Helpers\Url::to('/agents') . '/" + agentId + "/reassign-conversations", {
-            method: "POST",
-            headers: {
-                "X-Requested-With": "XMLHttpRequest"
-            },
-            body: formData
-        })
-        .then(function(response) { return response.json(); })
-        .then(function(data) {
-            // 4. Fechar modal de processamento
-            processingModal.hide();
-            
-            setTimeout(function() {
-                if (data.success) {
-                    // 5. Preencher dados do resultado
-                    document.getElementById("reassign_result_message").innerHTML = data.message || "Operação concluída com sucesso!";
-                    document.getElementById("reassign_conversations_count").textContent = data.conversations_reassigned || 0;
-                    document.getElementById("reassign_contacts_count").textContent = data.contact_agents_updated || 0;
-                    document.getElementById("reassign_agents_count").textContent = numTargetAgents;
-                    
-                    // Mostrar aviso se agente foi desativado
-                    var deactivatedNotice = document.getElementById("reassign_agent_deactivated_notice");
-                    if (data.agent_deactivated) {
-                        deactivatedNotice.style.display = "flex";
-                        deactivatedNotice.style.cssText = "display: flex !important;";
-                    } else {
-                        deactivatedNotice.style.display = "none";
-                        deactivatedNotice.style.cssText = "display: none !important;";
-                    }
-                    
-                    // 6. Mostrar modal de resultados
-                    var resultModal = new bootstrap.Modal(document.getElementById("kt_modal_reassign_result"));
-                    resultModal.show();
-                } else {
-                    alert("Erro: " + (data.message || "Erro ao reatribuir conversas"));
-                }
-            }, 300);
-        })
-        .catch(function(error) {
-            processingModal.hide();
-            alert("Erro ao reatribuir conversas. Por favor, tente novamente.");
-            console.error(error);
-        });
-    }, 400);
-    
-    return false;
-};
+// As funções reassignConversations, handleReassignSubmit e deleteAgent estão definidas no bloco <script> inline do topo da página
 
 document.addEventListener("DOMContentLoaded", function() {
     const table = document.querySelector("#kt_agents_table");

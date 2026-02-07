@@ -9,6 +9,7 @@ use App\Models\Message;
 use App\Helpers\WebSocket;
 use App\Services\AvatarService;
 use App\Services\AutomationService;
+use App\Services\ConversationMergeService;
 
 /**
  * WhatsAppCloudService
@@ -230,6 +231,165 @@ class WhatsAppCloudService extends MetaIntegrationService
         $url = self::$baseUrl . "/{$apiVersion}/{$phoneNumberId}/whatsapp_business_profile";
         
         return self::makeRequest($url, $accessToken, 'GET');
+    }
+    
+    /**
+     * Enviar mensagem interativa (botões de resposta rápida)
+     */
+    public static function sendInteractiveMessage(
+        string $phoneNumberId,
+        string $to,
+        string $bodyText,
+        array $buttons,
+        string $accessToken,
+        ?string $headerText = null,
+        ?string $footerText = null
+    ): array {
+        self::initConfig();
+        
+        $config = self::$config['whatsapp'] ?? [];
+        $apiVersion = $config['api_version'] ?? self::$apiVersion;
+        
+        $url = self::$baseUrl . "/{$apiVersion}/{$phoneNumberId}/messages";
+        
+        $interactiveButtons = [];
+        foreach ($buttons as $i => $btn) {
+            $interactiveButtons[] = [
+                'type' => 'reply',
+                'reply' => [
+                    'id' => $btn['id'] ?? 'btn_' . $i,
+                    'title' => mb_substr($btn['text'] ?? $btn['title'] ?? '', 0, 20),
+                ],
+            ];
+        }
+        
+        $interactive = [
+            'type' => 'button',
+            'body' => ['text' => $bodyText],
+            'action' => ['buttons' => $interactiveButtons],
+        ];
+        
+        if ($headerText) {
+            $interactive['header'] = ['type' => 'text', 'text' => $headerText];
+        }
+        if ($footerText) {
+            $interactive['footer'] = ['text' => $footerText];
+        }
+        
+        $data = [
+            'messaging_product' => 'whatsapp',
+            'recipient_type' => 'individual',
+            'to' => $to,
+            'type' => 'interactive',
+            'interactive' => $interactive,
+        ];
+        
+        self::logInfo("Enviando mensagem interativa WhatsApp para: {$to}");
+        
+        try {
+            $response = self::makeRequest($url, $accessToken, 'POST', $data);
+            
+            self::logInfo("Mensagem interativa enviada com sucesso", [
+                'to' => $to,
+                'message_id' => $response['messages'][0]['id'] ?? null,
+            ]);
+            
+            return $response;
+            
+        } catch (\Exception $e) {
+            self::logError("Erro ao enviar mensagem interativa: {$e->getMessage()}");
+            throw $e;
+        }
+    }
+    
+    /**
+     * Enviar template a partir do banco local (usando WhatsAppTemplate model)
+     * 
+     * @param string $phoneNumberId Phone Number ID da Meta
+     * @param string $to Número de destino
+     * @param int $localTemplateId ID do template no banco local
+     * @param array $parameters Parâmetros para variáveis {{1}}, {{2}}, etc.
+     * @param string $accessToken Token de acesso
+     * @return array Resposta da API
+     */
+    public static function sendLocalTemplate(
+        string $phoneNumberId,
+        string $to,
+        int $localTemplateId,
+        array $parameters,
+        string $accessToken
+    ): array {
+        $template = \App\Models\WhatsAppTemplate::find($localTemplateId);
+        
+        if (!$template) {
+            throw new \Exception("Template #{$localTemplateId} não encontrado");
+        }
+        
+        if ($template['status'] !== 'APPROVED') {
+            throw new \Exception("Template '{$template['name']}' não está aprovado (status: {$template['status']})");
+        }
+        
+        $response = self::sendTemplateMessage(
+            $phoneNumberId,
+            $to,
+            $template['name'],
+            $template['language'],
+            $parameters,
+            $accessToken
+        );
+        
+        // Incrementar contagem de envio
+        \App\Models\WhatsAppTemplate::incrementSent($localTemplateId);
+        
+        return $response;
+    }
+    
+    /**
+     * Verificar se a conversa está na janela de 24h
+     * (Baseado na última mensagem recebida do contato)
+     * 
+     * @param int $conversationId ID da conversa
+     * @param int|null $viaAccountId Se informado, verifica janela apenas para mensagens 
+     *                               recebidas por este número específico (importante para conversas mescladas)
+     */
+    public static function isWithin24hWindow(int $conversationId, ?int $viaAccountId = null): bool
+    {
+        // Para conversas mescladas: verificar janela por número específico
+        if ($viaAccountId) {
+            $lastContactMessage = \App\Helpers\Database::fetch(
+                "SELECT sent_at FROM messages 
+                 WHERE conversation_id = ? AND sender_type = 'contact' AND via_account_id = ?
+                 ORDER BY sent_at DESC LIMIT 1",
+                [$conversationId, $viaAccountId]
+            );
+            
+            // Se tem mensagem nesse número, verificar janela
+            if ($lastContactMessage && !empty($lastContactMessage['sent_at'])) {
+                $lastMessageTime = strtotime($lastContactMessage['sent_at']);
+                $windowEnd = $lastMessageTime + (24 * 60 * 60);
+                return time() < $windowEnd;
+            }
+            
+            // Se não tem mensagem desse número, a janela NÃO está aberta para esse número
+            return false;
+        }
+        
+        // Fallback: verificar qualquer mensagem do contato
+        $lastContactMessage = \App\Helpers\Database::fetch(
+            "SELECT sent_at FROM messages 
+             WHERE conversation_id = ? AND sender_type = 'contact' 
+             ORDER BY sent_at DESC LIMIT 1",
+            [$conversationId]
+        );
+        
+        if (!$lastContactMessage || empty($lastContactMessage['sent_at'])) {
+            return false;
+        }
+        
+        $lastMessageTime = strtotime($lastContactMessage['sent_at']);
+        $windowEnd = $lastMessageTime + (24 * 60 * 60); // +24 horas
+        
+        return time() < $windowEnd;
     }
     
     /**
@@ -476,11 +636,59 @@ class WhatsAppCloudService extends MetaIntegrationService
             return;
         }
         
-        // Buscar ou criar conversa
-        $conversation = Conversation::whereFirst('contact_id', '=', $contact['id'], [
-            ['channel', '=', 'whatsapp'],
-            ['status', '!=', 'closed']
-        ]);
+        // ==================== BUSCAR OU CRIAR CONVERSA ====================
+        $integrationAccountId = $whatsappPhone['integration_account_id'] ?? null;
+        $conversation = null;
+        
+        // 1. PRIMEIRO: Verificar se existe conversa MESCLADA para este contato
+        //    (mesmo contato falou por outro número, conversas foram mescladas)
+        if ($integrationAccountId) {
+            $conversation = ConversationMergeService::findMergedConversation(
+                $contact['id'],
+                $integrationAccountId
+            );
+            
+            if ($conversation) {
+                self::logInfo("Conversa MESCLADA encontrada para Cloud API: #{$conversation['id']}", [
+                    'contact_id' => $contact['id'],
+                    'integration_account_id' => $integrationAccountId,
+                ]);
+                // Atualizar último número usado pelo cliente (para responder pelo número certo)
+                ConversationMergeService::updateLastCustomerAccount($conversation['id'], $integrationAccountId);
+            }
+        }
+        
+        // 2. Buscar conversa aberta DESTE número específico (integration_account_id)
+        if (!$conversation && $integrationAccountId) {
+            $conversation = \App\Helpers\Database::fetch(
+                "SELECT * FROM conversations 
+                 WHERE contact_id = ? AND channel = 'whatsapp' AND status != 'closed'
+                 AND integration_account_id = ?
+                 ORDER BY updated_at DESC LIMIT 1",
+                [$contact['id'], $integrationAccountId]
+            );
+        }
+        
+        // 3. Fallback: buscar qualquer conversa aberta do contato no WhatsApp
+        if (!$conversation) {
+            $conversation = Conversation::whereFirst('contact_id', '=', $contact['id'], [
+                ['channel', '=', 'whatsapp'],
+                ['status', '!=', 'closed']
+            ]);
+            
+            // Se encontrou conversa de OUTRO número, sincronizar o integration_account_id
+            if ($conversation && $integrationAccountId && 
+                !empty($conversation['integration_account_id']) && 
+                $conversation['integration_account_id'] != $integrationAccountId) {
+                self::logInfo("Cliente mudou de número na Cloud API", [
+                    'conversation_id' => $conversation['id'],
+                    'old_account' => $conversation['integration_account_id'],
+                    'new_account' => $integrationAccountId,
+                ]);
+                // Atualizar last_customer_account_id para responder pelo número certo
+                ConversationMergeService::updateLastCustomerAccount($conversation['id'], $integrationAccountId);
+            }
+        }
 
         // Trava: não criar conversa se a primeira mensagem for exatamente o nome do contato (caso sem mídia)
         if (
@@ -501,7 +709,7 @@ class WhatsAppCloudService extends MetaIntegrationService
                 'contact_id' => $contact['id'],
                 'channel' => 'whatsapp',
                 'status' => 'open',
-                'integration_account_id' => $whatsappPhone['integration_account_id'] ?? null,
+                'integration_account_id' => $integrationAccountId,
                 'started_at' => date('Y-m-d H:i:s', (int)$timestamp),
             ];
             
@@ -520,6 +728,7 @@ class WhatsAppCloudService extends MetaIntegrationService
         // Criar mensagem
         $messageCreateData = [
             'conversation_id' => $conversation['id'],
+            'via_account_id' => $integrationAccountId, // Rastrear por qual número a mensagem chegou
             'content' => $content,
             'sender_type' => 'contact',
             'sender_id' => $contact['id'],

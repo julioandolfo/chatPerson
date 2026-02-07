@@ -7,6 +7,7 @@ use App\Helpers\Request;
 use App\Services\MetaIntegrationService;
 use App\Services\InstagramGraphService;
 use App\Services\WhatsAppCloudService;
+use App\Services\WhatsAppCoexService;
 
 /**
  * MetaWebhookController
@@ -112,8 +113,8 @@ class MetaWebhookController
                     break;
                     
                 case 'whatsapp_business_account':
-                    // Webhook do WhatsApp
-                    WhatsAppCloudService::processWebhook($payload);
+                    // Webhook do WhatsApp - processar por tipo de campo
+                    $this->processWhatsAppWebhook($payload);
                     break;
                     
                 case 'page':
@@ -128,6 +129,123 @@ class MetaWebhookController
             
         } catch (\Exception $e) {
             error_log("Erro ao processar webhook Meta: {$e->getMessage()}");
+        }
+    }
+    
+    /**
+     * Processar webhook do WhatsApp Business Account
+     * Roteia para o serviço correto baseado no campo do change
+     */
+    private function processWhatsAppWebhook(array $payload): void
+    {
+        $entries = $payload['entry'] ?? [];
+        
+        // Detectar quais campos estão presentes para rotear
+        $hasMessages = false;
+        $hasCoexFields = false;
+        $coexFields = [];
+        
+        foreach ($entries as $entry) {
+            $changes = $entry['changes'] ?? [];
+            foreach ($changes as $change) {
+                $field = $change['field'] ?? '';
+                
+                switch ($field) {
+                    case 'messages':
+                        $hasMessages = true;
+                        break;
+                    case 'smb_message_echoes':
+                    case 'smb_app_state_sync':
+                    case 'business_capability_update':
+                    case 'account_update':
+                    case 'history':
+                        $hasCoexFields = true;
+                        $coexFields[] = $field;
+                        break;
+                    case 'message_template_status_update':
+                    case 'message_template_quality_update':
+                        // Processar atualizações de status de template
+                        $this->processTemplateStatusWebhook($change);
+                        break;
+                }
+            }
+        }
+        
+        // Processar mensagens normais (Cloud API)
+        if ($hasMessages) {
+            WhatsAppCloudService::processWebhook($payload);
+        }
+        
+        // Processar campos CoEx
+        if ($hasCoexFields) {
+            foreach ($coexFields as $field) {
+                switch ($field) {
+                    case 'smb_message_echoes':
+                        WhatsAppCoexService::processSmbMessageEchoes($payload);
+                        break;
+                    case 'smb_app_state_sync':
+                        WhatsAppCoexService::processSmbAppStateSync($payload);
+                        break;
+                    case 'business_capability_update':
+                        WhatsAppCoexService::processBusinessCapabilityUpdate($payload);
+                        break;
+                    case 'account_update':
+                        WhatsAppCoexService::processAccountUpdate($payload);
+                        break;
+                    case 'history':
+                        WhatsAppCoexService::processHistoryWebhook($payload);
+                        break;
+                }
+            }
+        }
+        
+        // Se não tinha campos específicos, processar genérico
+        if (!$hasMessages && !$hasCoexFields) {
+            WhatsAppCloudService::processWebhook($payload);
+        }
+    }
+    
+    /**
+     * Processar webhook de atualização de status de template
+     */
+    private function processTemplateStatusWebhook(array $change): void
+    {
+        try {
+            $value = $change['value'] ?? [];
+            $templateId = $value['message_template_id'] ?? null;
+            $status = $value['event'] ?? null;
+            $reason = $value['reason'] ?? null;
+            
+            if ($templateId) {
+                $template = \App\Models\WhatsAppTemplate::findByTemplateId($templateId);
+                if ($template) {
+                    $updateData = ['last_synced_at' => date('Y-m-d H:i:s')];
+                    
+                    // Mapear evento para status
+                    $statusMap = [
+                        'APPROVED' => 'APPROVED',
+                        'REJECTED' => 'REJECTED',
+                        'PENDING_DELETION' => 'DISABLED',
+                        'DISABLED' => 'DISABLED',
+                        'FLAGGED' => 'PAUSED',
+                        'REINSTATED' => 'APPROVED',
+                    ];
+                    
+                    if (isset($statusMap[$status])) {
+                        $updateData['status'] = $statusMap[$status];
+                    }
+                    
+                    if ($reason) {
+                        $updateData['rejection_reason'] = $reason;
+                    }
+                    
+                    \App\Models\WhatsAppTemplate::update($template['id'], $updateData);
+                    
+                    error_log("Template {$template['name']} atualizado via webhook: {$status}");
+                }
+            }
+        } catch (\Exception $e) {
+            error_log("Erro ao processar template status webhook: {$e->getMessage()}");
         }
     }
     

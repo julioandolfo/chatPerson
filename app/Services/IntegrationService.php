@@ -20,6 +20,10 @@ class IntegrationService
                 return new NotificameService();
             case 'whatsapp_official':
                 return new WhatsAppOfficialService();
+            case 'meta_coex':
+            case 'meta_cloud':
+                // WhatsApp Cloud API (CoEx / API Oficial Meta)
+                return new WhatsAppCloudApiService();
             case 'quepasa':
             case 'evolution':
                 return new WhatsAppService();
@@ -66,6 +70,10 @@ class IntegrationService
                 $service->processWebhook($payload);
                 return;
             }
+        } elseif (in_array($provider, ['meta_coex', 'meta_cloud'])) {
+            // WhatsApp Cloud API (CoEx) - webhooks processados pelo MetaWebhookController
+            WhatsAppCloudService::processWebhook($payload);
+            return;
         } elseif (in_array($provider, ['quepasa', 'evolution'])) {
             if (method_exists($service, 'processWebhook')) {
                 $service->processWebhook($payload);

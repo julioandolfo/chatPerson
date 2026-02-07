@@ -530,11 +530,19 @@
                         <?php endif; ?>
                         <?php if (\App\Helpers\Permission::can('integrations.view')): ?>
                         <div class="menu-item">
-                            <a class="menu-link <?= isActive('/integrations/meta', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/integrations/meta') ?>">
+                            <a class="menu-link <?= isActive('/integrations/meta', $currentUri) && !isActive('/integrations/whatsapp-coex', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/integrations/meta') ?>">
                                 <span class="menu-bullet">
                                     <span class="bullet bullet-dot"></span>
                                 </span>
                                 <span class="menu-title">Meta (Instagram + WhatsApp)</span>
+                            </a>
+                        </div>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/integrations/whatsapp-coex', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/integrations/whatsapp-coex') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">WhatsApp CoEx (API Oficial)</span>
                             </a>
                         </div>
                         <?php endif; ?>

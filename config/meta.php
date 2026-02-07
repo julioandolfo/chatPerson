@@ -91,10 +91,21 @@ return [
             'message_reactions',
             'messaging_seen',
             
-            // WhatsApp
+            // WhatsApp - Mensagens
             'messages',
             'message_status',
             'messaging_postbacks',
+            
+            // WhatsApp - CoEx (Coexistence)
+            'smb_message_echoes',          // Eco de mensagens enviadas pelo app WhatsApp Business
+            'smb_app_state_sync',          // Sincronização de estado (leituras, etc.) entre app e API
+            'business_capability_update',  // Atualização de capacidades quando CoEx é ativado
+            'account_update',              // Notificação quando Embedded Signup é concluído
+            'history',                     // Importação de histórico de conversas (até 6 meses)
+            
+            // WhatsApp - Templates
+            'message_template_status_update',   // Mudanças de status de templates
+            'message_template_quality_update',  // Mudanças de qualidade de templates
         ],
     ],
     

@@ -34,6 +34,12 @@ class WhatsAppPhone extends Model
         'templates_count',
         'last_template_sync_at',
         'disconnected_at',
+        // Campos CoEx (Coexistence)
+        'coex_enabled',
+        'coex_status',
+        'coex_capabilities',
+        'coex_activated_at',
+        'coex_history_synced',
     ];
     
     /**
@@ -194,6 +200,41 @@ class WhatsAppPhone extends Model
     public static function hasGoodQuality(array $phone): bool
     {
         return in_array($phone['quality_rating'], ['GREEN', 'UNKNOWN']);
+    }
+    
+    // ==================== MÉTODOS CoEx ====================
+    
+    /**
+     * Verificar se o número tem CoEx ativo
+     */
+    public static function isCoexEnabled(array $phone): bool
+    {
+        return !empty($phone['coex_enabled']) && ($phone['coex_status'] ?? '') === 'active';
+    }
+    
+    /**
+     * Obter números com CoEx ativo
+     */
+    public static function getCoexActive(): array
+    {
+        $all = self::all();
+        return array_filter($all, function($phone) {
+            return self::isCoexEnabled($phone) && $phone['is_active'] && $phone['is_connected'];
+        });
+    }
+    
+    /**
+     * Obter capabilities CoEx decodificadas
+     */
+    public static function getCoexCapabilities(array $phone): array
+    {
+        if (empty($phone['coex_capabilities'])) {
+            return [];
+        }
+        if (is_string($phone['coex_capabilities'])) {
+            return json_decode($phone['coex_capabilities'], true) ?? [];
+        }
+        return is_array($phone['coex_capabilities']) ? $phone['coex_capabilities'] : [];
     }
 }
 
